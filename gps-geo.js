@@ -969,6 +969,79 @@
         return defaultTarget(Object.assign({}, o, { line: line }));
     }
 
+    // ---- THE TEE SHOT AT THE GOLFER'S DRIVER (023c, Manny 2026-10-20: "the line from the tee
+    // should land IN THE FAIRWAY at MY driver distance, then on to the green") ----------------
+    // From the tee, along the hole's centre line (`line`: the hole path, tee first - a dogleg
+    // bends it), `driverM` metres - the golfer's driver carry - snapped to the fairway. It STOPS
+    // SHORT, at the first of: the dogleg's corner (a turn of PATH_MIN_TURN_DEG+), the end of the
+    // fairway on the line (when the hole has fairway rings and the line runs through them), or
+    // TEE_HAZARD_SHORT_YD short of a water / bunker point on the line (within TEE_HAZARD_LINE_M
+    // of it). Never closer than MIN_LEFT_YD to the green. Par 3: the green, no tee shot.
+    //   o: { par, tee, mid, line?, fairway? (rings), hazards? ([{ type, side, pt }]), driverM }
+    //   -> { pt, alongM, wantM, stop: null | 'corner' | 'fairway' | 'hazard' | 'green',
+    //        hazard?: { type, atM }, par3? }   Pure.
+    var TEE_HAZARD_SHORT_YD = 10, TEE_HAZARD_LINE_M = 25, TEE_HAZARD_TYPES = { w: 'water', fb: 'bunker', b: 'bunker' };
+    function teeTarget(o) {
+        if (!o || !pinPt(o.mid)) return null;
+        if (Number(o.par) === 3) return { pt: o.mid, par3: true, stop: null };
+        var tee = pinPt(o.tee);
+        if (!tee) return null;
+        var line = (o.line && o.line.length >= 2) ? o.line.slice() : [tee, o.mid];
+        var a0 = alongLine(tee, line);
+        if (a0.t === 0 && a0.d > 5) line = [tee].concat(line);
+        if (haversineMeters(line[line.length - 1], o.mid) > 5) line = line.concat([o.mid]);
+        var total = polyLen(line);
+        var wantM = Math.max(0, Number(o.driverM) || DEFAULT_SHOT_YD * M_PER_YD);
+        var room = total - MIN_LEFT_YD * M_PER_YD;
+        if (room <= 0) return { pt: o.mid, alongM: total, wantM: wantM, stop: 'green' };
+        var stops = [];
+        if (wantM > room) stops.push({ at: room, stop: 'green' });
+        // The dogleg: the first corner the drive would pass.
+        var run = 0;
+        for (var i = 1; i + 1 < line.length; i++) {
+            run += haversineMeters(line[i - 1], line[i]);
+            if (turnAt(line[i - 1], line[i], line[i + 1]) >= PATH_MIN_TURN_DEG && run > 60 * M_PER_YD && run < Math.min(wantM, room)) { stops.push({ at: run, stop: 'corner' }); break; }
+        }
+        // The fairway's end on the line: the last spot inside a fairway before the drive lands outside it.
+        var rings = (o.fairway || []).filter(function (r) { return r && r.length >= 3; });
+        if (rings.length) {
+            var inFw = function (m) { var q = pointAlongHole(line, tee, m); return !!q && rings.some(function (r) { return pointInRing(q, r); }); };
+            var landM = Math.min(wantM, room);
+            if (!inFw(landM)) {
+                var lastIn = null;
+                for (var m = 100 * M_PER_YD; m < landM; m += 3) if (inFw(m)) lastIn = m;
+                if (lastIn != null) stops.push({ at: lastIn, stop: 'fairway' });
+            }
+        }
+        // Water / a bunker on the line, before the drive lands: 10 yds short of its near edge.
+        (o.hazards || []).forEach(function (z) {
+            var pt = z && pinPt(z.pt);
+            if (!pt || !TEE_HAZARD_TYPES[z.type]) return;
+            var al = alongLine(pt, line);
+            if (al.d > TEE_HAZARD_LINE_M) return;
+            var atM = al.t * total;
+            if (atM <= 40 * M_PER_YD || atM > Math.min(wantM, room) + 2) return;
+            stops.push({ at: Math.max(0, atM - TEE_HAZARD_SHORT_YD * M_PER_YD), stop: 'hazard', hazard: { type: z.type, atM: atM } });
+        });
+        stops.sort(function (a, b) { return a.at - b.at; });
+        var s0 = stops[0], alongM = s0 ? s0.at : wantM;
+        var pt = pointAlongHole(line, tee, alongM) || o.mid;
+        // In the fairway when it is mapped (not past a hazard / corner stop: those keep the line).
+        if (!s0 || s0.stop === 'green') pt = snapToFairway(pt, rings);
+        var out = { pt: pt, alongM: alongM, wantM: wantM, stop: s0 ? s0.stop : null };
+        if (s0 && s0.hazard) out.hazard = s0.hazard;
+        return out;
+    }
+    // The note under a stopped drive: "lay up 270 · water at 285" (yards or metres, unitM).
+    function teeTargetNote(t, unitM) {
+        if (!t || !t.stop || t.stop === 'green' || t.par3) return '';
+        var u = unitM || M_PER_YD, n = function (m) { return Math.round(m / u); };
+        if (t.stop === 'hazard' && t.hazard) return 'lay up ' + n(t.alongM) + ' \u00b7 ' + (TEE_HAZARD_TYPES[t.hazard.type] || 'hazard') + ' at ' + n(t.hazard.atM);
+        if (t.stop === 'corner') return 'lay up ' + n(t.alongM) + ' \u00b7 the corner';
+        if (t.stop === 'fairway') return 'lay up ' + n(t.alongM) + ' \u00b7 fairway ends';
+        return '';
+    }
+
     // WHERE THE NUMBERS ARE MEASURED FROM. The golfer, when they are on or near
     // the hole; the TEE when they are more than offYards from the green, or have
     // no fix at all (planning a hole from the clubhouse, or a GPS that has not
@@ -2060,6 +2133,7 @@
         return haversineMeters(loc, g) <= (maxM || 2000);
     }
     var api = {
+        teeTarget: teeTarget, teeTargetNote: teeTargetNote, TEE_HAZARD_SHORT_YD: TEE_HAZARD_SHORT_YD,
         courseGps: courseGps, holeOneNear: holeOneNear,
         courseNameWords: courseNameWords, golfCoursesQuery: golfCoursesQuery, pickGolfCourse: pickGolfCourse,
         defaultTarget: defaultTarget, pointAlongHole: pointAlongHole, snapToFairway: snapToFairway, lengthAlong: lengthAlong, simplifyLine: simplifyLine,

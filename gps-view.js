@@ -1688,6 +1688,33 @@
     // until the hole changes or Recenter. Dragging it does not pan the map (a
     // marker drag belongs to the marker); a drag anywhere else pans.
     function pathTargetOn() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('pathTarget') !== false; } catch (e) { return true; } }
+    // THE TEE SHOT AT THE GOLFER'S DRIVER (023c): from the tee (or within 40 yds of it), the
+    // target is the golfer's driver carry along the hole's line, in the fairway - stopping short
+    // at a dogleg's corner, the fairway's end, or 10 yds short of water / a bunker on the line
+    // (gps-geo.teeTarget). The carry: My bag's Driver, else the bag setup's default for the
+    // golfer's handicap; through the same air as the main number (altitude baseline, temperature,
+    // wind - playsAir) so a thin-air drive goes further on the ground. All on the phone.
+    var TEE_SHOT_YD = 40;
+    function driverCarryYd() {
+        var B = bagApi();
+        // My bag lives in gps-shots.js, read on first use: load it, then place the tee shot again.
+        if (!B) { if (S && !S.teeLoad) { S.teeLoad = true; var mine = S; withShots(function () { if (S === mine && !S.targetMoved) { placeTarget(resolved()); render(); } }); } return null; }
+        var b = null; try { b = bagSwitch() ? B.bag(bagGolfer()) : null; } catch (e) { b = null; }
+        if (b && b.Dr && b.Dr.yd > 0) return { yd: b.Dr.yd, own: true };
+        try { var dc = B.defaultCarries(bagHcp()); if (dc && dc.Dr > 0) return { yd: dc.Dr, own: false }; } catch (e) {}
+        return null;
+    }
+    function driverGroundM(r, carryYd) {
+        var m = carryYd * G.M_PER_YD;
+        if (tournament() || !S.pro || !r.tee || !r.mid || !inUS(r.tee)) return m;
+        try {
+            var q = playsAir(effectiveWind(), r), e = ptElev(r, r.tee, 'tee');
+            q.yards = carryYd; q.elevFromFt = e; q.elevToFt = e; q.shotBearingDeg = G.bearingDeg(r.tee, r.mid);
+            var pl = G.playsLike(q);
+            if (pl && pl.exact > 0) return m * Math.max(0.85, Math.min(1.15, carryYd / pl.exact));
+        } catch (e2) {}
+        return m;
+    }
     function placeTarget(r) {
         if (!S || S.targetMoved || !S.pro) return;
         var center = aimAt(r), o = origin(r);
@@ -1697,6 +1724,15 @@
             par: S.par, tee: r.tee, mid: center, line: osmPathFor(S.hole) || (rec && rec.line), fairway: rec && rec.fairway,
             from: o.from === 'me' ? 'me' : 'tee', pt: o.pt
         };
+        S.teeShot = null;
+        var onTee = r.tee && (o.from === 'tee' || (o.pt && G.haversineMeters(o.pt, r.tee) <= TEE_SHOT_YD * G.M_PER_YD));
+        var dc = onTee && Number(S.par) !== 3 && G.teeTarget ? driverCarryYd() : null;
+        if (dc) {
+            var hp = G.holePath ? G.holePath({ tee: r.tee, mid: center, line: opts.line, fairway: opts.fairway, hazards: rec && rec.hazards }) : null;
+            var tt = G.teeTarget({ par: S.par, tee: r.tee, mid: center, line: hp && hp.pts && hp.pts.length >= 2 && hp.src !== 'target' ? hp.pts : opts.line,
+                fairway: opts.fairway, hazards: rec && rec.hazards, driverM: driverGroundM(r, dc.yd) });
+            if (tt && tt.pt && !tt.par3) { S.target = tt.pt; S.teeShot = { carryYd: dc.yd, own: dc.own, t: tt }; return; }
+        }
         // 009 (switch pathTarget): on the hole's path - at the dogleg when its corner is
         // in the landing zone (gps-geo.pathTarget). Never bent by a dragged target.
         var p = pathTargetOn() && r.tee && G.pathTarget
@@ -1815,6 +1851,9 @@
         if (lbl) {
             lbl.style.display = '';
             var w = units() === 'm' ? Math.round(2 * TARGET_RADIUS_YD * G.M_PER_YD) + ' m' : (2 * TARGET_RADIUS_YD) + ' yd';
+            // 023c: a drive that stops short says why ("lay up 270 · water at 285").
+            var note = S.teeShot && !S.targetMoved && G.teeTargetNote ? G.teeTargetNote(S.teeShot.t, units() === 'm' ? 1 : G.M_PER_YD) : '';
+            if (note) w = note;
             if (lbl.textContent !== w) lbl.textContent = w;
             var lw = lbl.offsetWidth || 36, lh = lbl.offsetHeight || 14;
             var ux = Math.cos(ang * Math.PI / 180), uy = Math.sin(ang * Math.PI / 180);
@@ -2206,12 +2245,13 @@
         // default: the target IS the center, and the single distance is enough).
         if (aim && !onCenter) {
             var eOn = edgeOf(aim, S.target);
-            if (eOn) put(pOn, P(eOn), P(aim), G.shownDistance(G.haversineMeters(S.target, aim), u));
+            // 023c: "120 left" after a tee shot - layout D writes the unit after the number (data-u), so there "left" rides with it.
+            if (eOn) put(pOn, P(eOn), P(aim), G.shownDistance(G.haversineMeters(S.target, aim), u) + (S.teeShot && !S.targetMoved && !ldOn() ? ' left' : ''));
         }
         // To the target, on the you / tee -> circle line (the incoming line).
         if (o) {
             var eTo = edgeOf(o.pt, S.target);
-            if (eTo) put(pTo, P(o.pt), P(eTo), G.shownDistance(G.haversineMeters(o.pt, S.target), u));
+            if (eTo) put(pTo, P(o.pt), P(eTo), (S.teeShot && !S.targetMoved ? 'Driver ' : '') + G.shownDistance(G.haversineMeters(o.pt, S.target), u));
         }
         placeArcLabels(obstacles);
     }
@@ -4351,7 +4391,10 @@
         var mb = S.el.querySelector('.gps-mark-shot');
         if (mb && mb.textContent.indexOf('📍') === 0) mb.textContent = '◎' + mb.textContent.slice(2);
         var u = units() === 'm' ? 'm' : 'y';
-        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on'), function (p) { if (p.getAttribute('data-u') !== u) p.setAttribute('data-u', u); });
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on'), function (p) {
+            var uu = u + (p.classList.contains('gps-pill-on') && S.teeShot && !S.targetMoved ? ' left' : '');   // 023c: "170y left"
+            if (p.getAttribute('data-u') !== uu) p.setAttribute('data-u', uu);
+        });
         var pill = S.el.querySelector('.gps-ld-plays');
         if (pill) {
             var p = ldPlays(r, o, nums);
