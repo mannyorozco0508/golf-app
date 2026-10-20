@@ -112,11 +112,12 @@ test('009 path priority: a drawn centerline, else the dragged target, else the f
 });
 const south = (p, m) => north(p, -m);
 
-test('009 the flight: starts on the whole hole, glides the path turning at the dogleg, ends on the green with F / C / B, 4-6 s', () => {
+test('009/023b the flight: starts on the whole hole, glides the path LOW turning at the dogleg, ends on the green with F / C / B; par 4 = 5.5 s + a hold', () => {
     const path = geo.holePath({ tee: TEE, mid: GREEN, line: [TEE, CORNER, GREEN] }).pts;
     const front = west(GREEN, 12), back = east(GREEN, 12), green = ring(GREEN, 15);
     const plan = geo.flyoverPlan({ path, green, pins: [front, GREEN, back], view: VIEW, pad: PAD, maxZoom: 19 });
-    assert.ok(plan.ms >= 4000 && plan.ms <= 6000, 'duration ' + plan.ms);
+    // 023b: by par - a par 4 (the default) flies 5-6 s, then holds on the green.
+    assert.ok(plan.flyMs >= 5000 && plan.flyMs <= 6000 && plan.ms === plan.flyMs + plan.holdMs && plan.holdMs >= 800 && plan.holdMs <= 1500, 'duration ' + plan.flyMs + ' + ' + plan.holdMs);
     const c0 = geo.flyoverCamera(plan, 0), c1 = geo.flyoverCamera(plan, 1);
     assert.ok(inside(c0, [TEE, CORNER, GREEN].concat(green), VIEW, PAD), 'the start shows the whole hole: tee, corner, green');
     close(c0.pitch, 0, 0.01, 'flat at the start');
@@ -124,10 +125,12 @@ test('009 the flight: starts on the whole hole, glides the path turning at the d
     assert.ok(!inside(c1, [TEE], VIEW, PAD), 'the end is the green, not the whole hole again');
     assert.ok(c1.zoom > c0.zoom + 0.5, 'closer on the green than the whole hole: ' + c0.zoom + ' -> ' + c1.zoom);
     close(c1.pitch, 0, 0.01, 'flat at the end');
-    // The glide: zoomed out (fairway + hazards wide), never closer than 1.2 steps inside the whole hole.
-    assert.ok(plan.glideZoom >= c0.zoom && plan.glideZoom <= c0.zoom + 1.2 + 1e-9, 'glide height ' + plan.glideZoom + ' vs start ' + c0.zoom);
+    // 023b, the glide: LOW - the corridor (the fairway, ~40 yds with no outline, + 25 yds of rough each
+    // side) fills the screen's width; well inside the whole-hole view (2+ zoom steps here).
     const mpp = (z) => geo.EARTH_RADIUS_M * 2 * Math.PI * Math.cos(TEE[0] * Math.PI / 180) / (512 * Math.pow(2, z));
-    assert.ok(mpp(plan.glideZoom) * (VIEW.w - PAD.left - PAD.right) >= 119, 'at least 120 m across: ' + mpp(plan.glideZoom) * 238);
+    close(mpp(plan.glideZoom) * VIEW.w, plan.corridorM, 1, 'the corridor fills the screen edge to edge');
+    close(plan.corridorM, 2 * (18 + 25 * 0.9144), 0.5, 'no fairway outline: ~40 yds + 25 yds of rough each side');
+    assert.ok(plan.glideZoom >= c0.zoom + 1.5, 'a low pass - lower than 009\'s cap (1.2 steps inside the whole hole): ' + c0.zoom + ' -> ' + plan.glideZoom);
     // Samples: it passes the corner, the bearing turns with the dogleg, it never steps back.
     let nearCorner = Infinity, prev = -1, tilted = 0;
     const bAt = [];
@@ -140,7 +143,8 @@ test('009 the flight: starts on the whole hole, glides the path turning at the d
     }
     assert.ok(nearCorner < 25, 'the camera passes over the dogleg: ' + nearCorner);
     assert.ok(tilted >= 30, 'tilted while gliding: ' + tilted);
-    const first = bAt.filter((x) => x.t > 0.36 && x.s < 0.3)[0], after = bAt.filter((x) => x.s > 0.8 && x.t < 0.7).pop();
+    const fly = (x) => x.t * plan.ms / plan.flyMs;
+    const first = bAt.filter((x) => x.s > 0.1 && x.s < 0.3)[0], after = bAt.filter((x) => x.s > 0.8 && fly(x) < 0.8).pop();
     assert.ok(first && (first.b < 10 || first.b > 350), 'the first leg looks north: ' + JSON.stringify(first));
     assert.ok(after && after.b > 50 && after.b < 100, 'after the corner it looks east: ' + JSON.stringify(after));
     // Smooth: no jump of more than 6 degrees between two 1/200 samples.
@@ -150,6 +154,13 @@ test('009 the flight: starts on the whole hole, glides the path turning at the d
     for (let i = 0; i <= 20; i++) { const b = geo.flyoverCamera(sp, i / 20).bearing; assert.ok(b < 0.5 || b > 359.5, 'straight: ' + b); }
     assert.equal(geo.flyoverPlan({ path: [TEE] }), null);
     assert.equal(geo.flyoverCamera(null, 0.5), null);
+    // 023b: a par 3 = 3 s, a par 5 = 7-8 s (+ the hold); a fairway outline sets the corridor's width.
+    const p3 = geo.flyoverPlan({ path: [TEE, north(TEE, 150)], green: ring(north(TEE, 150), 15), par: 3, view: VIEW, pad: PAD, maxZoom: 19 });
+    const p5 = geo.flyoverPlan({ path: [TEE, north(TEE, 480)], green: ring(north(TEE, 480), 15), par: 5, view: VIEW, pad: PAD, maxZoom: 19 });
+    assert.equal(p3.flyMs, 3000); assert.ok(p5.flyMs >= 7000 && p5.flyMs <= 8000, 'par 5 ' + p5.flyMs);
+    const fw = [west(north(TEE, 100), 25), east(north(TEE, 100), 25), east(north(TEE, 300), 25), west(north(TEE, 300), 25)];
+    const pf = geo.flyoverPlan({ path: [TEE, north(TEE, 380)], green: ring(north(TEE, 380), 15), fairway: [fw], view: VIEW, pad: PAD, maxZoom: 19 });
+    close(pf.corridorM, 2 * (25 + 25 * 0.9144), 0.5, 'a 50 m fairway + 25 yds each side');
 });
 
 test('009 the dragged target bends the flight: tee -> target -> green', () => {
