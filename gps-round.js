@@ -332,6 +332,8 @@
         var go = function () {
             var H = window.HardPanDoors;
             if (!has && c && H && typeof H.forgetRound === 'function') { try { H.forgetRound(c, false); } catch (e) {} }
+            // URGENT-028: "New round" was the answer - Start Round on Course & Tees does not ask again.
+            if (has && c) { try { sessionStorage.setItem('hardpan_change_from', String(c).toUpperCase()); } catch (e) {} }
             window.location.href = 'home.html#gpsdoor';
         };
         if (!has || typeof window.uiConfirm !== 'function') { go(); return true; }
