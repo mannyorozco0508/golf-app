@@ -143,7 +143,7 @@
         var d = null; try { d = W.firebase && W.firebase.database ? W.firebase.database() : null; } catch (e) { d = null; }
         if (!d || GPSK.asked) { fin(); return; }
         GPSK.asked = true;
-        var left = 3, end = function () { if (--left === 0) { C.list = null; GA.t = null; fin(); } };
+        var left = 3, end = function () { if (--left === 0) { C.list = null; CR.rows = null; GA.t = null; fin(); } };
         var read = function (path, put) {
             var t = setTimeout(function () { put({}); t = null; end(); }, 6000);
             try {
@@ -182,13 +182,8 @@
     }
     function ready(key, name, loc) {
         if (!key) return false;
-        var G = W.HardPanGeo, c = W.HARDPAN_GPS_CONFIG || {};
-        if (G && G.courseGps) {
-            var lk = null; try { var v = JSON.parse(W.localStorage.getItem('hardpan_osm_v1_' + key) || 'null'); lk = v && v.holes && Object.keys(v.holes).length ? v : null; } catch (e) {}
-            var gaOn = live() || !!c.golfapiFile;
-            var rec = G.courseGps({ key: key, name: name || null, loc: loc || null, golfapi: gaOn ? gaTable() : null, osmOn: c.osm !== false, osmTable: W.HardPanGpsCourses || {}, lookedUp: lk });
-            return !!rec && G.holeOneNear(rec, loc || null);
-        }
+        var G = W.HardPanGeo;
+        if (G && G.courseGps) { var rec = courseGpsRec(key, name, loc); return !!rec && G.holeOneNear(rec, loc || null); }   // the resolver's one rule
         if (live()) return !!golfapiLink(key) || /^gapi_\d+$/.test(key) || !!(GPSK.links && GPSK.links[key]);
         var b = bundled(); return !!(b && b[key] && b[key].holes && Object.keys(b[key].holes).length);
     }
@@ -257,9 +252,122 @@
     var NEAR_MI = 25, NEAR_MAX = 8;
     function nearList(here) {
         if (!here) return [];
-        return allCourses().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: miles(here, c.pt) }; })
+        return courseList().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: miles(here, c.pt) }; })
             .filter(function (x) { return x.d <= NEAR_MI; }).sort(function (a, b) { return a.d - b.d; }).slice(0, NEAR_MAX);
     }
+
+    // ==== THE COURSE RESOLVER (Manny, 2026-10-20 9:3x: "ONE course resolver that every screen uses -
+    // same record, tees, card and greens everywhere. Remove the per-screen lookups.") ==============
+    // window.HardPanCourse - Course & Tees, NEAR YOU, search and the ✓ badge (simple-flow), Home's GPS
+    // picker (here), the GPS map's course point (gps-view), the Add golfer tee rows - all read it:
+    //   list()           every course, ONE ROW PER COURSE: the app's directory + its GolfAPI file + the
+    //                    shared records (Round Setup's globalCourses) - a directory row beside the shared
+    //                    record for the same course goes (the shared one has the tees and the card), a
+    //                    GolfAPI copy of a course of ours linked to it goes (ours keeps its tees + the link)
+    //   near(here, n)    list() by distance: within 25 miles, topped up from 100, n rows (default 9)
+    //   resolve(key|{key,name,loc}) -> { key: the course's ONE key (an alias - the dropped twin, the
+    //                    linked copy - resolves to it), name, loc, city, state, hasGps, hasCard, row }
+    //   hasCard(key)     its scorecard is here (Round Setup's own presets, or the shared record)
+    //   gps(key, name, loc)  the GPS record the map will draw (gps-geo courseGps) - hasGps is this AND
+    //                    hole 1's green within 2 km of the course
+    //   teeRows(rec)     a course record's tees as rows (name, gender, yards, rating, slope)
+    var CR = { sig: '', rows: null, alias: {} };
+    function crNk(n) { return String(shownName(n)).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+    var CR_GEN = /\b(the|golf|club|course|country|resort|links|gc|cc)\b/g;
+    function crClub(n) { return String(n || '').split('(')[0].toLowerCase().replace(CR_GEN, ' ').replace(/[^a-z0-9]/g, ''); }
+    function crPart(n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? m[1].toLowerCase().replace(/[^a-z0-9]/g, '').replace(/course$/, '') : ''; }
+    function crShared() { try { return typeof globalCourses !== 'undefined' && globalCourses ? globalCourses : {}; } catch (e) { return {}; } }   /* global globalCourses */
+    function crTwin(a, b) {
+        if (crClub(a.name) !== crClub(b.name)) return false;
+        if (a.pt && b.pt && miles(a.pt, b.pt) > 0.5) return false;
+        var x = crPart(a.name), y = crPart(b.name);
+        return x === y || !x || !y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1;
+    }
+    function crLoc(rec) {
+        var L = rec && rec.location;
+        return L && L.latitude != null && isFinite(Number(L.latitude)) && isFinite(Number(L.longitude)) ? [Number(L.latitude), Number(L.longitude)] : null;
+    }
+    function courseList() {
+        var base = allCourses(), gc = crShared();
+        var sig = base.length + '|' + Object.keys(gc).length + '|' + Object.keys(GPSK.links || {}).length + '|' + Object.keys(GPSK.gc || {}).length + '|' + (C.list === base ? 1 : 0);
+        if (CR.rows && CR.sig === sig && CR.base === base) return CR.rows;
+        var out = base.filter(function (c) { return c.key; }).map(function (c) { return Object.assign({}, c); }), have = {}, alias = {};
+        out.forEach(function (c) { have[c.key] = 1; });
+        Object.keys(gc).forEach(function (k) {
+            var r = gc[k];
+            // Any shared record the directory does not list itself (Thistle's rated pairings carry the
+            // tees the 27-hole directory row lacks) - never a merged one, never one the directory names.
+            if (have[k] || !r || !r.name || r.mergedInto) return;
+            if (!/^(gca_|gapi_|comm_)/.test(k) && base.some(function (b) { return crNk(b.name) === crNk(r.name); })) return;
+            var cov = base.filter(function (c) { return !c.key && crNk(c.name) === crNk(r.name); })[0];
+            var sib = base.filter(function (b) { return b.pt && crClub(b.name) === crClub(r.name); })[0];   // a pairing: its club's place
+            var pt = bundledPoint(k) || (cov && cov.pt) || crLoc(r) || (sib && sib.pt) || null;
+            out.push({ key: k, name: r.name, ready: ready(k, r.name, pt), pt: pt, city: (cov && cov.city) || (r.location && r.location.city) || '', state: (cov && cov.state) || (r.location && r.location.state) || '' });
+        });
+        // A GolfAPI copy set up for a course of ours that is linked to it: ours is the course.
+        var links = GPSK.links || {}, linked = {};
+        Object.keys(links).forEach(function (k) { if (have[k] || gc[k]) linked[String(links[k])] = k; });
+        out = out.filter(function (o) { var m = /^gapi_(\d+)$/.exec(o.key); if (m && linked[m[1]] && linked[m[1]] !== o.key) { alias[o.key] = linked[m[1]]; return false; } return true; });
+        // The directory's row beside the shared record for the same course: the shared one stays.
+        var SH = /^(gca_|gapi_|comm_)/;
+        out = out.filter(function (e) {
+            if (SH.test(e.key)) return true;
+            var s2 = out.filter(function (o) { return SH.test(o.key) && crTwin(e, o); })[0];
+            if (!s2) return true;
+            if (!s2.ready && e.ready) s2.ready = true;
+            if (!s2.pt && e.pt) s2.pt = e.pt;
+            alias[e.key] = s2.key;
+            return false;
+        });
+        CR.rows = out; CR.sig = sig; CR.base = base; CR.alias = alias;
+        return out;
+    }
+    function courseNear(here, n) {
+        if (!here) return [];
+        var all = courseList().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: miles(here, c.pt) }; })
+            .filter(function (x) { return x.d <= 100; }).sort(function (a, b) { return a.d - b.d; });
+        var close = all.filter(function (x) { return x.d <= 25; });
+        return (close.length >= (n || 9) ? close : all).slice(0, n || 9);
+    }
+    function courseHasCard(key) {
+        try { if (typeof coursePresets !== 'undefined' && coursePresets[key] && (coursePresets[key].data || []).length) return true; } catch (e) {}   /* global coursePresets */
+        var r = crShared()[key];
+        return !!(r && (r.data ? (r.data.length || Object.keys(r.data).length) : r.name));
+    }
+    function courseResolve(q) {
+        var o = q && typeof q === 'object' ? q : { key: q };
+        var rows = courseList(), key = o.key || '';
+        if (CR.alias[key]) key = CR.alias[key];
+        var row = rows.filter(function (c) { return c.key === key; })[0] || null;
+        if (!row && o.name) row = rows.filter(function (c) { return crNk(c.name) === crNk(o.name); })[0] || null;
+        var rec = crShared()[row ? row.key : key];
+        var loc = (row && row.pt) || crLoc(rec) || o.loc || null;
+        var name = (row && row.name) || (rec && rec.name) || o.name || '';
+        return { key: row ? row.key : key, asked: o.key || '', name: name, loc: loc, city: (row && row.city) || '', state: (row && row.state) || '',
+            hasGps: row ? !!row.ready : ready(key, name, loc), hasCard: courseHasCard(row ? row.key : key), row: row };
+    }
+    function courseGpsRec(key, name, loc) {
+        var G = W.HardPanGeo, c = W.HARDPAN_GPS_CONFIG || {};
+        if (!G || !G.courseGps) return null;
+        var lk = null; try { var v = JSON.parse(W.localStorage.getItem('hardpan_osm_v1_' + key) || 'null'); lk = v && v.holes && Object.keys(v.holes).length ? v : null; } catch (e) {}
+        return G.courseGps({ key: key, name: name || null, loc: loc || null, golfapi: (live() || !!c.golfapiFile) ? gaTable() : null, osmOn: c.osm !== false, osmTable: W.HardPanGpsCourses || {}, lookedUp: lk });
+    }
+    function teeRows(rec) {
+        var out = [], seen = {}, arr = function (v) { return Array.isArray(v) ? v : v && typeof v === 'object' ? Object.keys(v).sort(function (a, b) { return a - b; }).map(function (k) { return v[k]; }) : []; };
+        var yards = function (t) { var y = Number(t && (t.totalYards != null ? t.totalYards : t.total_yards)); if (!(y > 0)) y = arr(t && t.holes).reduce(function (s, h) { return s + (Number(h && (h.yardage != null ? h.yardage : h.yards)) || 0); }, 0); return y > 0 ? Math.round(y) : 0; };
+        ['male', 'female'].forEach(function (g) {
+            arr(rec && rec.tees && rec.tees[g]).forEach(function (t, i) {
+                if (!t || !t.name) return;
+                var y = yards(t), id = String(t.name).trim().toLowerCase() + '|' + y;
+                if (seen[id]) return; seen[id] = 1;
+                out.push({ key: g + ':' + i, name: String(t.name).replace(/\s+tees?$/i, ''), full: String(t.name), gender: g, yards: y,
+                    rating: Number(t.rating != null ? t.rating : (t.courseRating != null ? t.courseRating : t.course_rating)), slope: Number(t.slope != null ? t.slope : t.slope_rating), par: Number(t.parTotal != null ? t.parTotal : t.par) || null });
+            });
+        });
+        return out;
+    }
+    W.HardPanCourse = { list: courseList, near: courseNear, resolve: courseResolve, hasCard: courseHasCard, gps: courseGpsRec, teeRows: teeRows,
+        refresh: function () { C.list = null; CR.rows = null; } };
     function where(c, dist) {
         var bits = [];
         var place = c.city || c.state ? [c.city, c.state].filter(Boolean).join(', ') : '';
@@ -336,10 +444,10 @@
     }
     function gpsView() {
         var draw = function () {
-            var rec = recents(), all = allCourses();
+            var rec = recents(), all = courseList();   // the resolver's rows (one per course)
             $('hp-recent').style.display = rec.length ? '' : 'none';
             $('hp-recent-list').innerHTML = rec.map(function (r) {
-                var c = all.filter(function (x) { return x.key === r.key; })[0] || { key: r.key, name: r.name, ready: ready(r.key), state: stateOf(r.name) };
+                var rv = courseResolve({ key: r.key, name: r.name }), c = rv.row || { key: rv.key, name: rv.name || r.name, ready: rv.hasGps, state: stateOf(r.name) };
                 return rowHtml(c, C.here && c.pt ? miles(C.here, c.pt) : null);
             }).join('');
             fillPlaces(H.db, $('hp-recent-list'));
@@ -379,7 +487,8 @@
         if (!inp || !box) return;
         var raw = inp.value.trim(), q = raw.toLowerCase();
         if (q.length < 2) { box.style.display = 'none'; return; }
-        var hits = allCourses().filter(function (c) { return c.name.toLowerCase().indexOf(q) !== -1 || (c.city || '').toLowerCase().indexOf(q) !== -1; })
+        // The resolver's rows, plus the OpenStreetMap-only courses the directory has no key for.
+        var hits = courseList().concat(allCourses().filter(function (c) { return !c.key; })).filter(function (c) { return c.name.toLowerCase().indexOf(q) !== -1 || (c.city || '').toLowerCase().indexOf(q) !== -1; })
             .sort(function (a, b) { return (b.ready - a.ready) || (a.name.toLowerCase().indexOf(q) - b.name.toLowerCase().indexOf(q)); }).slice(0, 12);
         box.style.display = '';
         $('hp-results-list').innerHTML = hits.map(function (c) { return rowHtml(c, C.here && c.pt ? miles(C.here, c.pt) : null); }).join('')
@@ -684,8 +793,8 @@
         el.style.display = 'flex';
     }
     function pickCourse(key, name, row) {
-        var all = allCourses();
-        var c = all.filter(function (x) { return key ? x.key === key : (x.name === name && !x.key); })[0] || { key: key || null, name: name };
+        var rv = key ? courseResolve({ key: key, name: name }) : null;   // an alias -> the course's one key
+        var c = (rv && rv.row) || allCourses().filter(function (x) { return x.name === name && !x.key; })[0] || { key: (rv && rv.key) || key || null, name: name };
         // A GPS round starts only with GPS Map (the gate - Near You, search and Recent alike).
         gpsGate({ key: c.key, name: c.name || name }, function () {
             startRound({ key: c.key, name: c.name || name, city: c.city || '', state: c.state || '' });
@@ -2213,7 +2322,7 @@
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         // URGENT-019: the course list is worked out once; a page that loads the GPS course files after
         // that (simple-flow's Course & Tees) asks for it again, as the GPS-1 picker does (C.list = null).
-        refreshCourses: function () { C.list = null; }, loadGpsKeys: loadGpsKeys, gpsLinks: function () { return GPSK.links || {}; },
+        refreshCourses: function () { C.list = null; CR.rows = null; }, loadGpsKeys: loadGpsKeys, gpsLinks: function () { return GPSK.links || {}; },
         holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld,
         roundBackGuard: roundBackGuard };
     W.HardPanHome = { start: homeStart, show: show };

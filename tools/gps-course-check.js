@@ -38,6 +38,9 @@ const COURSES = (process.env.ONLY ? null : null) || [
     { label: 'Legacy', name: /Legacy Golf/i, q: 'legacy', at: [33.3850, -112.0197] },
     { label: 'Caledonia (Myrtle)', name: /^Caledonia/i, q: 'caledonia', at: [33.4528, -79.1547] },
     { label: 'Chambers Bay', name: /^Chambers Bay/i, q: 'chambers', at: [47.2008, -122.5715] },
+    // A course with a card and NO greens anywhere: the map must show the COURSE AREA with "Tap the middle
+    // of the green" - never the golfer's location (run with the golfer 2 km away).
+    { label: 'No greens: Las Colinas', name: /^Las Colinas/i, q: 'las colinas', at: [33.2441784, -111.6180444], noGreens: true, golfer: [33.2620, -111.6180] },
     { label: 'Thistle (MacKay/Cameron)', name: /^Thistle.*MacKay.*Cameron/i, q: 'thistle', at: [33.8890, -78.5350] }
 ].filter((c) => !process.env.ONLY || new RegExp(process.env.ONLY, 'i').test(c.label));
 
@@ -56,9 +59,9 @@ const GEO = (p) => "if (/index\\.html$/.test(location.pathname)) (function(){ va
 const SLOWGPS = (ms) => !ms ? '' : "(function(){ var t = setInterval(function () { if (!window.firebase || !firebase.database || firebase.__slowed) return; firebase.__slowed = 1; clearInterval(t); var d0 = firebase.database; firebase.database = function () { var d = d0.apply(this, arguments); if (d.__slow) return d; d.__slow = 1; var r = d.ref; d.ref = function (p) { var x = r.call(d, p), o = x.once; if (/^gps_(courses|links)\\/|^global_courses\\/[^/]+\\/location/.test(String(p))) x.once = function () { var a = arguments; return new Promise(function (res, rej) { setTimeout(function () { o.apply(x, a).then(res, rej); }, " + Number(ms) + "); }); }; return x; }; return d; }; }, 5); })();";
 
 async function check(c) {
-    const out = { label: c.label, once: '', tees: '', card: '', gps: '', map: '', bet: '', same: '', badge: null, why: [] };
+    const out = { label: c.label, once: '', tees: '', card: '', gps: '', map: '', bet: '', same: '', one: '', badge: null, why: [] };
     const j = await openJourney({ db: DB, viewport: { width: 393, height: 852 }, webgl: true,
-        preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + PHONE + SLOWGPS(process.env.SLOW) + GEO(process.env.AWAY ? process.env.AWAY.split(',').map(Number) : c.at) + "try{sessionStorage.setItem('hardpan_simple_flow','gps');}catch(e){}" });
+        preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + PHONE + SLOWGPS(process.env.SLOW) + GEO(c.golfer || (process.env.AWAY ? process.env.AWAY.split(',').map(Number) : c.at)) + "try{sessionStorage.setItem('hardpan_simple_flow','gps');}catch(e){}" });
     const ev = (x) => j.evaluate(x);
     const until = async (x, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await ev(x)) return true; } catch (e) {} await sleep(250); } return false; };
     try {
@@ -92,6 +95,8 @@ async function check(c) {
         const realTees = tees.filter((t) => t[0] && !/^[^A-Za-z]*$/.test(t[0]) && t[1]);
         out.tees = (realTees.length && realTees.length === tees.length ? 'PASS' : 'FAIL') + ' (' + tees.map((t) => t[0] + (t[1] ? ' ' + t[1] : '')).join(', ') + ')';
         if (!(realTees.length && realTees.length === tees.length)) out.why.push(tees.length ? 'a tee with no real name or no yards' : 'no tees');
+        // 8 (one record everywhere): what Course & Tees holds - key, name, card pars.
+        const cs = JSON.parse(await ev("(function(){ var k=document.getElementById('course-select').value, gcx=(typeof globalCourses!=='undefined'&&globalCourses)||{}, pr=(typeof coursePresets!=='undefined'&&coursePresets)||{}; var d=(gcx[k]&&gcx[k].data)||(pr[k]&&pr[k].data)||[]; if (!Array.isArray(d)) d=Object.keys(d).map(function(x){return d[x];}); return JSON.stringify({ key: k, name: (document.getElementById('course-search-input')||{}).value||'', pars: d.map(function(h){return Number(h&&h.par)||0;}).join(''), rv: window.HardPanCourse ? HardPanCourse.resolve(k).key : null }); })()"));
         // Start GPS.
         await ev("(function(){ var b=document.querySelector('[data-sf=\"startgps\"]'); if(b) b.click(); return 1; })()");
         const started = await until("/index\\.html/.test(location.pathname) && typeof currentData !== 'undefined' && currentData && (currentData.courseData||[]).length > 0", 40000);
@@ -117,7 +122,7 @@ async function check(c) {
         if (process.env.DEBUG) console.error('DEBUG2', await ev("(function(){ var out={}; try { out.watch = String(navigator.geolocation.watchPosition).slice(0,60); } catch(e){ out.watch='ERR '+e.message; } out.path = location.pathname.slice(-12); out.err = (window.__listenerErrs||[]).slice(0,3); out.denied=null; try { navigator.permissions.query({name:'geolocation'}).then(function(s){ window.__permst=s.state; }); } catch(e){} out.perm = window.__permst; out.side = HardPanGps.side(); return JSON.stringify(out); })()"));
         if (process.env.DEBUG) console.error('DEBUG', await ev("(function(){ var L=window.HardPanGpsLive; return JSON.stringify({ live: !!(L && L.on && L.on()), cfg: (window.HARDPAN_GPS_CONFIG||{}).liveTest, gapi: window.HardPanGolfApi ? Object.keys(HardPanGolfApi.courses||{}).length : null, key: HardPanGps.courseKey && HardPanGps.courseKey(), scripts: Array.prototype.map.call(document.querySelectorAll('script[src]'), function(s){return s.getAttribute('src');}).filter(function(x){return /gps|golf|maplibre/.test(x);}), body: (document.getElementById('gps-overlay')||{}).innerText ? document.getElementById('gps-overlay').innerText.slice(0,300) : '' }); })()"));
         const midY = (/(\d{2,3})/.exec(g.mid) || [])[1];
-        out.gps = (g.up && g.data && midY ? 'PASS' : 'FAIL') + ` (hole ${g.hole}: ${g.f || '-'} | ${g.mid || '-'} | ${g.b || '-'})`;
+        out.gps = (g.up && g.data && midY ? 'PASS' : 'FAIL') + ` (hole ${g.hole}: ${g.f || '-'} / ${g.mid || '-'} / ${g.b || '-'})`;
         if (!(g.up && g.data && midY)) out.why.push('GPS: ' + (g.up ? (g.data ? 'no MIDDLE number' : 'no green on hole 1') : 'map did not open') + (g.banner ? ' - "' + g.banner + '"' : ''));
         // 6 (URGENT-022): the map frames hole 1 - its tee and green in view - and the green is within 2 km
         // of the course (data in the wrong place, or a map on the golfer's street, fails here).
@@ -128,8 +133,20 @@ async function check(c) {
         out.map = (mapOk ? 'PASS' : 'FAIL') + (hc ? ` (tee ${hc.teeIn ? 'in view' : 'NOT in view'}, green ${hc.greenIn ? 'in view' : 'NOT in view'}, green ${gkm == null ? '?' : gkm.toFixed(2) + ' km'} from the course; framed: ${hc.framed})` : ' (no hole data)');
         if (!mapOk) out.why.push('map: ' + out.map.replace(/^FAIL /, ''));
         if (process.env.SHOTS) { await until("(function(){ var m=document.querySelector('.gps-map'); return !!(m && m.getAttribute('data-ready')); })()", 10000); await sleep(8000); try { await j.shot(path.join(process.env.SHOTS, c.label.replace(/[^A-Za-z0-9]+/g, '-') + '-hole1.png')); } catch (e) {} }
+        if (c.noGreens) {
+            // No greens: the map frames the COURSE AREA (near the course, far from the golfer) and says
+            // "Tap the middle of the green"; never the golfer's location.
+            const ng = JSON.parse(await ev("JSON.stringify({ banner: ((document.querySelector('.gps-banner')||{}).textContent||'').trim(), hc: window.HardPanGps && HardPanGps.holeCheck ? HardPanGps.holeCheck() : null, center: (function(){ try { var m = document.querySelector('.gps-map'); return null; } catch(e) { return null; } })() })"));
+            const ctr = ng.hc && ng.hc.center ? [ng.hc.center.lat, ng.hc.center.lng] : null;
+            const dCourse = km(ctr, c.at), dGolfer = km(ctr, c.golfer);
+            const okNg = /Tap the middle of the green/.test(ng.banner) && dCourse != null && dCourse < 1 && dGolfer > dCourse;
+            out.gps = (okNg ? 'PASS' : 'FAIL') + ` (no greens: "${ng.banner}")`;
+            out.map = (okNg ? 'PASS' : 'FAIL') + ` (course area: map ${dCourse == null ? '?' : dCourse.toFixed(2)} km from the course, ${dGolfer == null ? '?' : dGolfer.toFixed(2)} km from the golfer)`;
+            out.why = out.why.filter((w) => !/^GPS:|^map:|^note:/.test(w));
+            if (!okNg) out.why.push('no-greens map: ' + out.map + ' ' + out.gps);
+        }
         // 7 (URGENT-022): the list's ✓ GPS says what the map does - one answer for both.
-        const mapHasGps = /^PASS/.test(out.gps);
+        const mapHasGps = c.noGreens ? false : /^PASS/.test(out.gps);
         out.same = (out.badge === mapHasGps ? 'PASS' : 'FAIL') + ` (list ${out.badge ? '✓ GPS' : 'no ✓'}, map ${mapHasGps ? 'GPS' : 'no GPS'})`;
         if (out.badge !== mapHasGps) out.why.push('badge and map disagree');
         // + Bet.
@@ -138,6 +155,18 @@ async function check(c) {
         const bet = await ev("!!document.querySelector('#hp-bet.open')");
         out.bet = bet ? 'PASS' : 'FAIL';
         if (!bet) out.why.push('+ Bet did not open');
+        await ev("(function(){ try { HardPanBet.close(); } catch (e) {} return 1; })()");
+        // 8: ONE RECORD EVERYWHERE - Course & Tees == the round == the map == Resume (a reopen).
+        const rd = JSON.parse(await ev("JSON.stringify({ key: currentData.activeCourseKey, name: currentData.courseName, pars: (currentData.courseData||[]).map(function(h){return Number(h&&h.par)||0;}).join(''), map: window.HardPanGps && HardPanGps.courseKey ? HardPanGps.courseKey() : null, green: (window.HardPanGps && HardPanGps.holeCheck && HardPanGps.holeCheck() || {}).green || null, rv: (function(){ try { var r = HardPanCourse.resolve({ key: currentData.activeCourseKey, name: currentData.courseName }); var g = HardPanCourse.gps(r.key, r.name, r.loc); var h = g && g.holes && (g.holes['1'] || g.holes[1]); var x = h && (h.osm || h); return { key: r.key, green: x ? (x.mid || null) : null }; } catch (e) { return { err: String(e) }; } })() })"));
+        const url = await ev('location.href');
+        await j.goto(url, 4500);
+        await ev(TO_GPS); await until("window.HardPanGps && HardPanGps.isMounted && HardPanGps.isMounted() && HardPanGps.side() === 'gps'", 15000); await sleep(3000);
+        const rs = JSON.parse(await ev("JSON.stringify({ key: currentData && currentData.activeCourseKey, map: window.HardPanGps && HardPanGps.courseKey ? HardPanGps.courseKey() : null, green: (window.HardPanGps && HardPanGps.holeCheck && HardPanGps.holeCheck() || {}).green || null })"));
+        const closeTo = (a, b) => (!a && !b) || (a && b && km(a, b) < 0.05);
+        const same = cs.key === rd.key && cs.key === rd.map && cs.key === rs.key && cs.key === rs.map && (!cs.rv || cs.rv === cs.key) && (!rd.rv || !rd.rv.key || rd.rv.key === cs.key)
+            && cs.pars === rd.pars && closeTo(rd.green, rs.green) && (c.noGreens || closeTo(rd.green, rd.rv && rd.rv.green));
+        out.one = (same ? 'PASS' : 'FAIL') + ` (${cs.key}: setup = round = map = resume${c.noGreens ? '' : '; greens = the resolver\u2019s'})`;
+        if (!same) out.why.push('one record: ' + JSON.stringify({ cs, rd, rs }).slice(0, 400));
     } catch (e) {
         out.why.push('check error: ' + (e && e.message || e));
     } finally { try { await j.close(); } catch (e) {} }
@@ -148,13 +177,13 @@ async function check(c) {
     const rows = [];
     for (const c of COURSES) { const r = await check(c); rows.push(r); console.error(c.label, JSON.stringify(r)); }
     const ok = (s) => /^PASS/.test(s || '');
-    console.log('| Course | 1 found once | 2 tees | 3 card (18) | 4 GPS hole 1 (F | MIDDLE | B) | 5 + Bet | 6 map frames hole 1 | 7 badge = map | Result |');
-    console.log('|---|---|---|---|---|---|---|---|---|');
+    console.log('| Course | 1 found once | 2 tees | 3 card (18) | 4 GPS hole 1 (F / MIDDLE / B) | 5 + Bet | 6 map frames hole 1 | 7 badge = map | 8 one record | Result |');
+    console.log('|---|---|---|---|---|---|---|---|---|---|');
     let fails = 0;
     rows.forEach((r) => {
-        const all = [r.once, r.tees, r.card, r.gps, r.bet, r.map, r.same].every(ok);
+        const all = [r.once, r.tees, r.card, r.gps, r.bet, r.map, r.same, r.one].every(ok);
         if (!all) fails++;
-        console.log(`| ${r.label} | ${r.once} | ${r.tees} | ${r.card} | ${r.gps} | ${r.bet} | ${r.map} | ${r.same} | ${all ? 'PASS' : 'FAIL: ' + r.why.join('; ')} |`);
+        console.log(`| ${r.label} | ${r.once} | ${r.tees} | ${r.card} | ${r.gps} | ${r.bet} | ${r.map} | ${r.same} | ${r.one} | ${all ? 'PASS' : 'FAIL: ' + r.why.join('; ')} |`);
     });
     console.log('\n' + (fails ? fails + ' of ' + rows.length + ' courses FAIL' : 'all ' + rows.length + ' courses PASS'));
     process.exit(fails ? 1 : 0);

@@ -192,88 +192,13 @@
     // Every course Round Setup can start: the app's list (front-door allCourses) plus the shared
     // courses Round Setup itself lists (globalCourses: gca_ / gapi_ / comm_), each with its point.
     function nk(n) { var H = HD(); return String(typeof H.shownName === 'function' ? H.shownName(n) : n).toLowerCase().replace(/[^a-z0-9]/g, ''); }
-    function pointOf(key) {
-        var b = W.HardPanGpsCourses, r = b && b[key], h = r && r.holes && (r.holes['1'] || r.holes[Object.keys(r.holes)[0]]), o = h && (h.osm || h);
-        return o && o.tee ? o.tee : (o && o.mid ? o.mid : null);
-    }
-    function courses() {
-        var H = HD(), base = [];
-        try { base = typeof H.allCourses === 'function' ? H.allCourses() : []; } catch (e) { base = []; }
-        var out = base.filter(function (c) { return c.key; }), have = {};
-        out.forEach(function (c) { have[c.key] = 1; });
-        var gc = typeof globalCourses !== 'undefined' && globalCourses ? globalCourses : {};   /* global globalCourses */
-        Object.keys(gc).forEach(function (k) {
-            // Any shared record the directory does not list itself (021 course check: Thistle's rated
-            // pairings "thistle_mackay_cameron" / "thistle_cameron_stewart" carry the tees - the 27-hole
-            // directory row has none), not only gca_ / gapi_ / comm_; never one the directory names.
-            if (have[k] || !gc[k] || !gc[k].name || gc[k].mergedInto) return;
-            if (!/^(gca_|gapi_|comm_)/.test(k) && base.some(function (b) { return nk(b.name) === nk(gc[k].name); })) return;
-            var cov = base.filter(function (c) { return !c.key && nk(c.name) === nk(gc[k].name); })[0];
-            // A record with no place of its own (a 27-hole pairing): its club's directory row's place.
-            var clubOf = function (n) { return nk(String(n).split('(')[0]); };
-            var sib = base.filter(function (b) { return b.pt && clubOf(b.name) === clubOf(gc[k].name); })[0];
-            var loc = gc[k].location, lpt = loc && isFinite(Number(loc.latitude)) && isFinite(Number(loc.longitude)) && loc.latitude !== null ? [Number(loc.latitude), Number(loc.longitude)] : null;
-            var kpt = pointOf(k) || (cov && cov.pt) || lpt || (sib && sib.pt) || null;
-            out.push({ key: k, name: gc[k].name, ready: ready(k, gc[k].name, kpt), pt: kpt, city: (cov && cov.city) || (loc && loc.city) || '', state: (cov && cov.state) || (loc && loc.state) || '' });
-        });
-        // ONE ROW PER COURSE (URGENT-019/020 course check): the directory's own row for a course
-        // ("Talking Stick Golf Club (Piipaash)" - no tees) beside the shared record for the same
-        // course ("... (South - Piipaash)", its tees) listed it twice, and picked the one with no
-        // tees. The shared record stays (its tees, its card); it takes the directory row's GPS and
-        // place when it has none of its own.
-        // The club's own words: "Chambers Bay" and "Chambers Bay Golf Club" are one club (URGENT-022).
-        var SH = /^(gca_|gapi_|comm_)/, GEN = /\b(the|golf|club|course|country|resort|links|gc|cc)\b/g;
-        var club = function (n) { return nk(String(n).split('(')[0].toLowerCase().replace(GEN, ' ')); };
-        var part = function (n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? nk(m[1]).replace(/course$/, '') : ''; };
-        var H2 = HD(), near = function (a, b) { return !a.pt || !b.pt || typeof H2.miles !== 'function' || H2.miles(a.pt, b.pt) <= 0.5; };
-        var twin = function (a, b) {
-            if (club(a.name) !== club(b.name) || !near(a, b)) return false;
-            var x = part(a.name), y = part(b.name);
-            return x === y || !x || !y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1;
-        };
-        // A GolfAPI record set up for a course of ours that is linked to it (gps_links: O'odham's
-        // gca_rvjzcr4m -> its GolfAPI id, written when the course was loaded): ours stays (its tees,
-        // its GPS through the link), the GolfAPI copy is not listed again (URGENT-022 check).
-        var links = typeof H2.gpsLinks === 'function' ? H2.gpsLinks() : {}, linkedIds = {};
-        Object.keys(links || {}).forEach(function (k) { if (out.some(function (o) { return o.key === k; })) linkedIds[String(links[k])] = k; });
-        out = out.filter(function (o) { var m = /^gapi_(\d+)$/.exec(o.key); return !(m && linkedIds[m[1]] && linkedIds[m[1]] !== o.key); });
-        return out.filter(function (e) {
-            if (SH.test(e.key)) return true;
-            var s2 = out.filter(function (o) { return SH.test(o.key) && twin(e, o); })[0];
-            if (!s2) return true;
-            if (!s2.ready && e.ready) s2.ready = true;
-            if (!s2.pt && e.pt) s2.pt = e.pt;
-            return false;
-        });
-    }
-    function nearList(here) {
-        var H = HD();
-        if (!here || typeof H.miles !== 'function') return [];
-        // URGENT-016: up to 8 - everything within 25 miles, topped up from the next closest within
-        // 100 (a course with few neighbours still gets a list to choose from).
-        var all = courses().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: H.miles(here, c.pt) }; })
-            .filter(function (x) { return x.d <= 100; }).sort(function (a, b) { return a.d - b.d; });
-        // ONE ROW PER COURSE (URGENT-019): the directory's "Talking Stick Golf Club (Piipaash)" (no GPS on
-        // the phone, no tees) and the app's GolfAPI "Talking Stick Golf Club (South - Piipaash)" (✓ GPS,
-        // its tees) are one course: within half a mile, the same club, the one's (...) inside the other's.
-        // The row without GPS goes; a course with no GPS twin stays as it is (no ✓ GPS).
-        var club = function (n) { return nk(String(n).split('(')[0]); };
-        var part = function (n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? nk(m[1]).replace(/course$/, '') : ''; };
-        all = all.filter(function (x) {
-            if (x.c.ready) return true;
-            return !all.some(function (y) {
-                if (y === x || !y.c.ready || H.miles(x.c.pt, y.c.pt) > 0.5 || club(x.c.name) !== club(y.c.name)) return false;
-                var a = part(x.c.name), b = part(y.c.name);
-                return !a || !b || b.indexOf(a) !== -1 || a.indexOf(b) !== -1;
-            });
-        });
-        var near = all.filter(function (x) { return x.d <= 25; });
-        return (near.length >= 8 ? near : all).slice(0, 9);
-    }
+    // THE COURSE RESOLVER (front-door.js window.HardPanCourse): this screen's list, NEAR YOU, search, the
+    // ✓ GPS badge and "has a card" are the resolver's - the same record every screen and the map use.
+    function HC() { return W.HardPanCourse || null; }
+    function courses() { var c = HC(); try { return c ? c.list() : []; } catch (e) { return []; } }
+    function nearList(here) { var c = HC(); try { return c && here ? c.near(here, 9) : []; } catch (e) { return []; } }
     function nameOf(c) { var H = HD(); return typeof H.shownName === 'function' ? H.shownName(c.name) : c.name; }
-    function ready(key, name, loc) { var H = HD(); try { return !!(key && typeof H.ready === 'function' && H.ready(key, name, loc)); } catch (e) { return false; } }
-    // The course's own ✓ GPS as the list has it (name + place: the map's rule needs both).
-    function readyOf(key) { var c = courses().filter(function (x) { return x.key === key; })[0]; return c ? !!c.ready : ready(key); }
+    function readyOf(key) { var c = HC(); try { return !!(c && key && c.resolve(key).hasGps); } catch (e) { return false; } }
     function distTo(c) { var H = HD(); return S.here && c.pt && typeof H.miles === 'function' ? H.miles(S.here, c.pt) : null; }
     function miStr(d) { return d == null ? '' : (d < 10 ? d.toFixed(1) : Math.round(d)) + ' mi'; }
     function locate() {
@@ -316,11 +241,7 @@
     // this phone asks once per course per 30 days. Not found: said plainly, with Pick another course
     // and Request this course first, and "Enter pars yourself" last and small.
     var LOOK = 'hardpan_autolook_', LOOK_MS = 30 * 24 * 3600 * 1000;
-    function hasCard(key) {
-        try { if (typeof coursePresets !== 'undefined' && coursePresets[key] && (coursePresets[key].data || []).length) return true; } catch (e) {}   /* global coursePresets */
-        var gc = typeof globalCourses !== 'undefined' && globalCourses ? globalCourses : {};
-        return !!(gc[key] && (gc[key].data ? (gc[key].data.length || Object.keys(gc[key].data).length) : gc[key].name));
-    }
+    function hasCard(key) { var c = HC(); try { return !!(c && key && c.hasCard(key)); } catch (e) { return false; } }
     function liveOn() { var L = W.HardPanGpsLive; try { return !!(L && L.on && L.on()); } catch (e) { return false; } }
     function partOf(n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? nk(m[1]).replace(/course$/, '') : ''; }
     function lookup(key, name) {
@@ -383,6 +304,9 @@
     function pick(key, name) {
         var f = fn('selectCourse');
         if (!f) return;
+        // The course's ONE record (an alias - a dropped twin, a linked copy - resolves to it).
+        var rv = HC() && key ? HC().resolve({ key: key, name: name }) : null;
+        if (rv && rv.row && rv.key !== key) { key = rv.key; name = rv.name; }
         S.picked = { key: key, name: name };
         f(key, name);
         S.shotgun = false;
@@ -519,7 +443,7 @@
         var c = courses().filter(function (x) { return x.key === key; })[0];
         var d = c ? distTo(c) : null;
         return '<div class="sf-card sf-sel" id="sf-course" style="padding:12px 14px;"><div class="sf-line" style="border:0;padding:0;"><span class="n" style="font-size:16px;font-weight:800;">' + esc(c ? nameOf(c) : String(name).split(' (')[0]) + '</span>'
-            + '<span class="sf-note">' + esc(miStr(d)) + ((c ? c.ready : ready(key)) ? (d != null ? ' · ' : '') + '✓ GPS' : '') + ' · <button type="button" class="sf-link" data-sf="change" style="padding:0;min-height:0;font-size:13px;">Change</button></span></div></div>';
+            + '<span class="sf-note">' + esc(miStr(d)) + ((c ? c.ready : readyOf(key)) ? (d != null ? ' · ' : '') + '✓ GPS' : '') + ' · <button type="button" class="sf-link" data-sf="change" style="padding:0;min-height:0;font-size:13px;">Change</button></span></div></div>';
     }
     function courseCard() {
         var key = courseKey(), name = courseName();
@@ -1047,7 +971,7 @@
             }).join('')
             + '<button type="button" class="sf-btn" data-sf="qr" style="width:100%;min-height:50px;margin-top:4px;">📷 Show QR codes</button>'
             + '<div class="sf-note" style="margin-top:6px;">Hold the phone up on the first tee — each scorekeeper scans their group. Works with no signal.</div>';
-        var gps = ready(courseKey() || d.activeCourseKey);
+        var gps = readyOf(courseKey() || d.activeCourseKey);
         return shell('✅ Round ready', body, '<button type="button" class="sf-cta" data-sf="done">Done · ' + (gps ? 'open the GPS' : 'open the card') + ' ▶</button>', 0);
     }
     function done() {
