@@ -44,6 +44,7 @@
     function hiloHere() { return typeof window.hiloShapeOk === 'function' && typeof window.hiloForSideMatch === 'function'; }
 
     // ---- THE ROUND (index.html's globals, read at call time) -------------------
+    /* global validateMoneyPool, moneyPoolRulesLocked, canReachSetup, requireOnlineForMoney */
     /* global currentData, currentMode, db, lockedGroup, hasGroupLock, resolvedMeId, durableWrite, playerGroupMap, sideMatchStartHole,
        sideMatchPayloadFromTerms, computeCombinedNetTotals, getRoundGames, uiToast, uiRefuse, uiFail, hpSpectating */
     function data() { try { return typeof currentData !== 'undefined' && currentData ? currentData : null; } catch (e) { return null; } }
@@ -319,7 +320,8 @@
         + '.hp-bet-btn{border:0;border-radius:16px;background:#ffd60a;color:#0b0f0c;min-height:48px;padding:0 18px;font:800 17px/1 -apple-system,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;}';
     function ensureCss() {
         if (document.getElementById('hp-bet-css')) return;
-        var s = document.createElement('style'); s.id = 'hp-bet-css'; s.textContent = CSS; document.head.appendChild(s);
+        // The Weekly Game sheet (#hp-weekly) wears the bet sheet's own styles.
+        var s = document.createElement('style'); s.id = 'hp-bet-css'; s.textContent = CSS + CSS.split('}').filter(function (r) { return /#hp-bet[ .{]/.test(r); }).map(function (r) { return r.replace(/#hp-bet(?=[ .{])/g, '#hp-weekly') + '}'; }).join('') + '#hp-weekly{z-index:10210;}'; document.head.appendChild(s);
     }
     function root() {
         var r = document.getElementById('hp-bet');
@@ -721,6 +723,146 @@
         window.location.href = 'sidematches.html?game=' + encodeURIComponent(code() || '') + (g ? '&group=' + g : '') + '&hpback=1&hpfull=1';
     }
 
+    // ---- WEEKLY GAME SETTINGS, IN PLACE (URGENT-018) --------------------------------
+    // Round settings › Weekly Game, and "KP pool / Weekly game" in Add a game: a small sheet
+    // over the round - buy-in, KP $ + holes, net finish, skins (take the rest / a fixed $ /
+    // none, net or gross, carry) - instead of Round Setup's whole wizard (Step 4 Money).
+    // THE SAME RECORD ROUND SETUP WRITES: events/<code>/moneyPool in captureMoneyPool()'s
+    // shape ({ enabled, buyIn, kp: { amount, holes }, net: { amount, places } or { payoutMode:
+    // 'custom', amounts }, skins: { mode, scoring, carryOver[, amount] }), every other key on
+    // the saved pool riding along (mergePreservedPoolFields' rule), and the SAME gate as its
+    // Save: pool-engine.js validateMoneyPool on this round's golfers and holes - refused with
+    // its reason. Turning it off writes moneyPool: null (what an unticked box saves). Organizer
+    // only (canReachSetup), online only (requireOnlineForMoney), as the Players sheet.
+    // No engine is touched.
+    var wk = null;
+    var NET_PRESETS = [[100], [60, 40], [50, 30, 20], [40, 30, 20, 10]];
+    function wkRoot() {
+        var r = document.getElementById('hp-weekly');
+        if (r) return r;
+        ensureCss();
+        r = document.createElement('div');
+        r.id = 'hp-weekly'; r.setAttribute('role', 'dialog'); r.setAttribute('aria-modal', 'true'); r.setAttribute('aria-label', 'Weekly Game');
+        r.innerHTML = '<div class="hb-scrim" data-wk="close"></div><div class="hb-panel gps-scroll-ok"></div>';
+        document.body.appendChild(r);
+        r.addEventListener('click', wkClick);
+        r.addEventListener('input', wkInput);
+        r.addEventListener('change', wkInput);
+        return r;
+    }
+    function wkOpen() { var r = document.getElementById('hp-weekly'); return !!(r && r.classList.contains('open')); }
+    function wkHoles() { var d = data() || {}; return (d.courseData || []).filter(function (h) { return h && h.hole; }).map(function (h) { return { n: parseInt(h.hole, 10), par: Number(h.par) }; }).sort(function (a, b) { return a.n - b.n; }); }
+    function organizerHere() { try { return typeof canReachSetup === 'function' && !!canReachSetup(); } catch (e) { return false; } }
+    function openWeekly(opts) {
+        var o = opts || {};
+        if (!on() || !data() || !code()) return false;
+        var mp = data().moneyPool, has = !!(mp && mp.enabled !== false);
+        var base = has ? JSON.parse(JSON.stringify(mp)) : { enabled: true, buyIn: 20, kp: { amount: 0, holes: [] }, net: null, skins: { mode: 'remainder', scoring: 'net', carryOver: true } };
+        var net = base.net || null, custom = !!(net && net.payoutMode === 'custom');
+        wk = { on: has || o.turnOn === true, pool: base, buyIn: String(base.buyIn != null ? base.buyIn : ''),
+            kpAmt: String(base.kp && base.kp.amount ? base.kp.amount : ''), kpHoles: (base.kp && Array.isArray(base.kp.holes) ? base.kp.holes : []).map(Number),
+            netCustom: custom, netAmt: String(net && !custom && net.amount ? net.amount : ''), netPlaces: net && !custom && Array.isArray(net.places) ? net.places.map(Number) : [60, 40],
+            netAmounts: custom ? net.amounts.slice() : ['', ''],
+            skMode: (base.skins && base.skins.mode) || 'remainder', skAmt: String(base.skins && base.skins.amount ? base.skins.amount : ''),
+            skScoring: (base.skins && base.skins.scoring) || 'net', skCarry: !(base.skins && base.skins.carryOver === false),
+            err: '', saving: false, returnTo: o.returnTo || null, onDone: o.onDone || null };
+        wkDraw();
+        wkRoot().classList.add('open');
+        return true;
+    }
+    function wkClose() { var r = document.getElementById('hp-weekly'); if (r) r.classList.remove('open'); wk = null; }
+    function wkPool() {
+        var num = function (v) { return parseFloat(v) || 0; };
+        var pool = { enabled: true, buyIn: num(wk.buyIn) };
+        if (num(wk.kpAmt) > 0) pool.kp = { amount: num(wk.kpAmt), holes: wk.kpHoles.slice().sort(function (a, b) { return a - b; }) };
+        if (wk.netCustom) { var am = wk.netAmounts.map(function (v) { var n = parseFloat(v); return isNaN(n) ? '' : n; }); if (am.some(function (v) { return v !== ''; })) pool.net = { payoutMode: 'custom', amounts: am }; }
+        else if (num(wk.netAmt) > 0) pool.net = { amount: num(wk.netAmt), places: wk.netPlaces.slice() };
+        pool.skins = { mode: wk.skMode, scoring: wk.skScoring, carryOver: wk.skCarry };
+        if (wk.skMode === 'fixed') pool.skins.amount = num(wk.skAmt);
+        // Every key Round Setup's form does not own rides along (participantIds, ...).
+        Object.keys(wk.pool || {}).forEach(function (k) { if (['enabled', 'buyIn', 'kp', 'net', 'skins'].indexOf(k) === -1 && pool[k] === undefined) pool[k] = wk.pool[k]; });
+        return pool;
+    }
+    function wkCheck(pool) {
+        if (typeof validateMoneyPool !== 'function') return { valid: false, errors: ['This page cannot check the pot - use Round settings › Full setup.'] };
+        var d = data() || {};
+        return validateMoneyPool(Object.assign({}, d, { moneyPool: pool }), d.courseData || []);
+    }
+    function wkDraw() {
+        if (!wk) return;
+        var panel = wkRoot().querySelector('.hb-panel'), y = panel.scrollTop;
+        var seg = function (k, v, label) { return '<button type="button" data-wk-set="' + k + '" data-v="' + v + '" class="' + (String(wk[k]) === String(v) ? 'on' : '') + '">' + label + '</button>'; };
+        var h = '<div class="hb-grab"></div><div class="hb-head"><div class="hb-title">Weekly Game</div><button type="button" class="hb-x" data-wk="close" aria-label="Close">✕</button></div>';
+        h += '<div class="hb-card"><div class="hb-row"><span>Weekly Game</span><span class="hb-seg">' + seg('on', true, 'On') + seg('on', false, 'Off') + '</span></div></div>';
+        if (wk.on) {
+            var pool = wkPool(), v = wkCheck(pool), holes = wkHoles();
+            h += '<div class="hb-card">'
+                + '<div class="hb-row"><span>Buy-in</span><span>$ <input class="hb-custom" data-wk-in="buyIn" inputmode="decimal" value="' + esc(wk.buyIn) + '" aria-label="Buy-in"></span></div>'
+                + '<div class="hb-row"><span>Pot</span><b id="wk-pot">$' + esc(String(Math.round(v.totalPool || 0))) + '</b></div></div>';
+            h += '<div class="hb-h">KP (closest to the pin)</div><div class="hb-card"><div class="hb-row"><span>KP money</span><span>$ <input class="hb-custom" data-wk-in="kpAmt" inputmode="decimal" value="' + esc(wk.kpAmt) + '" aria-label="KP money"></span></div></div>';
+            if (holes.length) h += '<div class="hb-chips" style="margin-top:8px;">' + holes.map(function (x) { return '<button type="button" class="hb-chip' + (wk.kpHoles.indexOf(x.n) > -1 ? ' on' : '') + '" data-wk-kp="' + x.n + '" aria-pressed="' + (wk.kpHoles.indexOf(x.n) > -1) + '">' + x.n + (x.par === 3 ? ' · P3' : '') + '</button>'; }).join('') + '</div>';
+            h += '<div class="hb-h">Net finish</div><div class="hb-card">';
+            if (wk.netCustom) {
+                h += wk.netAmounts.map(function (a, i) { return '<div class="hb-row"><span>' + ['1st', '2nd', '3rd', '4th'][i] + '</span><span>$ <input class="hb-custom" data-wk-netc="' + i + '" inputmode="decimal" value="' + esc(a) + '"></span></div>'; }).join('');
+            } else {
+                h += '<div class="hb-row"><span>Net money</span><span>$ <input class="hb-custom" data-wk-in="netAmt" inputmode="decimal" value="' + esc(wk.netAmt) + '" aria-label="Net money"></span></div>'
+                    + '<div class="hb-row"><span>Paid</span><span class="hb-seg">' + NET_PRESETS.map(function (p) { return '<button type="button" data-wk-places="' + p.join(',') + '" class="' + (p.join(',') === wk.netPlaces.join(',') ? 'on' : '') + '">' + (p.length === 1 ? 'Winner' : p.join('/')) + '</button>'; }).join('') + '</span></div>';
+            }
+            h += '</div>';
+            h += '<div class="hb-h">Skins</div><div class="hb-card">'
+                + '<div class="hb-row"><span>Money</span><span class="hb-seg">' + seg('skMode', 'remainder', 'The rest') + seg('skMode', 'fixed', 'Fixed $') + seg('skMode', 'none', 'None') + '</span></div>'
+                + (wk.skMode === 'fixed' ? '<div class="hb-row"><span>Skins money</span><span>$ <input class="hb-custom" data-wk-in="skAmt" inputmode="decimal" value="' + esc(wk.skAmt) + '"></span></div>' : '')
+                + (wk.skMode !== 'none' ? '<div class="hb-row"><span>Scoring</span><span class="hb-seg">' + seg('skScoring', 'net', 'Net') + seg('skScoring', 'gross', 'Gross') + '</span></div>'
+                    + '<div class="hb-row"><span>Ties carry over</span><span class="hb-seg">' + seg('skCarry', true, 'Yes') + seg('skCarry', false, 'No') + '</span></div>' : '')
+                + '</div>';
+            var line = v.valid ? ('$' + Math.round(v.totalPool) + ' pot' + (wk.skMode === 'remainder' ? ' · $' + Math.round(v.remainder) + ' to skins' : '')) : (v.errors || [])[0];
+            h += '<div class="hb-why" id="wk-why">' + esc(wk.err || line || '') + '</div>';
+            if (typeof moneyPoolRulesLocked === 'function' && moneyPoolRulesLocked(data() || {})) h += '<div class="hb-worst">Scores are in: a change here changes who is paid, for everyone.</div>';
+        }
+        h += '<button type="button" class="hb-go" data-wk="save"' + (wk.saving ? ' disabled' : '') + '>' + (wk.saving ? 'Saving…' : 'Save') + '</button>'
+            + '<button type="button" class="hb-go hb-cancel" data-wk="close">Cancel</button>';
+        panel.innerHTML = h;
+        panel.scrollTop = y;
+    }
+    function wkInput(ev) {
+        var t = ev.target; if (!wk || !t) return;
+        var k = t.getAttribute('data-wk-in'), c = t.getAttribute('data-wk-netc');
+        if (k) wk[k] = t.value;
+        else if (c != null) wk.netAmounts[Number(c)] = t.value;
+        else return;
+        wk.err = '';
+        var v = wkCheck(wkPool()), why = document.getElementById('wk-why'), pot = document.getElementById('wk-pot');
+        if (pot) pot.textContent = '$' + Math.round(v.totalPool || 0);
+        if (why) why.textContent = v.valid ? ('$' + Math.round(v.totalPool) + ' pot' + (wk.skMode === 'remainder' ? ' · $' + Math.round(v.remainder) + ' to skins' : '')) : (v.errors || [])[0] || '';
+    }
+    function wkClick(ev) {
+        var t = ev.target && ev.target.closest ? ev.target : null, b;
+        if (!t || !wk) return;
+        if ((b = t.closest('[data-wk-set]'))) { var k = b.getAttribute('data-wk-set'), v = b.getAttribute('data-v'); wk[k] = v === 'true' ? true : v === 'false' ? false : v; wk.err = ''; wkDraw(); return; }
+        if ((b = t.closest('[data-wk-kp]'))) { var n = Number(b.getAttribute('data-wk-kp')), i = wk.kpHoles.indexOf(n); if (i > -1) wk.kpHoles.splice(i, 1); else wk.kpHoles.push(n); wkDraw(); return; }
+        if ((b = t.closest('[data-wk-places]'))) { wk.netPlaces = b.getAttribute('data-wk-places').split(',').map(Number); wkDraw(); return; }
+        b = t.closest('[data-wk]'); if (!b) return;
+        var a = b.getAttribute('data-wk');
+        if (a === 'close') { var rt = wk.returnTo; wkClose(); if (rt) afterSave(rt); return; }
+        if (a === 'save') wkSave();
+    }
+    function wkSave() {
+        if (!wk || wk.saving) return;
+        if (!organizerHere()) { wk.err = 'Only the round’s organizer can change the Weekly Game.'; wkDraw(); return; }
+        var pool = wk.on ? wkPool() : null;
+        if (pool) { var v = wkCheck(pool); if (!v.valid) { wk.err = 'NOT SAVED — ' + (v.errors || ['check the pot'])[0]; wkDraw(); return; } }
+        if (typeof requireOnlineForMoney === 'function' && !requireOnlineForMoney('NOT SAVED', 'Reconnect before changing the Weekly Game.')) return;
+        wk.saving = true; wkDraw();
+        var w = wk, cb = w.onDone, rt = w.returnTo;
+        db.ref('events/' + code()).update({ moneyPool: pool }).then(function () {
+            wkClose();
+            say('toast', pool ? 'Weekly Game saved: $' + pool.buyIn + ' in' : 'Weekly Game off');
+            setTimeout(refresh, 0);
+            if (typeof cb === 'function') { try { cb(pool); } catch (e) {} }
+            if (rt) afterSave(rt);
+        }, function (err) { if (wk !== w) return; w.saving = false; w.err = 'NOT SAVED — ' + ((err && err.message) || 'try again'); wkDraw(); });
+    }
+
     // ---- THE CARD SIDE: money chip + "+ Bet" -----------------------------------
     function cardBar() {
         var bar = document.getElementById('hp-card-bet');
@@ -796,6 +938,7 @@
     var api = {
         on: on, open: open, close: close, isOpen: isOpen, refresh: refresh, openBets: openBets,
         redraw: function () { if (isOpen()) draw(); },
+        openWeekly: openWeekly, closeWeekly: wkClose, weeklyOpen: wkOpen,
         hiloHere: hiloHere, tiles: tiles, preview: preview, playedRange: playedRange,
         // Pure-ish pieces for the tests.
         shapeOf: shapeOf, buildBet: buildBet, worstCase: worstCase, moneyNow: moneyNow,
@@ -804,6 +947,7 @@
     };
     window.HardPanBet = api;
     if (window.GolfBack && typeof window.GolfBack.register === 'function') {
+        try { window.GolfBack.register({ name: 'hp-weekly', priority: 2, isOpen: wkOpen, close: wkClose }); } catch (e) {}
         try { window.GolfBack.register({ name: 'hp-bet', priority: 1, isOpen: isOpen, close: function () { if (st && st.step > 1) { st.step -= 1; draw(); } else close(); } }); } catch (e) {}
     }
 })();

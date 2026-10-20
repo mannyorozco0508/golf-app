@@ -3154,7 +3154,13 @@ html {
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/presses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/presses/${pushKey}`).set({ baseId, startHole: nextHole, stake: amt })
-            .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${pressMatchNames(sm)}\n$${amt}\nStarts Hole ${nextHole}`))
+            .then(() => {
+                uiToast(`\u2705 PRESS CONFIRMED\n${pressMatchNames(sm)}\n$${amt}\nStarts Hole ${nextHole}`);
+                // GPS:BEGIN
+                // URGENT-018: a press made from the round (&hpback=1) goes back to it - its side and hole.
+                if (typeof hpBackWanted === 'function' && hpBackWanted() && urlParams.get('press')) setTimeout(hpBackToRound, 900);
+                // GPS:END
+            })
             .catch(err => uiFail(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
