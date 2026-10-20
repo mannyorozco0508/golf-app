@@ -3442,6 +3442,19 @@
         // THE WATCH (feature 10): the same three numbers to an Apple Watch, when the native
         // plugin exists and the 'watch' switch is on. Never allowed to break the screen.
         try { watchSync(nums, aim, o, u); } catch (e) {}
+        // 022 (1): the Lock Screen / Dynamic Island yardages (gps-live-activity.js - the app only, its own throttle).
+        try {
+            var LA = window.HardPanLiveActivity;
+            if (LA && S.eventCode && nums && S.mode === 'measure' && !tournament()) {
+                var toU = function (m) { return m == null ? null : Math.round(u === 'm' ? m : m / 0.9144); };
+                var midM = (aim && o) ? G.haversineMeters(o.pt, aim) : nums.middleM, pl = playsLineNow(), chip = S.el.querySelector('.gps-lc-score'), mny = window.HardPanBet && window.HardPanBet.moneyNow ? window.HardPanBet.moneyNow() : null;
+                var mid = toU(midM), pt = function (q) { return q && q.length === 2 ? [q[0], q[1]] : null; };
+                LA.sync({ round: String(S.eventCode), course: String((S.round && S.round.courseName) || '').split(' (')[0], hole: Number(S.hole), par: S.par ? Number(S.par) : null,
+                    front: toU(nums.frontM), mid: mid, back: toU(nums.backM), unit: u === 'm' ? 'm' : 'y', playsDelta: pl && mid != null ? pl.shown - mid : 0,
+                    fromTee: !!(o && o.from === 'tee'), thru: chip && chip.textContent ? chip.textContent.trim() : null, money: mny && mny.bets > 0 ? String(mny.text || '') : null,
+                    green: { f: pt(nums.front), c: pt(nums.middle), b: pt(nums.back) } });
+            }
+        } catch (e) {}
 
         // URGENT-022: the hole is in and the map is still on the course / the golfer / the world (it was
         // framed before the hole's data landed): the hole, tee to green - unless the golfer moved it.
@@ -4443,6 +4456,8 @@
         // shown only when that API is in the page.
         +   '<div class="gps-ts-row" data-ts-row="others"><span>Track stats for others</span><button type="button" class="gps-ts-sw" data-ts-sw="others" role="switch" aria-label="Track stats for others"><i></i></button></div>'
         // 020: "Practice round" (gps-stats.js setPractice, per round): nothing from this round goes into My stats.
+        // 022 (1): the Lock Screen / Dynamic Island yardages (gps-live-activity.js), per phone, default on. The app only.
+        +   '<div class="gps-ts-row" data-ts-row="lockscreen"><span>Lock Screen yardages<span style="display:block;font-size:12px;font-weight:600;opacity:.75;">The middle number on the Lock Screen and the Dynamic Island</span></span><button type="button" class="gps-ts-sw" data-ts-sw="lockscreen" role="switch" aria-label="Lock Screen yardages"><i></i></button></div>'
         +   '<div class="gps-ts-row" data-ts-row="practice"><span>Practice round<span style="display:block;font-size:12px;font-weight:600;opacity:.75;">Nothing from this round goes into My stats</span></span><button type="button" class="gps-ts-sw" data-ts-sw="practice" role="switch" aria-label="Practice round"><i></i></button></div>'
         + '</div>'
         + '<div class="gps-ts-h">MORE</div><div class="gps-ts-grid">'
@@ -4467,6 +4482,8 @@
         sw('others', H ? H.trackOthers() : false, !!H);
         var PS = window.HardPanGpsStats, pc = String(S.eventCode || '');
         sw('practice', !!(PS && PS.practiceOn && pc && PS.practiceOn(pc)), !!(PS && PS.setPractice && pc));
+        var LAs = window.HardPanLiveActivity;
+        sw('lockscreen', !!(LAs && LAs.isOn()), !!(LAs && isNative()));
         Array.prototype.forEach.call(t.querySelectorAll('[data-ts-tile]'), function (b) {
             var m = S.el.querySelector('.gps-tools-menu ' + b.getAttribute('data-ts-tile'));
             b.style.display = m && m.style.display !== 'none' ? '' : 'none';
@@ -4503,6 +4520,7 @@
             if (w === 'tourney') tsRun('.gps-tourney-toggle');
             else if (w === 'aa') tsRun('.gps-aa-toggle');
             else if (w === 'others') { var H = tsStats(); if (H) { H.setTrackOthers(!H.trackOthers()); tsSync(); } }
+            else if (w === 'lockscreen') { var LAc = window.HardPanLiveActivity; if (LAc) { LAc.setOn(!LAc.isOn()); tsSync(); render(); } }
             else if (w === 'practice') { var P = window.HardPanGpsStats, c = String(S.eventCode || ''); if (P && P.setPractice && c) { P.setPractice(c, !P.practiceOn(c)); tsSync(); } }
             return;
         }

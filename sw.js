@@ -4746,6 +4746,8 @@ const SHELL_FILES = [
     './gps-add-golfer.js',
     // URGENT-018: round edits in place - groups, start, nines, tee (simpleFlow).
     './gps-round-edit.js',
+    // 022 (1): Lock Screen / Dynamic Island yardages (the app only).
+    './gps-live-activity.js',
     // Simpler HardPan (017): the 3-step New round on Round Setup.
     './simple-flow.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).
