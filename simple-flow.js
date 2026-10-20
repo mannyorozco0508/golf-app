@@ -114,6 +114,7 @@
         + '#sf .sf-tile.on{border:2px solid #0f4c3a;background:#f3f8f4}#sf .sf-tile.on .n:after{content:" \\2713";color:#0f4c3a}'
         + '#sf .sf-money{display:flex;align-items:center;gap:6px}#sf .sf-money input{width:76px;height:40px;border:1px solid #dfe5df;border-radius:10px;padding:0 8px;font-size:16px;text-align:right;font-family:inherit}'
         + '#sf .sf-seg{display:flex;background:#e9eee9;border-radius:12px;padding:3px}#sf .sf-seg button{border:0;background:none;border-radius:10px;padding:8px 18px;font-weight:800;font-size:15px;font-family:inherit;cursor:pointer;color:#13241d}#sf .sf-seg button.on{background:#0f4c3a;color:#fff}'
+        + '#sf .sf-trow{display:flex;gap:6px;align-items:center;margin-bottom:8px}#sf .sf-trow input{height:46px;border:1px solid #dfe5df;border-radius:12px;padding:0 10px;font-size:16px;font-family:inherit;background:#fff;color:#13241d;min-width:0}#sf .sf-tname{flex:1}#sf .sf-thcp{width:64px;text-align:center}#sf .sf-ttee{height:46px;border:1px solid #dfe5df;border-radius:12px;font-size:14px;max-width:96px;background:#fff}#sf .sf-tfl{min-width:40px}#sf .sf-seg button{min-height:40px}'
         + '#sf .sf-note{font-size:13px;color:#667;line-height:1.4}#sf .sf-dot{width:22px;height:22px;border-radius:50%;flex:none;display:inline-block}#sf .sf-tee{padding:12px 14px}'
         + '#sf .sf-err{color:#b42318;font-weight:700;font-size:14px;margin:6px 0}'
         + '#sf .sf-big{font:800 34px/1.1 ui-monospace,Menlo,monospace;letter-spacing:.12em;color:#0f4c3a;text-align:center;margin:4px 0}'
@@ -128,6 +129,8 @@
         e.addEventListener('click', onClick);
         e.addEventListener('input', onInput);
         e.addEventListener('change', onChange);
+        e.addEventListener('keydown', typeKey);
+        e.addEventListener('paste', function (ev) { if (ev.target && ev.target.id === 'sf-paste') setTimeout(function () { if (readPaste()) sumOnly(); }, 0); });
         return e;
     }
     function show(on) {
@@ -407,11 +410,88 @@
             }).join('') + '</div>';
         }).join('') + '<div class="sf-note">They stay two golfers. The round starts once the names differ.</div></div>';
     }
+    // TWO WAYS IN (URGENT-013, 5:17 PM): [Paste a list] [Type names]. Both write the wizard's own
+    // player rows, so the summary card, flights and "Add initial" read the same roster either way.
+    // NOTHING HERE RE-DRAWS THE BOX BEING TYPED IN: the paste box is read on a paste, on leaving
+    // the box, or on Done; typed rows write straight into the wizard rows and only the summary
+    // under them is re-drawn (sumOnly), so the keyboard never leaves.
+    var PMODE = 'hardpan_players_mode';
+    function pmode() {
+        if (!S.pmode) { var m = ls(PMODE); S.pmode = m === 'paste' || m === 'type' ? m : 'type'; }
+        return S.pmode;
+    }
+    function wizRow(id) { return Array.prototype.filter.call(D.querySelectorAll('#player-list .player-row'), function (r) { return r.getAttribute('data-player-id') === String(id); })[0] || null; }
+    function allRows() {
+        return Array.prototype.map.call(D.querySelectorAll('#player-list .player-row'), function (r) {
+            var f = r.querySelector('.p-flight-input'), t = r.querySelector('.p-tee-input');
+            return { id: r.getAttribute('data-player-id'), name: (r.querySelector('.p-name-input') || {}).value || '', hcp: (r.querySelector('.p-hcp-input') || {}).value || '', flight: f ? f.getAttribute('data-flight') : null, tee: t ? t.value : '' };
+        });
+    }
+    function typeRows() {
+        var rows = allRows(), tees = teeRows(courseKey()), fl = flightsOn();
+        var teeSel = function (r) {
+            if (tees.length < 2) return '';
+            var row = wizRow(r.id), cur = row && row.querySelector('.p-tee-input') ? row.querySelector('.p-tee-input').value : '';
+            return '<select class="sf-ttee" data-sf-ttee="' + esc(r.id) + '" aria-label="Tee"><option value="">Tee</option>' + tees.map(function (t) { return '<option value="' + esc(t.key) + '"' + (cur === t.key ? ' selected' : '') + '>' + esc(t.name) + '</option>'; }).join('') + '</select>';
+        };
+        return '<div id="sf-type">' + rows.map(function (r, i) {
+            return '<div class="sf-trow" data-sf-trow="' + esc(r.id) + '">'
+                + '<input type="text" class="sf-tname" data-sf-tname="' + esc(r.id) + '" value="' + esc(r.name) + '" placeholder="Golfer ' + (i + 1) + '" autocomplete="off" autocapitalize="words" enterkeyhint="next" aria-label="Name ' + (i + 1) + '">'
+                + '<input type="text" class="sf-thcp" data-sf-thcp="' + esc(r.id) + '" value="' + esc(r.hcp) + '" placeholder="HCP" inputmode="decimal" enterkeyhint="next" aria-label="Handicap ' + (i + 1) + '">'
+                + (fl ? '<button type="button" class="sf-chip on sf-tfl" data-sf-tfl="' + esc(r.id) + '">' + esc(r.flight || 'A') + '</button>' : '')
+                + teeSel(r) + '</div>';
+        }).join('') + '</div><button type="button" class="sf-btn" data-sf="addgolfer" style="width:100%;min-height:48px;margin:4px 0 12px;">+ Add golfer</button>';
+    }
+    // A row with no name and no handicap is nobody (the wizard would save it as "Player N").
+    function pruneEmpty() {
+        if (!fn('captureCurrentPlayerInputs') || !fn('appendPlayerFrom')) return;
+        var all = W.captureCurrentPlayerInputs(), keep = all.filter(function (p) { return String(p.name || '').trim() || String(p.hcp || '').trim(); });
+        if (keep.length === all.length) return;
+        $('player-list').innerHTML = '';
+        if (fn('renderPlayerListHeaderAndWarning')) W.renderPlayerListHeaderAndWarning(keep.length);
+        keep.forEach(function (p) { W.appendPlayerFrom(p, false, keep.length); });
+        if (fn('updateCount')) W.updateCount();
+    }
     function step2() {
-        var body = '<textarea id="sf-paste" placeholder="Paste your pairings or type names…&#10;Skeens 2.0/A&#10;Glenn 12.0/B">' + esc(S.pasted || '') + '</textarea>'
-            + '<div class="sf-note" style="margin:6px 2px 12px;">One golfer a line, handicap after the name, /A or /B for a flight. A blank line starts a new group.</div>'
-            + summary() + dupCard() + (S.err2 ? '<div class="sf-err">' + esc(S.err2) + '</div>' : '');
+        var m = pmode();
+        if (m === 'type' && !allRows().length && fn('addNewPlayerAndRefresh')) W.addNewPlayerAndRefresh();
+        var seg = '<div class="sf-seg" style="margin-bottom:12px;"><button type="button" data-sf-pmode="paste" class="' + (m === 'paste' ? 'on' : '') + '" style="flex:1;">Paste a list</button><button type="button" data-sf-pmode="type" class="' + (m === 'type' ? 'on' : '') + '" style="flex:1;">Type names</button></div>';
+        var top = m === 'paste'
+            ? '<textarea id="sf-paste" placeholder="Paste your pairings or type names…&#10;Skeens 2.0/A&#10;Glenn 12.0/B">' + esc(S.pasted || '') + '</textarea>'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin:6px 2px 12px;"><span class="sf-note">One golfer a line, handicap after the name, /A or /B for a flight. A blank line starts a new group.</span><button type="button" class="sf-btn" data-sf="pastedone">Done</button></div>'
+            : typeRows();
+        var body = seg + top + '<div id="sf-p2sum">' + sumHtml() + '</div>';
         return shell('Who’s playing?', body, '<button type="button" class="sf-cta" data-sf="next">Next: Games ›</button>', 2);
+    }
+    function sumHtml() { return summary() + dupCard() + (S.err2 ? '<div class="sf-err">' + esc(S.err2) + '</div>' : ''); }
+    function sumOnly() { var b = $('sf-p2sum'); if (b) b.innerHTML = sumHtml(); }
+    // The paste box, read once per change of its text (never while typing in it).
+    function readPaste() {
+        var p = $('sf-paste'), text = p ? p.value : S.pasted;
+        S.pasted = text;
+        if (!String(text || '').trim() || text === S.pastedRead) return false;
+        S.pastedRead = text;
+        paste(text);
+        ls(PMODE, 'paste');
+        return true;
+    }
+    function addGolfer() {
+        if (fn('addNewPlayerAndRefresh')) W.addNewPlayerAndRefresh();
+        render();
+        var ins = el().querySelectorAll('[data-sf-tname]'), last = ins[ins.length - 1];
+        if (last) { try { last.focus(); last.scrollIntoView({ block: 'center' }); } catch (e) {} }
+    }
+    function typeKey(ev) {
+        var t = ev.target;
+        if (ev.key !== 'Enter' || !t.getAttribute) return;
+        if (t.id === 'sf-paste') return;                       // Enter = a new line, in the box
+        var id = t.getAttribute('data-sf-tname') || t.getAttribute('data-sf-thcp');
+        if (!id) return;
+        ev.preventDefault();
+        if (t.getAttribute('data-sf-tname')) { var h = el().querySelector('[data-sf-thcp="' + id + '"]'); if (h) h.focus(); return; }
+        var rows = Array.prototype.slice.call(el().querySelectorAll('[data-sf-tname]'));
+        var at = rows.map(function (x) { return x.getAttribute('data-sf-tname'); }).indexOf(id);
+        if (rows[at + 1]) rows[at + 1].focus(); else addGolfer();
     }
 
     // ---- STEP 3: GAMES ------------------------------------------------------------
@@ -573,11 +653,13 @@
     function start() {
         S.err3 = '';
         if (!courseName()) { go(1); return; }
-        if (!players().length) { S.err2 = 'Paste or type who’s playing first.'; go(2); return; }
+        pruneEmpty();
+        if (!players().length) { S.err2 = 'Paste or type who\u2019s playing first.'; go(2); return; }
         if (dupList().length) { S.dupOpen = true; S.err2 = 'Two golfers have the same name — add an initial, then Start.'; go(2); return; }
         var bad = ['nassau', 'match', 'hilo'].filter(function (k) { return S.games[k] && (k !== 'hilo' || hiloHere()) && !sides(k, players()); });
         if (bad.length) { S.err3 = 'Pick who’s in the ' + bad.map(function (k) { return k === 'hilo' ? 'Hi-Lo' : k.replace(/^\w/, function (c) { return c.toUpperCase(); }); }).join(' and ') + '.'; render(); return; }
         apply();
+        ls(PMODE, pmode());
         runSave('err3');
     }
     function runSave(errKey) {
@@ -753,6 +835,8 @@
             if (at >= 0) cur.splice(at, 1); else cur.push(id);
             S.who[gk] = cur.slice(0, 4); render(); return;
         }
+        if ((b = t.closest('[data-sf-pmode]'))) { if (S.pmode === 'paste') readPaste(); S.pmode = b.getAttribute('data-sf-pmode'); render(); return; }
+        if ((b = t.closest('[data-sf-tfl]'))) { var fr = wizRow(b.getAttribute('data-sf-tfl')), fb = fr && fr.querySelector('.p-flight-input'); if (fb && fn('toggleRowFlight')) { W.toggleRowFlight(fb); b.textContent = fb.getAttribute('data-flight'); sumOnly(); } return; }
         if ((b = t.closest('[data-sf-whoall]'))) { S.whoAll[b.getAttribute('data-sf-whoall')] = true; render(); return; }
         if ((b = t.closest('[data-sf-share]'))) {
             var g = Number(b.getAttribute('data-sf-share'));
@@ -768,7 +852,9 @@
             W.location.href = 'home.html';
             return;
         }
-        if (a === 'next') { S.err2 = ''; if (S.step === 1 && !courseName()) return; if (S.step === 2 && !players().length) { S.err2 = 'Paste or type who’s playing.'; render(); return; } if (S.step === 2 && dupList().length) { S.dupOpen = true; S.err2 = 'Two golfers have the same name \u2014 add an initial first.'; render(); return; } go(S.step + 1); return; }
+        if (a === 'next') { S.err2 = ''; if (S.step === 2 && pmode() === 'paste') readPaste(); if (S.step === 2) pruneEmpty(); if (S.step === 1 && !courseName()) return; if (S.step === 2 && !players().length) { S.err2 = 'Paste or type who’s playing.'; render(); return; } if (S.step === 2 && dupList().length) { S.dupOpen = true; S.err2 = 'Two golfers have the same name \u2014 add an initial first.'; render(); return; } go(S.step + 1); return; }
+        if (a === 'pastedone') { readPaste(); render(); return; }
+        if (a === 'addgolfer') { addGolfer(); return; }
         if (a === 'change') { S.changing = true; render(); var q = $('sf-q'); if (q) q.focus(); return; }
         if (a === 'startgps') { startGps(); return; }
         if (a === 'mix') { away(step('players'), 'Tees set'); return; }
@@ -799,10 +885,13 @@
     function onInput(ev) {
         var t = ev.target;
         if (t.id === 'sf-q') { S.q = t.value; clearTimeout(S.qt); S.qt = setTimeout(function () { render(); var q = $('sf-q'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }, 250); return; }
-        if (t.id === 'sf-paste') {
-            S.pasted = t.value;
-            clearTimeout(pasteTimer);
-            pasteTimer = setTimeout(function () { paste(t.value); render(); var p = $('sf-paste'); if (p && D.activeElement !== p) { /* kept */ } }, 700);
+        if (t.id === 'sf-paste') { S.pasted = t.value; return; }   // read on paste / leaving the box / Done
+        if (t.getAttribute('data-sf-tname') || t.getAttribute('data-sf-thcp')) {
+            var tid = t.getAttribute('data-sf-tname') || t.getAttribute('data-sf-thcp'), wr = wizRow(tid);
+            var box = wr && wr.querySelector(t.getAttribute('data-sf-tname') ? '.p-name-input' : '.p-hcp-input');
+            if (box) { box.value = t.value; box.dispatchEvent(new Event('input', { bubbles: true })); }
+            clearTimeout(S.sumT); S.sumT = setTimeout(sumOnly, 250);
+            ls(PMODE, 'type');
             return;
         }
         if (t.getAttribute('data-sf-stake')) {
@@ -827,7 +916,14 @@
             if (!dupList().length) { S.dupOpen = false; S.err2 = ''; }
             render(); return;
         }
-        if (t.getAttribute('data-sf-stake') || t.id === 'sf-paste') render();
+        if (t.id === 'sf-paste') { if (readPaste()) sumOnly(); return; }
+        if (t.getAttribute('data-sf-ttee')) {
+            var tr2 = wizRow(t.getAttribute('data-sf-ttee')), ts2 = tr2 && tr2.querySelector('.p-tee-input');
+            if (ts2) { ts2.value = t.value; ts2.dispatchEvent(new Event('change', { bubbles: true })); }
+            return;
+        }
+        if (t.getAttribute('data-sf-tname')) { if (fn('renderDuplicateNamesBlock')) try { W.renderDuplicateNamesBlock(); } catch (e) {} sumOnly(); return; }
+        if (t.getAttribute('data-sf-stake')) render();
     }
 
     // ---- ARRIVAL ------------------------------------------------------------------
