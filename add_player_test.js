@@ -150,8 +150,9 @@ describe('THE SURROUNDING BEHAVIOUR IS UNCHANGED', () => {
         // wave (2026-09-13) and `teeKey = undefined` as the eleventh in the
         // per-golfer tees wave (2026-10-05); every default before them is
         // unchanged, which is the claim - a bare addPlayerRow() still adds one
-        // row with an immediate refresh.
-        assert.ok(/function addPlayerRow\(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined, teeKey = undefined\)/.test(ADM),
+        // row with an immediate refresh. (`teeName = undefined`, the twelfth, polish 029 #1: a
+        // copied golfer's tee is checked by name against this course's tees.)
+        assert.ok(/function addPlayerRow\(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined, teeKey = undefined, teeName = undefined\)/.test(ADM),
             'a plain addPlayerRow() must still add one row with an immediate refresh');
     });
 
@@ -199,8 +200,9 @@ describe('THE SURROUNDING BEHAVIOUR IS UNCHANGED', () => {
         const call = ADM.slice(ADM.indexOf('addPlayerRow(', at));
         const args = call.slice(call.indexOf('(') + 1, call.indexOf(')')).split(',').map(a => a.trim());
         // ELEVEN since the per-golfer tees wave: the row needs to know which tee
-        // this golfer was saved on, and the eleventh is where it is passed.
-        assert.equal(args.length, 11, 'eleven arguments: ' + JSON.stringify(args));
+        // this golfer was saved on, and the eleventh is where it is passed; TWELVE since polish
+        // 029 #1 (the tee's name, so a copied golfer's tee is checked against this course's).
+        assert.equal(args.length, 12, 'twelve arguments: ' + JSON.stringify(args));
         assert.equal(args[7], 'true', 'the 8th argument is deferRefresh, and the batch defers: ' + JSON.stringify(args));
         assert.equal(args[8], 'p.id', 'and the row still carries the golfer\'s own id');
         // The signature's 8th parameter really is deferRefresh - so position 8
