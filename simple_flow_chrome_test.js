@@ -27,7 +27,13 @@ const POOL = { enabled: true, buyIn: 40, kp: { amount: 100, holes: [3, 7, 12, 16
 const NAMES = ['Ann Alpha', 'Ben Bravo', 'Cal Charlie', 'Dee Delta', 'Eli Echo', 'Fay Foxtrot', 'Gus Golf', 'Hal Hotel'];
 const SRC = wizardSavedRound({ code: 'SALW01', golfers: 8, names: NAMES, ownerUid: 'anon-cold', thru: 9, courseData: CD,
     overrides: { activeCourseKey: 'gca_zgkynkan', courseName: 'Dobson Ranch Golf Course', groupSizeOverrides: { 0: 4, 1: 4 }, moneyPool: POOL } });
-const DB = (ev) => ({ events: ev || {}, global_courses: { gca_zgkynkan: { name: 'Dobson Ranch Golf Course', data: CD } }, trips: {}, tournaments: {}, organizers: {} });
+// Dobson's shared record as it is shaped: tees.male / tees.female, each tee { name, rating, slope, parTotal, totalYards, holes }.
+const TEE = (name, y, r, sl) => ({ name, rating: r, slope: sl, parTotal: 72, totalYards: y, holes: CD.map((h) => ({ par: h.par, yardage: Math.round(y / 18) })) });
+const TEES = { male: [TEE('Back', 6586, 71.1, 123), TEE('DRGA Tournament Tee', 6394, 70.2, 121), TEE('White', 6187, 69.0, 118), TEE('Red', 5645, 66.9, 112)],
+    female: [TEE('White', 6187, 74.6, 129), TEE('Red', 5645, 71.4, 120)] };
+const DB = (ev) => ({ events: ev || {}, global_courses: { gca_zgkynkan: { name: 'Dobson Ranch Golf Course', data: CD, tees: TEES } }, trips: {}, tournaments: {}, organizers: {} });
+const SHOT = (name) => (process.env.SF_SHOTS ? [{ shot: require('path').join(process.env.SF_SHOTS, name), viewportOnly: true }] : []);
+const TEEROWS = "JSON.stringify({ tees: Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-tee]'), function (b) { return b.innerText.replace(/\\n/g, ' | ') + (b.classList.contains('sf-sel') ? ' *' : ''); }) })";
 const BASE = 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true });
 const OFF = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{features:Object.assign({},v&&v.features,{simpleFlow:false})});}});})();";
 const X = (e) => ({ expression: e });
@@ -40,27 +46,31 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE, steps: [
             { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.3759, longitude: -111.8778, accuracy: 10 } } },
             { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
-            X("JSON.stringify({ home: document.getElementById('v-simple').innerText })"),
+            X("JSON.stringify({ home: document.getElementById('v-simple').innerText })"), ...SHOT('v2-home.png'),
             { tap: '[data-hp-act="snew"]' },
-            { waitFor: "/game=/.test(location.search) && !!document.getElementById('sf-course')", timeout: 30000 }, { sleep: 800 }, X(SF),
+            { waitFor: "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-tee]')", timeout: 30000 }, { sleep: 800 }, X(SF), X(TEEROWS), ...SHOT('v2-course-tees.png'),
             { tap: '[data-sf="next"]' }, { sleep: 300 },
             X("(function(){ var t = document.getElementById('sf-paste'); t.value = " + JSON.stringify(PASTE) + "; t.dispatchEvent(new Event('input', { bubbles: true })); return 'pasted'; })()"),
-            { waitFor: "/20 golfers/.test(document.getElementById('sf').innerText)", timeout: 8000 }, { sleep: 300 }, X(SF),
+            { waitFor: "/20 golfers/.test(document.getElementById('sf').innerText)", timeout: 8000 }, { sleep: 300 }, X(SF), ...SHOT('v2-players.png'),
             { tap: '[data-sf="next"]' }, { sleep: 300 }, X(SF),   // refused: the same names
             X("(function(){ var out = []; ['Matt S', 'Mike R'].forEach(function (v) { var i = document.querySelector('[data-sf-rename]'); if (!i) return; i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); out.push(v); }); return out.join(','); })()"),
             { sleep: 300 }, X(SF),
             { tap: '[data-sf="next"]' }, { sleep: 300 },
-            { tap: '[data-sf-game="weekly"]' }, { tap: '[data-sf-game="skins"]' }, { tap: '[data-sf-game="nassau"]' }, { sleep: 300 }, X(SF),
+            { tap: '[data-sf-game="weekly"]' }, { tap: '[data-sf-game="skins"]' }, { tap: '[data-sf-game="nassau"]' }, { sleep: 300 }, X(SF), ...SHOT('v2-games.png'),
             { tap: '[data-sf="start"]' },
             { waitFor: "!!document.getElementById('sf-code')", timeout: 20000 }, { sleep: 500 }, X(SF), X(WRITES),
             { tap: '[data-sf="done"]' }, { sleep: 800 },
             X("JSON.stringify({ done: location.href.split('/').pop() })")] });
         assert.equal(r.ok, true, r.reason);
-        const [home, s1, s2, refused, fixed, s3, sheet, w, done] = J(r);
-        assert.match(home.home, /Same as last week|New round/);
-        assert.match(home.home, /\+ New round[\s\S]*Join with a code[\s\S]*Just GPS \(no games\)[\s\S]*MORE[\s\S]*Trip[\s\S]*History[\s\S]*How it works/);
+        const [home, s1, tees, s2, refused, fixed, s3, sheet, w, done] = J(r);
+        assert.match(home.home, /GPS\nYardages for your round[\s\S]*Games & Bets\nSet up the group, games and money[\s\S]*Join with a code · Trip · History/, 'the two doors, then the slim row');
         assert.equal(s1.h1, 'Where are you playing?');
-        assert.match(s1.text, /Dobson Ranch Golf Course\n0\.0 mi · ✓ GPS/, 'the closest course, picked, with the GPS badge');
+        assert.match(s1.text, /^‹\nGames & Bets/);
+        assert.match(s1.text, /Dobson Ranch Golf Course\n0\.0 mi · ✓ GPS · Change/, 'the closest course, picked, with the GPS badge');
+        // URGENT-013: the tee NAMES (the first look showed the gender: Men, Men, Men, Men, Women, Women),
+        // Men/Women small, yards, rating / slope; the women's White and Red (same yards) not repeated.
+        assert.deepEqual(tees.tees, ['Back | Men | 6,586 yds | 71.1 / 123 *', 'DRGA Tournament | Men | 6,394 yds | 70.2 / 121', 'White | Men | 6,187 yds | 69.0 / 118', 'Red | Men | 5,645 yds | 66.9 / 112']);
+        assert.match(s2.text, /Tees\nBack for all · Mix/);
         assert.match(s1.text, /Start\nHole 1\n10\nShotgun/);
         assert.match(s2.text, /20 golfers · 5 groups/);
         assert.match(s2.text, /Flights\nA 10\nB 10/);
@@ -108,7 +118,7 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
                 { waitFor: "!!document.getElementById('sf-code')", timeout: 20000 }, X(WRITES)] });
         assert.equal(r.ok, true, r.reason);
         const [home, s3, w] = J(r);
-        assert.match(home.same, /Same as last week\nDobson Ranch Golf Course · 8 golfers · Weekly Game/);
+        assert.match(home.same, /LAST WEEK\nDobson Ranch Golf Course · 8 · Weekly Game\n↻\nAgain/);
         assert.match(s3.text, /Weekly Game\n\$40/);
         assert.equal(w.writes.length, 1);
         assert.notEqual(w.writes[0].path, 'events/SALW01', 'a NEW round');
@@ -129,6 +139,26 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         const [s] = J(r);
         assert.match(s.prog, /IN PROGRESS\nDobson Ranch Golf Course · Thru 9\nResume ›/);
         assert.deepEqual(s.forms, ['index.html?game=SALW01', 'index.html?game=SALW01&group=2', 'index.html?game=SALW01&group=2', 'index.html?game=SALW01&group=1&sk=ABCD']);
+    });
+
+    test('GPS door: the same Course & Tees screen, "Start GPS" saves you as the golfer and opens the map', { timeout: 90000 }, async () => {
+        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE, steps: [
+            { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.3759, longitude: -111.8778, accuracy: 10 } } },
+            { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
+            { tap: '[data-hp-act="sgpsdoor"]' },
+            { waitFor: "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-tee]')", timeout: 30000 }, { sleep: 600 }, X(SF),
+            { tap: '#sf [data-sf-tee]', nth: 2 }, { sleep: 200 }, X(TEEROWS),
+            { tap: '[data-sf="startgps"]' },
+            { waitFor: "/index\\.html/.test(location.pathname)", timeout: 20000 },
+            X("JSON.stringify({ at: location.href.split('/').pop(), tee: localStorage.getItem('hardpan_last_tee_gca_zgkynkan') })")] });
+        assert.equal(r.ok, true, r.reason);
+        const [s1, tees, end] = J(r);
+        assert.match(s1.text, /^‹\nGPS\nWhere are you playing\?/);
+        assert.match(s1.text, /📍 Start GPS/);
+        assert.doesNotMatch(s1.text, /Next: Players/);
+        assert.ok(tees.tees[2].endsWith('*'), 'White picked: ' + tees.tees[2]);
+        assert.match(end.at, /^index\.html\?game=\w+&group=1&me=\d+$/, 'straight to the round (the map), as its golfer');
+        assert.equal(end.tee, 'White', 'the last-used tee is remembered for this course');
     });
 
     test('switch off: today\'s Home (two doors) and Round Setup\'s own wizard - no 3-step screen', { timeout: 90000 }, async () => {
