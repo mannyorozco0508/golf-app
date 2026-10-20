@@ -44,7 +44,7 @@ const DB = { events: { [CODE]: round(CODE, { startingHole: 1, groupStartingHoles
     global_courses: {}, trips: {}, organizers: {}, tournaments: {} };
 const PRE = 'window.__hardpanDoors = true;' + iapStub({ active: true });
 const ST = "JSON.stringify({ url: document.URL.replace(/^.*\\//, ''), card: typeof currentViewedHole !== 'undefined' ? currentViewedHole : null, gps: window.HardPanGps && HardPanGps.hole ? HardPanGps.hole() : null, side: window.HardPanGps && HardPanGps.side ? HardPanGps.side() : null, keys: Object.keys(localStorage).filter(function (k) { return /^hardpan_last_hole_/.test(k); }).sort().map(function (k) { return k + '=' + localStorage.getItem(k); }) })";
-const GPS = { expression: "(function(){ var b = document.getElementById('fd-gps-btn'); if (b) b.click(); return 'gps'; })()" };
+const GPS = { expression: "(function(){ var b = (document.querySelector('#hp-card-bet [data-hp-bar=gps]') || document.getElementById('fd-gps-btn')); if (b) b.click(); return 'gps'; })()" };
 const CARD = { expression: "(function(){ if (window.HardPanGps && HardPanGps.showSide) HardPanGps.showSide('bets'); return 'card'; })()" };
 const PICK = (g) => ({ expression: "(function(){ var b = Array.prototype.filter.call(document.querySelectorAll('#group-pick-overlay button'), function (x) { return /Keep score for Group " + g + "\\b/.test(x.innerText); })[0]; if (!b) return 'no button'; b.click(); return 'picked'; })()" });
 const GO = (q) => ({ expression: "(function(){ location.href = 'index.html?" + q + "'; return 'go'; })()" });

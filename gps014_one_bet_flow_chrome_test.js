@@ -64,7 +64,7 @@ const terms1 = (t, a, b) => CH.sideMatchPayloadFromTerms(Object.assign({ scoring
 before(async () => {
     j = await openJourney({ db: DB, viewport: { width: 393, height: 852 }, webgl: true, preScript: PRE });
     await j.goto(fileUrl('index.html', Q), 4500);
-    await ev("(function(){ var b=document.getElementById('fd-gps-btn'); if(b) b.click(); return 1; })()");
+    await ev("(function(){ var b=(document.querySelector('#hp-card-bet [data-hp-bar=gps]') || document.getElementById('fd-gps-btn')); if(b) b.click(); return 1; })()");
     await sleep(2500);
     assert.ok(await ev('(function(){ var cv=document.querySelector("#gps-overlay canvas"); if(!cv) return false; cv.__hp014 = "same-map"; return true; })()'));
 });

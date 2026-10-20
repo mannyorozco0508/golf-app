@@ -63,7 +63,7 @@ test('the card and the GPS have "+ Bet" and the money chip', { timeout: 60000 },
     assert.equal(card.bet, true, 'no + Bet on the card');
     assert.match(card.chip, /^You: \$0 · \d+ bets?$/);
     await shot('card');
-    await ev("(function(){ var b=document.getElementById('fd-gps-btn'); if(b) b.click(); return 1; })()");
+    await ev("(function(){ var b=(document.querySelector('#hp-card-bet [data-hp-bar=gps]') || document.getElementById('fd-gps-btn')); if(b) b.click(); return 1; })()");
     await sleep(3000);
     const g = JSON.parse(await ev('(function(){' + VIS + ' var b=document.querySelector("#gps-overlay .gps-bet-btn"); var c=document.querySelector("#gps-overlay .gps-money"); return JSON.stringify({ side: HardPanGps.side(), layout: HardPanGps.layout(), bet: vis(b), text: b && b.innerText, bg: b && getComputedStyle(b).backgroundColor, chip: vis(c) && c.innerText, cardBar: vis(document.querySelector("#hp-card-bet .hp-bet-btn")) }); })()'));
     assert.equal(g.side, 'gps'); assert.equal(g.layout, 'd');
@@ -169,7 +169,7 @@ test('a score entered on the card moves the money chip on the card and the GPS',
     const after = JSON.parse(await ev('JSON.stringify({ card: document.querySelector("#hp-card-bet .hp-money-chip").innerText, m: HardPanBet.moneyNow() })'));
     assert.notEqual(after.card, before0, 'the chip did not move: ' + before0);
     assert.equal(after.card.replace(/\s+/g, ' '), after.m.text);
-    await ev("(function(){ var b=document.getElementById('fd-gps-btn'); if(b) b.click(); return 1; })()");
+    await ev("(function(){ var b=(document.querySelector('#hp-card-bet [data-hp-bar=gps]') || document.getElementById('fd-gps-btn')); if(b) b.click(); return 1; })()");
     await sleep(1200);
     assert.equal(await ev('document.querySelector("#gps-overlay .gps-money").innerText'), after.card, 'GPS chip = card chip');
 });

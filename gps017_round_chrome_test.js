@@ -52,7 +52,7 @@ async function click(sel) { assert.ok(await ev('(function(){var e=document.query
 before(async () => {
     j = await openJourney({ db: DB, viewport: { width: 393, height: 852 }, webgl: true, preScript: PRE });
     await j.goto(fileUrl('index.html', 'game=' + CODE + '&group=1'), 4500);
-    await ev("(function(){ var b=document.getElementById('fd-gps-btn'); if(b) b.click(); return 1; })()");
+    await ev("(function(){ var b=(document.querySelector('#hp-card-bet [data-hp-bar=gps]') || document.getElementById('fd-gps-btn')); if(b) b.click(); return 1; })()");
     await sleep(3000);
     // Mark the map's canvas: a rebuilt map would be a new canvas without the mark.
     assert.ok(await ev('(function(){ var cv=document.querySelector("#gps-overlay canvas"); if(!cv) return false; cv.__hp017 = "same-map"; return true; })()'), 'no map canvas');
