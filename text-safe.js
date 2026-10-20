@@ -69,7 +69,9 @@ function getSmartDisplayName(player, allPlayers) {
         return pLastInitial === lastInitial;
     });
 
-    if (sameFirstAndInitial.length === 1) return `${first} ${lastInitial}.`; 
+    // A ONE-LETTER LAST NAME IS ALREADY AN INITIAL (polish #16, 2026-10-20):
+    // "Test A" stays "Test A", never "Test A." - the dot only marks a cut.
+    if (sameFirstAndInitial.length === 1) return last.length === 1 ? `${first} ${lastInitial}` : `${first} ${lastInitial}.`;
     return `${first} ${last}`;
 }
 

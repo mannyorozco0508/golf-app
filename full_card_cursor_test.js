@@ -108,50 +108,50 @@ function arrive(data, search, mounts) {
 }
 const html = (sb, id) => String(run(sb, "document.getElementById('" + id + "').innerHTML") || '');
 
-describe('2. INITIALS: Randy T. / Randy C. / Matt M. / Matt B. / Matt H. on every surface, Marty bare', () => {
+describe('2. INITIALS: Randy T / Randy C / Matt M / Matt B / Matt H on every surface (no dot on a one-letter last name, polish 029 #16), Marty bare', () => {
     test('the landing summary ("Playing with") on group 1\'s link', () => {
         const sb = arrive(round12(), '?game=nm1&group=1', ['landing-group-names']);
         run(sb, "window.__scGroupMissing = false; renderLandingSummary(currentData.players.slice(0, 4), currentData.players)");
         const h = html(sb, 'landing-group-names');
-        assert.match(h, /Randy T\., Randy C\., Marty, Matt M\./);
+        assert.match(h, /Randy T, Randy C, Marty, Matt M/);
         assert.doesNotMatch(h, /Randy,|Matt,/, 'CONTROL: no bare Randy or Matt');
     });
     test('the group picker rows, the Group Links panel rows', () => {
         const sb = arrive(round12(), '?game=nm1', ['group-pick-body', 'group-links-panel']);
         // Wave 39: the row reads "Keep score for Group N" with the names on a
         // second line, so the names no longer sit after a middle dot. What this
-        // test is about is unchanged - the SHORTENED names, "Randy T." where two
+        // test is about is unchanged - the SHORTENED names, "Randy T" where two
         // Randys play - so it asserts the name run and the group label separately.
         assert.match(html(sb, 'group-pick-body'), /Keep score for Group 1/);
-        assert.match(html(sb, 'group-pick-body'), />Randy T\., Randy C\., Marty, Matt M\.</);
+        assert.match(html(sb, 'group-pick-body'), />Randy T, Randy C, Marty, Matt M</);
         assert.match(html(sb, 'group-pick-body'), /Keep score for Group 2/);
-        assert.match(html(sb, 'group-pick-body'), />Matt B\., Matt H\., Ann, Ben</);
+        assert.match(html(sb, 'group-pick-body'), />Matt B, Matt H, Ann, Ben</);
         assert.doesNotMatch(html(sb, 'group-pick-body'), />Randy,|>Matt,/,
             'CONTROL: no bare Randy or Matt - two of each play in this round');
         run(sb, "window.authBootState.uid = currentData.ownerUid = 'anon-stub'; groupLinksPanelOpen = true; renderGroupLinksPanel()");
-        assert.match(html(sb, 'group-links-panel'), /Randy T\., Randy C\., Marty, Matt M\./);
+        assert.match(html(sb, 'group-links-panel'), /Randy T, Randy C, Marty, Matt M/);
     });
     test('the who-am-I buttons and Finish Round\'s missing rows', () => {
         const d = round12(); d.players.forEach((p, i) => { for (let h = 1; h <= 3; h++) d.scores['p' + p.id + '_h' + h] = 4; }); delete d.scores['p101_h2']; delete d.scores['p104_h3'];
         const sb = arrive(d, '?game=nm1&group=1', ['fr-incomplete-warning']);
         // WAVE 17: the buttons are built by whoAmILineHtml() and revealed by a tap, instead
         // of a 287px panel in #whoami-mount that opened by itself. What this test is about
-        // is the NAMES on those buttons - shortened to "Randy T." where two Randys play -
+        // is the NAMES on those buttons - shortened to "Randy T" where two Randys play -
         // so it reads the builder's own output and leaves the mount out of it.
         const w = run(sb, "whoAmIDismissed = false; meId = null; whoAmIPickerOpen = true; whoAmILineHtml()");
-        assert.match(w, /whoami-btn" onclick="setMe\('101'\)">Randy T\.<\/button>/);
-        assert.match(w, /setMe\('104'\)">Matt M\.<\/button>/);
+        assert.match(w, /whoami-btn" onclick="setMe\('101'\)">Randy T<\/button>/);
+        assert.match(w, /setMe\('104'\)">Matt M<\/button>/);
         run(sb, 'renderIncompleteWarning()');
         const f = html(sb, 'fr-incomplete-warning');
-        assert.match(f, /Hole 2 · Randy T\. <a/); assert.match(f, /Hole 3 · Matt M\. <a/);
+        assert.match(f, /Hole 2 · Randy T <a/); assert.match(f, /Hole 3 · Matt M <a/);
     });
     test('a golfer named by id in the round ticker / Ryder pairings, and the Wolf name', () => {
         const sb = arrive(round12(), '?game=nm1&group=1', []);
-        assert.equal(run(sb, "golferLabel(102)"), 'Randy C.');
+        assert.equal(run(sb, "golferLabel(102)"), 'Randy C');
         assert.equal(run(sb, "golferLabel(currentData.players[2])"), 'Marty');
-        assert.equal(run(sb, "golferLabelFor('Matt H')"), 'Matt H.');
+        assert.equal(run(sb, "golferLabelFor('Matt H')"), 'Matt H');
         assert.equal(run(sb, "golferLabelFor('Somebody Else')"), 'Somebody Else', 'a name not on the roster prints whole (the formatter has nothing to shorten against)');
-        assert.deepEqual(J(run(sb, 'shortPlayerLabels(currentData.players.slice(0, 4))')), ['Randy T.', 'Randy C.', 'Marty', 'Matt M.']);
+        assert.deepEqual(J(run(sb, 'shortPlayerLabels(currentData.players.slice(0, 4))')), ['Randy T', 'Randy C', 'Marty', 'Matt M']);
     });
     test('CONTROL: no first-token cut is left at the swept sites; the Full Card column initials (getInitials) remain', () => {
         const src = read('index.html');
