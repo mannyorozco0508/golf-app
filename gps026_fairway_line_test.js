@@ -56,8 +56,11 @@ test('the GolfAPI round borrows hole 1\'s LINE and FAIRWAY (same key, within 40 
     // a straight hole (2-point line) still lends its fairway
     const straight = Object.keys(table[KEY].holes).find((n) => H(n).line.length === 2 && (H(n).fairway || []).length);
     assert.ok(straight && op.fairways[straight] && !op.lines[straight], 'hole ' + straight);
-    // too far from GolfAPI's tee: no fairway
-    assert.strictEqual(geo.osmPathFairway({ tee: dest(H(1).tee, 0, 200), mid: H(1).mid }, table[KEY].holes['1']), null);
+    // another tee box (up to 150 m from OSM's line start) still lends the fairway - the green decides
+    assert.ok(geo.osmPathFairway({ tee: dest(H(1).line[0], 0, 100), mid: H(1).mid }, table[KEY].holes['1']));
+    // too far from GolfAPI's tee, or from its green: no fairway
+    assert.strictEqual(geo.osmPathFairway({ tee: dest(H(1).line[0], 0, 200), mid: H(1).mid }, table[KEY].holes['1']), null);
+    assert.strictEqual(geo.osmPathFairway({ tee: H(1).tee, mid: dest(H(1).mid, 90, 50) }, table[KEY].holes['1']), null);
 });
 
 test('Papago hole 1, a 305 driver: ON the path (not the straight line), at the corner, IN the fairway', () => {
@@ -147,4 +150,21 @@ test('the view: one shape for the target and the flyover; the caption hidden in 
     assert.match(v, /if \(!out\.data && G\.savedLine\)/, 'a saved line only where there is no path data');
     assert.match(v, /f\.lineSave === true/);
     assert.match(fs.readFileSync(path.join(__dirname, 'gps-config.js'), 'utf8'), /lineSave: false/);
+});
+
+test('a bunker the drive carries before the fairway starts (the lay-up would sit outside the fairway) is not the target', () => {
+    const tee = [33.4, -111.9], mid = dest(tee, 0, 430 * YD);
+    const ring = (a, b) => [dest(dest(tee, 0, a * YD), 90, 20), dest(dest(tee, 0, b * YD), 90, 20), dest(dest(tee, 0, b * YD), 270, 20), dest(dest(tee, 0, a * YD), 270, 20)];
+    const bunker = { type: 'fb', side: 'C', pt: dest(tee, 0, 150 * YD) };
+    const t = geo.teeTarget({ par: 4, tee, mid, fairway: [ring(180, 340)], hazards: [bunker], driverM: 280 * YD });
+    assert.notStrictEqual(t.stop, 'hazard', JSON.stringify(t));
+    assert.ok(inFw(t.pt, [ring(180, 340)]));
+    // inside the fairway, the lay-up still holds (023c)
+    const w = geo.teeTarget({ par: 4, tee, mid, fairway: [ring(100, 340)], hazards: [{ type: 'w', side: 'C', pt: dest(tee, 0, 260 * YD) }], driverM: 280 * YD });
+    assert.strictEqual(w.stop, 'hazard');
+    assert.ok(Math.abs(w.alongM / YD - 250) < 2);
+});
+
+test('Talking Stick South: its GolfAPI key is a bundle alias - the round borrows the Piipaash lines and fairways', () => {
+    assert.deepStrictEqual(table.gapi_012141520639939791440, { v: 1, compose: ['az_talking_piipaash'] });
 });

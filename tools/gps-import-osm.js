@@ -141,7 +141,10 @@ const COURSES = [
       nineNotes: { stewart: STEWART_NOTE } },
 ];
 
-const ALIASES = { wa_chambers: 'gca_50bc8qqa' };
+// URGENT-026: Talking Stick South's GolfAPI round (gapi_<id>, "Talking Stick Golf Club (South -
+// Piipaash)") has no link and its name is not the bundle's, so its hole lines and fairways were
+// never borrowed: the same course under its GolfAPI key.
+const ALIASES = { wa_chambers: 'gca_50bc8qqa', gapi_012141520639939791440: 'az_talking_piipaash' };
 
 function loadCourseData() {
     const src = fs.readFileSync(path.join(ROOT, 'course-data.js'), 'utf8');

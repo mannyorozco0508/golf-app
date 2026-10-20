@@ -1032,6 +1032,9 @@
             if (al.d > TEE_HAZARD_LINE_M) return;
             var atM = al.t * total;
             if (atM <= 40 * M_PER_YD || atM > Math.min(wantM, room) + 2) return;
+            // URGENT-026: with the fairway mapped, a lay-up that would sit OUTSIDE it (a bunker the
+            // drive carries before the fairway starts, one at its edge) is not the target.
+            if (rings.length) { var lay = pointAlongHole(line, tee, Math.max(0, atM - TEE_HAZARD_SHORT_YD * M_PER_YD)); if (!lay || !rings.some(function (r) { return pointInRing(lay, r); })) return; }
             stops.push({ at: Math.max(0, atM - TEE_HAZARD_SHORT_YD * M_PER_YD), stop: 'hazard', hazard: { type: z.type, atM: atM } });
         });
         stops.sort(function (a, b) { return a.at - b.at; });
@@ -2189,16 +2192,19 @@
         if (dE > OSM_PATH_M) return { reject: 'end ' + Math.round(dE) + ' m from the green' };
         return { line: [tee].concat(line.slice(1, -1), [mid]) };
     }
-    // URGENT-026: the same hole's FAIRWAY rings, guarded the same way (its drawn line - 2 points
-    // is enough, a straight hole - starts within 40 m of GolfAPI's tee and ends within 40 m of its
-    // green center). The target is snapped into them; the flyover is as wide as they are.
+    // URGENT-026: the same hole's FAIRWAY rings, guarded much the same way: its drawn line (2 points
+    // is enough, a straight hole) ends within 40 m of GolfAPI's green center and starts within
+    // OSM_FAIRWAY_TEE_M of GolfAPI's tee (OpenStreetMap draws from one tee box, GolfAPI may give
+    // another - the green decides the hole). The target is snapped into them; the flyover is as
+    // wide as they are.
+    var OSM_FAIRWAY_TEE_M = 150;
     function osmPathFairway(gaHole, osmHole) {
         var ga = gaHole && (gaHole.osm || gaHole), o = osmHole && (osmHole.osm || osmHole);
         var tee = pinPt(ga && ga.tee), mid = pinPt(ga && (ga.mid || ga.end));
         var fw = ((o && o.fairway) || []).filter(function (r) { return r && r.length >= 3; });
         if (!tee || !mid || !fw.length || ((ga.fairway) || []).length) return null;
         var line = ((o && o.line) || []).map(pinPt).filter(Boolean);
-        if (line.length < 2 || haversineMeters(line[0], tee) > OSM_PATH_M || haversineMeters(line[line.length - 1], mid) > OSM_PATH_M) return null;
+        if (line.length < 2 || haversineMeters(line[0], tee) > OSM_FAIRWAY_TEE_M || haversineMeters(line[line.length - 1], mid) > OSM_PATH_M) return null;
         return fw;
     }
     // The whole course: { key, how, lines: { n: line }, fairways: { n: rings }, rejected: { n: why } } or null.
