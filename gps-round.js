@@ -114,7 +114,17 @@
         + 'body.hp-bets-open #hp-card-bet .hp-money-chip{display:none !important;}'
         + '#hp-strip{display:none;position:fixed;left:0;right:0;top:0;height:calc(env(safe-area-inset-top) + 92px);z-index:2;background:transparent;border:0;cursor:pointer;}'
         + 'body.hp-card-sheet #hp-strip{display:block;}'
-        + '#hp-strip-grab{position:absolute;left:50%;bottom:6px;width:44px;height:5px;margin-left:-22px;border-radius:3px;background:rgba(255,255,255,.75);}'
+        // POLISH #15: the grab handle is the sheet's own header row (it rode on the strip, fixed, and
+        // the card scrolled under it - over "+ Add game").
+        + '#hp-strip-grab{display:none;}'
+        + 'body.hp-card-sheet #main-content::before{content:"";display:block;width:44px;height:5px;border-radius:3px;background:#cfd8d3;margin:2px auto 10px;}'
+        // POLISH #13: a solid band under the status bar and the Dynamic Island - the card scrolls
+        // under it, never under the clock.
+        + 'body.hp-card-sheet #hp-strip::before{content:"";position:absolute;left:0;right:0;top:0;height:env(safe-area-inset-top);background:#0b0f0c;}'
+        // POLISH #14: the card ends above the bottom bar (☰ / GPS / Enter score: 66 px + the home bar).
+        + 'body.hp-sf-card #main-content{padding-bottom:calc(env(safe-area-inset-bottom) + 84px) !important;}'
+        // Round settings' "Full setup ›" (POLISH #12): inside the sheet, wrapped.
+        + '#round-sheet-body a[data-hp-full="1"]{box-sizing:border-box;max-width:100%;white-space:normal;overflow-wrap:anywhere;}'
         // The old Round Menu pill steps aside for the bar; it still opens as Round settings.
         + 'body.hp-sf-card #round-sheet:not(.open){transform:translateY(100%);visibility:hidden;}'
         // Over the map: the toasts and the QR codes come up above it.

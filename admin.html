@@ -1115,6 +1115,13 @@ html {
     padding-top: max(20px, env(safe-area-inset-top, 0px));
     padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
 }
+/* POLISH #13 (map helper, SHARED): the page scrolls under the status bar and the Dynamic Island -
+   a solid band there, and the wizard's step dots scroll in BELOW it, not under it. 0px on the web. */
+body::before {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f3);
+}
+.wizard-progress { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 8px); }
 </style>
 </head>
 <body>
@@ -13868,6 +13875,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     renderWizardProgress();
     // Game Day lands here. The first thing a golfer sees is the format gallery.
     goToWizardStep(wizardFirstStep());
+    // POLISH #13: and it opens AT THE TOP (the step's own scroll to the dots is for moving between steps).
+    try { window.scrollTo(0, 0); } catch (e) {}
 
     // THE COACH ARRIVAL (UI Wave 10). ?coach=1 is set by createRoom when the entry
     // on the lobby minted this round, so the coach opens on the same page load as

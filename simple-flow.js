@@ -84,6 +84,8 @@
     // ---- THE SCREEN ---------------------------------------------------------------
     var CSS = '#sf{position:fixed;inset:0;z-index:900;overflow:auto;-webkit-overflow-scrolling:touch;background:#f2f4ef;color:#13241d;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:light}'
         + '#sf *{box-sizing:border-box}'
+        // POLISH #13 (map helper, SHARED): a solid band under the status bar / Dynamic Island - the list scrolls under it, not the clock.
+        + '#sf::before{content:"";position:fixed;left:0;right:0;top:0;height:env(safe-area-inset-top);background:#f2f4ef;z-index:4;pointer-events:none}'
         + '#sf .sf-in{max-width:520px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 16px)}'
         + '#sf .sf-top{display:flex;align-items:center;gap:8px;min-height:44px}'
         + '#sf .sf-back{border:0;background:none;font-size:26px;line-height:1;color:#0f4c3a;min-width:44px;min-height:44px;padding:0;text-align:left;cursor:pointer}'
