@@ -438,9 +438,10 @@
     // ---- HOME (home.html) ----------------------------------------------------------
     var H = { db: null };
     function show(view) {
-        ['main', 'gps', 'games', 'simple'].forEach(function (v) { var el = $('v-' + v); if (el) el.classList.toggle('on', v === view); });
+        ['main', 'gps', 'games', 'simple', 'history'].forEach(function (v) { var el = $('v-' + v); if (el) el.classList.toggle('on', v === view); });
         try {
             if (view === 'simple') simpleView();
+            if (view === 'history') historyView();
             if (view === 'gps') gpsView();
             if (view === 'games') gamesView();
         } catch (e) {
@@ -994,6 +995,7 @@
             else { setupClose(); var q = $('hp-q'); if (q) { q.value = ''; q.focus(); } search(); }
             return;
         }
+        if ((b = t.closest('[data-hp-hist]'))) { historyOpen(b); return; }
         if ((b = t.closest('[data-hp-open]'))) { W.location.href = roundHref(b.getAttribute('data-hp-open')); return; }
         if ((b = t.closest('[data-hp-draft]'))) { var dr = draftRead(); if (dr) W.location.href = draftHref(dr); else draftPaint(); return; }
         if ((b = t.closest('[data-hp-draft-discard]'))) { draftClear(b.getAttribute('data-hp-draft-discard')); draftPaint(); return; }
@@ -1286,6 +1288,85 @@
     }
     function golfersText(n) { return n + ' golfer' + (n === 1 ? '' : 's'); }
     function namedPlayers(d) { return d && Array.isArray(d.players) ? d.players.filter(function (p) { return p && String(p.name || '').trim(); }) : []; }
+    // A finished round's result, display only (gross totals off the card - no money here):
+    // one golfer "Shot 84"; more "Low: Dave 79" (ties "Low: Dave, Mike 79").
+    function roundResult(d) {
+        var ps = namedPlayers(d), sc = (d && d.scores) || {}, holes = ((d && d.courseData) || []).map(function (h) { return Number(h.hole); });
+        var tot = ps.map(function (p) { return { name: String(p.name).trim(), t: holes.reduce(function (s, h) { return s + (Number(sc['p' + p.id + '_h' + h]) || 0); }, 0) }; }).filter(function (x) { return x.t > 0; });
+        if (!tot.length) return '';
+        if (ps.length === 1) return 'Shot ' + tot[0].t;
+        var low = Math.min.apply(null, tot.map(function (x) { return x.t; }));
+        return 'Low: ' + tot.filter(function (x) { return x.t === low; }).map(function (x) { return x.name; }).join(', ') + ' ' + low;
+    }
+    // One history row from a round's data (this phone's copy, or the server's).
+    function historyRow(code, d, at, group) {
+        var ps = namedPlayers(d), pr = progressOf(d);
+        return { code: String(code).toUpperCase(), course: shownName(String((d && d.courseName) || (d && d.eventName) || 'Round ' + code).split(' (')[0]),
+            at: roundDay(code, at), golfers: ps.length, names: ps.map(function (p) { return String(p.name).trim(); }),
+            finished: pr.finished, thru: pr.thru, result: pr.finished ? roundResult(d) : '', group: group || null };
+    }
+    // EVERY ROUND THIS PHONE HAS OPENED (the scorecard keeps a copy of each: golfapp_snap_v1_<code>,
+    // with this phone's unsent scores on top), newest first. Storage only - works with no signal.
+    function historyList() {
+        var out = [], s = lstore();
+        if (!s) return out;
+        try {
+            for (var i = 0; i < s.length; i++) {
+                var k = s.key(i);
+                if (!k || k.indexOf('golfapp_snap_v1_') !== 0) continue;
+                var code = k.slice('golfapp_snap_v1_'.length), snap = null;
+                try { snap = JSON.parse(s.getItem(k)); } catch (e) { continue; }
+                if (!snap || !snap.data || !namedPlayers(snap.data).length || !Array.isArray(snap.data.courseData)) continue;
+                var lr = localRound(code);
+                out.push(historyRow(code, (lr && lr.data) || snap.data, snap.at, snap.meta && snap.meta.group));
+            }
+        } catch (e) { /* what was read so far */ }
+        out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+        return out.slice(0, 40);
+    }
+    function historyRowHtml(r) {
+        var sub = [dayLabel(r.at), golfersText(r.golfers)].filter(Boolean).join(' · ');
+        var names = r.names.slice(0, 4).join(', ') + (r.names.length > 4 ? ' +' + (r.names.length - 4) : '');
+        var state = r.finished ? 'Final' + (r.result ? ' · ' + r.result : '') : (r.thru ? 'Thru ' + r.thru : 'Not started');
+        return '<button type="button" class="hp-row hp-hist-row" data-hp-hist="' + esc(r.code) + '" data-hp-hist-fin="' + (r.finished ? 1 : 0) + '"' + (r.group ? ' data-hp-hist-g="' + esc(r.group) + '"' : '') + '>'
+            + '<span style="min-width:0;"><span class="n" style="display:block;">' + esc(r.course) + '</span>'
+            + '<span class="s" style="display:block;">' + esc(sub) + '</span>'
+            + '<span class="s" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(names) + '</span>'
+            + '<span class="s" style="display:block;font-weight:700;color:' + (r.finished ? 'var(--hp-text)' : 'var(--hp-warn)') + ';">' + esc(state) + '</span></span>'
+            + '<span class="hp-badge' + (r.finished ? '' : ' setup') + '">' + (r.finished ? 'Results ›' : 'Resume ›') + '</span></button>';
+    }
+    // HOME › HISTORY: the list, then each row refreshed from the server (a round finished on
+    // another phone reads Final here). Reads only - nothing is written.
+    function historyView() {
+        var box = $('hp-history-list');
+        if (!box) return;
+        var rows = historyList();
+        var paint = function () {
+            box.innerHTML = rows.length ? rows.map(historyRowHtml).join('')
+                : '<div class="hp-status" style="text-align:center;padding:24px 8px;">No rounds on this phone yet. Rounds you start or join show up here.</div>';
+        };
+        paint();
+        if (!H.db) return;
+        rows.forEach(function (r, i) {
+            timeout(H.db.ref('events/' + r.code).once('value'), 6000, 'history').then(function (s) {
+                var d = s && s.val ? s.val() : null;
+                if (!d || !namedPlayers(d).length || !Array.isArray(d.courseData)) return;
+                var lr = localRound(r.code);   // this phone's unsent scores stay on top
+                if (lr && typeof (oq() || {}).applyQueued === 'function') { try { d = oq().applyQueued(d, oq().peek(lstore()) || [], r.code) || d; } catch (e) {} }
+                var nr = historyRow(r.code, d, r.at, r.group);
+                nr.at = r.at;
+                rows[i] = nr; paint();
+            }, function () {});
+        });
+    }
+    function historyOpen(b) {
+        var code = b.getAttribute('data-hp-hist'), g = b.getAttribute('data-hp-hist-g');
+        if (b.getAttribute('data-hp-hist-fin') === '1') { W.location.href = 'settlement.html?game=' + encodeURIComponent(code) + (g ? '&group=' + encodeURIComponent(g) : ''); return; }
+        var h = roundHref(code);
+        if (g && !/[?&](group|spectate)=/.test(h)) h += '&group=' + encodeURIComponent(g);
+        W.location.href = h;
+    }
+
     // ---- JOIN WITH A BARE CODE ASKS WHICH GROUP (2.0 polish #9) ---------------------------------
     // A bare code (or the whole-round link) used to open a spectator view straight away - with
     // no question, and on the organizer's own phone a writable one. Now Home asks: each group with
@@ -1438,7 +1519,7 @@
         if (a === 'sgps') { gpsGate(homeCourse(), function () { setDoor('gps'); show('gps'); }); return true; }
         if (a === 'shome') { show('simple'); mainDecor(); return true; }
         if (a === 'strip') { var t = myTrips(); W.location.href = t.length ? 'trip.html?trip=' + encodeURIComponent(t[0]) : 'trip.html#build'; return true; }
-        if (a === 'shistory') { setDoor('games'); show('games'); return true; }
+        if (a === 'shistory') { show('history'); return true; }   // 2.0 polish #6: this phone's past rounds
         if (a === 'show') { W.location.href = 'instructions.html'; return true; }
         if (a === 'sstats') {
             var S = W.HardPanGpsStats;
@@ -2449,7 +2530,7 @@
         }, function () { return false; });
     }
 
-    W.HardPanDoors = { dayLabel: dayLabel, joinGroups: joinGroups, seenRound: seenRound, hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
+    W.HardPanDoors = { dayLabel: dayLabel, historyList: historyList, joinGroups: joinGroups, seenRound: seenRound, roundResult: roundResult, hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
         position: position, nearList: nearList, shownName: shownName, where: where, meName: meName, myHcp: myHcp, loadScriptTimed: loadScriptTimed, STATES: STATES, gamesOf: gamesOf, simpleOn: simpleOn,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         // URGENT-028: the round in progress as this phone has it (Start Round asks before replacing a scored one).
