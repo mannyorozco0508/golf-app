@@ -613,12 +613,19 @@
         if (k === 'hilo' ? n !== 4 : !(n === 2 || n === 4)) return null;
         return { a: ids.slice(0, n / 2), b: ids.slice(n / 2) };
     }
-    function nameById(ps, id) { var p = ps.filter(function (x) { return String(x.id) === String(id); })[0]; return p ? first(p.name) : '?'; }
+    // A golfer's short name: the first name, plus the last initial when another golfer shares it
+    // ("Test A." / "Test B."), so the who's-in chips and the "vs" line tell them apart.
+    function shortName(ps, p) {
+        var f = first(p.name), parts = String(p.name || '').trim().split(/\s+/);
+        var clash = ps.some(function (x) { return x !== p && first(x.name).toLowerCase() === f.toLowerCase(); });
+        return clash && parts.length > 1 ? f + ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + '.' : (clash ? String(p.name).trim() : f);
+    }
+    function nameById(ps, id) { var p = ps.filter(function (x) { return String(x.id) === String(id); })[0]; return p ? shortName(ps, p) : '?'; }
     function whoBox(k, ps) {
         var ids = who(k, ps), sd = sides(k, ps), mg = myGroup(ps);
         var list = S.whoAll[k] ? ps : mg.members;
         return '<div class="sf-note" style="margin:6px 0 4px;">Tap who’s in (first ' + (k === 'hilo' ? 'two' : 'half') + ' = one side)</div><div class="sf-chips" style="justify-content:flex-start;">'
-            + list.map(function (p) { var at = ids.indexOf(String(p.id)); return chip((at >= 0 ? (at + 1) + ' ' : '') + first(p.name), at >= 0, 'data-sf-who="' + k + '" data-id="' + esc(p.id) + '"'); }).join('')
+            + list.map(function (p) { var at = ids.indexOf(String(p.id)); return chip((at >= 0 ? (at + 1) + ' ' : '') + shortName(ps, p), at >= 0, 'data-sf-who="' + k + '" data-id="' + esc(p.id) + '"'); }).join('')
             + (!S.whoAll[k] && mg.many ? '<button type="button" class="sf-link" data-sf-whoall="' + k + '">Anyone in the field ›</button>' : '') + '</div>'
             + '<div style="font-weight:800;margin-top:6px;">' + (sd ? sd.a.map(function (x) { return nameById(ps, x); }).join(' + ') + ' <span style="font-weight:400;">vs</span> ' + sd.b.map(function (x) { return nameById(ps, x); }).join(' + ')
                 : '<span class="sf-err">' + (k === 'hilo' ? 'Tap four golfers (2 v 2)' : 'Tap two golfers (1 v 1) or four (2 v 2)') + '</span>') + '</div>';
