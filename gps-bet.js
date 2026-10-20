@@ -429,6 +429,9 @@
                         html += '<button type="button" class="hb-field" data-hb="field">+ Anyone in the field \u203a</button>';
                     }
                 }
+                // URGENT-017: a golfer who is not in the round yet - the Add golfer sheet over this one
+                // (gps-add-golfer.js); the chips redraw with them in it.
+                if (window.HardPanAddGolfer) html += '<button type="button" class="hb-field" data-hp-addgolfer="1">+ Add golfer</button>';
                 var sh = shapeOf(st.game, st.picks, st.mode);
                 html += '<div class="hb-vsrow"><div class="hb-vs" aria-live="polite">' + (vsLine(st.game, st.picks, st.mode) || '<span style="color:#8a958f">Tap the golfers in the order of the sides</span>') + '</div>'
                     + (st.game !== 'skins' && st.picks.length >= 2 ? '<button type="button" class="hb-swap" data-hb="swap" aria-label="Swap sides">\u21C4 Swap</button>' : '') + '</div>';
@@ -792,6 +795,7 @@
 
     var api = {
         on: on, open: open, close: close, isOpen: isOpen, refresh: refresh, openBets: openBets,
+        redraw: function () { if (isOpen()) draw(); },
         hiloHere: hiloHere, tiles: tiles, preview: preview, playedRange: playedRange,
         // Pure-ish pieces for the tests.
         shapeOf: shapeOf, buildBet: buildBet, worstCase: worstCase, moneyNow: moneyNow,

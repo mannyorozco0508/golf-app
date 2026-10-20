@@ -225,6 +225,27 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         assert.equal(end.tee, 'White', 'the last-used tee is remembered for this course');
     });
 
+    test('URGENT-017: Start GPS fills in this phone\'s golfer\'s own saved handicap (+2.0), not a blank / 0', { timeout: 90000 }, async () => {
+        const SNAP = JSON.stringify({ at: Date.now() - 86400000, data: { players: [{ id: 101, name: 'Skeens', hcp: '2.0' }, { id: 102, name: 'Manny', hcp: '+2.0' }] } });
+        // The round page's stub does not carry the save across the hop, so the Start tap is held
+        // on Round Setup (the save itself is Round Setup's own) and the golfer row is read there.
+        const HOLD = "window.__holdSave = true;";
+        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 },
+            preScript: BASE + HOLD + "try{localStorage.setItem('golfapp_snap_v1_OLD002'," + JSON.stringify(SNAP) + ");localStorage.setItem('golfapp_me_OLD002','102');}catch(e){}", steps: [
+                { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.3759, longitude: -111.8778, accuracy: 10 } } },
+                { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
+                { tap: '[data-hp-act="sgpsdoor"]' },
+                { waitFor: "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-tee]')", timeout: 30000 }, { sleep: 600 },
+                X("(function(){ window.saveSettings = function () { window.__held = Array.prototype.map.call(document.querySelectorAll('#player-list .player-row'), function (r) { return [(r.querySelector('.p-name-input') || {}).value, (r.querySelector('.p-hcp-input') || {}).value]; }); return Promise.resolve(); }; return 'held'; })()"),
+                { tap: '[data-sf="startgps"]' },
+                { waitFor: "!!window.__held", timeout: 15000 },
+                X("JSON.stringify({ my: HardPanDoors.myHcp(), rows: window.__held })")] });
+        assert.equal(r.ok, true, r.reason);
+        const [w] = J(r);
+        assert.equal(w.my, '+2.0');
+        assert.deepEqual(w.rows.filter((x) => x[0]), [[w.rows[0][0], '+2.0']], 'the golfer row carries +2.0: ' + JSON.stringify(w.rows));
+    });
+
     test('URGENT-015: the course picked before Round Setup finishes loading holds, and Start GPS waits for a slow card (Dobson shaped as live)', { timeout: 90000 }, async () => {
         // global_courses/gca_zgkynkan as it is live: name, source, location, tees, data (18 holes).
         const LIVE = { name: 'Dobson Ranch Golf Course', source: { provider: 'golfcourseapi', id: 1 }, location: { city: 'Mesa', state: 'AZ' },

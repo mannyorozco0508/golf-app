@@ -4742,6 +4742,8 @@ const SHELL_FILES = [
     './gps-bet.js',
     // 017: the Round Menu, Settle up, Bets and the Card as sheets (simpleFlow).
     './gps-round.js',
+    // URGENT-017: Add golfer, one sheet in place (simpleFlow).
+    './gps-add-golfer.js',
     // Simpler HardPan (017): the 3-step New round on Round Setup.
     './simple-flow.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).

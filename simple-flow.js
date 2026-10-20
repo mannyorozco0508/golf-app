@@ -804,6 +804,9 @@
             var f = D.querySelector('#player-list .p-name-input'), H = HD();
             if (f) f.value = (typeof H.meName === 'function' ? H.meName() : '') || 'Me';
         }
+        // URGENT-017: your own saved handicap, not a blank (read as 0) - when the box is empty.
+        var hb = D.querySelector('#player-list .p-hcp-input'), mh = typeof HD().myHcp === 'function' ? HD().myHcp() : '';
+        if (hb && !String(hb.value || '').trim() && mh) { hb.value = mh; hb.dispatchEvent(new Event('input', { bubbles: true })); }
         var first1 = players()[0];
         S.meName = first1 ? first1.name.trim() : 'Me';
         runSave('err1');

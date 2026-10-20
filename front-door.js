@@ -377,6 +377,30 @@
         var n = a.displayName || a.name || (W.firebase && W.firebase.auth && (function () { try { var u = W.firebase.auth().currentUser; return u && u.displayName; } catch (e) { return null; } })());
         return n ? String(n).split(' ')[0] : 'Me';
     }
+    // THIS GOLFER'S OWN HANDICAP (URGENT-017: a GPS round showed "HCP 0" for Manny, a +2.0):
+    // the number this phone's golfer carried on their most recent round here ("This is me" /
+    // the GPS name tag, else their first name), else the HardPan Index this phone keeps. '' if none.
+    function myHcp() {
+        var best = null, me = String(meName() || '').toLowerCase();
+        try {
+            for (var i = 0; i < W.localStorage.length; i++) {
+                var k = W.localStorage.key(i), m = /^golfapp_snap_v1_(\w+)$/.exec(k || '');
+                if (!m) continue;
+                var o = null; try { o = JSON.parse(W.localStorage.getItem(k)); } catch (e) { o = null; }
+                var ps = o && o.data && Array.isArray(o.data.players) ? o.data.players : [];
+                var id = ls('golfapp_me_' + m[1]) || ls('hardpan_gps_golfer_' + m[1]);
+                var p = ps.filter(function (q) { return q && id != null && String(q.id) === String(id); })[0]
+                    || (me && me !== 'me' ? ps.filter(function (q) { return q && String(q.name || '').trim().split(/\s+/)[0].toLowerCase() === me; })[0] : null);
+                if (!p) continue;
+                var h = String(p.handicapIndex != null && String(p.handicapIndex).trim() !== '' ? p.handicapIndex : (p.hcp == null ? '' : p.hcp)).trim();
+                if (!h || h === '0') continue;
+                if (!best || (o.at || 0) > best.at) best = { at: o.at || 0, h: h };
+            }
+        } catch (e) {}
+        if (best) return best.h;
+        try { var I = W.HardPanIndex && W.HardPanIndex.current ? W.HardPanIndex.current() : null; if (I && I.text) return String(I.text); } catch (e) {}
+        return '';
+    }
     // The round, in Round Setup's saved shape; one golfer: you.
     function roundPayload(key, name, card, opts) {
         var o = opts || {};
@@ -398,7 +422,7 @@
             courseData: card, startingHole: start,
             teeRating: tee,
             alohaAllowed: false, handicapBasis: 'as-entered',
-            players: [{ id: 101, name: meName(), hcp: '0', team: 'Team 1', squad: 'red', playingForMoney: true }]
+            players: [{ id: 101, name: meName(), hcp: myHcp() || '0', team: 'Team 1', squad: 'red', playingForMoney: true }]
         }, extra);
     }
     function create(key, name, card, side, opts) {
@@ -2074,7 +2098,7 @@
     }
 
     W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
-        position: position, nearList: nearList, shownName: shownName, where: where, meName: meName, loadScriptTimed: loadScriptTimed, STATES: STATES, gamesOf: gamesOf, simpleOn: simpleOn,
+        position: position, nearList: nearList, shownName: shownName, where: where, meName: meName, myHcp: myHcp, loadScriptTimed: loadScriptTimed, STATES: STATES, gamesOf: gamesOf, simpleOn: simpleOn,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld,
         roundBackGuard: roundBackGuard };
