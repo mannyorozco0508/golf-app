@@ -84,6 +84,8 @@
     // ---- THE SCREEN ---------------------------------------------------------------
     var CSS = '#sf{position:fixed;inset:0;z-index:900;overflow:auto;-webkit-overflow-scrolling:touch;background:#f2f4ef;color:#13241d;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:light}'
         + '#sf *{box-sizing:border-box}'
+        // POLISH #13 (map helper, SHARED): a solid band under the status bar / Dynamic Island - the list scrolls under it, not the clock.
+        + '#sf::before{content:"";position:fixed;left:0;right:0;top:0;height:env(safe-area-inset-top);background:#f2f4ef;z-index:4;pointer-events:none}'
         + '#sf .sf-in{max-width:520px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 16px)}'
         + '#sf .sf-top{display:flex;align-items:center;gap:8px;min-height:44px}'
         + '#sf .sf-back{border:0;background:none;font-size:26px;line-height:1;color:#0f4c3a;min-width:44px;min-height:44px;padding:0;text-align:left;cursor:pointer}'
@@ -199,7 +201,9 @@
     function HC() { return W.HardPanCourse || null; }
     function courses() { var c = HC(); try { return c ? c.list() : []; } catch (e) { return []; } }
     function nearList(here) { var c = HC(); try { return c && here ? c.near(here, 9) : []; } catch (e) { return []; } }
-    function nameOf(c) { var H = HD(); return typeof H.shownName === 'function' ? H.shownName(c.name) : c.name; }
+    // POLISH #22 (map helper, SHARED): a trailing "(Papago)" that repeats the name is dropped (gps-round.js tidyCourse).
+    function dropRepeat(n) { var s = String(n == null ? '' : n), m = /^(.*\S)\s*\(([^()]+)\)\s*$/.exec(s.trim()); if (!m) return s; var w = function (t) { return String(t).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean); }, h = w(m[1]), t = w(m[2]); return t.length && t.every(function (x) { return h.indexOf(x) >= 0; }) ? m[1] : s; }
+    function nameOf(c) { var H = HD(); return dropRepeat(typeof H.shownName === 'function' ? H.shownName(c.name) : c.name); }
     function readyOf(key) { var c = HC(); try { return !!(c && key && c.resolve(key).hasGps); } catch (e) { return false; } }
     function distTo(c) { var H = HD(); return S.here && c.pt && typeof H.miles === 'function' ? H.miles(S.here, c.pt) : null; }
     function miStr(d) { return d == null ? '' : (d < 10 ? d.toFixed(1) : Math.round(d)) + ' mi'; }

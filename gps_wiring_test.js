@@ -319,7 +319,8 @@ test('build 7 live wind: the station\'s latest observation first, the hourly for
     assert.ok(/if \(windTimer && typeof windTimer\.unref === 'function'\) windTimer\.unref\(\);/.test(sec), 'never keeps a test process alive');
     const show = v.slice(v.indexOf('function showSide('), v.indexOf('function showSide(') + 3200);
     assert.ok(/S\.windKick = true;\s*startWindTick\(\);/.test(show) && /closeWindSheet\(\);\s*stopWindTick\(\);/.test(show), 'only while GPS is showing');
-    assert.ok(/w\.mph \+ \(w\.gustMph \? ' g ' \+ w\.gustMph : ''\) \+ ' mph'/.test(sec), '"12 g 20 mph"');
+    // POLISH #18: "12 mph · gusts 20" (was "12 g 20 mph").
+    assert.ok(/w\.mph \+ ' mph' \+ \(w\.gustMph \? ' \\u00b7 gusts ' \+ w\.gustMph : ''\)/.test(sec), '"12 mph · gusts 20"');
 });
 
 test('build 5 landing: the Card choice is remembered per round, so every new round opens on GPS', { skip }, () => {

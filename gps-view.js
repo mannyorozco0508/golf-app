@@ -1126,6 +1126,7 @@
             sizeTarget();
             var r = resolved();
             if (S.arcs && S.arcStep !== arcStepNow(aimAt(r))) drawArcs(r, origin(r));
+            spreadPins();
             placePills();
         });
         map.on('resize', function () {
@@ -1308,6 +1309,9 @@
         // 012: the top bar's own bottom - the Tools sheet never reaches over it.
         if (t && t.offsetParent !== null) S.el.style.setProperty('--gps-bar-b', Math.round(t.getBoundingClientRect().bottom - S.el.getBoundingClientRect().top + 8) + 'px');
         if (tB != null) S.el.style.setProperty('--gps-top-b', Math.round(tB - S.el.getBoundingClientRect().top + 8) + 'px');
+        // POLISH #19: the same line for the page (the overlay is fixed at 0,0) - the toasts sit
+        // under the top bar and the Menu row, clear of the Plays-like pill (gps-round.js CSS).
+        if (tB != null) { try { document.documentElement.style.setProperty('--gps-top-b', Math.round(tB + 8) + 'px'); } catch (e) {} }
         if (ldOn()) ldPlace();
     }
     // LAYOUT D, MEASURED: the pill and Recenter ride above the credit line (however tall the
@@ -1604,7 +1608,65 @@
         marker('dfront', S.draft && S.draft.front, function () { return pinEl('gps-pin-front gps-pin-draft', 'F'); });
         marker('dback', S.draft && S.draft.back, function () { return pinEl('gps-pin-back gps-pin-draft', 'B'); });
         marker('tee', o && o.from === 'tee' ? o.pt : null, function () { return pinEl('gps-pin-tee', 'T'); });
+        spreadPins();
         drawArcs(r, o);
+    }
+    // POLISH #17: F / C / B LESS THAN ~20 px APART ON SCREEN (a small green seen whole) drew on top
+    // of each other - F hidden behind C. F and B step out along their own line from C (or straight
+    // down / up the screen when they sit on it) to PIN_GAP px; the pins themselves stay as they were
+    // (URGENT-025: no new labels). Worked out again on every move and zoom.
+    var PIN_GAP = 22;
+    function pinSpread(pts, gap) {
+        gap = gap || PIN_GAP;
+        var out = { front: [0, 0], mid: [0, 0], back: [0, 0] };
+        var c = pts.mid, f = pts.front, b = pts.back;
+        if (!c && f && b) {
+            // No center: F and B apart from their midpoint.
+            c = [(f[0] + b[0]) / 2, (f[1] + b[1]) / 2];
+            gap = gap / 2;
+        }
+        if (!c) return out;
+        ['front', 'back'].forEach(function (k) {
+            var p = pts[k]; if (!p) return;
+            var dx = p[0] - c[0], dy = p[1] - c[1], len = Math.sqrt(dx * dx + dy * dy);
+            if (len >= gap) return;
+            var ux, uy;
+            if (len > 0.5) { ux = dx / len; uy = dy / len; }
+            else {
+                // On top of C: along the F -> B line when the other one is clear of C, else down (F, nearer
+                // the golfer) / up (B) - the hole's view has the tee at the bottom.
+                var o = pts[k === 'front' ? 'back' : 'front'], odx = o ? o[0] - c[0] : 0, ody = o ? o[1] - c[1] : 0, ol = Math.sqrt(odx * odx + ody * ody);
+                if (ol > 0.5) { ux = -odx / ol; uy = -ody / ol; } else { ux = 0; uy = k === 'front' ? 1 : -1; }
+            }
+            out[k] = [Math.round(ux * gap - dx), Math.round(uy * gap - dy)];
+        });
+        // F and B pushed the same way (both on one side of C): B one more gap out.
+        var fp = pts.front && [pts.front[0] + out.front[0], pts.front[1] + out.front[1]], bp = pts.back && [pts.back[0] + out.back[0], pts.back[1] + out.back[1]];
+        if (fp && bp) {
+            var ex = bp[0] - fp[0], ey = bp[1] - fp[1], el = Math.sqrt(ex * ex + ey * ey);
+            if (el < gap) {
+                var vx = bp[0] - c[0], vy = bp[1] - c[1], vl = Math.sqrt(vx * vx + vy * vy) || 1;
+                out.back = [Math.round(out.back[0] + vx / vl * gap), Math.round(out.back[1] + vy / vl * gap)];
+            }
+        }
+        return out;
+    }
+    function spreadPins() {
+        if (!S || !S.map || !S.markers) return;
+        [['front', 'mid', 'back'], ['dfront', 'dmid', 'dback']].forEach(function (set) {
+            var pts = {}, ms = {};
+            ['front', 'mid', 'back'].forEach(function (k, i) {
+                var m = S.markers[set[i]]; ms[k] = m;
+                if (m) { try { var q = S.map.project(m.getLngLat()); pts[k] = [q.x, q.y]; } catch (e) {} }
+            });
+            var off = pinSpread(pts);
+            ['front', 'mid', 'back'].forEach(function (k) {
+                var m = ms[k]; if (!m) return;
+                var want = off[k], have = m.getOffset ? m.getOffset() : null;
+                if (!have || Math.round(have.x) !== want[0] || Math.round(have.y) !== want[1]) { try { m.setOffset(want); } catch (e) {} }
+                try { var me = m.getElement(); if (me) me.setAttribute('data-spread', want[0] || want[1] ? '1' : '0'); } catch (e) {}
+            });
+        });
     }
 
     // ---- YARDAGE ARCS (Wave 1) ------------------------------------------------
@@ -2776,7 +2838,8 @@
         box.classList.toggle('gps-wind-tagged', has);
         if (!has) { txt('.gps-wind-mph', 'Wind –'); txt('.gps-wind-tag', ''); box.removeAttribute('data-rot'); box.setAttribute('aria-label', 'Wind: tap to set it'); return; }
         w = ew;
-        txt('.gps-wind-mph', w.mph === 0 ? 'Calm' : w.mph + (w.gustMph ? ' g ' + w.gustMph : '') + ' mph');
+        // POLISH #18: "7 mph · gusts 17", never the cryptic "7 g 17 mph".
+        txt('.gps-wind-mph', w.mph === 0 ? 'Calm' : w.mph + ' mph' + (w.gustMph ? ' \u00b7 gusts ' + w.gustMph : ''));
         txt('.gps-wind-tag', w.manual ? 'Manual' : 'Live · ' + ageText(w.at).replace(/^updated /, ''));
         var arrow = box.querySelector('.gps-wind-arrow');
         // The arrow points where the wind BLOWS, relative to the HOLE (tee -> green
@@ -5842,7 +5905,15 @@
                 if (S.locPending && !courseHasAnyData()) setTimeout(open, 1500); else open();
             });
         });
-        on(el, '.gps-side-bets', function () { S.userChoseSide = true; showSide('bets'); });
+        // POLISH #8: "Card" IS THE CARD - the hole-by-hole 18-hole grid (gps-round.js toFullCard), never
+        // the one-hole score sheet or the results pop-up (that comes only from Finish). "Score" (the
+        // app's front door) and a page without the round helpers keep the old side switch.
+        on(el, '.gps-side-bets', function () {
+            S.userChoseSide = true;
+            var cap = el.querySelector('.gps-side-bets .gps-cap'), R = window.HardPanRound;
+            if (cap && cap.textContent === 'Card' && R && typeof R.toFullCard === 'function') { R.toFullCard(); return; }
+            showSide('bets');
+        });
         // "‹" IS THE WAY OUT (URGENT-019, simpleFlow, in a round): nothing scored yet -> Change course
         // (the Course & Tees screen for a new round); scores in -> Home, the round kept as Resume.
         // The card stays one tap away on the bottom bar. Off / no round: the card, as before.
@@ -6100,6 +6171,8 @@
         on(el, '.gps-score', function () {
             if (!S || (S.swipedAt && Date.now() - S.swipedAt < 450)) return;
             var w = scoreFor();
+            // POLISH #8: the Card may be showing the 18-hole grid - a score is entered on the hole view.
+            try { var R = window.HardPanRound; if (R && typeof R.holeView === 'function') R.holeView(); } catch (e) {}
             if (typeof S.openScore === 'function' && !readOnlyHere()) S.openScore(S.hole, w ? w.id : null);
         });
         on(el, '.gps-who', function () { if (S && !(S.swipedAt && Date.now() - S.swipedAt < 450)) openWho(false); });
@@ -6583,6 +6656,8 @@
         watchScore: function (ev) { return watchScore(ev); },
         // LAYOUT C's round chip (011; gps_layout_c_test.js): pure.
         roundScore: roundScore, roundScoreText: roundScoreText,
+        // POLISH #17: F / C / B screen offsets when they crowd (pure; polish_map_chrome_test.js).
+        pinSpread: pinSpread,
         // LAYOUT D (012): which layout shows ('d' | 'c' | 'old'), and Tools > Screen layout's switch.
         layout: function () { return layoutNow(); },
         setLayout: function (name) { if (S) setLayout(name === 'c' ? 'c' : 'd'); },
