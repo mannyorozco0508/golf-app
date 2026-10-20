@@ -5829,7 +5829,15 @@
                 if (S.locPending && !courseHasAnyData()) setTimeout(open, 1500); else open();
             });
         });
-        on(el, '.gps-side-bets', function () { S.userChoseSide = true; showSide('bets'); });
+        // POLISH #8: "Card" IS THE CARD - the hole-by-hole 18-hole grid (gps-round.js toFullCard), never
+        // the one-hole score sheet or the results pop-up (that comes only from Finish). "Score" (the
+        // app's front door) and a page without the round helpers keep the old side switch.
+        on(el, '.gps-side-bets', function () {
+            S.userChoseSide = true;
+            var cap = el.querySelector('.gps-side-bets .gps-cap'), R = window.HardPanRound;
+            if (cap && cap.textContent === 'Card' && R && typeof R.toFullCard === 'function') { R.toFullCard(); return; }
+            showSide('bets');
+        });
         // "‹" IS THE WAY OUT (URGENT-019, simpleFlow, in a round): nothing scored yet -> Change course
         // (the Course & Tees screen for a new round); scores in -> Home, the round kept as Resume.
         // The card stays one tap away on the bottom bar. Off / no round: the card, as before.
@@ -6087,6 +6095,8 @@
         on(el, '.gps-score', function () {
             if (!S || (S.swipedAt && Date.now() - S.swipedAt < 450)) return;
             var w = scoreFor();
+            // POLISH #8: the Card may be showing the 18-hole grid - a score is entered on the hole view.
+            try { var R = window.HardPanRound; if (R && typeof R.holeView === 'function') R.holeView(); } catch (e) {}
             if (typeof S.openScore === 'function' && !readOnlyHere()) S.openScore(S.hole, w ? w.id : null);
         });
         on(el, '.gps-who', function () { if (S && !(S.swipedAt && Date.now() - S.swipedAt < 450)) openWho(false); });

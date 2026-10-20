@@ -4344,7 +4344,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         cipWasIn[key] = isIn;
         // The first thing this session ever saw about this card is not a transition.
         if (!seen) return;
-        if (isIn && was === false) openCardInPopup();
+        // POLISH #8: in a map round the pop-up is Finish's alone. Opened here it waited behind the map
+        // and met the golfer who tapped Card; the card's own "Final results are in" line still says so.
+        let finishOnly = false;
+        // GPS:BEGIN
+        finishOnly = !!(window.HardPanRound && window.HardPanGps && typeof window.HardPanGps.isMounted === 'function' && window.HardPanGps.isMounted());
+        // GPS:END
+        if (isIn && was === false && !finishOnly) openCardInPopup();
     }
 
     function cardInPopupRows() {

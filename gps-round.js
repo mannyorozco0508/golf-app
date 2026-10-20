@@ -196,7 +196,7 @@
         return show('menu', html, 'Round Menu');
     }
     function tile(k) {
-        if (k === 'card') { closeSheet(true); closeBets(); toCard(); return; }
+        if (k === 'card') { closeSheet(true); closeBets(); toFullCard(); return; }
         if (k === 'bets') { closeSheet(true); openBets(); return; }
         if (k === 'gps') { closeSheet(true); closeBets(); toGps(); return; }
         if (k === 'bet') { closeSheet(true); if (B()) B().open(); return; }
@@ -582,11 +582,29 @@
         if (g && gpsUp() && onGps()) g.showSide('bets', { remember: false });
         return true;
     }
+    // POLISH #8: THE CARD IS THE 18-HOLE GRID (index.html's Full Card), hole by hole - the map's
+    // ▤ Card and the Round Menu's Card tile. The "Final results are in" pop-up is Finish's alone, so
+    // one left open behind the map is closed. Enter score goes back to the hole view (holeView).
+    function cardMode(m) {
+        try { if (typeof setViewMode === 'function' && typeof currentViewMode !== 'undefined' && currentViewMode !== m) setViewMode(m); } catch (e) {}   /* global setViewMode, currentViewMode */
+    }
+    function toFullCard() {
+        var g = G();
+        closeBets(); closeSheet(true);
+        try { if (typeof closeCardInPopup === 'function') closeCardInPopup(); } catch (e) {}   /* global closeCardInPopup */
+        if (g && gpsUp() && onGps()) g.showSide('bets', { remember: false });
+        cardMode('full');
+        cardY = 0;
+        try { window.scrollTo(0, 0); } catch (e) {}
+        return true;
+    }
+    function holeView() { cardMode('hole'); return true; }
     // ENTER SCORE, from any screen: on the map (or Bets over it) the GPS's own score entry; on the
     // card the first empty box of this hole (or this phone's golfer's), focused.
     function enterScore() {
         closeBets(); closeSheet(true);
         if (onGps()) { var b = document.querySelector('#gps-overlay .gps-score'); if (b) { b.click(); return true; } }
+        holeView();
         var h = (function () { try { return currentViewedHole; } catch (e) { return null; } })();   /* global currentViewedHole */
         // 018: THE CARD'S "Enter score" IS THE SAME SHEET AS THE MAP'S - this hole, and ‹ for an
         // earlier one - over the card, which stays on its hole (index.html gpsOpenSheet).
@@ -686,7 +704,7 @@
     window.HardPanRound = {
         openMenu: function () { return openMenu(); }, openShare: openShare, openFinish: openFinish, openSettings: openSettings,
         openBets: openBets, closeBets: closeBets, closeSheet: closeSheet, go: go, barFor: barFor, refresh: refresh,
-        toGps: toGps, toCard: toCard, screen: screen, sheetKind: function () { return sheetOpen() ? sheetKind : null; },
+        toGps: toGps, toCard: toCard, toFullCard: toFullCard, holeView: holeView, tidyCourse: tidyCourse, screen: screen, sheetKind: function () { return sheetOpen() ? sheetKind : null; },
         payText: function () { return payText(settle()); }, feed: feed, enterScore: enterScore,
         changeCourse: changeCourse, leaveRound: leaveRound, scored: scored
     };
