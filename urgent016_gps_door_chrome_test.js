@@ -7,8 +7,11 @@
 //      highlighted, and 6+ nearby courses right under it (distance, ✓ GPS); a tap on one switches
 //      the course in place.
 //   3  Location denied: YOUR COURSES (this phone's own) instead of an empty list.
-//   4  Games & Bets: the ORIGINAL setup - Round Setup's lobby, "What are you setting up?" with
-//      Road Trip / Game Day, no 3-step screen, no session mark (features.simpleGames off).
+//   4  Games & Bets: Round Setup's own lobby page (admin.html?start=lobby), drawn since polish #29
+//      (option B) as Home-style door cards - "‹ Home", Game Day / Road Trip - over the same lobby
+//      functions; no 3-step screen, no session mark (features.simpleGames off). Game Day still opens
+//      the original wizard. (Was: the old "What are you setting up?" lobby itself, which #29 replaced
+//      in the HardPan app; polish029_games_lobby_chrome_test.js holds the rest of the new screen.)
 'use strict';
 const fs = require('fs'), path = require('path');
 if (!fs.existsSync(path.join(__dirname, 'simple-flow.js'))) { console.log('Consumer tree: no HardPan Home / simple flow - skipped.'); process.exit(0); }
@@ -58,11 +61,12 @@ describe('URGENT-016: the GPS door', () => {
         assert.equal(fr.frames.start.lobby, 0, 'the old lobby flashed on the code-minting hop: ' + JSON.stringify(fr.frames));
         assert.equal(fr.frames.game.lobby, 0, 'the old lobby flashed on the round page: ' + JSON.stringify(fr.frames));
         assert.equal(fr.cover, false, 'the cover is lifted once the screen is up');
-        // the picked course on top, highlighted; NEAR YOU right under it (before the tees); 6+ others
+        // the picked course on top, highlighted; its TEES right under it, then NEAR YOU (polish 029 #11,
+        // Manny: the tees sat under 8 NEAR YOU rows, below the fold); 6+ others
         assert.equal(s1.key, 'gca_zgkynkan');
         assert.match(s1.head, /Dobson Ranch Golf Course\n0\.0 mi · (✓ GPS · )?Change/);   // ✓ GPS = what the map draws (URGENT-022)
         assert.equal(s1.headSel, true);
-        assert.ok(s1.order[0] > 0 && s1.order[0] < s1.order[1], 'NEAR YOU sits above the tees: ' + JSON.stringify(s1.order));
+        assert.ok(s1.order[1] > 0 && s1.order[1] < s1.order[0], 'polish #11: the TEES sit under the picked course, above NEAR YOU: ' + JSON.stringify(s1.order));
         assert.ok(s1.near.length >= 6, 'at least 6 nearby courses: ' + JSON.stringify(s1.near));
         assert.ok(s1.near.every((t) => !/^Dobson Ranch Golf Course \|/.test(t)), 'the picked course is not repeated in the list');
         assert.ok(s1.near.every((t) => / mi/.test(t)), 'each row shows its distance: ' + JSON.stringify(s1.near));
@@ -86,18 +90,19 @@ describe('URGENT-016: the GPS door', () => {
         assert.match(s1.text, /YOUR COURSES\nDobson Ranch Golf Course/);
     });
 
-    test('Games & Bets: the ORIGINAL setup - "What are you setting up?" Road Trip / Game Day, no 3-step screen', { timeout: 90000 }, async () => {
+    test('Games & Bets: Round Setup\'s lobby page as door cards (polish #29) - Game Day / Road Trip, no 3-step screen', { timeout: 90000 }, async () => {
         const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE, steps: [
             { tap: '[data-hp-act="snew"]' },
-            { waitFor: "/admin\\.html/.test(location.pathname) && !!document.querySelector('.lobby-lead') && document.querySelector('.lobby-lead').getBoundingClientRect().height > 0", timeout: 20000 }, { sleep: 1500 },
-            X("JSON.stringify({ at: location.href.split('/').pop(), lobby: document.getElementById('lobby-screen').innerText, sf: !!document.getElementById('sf'), mark: sessionStorage.getItem('hardpan_simple_flow'), cover: document.documentElement.classList.contains('sf-pre') })"),
-            { tap: '#hw-quick' },
+            { waitFor: "/admin\\.html/.test(location.pathname) && !!document.getElementById('gl-view') && document.getElementById('gl-view').getBoundingClientRect().height > 0", timeout: 20000 }, { sleep: 1500 },
+            X("JSON.stringify({ at: location.href.split('/').pop(), lobby: document.getElementById('gl-view').innerText, old: getComputedStyle(document.getElementById('lobby-screen')).display, sf: !!document.getElementById('sf'), mark: sessionStorage.getItem('hardpan_simple_flow'), cover: document.documentElement.classList.contains('sf-pre') })"),
+            { tap: '#gl-gameday' },
             { waitFor: "/game=/.test(location.search) && document.querySelectorAll('.wizard-step').length > 0", timeout: 20000 }, { sleep: 2000 },
             X("JSON.stringify({ sf: !!document.getElementById('sf') && getComputedStyle(document.getElementById('sf')).display !== 'none', admin: getComputedStyle(document.getElementById('admin-screen')).display })")] });
         assert.equal(r.ok, true, r.reason);
         const [lobby, wiz] = J(r);
         assert.equal(lobby.at, 'admin.html?start=lobby');
-        assert.match(lobby.lobby, /What are you setting up\?[\s\S]*Road Trip[\s\S]*Game Day/);
+        assert.match(lobby.lobby, /^‹\nHome\nGames & Bets[\s\S]*Game Day[\s\S]*Road Trip/);
+        assert.equal(lobby.old, 'none', 'the old lobby (HARDPAN banner, What are you setting up?) is not on screen');
         assert.deepEqual([lobby.sf, lobby.mark, lobby.cover], [false, null, false]);
         assert.deepEqual(wiz, { sf: false, admin: 'block' }, 'Game Day opens the original wizard');
     });

@@ -883,6 +883,7 @@ html {
     // Points and dots only. No projected payout: what a game is worth is settled
     // in Results, and a running dollar figure mid-round is not final.
     function buildLivePointsHtml(data, courseData, savedScores) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLivePointsState !== 'function') return '';
         const st = buildLivePointsState(data, courseData, savedScores);
         if (!st) return '';
@@ -916,6 +917,7 @@ html {
     // NO MONEY. Settlement is (t1Points - t2Points) x holeBetStake and belongs in
     // Results; a running figure mid-round is not final.
     function buildLiveHiLoHtml(data, courseData, savedScores) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLiveHiLoState !== 'function') return '';
         const st = buildLiveHiLoState(data, courseData, savedScores);
         if (!st) return '';
@@ -956,6 +958,7 @@ html {
     // NO MONEY TOTALS. What the next hole is worth is game state - a running
     // payout is settlement's, and is not final mid-round.
     function buildLiveStrokeBetHtml(data, courseData, savedScores, visibleIds) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLiveStrokeBetStates !== 'function') return '';
         // Scoped to the link's group AFTER the engine builds every state over the
         // whole field (visibleIds), so a group link sees only the bets its golfers

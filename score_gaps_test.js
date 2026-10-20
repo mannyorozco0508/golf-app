@@ -152,11 +152,11 @@ describe('THE SCORECARD (index.html): the box, the banner, the tap', () => {
         assert.match(wrapperOf(s.card, 105, 12), /score-gap/);
         range(1, 9).forEach(h => assert.doesNotMatch(wrapperOf(s.card, 105, h) || '', /score-gap/, 'h' + h + ' before a shotgun start is not a gap'));
         assert.equal((s.card.match(/score-gap/g) || []).length, 1);
-        assert.match(s.banner, /⚠ Randy T\.: hole 12 has no score/, 'Randy T. with the initial - two Randys in the round');
+        assert.match(s.banner, /⚠ Randy T: hole 12 has no score/, 'Randy T with the initial - two Randys in the round');
     });
     test('the bare link (the organizer): both gaps, in group order', () => {
         const s = scorecard(GAPPY, '?game=gap1');
-        assert.match(s.banner, /Marty: hole 1 has no score[\s\S]*Randy T\.: hole 12 has no score/);
+        assert.match(s.banner, /Marty: hole 1 has no score[\s\S]*Randy T: hole 12 has no score/);
         assert.equal((s.card.match(/score-gap/g) || []).length, 2);
     });
     test('CONTROL - a clean round: no outline, banner display none and empty', () => {
@@ -171,11 +171,11 @@ describe('THE SCORECARD (index.html): the box, the banner, the tap', () => {
         assert.equal(run(s.sb, "currentViewMode"), 'hole');
         assert.deepEqual(J(run(s.sb, 'window.__lastGapFocus')), { playerId: '101', hole: '1' });
     });
-    test('Finish Round: "Not final — Marty is missing hole 1; Randy T. is missing hole 12" first in the warning; absent on a clean round', () => {
+    test('Finish Round: "Not final — Marty is missing hole 1; Randy T is missing hole 12" first in the warning; absent on a clean round', () => {
         const s = scorecard(GAPPY, '?game=gap1');
         run(s.sb, 'renderIncompleteWarning()');
         const w = String(run(s.sb, "document.getElementById('fr-incomplete-warning').innerHTML"));
-        assert.match(w, /^<div class="fr-gap-line">Not final — Marty is missing hole 1; Randy T\. is missing hole 12<\/div>/);
+        assert.match(w, /^<div class="fr-gap-line">Not final — Marty is missing hole 1; Randy T is missing hole 12<\/div>/);
         assert.match(w, /scores still missing/, 'the existing list is still under it');
         const c = scorecard(CLEAN, '?game=gap1');
         run(c.sb, 'renderIncompleteWarning()');
@@ -192,7 +192,7 @@ describe('THE BOARD (leaderboard.html): ⚠ missing N beside the total, the rank
         hs.forEach(h => h.cb({ val: () => J(data), exists: () => true }));
         return String(run(sb, "document.getElementById('board-content').innerHTML") || '');
     }
-    test('Marty and Randy T. carry the flag; nobody else does; the position column is the same with and without gaps', () => {
+    test('Marty and Randy T carry the flag; nobody else does; the position column is the same with and without gaps', () => {
         const g = board(GAPPY), c = board(CLEAN);
         assert.match(g, /Marty[\s\S]{0,300}?<span class="gap-flag">⚠ missing 1<\/span>/);
         assert.match(g, /Randy T[\s\S]{0,300}?<span class="gap-flag">⚠ missing 1<\/span>/);   // the board's rows print the stored name (escapeHtml(r.name)), as before
@@ -212,7 +212,7 @@ describe('RESULTS (settlement.html): "Not final — …" ONCE, in its own mount 
     }
     test('the line in #results-gap-line, then the head with no copy of its own', () => {
         const r = results(GAPPY);
-        assert.equal(r.gap, '<div class="gap-line results-gap">Not final — Marty is missing hole 1; Randy T. is missing hole 12</div>');
+        assert.equal(r.gap, '<div class="gap-line results-gap">Not final — Marty is missing hole 1; Randy T is missing hole 12</div>');
         assert.match(r.live, /^<div class="settle-card live-head"><div class="settle-header">/);
         assert.doesNotMatch(r.live, /Not final/);
         const c = results(CLEAN);

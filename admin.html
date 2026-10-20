@@ -1115,10 +1115,177 @@ html {
     padding-top: max(20px, env(safe-area-inset-top, 0px));
     padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
 }
+/* POLISH #13 (map helper, SHARED): the page scrolls under the status bar and the Dynamic Island -
+   a solid band there, and the wizard's step dots scroll in BELOW it, not under it. 0px on the web. */
+body::before {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f3);
+}
+.wizard-progress { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 8px); }
 </style>
 </head>
 <body>
 
+<!-- GPS:BEGIN -->
+<!-- GAMES & BETS, HOME-STYLE DOOR CARDS (polish #29, option B, Manny 2026-10-20). Home's Games & Bets
+     door opens admin.html?start=lobby. In the HardPan app (front-door.js on(), the doors flag) that
+     page is this view instead of the old lobby (HARDPAN banner, moon, "Open something else", no way
+     back). A LOOK CHANGE ONLY: every card calls what the old lobby's own control called -
+       Game Day          selectHomeWidget('quick')  (createRoom on #hw-quick)
+       Road Trip         selectHomeWidget('trip')
+       Same as last week sameAsLastWeek(#same-as-last-week)   (lastRoomCode, Round Setup's copier)
+       Have a game code? the lobby's own "Open a round" card (#open-round-card: openRoundByCode),
+                         moved here when tapped - the same field, button and refusal line
+       Resume            resumeGame()               (lastRoomCode), shown only while that round is
+                         in progress (HardPanDoors.localRound / progressOf, then the server's copy)
+     The old lobby stays in the page, hidden, so those functions find their elements. The Consumer
+     build drops this block and keeps its lobby as it is. -->
+<style>
+    #gl-view { display: none; }
+    html.gl-on #lobby-screen { display: none !important; }
+    html.gl-on, html.gl-on body { background: #f2f4ef !important; }
+    html.gl-on body { padding-left: 0 !important; padding-right: 0 !important; }
+    html.gl-on #gl-view { display: block; }
+    #gl-view { --gl-line: #dfe5df; --gl-ink: #13241d; --gl-green: #0f4c3a; --gl-muted: #5d6b64; --gl-lime: #d4f27c; --gl-lime-ink: #10392d;
+        box-sizing: border-box; max-width: 480px; margin: 0 auto; color: var(--gl-ink); text-align: left;
+        padding: max(8px, env(safe-area-inset-top, 0px)) 16px max(20px, env(safe-area-inset-bottom, 0px));
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+    #gl-view *, #gl-view *::before, #gl-view *::after { box-sizing: border-box; }
+    #gl-view button { font-family: inherit; -webkit-tap-highlight-color: transparent; cursor: pointer; }
+    #gl-view .gl-top { display: flex; align-items: center; min-height: 44px; }
+    #gl-view .gl-back { border: 0; background: none; color: var(--gl-green); font-weight: 700; font-size: 17px; line-height: 1; display: flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 6px 0 0; margin: 0; width: auto; }
+    #gl-view .gl-back b { font-size: 28px; font-weight: 400; line-height: 20px; margin-top: -3px; }
+    #gl-view .gl-h1 { font-size: 30px; font-weight: 800; letter-spacing: -.02em; margin: 4px 2px 12px; line-height: 1.15; color: var(--gl-ink); }
+    #gl-view .gl-hero { display: flex; flex-direction: column; justify-content: flex-end; width: 100%; min-height: 150px; margin: 0 0 12px; padding: 22px 20px;
+        border: 0; border-radius: 22px; color: #fff; text-align: left; }
+    #gl-view .gl-hero.g { background: linear-gradient(160deg, #2a6a4f, #0f4c3a); }
+    #gl-view .gl-hero.n { background: #1d3557; }
+    #gl-view .gl-hero .em { font-size: 30px; line-height: 1.1; margin-bottom: auto; padding-bottom: 14px; }
+    #gl-view .gl-hero .t { font-size: 28px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+    #gl-view .gl-hero .d { font-size: 15px; opacity: .85; margin-top: 4px; line-height: 1.3; }
+    #gl-view .gl-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    #gl-view .gl-tile { display: flex; flex-direction: column; gap: 4px; min-height: 96px; margin: 0; padding: 14px; width: 100%;
+        background: #fff; border: 1px solid var(--gl-line); border-radius: 16px; color: var(--gl-ink); text-align: left; }
+    #gl-view .gl-tile .t { font-size: 17px; font-weight: 800; line-height: 1.2; }
+    #gl-view .gl-tile .d { font-size: 13px; color: var(--gl-muted); line-height: 1.3; overflow-wrap: anywhere; }
+    #gl-view .gl-tile.lime { background: var(--gl-lime); border-color: var(--gl-lime); color: var(--gl-lime-ink); }
+    #gl-view .gl-tile.lime .d { color: var(--gl-lime-ink); opacity: .8; }
+    #gl-view .gl-tiles.one { grid-template-columns: 1fr; }
+    #gl-view [aria-disabled="true"] { opacity: .6; pointer-events: none; }
+    #gl-view .gl-join { margin: 0 0 12px; }
+    #gl-view .gl-join .w-card { margin: 0; text-align: left; }
+    #gl-view .gl-foot { display: block; width: 100%; border: 0; background: none; min-height: 44px; margin: 4px 0 0; padding: 8px 4px;
+        text-align: center; font-size: 15px; line-height: 1.35; color: var(--gl-muted); }
+    #gl-view .gl-foot b { color: var(--gl-green); }
+</style>
+<div id="gl-view" aria-label="Games and Bets">
+    <div class="gl-top"><button type="button" class="gl-back" id="gl-back"><b>&lsaquo;</b>Home</button></div>
+    <div class="gl-h1" role="heading" aria-level="1">Games &amp; Bets</div>
+    <button type="button" class="gl-hero g" id="gl-gameday"><span class="em" aria-hidden="true">&#x1F3CC;&#xFE0F;</span><span class="t">Game Day</span><span class="d">One round today &middot; group, games and money</span></button>
+    <button type="button" class="gl-hero n" id="gl-trip"><span class="em" aria-hidden="true">&#x1F690;</span><span class="t">Road Trip</span><span class="d">Several rounds &middot; teams, money across days</span></button>
+    <div class="gl-tiles one" id="gl-tiles">
+        <button type="button" class="gl-tile lime" id="gl-same" style="display:none;"><span class="t">&#x21BB; Same as last week</span><span class="d" id="gl-same-d"></span></button>
+        <button type="button" class="gl-tile" id="gl-code"><span class="t">&#x0023;&#xFE0F;&#x20E3; Have a game code?</span><span class="d">Join with a code, link or QR</span></button>
+    </div>
+    <div class="gl-join" id="gl-join" style="display:none;"></div>
+    <button type="button" class="gl-foot" id="gl-resume" style="display:none;"></button>
+</div>
+<script>
+(function () {
+    'use strict';
+    var W = window, D = W.document;
+    var p; try { p = new URLSearchParams(W.location.search); } catch (e) { return; }
+    var HP = W.HardPanDoors;
+    if (p.get('start') !== 'lobby' || p.get('game') || !HP || typeof HP.on !== 'function' || !HP.on()) return;
+    D.documentElement.classList.add('gl-on');
+    function $(id) { return D.getElementById(id); }
+    function short(n) { return String(n || '').split(' (')[0].trim(); }
+    function code() { try { return typeof W.lastWeekCode === 'function' ? W.lastWeekCode() : String(W.localStorage.getItem('lastRoomCode') || '').trim().toUpperCase(); } catch (e) { return ''; } }
+    function within(pr, ms) { return Promise.race([pr, new Promise(function (_, no) { setTimeout(function () { no(new Error('timeout')); }, ms); })]); }
+    function serverRound(c) { try { return typeof db !== 'undefined' && db ? within(db.ref('events/' + c).once('value'), 6000).then(function (s) { return s && s.val ? s.val() : null; }) : Promise.reject(new Error('no db')); } catch (e) { return Promise.reject(e); } }   /* global db */
+    function localData(c) {
+        try { var q = W.OfflineQueue, s = q && q.loadSnapshot(W.localStorage, c); return s && s.data ? s.data : null; } catch (e) { return null; }
+    }
+    // THE OLD CONTROL'S PENDING STATE, SHOWN ON THE NEW CARD. The old functions mark the control they
+    // were handed (setControlPending: aria-disabled, then restored on a refusal); this card follows it.
+    function mirror(src, card, text) {
+        if (!src || !card) return;
+        var d = card.querySelector('.d'), was = d ? d.textContent : '';
+        var sync = function () {
+            var on = src.getAttribute('aria-disabled') === 'true';
+            if (on) { card.setAttribute('aria-disabled', 'true'); if (d) d.textContent = text; }
+            else { card.removeAttribute('aria-disabled'); if (d) d.textContent = was; }
+        };
+        try { new MutationObserver(sync).observe(src, { attributes: true, attributeFilter: ['aria-disabled'] }); } catch (e) {}
+        sync();
+    }
+    // SAME AS LAST WEEK: offered when the old lobby offers it (syncSameAsLastWeek: lastRoomCode), with
+    // what that round was - course, golfers, games.
+    function sameText(d) {
+        var ps = d && Array.isArray(d.players) ? d.players.filter(function (x) { return x && String(x.name || '').trim(); }).map(function (x) { return String(x.name).trim(); }) : [];
+        var bits = [];
+        if (d && (d.courseName || d.eventName)) bits.push(short(d.courseName || d.eventName));
+        if (ps.length) bits.push(ps.length <= 3 ? ps.join(', ') : ps.slice(0, 2).join(', ') + ' +' + (ps.length - 2));
+        var g = [];
+        try { g = typeof HP.gamesOf === 'function' ? HP.gamesOf(d) : []; } catch (e) { g = []; }
+        var sm = (d && d.sideMatches) || {}, stake = null;
+        Object.keys(sm).forEach(function (k) { var m = sm[k]; if (m && m.format === 'nassau' && Number(m.frontStake) && stake === null) stake = Number(m.frontStake); });
+        g = g.map(function (x) { return x === 'Nassau' && stake ? 'Nassau $' + stake : x; });
+        if (g.length) bits.push(g.join(', '));
+        return bits.join(' · ');
+    }
+    function paintSame() {
+        var c = code(), b = $('gl-same'), dEl = $('gl-same-d');
+        if (!b) return;
+        b.style.display = c ? '' : 'none';
+        $('gl-tiles').classList.toggle('one', !c);
+        if (!c) return;
+        var put = function (d) { if (b.getAttribute('aria-disabled') !== 'true') dEl.textContent = (d && sameText(d)) || ('Copies round ' + c + ' — same course, games and money'); };
+        put(localData(c));
+        serverRound(c).then(function (d) { if (d) put(d); }, function () {});
+    }
+    // RESUME <course> · thru N: the old lobby's Resume (resumeGame, lastRoomCode), only while that
+    // round is in progress - this phone's copy first (works with no signal), then the server's.
+    function paintResume() {
+        var c = code(), b = $('gl-resume');
+        if (!b || !c) return;
+        var put = function (course, thru) { b.innerHTML = '▶︎ <b></b> · ' + (thru ? 'thru ' + thru : 'not started'); b.querySelector('b').textContent = 'Resume ' + (short(course) || c); b.style.display = ''; };
+        var hide = function () { b.style.display = 'none'; b.textContent = ''; };
+        var local = null; try { local = typeof HP.localRound === 'function' ? HP.localRound(c) : null; } catch (e) { local = null; }
+        if (local && !local.finished) put(local.data.courseName || local.data.eventName, local.thru);
+        serverRound(c).then(function (d) {
+            if (!d) { var held = false; try { held = typeof HP.heldFor === 'function' && !!HP.heldFor(c); } catch (e) {} if (!held) hide(); return; }
+            if (!d.players || !d.courseData) return;
+            var pr = HP.progressOf(d);
+            if (pr.finished) hide(); else put(d.courseName || d.eventName, pr.thru);
+        }, function () {});
+    }
+    // "Have a game code?": the old lobby's own Open-a-round card, here.
+    function openJoin() {
+        var box = $('gl-join'), card = $('open-round-card');
+        if (!box || !card) return;
+        if (card.parentNode !== box) box.appendChild(card);
+        var show = box.style.display === 'none';
+        box.style.display = show ? '' : 'none';
+        var i = $('join-code-input');
+        if (show && i) { try { i.focus(); } catch (e) {} }
+    }
+    function wire() {
+        $('gl-back').addEventListener('click', function () { W.location.href = 'home.html'; });
+        $('gl-gameday').addEventListener('click', function () { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); });
+        $('gl-trip').addEventListener('click', function () { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('trip'); });
+        $('gl-same').addEventListener('click', function () { if (typeof W.sameAsLastWeek === 'function') W.sameAsLastWeek($('same-as-last-week')); });
+        $('gl-code').addEventListener('click', openJoin);
+        $('gl-resume').addEventListener('click', function () { if (typeof W.resumeGame === 'function') W.resumeGame(); });
+        mirror($('hw-quick'), $('gl-gameday'), '⏳ Starting…');
+        mirror($('same-as-last-week'), $('gl-same'), '⏳ Checking…');
+        paintSame();
+        paintResume();
+    }
+    if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', wire); else wire();
+})();
+</script>
+<!-- GPS:END -->
 <div class="container" id="lobby-screen">
     <!-- ACCOUNT. The email-link flow used to own this screen as a tall "Keep this
          organizer" card above Resume. It is the same flow, behind this link. -->
@@ -2715,9 +2882,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     <div class="lobby-divider"><span>OR</span></div>
     <button class="btn-outline" onclick="editRoundFromReady()" style="margin-bottom:8px;">✏️ Edit Round Setup</button>
     <!-- THE supersededBy GUARD (v191). Filled by offerRetire() after a NEW round is
-         saved when this device saved an unfinished round with the same golfers in
-         the last 7 days: "Retire OLD — anyone who opens it is sent here.", checked
-         by default (the write fires on render; unticking clears it). Empty otherwise. -->
+         saved when this device saved an unfinished round with the same golfers, on the
+         same course, the same day: "Retire OLD — anyone who opens it is sent here.",
+         UNCHECKED (polish 029 #3: nothing is written until the organizer ticks it;
+         unticking clears it). Empty otherwise. -->
     <div id="rr-retire"></div>
     <div id="rr-links-box" style="margin-top:12px;"></div>
 </div>
@@ -2813,6 +2981,22 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!q || !offline) { box.style.display = 'none'; box.innerHTML = ''; return; }
         var rounds = [];
         try { rounds = q.localRounds(localStorage) || []; } catch (e) { rounds = []; }
+        // POLISH 029 #5: EACH ROUND ONCE, AND NEVER A FINISHED ONE. The walk listed "Resume Dobson"
+        // twice (the Resume line above AND this row) and "Resume Papago", a finished round.
+        var D = window.HardPanDoors, seenCodes = {};
+        rounds = rounds.filter(function (r) {
+            var c = String(r && r.code || '').toUpperCase();
+            if (!c || seenCodes[c]) return false;
+            seenCodes[c] = 1;
+            var lr = null;
+            try { lr = D && typeof D.localRound === 'function' ? D.localRound(c) : null; } catch (e) { lr = null; }
+            return !(lr && lr.finished);
+        });
+        var lastRoomNow = '';
+        try { lastRoomNow = String(localStorage.getItem('lastRoomCode') || '').toUpperCase(); } catch (e) { lastRoomNow = ''; }
+        var resumeBox = document.getElementById('resume-container');
+        // The Resume line above is the same round as a row here (or a finished one): shown once.
+        if (resumeBox && lastRoomNow && seenCodes[lastRoomNow]) resumeBox.style.display = 'none';
         if (!rounds.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
         // NEWEST FIRST AND CAPPED AT FOUR: a phone that has opened thirty rounds
         // does not need thirty rows on a screen with no signal, it needs the one
@@ -3564,9 +3748,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const scores = (data && data.scores) || {};
         return players.some(p => holes.some(h => !(scores['p' + p.id + '_h' + h.hole] > 0)));
     }
+    // POLISH 029 #3: ONLY THE SAME COURSE AND THE SAME DAY. The walk offered (and
+    // wrote) "Retire TC47A7" - a Dobson round in progress - on a new Papago round,
+    // so anyone opening the Dobson round was sent to Papago. A replaced round is
+    // today's round at today's course; anything else is a different round.
+    const courseIdOf = (d) => String((d && d.courseName) || '').split(' (')[0].trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    function sameCourseRound(a, b) {
+        const ka = a && a.activeCourseKey, kb = b && b.activeCourseKey;
+        if (ka && kb && ka === kb) return true;
+        const na = courseIdOf(a), nb = courseIdOf(b);
+        return !!(na && nb && na === nb);
+    }
+    function sameLocalDay(t1, t2) {
+        const a = new Date(t1), b = new Date(t2);
+        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
     // The one code to offer, or null: this uid's, unfinished, not already
-    // retired, saved within the window, sharing at least half the NEW roster's
-    // names; the most recently saved such round wins.
+    // retired, saved today on this device, on the same course, sharing at least
+    // half the NEW roster's names; the most recently saved such round wins.
     function supersedeCandidate(newData, newCode, uid, entries, records, now) {
         const need = Math.ceil(((newData && newData.players) || []).length / 2);
         if (need === 0) return null;
@@ -3578,6 +3777,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (!rec) continue;
             if (!uid || rec.ownerUid !== uid) continue;
             if (rec.supersededBy) continue;
+            if (!sameLocalDay(e.at || 0, now)) continue;
+            if (!sameCourseRound(newData, rec)) continue;
             if (!roundUnfinished(rec)) continue;
             if (rosterOverlap(newData.players, rec.players) < need) continue;
             return e.code;
@@ -3585,7 +3786,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return null;
     }
     // After a NEW round's save: read the remembered rounds, pick one, render the
-    // row, and - checked by default - write. Never for an edit of an existing round.
+    // row UNCHECKED, and write nothing - the organizer's tick is the write
+    // (polish 029 #3). Never for an edit of an existing round.
     function offerRetire(newCode, newData, uid) {
         const mount = document.getElementById('rr-retire');
         if (!mount) return Promise.resolve(null);
@@ -3597,9 +3799,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const records = {}; pairs.forEach(([c, v]) => { if (v) records[c] = v; });
             const code = supersedeCandidate(newData, newCode, uid, entries, records, Date.now());
             if (!code) return null;
-            mount.innerHTML = '<label class="rr-retire-row"><input type="checkbox" id="rr-retire-box" checked onchange="retireRound(\'' + code + '\', this.checked)"> '
+            mount.innerHTML = '<label class="rr-retire-row"><input type="checkbox" id="rr-retire-box" onchange="retireRound(\'' + code + '\', this.checked)"> '
                 + '<span>Retire ' + code + ' \u2014 anyone who opens it is sent here.</span></label>';
-            retireRound(code, true);
             return code;
         });
     }
@@ -6634,6 +6835,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // phone says it is offline), so the reason is said plainly. A new round needs a code checked
         // against the server, so with no signal it cannot be started here: try again with signal.
         // Only when it is KNOWN - a timeout on a live socket keeps the words below.
+        // POLISH 029 #5: THE GPS DOOR NEVER FALLS BACK TO THIS LOBBY. Its Course & Tees screen
+        // (simple-flow.js) stays up with the reason on it and asks again when the signal is back.
+        try {
+            const SF = window.HardPanSimpleFlow;
+            if (what === 'round' && SF && typeof SF.noCode === 'function'
+                && SF.noCode(hpNoSignal() ? 'offline' : 'error')) return;
+        } catch (e) { /* the lobby's own words below */ }
         if (err && err.code === 'timeout' && hpNoSignal()) {
             uiFail('\uD83D\uDCF4 No signal \u2014 try again when you have a connection.\n'
                 + 'The new ' + what + ' was not started; nothing was saved.');
@@ -8880,6 +9088,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (rating) rating.value = opt.getAttribute('data-rating') || '';
         if (par) par.value = opt.getAttribute('data-par') || '';
         syncTeeAdjustRow();
+        // POLISH #1: the golfers who have no tee of their own are on the round's tee.
+        if (typeof rowTeesFollowRound === 'function') rowTeesFollowRound();
         refreshHandicapNote();
     }
 
@@ -8969,6 +9179,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // Help me set this up, Edit Round Setup, a trip round and a paste -
         // rather than six call sites each remembering to do it.
         if (typeof refreshRowTeeControls === 'function') refreshRowTeeControls();
+        if (typeof rowTeesFollowRound === 'function') rowTeesFollowRound();
     }
 
     function handicapReviewLine() {
@@ -9657,15 +9868,32 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (row.querySelector('.p-tee-input')) return;
             const line = row.querySelector('.p-tee-line');
             if (line) line.remove();
-            appendTeeControl(row, row.getAttribute('data-tee-key') || undefined);
+            // POLISH #1: only a golfer's OWN tee is put back; everyone else takes the round's.
+            const own = row.getAttribute('data-tee-own') === '1';
+            appendTeeControl(row, own ? (row.getAttribute('data-tee-key') || undefined) : undefined,
+                own ? (row.getAttribute('data-tee-name') || undefined) : undefined);
         });
     }
 
-    function appendTeeControl(row, teeKey) {
-        const src = document.getElementById('tee-rating-select');
-        if (!src || !src.options || src.options.length < 2) return;
-        const sel = document.createElement('select');
-        sel.className = 'p-tee-input';
+    // POLISH #1 (029: the golfer was saved on Black at Papago with White picked, and on
+    // Papago's "Men · Black 75/130" at Dobson, which has no Black tee).
+    //
+    // THE CAUSE. A row's tee dropdown is a COPY of the round select, taken when the row is
+    // built - and nothing ever touched it again: a tee tapped afterwards, or a different
+    // course picked, left the row on the old value (the first option, the tips) and the old
+    // course's options. The save reads the ROW, so the golfer was stored on that tee.
+    //
+    // THE RULE NOW. A row FOLLOWS the round tee unless the golfer was given a tee of their
+    // own (picked on the row, "Tee for everyone", "Name 6 Blue", or a saved round's own
+    // tee): data-tee-own. A new course rebuilds every row's options from the round select
+    // and puts everyone on the round's tee - tee keys are positions ("male:0"), so a tee
+    // from another course is never carried over. Display / setup only: the save and every
+    // handicap formula are unchanged; they simply read the right tee.
+    function teeOptionsSig(sel) {
+        return Array.prototype.map.call((sel && sel.options) || [], o => o.value + '|' + o.textContent).join('\n');
+    }
+    function fillRowTeeOptions(sel, src) {
+        sel.innerHTML = '';
         for (let i = 0; i < src.options.length; i++) {
             const o = src.options[i];
             const opt = document.createElement('option');
@@ -9677,16 +9905,85 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             });
             sel.appendChild(opt);
         }
+    }
+    function teeCourseNow() {
+        const c = document.getElementById('course-select');
+        return c ? String(c.value || '') : '';
+    }
+    // A golfer's own tee, on THIS course's options: the key when that option still carries
+    // the tee's name (a copied round from another course carries Papago's "Men · Black"
+    // under a key that means something else here), else the option with that name, else none.
+    function ownTeeKeyHere(sel, teeKey, teeName) {
+        if (!teeKey && !teeName) return '';
+        const opts = Array.prototype.slice.call(sel.options || []);
+        const byKey = teeKey ? opts.filter(o => o.value === teeKey)[0] : null;
+        const nm = String(teeName || '').trim();
+        if (byKey && (!nm || String(byKey.textContent || '').trim() === nm)) return byKey.value;
+        const byName = nm ? opts.filter(o => String(o.textContent || '').trim() === nm)[0] : null;
+        return byName ? byName.value : '';
+    }
+    function rowTeesFollowRound() {
+        const src = document.getElementById('tee-rating-select');
+        const list = document.getElementById('player-list');
+        if (!src || !list || !src.options || src.options.length < 2) return;
+        const sig = teeOptionsSig(src), course = teeCourseNow();
+        Array.from(list.querySelectorAll('.player-row')).forEach((row) => {
+            const sel = row.querySelector('.p-tee-input');
+            if (!sel) return;
+            let own = row.getAttribute('data-tee-own') === '1';
+            if (teeOptionsSig(sel) !== sig) {
+                const sameCourse = course && row.getAttribute('data-tee-course') === course;
+                const cur = Array.prototype.filter.call(sel.options, o => o.value === sel.value)[0];
+                const keep = own && sameCourse && cur ? ownTeeKeyHere(sel, sel.value, cur.textContent) : '';
+                fillRowTeeOptions(sel, src);
+                const k = keep ? ownTeeKeyHere(sel, keep, '') : '';
+                own = !!k;
+                sel.value = k || src.value || '';
+                row.setAttribute('data-tee-course', course);
+                if (own) row.setAttribute('data-tee-own', '1');
+                else { row.removeAttribute('data-tee-own'); row.removeAttribute('data-tee-name'); }
+                row.setAttribute('data-tee-key', sel.value || '');
+                syncTeeShort(sel);
+                return;
+            }
+            if (own) return;
+            if (src.value && sel.value !== src.value) {
+                sel.value = src.value;
+                row.setAttribute('data-tee-key', src.value);
+                syncTeeShort(sel);
+            }
+        });
+    }
+
+    function appendTeeControl(row, teeKey, teeName) {
+        // A tee handed over before the tees are here stays on the row, marked as the golfer's own.
+        if (teeKey) {
+            row.setAttribute('data-tee-key', teeKey);
+            row.setAttribute('data-tee-own', '1');
+            if (teeName) row.setAttribute('data-tee-name', String(teeName));
+        }
+        const src = document.getElementById('tee-rating-select');
+        if (!src || !src.options || src.options.length < 2) return;
+        const sel = document.createElement('select');
+        sel.className = 'p-tee-input';
+        fillRowTeeOptions(sel, src);
         // A new golfer takes "Tee for everyone" when it has been set; otherwise the round's tee.
         const everyone = document.getElementById('tee-everyone');
         const everyoneKey = (everyone && everyone.value && Array.prototype.some.call(sel.options, o => o.value === everyone.value)) ? everyone.value : '';
-        const want = (teeKey && Array.prototype.some.call(sel.options, o => o.value === teeKey))
-            ? teeKey : (everyoneKey || src.value || '');
+        const ownKey = ownTeeKeyHere(sel, teeKey, teeName);
+        const want = ownKey || everyoneKey || src.value || '';
         sel.value = want;
         // ON THE ROW, so refreshRowTeeControls can put the same tee back when it
         // builds a control for a row that had none.
         row.setAttribute('data-tee-key', want || '');
-        sel.addEventListener('change', function () { row.setAttribute('data-tee-key', sel.value || ''); });
+        row.setAttribute('data-tee-course', teeCourseNow());
+        if (ownKey || everyoneKey) row.setAttribute('data-tee-own', '1');
+        else { row.removeAttribute('data-tee-own'); row.removeAttribute('data-tee-name'); }
+        sel.addEventListener('change', function () {
+            row.setAttribute('data-tee-key', sel.value || '');
+            row.setAttribute('data-tee-own', '1');
+            row.removeAttribute('data-tee-name');
+        });
         sel.onchange = function () { syncTeeShort(sel); if (typeof refreshHandicapNote === 'function') refreshHandicapNote(); };
         sel.setAttribute('aria-label', 'Tee');
         // COMPACT: the tee is the 4th column of the row. The closed control shows a
@@ -9757,6 +10054,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (!sel || !Array.prototype.some.call(sel.options, o => o.value === key)) return;
             sel.value = key;
             row.setAttribute('data-tee-key', key);
+            row.setAttribute('data-tee-own', '1');
+            row.removeAttribute('data-tee-name');
             syncTeeShort(sel);
         });
         if (typeof refreshHandicapNote === 'function') refreshHandicapNote();
@@ -10022,9 +10321,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // off the attribute rather than the select because
             // refreshRowTeeControls uses that attribute to restore a tee when it
             // builds a control for a row that had none.
-            const teeKeyOnRow = row.getAttribute('data-tee-key')
-                || (row.querySelector('.p-tee-input') ? row.querySelector('.p-tee-input').value : '');
-            if (teeKeyOnRow) entry.tee = { teeKey: teeKeyOnRow };
+            // POLISH #1: only a golfer's OWN tee rides along; a row that follows the round
+            // tee is rebuilt on the round tee, which is the same tee - and stays current.
+            const teeSelOnRow = row.querySelector('.p-tee-input');
+            const teeKeyOnRow = row.getAttribute('data-tee-own') === '1'
+                ? (row.getAttribute('data-tee-key') || (teeSelOnRow ? teeSelOnRow.value : '')) : '';
+            if (teeKeyOnRow) {
+                const teeOpt = teeSelOnRow ? Array.prototype.filter.call(teeSelOnRow.options, o => o.value === teeKeyOnRow)[0] : null;
+                const teeNameOnRow = teeOpt ? String(teeOpt.textContent || '') : (row.getAttribute('data-tee-name') || '');
+                entry.tee = teeNameOnRow ? { teeKey: teeKeyOnRow, teeName: teeNameOnRow } : { teeKey: teeKeyOnRow };
+            }
             list.push(entry);
         });
         return list;
@@ -10239,7 +10545,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function appendPlayerFrom(p, fromSaved, total) {
         const shown = (fromSaved && p.handicapIndex != null && String(p.handicapIndex).trim() !== '')
             ? String(p.handicapIndex) : (p.hcp || '');
-        addPlayerRow(p.name, shown, p.team, p.squad, false, p.playingForMoney !== false, total, true, p.id, p.flight, p.tee && p.tee.teeKey);
+        addPlayerRow(p.name, shown, p.team, p.squad, false, p.playingForMoney !== false, total, true, p.id, p.flight, p.tee && p.tee.teeKey, p.tee && p.tee.teeName);
         const list = document.getElementById('player-list');
         const row = list ? list.lastElementChild : null;
         if (!row) return;
@@ -12583,7 +12889,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match', 'stableford'];
 
-    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined, teeKey = undefined) {
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined, teeKey = undefined, teeName = undefined) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         // When rebuilding the whole list at once (renderPlayerList's loop), currentCount only
@@ -12697,7 +13003,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // Always on the second line in the compact list (asLine = true).
         if (flightsOn) appendFlightControl(row, flight, true);
         void flightAsLine;
-        appendTeeControl(row, teeKey);
+        appendTeeControl(row, teeKey, teeName);
         appendOrderControl(row);
         compactExtraLine(row);
         attachRowDrag(row);
@@ -13868,6 +14174,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     renderWizardProgress();
     // Game Day lands here. The first thing a golfer sees is the format gallery.
     goToWizardStep(wizardFirstStep());
+    // POLISH #13: and it opens AT THE TOP (the step's own scroll to the dots is for moving between steps).
+    try { window.scrollTo(0, 0); } catch (e) {}
 
     // THE COACH ARRIVAL (UI Wave 10). ?coach=1 is set by createRoom when the entry
     // on the lobby minted this round, so the coach opens on the same page load as

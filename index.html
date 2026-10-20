@@ -2478,7 +2478,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     const hpSpectateParam = urlParams.get('spectate') === '1';
     let hpKeyState = 'none';            // 'none' | 'pending' | 'ok' | 'bad'
     let hpKeyFor = null;
-    function hpSpectating() { return window.__hpReadOnly === true || (hpSpectateParam && !hasGroupLock && !(typeof canReachSetup === 'function' && canReachSetup())); }
+    // 2.0 POLISH #9: ?spectate=1 is READ-ONLY for everyone, the round's organizer included. Home's
+    // Join asks "Which group are you in?" first, so this link is only ever "Just watching" (or a
+    // leaderboard / spectator link). Before, the owner's phone kept full scoring here and Save wrote.
+    function hpSpectating() { return window.__hpReadOnly === true || (hpSpectateParam && !hasGroupLock); }
     window.hpSpectating = hpSpectating;
     // THE TEE MOVED (gps-start10, 2026-10-14): Round Setup saved "Start on 10" (or this group's own
     // tee) while the round was open on 1. Before anyone has a score, the card - and GPS with it -
@@ -3106,6 +3109,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const p = players.find(x => x.name === name) || { name: String(name || '') };
         return getSmartDisplayName(p, players);
     }
+    // POLISH #2 (2026-10-20): the presenters in bet-strip.js and hole-events.js (both
+    // pinned) cut every name to its first word, so two golfers called Test read
+    // "Test v Test". Display callers hand them the round's display copy instead -
+    // text-safe.js roundDataForDisplay: the same round, colliding names swapped for
+    // "Test A" / "Test B". Never saved; write paths (presses) keep currentData.
+    function shownRound() { return (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(currentData) : currentData; }
+    function shownList(list) { return (list && typeof playersForDisplay === 'function') ? playersForDisplay(list, currentData.players) : list; }
     function shortPlayerLabels(list) {
         return (list || []).map(p => golferLabel(p) || String((p && p.name) || '').trim());
     }
@@ -3963,6 +3973,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const esc = t => String(t === undefined || t === null ? '' : t)
             .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
         const first = n => String(n || '').trim().split(' ')[0];
+        // Two golfers with one first name: "Test A" / "Test B", not "Test" twice (polish #2).
+        const shortMap = (typeof golferShortNameMap === 'function') ? golferShortNameMap(currentData.players) : {};
+        const short = r => shortMap[String(r && r.id)] || first(r && r.name);
         const rows = [];
 
         // 1. THE TOP FIVE, and the way to the rest.
@@ -3985,7 +3998,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             rows.push('<button type="button" class="hl-row hl-board" onclick="openLiveBoard()"'
                 + ' aria-label="Open the full leaderboard">'
                 + board.slice(0, 5).map(r => '<span class="hl-chip"><b>' + esc(r.positionLabel) + '</b> '
-                    + esc(first(r.name)) + ' ' + esc(formatToPar(r.toPar))
+                    + esc(short(r)) + ' ' + esc(formatToPar(r.toPar))
                     // THRU IS ALWAYS PRINTED, 0 included: before anyone has started,
                     // "E thru 0" is the whole truth about the round and reads as one.
                     + ' <i>thru ' + esc(r.thru || 0) + '</i></span>').join('')
@@ -4000,7 +4013,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         try {
             const ids = (typeof scopedPlayers === 'function' ? scopedPlayers() : []).map(p => String(p.id));
             states = (typeof buildLiveMatchStates === 'function')
-                ? (buildLiveMatchStates(currentData, currentData.courseData || [],
+                ? (buildLiveMatchStates((typeof roundDataForDisplay === 'function' ? roundDataForDisplay(currentData) : currentData), currentData.courseData || [],
                                         currentData.scores || {}, ids) || []) : [];
         } catch (e) { states = []; }
         states.forEach(st => {
@@ -4344,7 +4357,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         cipWasIn[key] = isIn;
         // The first thing this session ever saw about this card is not a transition.
         if (!seen) return;
-        if (isIn && was === false) openCardInPopup();
+        // POLISH #8: in a map round the pop-up is Finish's alone. Opened here it waited behind the map
+        // and met the golfer who tapped Card; the card's own "Final results are in" line still says so.
+        let finishOnly = false;
+        // GPS:BEGIN
+        finishOnly = !!(window.HardPanRound && window.HardPanGps && typeof window.HardPanGps.isMounted === 'function' && window.HardPanGps.isMounted());
+        // GPS:END
+        if (isIn && was === false && !finishOnly) openCardInPopup();
     }
 
     function cardInPopupRows() {
@@ -4484,6 +4503,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // Points and dots only. No projected payout: what a game is worth is settled
     // in Results, and a running dollar figure mid-round is not final.
     function buildLivePointsHtml(data, courseData, savedScores) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLivePointsState !== 'function') return '';
         const st = buildLivePointsState(data, courseData, savedScores);
         if (!st) return '';
@@ -4517,6 +4537,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // NO MONEY. Settlement is (t1Points - t2Points) x holeBetStake and belongs in
     // Results; a running figure mid-round is not final.
     function buildLiveHiLoHtml(data, courseData, savedScores) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLiveHiLoState !== 'function') return '';
         const st = buildLiveHiLoState(data, courseData, savedScores);
         if (!st) return '';
@@ -4557,6 +4578,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // NO MONEY TOTALS. What the next hole is worth is game state - a running
     // payout is settlement's, and is not final mid-round.
     function buildLiveStrokeBetHtml(data, courseData, savedScores, visibleIds) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLiveStrokeBetStates !== 'function') return '';
         const states = buildLiveStrokeBetStates(data, courseData, savedScores, visibleIds);
         if (!states || states.length === 0) return '';
@@ -5433,7 +5455,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const savedScores = currentData.scores || {};
         const scoped = scopedPlayers();
         try {
-            return buildBetStrip(currentData, courseData, savedScores, scoped);
+            return buildBetStrip(shownRound(), courseData, savedScores, shownList(scoped));
         } catch (e) {
             // A presenter must never be able to take down score entry.
             console.error('Bet strip failed to build:', e);
@@ -5619,8 +5641,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (typeof buildHoleEvents !== 'function') return keys;
         let events = [];
         try {
-            events = buildHoleEvents(currentData, courseData, savedScores,
-                currentViewedHole, resolvedMeId(), scoped);
+            events = buildHoleEvents(shownRound(), courseData, savedScores,
+                currentViewedHole, resolvedMeId(), shownList(scoped));
         } catch (e) { return keys; }
         const moved = events.some(e =>
             e.type === 'LEAD_CHANGE' || e.type === 'WAGER_FINAL' || e.type === 'PRESS_STARTED');
@@ -5636,8 +5658,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (typeof buildHoleEvents !== 'function') return keys;
         let events = [];
         try {
-            events = buildHoleEvents(currentData, courseData, savedScores,
-                currentViewedHole, resolvedMeId(), scoped);
+            events = buildHoleEvents(shownRound(), courseData, savedScores,
+                currentViewedHole, resolvedMeId(), shownList(scoped));
         } catch (e) { return keys; }
         events.forEach(e => {
             if (e.type === 'SKIN_WON' || e.type === 'SKINS_CARRIED') keys.skins = true;
@@ -6522,6 +6544,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             holes: played, at: h => gpsSheetHole(Number(h), here.golfers),
             next: () => { if (Number(currentViewedHole) === n) gpsStepHole(1); },
             last: order.indexOf(n) === order.length - 1,
+            // POLISH #10: the last hole saved (every golfer scored) - "Finish & settle up" opens. It
+            // only shows the money (writes nothing); the round is finished by the golfer, never here.
+            finish: () => {
+                const R = window.HardPanRound;
+                if (R && typeof R.openFinish === 'function' && R.openFinish()) return;
+                if (typeof uiToast === 'function') uiToast('\uD83C\uDFC1 Last hole saved \u2014 \u2630 Menu \u203A Finish & settle up', 5000);
+            },
             host: overlay && document.body.classList.contains('gps-side-gps') ? overlay : document.body
         }));
     }
@@ -7456,8 +7485,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         let events = [];
         try {
-            events = buildHoleEvents(currentData, courseData, currentData.scores || {},
-                currentViewedHole, resolvedMeId(), scoped);
+            events = buildHoleEvents(shownRound(), courseData, currentData.scores || {},
+                currentViewedHole, resolvedMeId(), shownList(scoped));
         } catch (e) {
             console.error('Hole recap failed:', e);
             mount.innerHTML = '';
@@ -7496,8 +7525,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         let games = [], side = [], changedKeys = {};
         try {
-            games = buildActionRows(currentData, courseData, savedScores, scoped);
-            side = buildSideActionRows(currentData, courseData, savedScores, scoped, resolvedMeId());
+            games = buildActionRows(shownRound(), courseData, savedScores, shownList(scoped));
+            side = buildSideActionRows(shownRound(), courseData, savedScores, shownList(scoped), resolvedMeId());
             // What moved on the hole in view, so it can rise briefly within its
             // section. Recomputed every render and never stored - bet order is a
             // presentation concern, not something that belongs in Firebase.
@@ -9827,6 +9856,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     var syncedHideTimer = null;
     var badgeHasSpoken = false;
     function renderOfflineBadge(sending) {
+        // GPS:BEGIN
+        // POLISH #4: the map's "📴 2 waiting" (on its Thru pill) follows the same queue, and goes
+        // when the last score is sent.
+        try { if (window.HardPanGps && typeof window.HardPanGps.queueChanged === 'function') window.HardPanGps.queueChanged(); } catch (e) {}
+        // GPS:END
         var el = document.getElementById('offline-badge');
         if (!el) return;
         var q = window.OfflineQueue;
@@ -9891,10 +9925,37 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         return true;
     }
 
+    // GPS:BEGIN
+    // POLISH #4: the queued score on the card / pill (see saveScore). Reads the offline queue only.
+    function hpShowQueuedScore(scoreKey, newVal) {
+        try {
+            const q = window.OfflineQueue, store = offlineStore();
+            if (!q || !store || !currentData || !currentData.players) return false;
+            const have = (currentData.scores || {})[scoreKey];
+            if ((have == null ? null : Number(have)) === newVal) return false;   // the listener already showed it
+            currentData = q.applyQueued(currentData, q.peek(store) || [], currentMode) || currentData;
+            renderScorecard();
+            return true;
+        } catch (e) { return false; }
+    }
+    // POLISH #4: "Saving…" NEVER STAYS. With no signal a write never settles, and the line used to
+    // read "Saving…" for the rest of the round. The score is already on this phone (the queue), so
+    // the line says that - at once when the phone says it is offline, else after a few seconds
+    // with no answer (one bar), and goes like "✓ Saved" does - the offline badge under it keeps
+    // the count ("2 waiting") until they are sent. A later answer still says "✓ Saved" or the error.
+    const HP_SAVED_HERE = '\uD83D\uDCF4 Saved on this phone';
+    // GPS:END
     // The promise is only OBSERVED. The write itself is unchanged, and the
     // original promise is what callers keep chaining.
     function trackWrite(promise) {
-        setSaveState('saving', 'Saving\u2026');
+        // GPS:BEGIN
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) setSaveState('saved', HP_SAVED_HERE);
+        else {
+            setSaveState('saving', 'Saving\u2026');
+            const tok = saveStateToken;
+            setTimeout(() => { if (tok === saveStateToken) setSaveState('saved', HP_SAVED_HERE); }, 5000);
+        }
+        // GPS:END
         return promise
             .then(() => setSaveState('saved', '\u2713 Saved'))
             .catch(() => setSaveState('error',
@@ -9940,6 +10001,15 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // Both watch the SAME promise - neither replaces the other, and the write
         // is untouched by either.
         trackWrite(writePromise);
+        // GPS:BEGIN
+        // POLISH #4: A SCORE QUEUED WITH NO SIGNAL IS ON THE CARD AT ONCE. Online the round's own
+        // listener fires on the local write and lays the queue over the round; with no signal (or a
+        // round opened from this phone's copy) it does not fire, and the card, the leaderboard line and
+        // the map's Thru pill kept the old round - the score looked lost. So: when the round in memory
+        // does not show this score yet, the offline queue is laid over it here (display only - the
+        // queue and the write above are untouched) and the card draws again.
+        hpShowQueuedScore(scoreKey, newVal);
+        // GPS:END
 
         // RYDER CUP MATCH LOCK. A Cup pairing freezes the moment the first score
         // for that match is posted, so a roster edit can never rewrite holes that
@@ -12350,6 +12420,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // Only players opted in to money betting participate in the payout engines below -
         // everyone still enters scores and shows on the card regardless of this flag.
         const moneyPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
+        // Labels only: the engines name a side by first word, so two golfers who
+        // share one are handed in as "Test A" / "Test B". Same ids, same scores.
+        const shownPlayers = list => (typeof playersForDisplay === 'function') ? playersForDisplay(list, currentData.players) : list;
 
         let hiloCalc = null;
         let matchCalc = null;
@@ -12362,7 +12435,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         let manualMatchPresses = [];
 
         if (gameFormat === 'hilo') {
-            hiloCalc = calculateHiLoEngine(moneyPlayers, courseData, savedScores);
+            // shownPlayers: "Test A" / "Test B" in the team labels when two share a first name (polish #2).
+            hiloCalc = calculateHiLoEngine(shownPlayers(moneyPlayers), courseData, savedScores);
         } else if (gameFormat === 'match' && currentData.matchScoringStyle === 'stroke') {
             // Total strokes, not hole-by-hole match play — a genuinely different model, so this
             // skips calculateMatchEngine entirely rather than feeding it data it can't interpret.
@@ -12383,7 +12457,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // and holes-remaining all come from the sequence. Off the 1st tee this
             // argument is the same ascending card it has always been, which is why
             // every settled round is untouched.
-            matchCalc = calculateMatchEngine(moneyPlayers, playOrderCourse(courseData), savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses, nassauStakeConfig(currentData));
+            matchCalc = calculateMatchEngine(shownPlayers(moneyPlayers), playOrderCourse(courseData), savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses, nassauStakeConfig(currentData));
         }
 
         let wolfCalc = null, stablefordCalc = null;
@@ -12554,7 +12628,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const matchNoteEl = document.getElementById("match-hcp-note");
         if (matchNoteEl) {
             // TEXT, NEVER MARKUP (audit H1): a name is whatever the round record says.
-            const firstName = p => escapeHtml(String(p.name || '').split(" ")[0]);
+            // golferLabel: the first name, or "Test A" / "Test B" when two share it (polish #2).
+            const firstName = p => escapeHtml(golferLabel(p) || String(p.name || '').split(" ")[0]);
             let noteHtml = "";
             if (dotNoteMode === 'auto' && dotNoteMatches.length > 1) {
                 // MERGED MODE HAS NO SINGLE "LOW". Two matches mean two baselines, so
@@ -13161,7 +13236,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
             let scoresList = [];
             filteredPlayers.forEach(p => {
-                let shortName = p.name.split(" ")[0];
+                let shortName = golferLabel(p) || p.name.split(" ")[0];   // polish #2: "Test A" / "Test B"
                 let pts = wolfCalc.totals[p.id] || 0;
                 let moneyTxt = "";
                 if (p.playingForMoney !== false && currentData.wolfPointVal) {
@@ -13180,7 +13255,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
             let scoresList = [];
             filteredPlayers.forEach(p => {
-                let shortName = p.name.split(" ")[0];
+                let shortName = golferLabel(p) || p.name.split(" ")[0];   // polish #2: "Test A" / "Test B"
                 let pts = stablefordCalc.totals[p.id] || 0;
                 let moneyTxt = "";
                 if (p.playingForMoney !== false && currentData.stablefordPointVal) {
@@ -13207,7 +13282,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             
             let scoresList = [];
             filteredPlayers.forEach(p => {
-                let shortName = p.name.split(" ")[0];
+                let shortName = golferLabel(p) || p.name.split(" ")[0];   // polish #2: "Test A" / "Test B"
                 scoresList.push(`<span style="white-space:nowrap;">${escapeHtml(shortName)}: <strong>${playerDots[p.id]}</strong></span>`);
             });
             
@@ -13229,7 +13304,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 if (thru > maxThru) maxThru = thru;
                 
                 let toParText = runningStats[p.id] === 0 ? "E" : (runningStats[p.id] > 0 ? `+${runningStats[p.id]}` : `${runningStats[p.id]}`);
-                let shortName = p.name.split(" ")[0]; 
+                let shortName = golferLabel(p) || p.name.split(" ")[0];   // polish #2: "Test A" / "Test B"
                 
                 scoresList.push(`<span style="white-space:nowrap;">${escapeHtml(shortName)}: <strong>${thru === 0 ? '-' : toParText}</strong></span>`);
             });

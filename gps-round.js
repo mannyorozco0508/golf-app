@@ -49,6 +49,15 @@
     function gpsUp() { var g = G(); return !!(g && g.isMounted && g.isMounted()); }
     function base() { try { return typeof shareBaseUrl === 'function' ? shareBaseUrl() : ''; } catch (e) { return ''; } }
     function roundUrl() { return base() + 'index.html?game=' + encodeURIComponent(code() || ''); }
+    // POLISH #22: "Papago Golf Club (Papago)" -> "Papago Golf Club" - a trailing "(Name)" that only
+    // repeats words already in the name goes; "(Championship)", "(South - Piipaash)" stay.
+    function tidyCourse(name) {
+        var s = String(name == null ? '' : name).trim(), m = /^(.*\S)\s*\(([^()]+)\)\s*$/.exec(s);
+        if (!m) return s;
+        var words = function (t) { return String(t).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean); };
+        var head = words(m[1]), tail = words(m[2]);
+        return tail.length && tail.every(function (w) { return head.indexOf(w) >= 0; }) ? m[1] : s;
+    }
     function say(t) { try { if (typeof uiToast === 'function') uiToast(t); } catch (e) {} }
 
     var FONT = '-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif';
@@ -61,7 +70,7 @@
         + '.hp-sheet .hs-grab{width:44px;height:5px;border-radius:3px;background:#cfd8d3;margin:2px auto 10px;}'
         + '.hp-sheet .hs-head{display:flex;align-items:center;gap:8px;margin:2px 0 14px;}'
         + '.hp-sheet .hs-title{flex:1;font:800 22px/1.2 ' + FONT + ';}'
-        + '.hp-sheet .hs-mtitle{display:flex;align-items:center;gap:8px;min-width:0;}.hp-sheet .hs-course{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+        + '.hp-sheet .hs-mtitle{display:flex;align-items:center;gap:8px;min-width:0;}.hp-sheet .hs-course{min-width:0;overflow-wrap:anywhere;}'
         + '.hp-sheet .hs-codechip{flex:0 0 auto;font:800 13px/1 ' + FONT + ';letter-spacing:.06em;background:#0f4d3a;color:#fff;border-radius:999px;padding:6px 10px;}'
         + '.hp-sheet .hs-x{border:0;background:#e3e9e5;color:#0f3d2e;border-radius:999px;min-width:40px;height:40px;font:800 18px/1 ' + FONT + ';cursor:pointer;}'
         + '.hp-sheet .hs-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;}'
@@ -105,13 +114,24 @@
         + 'body.hp-bets-open #hp-card-bet .hp-money-chip{display:none !important;}'
         + '#hp-strip{display:none;position:fixed;left:0;right:0;top:0;height:calc(env(safe-area-inset-top) + 92px);z-index:2;background:transparent;border:0;cursor:pointer;}'
         + 'body.hp-card-sheet #hp-strip{display:block;}'
-        + '#hp-strip-grab{position:absolute;left:50%;bottom:6px;width:44px;height:5px;margin-left:-22px;border-radius:3px;background:rgba(255,255,255,.75);}'
+        // POLISH #15: the grab handle is the sheet's own header row (it rode on the strip, fixed, and
+        // the card scrolled under it - over "+ Add game").
+        + '#hp-strip-grab{display:none;}'
+        + 'body.hp-card-sheet #main-content::before{content:"";display:block;width:44px;height:5px;border-radius:3px;background:#cfd8d3;margin:2px auto 10px;}'
+        // POLISH #13: a solid band under the status bar and the Dynamic Island - the card scrolls
+        // under it, never under the clock.
+        + 'body.hp-card-sheet #hp-strip::before{content:"";position:absolute;left:0;right:0;top:0;height:env(safe-area-inset-top);background:#0b0f0c;}'
+        // POLISH #14: the card ends above the bottom bar (☰ / GPS / Enter score: 66 px + the home bar).
+        + 'body.hp-sf-card #main-content{padding-bottom:calc(env(safe-area-inset-bottom) + 84px) !important;}'
+        // Round settings' "Full setup ›" (POLISH #12): inside the sheet, wrapped.
+        + '#round-sheet-body a[data-hp-full="1"]{box-sizing:border-box;max-width:100%;white-space:normal;overflow-wrap:anywhere;}'
         // The old Round Menu pill steps aside for the bar; it still opens as Round settings.
         + 'body.hp-sf-card #round-sheet:not(.open){transform:translateY(100%);visibility:hidden;}'
         // Over the map: the toasts and the QR codes come up above it.
         + 'body.hp-sf-card.gps-side-gps .ui-toast-wrap,body.hp-sf-card .qr-sheet{z-index:10300 !important;}'
-        // Toasts clear the bottom bar (the card's, and the GPS's Mark shot + bar).
-        + 'body.hp-sf-card .ui-toast-wrap{bottom:calc(env(safe-area-inset-bottom) + 84px);}body.hp-sf-card.gps-side-gps .ui-toast-wrap{bottom:calc(env(safe-area-inset-bottom) + 200px);}'
+        // Toasts clear the bottom bar (the card's); on the map (POLISH #19) they sit under the top bar and
+        // the Menu row (--gps-top-b, gps-view.js), never over the Plays-like pill.
+        + 'body.hp-sf-card .ui-toast-wrap{bottom:calc(env(safe-area-inset-bottom) + 84px);}body.hp-sf-card.gps-side-gps .ui-toast-wrap{bottom:auto;top:var(--gps-top-b,calc(env(safe-area-inset-top) + 150px));}'
         + '#hp-gps-tools{display:block;width:100%;margin:0 0 10px;min-height:44px;border-radius:12px;border:1.5px solid #0f4d3a;background:#fff;color:#0f4d3a;font-weight:800;font-size:.95rem;cursor:pointer;}';
     function ensureCss() {
         if (document.getElementById('hp-round-css')) return;
@@ -167,8 +187,9 @@
         if (!on() || !code()) return false;
         if (!again) stack = [];
         var d = data() || {};
-        // The course on one line (ellipsis), the code beside it in its own chip (the mockup).
-        var html = '<div class="hs-head"><div class="hs-title hs-mtitle"><span class="hs-course">' + esc(d.courseName || d.eventName || 'This round') + '</span>'
+        // The course, the code beside it in its own chip (the mockup). POLISH #22: the name WRAPS (it
+        // was cut to "Papago Golf Club (P…") and a "(Papago)" that repeats it is dropped.
+        var html = '<div class="hs-head"><div class="hs-title hs-mtitle"><span class="hs-course">' + esc(tidyCourse(d.courseName || d.eventName || 'This round')) + '</span>'
             + '<span class="hs-codechip">' + esc(code()) + '</span></div><button type="button" class="hs-x" data-hs="close" aria-label="Close">✕</button></div>'
             + '<div class="hs-tiles">' + TILES.filter(function (t) { return t.k !== 'gps' || gpsUp(); }).map(function (t) {
                 return '<button type="button" class="hs-tile" data-hs-tile="' + t.k + '"><b>' + t.ico + ' ' + esc(t.t) + '</b><span>' + esc(t.s) + '</span></button>';
@@ -186,7 +207,7 @@
         return show('menu', html, 'Round Menu');
     }
     function tile(k) {
-        if (k === 'card') { closeSheet(true); closeBets(); toCard(); return; }
+        if (k === 'card') { closeSheet(true); closeBets(); toFullCard(); return; }
         if (k === 'bets') { closeSheet(true); openBets(); return; }
         if (k === 'gps') { closeSheet(true); closeBets(); toGps(); return; }
         if (k === 'bet') { closeSheet(true); if (B()) B().open(); return; }
@@ -208,7 +229,7 @@
             + '<button type="button" class="hs-btn alt" data-hs="qr">📷 Show QR code</button>';
         if (gs.length > 1 && organizer()) {
             html += '<div class="hs-h">Scorekeeper links · one per group</div>' + gs.map(function (b) {
-                var names = players.slice(b.startIdx, b.startIdx + b.size).map(function (p) { return String(p.name || '').split(' ')[0]; }).join(', ');
+                var names = players.slice(b.startIdx, b.startIdx + b.size).map(function (p) { return typeof golferShortName === 'function' ? golferShortName(p, players) : String(p.name || '').split(' ')[0]; }).join(', ');
                 return '<div class="hs-row"><div class="hs-grow"><b>Group ' + b.group + '</b><small>' + esc(names) + '</small></div>'
                     + '<button type="button" data-hs-copy="' + b.group + '">Copy</button><button type="button" data-hs-sharegroup="' + b.group + '">Share</button></div>';
             }).join('');
@@ -263,7 +284,7 @@
         var html = head('Settle up', true);
         if (!res) html += '<div class="hs-gate">Couldn’t total the money - open the full review below.</div>';
         else if (missing) html += '<div class="hs-gate">Money so far - not final: ' + missing + ' score' + (missing === 1 ? '' : 's') + ' still missing.</div>';
-        html += '<div class="hs-h">' + (!tx.length ? 'Who pays who' : (tx.length === 1 ? 'One payment' : tx.length + ' payments') + ' settle everything') + '</div>';
+        html += '<div class="hs-h">' + (!tx.length ? 'Who pays who' : (tx.length === 1 ? 'One payment settles' : tx.length + ' payments settle') + ' everything') + '</div>';
         html += tx.length ? tx.map(function (t) {
             return '<div class="hs-row hs-pay"><div class="hs-grow"><b>' + esc(t.from) + '</b> → <b>' + esc(t.to) + '</b></div><span class="hs-amt">$' + whole(t.amount) + '</span></div>';
         }).join('') : '<div class="hs-row">Everyone’s square - nobody owes anybody.</div>';
@@ -572,11 +593,29 @@
         if (g && gpsUp() && onGps()) g.showSide('bets', { remember: false });
         return true;
     }
+    // POLISH #8: THE CARD IS THE 18-HOLE GRID (index.html's Full Card), hole by hole - the map's
+    // ▤ Card and the Round Menu's Card tile. The "Final results are in" pop-up is Finish's alone, so
+    // one left open behind the map is closed. Enter score goes back to the hole view (holeView).
+    function cardMode(m) {
+        try { if (typeof setViewMode === 'function' && typeof currentViewMode !== 'undefined' && currentViewMode !== m) setViewMode(m); } catch (e) {}   /* global setViewMode, currentViewMode */
+    }
+    function toFullCard() {
+        var g = G();
+        closeBets(); closeSheet(true);
+        try { if (typeof closeCardInPopup === 'function') closeCardInPopup(); } catch (e) {}   /* global closeCardInPopup */
+        if (g && gpsUp() && onGps()) g.showSide('bets', { remember: false });
+        cardMode('full');
+        cardY = 0;
+        try { window.scrollTo(0, 0); } catch (e) {}
+        return true;
+    }
+    function holeView() { cardMode('hole'); return true; }
     // ENTER SCORE, from any screen: on the map (or Bets over it) the GPS's own score entry; on the
     // card the first empty box of this hole (or this phone's golfer's), focused.
     function enterScore() {
         closeBets(); closeSheet(true);
         if (onGps()) { var b = document.querySelector('#gps-overlay .gps-score'); if (b) { b.click(); return true; } }
+        holeView();
         var h = (function () { try { return currentViewedHole; } catch (e) { return null; } })();   /* global currentViewedHole */
         // 018: THE CARD'S "Enter score" IS THE SAME SHEET AS THE MAP'S - this hole, and ‹ for an
         // earlier one - over the card, which stays on its hole (index.html gpsOpenSheet).
@@ -676,7 +715,7 @@
     window.HardPanRound = {
         openMenu: function () { return openMenu(); }, openShare: openShare, openFinish: openFinish, openSettings: openSettings,
         openBets: openBets, closeBets: closeBets, closeSheet: closeSheet, go: go, barFor: barFor, refresh: refresh,
-        toGps: toGps, toCard: toCard, screen: screen, sheetKind: function () { return sheetOpen() ? sheetKind : null; },
+        toGps: toGps, toCard: toCard, toFullCard: toFullCard, holeView: holeView, tidyCourse: tidyCourse, screen: screen, sheetKind: function () { return sheetOpen() ? sheetKind : null; },
         payText: function () { return payText(settle()); }, feed: feed, enterScore: enterScore,
         changeCourse: changeCourse, leaveRound: leaveRound, scored: scored
     };

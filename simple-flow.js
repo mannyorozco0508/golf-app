@@ -84,6 +84,8 @@
     // ---- THE SCREEN ---------------------------------------------------------------
     var CSS = '#sf{position:fixed;inset:0;z-index:900;overflow:auto;-webkit-overflow-scrolling:touch;background:#f2f4ef;color:#13241d;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:light}'
         + '#sf *{box-sizing:border-box}'
+        // POLISH #13 (map helper, SHARED): a solid band under the status bar / Dynamic Island - the list scrolls under it, not the clock.
+        + '#sf::before{content:"";position:fixed;left:0;right:0;top:0;height:env(safe-area-inset-top);background:#f2f4ef;z-index:4;pointer-events:none}'
         + '#sf .sf-in{max-width:520px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;padding:calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 16px)}'
         + '#sf .sf-top{display:flex;align-items:center;gap:8px;min-height:44px}'
         + '#sf .sf-back{border:0;background:none;font-size:26px;line-height:1;color:#0f4c3a;min-width:44px;min-height:44px;padding:0;text-align:left;cursor:pointer}'
@@ -199,7 +201,9 @@
     function HC() { return W.HardPanCourse || null; }
     function courses() { var c = HC(); try { return c ? c.list() : []; } catch (e) { return []; } }
     function nearList(here) { var c = HC(); try { return c && here ? c.near(here, 9) : []; } catch (e) { return []; } }
-    function nameOf(c) { var H = HD(); return typeof H.shownName === 'function' ? H.shownName(c.name) : c.name; }
+    // POLISH #22 (map helper, SHARED): a trailing "(Papago)" that repeats the name is dropped (gps-round.js tidyCourse).
+    function dropRepeat(n) { var s = String(n == null ? '' : n), m = /^(.*\S)\s*\(([^()]+)\)\s*$/.exec(s.trim()); if (!m) return s; var w = function (t) { return String(t).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean); }, h = w(m[1]), t = w(m[2]); return t.length && t.every(function (x) { return h.indexOf(x) >= 0; }) ? m[1] : s; }
+    function nameOf(c) { var H = HD(); return dropRepeat(typeof H.shownName === 'function' ? H.shownName(c.name) : c.name); }
     function readyOf(key) { var c = HC(); try { return !!(c && key && c.resolve(key).hasGps); } catch (e) { return false; } }
     function distTo(c) { var H = HD(); return S.here && c.pt && typeof H.miles === 'function' ? H.miles(S.here, c.pt) : null; }
     function miStr(d) { return d == null ? '' : (d < 10 ? d.toFixed(1) : Math.round(d)) + ' mi'; }
@@ -248,6 +252,7 @@
     function partOf(n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? nk(m[1]).replace(/course$/, '') : ''; }
     function lookup(key, name) {
         var L = W.HardPanGpsLive;
+        if (S.offline) return false;   // no round code, no signal: nothing is looked up online
         if (!key || !liveOn() || !L.find || !L.course) return false;
         if (readyOf(key) && hasCard(key)) return false;
         var at = Number(ls(LOOK + key) || 0);
@@ -576,13 +581,36 @@
         return out;
     }
     // THE ROUND'S / LAST-USED TEE: remembered by name per course on this phone.
+    // POLISH 029 #11: the first time at a course it is a MIDDLE tee, never the tips (Papago
+    // pre-picked Black, 7,419 yds): the men's tees, the combos ("Black/Blue") left out when
+    // there are plain ones, longest first, the one at the middle (5 -> the 3rd, 4 -> the 3rd,
+    // 2 -> the shorter). After that, the tee this phone last started a round on there.
     var TEE_MEM = 'hardpan_last_tee_';
+    function middleTee(rows) {
+        var men = (rows || []).filter(function (r) { return r.gender !== 'female'; }), list = men.length ? men : (rows || []);
+        var plain = list.filter(function (r) { return !/\//.test(r.name); });
+        if (plain.length >= 2) list = plain;
+        list = list.map(function (r, i) { return { r: r, i: i }; }).sort(function (a, b) { return ((b.r.yards || 0) - (a.r.yards || 0)) || (a.i - b.i); }).map(function (x) { return x.r; });
+        return list.length ? list[Math.floor(list.length / 2)] : null;
+    }
     function preferTee(key) {
-        var want = ls(TEE_MEM + key), sel = $('tee-rating-select');
-        if (!want || !sel || S.teeChosen === key) return;
-        var rows = teeRows(key), hit = rows.filter(function (r) { return r.name.toLowerCase() === want.toLowerCase(); })[0];
-        if (hit && sel.value !== hit.key) { sel.value = hit.key; if (fn('applySelectedTee')) W.applySelectedTee(); }
-        S.teeChosen = key;
+        var sel = $('tee-rating-select');
+        if (!sel || S.teeChosen === key) return;   // the golfer's own tap (or Full setup) holds
+        var rows = teeRows(key);
+        if (!rows.length) return;
+        var want = ls(TEE_MEM + key);
+        var hit = want ? rows.filter(function (r) { return r.name.toLowerCase() === want.toLowerCase(); })[0] : null;
+        if (!hit) hit = middleTee(rows);
+        // Only once the round select holds THIS course's tees (it fills one read after the pick).
+        if (!hit || !Array.prototype.some.call(sel.options, function (o) { return o.value === hit.key; })) return;
+        if (sel.value !== hit.key) { sel.value = hit.key; if (fn('applySelectedTee')) W.applySelectedTee(); }
+    }
+    // The tee a round starts on is the one remembered for that course.
+    function rememberTee() {
+        var k = courseKey(), sel = $('tee-rating-select');
+        if (!k || !sel || !sel.value) return;
+        var r = teeRows(k).filter(function (x) { return x.key === sel.value; })[0];
+        if (r) ls(TEE_MEM + k, r.name);
     }
     function teeList(key) {
         var rows = teeRows(key), sel = $('tee-rating-select');
@@ -633,7 +661,7 @@
         }
         h += '<div class="sf-line"><span class="l">Start</span><span class="sf-chips">'
             + chip('Hole 1', !S.shotgun && at !== '10', 'data-sf-start="1"')
-            + (full ? chip('10', !S.shotgun && at === '10', 'data-sf-start="10"') : '')
+            + (full ? chip('Hole 10', !S.shotgun && at === '10', 'data-sf-start="10"') : '')
             + chip('Shotgun', S.shotgun, 'data-sf-start="shotgun"') + '</span></div></div>';
         if (S.shotgun) h += '<div class="sf-note" style="margin:-4px 2px 10px;">Shotgun: Group 1 goes off hole 1, Group 2 hole 2, and so on.</div>';
         return h;
@@ -641,7 +669,7 @@
     function step1() {
         locate();
         var all = S.gpsFiles ? courses() : [], q = S.q.toLowerCase(), key = courseKey();
-        var body = '<input type="search" class="sf-search" id="sf-q" placeholder="🔍 Search courses" value="' + esc(S.q) + '" autocomplete="off" style="margin-bottom:12px;">';
+        var body = (S.offline ? offlineBox() : '') + '<input type="search" class="sf-search" id="sf-q" placeholder="🔍 Search courses" value="' + esc(S.q) + '" autocomplete="off" style="margin-bottom:12px;">';
         if (q.length >= 2) {
             // URGENT-027: forgiving local matches first, then every US course online (webBox).
             var hits = localHits(all, S.q.trim()).slice(0, 10).map(function (x) { return x.c; });
@@ -655,7 +683,8 @@
         // URGENT-028: a tapped online course still loading IS the selected card (never the one before it).
         var pend = pendBusy() ? S.pend : null, pendOld = pend && pend.state !== 'card';
         if (pendOld) body += pendHead(pend);
-        else if (!S.changing) body += courseHead() + lookupBox(key, courseName());
+        // POLISH 029 #11: the TEES (and the start) sit right under the picked course, above NEAR YOU.
+        else if (!S.changing) body += courseHead() + lookupBox(key, courseName()) + courseCard();
         // NEAR YOU, ALWAYS (URGENT-016: with a course already picked the list was gone - only the
         // course and "Change"). The picked course is the card above; the list under it is the
         // others, closest first; a tap switches the course and its tees redraw in place.
@@ -681,10 +710,12 @@
                 else body += others.map(function (x) { return rowHtml(x.c, x.d, false); }).join('');
             }
         }
-        if (!S.changing && !pendOld) body += courseCard();
         if (q.length < 2) body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Add a course ›</button>';
         var ok = courseName() && !pend ? '' : ' disabled';
         var pendLbl = pend ? (pend.state === 'busy' || pend.state === 'offline' || pend.state === 'card' ? 'Loading ' + tidy(pend.name) + '\u2026' : 'Start Round') : '';
+        // NO ROUND CODE YET (polish 029 #5): Start Round waits for the signal - said on the button.
+        if (S.offline) return shell('Where are you playing?', body, '<button type="button" class="sf-cta lime" data-sf="retrycode"' + (S.minting ? ' disabled' : '') + '>'
+            + (S.minting ? 'Getting a round code\u2026' : 'Start Round') + '<span class="sub">' + (S.minting ? 'One bar is enough' : 'Needs a moment of signal \u2014 one bar is enough') + '</span></button>', 0);
         var foot = S.mode === 'gps'
             ? '<button type="button" class="sf-cta lime" data-sf="startgps"' + (ok || (S.saving || (S.lookup && S.lookup.key === key && S.lookup.state === 'busy') || (S.noCard === key && !hasCard(key)) ? ' disabled' : '')) + '>' + (pend ? esc(pendLbl) : S.saving ? 'Starting…' : S.cardWait ? 'Loading the course card…' : (S.lookup && S.lookup.key === key && S.lookup.state === 'busy') ? 'Getting the course\u2026' : 'Start Round') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '')
 
@@ -885,11 +916,13 @@
         return { a: ids.slice(0, n / 2), b: ids.slice(n / 2) };
     }
     // A golfer's short name: the first name, plus the last initial when another golfer shares it
-    // ("Test A." / "Test B."), so the who's-in chips and the "vs" line tell them apart.
+    // ("Test A" / "Test B" - no dot on a one-letter last name, polish #16), so the who's-in
+    // chips and the "vs" line tell them apart.
     function shortName(ps, p) {
+        if (typeof golferShortName === 'function' && p && p.name && String(p.name).trim()) return golferShortName(p, ps);
         var f = first(p.name), parts = String(p.name || '').trim().split(/\s+/);
         var clash = ps.some(function (x) { return x !== p && first(x.name).toLowerCase() === f.toLowerCase(); });
-        return clash && parts.length > 1 ? f + ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + '.' : (clash ? String(p.name).trim() : f);
+        return clash && parts.length > 1 ? f + ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + (parts[parts.length - 1].length > 1 ? '.' : '') : (clash ? String(p.name).trim() : f);
     }
     function nameById(ps, id) { var p = ps.filter(function (x) { return String(x.id) === String(id); })[0]; return p ? shortName(ps, p) : '?'; }
     function whoBox(k, ps) {
@@ -1032,6 +1065,7 @@
     }
     function runSave(errKey) {
         hookSave();
+        rememberTee();
         var save = fn('saveSettings');
         if (!save) { S[errKey] = 'Round Setup is not ready \u2014 reload and try again.'; render(); return; }
         S.saving = true; render();
@@ -1211,6 +1245,7 @@
     function away(n, label) {
         placePool(false);
         S.picked = null;   // a course picked on the full setup is the one that holds
+        S.teeChosen = courseKey();   // ...and so does a tee set there
         S.away = true;
         show(false);
         try { W.goToWizardStep(n); } catch (e) {}
@@ -1285,6 +1320,7 @@
         if (a === 'change') { S.changing = true; render(); var q = $('sf-q'); if (q) q.focus(); return; }
         if (a === 'relocate') { S.near = null; S.nearWhy = null; locate(); render(); return; }
         if (a === 'startgps') { needCard('err1', startGps); return; }
+        if (a === 'retrycode') { retryCode(); return; }
         if (a === 'askclose') { if (t.closest('.sf-card')) return; S.ask = null; render(); return; }
         if (a === 'asknew') { S.ask = null; runSave('err1'); return; }
         if (a === 'askresume') {
@@ -1392,6 +1428,79 @@
         if (t.getAttribute('data-sf-stake')) render();
     }
 
+    // ---- NO SIGNAL AT THE GPS DOOR (POLISH 029 #5) ------------------------------------
+    // The walk: Home > GPS with no signal landed on the OLD lobby ("What are you setting up? Road
+    // Trip / Game Day") under a red "No signal ... The new round was not started", listing Resume
+    // Dobson TWICE and Resume Papago, a FINISHED round.
+    // NOW: the door stays on Course & Tees. A clear line says why Start Round waits, the golfer can
+    // still pick the course and tee (both carried into the round), the rounds this phone can resume
+    // are listed once each (unfinished only), and the round's code is asked for again by itself as
+    // soon as the signal is back (or on Start Round).
+    // NOT AN OFFLINE START, ON PURPOSE: a round's code is checked against the server before it is
+    // used (code-issuer.js). A code made up offline could already be another group's round, and the
+    // rules let any client write any child of a round that exists - the queued round would land in
+    // their round when the signal came back. So the code still needs one bar; nothing else does.
+    function offlineNow() { try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch (e) { return false; } }
+    function resumable() {
+        var q = W.OfflineQueue, H = HD(), out = [], seen = {};
+        if (!q || typeof q.localRounds !== 'function') return out;
+        var list = []; try { list = q.localRounds(W.localStorage) || []; } catch (e) { list = []; }
+        list.forEach(function (r) {
+            var code = String(r.code || '').toUpperCase();
+            if (!code || seen[code]) return;          // each round once
+            seen[code] = 1;
+            var lr = null; try { lr = typeof H.localRound === 'function' ? H.localRound(code) : null; } catch (e) { lr = null; }
+            if (!lr || lr.finished) return;             // a finished round is not resumed
+            out.push({ code: code, course: r.courseName || r.eventName || code, thru: lr.thru || 0, waiting: r.waiting || 0, href: q.resumeHref(r) });
+        });
+        return out.slice(0, 4);
+    }
+    function offlineBox() {
+        var line = S.offline === 'error'
+            ? 'Couldn\u2019t get a round code just now. Pick your course and tee \u2014 Start Round tries again.'
+            : 'No signal. A new round needs one bar to get its code \u2014 pick your course and tee now, and it carries on by itself when the signal is back.';
+        var h = '<div class="sf-warn" id="sf-offline" role="status"><div style="font-weight:700;">\uD83D\uDCF4 ' + esc(line) + '</div>'
+            + '<button type="button" class="sf-link" data-sf="retrycode" style="padding:6px 0 0;min-height:0;"' + (S.minting ? ' disabled' : '') + '>' + (S.minting ? 'Trying\u2026' : 'Try again') + '</button></div>';
+        var rs = resumable();
+        if (rs.length) {
+            h += '<div class="sf-h" style="margin-top:4px;">RESUME ON THIS PHONE</div>' + rs.map(function (r) {
+                return '<a class="sf-row" style="text-decoration:none;" data-sf-resume="' + esc(r.code) + '" href="' + esc(r.href) + '"><span class="n">' + esc(tidy(r.course)) + '</span>'
+                    + '<span class="s">' + (r.thru ? 'Thru ' + esc(r.thru) : 'Not started') + (r.waiting ? ' \u00b7 ' + esc(r.waiting) + ' waiting' : '') + ' \u203a</span></a>';
+            }).join('');
+        }
+        return h;
+    }
+    // Shows the course screen with no round code. kind: 'offline' (no signal known) | 'error'.
+    // True when it took over (the GPS door's mark is on this page and no round code is in hand).
+    function noCode(kind) {
+        var m = marker();
+        if (!m || m.mode !== 'gps' || params().get('game') || !/admin\.html$/.test(String(W.location.pathname || ''))) return false;
+        S.offline = kind === 'error' ? 'error' : 'offline';
+        S.minting = false;
+        if (S.open) { render(); return true; }
+        S.mode = 'gps'; S.code = ''; S.step = 1;
+        show(true);
+        D.documentElement.classList.remove('sf-pre');
+        render();
+        gpsFiles(function () { if (S.step === 1) render(); });
+        watchTees();
+        if (!S.onlineHook) { S.onlineHook = true; try { W.addEventListener('online', function () { if (S.offline) retryCode(); }); } catch (e) {} }
+        return true;
+    }
+    // Ask for the round's code again (Round Setup's own createRoom, through the lobby tile), with the
+    // picked course carried in the GPS door's mark so the new round's page opens on it.
+    function retryCode() {
+        if (S.minting) return;
+        var m = marker() || { mode: 'gps' }, k = courseKey(), n = courseName();
+        if (k || n) m.pick = { key: k, name: n };
+        ss(MARK, JSON.stringify(m));
+        rememberTee();
+        S.minting = true; render();
+        try { if (fn('selectHomeWidget')) W.selectHomeWidget('quick'); } catch (e) { S.minting = false; }
+        // createRoom navigates on success; a refusal comes back through noCode(). A hang gives the button back.
+        setTimeout(function () { if (S.minting) { S.minting = false; if (S.open) render(); } }, 20000);
+    }
+
     // ---- ARRIVAL ------------------------------------------------------------------
     // What the round already holds (Same as last week's copy): its games lit up on Step 3.
     function readBack() {
@@ -1420,6 +1529,9 @@
     function boot() {
         if (!/admin\.html$/.test(String(W.location.pathname || ''))) return;
         var code = String(params().get('game') || '').toUpperCase();
+        // POLISH 029 #5: the GPS door with no signal stays on Course & Tees (the code is asked for
+        // by Round Setup's lobby underneath; with no signal its refusal comes back to noCode too).
+        if (!code && params().get('start') === 'quick' && switchOn() && offlineNow()) { noCode('offline'); return; }
         if (!code) return;
         // URGENT-016: front-door.js covered this page from <head> (the GPS door never shows the
         // lobby); lifted here, once this screen is painted or is not wanted.
@@ -1440,6 +1552,8 @@
             gpsFiles(function () { if (S.step === 1 || S.step === 4) render(); });
             S.step = S.mode === 'same' ? 3 : 1;
             if (S.mode === 'same') { var ps = players(); var me = meDefault(ps); if (me) S.meName = me.name.trim(); }
+            // The course picked while there was no round code yet (polish #5) is this round's course.
+            if (S.mode === 'gps' && m.pick && (m.pick.key || m.pick.name) && !courseKey()) pick(m.pick.key, m.pick.name);
             render();
             if (S.step === 1) watchTees();
         });
@@ -1447,6 +1561,6 @@
         var guard = setInterval(function () { if (!ss(MARK) && S.open && !S.saved) { show(false); clearInterval(guard); } }, 300);
         setTimeout(function () { clearInterval(guard); }, 20000);
     }
-    W.HardPanSimpleFlow = { afterSave: afterSave, state: function () { return S; }, open: function () { return S.open; } };
+    W.HardPanSimpleFlow = { afterSave: afterSave, state: function () { return S; }, open: function () { return S.open; }, noCode: noCode, _middleTee: middleTee, _resumable: resumable };
     if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', boot); else setTimeout(boot, 0);
 })();

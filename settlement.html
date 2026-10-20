@@ -554,6 +554,284 @@ html {
     background-color: var(--bg-page, transparent);
 }
 </style>
+<!-- GPS:BEGIN -->
+<!-- POLISH #31 (OPTION A, Manny URGENT-031: "full page, sectioned cards"). THE RECEIPT IN THE
+     GPS LOOK: "‹ Back to round" + the code chip, "Round Receipt", a course card, FINAL SCORES, one
+     card per game, SETTLE UP and a lime "Share receipt" (the page's own printReceipt). LOOK ONLY:
+     every figure is the one this page already computes - the same receipt objects, the same Who
+     Pays Who transactions, the same scorecard cells - drawn differently. No money is computed here.
+     Every other card (Pay out, the pool games, side games, Net +/-, the Full Scorecard) stays,
+     restyled as cards below. On with HardPan's simple flow (features.simpleFlow and this phone's
+     "hardpan_simple_flow", the hpSimpleFlow() rule at the foot of this page); off = the old page.
+     The Consumer app has none of this (GPS block). -->
+<script src="gps-config.js"></script>
+<script>
+    (function () {
+        try {
+            if ((((window.HARDPAN_GPS_CONFIG || {}).features || {}).simpleFlow === true) && localStorage.getItem('hardpan_simple_flow') !== 'off')
+                document.documentElement.classList.add('hp-rcpt');
+        } catch (e) {}
+    })();
+    window.HpRcpt = (function () {
+        'use strict';
+        function on() { try { return document.documentElement.classList.contains('hp-rcpt'); } catch (e) { return false; } }
+        function esc(v) {
+            if (typeof escapeHtml === 'function') return escapeHtml(v);
+            return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+        }
+        function whole(n) { return (typeof fmtWhole === 'function') ? fmtWhole(n) : String(n); }
+        function q(k) { try { return new URLSearchParams(location.search).get(k); } catch (e) { return null; } }
+        function code() { return String(q('game') || '').toUpperCase(); }
+        // Back to the round this Receipt was opened from (Finish › Review › Round Receipt): the way
+        // the page came when there is one, else the round itself - never the lobby.
+        function back() {
+            try { if (document.referrer && document.referrer.indexOf(location.host) !== -1 && history.length > 1) { history.back(); return; } } catch (e) {}
+            var g = q('group');
+            location.href = 'index.html?game=' + encodeURIComponent(code()) + (g ? '&group=' + encodeURIComponent(g) : '');
+        }
+        function chrome() {
+            if (!on()) return;
+            var main = document.getElementById('main-content');
+            if (!main || document.getElementById('hp-rc-top')) return;
+            var top = document.createElement('div');
+            top.id = 'hp-rc-top'; top.className = 'hp-rc-top';
+            top.innerHTML = '<button type="button" class="hp-rc-back"><b aria-hidden="true">‹</b>Back to round</button>'
+                + (code() ? '<span class="hp-rc-code">' + esc(code()) + '</span>' : '');
+            var h1 = document.createElement('h1');
+            h1.id = 'hp-rc-title'; h1.className = 'hp-rc-h1'; h1.textContent = 'Round Receipt';
+            var scores = document.createElement('div');
+            scores.id = 'hp-rc-scores';
+            var foot = document.createElement('div');
+            foot.id = 'hp-rc-foot'; foot.className = 'hp-rc-foot'; foot.hidden = true;
+            foot.innerHTML = '<button type="button" class="hp-rc-share">Share receipt</button>';
+            main.insertBefore(h1, main.firstChild);
+            main.insertBefore(top, h1);
+            main.appendChild(scores);
+            main.appendChild(foot);
+            top.querySelector('.hp-rc-back').addEventListener('click', back);
+            // THE PAGE'S OWN SHARE: the same printReceipt() the "📤 Send" pill calls.
+            foot.querySelector('.hp-rc-share').addEventListener('click', function () { if (typeof printReceipt === 'function') printReceipt(); });
+        }
+        // On when the page's Send pill is on (a finished round), off when it is not.
+        function share(show) {
+            chrome();
+            var f = document.getElementById('hp-rc-foot');
+            if (f) f.hidden = !show;
+        }
+        // THE COURSE CARD: buildReceiptHeader's own header (course, date, format), dressed as the card
+        // where it stands - the same element, the same id, so the export reads it as it always did.
+        // The format line becomes the chips: the round's tee, the format, Final, and the round's
+        // name when it has one of its own.
+        function decorateHead(data) {
+            var h = document.getElementById('receipt-export-head');
+            if (!h || h.getAttribute('data-hp') === '1') return;
+            h.setAttribute('data-hp', '1');
+            h.classList.add('hp-rc-card', 'hp-rc-course');
+            var d = data || {};
+            var teeName = d.teeRating && d.teeRating.teeName ? String(d.teeRating.teeName) : '';
+            var tee = teeName ? teeName.split('\u00B7').pop().trim() : '';
+            var fmt = h.querySelector('.receipt-head-format'), grp = h.querySelector('.receipt-head-group'), date = h.querySelector('.receipt-head-date');
+            var sub = fmt ? fmt.textContent.replace(/\s*\u00B7\s*\d+ golfers?\s*$/, '').trim() : '';
+            var label = grp ? grp.textContent.trim() : '';
+            var chips = [];
+            if (tee) chips.push(/\btees?$/i.test(tee) ? tee : tee + ' tees');
+            if (sub) chips.push(sub);
+            chips.push('Final');
+            if (label && !/^(single round|weekend round)$/i.test(label)) chips.push(label);
+            if (grp) grp.parentNode.removeChild(grp);
+            if (fmt) { fmt.className = 'hp-rc-chips'; fmt.innerHTML = chips.map(function (c) { return '<span class="hp-rc-chip">' + esc(c) + '</span>'; }).join(''); }
+            if (date) { date.classList.add('hp-rc-meta'); var c = document.createElement('span'); c.className = 'hp-rc-city'; date.appendChild(c); }
+            var crs = h.querySelector('.receipt-head-course'); if (crs) crs.classList.add('hp-rc-crs');
+        }
+        // ONE CARD PER GAME, from buildReceiptBlock's own receipt (r), rows and match-net line -
+        // the side-match-lines.js sentences, unchanged. The stakes ride in the heading, a press
+        // keeps its own stake on its row.
+        function gameCard(r, rows, netText, done) {
+            var isPress = function (row) { return /press/i.test(String(row.label || '')); };
+            var stakes = rows.filter(function (x) { return !isPress(x); }).map(function (x) { return '$' + whole(x.stake); }).join(' / ');
+            var k = esc(r.format) + ' · ' + esc(r.nameA) + ' v ' + esc(r.nameB) + (stakes ? ' · ' + stakes : '');
+            var body = '';
+            if (r.isTeam) body += '<div class="hp-rc-note">' + (r.format === 'Hi-Lo' ? '2v2 (low ball + high ball)' : '2v2 (best ball)') + ' · ' + esc(r.scoring) + '</div>';
+            rows.forEach(function (row) {
+                var label = (typeof receiptSegLabel === 'function') ? receiptSegLabel(row.label) : row.label;
+                var left = esc(label) + (isPress(row) ? ' · $' + whole(row.stake) : '') + (row.result ? ' · ' + esc(row.result) : '');
+                var m = row.moneyText || '';
+                body += '<div class="hp-rc-ln"><span>' + left + '</span><span class="r ' + (/\+\$/.test(m) ? 'pos' : 'mut') + '">' + esc(m) + '</span></div>';
+            });
+            var parts = String(netText || '').split(' — ');
+            var amt = parts.shift(), why = parts.join(' — ');
+            var each = (r.isTeam && r.netTo && done) ? ' <span class="hp-rc-each">($' + whole(Math.abs(r.perPlayerA)) + ' each)</span>' : '';
+            body += '<div class="hp-rc-tot"><span>Match net</span><span>' + esc(amt) + each + '</span></div>';
+            if (why) body += '<div class="hp-rc-why">' + esc(why) + '</div>';
+            return '<div class="hp-rc-game"><div class="hp-rc-k">' + k + '</div><div class="hp-rc-card">' + body + '</div></div>';
+        }
+        // SETTLE UP: Who Pays Who's own transactions (computeCombinedNetTotals), one line each.
+        function settleUp(tx) {
+            var n = tx.length;
+            return '<div class="hp-rc-settle"><div class="hp-rc-k">Settle up</div><div class="hp-rc-card">'
+                + tx.map(function (t) { return '<div class="hp-rc-pay"><span>' + esc(t.from) + ' → ' + esc(t.to) + '</span><span>$' + whole(t.amount) + '</span></div>'; }).join('')
+                + '<div class="hp-rc-meta">' + (n === 1 ? 'One payment settles everything' : n + ' payments settle everything') + '</div>'
+                + '</div></div>';
+        }
+        // FINAL SCORES: the Full Scorecard's own cells (scorecard-rows.js: OUT / IN / TOT, net from
+        // the canonical getStrokes) and +/- from computeNetToParStandings, the board's ranking.
+        function scoresHtml(data) {
+            var d = data || {}, cd = d.courseData || [], players = d.players || [], sc = d.scores || {};
+            if (!cd.length || !players.length || !window.ScorecardRows) return '';
+            if (!(typeof receiptSettlement === 'function' && receiptSettlement(d, cd, sc).settled)) return '';
+            var c = window.ScorecardRows.scorecardCells({ courseData: cd, scores: sc, players: players, showNet: true });
+            var par = {};
+            if (typeof computeNetToParStandings === 'function') {
+                try { computeNetToParStandings(players, cd, sc, { basis: 'net' }).forEach(function (x) { par[String(x.id)] = x; }); } catch (e) {}
+            }
+            var both = c.hasFront && c.hasBack, D = '–';
+            var fmtPar = function (n) { return (typeof formatToPar === 'function') ? formatToPar(n) : (n === 0 ? 'E' : (n > 0 ? '+' + n : String(n))); };
+            var html = '<div class="hp-rc-k">Final scores</div><div class="hp-rc-card hp-rc-scores"><table><thead><tr><th>Golfer</th>'
+                + (both ? '<th>Out</th><th>In</th>' : '') + '<th>Gross</th><th>Net</th><th>+/-</th></tr></thead><tbody>';
+            c.golfers.forEach(function (g) {
+                var s = par[String(g.id)];
+                var started = !!(s && s.started);
+                var hcp = (g.hcp === undefined || g.hcp === null || String(g.hcp).trim() === '') ? '' : ' <span class="hp-rc-hcp">' + esc(String(g.hcp).trim()) + '</span>';
+                var tp = started ? s.toParNet : null;
+                html += '<tr' + (g.out ? ' class="golfer-out"' : '') + ' data-pid="' + esc(g.id) + '"><td class="nm">' + esc(g.name) + hcp + '</td>'
+                    + (both ? '<td class="o">' + (g.gross.out || D) + '</td><td class="i">' + (g.gross.in || D) + '</td>' : '')
+                    + '<td class="g"><b>' + (g.gross.tot || D) + '</b></td><td class="n">' + ((g.net && g.net.tot) || D) + '</td>'
+                    + '<td class="p ' + (tp !== null && tp < 0 ? 'pos' : '') + '"><b>' + (tp === null ? D : esc(fmtPar(tp))) + '</b></td></tr>';
+            });
+            return html + '</tbody></table></div>';
+        }
+        // The city, when the course record has one (read only, once per course; nothing written).
+        var cities = {};
+        function city(data) {
+            var key = data && data.activeCourseKey;
+            var paint = function () {
+                var t = cities[key];
+                Array.prototype.forEach.call(document.querySelectorAll('.hp-rc-city'), function (el) { el.textContent = t ? ' · ' + t : ''; });
+            };
+            if (!key || !/^[A-Za-z0-9_\-]+$/.test(String(key))) return;
+            if (cities[key] !== undefined) { paint(); return; }
+            cities[key] = '';
+            try {
+                firebase.database().ref('global_courses/' + key + '/location').once('value').then(function (s) {
+                    var l = (s && s.val && s.val()) || {};
+                    cities[key] = [l.city, l.state].filter(Boolean).join(', ');
+                    paint();
+                }, function () {});
+            } catch (e) {}
+        }
+        function render(data) {
+            if (!on()) return;
+            chrome();
+            var m = document.getElementById('hp-rc-scores');
+            if (m) { try { m.innerHTML = scoresHtml(data); } catch (e) { m.innerHTML = ''; } }
+            try { decorateHead(data); } catch (e) {}
+            city(data);
+        }
+        return { on: on, chrome: chrome, share: share, gameCard: gameCard, settleUp: settleUp, scoresHtml: scoresHtml, render: render };
+    })();
+</script>
+<style>
+@media screen {
+    html.hp-rcpt, html.hp-rcpt.dark-mode {
+        --hp-bg: #f2f4ef; --hp-line: #dfe5df; --hp-soft: #eef1ee; --hp-chip: #e9eee9; --hp-ink: #13241d; --hp-green: #0f4c3a;
+        --hp-muted: #5d6b64; --hp-kick: #667; --hp-lime: #d4f27c; --hp-lime-ink: #10392d; --hp-pos: #0f7a3f; --hp-neg: #b3261e;
+        /* the page's own tokens, so every card below takes the look */
+        --bg-page: #f2f4ef; --bg-card: #ffffff; --text-main: #13241d; --text-muted: #5d6b64; --text-secondary: #3f4d46;
+        --brand-green: #0f4c3a; --brand-navy: #1d3557; --accent-teal: #0f7a3f; --accent-red: #b3261e;
+        --border-light: #dfe5df; --border-mid: #dfe5df; --border-faint: #eef1ee; --nav-bg: #e9eee9; --subtle-bg: #e9eee9;
+        --nassau-box-bg: #ffffff; --shadow-color: transparent;
+    }
+    html.hp-rcpt body { background: var(--hp-bg); color: var(--hp-ink); padding: 0 16px 0; }
+    html.hp-rcpt .container { max-width: 560px; background: none; box-shadow: none; border-radius: 0; padding: 0; }
+    html.hp-rcpt #main-content[style*="block"] { display: flex !important; flex-direction: column; }
+    html.hp-rcpt #theme-toggle-btn, html.hp-rcpt .app-nav-wrap, html.hp-rcpt .back-btn, html.hp-rcpt #title-row,
+    html.hp-rcpt .rfb-final { display: none !important; }
+    /* THE ORDER: course, scores, the games, Settle up - then every other card. */
+    html.hp-rcpt #hp-rc-top { order: 0; } html.hp-rcpt #hp-rc-title { order: 1; }
+    html.hp-rcpt #sync-caveat { order: 2; } html.hp-rcpt #results-final-banner, html.hp-rcpt #results-gap-line { order: 3; }
+    html.hp-rcpt #results-top { display: contents; }
+    html.hp-rcpt #results-top > .receipt-head { order: 4; }
+    html.hp-rcpt #hp-rc-scores { order: 5; } html.hp-rcpt #money-pool-section { order: 6; } html.hp-rcpt #settle-content { order: 7; }
+    html.hp-rcpt #combined-settlement-summary { order: 8; } html.hp-rcpt #results-top > :not(.receipt-head) { order: 9; }
+    html.hp-rcpt #results-net { order: 10; } html.hp-rcpt #receipt-scorecard { order: 11; }
+    html.hp-rcpt #hp-add-bet { order: 12; } html.hp-rcpt #hp-rc-foot { order: 13; }
+    html.hp-rcpt #combined-settlement-summary:has(.live-head) { order: 4; }   /* a round still in play: who is out, first */
+    html.hp-rcpt #combined-settlement-summary:not(:empty), html.hp-rcpt #settle-content:not(:empty),
+    html.hp-rcpt #results-net:not(:empty), html.hp-rcpt #receipt-scorecard:not(:empty) { border-top: 0; margin-top: 0; padding-top: 0; }
+    /* the head */
+    .hp-rc-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 44px; margin-top: 6px; }
+    .hp-rc-back { white-space: nowrap; border: 0; background: none; color: var(--hp-green); font-family: inherit; font-weight: 700; font-size: 17px; line-height: 1;
+        display: flex; align-items: center; gap: 2px; min-height: 44px; padding: 0 6px 0 0; cursor: pointer; }
+    .hp-rc-back b { font-size: 28px; font-weight: 400; line-height: 20px; margin-top: -3px; }
+    .hp-rc-code { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 11px; background: var(--hp-green); color: #fff;
+        font-weight: 800; font-size: 13px; line-height: 1; letter-spacing: .08em; }
+    .hp-rc-h1 { font-size: 26px; font-weight: 800; letter-spacing: -.02em; margin: 4px 2px 10px; color: var(--hp-ink); }
+    /* cards and section kickers */
+    .hp-rc-k { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--hp-kick); margin: 16px 2px 8px; text-transform: uppercase; line-height: 1.35; }
+    .hp-rc-card { background: #fff; border: 1px solid var(--hp-line); border-radius: 16px; padding: 14px; margin-bottom: 12px; }
+    html.hp-rcpt .receipt-head.hp-rc-course { text-align: left; margin: 0 0 12px; }
+    .hp-rc-crs { font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: var(--hp-ink); }
+    html.hp-rcpt .hp-rc-crs { text-transform: none; color: var(--hp-ink); }
+    .hp-rc-meta { font-size: 14px; color: var(--hp-muted); margin-top: 4px; }
+    .hp-rc-chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .hp-rc-chip { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 11px; background: var(--hp-chip); font-weight: 600; font-size: 13px; line-height: 1; color: var(--hp-ink); }
+    /* FINAL SCORES */
+    .hp-rc-scores table { width: 100%; border-collapse: collapse; font-size: 16px; }
+    .hp-rc-scores th { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--hp-kick); text-align: right; padding: 0 0 6px 6px; }
+    .hp-rc-scores td { padding: 9px 0 9px 6px; border-top: 1px solid var(--hp-soft); text-align: right; font-variant-numeric: tabular-nums; }
+    .hp-rc-scores th:first-child, .hp-rc-scores td:first-child { text-align: left; padding-left: 0; }
+    .hp-rc-scores td.nm { font-weight: 700; word-break: break-word; }
+    .hp-rc-hcp { font-weight: 400; font-size: 13px; color: var(--hp-muted); }
+    .hp-rc-scores .pos, .hp-rc-ln .pos { color: var(--hp-pos); }
+    .hp-rc-ln .mut { color: var(--hp-muted); }
+    /* a game */
+    .hp-rc-game .hp-rc-card { padding-top: 6px; }
+    .hp-rc-note { font-size: 13px; color: var(--hp-muted); padding: 6px 0 2px; }
+    .hp-rc-ln { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 0; border-top: 1px solid var(--hp-soft); font-size: 15px; }
+    .hp-rc-ln:first-child { border-top: 0; }
+    .hp-rc-ln .r { font-weight: 800; text-align: right; white-space: nowrap; }
+    .hp-rc-tot { display: flex; justify-content: space-between; gap: 10px; padding-top: 10px; border-top: 2px solid var(--hp-line); font-weight: 800; color: var(--hp-green); font-size: 16px; }
+    .hp-rc-tot span:last-child { text-align: right; }
+    .hp-rc-each { font-weight: 600; font-size: 13px; color: var(--hp-muted); }
+    .hp-rc-why { font-size: 13px; color: var(--hp-muted); margin-top: 4px; }
+    /* Settle up */
+    .hp-rc-pay { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 18px; font-weight: 800; padding: 6px 0; }
+    .hp-rc-pay + .hp-rc-pay { border-top: 1px solid var(--hp-soft); }
+    /* every other card, the same way */
+    html.hp-rcpt .settle-card { background: #fff; border: 1px solid var(--hp-line); border-radius: 16px; padding: 14px; margin: 0 0 12px; }
+    html.hp-rcpt .settle-card[data-flight="A"] { border-left: 4px solid var(--hp-pos); }
+    html.hp-rcpt .settle-card[data-flight="B"] { border-left: 4px solid var(--brand-navy); }
+    html.hp-rcpt .settle-header { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--hp-kick); text-align: left; border-bottom: 0;
+        padding: 0; margin: 0 0 6px; text-transform: uppercase; }
+    html.hp-rcpt .ledger-row { background: none; border: 0; border-top: 1px solid var(--hp-soft); border-radius: 0; padding: 9px 0; margin: 0; font-size: 15px; font-weight: 600; }
+    html.hp-rcpt .settle-header + .ledger-row { border-top: 0; }
+    html.hp-rcpt .game-card { padding: 14px; }
+    html.hp-rcpt .game-head, html.hp-rcpt .game-kp .game-head, html.hp-rcpt .game-net .game-head, html.hp-rcpt .game-skins .game-head,
+    html.hp-rcpt .game-skins[data-flight="B"] .game-head { background: none; color: var(--hp-ink); padding: 0 0 6px; margin: 0; }
+    html.hp-rcpt .game-title { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--hp-kick); }
+    html.hp-rcpt .game-pot { font-size: 15px; font-weight: 800; }
+    html.hp-rcpt .game-card > .ledger-row, html.hp-rcpt .game-card > .nf-explain, html.hp-rcpt .game-card > .game-note { margin-left: 0; margin-right: 0; }
+    html.hp-rcpt .po-head { align-items: center; }
+    html.hp-rcpt .po-total { font-size: 13px; color: var(--hp-muted); }
+    html.hp-rcpt .po-row { border: 0; border-top: 1px solid var(--hp-soft); border-radius: 0; margin: 0; }
+    html.hp-rcpt .po-row > summary { padding: 10px 0; }
+    html.hp-rcpt .po-amt { font-size: 18px; color: var(--hp-pos); }
+    html.hp-rcpt .po-reason { padding: 4px 0 4px 18px; }
+    html.hp-rcpt .val-pos { color: var(--hp-pos); } html.hp-rcpt .val-neg { color: var(--hp-neg); }
+    html.hp-rcpt .net-view > summary { margin-bottom: 0; }
+    html.hp-rcpt .receipt-card-wide .settle-header { margin-bottom: 8px; }
+    html.hp-rcpt .rfb { background: #fff; border: 1px solid var(--hp-line); border-radius: 12px; }
+    html.hp-rcpt #hp-add-bet { background: #fff !important; color: var(--hp-green) !important; border: 2px solid var(--hp-green) !important;
+        border-radius: 16px !important; margin: 4px 0 0 !important; min-height: 54px !important; font-size: 17px !important; }
+    /* Share receipt: the lime button, held at the foot of the screen */
+    .hp-rc-foot { position: sticky; bottom: 0; margin: 4px -16px 0; padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+        background: linear-gradient(rgba(242, 244, 239, 0), #f2f4ef 22%); }
+    .hp-rc-foot[hidden] { display: none; }
+    .hp-rc-share { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 58px; border: 0; border-radius: 16px;
+        background: var(--hp-lime); color: var(--hp-lime-ink); font-family: inherit; font-weight: 800; font-size: 19px; line-height: 1; cursor: pointer; }
+}
+</style>
+<!-- GPS:END -->
 </head>
 <body>
 
@@ -792,6 +1070,9 @@ html {
             renderCombinedSummary(currentData, currentData.courseData || [], currentData.scores || {});
             renderSettlement(currentData);
             renderReceiptScorecard();
+            // GPS:BEGIN
+            if (window.HpRcpt) window.HpRcpt.render(currentData);   // POLISH #31 (option A): the head, FINAL SCORES
+            // GPS:END
         });
     }
     // ONE RENDERER, ONE SENTENCE, FOUR PAGES. The decision is OfflineQueue's;
@@ -1167,7 +1448,9 @@ html {
 
     function buildReceiptBlock(matchId, data, courseData, savedScores) {
         if (typeof buildSideMatchReceipts !== 'function') return '';
-        const r = buildSideMatchReceipts(data, courseData, savedScores).find(x => x.matchId === matchId);
+        // Labels only (polish #2): two golfers with one first name read "Test A" / "Test B".
+        const shownData = (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(data) : data;
+        const r = buildSideMatchReceipts(shownData, courseData, savedScores).find(x => x.matchId === matchId);
         if (!r) return '';
 
         let html = `<div class="receipt-match">`;
@@ -1233,6 +1516,10 @@ html {
         const netText = (typeof sideMatchNetLine === 'function')
             ? sideMatchNetLine(r, { complete: rDone })
             : (r.netTo ? `${r.netTo} +$${fmtWhole(r.netAmount)}` : 'Push \u2014 nobody pays');
+        // GPS:BEGIN
+        // POLISH #31 (option A): this receipt, these rows, this match net - as one card per game.
+        if (window.HpRcpt && window.HpRcpt.on()) return window.HpRcpt.gameCard(r, rRows, netText, rDone);
+        // GPS:END
         html += `<div class="receipt-net">MATCH NET \u00B7 ${escapeHtml(netText)}` +
             (r.isTeam && r.netTo && rDone ? ` <span class="receipt-each">($${fmtWhole(Math.abs(r.perPlayerA))} each)</span>` : '') +
             `</div>`;
@@ -1346,6 +1633,10 @@ html {
         });
 
         if (!rows) return "";
+        // GPS:BEGIN
+        // POLISH #31 (option A): each game is its own card - no wrapper card around them.
+        if (window.HpRcpt && window.HpRcpt.on()) return rows;
+        // GPS:END
         return `<div class="settle-card"><div class="settle-header">⚔️ Side Matches</div>${rows}</div>`;
     }
 
@@ -2322,6 +2613,10 @@ html {
             });
             html += `</div>`;
         }
+        // GPS:BEGIN
+        // POLISH #31 (option A): Who Pays Who's same transactions, as SETTLE UP.
+        if (window.HpRcpt && window.HpRcpt.on() && transactions.length > 0 && hasPlayerToPlayerSettlement(contributions)) html = window.HpRcpt.settleUp(transactions);
+        // GPS:END
 
         container.innerHTML = html;
         // The receipt is on screen and final: the one way to send it goes on.
@@ -2341,6 +2636,9 @@ html {
         mount.innerHTML = show
             ? '<button class="receipt-send" onclick="printReceipt()">\uD83D\uDCE4 Send</button>'
             : '';
+        // GPS:BEGIN
+        if (window.HpRcpt) window.HpRcpt.share(show);   // POLISH #31 (option A): "Share receipt", on and off with the pill
+        // GPS:END
     }
 
     // Scores come LAST. The money story is what a golfer opens this document for, and
@@ -2394,7 +2692,8 @@ html {
 
         if (gameFormat === 'hilo') {
             const hiloNet = computeHiLoSettlementNet(data, courseData, savedScores);
-            const calc = calculateHiLoEngine(moneyPlayers, courseData, savedScores);
+            // The points line's team names only (polish #2); the money is hiloNet, above.
+            const calc = calculateHiLoEngine((typeof playersForDisplay === 'function') ? playersForDisplay(moneyPlayers, data.players) : moneyPlayers, courseData, savedScores);
             let ledgerHtml = "";
             moneyPlayers.forEach(p => {
                 const money = hiloNet[p.id] || 0;
@@ -2591,7 +2890,7 @@ html {
             pressSet.pressResults.forEach(pr => {
                 const winnerName = pr.roundComplete && pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name) : null;
                 const prStatus = !pr.roundComplete
-                    ? `Not yet final — thru ${pr.holesCompleted} holes of this press`
+                    ? `Not yet final — thru ${pr.holesCompleted} hole${pr.holesCompleted === 1 ? '' : 's'} of this press`
                     : (winnerName ? `${escapeHtml(winnerName)} won $${pr.stake}` : 'Tied, no money');
                 pressBreakdownHtml += `<div class="breakdown-item"><span>Press ${pr.pressNum} (Hole ${pr.startHole}, $${pr.stake}):</span> <span>${prStatus}</span></div>`;
             });
@@ -2641,7 +2940,8 @@ html {
             if (typeof playOrder !== 'function' || typeof teeStartHole !== 'function') return holes;
             return playOrder(holes, teeStartHole(data || {}, holes));
         }
-        const matchData = calculateMatchEngine(moneyPlayers, mainGamePlayOrder(courseData), savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
+        // Team labels only (polish #2): "Test A" / "Test B" for two of one first name.
+        const matchData = calculateMatchEngine((typeof playersForDisplay === 'function') ? playersForDisplay(moneyPlayers, data.players) : moneyPlayers, mainGamePlayOrder(courseData), savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
 
         if (!matchData) {
             const sideHtml = buildSideGamesHtml(data, courseData, savedScores);
@@ -2744,7 +3044,7 @@ html {
      round's page (index.html ?hpbet=1, which comes back here after Start), or, inside the Bets
      sheet, the sheet over it. The switch is gps-config.js features.simpleFlow and this phone's
      "hardpan_simple_flow" (off = today's forms exactly). -->
-<script src="gps-config.js"></script>
+<!-- gps-config.js loads in the head now (POLISH #31's block), ahead of the first render. -->
 <script>
     function hpSimpleFlow() {
         try {

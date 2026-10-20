@@ -1404,7 +1404,7 @@ html {
         const map = buildPlayerGroupMap();
         wrap.innerHTML = groups.map(g => {
             const names = players.filter(p => String(map[String(p.id)]) === String(g))
-                .map(p => p.name.split(' ')[0]).join(', ');
+                .map(p => shortOf(p)).join(', ');
             return `<button type="button" class="sm-scope-choice" onclick="pickOwnerGroup(${g})">`
                 + `<strong>Group ${g}</strong><small>${names || 'No golfers'}</small></button>`;
         }).join('');
@@ -1777,7 +1777,7 @@ html {
         const leftOut = players.filter(pl => !chosenIds.includes(String(pl.id)));
         if (leftOut.length > 0) {
             wrap.innerHTML += `<p style="flex-basis:100%; font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;">`
-                + `${leftOut.map(pl => pl.name.split(' ')[0]).join(', ')} `
+                + `${leftOut.map(pl => shortOf(pl)).join(', ')} `
                 + `${leftOut.length === 1 ? 'is' : 'are'} out of this game only \u2014 still scoring, still in every whole-field game.</p>`;
         }
 
@@ -1859,7 +1859,7 @@ html {
                 // Inside a group game every name is in the same group, so the tag is noise.
                 const groupTag = (!showHeads && distinctGroups > 1 && actionScope !== 'group')
                     ? `<span style="display:block; font-size:0.62rem; opacity:0.7; font-weight:normal;">Group ${grp || '?'}</span>` : '';
-                html += `<div class="player-pick-badge ${cls}" onclick="pickPlayerForSide('${p.id}')">${order}${p.name.split(' ')[0]}${tag}${groupTag}</div>`;
+                html += `<div class="player-pick-badge ${cls}" onclick="pickPlayerForSide('${p.id}')">${order}${shortOf(p)}${tag}${groupTag}</div>`;
             });
             wrapper.innerHTML = html || `<div style="font-size:0.8rem; color:var(--text-muted);">No players found — set up players on the Home page first.</div>`;
         }
@@ -1933,7 +1933,7 @@ html {
         // stored cannot disagree.
         const firstName = id => {
             const p = players.find(x => String(x.id) === String(id));
-            return p ? p.name.split(' ')[0] : id;
+            return p ? shortOf(p) : id;
         };
         const nameList = ids => ids.map(firstName).join(' & ');
 
@@ -1989,8 +1989,8 @@ html {
 
         const teamAPlayers = players.filter(p => teamAIds.includes(String(p.id)));
         const teamBPlayers = players.filter(p => teamBIds.includes(String(p.id)));
-        const namesA = teamAPlayers.map(p => p.name.split(' ')[0]).join(' + ');
-        const namesB = teamBPlayers.map(p => p.name.split(' ')[0]).join(' + ');
+        const namesA = teamAPlayers.map(p => shortOf(p)).join(' + ');
+        const namesB = teamBPlayers.map(p => shortOf(p)).join(' + ');
 
         // Stroke-index handicap preview — only meaningful for a genuine 1v1, matching exactly
         // how getStrokes/parseHcp are already used everywhere else in this file, nothing new.
@@ -2005,7 +2005,7 @@ html {
                     strokesTotal += Math.abs(sA - sB) > 0 ? Math.max(sA, sB) - Math.min(sA, sB) : 0;
                 });
                 const higherHcpPlayer = hcpA > hcpB ? teamAPlayers[0] : teamBPlayers[0];
-                if (strokesTotal > 0) strokeNote = `<div style="margin-top:4px; font-size:0.78rem; color:var(--text-muted);">${higherHcpPlayer.name.split(' ')[0]} receives ${strokesTotal} stroke${strokesTotal === 1 ? '' : 's'}</div>`;
+                if (strokesTotal > 0) strokeNote = `<div style="margin-top:4px; font-size:0.78rem; color:var(--text-muted);">${shortOf(higherHcpPlayer)} receives ${strokesTotal} stroke${strokesTotal === 1 ? '' : 's'}</div>`;
             }
         }
 
@@ -2294,7 +2294,7 @@ html {
                 seenGroups.add(group);
                 const namesInGroup = involvedIds
                     .filter(pid => groupMap[String(pid)] === group)
-                    .map(pid => { const p = players.find(pl => String(pl.id) === String(pid)); return p ? p.name.split(' ')[0] : '?'; })
+                    .map(pid => { const p = players.find(pl => String(pl.id) === String(pid)); return p ? shortOf(p) : '?'; })
                     .join(' & ');
                 const url = `${scorecardBaseUrl()}?game=${currentMode}&group=${group}`;
                 html += `<div class="team-link-row">
@@ -2674,8 +2674,8 @@ html {
         if (sm) {
             const teamAIds = (sm.teamAIds || []).map(String);
             const teamBIds = (sm.teamBIds || []).map(String);
-            const namesA = players.filter(p => teamAIds.includes(String(p.id))).map(p => p.name.split(' ')[0]).join(' + ');
-            const namesB = players.filter(p => teamBIds.includes(String(p.id))).map(p => p.name.split(' ')[0]).join(' + ');
+            const namesA = players.filter(p => teamAIds.includes(String(p.id))).map(p => shortOf(p)).join(' + ');
+            const namesB = players.filter(p => teamBIds.includes(String(p.id))).map(p => shortOf(p)).join(' + ');
             const formatLabel = sm.format === 'nassau' ? 'Nassau' : (sm.format === 'stroke' ? 'Stroke Play' : (sm.format === 'hilo' ? 'Hi-Lo' : 'Match Play'));
             const stakeText = sm.format === 'stroke'
                 ? `$${sm.holeStake || 0}/hole, $${sm.overallStake || 0} overall`
@@ -2829,8 +2829,8 @@ html {
         }
         let html = "";
         autoPairPreview.forEach(m => {
-            const aNames = m.teamA.map(p => p.name.split(' ')[0]).join(' / ');
-            const bNames = m.teamB.map(p => p.name.split(' ')[0]).join(' / ');
+            const aNames = m.teamA.map(p => shortOf(p)).join(' / ');
+            const bNames = m.teamB.map(p => shortOf(p)).join(' / ');
             html += `<div style="display:flex; justify-content:space-between; padding:6px 10px; background:var(--nav-bg); border-radius:6px; margin-bottom:4px; font-size:0.85rem;">
                 <span>${aNames}</span><span style="color:var(--text-muted);">vs</span><span>${bNames}</span>
             </div>`;
@@ -2884,7 +2884,7 @@ html {
     // spot on the 14th tee invent a wager that exists on one phone and nowhere else.
     function pressMatchNames(sm) {
         const players = currentData.players || [];
-        const nm = id => { const p = players.find(x => String(x.id) === String(id)); return p ? p.name.split(' ')[0] : '?'; };
+        const nm = id => { const p = players.find(x => String(x.id) === String(id)); return p ? shortOf(p) : '?'; };
         return `${(sm.teamAIds || []).map(nm).join(' / ')} vs ${(sm.teamBIds || []).map(nm).join(' / ')}`;
     }
 
@@ -2902,6 +2902,17 @@ html {
         if (typeof alohaMainGameMatch !== 'function') return null;
         return alohaMainGameMatch(currentData);
     }
+    // POLISH #2 (2026-10-20): a golfer's short name is the round's, not the first word -
+    // "Test A" / "Test B" when two share a first name (text-safe.js golferShortName).
+    // shownRound / shownList hand the presenters the display copy; labels only, never saved.
+    function shortOf(p) {
+        if (!p) return '';
+        const ps = (typeof currentData !== 'undefined' && currentData && currentData.players) || [];
+        return (typeof golferShortName === 'function' && typeof p.name === 'string' && p.name.trim())
+            ? golferShortName(p, ps) : String(p.name || '').split(' ')[0];
+    }
+    function shownRound() { return (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(currentData) : currentData; }
+    function shownList(list) { return (list && typeof playersForDisplay === 'function') ? playersForDisplay(list, currentData.players) : list; }
     function mainGameAlohaRowHtml() {
         const sm = mainGameAloha();
         if (!sm) return '';
@@ -2916,7 +2927,7 @@ html {
         const virtual = players.map(p => Object.assign({}, p, { team: idsA.indexOf(String(p.id)) > -1 ? 'Team 1' : 'Team 2' }));
         const presses = sm.presses ? Object.values(sm.presses) : [];
         try {
-            return calculateMatchEngine(virtual, currentData.courseData || [], currentData.scores || {},
+            return calculateMatchEngine(shownList(virtual), currentData.courseData || [], currentData.scores || {},
                 sm.scoring, sm.format, sm.pressRule, sm.stake, 0, presses,
                 (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(currentData) : undefined));
         } catch (e) { return null; }
@@ -3123,7 +3134,7 @@ html {
         const virtual = ps.map(p => Object.assign({}, p, { team: idsA.indexOf(String(p.id)) > -1 ? 'Team 1' : 'Team 2' }));
         const presses = sm.presses ? Object.values(sm.presses) : [];
         try {
-            return calculateMatchEngine(virtual, alohaCourseFor(sm), currentData.scores || {},
+            return calculateMatchEngine(shownList(virtual), alohaCourseFor(sm), currentData.scores || {},
                 sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, presses,
                 (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(sm) : undefined));
         } catch (e) { return null; }
@@ -3297,7 +3308,7 @@ html {
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses/${pushKey}`).set({ startHole: nextHole, stake: amtO })
-            .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${p1.name.split(' ')[0]} vs ${p2.name.split(' ')[0]}\n$${amtO}\nStarts Hole ${nextHole}`))
+            .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${shortOf(p1)} vs ${shortOf(p2)}\n$${amtO}\nStarts Hole ${nextHole}`))
             .catch(err => uiFail(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
@@ -3332,7 +3343,7 @@ html {
         let playerRows = '';
         virtualPlayers.forEach(p => {
             let outScore = 0, inScore = 0;
-            let row = `<td class="sm-row-label">${p.name.split(' ')[0]}</td>`;
+            let row = `<td class="sm-row-label">${shortOf(p)}</td>`;
 
             function scoreCell(h) {
                 const v = savedScores[`p${p.id}_h${h.hole}`];
@@ -4196,7 +4207,7 @@ html {
 
     function challengeNameOf(id) {
         const p = (currentData.players || []).find(x => String(x.id) === String(id));
-        return p ? p.name.split(' ')[0] : '?';
+        return p ? shortOf(p) : '?';
     }
 
     // The viewer, as a roster id - the same storage the scorecard writes.
@@ -4318,7 +4329,7 @@ html {
         const list = document.getElementById("sidematches-list");
         if (!list) return;
 
-        const players = currentData.players || [];
+        const players = shownList(currentData.players || []);   // polish #2: "Test A" / "Test B" on every card; ids unchanged
         const courseData = currentData.courseData || [];
         const savedScores = currentData.scores || {};
         const sideMatches = currentData.sideMatches || {};
@@ -4354,7 +4365,7 @@ html {
         // like the engines, and a missing presenter must break this card loudly
         // rather than render every match with a blank line.
         const rowsById = {};
-        buildSideActionRows(currentData, courseData, savedScores, players).forEach(r => { rowsById[r.key] = r; });
+        buildSideActionRows(shownRound(), courseData, savedScores, shownList(players)).forEach(r => { rowsById[r.key] = r; });
 
         let html = "";
         visibleIds.sort((a, b) => (sideMatches[a].createdAt || 0) - (sideMatches[b].createdAt || 0)).forEach(matchId => {
@@ -4375,7 +4386,7 @@ html {
                 ? sideMatchHoles(sm, courseData, currentData)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
 
-            const sideName = (side) => side.map(pl => pl.name.split(' ')[0]).join(' / ');
+            const sideName = (side) => side.map(pl => shortOf(pl)).join(' / ');
             const sideAName = sideName(teamAPlayers);
             const sideBName = sideName(teamBPlayers);
             const rangeText = (typeof sideMatchRangeText === 'function') ? sideMatchRangeText(sm, courseData) : '';
