@@ -87,7 +87,8 @@
         r.ref('global_courses/' + key + '/tees').once('value').then(function (s) {
             if (done) return;
             S.tees = teeRowsOf({ tees: s && s.val ? s.val() : null });
-            if (!S.tee) S.tee = roundTeeKey(S.tees);
+            if (S.mode === 'edit' && S.edit && !S.teePicked) { var ep = playerById(S.edit); S.tee = S.teeWas = playerTeeKey(ep); }
+            else if (!S.tee) S.tee = roundTeeKey(S.tees);
             if (S.open) render();
         }, function () {});
     }
@@ -203,10 +204,13 @@
     }
     function teeName(key) { var r = (S.tees || []).filter(function (x) { return x.key === key; })[0]; return r ? r.name : ''; }
     function render() {
+        if (S.mode === 'edit') { renderEdit(); return; }
+        if (S.mode === 'list') { renderList(); return; }
         var e = root(), y = e.querySelector('.ag-panel') ? e.querySelector('.ag-panel').scrollTop : 0;
         var gs = bounds(), plus = /^\+/.test(S.hcp), rt = roundTeeKey(S.tees || []);
         var h = '<div class="ag-scrim" data-ag="close"></div><div class="ag-panel"><div class="ag-grab"></div>'
-            + '<div class="ag-top"><h2>Add golfer</h2><button type="button" class="ag-x" data-ag="close" aria-label="Close">✕</button></div>';
+            + '<div class="ag-top">' + (S.from === 'list' ? '<button type="button" class="ag-x" data-ag="tolist" aria-label="Back">‹</button>' : '') + '<h2 style="flex:1;">Add golfer</h2><button type="button" class="ag-x" data-ag="close" aria-label="Close">✕</button></div>';
+        if (S.why) h += '<div class="ag-note" style="margin:2px 2px 6px;font-weight:700;color:#0f4c3a;">' + esc(S.why) + '</div>';
         if (S.list.length) h += '<div class="ag-h">ADDING</div><div class="ag-adding" id="ag-adding">' + S.list.map(function (r, i) {
             return '<div>' + esc(r.name) + (r.hcp !== '' ? ' · ' + esc(r.hcp) : '') + (r.tee && r.tee !== rt && teeName(r.tee) ? ' · ' + esc(teeName(r.tee)) : '') + ' <button type="button" data-ag-drop="' + i + '" aria-label="Remove ' + esc(r.name) + '">✕</button></div>';
         }).join('') + '</div>';
@@ -227,6 +231,137 @@
         e.innerHTML = h;
         var p = e.querySelector('.ag-panel'); if (p) p.scrollTop = y;
     }
+    // ---- EDIT ONE GOLFER (URGENT-018): name, HCP, tee, group, Out - in place ------------
+    function playerById(id) { return ((data() || {}).players || []).filter(function (p) { return String(p.id) === String(id); })[0] || null; }
+    function groupOfId(id) {
+        var ps = (data() || {}).players || [], i = ps.map(function (p) { return String(p.id); }).indexOf(String(id));
+        var b = i >= 0 ? bounds().filter(function (x) { return i >= x.startIdx && i < x.startIdx + x.size; })[0] : null;
+        return b ? b.group : 1;
+    }
+    function shownHcp(p) { try { return typeof psShownHandicap === 'function' ? psShownHandicap(p, data()) : String((p && p.hcp) || ''); } catch (e) { return String((p && p.hcp) || ''); } }   /* global psShownHandicap */
+    function playerTeeKey(p) {
+        var rows = S.tees || [], t = p && p.tee;
+        if (!t) return roundTeeKey(rows);
+        var hit = rows.filter(function (r) { return t.teeKey && r.key === t.teeKey; })[0] || rows.filter(function (r) { return nk(r.full) === nk(t.teeName) || nk(r.name) === nk(t.teeName); })[0];
+        return hit ? hit.key : roundTeeKey(rows);
+    }
+    function editDraft() {
+        var p = playerById(S.edit), ps = (data() || {}).players || [];
+        var idx = ps.indexOf(p);
+        return { edits: [{ idx: idx, name: S.name.trim(), hcp: S.hcp.trim(), flight: p && p.flight === 'B' ? 'B' : 'A', out: !!S.out, group: S.group }], added: [] };
+    }
+    function editMoney() {
+        try { if (typeof buildPlayersUpdate !== 'function' || !playerById(S.edit)) return ''; var u = buildPlayersUpdate(data(), editDraft()); return u && typeof u.money === 'string' ? u.money : (u && u.money && u.money.line) || ''; } catch (e) { return ''; }
+    }
+    function renderEdit() {
+        var e = root(), y = e.querySelector('.ag-panel') ? e.querySelector('.ag-panel').scrollTop : 0;
+        var p = playerById(S.edit), gs = bounds(), plus = /^\+/.test(S.hcp);
+        if (!p) { S.mode = 'list'; renderList(); return; }
+        var h = '<div class="ag-scrim" data-ag="close"></div><div class="ag-panel"><div class="ag-grab"></div>'
+            + '<div class="ag-top">' + (S.from === 'list' ? '<button type="button" class="ag-x" data-ag="tolist" aria-label="Back">\u2039</button>' : '') + '<h2 style="flex:1;">Edit golfer</h2><button type="button" class="ag-x" data-ag="close" aria-label="Close">\u2715</button></div>';
+        h += '<div class="ag-h">NAME \u00b7 HCP</div><div class="ag-in"><input id="ag-name" type="text" placeholder="Name" autocomplete="off" autocapitalize="words" value="' + esc(S.name) + '">'
+            + '<button type="button" class="ag-plus' + (plus ? ' on' : '') + '" data-ag="plus" aria-label="Plus handicap" aria-pressed="' + plus + '">+</button>'
+            + '<input id="ag-hcp" type="text" inputmode="decimal" placeholder="HCP" autocomplete="off" value="' + esc(S.hcp.replace(/^\+/, '')) + '"></div>'
+            + '<div class="ag-note" style="margin:6px 2px 0;">A plus handicap: tap <b>+</b> (or type +2).</div>';
+        if (gs.length > 1) h += '<div class="ag-h">GROUP</div><div class="ag-chips">' + gs.map(function (b) { return '<button type="button" class="ag-chip' + (S.group === b.group ? ' on' : '') + '" data-ag-group="' + b.group + '">Group ' + b.group + '</button>'; }).join('') + '</div>';
+        h += teeRowsHtml();
+        h += '<div class="ag-h">IN THE ROUND</div><div class="ag-chips">'
+            + '<button type="button" class="ag-chip' + (!S.out ? ' on' : '') + '" data-ag="in">Playing</button>'
+            + '<button type="button" class="ag-chip' + (S.out ? ' on' : '') + '" data-ag="out">Out of the round</button></div>'
+            + (S.out ? '<div class="ag-note" style="margin:6px 2px 0;">Out: their scores stay on the record; they are out of the pot and every payout for the whole field.</div>' : '');
+        var m = editMoney();
+        if (m) h += '<div class="ag-note" id="ag-money" style="margin:10px 2px 0;font-weight:700;color:#0f4c3a;">' + esc(m) + '</div>';
+        h += (S.err ? '<div class="ag-err" role="alert">' + esc(S.err) + '</div>' : '')
+            + '<button type="button" class="ag-cta" data-ag="saveedit"' + (S.saving ? ' disabled' : '') + '>' + (S.saving ? 'Saving\u2026' : 'Save') + '</button></div>';
+        e.innerHTML = h;
+        var pn = e.querySelector('.ag-panel'); if (pn) pn.scrollTop = y;
+    }
+    // ---- THE GOLFERS LIST (Round settings > Golfers): each golfer -> Edit; + Add golfer ------
+    function hcpLabel(p) { try { return typeof golferHandicapLabel === 'function' ? golferHandicapLabel(p) : 'HCP ' + (p.hcp || 0); } catch (e) { return 'HCP ' + (p.hcp || 0); } }   /* global golferHandicapLabel */
+    function renderList() {
+        var e = root(), y = e.querySelector('.ag-panel') ? e.querySelector('.ag-panel').scrollTop : 0;
+        var ps = (data() || {}).players || [], gs = bounds();
+        var h = '<div class="ag-scrim" data-ag="close"></div><div class="ag-panel"><div class="ag-grab"></div>'
+            + '<div class="ag-top"><h2>Golfers</h2><button type="button" class="ag-x" data-ag="close" aria-label="Close">\u2715</button></div>';
+        gs.forEach(function (b) {
+            if (gs.length > 1) h += '<div class="ag-h">GROUP ' + b.group + '</div>';
+            else h += '<div class="ag-h">' + ps.length + ' GOLFER' + (ps.length === 1 ? '' : 'S') + '</div>';
+            for (var i = b.startIdx; i < b.startIdx + b.size; i++) {
+                var p = ps[i]; if (!p) continue;
+                var tk = p.tee ? playerTeeKey(p) : '', own = tk && tk !== roundTeeKey(S.tees || []) ? teeName(tk) || (p.tee && p.tee.teeName) : '';
+                h += '<button type="button" class="ag-row" data-ag-edit="' + esc(p.id) + '"' + (p.out === true ? ' style="opacity:.6;"' : '') + '><span><span class="n"' + (p.out === true ? ' style="text-decoration:line-through;"' : '') + '>' + esc(p.name) + '</span>'
+                    + '<span class="s">' + esc(hcpLabel(p)) + (own ? ' \u00b7 ' + esc(own) : '') + (p.out === true ? ' \u00b7 Out' : '') + '</span></span><span class="s">Edit \u203a</span></button>';
+            }
+        });
+        h += (S.err ? '<div class="ag-err" role="alert">' + esc(S.err) + '</div>' : '')
+            + '<button type="button" class="ag-cta" data-ag="toadd">+ Add golfer</button></div>';
+        e.innerHTML = h;
+        var pn = e.querySelector('.ag-panel'); if (pn) pn.scrollTop = y;
+    }
+    function startEdit(id, from) {
+        var p = playerById(id);
+        if (!p) return false;
+        S.mode = 'edit'; S.edit = String(p.id); S.from = from || null; S.err = ''; S.saving = false;
+        S.name = String(p.name || ''); S.hcp = shownHcp(p); S.out = p.out === true; S.group = groupOfId(p.id);
+        S.tee = playerTeeKey(p); S.teeWas = S.tee; S.teePicked = false;
+        render();
+        return true;
+    }
+    function saveEdit() {
+        if (S.saving) return;
+        if (!organizer()) { S.err = 'Only the round\u2019s organizer can change golfers.'; render(); return; }
+        if (typeof buildPlayersUpdate !== 'function' || typeof rosterSignature !== 'function' || !dbr() || !code()) { S.err = 'This page cannot change golfers.'; render(); return; }
+        if (typeof requireOnlineForMoney === 'function' && !requireOnlineForMoney('NOT SAVED', 'Reconnect before changing the players.')) return;
+        var id = S.edit, before = rosterSignature((data() || {}).players), draft = editDraft(), rt = roundTeeKey(S.tees || []);
+        var teeChanged = !!(S.tee && S.teeWas && S.tee !== S.teeWas), newTee = teeChanged ? (S.tee === rt ? null : teeObj(S.tee)) : undefined;
+        var typed = S.hcp.trim();
+        S.saving = true; S.err = ''; render();
+        dbr().ref('events/' + code()).once('value').then(function (snap) {
+            var fresh = (snap && snap.val()) || {};
+            if (rosterSignature(fresh.players) !== before) throw new Error('The roster changed on another phone \u2014 close this and try again.');
+            var merged = Object.assign({}, data(), fresh);
+            var idx = (merged.players || []).map(function (p) { return String(p.id); }).indexOf(String(id));
+            if (idx < 0) throw new Error('That golfer is no longer in the round.');
+            draft.edits[0].idx = idx;
+            var u = buildPlayersUpdate(merged, draft);
+            if (u.refused) throw new Error(u.refused);
+            var updates = u.updates || {};
+            // THE GOLFER'S OWN TEE: recorded (player-tees.js reads p.tee); on a GHIN round the Index
+            // is converted from THAT tee (or the round's, back on it) - the Add sheet's rule.
+            if (teeChanged) {
+                var basis = typeof handicapBasisOf === 'function' ? handicapBasisOf(merged) : 'ghin-index';
+                var p0 = merged.players[idx];
+                var idxText = typed !== shownHcp(p0) ? typed : String(p0.handicapIndex != null && String(p0.handicapIndex).trim() !== '' ? p0.handicapIndex : '');
+                var conv = basis === 'ghin-index' && idxText !== '' && typeof convertHandicapIndex === 'function' ? convertHandicapIndex(idxText, newTee || merged.teeRating || null) : null;
+                if (u.whole && updates.players) {
+                    var wp = updates.players.filter(function (q) { return String(q.id) === String(id); })[0];
+                    if (wp) {
+                        if (newTee) wp.tee = newTee; else delete wp.tee;
+                        if (conv && conv.ok) { wp.hcp = conv.playingText; wp.handicapIndex = conv.indexText; wp.courseHandicap = conv.course; delete wp.handicapUnconverted; }
+                    }
+                } else {
+                    updates['players/' + idx + '/tee'] = newTee || null;
+                    if (conv && conv.ok) {
+                        updates['players/' + idx + '/hcp'] = conv.playingText; updates['players/' + idx + '/handicapIndex'] = conv.indexText;
+                        updates['players/' + idx + '/courseHandicap'] = conv.course; updates['players/' + idx + '/handicapUnconverted'] = null;
+                    }
+                }
+            } else if (!u.changed) return { nothing: true };
+            return dbr().ref('events/' + code()).update(updates).then(function () { return { warnings: u.warnings || [] }; });
+        }).then(function (res) {
+            S.saving = false;
+            var from = S.from;
+            if (res && res.warnings && res.warnings.length) say(res.warnings.join(' \u00b7 '));
+            else if (!(res && res.nothing)) say('Saved');
+            if (from === 'list') { S.mode = 'list'; S.edit = null; setTimeout(render, 0); }
+            else close();
+            setTimeout(function () { try { if (W.HardPanBet && W.HardPanBet.redraw) W.HardPanBet.redraw(); } catch (e) {} }, 0);
+        }, function (err) {
+            S.saving = false;
+            S.err = 'NOT SAVED \u2014 ' + ((err && err.message) || 'try again');
+            render();
+        });
+    }
     function take() {
         var n = S.name.trim();
         if (!n) return false;
@@ -244,20 +379,26 @@
         if (t.id === 'ag-name') S.name = t.value;
         else if (t.id === 'ag-hcp') { var v = String(t.value || '').trim(); S.hcp = /^\+/.test(v) ? v : (/^\+/.test(S.hcp) && v ? '+' + v : v); if (/^\+/.test(v)) { t.value = v.slice(1); render(); var h = D.getElementById('ag-hcp'); if (h) { h.focus(); h.setSelectionRange(h.value.length, h.value.length); } } }
         else if (t.id === 'ag-paste') S.pasteText = t.value;
+        if (S.mode === 'edit') { var mo = D.getElementById('ag-money'), mt = editMoney(); if (mo) mo.textContent = mt; return; }
         var cta = D.querySelector('#hp-addg [data-ag="save"]');
         if (cta && !S.saving) { var n = S.list.length + (S.name.trim() ? 1 : 0); cta.disabled = !n; cta.textContent = n > 1 ? 'Add ' + n + ' golfers' : 'Add'; }
     }
     function onClick(ev) {
         var t = ev.target && ev.target.closest ? ev.target : null, b;
         if (!t) return;
-        if ((b = t.closest('[data-ag-tee]'))) { S.tee = b.getAttribute('data-ag-tee'); render(); return; }
+        if ((b = t.closest('[data-ag-tee]'))) { S.tee = b.getAttribute('data-ag-tee'); S.teePicked = true; render(); return; }
         if ((b = t.closest('[data-ag-group]'))) { S.group = Number(b.getAttribute('data-ag-group')); render(); return; }
         if ((b = t.closest('[data-ag-chip]'))) { S.list.push({ name: b.getAttribute('data-ag-chip'), hcp: b.getAttribute('data-ag-chcp') || '', tee: roundTeeKey(S.tees || []) }); S.err = ''; render(); return; }
         if ((b = t.closest('[data-ag-drop]'))) { S.list.splice(Number(b.getAttribute('data-ag-drop')), 1); render(); return; }
+        if ((b = t.closest('[data-ag-edit]'))) { startEdit(b.getAttribute('data-ag-edit'), 'list'); return; }
         b = t.closest('[data-ag]');
         if (!b) return;
         var a = b.getAttribute('data-ag');
         if (a === 'close') { close(); return; }
+        if (a === 'tolist') { S.mode = 'list'; S.err = ''; S.list = []; S.name = ''; S.hcp = ''; render(); return; }
+        if (a === 'toadd') { S.mode = 'add'; S.from = 'list'; S.err = ''; S.list = []; S.name = ''; S.hcp = ''; S.group = myGroup(); S.tee = roundTeeKey(S.tees || []); render(); focusName(); return; }
+        if (a === 'in' || a === 'out') { S.out = a === 'out'; render(); return; }
+        if (a === 'saveedit') { saveEdit(); return; }
         if (a === 'plus') { var raw = S.hcp.replace(/^\+/, ''); S.hcp = /^\+/.test(S.hcp) ? raw : '+' + raw; render(); return; }
         if (a === 'another') { if (!take()) { S.err = 'Type a name first.'; render(); focusName(); return; } S.err = ''; render(); focusName(); return; }
         if (a === 'paste') { S.paste = true; render(); loadPaste(function () {}); setTimeout(function () { var p = D.getElementById('ag-paste'); if (p) p.focus(); }, 30); return; }
@@ -320,8 +461,8 @@
             return dbr().ref('events/' + code()).update(u.updates).then(function () { return list; });
         }).then(function (added) {
             S.saving = false;
-            var cb = S.onDone;
-            close();
+            var cb = S.onDone, from = S.from;
+            if (from === 'list') { S.mode = 'list'; S.list = []; S.name = ''; S.hcp = ''; setTimeout(render, 0); } else close();
             say(added.length > 1 ? 'Added ' + added.length + ' golfers' : 'Added ' + added[0].name);
             if (typeof cb === 'function') { try { cb(added); } catch (e) {} }
             // Whatever was under the sheet shows them: the + Bet chips redraw (the card redraws on
@@ -339,13 +480,33 @@
     function open(opts) {
         var o = opts || {};
         if (!data() || !code()) return false;
-        S = { open: true, list: [], name: o.name || '', hcp: '', tee: '', group: o.group || myGroup(), err: '', saving: false, paste: false, pasteText: '', tees: S.tees, chips: null, onDone: o.onDone || null };
+        S = { open: true, mode: 'add', why: o.why || '', from: null, edit: null, out: false, list: [], name: o.name || '', hcp: '', tee: '', group: o.group || myGroup(), err: '', saving: false, paste: false, pasteText: '', tees: S.tees, chips: null, onDone: o.onDone || null };
         if (S.tees && S.tees.length) S.tee = roundTeeKey(S.tees);
         loadTees(); loadChips();
         render();
         root().classList.add('open');
         if (!organizer()) { S.err = 'Only the round’s organizer can add golfers.'; render(); }
         focusName();
+        return true;
+    }
+    // EDIT ONE GOLFER in place (a tap on a golfer's name on the card, or a row of the Golfers list).
+    function openEdit(id) {
+        if (!data() || !code() || !playerById(id)) return false;
+        S = { open: true, mode: 'edit', from: null, edit: null, out: false, list: [], name: '', hcp: '', tee: '', group: 1, err: '', saving: false, paste: false, pasteText: '', tees: S.tees, chips: S.chips, onDone: null };
+        loadTees();
+        root().classList.add('open');
+        startEdit(id, null);
+        if (!organizer()) { S.err = 'Only the round\u2019s organizer can change golfers.'; render(); }
+        return true;
+    }
+    // THE GOLFERS LIST (Round settings > Golfers): every golfer -> Edit, and + Add golfer.
+    function openGolfers() {
+        if (!data() || !code()) return false;
+        S = { open: true, mode: 'list', from: null, edit: null, out: false, list: [], name: '', hcp: '', tee: '', group: myGroup(), err: '', saving: false, paste: false, pasteText: '', tees: S.tees, chips: null, onDone: null };
+        loadTees(); loadChips();
+        root().classList.add('open');
+        render();
+        if (!organizer()) { S.err = 'Only the round\u2019s organizer can change golfers.'; render(); }
         return true;
     }
     function close() { S.open = false; var e = D.getElementById('hp-addg'); if (e) { e.classList.remove('open'); e.innerHTML = ''; } }
@@ -366,10 +527,41 @@
         ev.preventDefault(); ev.stopPropagation();
         open();
     }, true);
+    // A TAP ON A GOLFER'S NAME ON THE CARD (Hole View row / Full Card header): Edit golfer, in
+    // place - the organizer only. The card labels golfers with shortPlayerLabels over the golfers
+    // it shows (the link's group); the same labels find the golfer back.
+    function shownPlayers() {
+        var ps = (data() || {}).players || [];
+        try {
+            if (typeof hasGroupLock !== 'undefined' && hasGroupLock && lockedGroup) {
+                var b = bounds().filter(function (x) { return x.group === Number(lockedGroup); })[0];
+                if (b) return ps.slice(b.startIdx, b.startIdx + b.size);
+            }
+        } catch (e) {}
+        return ps;
+    }
+    function idForLabel(label) {
+        var list = shownPlayers(), labels;
+        try { labels = typeof shortPlayerLabels === 'function' ? shortPlayerLabels(list) : list.map(function (p) { return p.name; }); } catch (e) { labels = list.map(function (p) { return p.name; }); }   /* global shortPlayerLabels */
+        var i = labels.map(function (l) { return String(l).trim(); }).indexOf(String(label).trim());
+        if (i < 0) { var byName = list.filter(function (p) { return String(p.name).trim() === String(label).trim(); }); return byName.length === 1 ? byName[0].id : null; }
+        return list[i] ? list[i].id : null;
+    }
+    D.addEventListener('click', function (ev) {
+        if (!on() || !organizer() || isOpen()) return;
+        var t = ev.target && ev.target.closest ? ev.target : null;
+        var hv = t ? t.closest('.hv-player-name') : null, fc = t ? t.closest('th[data-player-name]') : null;
+        if (!hv && !fc) return;
+        var label = fc ? fc.getAttribute('data-player-name') : (hv.firstChild && hv.firstChild.nodeType === 3 ? hv.firstChild.nodeValue : '');
+        var id = label ? idForLabel(label) : null;
+        if (id == null) return;
+        ev.preventDefault(); ev.stopPropagation();
+        openEdit(id);
+    }, true);
     // BACK (GolfBack): the sheet closes first.
     try {
         if (W.GolfBack && typeof W.GolfBack.register === 'function') W.GolfBack.register({ name: 'hp-addgolfer', priority: 3, isOpen: isOpen, close: close });
     } catch (e) {}
 
-    W.HardPanAddGolfer = { open: open, close: close, isOpen: isOpen, myGroup: myGroup, _teeRowsOf: teeRowsOf };
+    W.HardPanAddGolfer = { open: open, openEdit: openEdit, openGolfers: openGolfers, close: close, isOpen: isOpen, myGroup: myGroup, _teeRowsOf: teeRowsOf };
 })();
