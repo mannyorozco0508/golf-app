@@ -309,7 +309,11 @@
     }
     function courseList() {
         var base = allCourses(), gc = crShared();
-        var sig = base.length + '|' + Object.keys(gc).length + '|' + Object.keys(GPSK.links || {}).length + '|' + Object.keys(GPSK.gc || {}).length + '|' + (C.list === base ? 1 : 0);
+        // The GPS answers change when the GolfAPI courses land (the app's file, a course pulled or read
+        // later, the GPS settings): part of the cache key, so an early ask never leaves them stale (022 Sun).
+        var ga = W.HardPanGolfApi || {}, cfgs = W.HARDPAN_GPS_CONFIG ? 1 : 0;
+        var sig = base.length + '|' + Object.keys(gc).length + '|' + Object.keys(GPSK.links || {}).length + '|' + Object.keys(GPSK.gc || {}).length + '|' + (C.list === base ? 1 : 0)
+            + '|' + Object.keys(ga.courses || {}).length + '|' + Object.keys(ga.links || {}).length + '|' + cfgs + '|' + (live() ? 1 : 0) + '|' + (W.HardPanGeo ? 1 : 0);
         if (CR.rows && CR.sig === sig && CR.base === base) return CR.rows;
         var out = base.filter(function (c) { return c.key; }).map(function (c) { return Object.assign({}, c); }), have = {}, alias = {};
         out.forEach(function (c) { have[c.key] = 1; });
