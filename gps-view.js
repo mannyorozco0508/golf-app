@@ -4637,14 +4637,19 @@
         var take = function (c, s) { if (!out.city && clStr(c)) out.city = clStr(c); if (!out.state && clStr(s)) out.state = clStr(s); };
         var r = (S && S.round) || {}, key = S && S.courseKey;
         take(r.courseCity, r.courseState);
-        // A GolfAPI course (gps_courses / the app's file): the record the map draws names its ids.
+        // A GolfAPI course (gps_courses / the app's file): read as they are - the record the map already
+        // matched (S.gaCache), the key's own id (gapi_<id>) or its link. Never asks the resolver or the
+        // matcher here: an early ask would fill their caches before the course data is in (URGENT-030).
         try {
-            var rec = golfapiFor(key), d = window.HardPanGolfApi;
-            ((rec && rec.golfapiIds) || []).forEach(function (id) { var c = d && d.courses && d.courses[String(id).split('#')[0]]; if (c) take(c.city, c.state); });
+            var d = window.HardPanGolfApi, ids = [];
+            var rec = S && S.gaCache && S.gaCache.v;
+            if (rec && rec.golfapiIds) ids = ids.concat(rec.golfapiIds);
+            var m = /^gapi_(\d+)$/.exec(String(key || '')); if (m) ids.push(m[1]);
+            if (d && d.links && key && d.links[key]) ids.push(d.links[key]);
+            ids.forEach(function (id) { var c = d && d.courses && d.courses[String(id).split('#')[0]]; if (c) take(c.city, c.state); });
         } catch (e) {}
-        // The course resolver (directory rows, global_courses' location).
-        try { var CR = window.HardPanCourse, rv = CR && key ? CR.resolve({ key: key, name: r.courseName }) : null; if (rv) take(rv.city, rv.state); } catch (e) {}
-        // global_courses/<key>/location as read for the map (loadCourseLocation), or Course & Tees' copy.
+        // global_courses' own location fields (Round Setup's copy on this page, when it has one).
+        try { var gc = typeof globalCourses !== 'undefined' && globalCourses ? globalCourses[key] : null; if (gc && gc.location) take(gc.location.city, gc.location.state); } catch (e) {}   /* global globalCourses */
         if (S && S.coursePlace) take(S.coursePlace.city, S.coursePlace.state);
         if (key) {
             var c1 = lsGet(COURSE_LOC + key); if (c1) take(c1.city, c1.state);
@@ -4655,7 +4660,6 @@
     function courseLineNow() {
         if (!S || !S.round) return '';
         var nm = clStr(S.round.courseName);
-        if (!nm) { try { var CR = window.HardPanCourse, rv = CR && S.courseKey ? CR.resolve({ key: S.courseKey }) : null; nm = rv ? clStr(rv.name) : ''; } catch (e) {} }
         if (!nm) return '';
         // Kept once it has a place; without one, asked again at most every 5 s (the GolfAPI course
         // and the location read can land later).
