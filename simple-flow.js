@@ -199,7 +199,27 @@
             var loc = gc[k].location, lpt = loc && isFinite(Number(loc.latitude)) && isFinite(Number(loc.longitude)) && loc.latitude !== null ? [Number(loc.latitude), Number(loc.longitude)] : null;
             out.push({ key: k, name: gc[k].name, ready: ready(k), pt: pointOf(k) || (cov && cov.pt) || lpt, city: (cov && cov.city) || (loc && loc.city) || '', state: (cov && cov.state) || (loc && loc.state) || '' });
         });
-        return out;
+        // ONE ROW PER COURSE (URGENT-019/020 course check): the directory's own row for a course
+        // ("Talking Stick Golf Club (Piipaash)" - no tees) beside the shared record for the same
+        // course ("... (South - Piipaash)", its tees) listed it twice, and picked the one with no
+        // tees. The shared record stays (its tees, its card); it takes the directory row's GPS and
+        // place when it has none of its own.
+        var SH = /^(gca_|gapi_|comm_)/, club = function (n) { return nk(String(n).split('(')[0]); };
+        var part = function (n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? nk(m[1]).replace(/course$/, '') : ''; };
+        var H2 = HD(), near = function (a, b) { return !a.pt || !b.pt || typeof H2.miles !== 'function' || H2.miles(a.pt, b.pt) <= 0.5; };
+        var twin = function (a, b) {
+            if (club(a.name) !== club(b.name) || !near(a, b)) return false;
+            var x = part(a.name), y = part(b.name);
+            return x === y || (!!x && !!y && (x.indexOf(y) !== -1 || y.indexOf(x) !== -1));
+        };
+        return out.filter(function (e) {
+            if (SH.test(e.key)) return true;
+            var s2 = out.filter(function (o) { return SH.test(o.key) && twin(e, o); })[0];
+            if (!s2) return true;
+            if (!s2.ready && e.ready) s2.ready = true;
+            if (!s2.pt && e.pt) s2.pt = e.pt;
+            return false;
+        });
     }
     function nearList(here) {
         var H = HD();

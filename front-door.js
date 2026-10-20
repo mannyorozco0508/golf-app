@@ -112,7 +112,16 @@
     // GPS READY = what the GPS screen will actually draw. In the app (GPS LIVE) that is
     // GolfAPI data ONLY (gps-view osmRecord: "GolfAPI or nothing"): the bundled GolfAPI
     // file's links, or a course pulled before. On the web: the bundled OSM holes.
-    function live() { try { return !!(W.HardPanGpsLive && W.HardPanGpsLive.on()); } catch (e) { return false; } }
+    // URGENT-019: from the app's own settings when gps-live.js is not loaded yet - the course list
+    // can be worked out before it is (Round Setup loads it late), and then marked the directory's
+    // OpenStreetMap courses "✓ GPS" in the app, where the GPS screen never draws them ("isn't mapped").
+    function live() {
+        try {
+            if (W.HardPanGpsLive) return !!W.HardPanGpsLive.on();
+            var c = W.HARDPAN_GPS_CONFIG;
+            return !!(c && c.live === true && c.golfapi !== false && c.liveBase && (native() || c.liveTest));
+        } catch (e) { return false; }
+    }
     function golfapiLink(key) {
         var d = W.HardPanGolfApi, L = d && d.links;
         if (!L || !key) return null;
