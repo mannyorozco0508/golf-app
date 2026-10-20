@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		AA0220000000000000000007 /* HardPanRoundAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000001 /* HardPanRoundAttributes.swift */; };
+		AA0220000000000000000008 /* HardPanLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000004 /* HardPanLiveActivityPlugin.swift */; };
+		AA0220000000000000000009 /* HardPanBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000005 /* HardPanBridgeViewController.swift */; };
+		AA022000000000000000000A /* HardPanRoundAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000001 /* HardPanRoundAttributes.swift */; };
+		AA022000000000000000000B /* HardPanLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000002 /* HardPanLiveActivityWidget.swift */; };
+		AA022000000000000000000C /* HardPanLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000006 /* HardPanLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		C4B10A022F00000000000004 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = C4B10A012F00000000000004 /* GoogleService-Info.plist */; };
 		B1E7A0022F000000000001AB /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B1E7A0012F00000000000000 /* PrivacyInfo.xcprivacy */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
@@ -20,7 +26,37 @@
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		AA0220000000000000000014 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA022000000000000000000F;
+			remoteInfo = HardPanLiveActivity;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AA0220000000000000000013 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA022000000000000000000C /* HardPanLiveActivity.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		AA0220000000000000000001 /* HardPanRoundAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanRoundAttributes.swift; sourceTree = "<group>"; };
+		AA0220000000000000000002 /* HardPanLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanLiveActivityWidget.swift; sourceTree = "<group>"; };
+		AA0220000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AA0220000000000000000004 /* HardPanLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanLiveActivityPlugin.swift; sourceTree = "<group>"; };
+		AA0220000000000000000005 /* HardPanBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanBridgeViewController.swift; sourceTree = "<group>"; };
+		AA0220000000000000000006 /* HardPanLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HardPanLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4B10A012F00000000000004 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		C4B10A032F00000000000004 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		C4B10A042F00000000000004 /* AppRelease.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AppRelease.entitlements; sourceTree = "<group>"; };
@@ -47,6 +83,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0220000000000000000011 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -55,6 +98,8 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				AA022000000000000000000E /* PhoneBridge */,
+				AA022000000000000000000D /* HardPanLiveActivity */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,6 +108,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				AA0220000000000000000006 /* HardPanLiveActivity.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -87,6 +133,25 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		AA022000000000000000000E /* PhoneBridge */ = {
+			isa = PBXGroup;
+			children = (
+				AA0220000000000000000005 /* HardPanBridgeViewController.swift */,
+				AA0220000000000000000004 /* HardPanLiveActivityPlugin.swift */,
+			);
+			path = PhoneBridge;
+			sourceTree = "<group>";
+		};
+		AA022000000000000000000D /* HardPanLiveActivity */ = {
+			isa = PBXGroup;
+			children = (
+				AA0220000000000000000001 /* HardPanRoundAttributes.swift */,
+				AA0220000000000000000002 /* HardPanLiveActivityWidget.swift */,
+				AA0220000000000000000003 /* Info.plist */,
+			);
+			path = HardPanLiveActivity;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -98,10 +163,12 @@
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
 				C4B10A052F00000000000004 /* Firebase config is for this app */,
+				AA0220000000000000000013 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AA0220000000000000000015 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -110,6 +177,23 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		AA022000000000000000000F /* HardPanLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0220000000000000000016 /* Build configuration list for PBXNativeTarget "HardPanLiveActivity" */;
+			buildPhases = (
+				AA0220000000000000000010 /* Sources */,
+				AA0220000000000000000011 /* Frameworks */,
+				AA0220000000000000000012 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HardPanLiveActivity;
+			productName = HardPanLiveActivity;
+			productReference = AA0220000000000000000006 /* HardPanLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -123,6 +207,10 @@
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
+						ProvisioningStyle = Automatic;
+					};
+					AA022000000000000000000F = {
+						CreatedOnToolsVersion = 26.0;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -144,6 +232,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				AA022000000000000000000F /* HardPanLiveActivity */,
 			);
 		};
 /* End PBXProject section */
@@ -161,6 +250,13 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0220000000000000000012 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -191,10 +287,30 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				AA0220000000000000000007 /* HardPanRoundAttributes.swift in Sources */,
+				AA0220000000000000000008 /* HardPanLiveActivityPlugin.swift in Sources */,
+				AA0220000000000000000009 /* HardPanBridgeViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0220000000000000000010 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA022000000000000000000A /* HardPanRoundAttributes.swift in Sources */,
+				AA022000000000000000000B /* HardPanLiveActivityWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AA0220000000000000000015 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA022000000000000000000F /* HardPanLiveActivity */;
+			targetProxy = AA0220000000000000000014 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -373,6 +489,56 @@
 			};
 			name = Release;
 		};
+		AA0220000000000000000017 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 16;
+				DEVELOPMENT_TEAM = A2Z95T64UU;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HardPanLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rattlegolf.gpsbeta.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		AA0220000000000000000018 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 16;
+				DEVELOPMENT_TEAM = A2Z95T64UU;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = HardPanLiveActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.2;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rattlegolf.gpsbeta.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -390,6 +556,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA0220000000000000000016 /* Build configuration list for PBXNativeTarget "HardPanLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0220000000000000000017 /* Debug */,
+				AA0220000000000000000018 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
