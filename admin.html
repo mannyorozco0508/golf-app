@@ -8880,6 +8880,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (rating) rating.value = opt.getAttribute('data-rating') || '';
         if (par) par.value = opt.getAttribute('data-par') || '';
         syncTeeAdjustRow();
+        // POLISH #1: the golfers who have no tee of their own are on the round's tee.
+        if (typeof rowTeesFollowRound === 'function') rowTeesFollowRound();
         refreshHandicapNote();
     }
 
@@ -8969,6 +8971,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // Help me set this up, Edit Round Setup, a trip round and a paste -
         // rather than six call sites each remembering to do it.
         if (typeof refreshRowTeeControls === 'function') refreshRowTeeControls();
+        if (typeof rowTeesFollowRound === 'function') rowTeesFollowRound();
     }
 
     function handicapReviewLine() {
@@ -9657,15 +9660,32 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (row.querySelector('.p-tee-input')) return;
             const line = row.querySelector('.p-tee-line');
             if (line) line.remove();
-            appendTeeControl(row, row.getAttribute('data-tee-key') || undefined);
+            // POLISH #1: only a golfer's OWN tee is put back; everyone else takes the round's.
+            const own = row.getAttribute('data-tee-own') === '1';
+            appendTeeControl(row, own ? (row.getAttribute('data-tee-key') || undefined) : undefined,
+                own ? (row.getAttribute('data-tee-name') || undefined) : undefined);
         });
     }
 
-    function appendTeeControl(row, teeKey) {
-        const src = document.getElementById('tee-rating-select');
-        if (!src || !src.options || src.options.length < 2) return;
-        const sel = document.createElement('select');
-        sel.className = 'p-tee-input';
+    // POLISH #1 (029: the golfer was saved on Black at Papago with White picked, and on
+    // Papago's "Men · Black 75/130" at Dobson, which has no Black tee).
+    //
+    // THE CAUSE. A row's tee dropdown is a COPY of the round select, taken when the row is
+    // built - and nothing ever touched it again: a tee tapped afterwards, or a different
+    // course picked, left the row on the old value (the first option, the tips) and the old
+    // course's options. The save reads the ROW, so the golfer was stored on that tee.
+    //
+    // THE RULE NOW. A row FOLLOWS the round tee unless the golfer was given a tee of their
+    // own (picked on the row, "Tee for everyone", "Name 6 Blue", or a saved round's own
+    // tee): data-tee-own. A new course rebuilds every row's options from the round select
+    // and puts everyone on the round's tee - tee keys are positions ("male:0"), so a tee
+    // from another course is never carried over. Display / setup only: the save and every
+    // handicap formula are unchanged; they simply read the right tee.
+    function teeOptionsSig(sel) {
+        return Array.prototype.map.call((sel && sel.options) || [], o => o.value + '|' + o.textContent).join('\n');
+    }
+    function fillRowTeeOptions(sel, src) {
+        sel.innerHTML = '';
         for (let i = 0; i < src.options.length; i++) {
             const o = src.options[i];
             const opt = document.createElement('option');
@@ -9677,16 +9697,85 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             });
             sel.appendChild(opt);
         }
+    }
+    function teeCourseNow() {
+        const c = document.getElementById('course-select');
+        return c ? String(c.value || '') : '';
+    }
+    // A golfer's own tee, on THIS course's options: the key when that option still carries
+    // the tee's name (a copied round from another course carries Papago's "Men · Black"
+    // under a key that means something else here), else the option with that name, else none.
+    function ownTeeKeyHere(sel, teeKey, teeName) {
+        if (!teeKey && !teeName) return '';
+        const opts = Array.prototype.slice.call(sel.options || []);
+        const byKey = teeKey ? opts.filter(o => o.value === teeKey)[0] : null;
+        const nm = String(teeName || '').trim();
+        if (byKey && (!nm || String(byKey.textContent || '').trim() === nm)) return byKey.value;
+        const byName = nm ? opts.filter(o => String(o.textContent || '').trim() === nm)[0] : null;
+        return byName ? byName.value : '';
+    }
+    function rowTeesFollowRound() {
+        const src = document.getElementById('tee-rating-select');
+        const list = document.getElementById('player-list');
+        if (!src || !list || !src.options || src.options.length < 2) return;
+        const sig = teeOptionsSig(src), course = teeCourseNow();
+        Array.from(list.querySelectorAll('.player-row')).forEach((row) => {
+            const sel = row.querySelector('.p-tee-input');
+            if (!sel) return;
+            let own = row.getAttribute('data-tee-own') === '1';
+            if (teeOptionsSig(sel) !== sig) {
+                const sameCourse = course && row.getAttribute('data-tee-course') === course;
+                const cur = Array.prototype.filter.call(sel.options, o => o.value === sel.value)[0];
+                const keep = own && sameCourse && cur ? ownTeeKeyHere(sel, sel.value, cur.textContent) : '';
+                fillRowTeeOptions(sel, src);
+                const k = keep ? ownTeeKeyHere(sel, keep, '') : '';
+                own = !!k;
+                sel.value = k || src.value || '';
+                row.setAttribute('data-tee-course', course);
+                if (own) row.setAttribute('data-tee-own', '1');
+                else { row.removeAttribute('data-tee-own'); row.removeAttribute('data-tee-name'); }
+                row.setAttribute('data-tee-key', sel.value || '');
+                syncTeeShort(sel);
+                return;
+            }
+            if (own) return;
+            if (src.value && sel.value !== src.value) {
+                sel.value = src.value;
+                row.setAttribute('data-tee-key', src.value);
+                syncTeeShort(sel);
+            }
+        });
+    }
+
+    function appendTeeControl(row, teeKey, teeName) {
+        // A tee handed over before the tees are here stays on the row, marked as the golfer's own.
+        if (teeKey) {
+            row.setAttribute('data-tee-key', teeKey);
+            row.setAttribute('data-tee-own', '1');
+            if (teeName) row.setAttribute('data-tee-name', String(teeName));
+        }
+        const src = document.getElementById('tee-rating-select');
+        if (!src || !src.options || src.options.length < 2) return;
+        const sel = document.createElement('select');
+        sel.className = 'p-tee-input';
+        fillRowTeeOptions(sel, src);
         // A new golfer takes "Tee for everyone" when it has been set; otherwise the round's tee.
         const everyone = document.getElementById('tee-everyone');
         const everyoneKey = (everyone && everyone.value && Array.prototype.some.call(sel.options, o => o.value === everyone.value)) ? everyone.value : '';
-        const want = (teeKey && Array.prototype.some.call(sel.options, o => o.value === teeKey))
-            ? teeKey : (everyoneKey || src.value || '');
+        const ownKey = ownTeeKeyHere(sel, teeKey, teeName);
+        const want = ownKey || everyoneKey || src.value || '';
         sel.value = want;
         // ON THE ROW, so refreshRowTeeControls can put the same tee back when it
         // builds a control for a row that had none.
         row.setAttribute('data-tee-key', want || '');
-        sel.addEventListener('change', function () { row.setAttribute('data-tee-key', sel.value || ''); });
+        row.setAttribute('data-tee-course', teeCourseNow());
+        if (ownKey || everyoneKey) row.setAttribute('data-tee-own', '1');
+        else { row.removeAttribute('data-tee-own'); row.removeAttribute('data-tee-name'); }
+        sel.addEventListener('change', function () {
+            row.setAttribute('data-tee-key', sel.value || '');
+            row.setAttribute('data-tee-own', '1');
+            row.removeAttribute('data-tee-name');
+        });
         sel.onchange = function () { syncTeeShort(sel); if (typeof refreshHandicapNote === 'function') refreshHandicapNote(); };
         sel.setAttribute('aria-label', 'Tee');
         // COMPACT: the tee is the 4th column of the row. The closed control shows a
@@ -9757,6 +9846,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (!sel || !Array.prototype.some.call(sel.options, o => o.value === key)) return;
             sel.value = key;
             row.setAttribute('data-tee-key', key);
+            row.setAttribute('data-tee-own', '1');
+            row.removeAttribute('data-tee-name');
             syncTeeShort(sel);
         });
         if (typeof refreshHandicapNote === 'function') refreshHandicapNote();
@@ -10022,9 +10113,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // off the attribute rather than the select because
             // refreshRowTeeControls uses that attribute to restore a tee when it
             // builds a control for a row that had none.
-            const teeKeyOnRow = row.getAttribute('data-tee-key')
-                || (row.querySelector('.p-tee-input') ? row.querySelector('.p-tee-input').value : '');
-            if (teeKeyOnRow) entry.tee = { teeKey: teeKeyOnRow };
+            // POLISH #1: only a golfer's OWN tee rides along; a row that follows the round
+            // tee is rebuilt on the round tee, which is the same tee - and stays current.
+            const teeSelOnRow = row.querySelector('.p-tee-input');
+            const teeKeyOnRow = row.getAttribute('data-tee-own') === '1'
+                ? (row.getAttribute('data-tee-key') || (teeSelOnRow ? teeSelOnRow.value : '')) : '';
+            if (teeKeyOnRow) {
+                const teeOpt = teeSelOnRow ? Array.prototype.filter.call(teeSelOnRow.options, o => o.value === teeKeyOnRow)[0] : null;
+                const teeNameOnRow = teeOpt ? String(teeOpt.textContent || '') : (row.getAttribute('data-tee-name') || '');
+                entry.tee = teeNameOnRow ? { teeKey: teeKeyOnRow, teeName: teeNameOnRow } : { teeKey: teeKeyOnRow };
+            }
             list.push(entry);
         });
         return list;
@@ -10239,7 +10337,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function appendPlayerFrom(p, fromSaved, total) {
         const shown = (fromSaved && p.handicapIndex != null && String(p.handicapIndex).trim() !== '')
             ? String(p.handicapIndex) : (p.hcp || '');
-        addPlayerRow(p.name, shown, p.team, p.squad, false, p.playingForMoney !== false, total, true, p.id, p.flight, p.tee && p.tee.teeKey);
+        addPlayerRow(p.name, shown, p.team, p.squad, false, p.playingForMoney !== false, total, true, p.id, p.flight, p.tee && p.tee.teeKey, p.tee && p.tee.teeName);
         const list = document.getElementById('player-list');
         const row = list ? list.lastElementChild : null;
         if (!row) return;
@@ -12583,7 +12681,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match', 'stableford'];
 
-    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined, teeKey = undefined) {
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined, teeKey = undefined, teeName = undefined) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         // When rebuilding the whole list at once (renderPlayerList's loop), currentCount only
@@ -12697,7 +12795,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // Always on the second line in the compact list (asLine = true).
         if (flightsOn) appendFlightControl(row, flight, true);
         void flightAsLine;
-        appendTeeControl(row, teeKey);
+        appendTeeControl(row, teeKey, teeName);
         appendOrderControl(row);
         compactExtraLine(row);
         attachRowDrag(row);
