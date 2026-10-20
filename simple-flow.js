@@ -172,7 +172,11 @@
         if (!W.HardPanGolfApi && !W.__fdGolfApiTried) { W.__fdGolfApiTried = 1; need.push('gps-golfapi.js'); }
         (H.STATES || []).forEach(function (s) { if (!(W.HardPanGpsCoverage && W.HardPanGpsCoverage[s])) need.push('gps-coverage-' + s.toLowerCase() + '.js'); });
         var left = need.length;
-        var fin = function () { S.gpsFiles = true; done(); };
+        // URGENT-019 (Manny, 2:47 AM: Talking Stick "isn't mapped", from NEAR YOU): the course list
+        // is worked out ONCE (front-door allCourses) - and on the phone it was worked out before these
+        // files landed, so it never held the app's GolfAPI courses (Talking Stick South - Piipaash, ✓ GPS,
+        // Black / Gold / Jade) and its GPS-ready flags were all off. Worked out again once they are in.
+        var fin = function () { S.gpsFiles = true; if (typeof H.refreshCourses === 'function') H.refreshCourses(); S.near = S.here ? nearList(S.here) : S.near; done(); };
         if (!left || typeof H.loadScriptTimed !== 'function') { fin(); return; }
         need.forEach(function (src) { H.loadScriptTimed(src, function () { if (--left === 0) fin(); }); });
     }
@@ -192,7 +196,8 @@
         Object.keys(gc).forEach(function (k) {
             if (have[k] || !/^(gca_|gapi_|comm_)/.test(k) || !gc[k] || !gc[k].name) return;
             var cov = base.filter(function (c) { return !c.key && nk(c.name) === nk(gc[k].name); })[0];
-            out.push({ key: k, name: gc[k].name, ready: ready(k), pt: pointOf(k) || (cov && cov.pt) || null, city: (cov && cov.city) || '', state: (cov && cov.state) || '' });
+            var loc = gc[k].location, lpt = loc && isFinite(Number(loc.latitude)) && isFinite(Number(loc.longitude)) && loc.latitude !== null ? [Number(loc.latitude), Number(loc.longitude)] : null;
+            out.push({ key: k, name: gc[k].name, ready: ready(k), pt: pointOf(k) || (cov && cov.pt) || lpt, city: (cov && cov.city) || (loc && loc.city) || '', state: (cov && cov.state) || (loc && loc.state) || '' });
         });
         return out;
     }
@@ -203,6 +208,20 @@
         // 100 (a course with few neighbours still gets a list to choose from).
         var all = courses().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: H.miles(here, c.pt) }; })
             .filter(function (x) { return x.d <= 100; }).sort(function (a, b) { return a.d - b.d; });
+        // ONE ROW PER COURSE (URGENT-019): the directory's "Talking Stick Golf Club (Piipaash)" (no GPS on
+        // the phone, no tees) and the app's GolfAPI "Talking Stick Golf Club (South - Piipaash)" (✓ GPS,
+        // its tees) are one course: within half a mile, the same club, the one's (...) inside the other's.
+        // The row without GPS goes; a course with no GPS twin stays as it is (no ✓ GPS).
+        var club = function (n) { return nk(String(n).split('(')[0]); };
+        var part = function (n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? nk(m[1]).replace(/course$/, '') : ''; };
+        all = all.filter(function (x) {
+            if (x.c.ready) return true;
+            return !all.some(function (y) {
+                if (y === x || !y.c.ready || H.miles(x.c.pt, y.c.pt) > 0.5 || club(x.c.name) !== club(y.c.name)) return false;
+                var a = part(x.c.name), b = part(y.c.name);
+                return !a || !b || b.indexOf(a) !== -1 || a.indexOf(b) !== -1;
+            });
+        });
         var near = all.filter(function (x) { return x.d <= 25; });
         return (near.length >= 8 ? near : all).slice(0, 9);
     }
@@ -289,7 +308,10 @@
             S.cardWait = false;
             var pv = fn('previewCourseData') ? W.previewCourseData(key) : { ok: r.ok };
             if (!r.ok || !pv.ok) {
-                S[errKey] = 'No scorecard for ' + String(nm).split(' (')[0] + ' yet \u2014 tap "Not listed? Search online or add a course" to set it up, or pick another course.';
+                // URGENT-019 (Papago): not a dead end - the pars once (Round Setup's own scorecard entry,
+                // saved for everyone), then Start; on the map, "Tap the middle of the green" sets each green.
+                S[errKey] = String(nm).split(' (')[0] + ' has no scorecard in HardPan yet. Enter its pars once (about a minute, saved for everyone), then Start \u2014 or pick another course.';
+                S.noCard = key;
                 if (S.step !== 1) go(1); else render();
                 return;
             }
@@ -355,7 +377,7 @@
     }
     function teeList(key) {
         var rows = teeRows(key), sel = $('tee-rating-select');
-        if (!rows.length) return cardInHand(key) ? '' : '<div class="sf-h">TEES</div><div class="sf-note" style="margin:0 2px 12px;">Loading the course card\u2026</div>';
+        if (!rows.length) return cardInHand(key) || S.noCard === key ? '' : '<div class="sf-h">TEES</div><div class="sf-note" style="margin:0 2px 12px;">Loading the course card\u2026</div>';
         if (S.mode !== 'same') preferTee(key);
         return '<div class="sf-h">TEES</div>' + rows.map(function (r) {
             var on = sel && sel.value === r.key, col = teeColor(r.name);
@@ -438,6 +460,7 @@
         var ok = courseName() ? '' : ' disabled';
         var foot = S.mode === 'gps'
             ? '<button type="button" class="sf-cta lime" data-sf="startgps"' + (ok || (S.saving ? ' disabled' : '')) + '>' + (S.saving ? 'Starting…' : S.cardWait ? 'Loading the course card…' : '📍 Start GPS') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '')
+                + (S.noCard && S.noCard === courseKey() ? '<button type="button" class="sf-cta" data-sf="enterpars" style="margin-top:8px;">Enter the pars \u203a</button>' : '')
             : '<button type="button" class="sf-cta" data-sf="next"' + (ok || (S.cardWait ? ' disabled' : '')) + '>' + (S.cardWait ? 'Loading the course card\u2026' : 'Next: Players \u203a') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '');
         return shell('Where are you playing?', body, foot, S.mode === 'gps' ? 0 : 1);
     }
@@ -992,6 +1015,7 @@
         if (a === 'startgps') { needCard('err1', startGps); return; }
         if (a === 'mix') { away(step('players'), 'Tees set'); return; }
         if (a === 'fullcourse') { away(step('course'), 'Course picked'); return; }
+        if (a === 'enterpars') { S.err1 = ''; S.noCard = null; away(step('course'), 'Pars entered'); return; }
         if (a === 'roster') { away(step('players'), 'Roster done'); return; }
         if (a === 'moregames') { apply(); away(step('action'), 'Games done'); return; }
         if (a === 'split') {
