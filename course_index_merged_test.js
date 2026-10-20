@@ -27,7 +27,7 @@ function rig(o) {
 }
 
 test('the index version moved, so every cached picker rebuilds once', () => {
-    assert.equal(IDX.COURSE_INDEX_VERSION, 2);
+    assert.equal(IDX.COURSE_INDEX_VERSION, 3);   // URGENT-024: once more for the Oct 19 hides
 });
 test('a cold read offers one Dobson Ranch (gca_zgkynkan) and never the merged one', async () => {
     const r = rig({});
@@ -36,7 +36,7 @@ test('a cold read offers one Dobson Ranch (gca_zgkynkan) and never the merged on
     assert.ok(!/gapi_0121324924309988/.test(r.store.v), 'the merged key is in the saved name index');
 });
 test('a cached index that sees the merged key as NEW does not add it', async () => {
-    const stored = JSON.stringify({ v: 2, at: 1000, names: { gca_zgkynkan: 'Dobson Ranch Golf Course', pebble: 'Pebble Beach' } });
+    const stored = JSON.stringify({ v: 3, at: 1000, names: { gca_zgkynkan: 'Dobson Ranch Golf Course', pebble: 'Pebble Beach' } });
     const r = rig({ stored, shallow: { gca_zgkynkan: true, gapi_0121324924309988: true, pebble: true } });
     await r.loader.load();
     assert.deepEqual(Object.keys(r.into).sort(), ['gca_zgkynkan', 'pebble']);

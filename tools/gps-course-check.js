@@ -58,10 +58,20 @@ const GEO = (p) => "if (/index\\.html$/.test(location.pathname)) (function(){ va
 // SLOW=ms: the course's GPS data (gps_links / gps_courses) arrives late, as on a phone that just set it up.
 const SLOWGPS = (ms) => !ms ? '' : "(function(){ var t = setInterval(function () { if (!window.firebase || !firebase.database || firebase.__slowed) return; firebase.__slowed = 1; clearInterval(t); var d0 = firebase.database; firebase.database = function () { var d = d0.apply(this, arguments); if (d.__slow) return d; d.__slow = 1; var r = d.ref; d.ref = function (p) { var x = r.call(d, p), o = x.once; if (/^gps_(courses|links)\\/|^global_courses\\/[^/]+\\/location/.test(String(p))) x.once = function () { var a = arguments; return new Promise(function (res, rej) { setTimeout(function () { o.apply(x, a).then(res, rej); }, " + Number(ms) + "); }); }; return x; }; return d; }; }, 5); })();";
 
+// THE LIVE DATABASE RULES (URGENT-024: the phone failed where this passed - the stub applied none):
+// gps_links / gps_courses / course_gps are readable ONE CHILD AT A TIME (auth != null), never whole.
+const RULES = "(function(){ var t = setInterval(function () { if (!window.firebase || !firebase.database || firebase.__rules) return; firebase.__rules = 1; clearInterval(t); var d0 = firebase.database; firebase.database = function () { var d = d0.apply(this, arguments); if (d.__rules) return d; d.__rules = 1; var r = d.ref; d.ref = function (p) { var x = r.call(d, p); if (/^\\/?(gps_links|gps_courses|course_gps|gps_meta)\\/?$/.test(String(p))) { x.once = function () { window.__denied = (window.__denied || 0) + 1; return Promise.reject(new Error('PERMISSION_DENIED: Permission denied')); }; x.on = function (ev, ok, bad) { if (typeof bad === 'function') setTimeout(function () { bad(new Error('PERMISSION_DENIED')); }, 0); return ok; }; } return x; }; return d; }; }, 5); })();";
+
+// THE PHONE'S OLD COURSE INDEX (URGENT-024): a name index saved before the Oct 19 hides (version 2,
+// with the hidden "Talking Stick Golf Club (Piipaash Course)" etc.) - a phone that had it must not list them.
+const OLDINDEX = () => { const names = {}; Object.keys(DB.global_courses).forEach((k) => { const r = DB.global_courses[k]; if (r && r.name) names[k] = r.name; });
+    return "try{localStorage.setItem('golfapp-course-index-v1'," + JSON.stringify(JSON.stringify({ v: 2, at: Date.now() - 3600e3, names })) + ");}catch(e){}"; };
+
 async function check(c) {
     const out = { label: c.label, once: '', tees: '', card: '', gps: '', map: '', bet: '', same: '', one: '', badge: null, why: [] };
-    const j = await openJourney({ db: DB, viewport: { width: 393, height: 852 }, webgl: true,
-        preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + PHONE + SLOWGPS(process.env.SLOW) + GEO(c.golfer || (process.env.AWAY ? process.env.AWAY.split(',').map(Number) : c.at)) + "try{sessionStorage.setItem('hardpan_simple_flow','gps');}catch(e){}" });
+    const VIEW = (process.env.VIEW || '393x852').split('x').map(Number);
+    const j = await openJourney({ db: DB, viewport: { width: VIEW[0], height: VIEW[1] }, webgl: true,
+        preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + PHONE + RULES + OLDINDEX() + SLOWGPS(process.env.SLOW) + GEO(c.golfer || (process.env.AWAY ? process.env.AWAY.split(',').map(Number) : c.at)) + "try{sessionStorage.setItem('hardpan_simple_flow','gps');}catch(e){}" });
     const ev = (x) => j.evaluate(x);
     const until = async (x, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await ev(x)) return true; } catch (e) {} await sleep(250); } return false; };
     try {
@@ -145,6 +155,10 @@ async function check(c) {
             out.why = out.why.filter((w) => !/^GPS:|^map:|^note:/.test(w));
             if (!okNg) out.why.push('no-greens map: ' + out.map + ' ' + out.gps);
         }
+        // URGENT-023: nothing on the map covers the Plays-like pill (any visible control or pill overlapping it).
+        const ov = JSON.parse(await ev("(function(){ var p=document.querySelector('#gps-overlay .gps-ld-plays'); if(!p || !p.offsetParent) return JSON.stringify({ pill: false, hits: [] }); var r=p.getBoundingClientRect(); var hits=[]; Array.prototype.forEach.call(document.querySelectorAll('#gps-overlay button, #gps-overlay .gps-banner, #hp-card-bet, .hp-money-chip'), function(e){ if (e===p || p.contains(e) || e.contains(p) || !e.offsetParent) return; var cs=getComputedStyle(e); if (cs.visibility==='hidden' || cs.opacity==='0') return; var q=e.getBoundingClientRect(); if (q.width<2||q.height<2) return; var x=Math.min(r.right,q.right)-Math.max(r.left,q.left), y=Math.min(r.bottom,q.bottom)-Math.max(r.top,q.top); if (x>2 && y>2) hits.push((e.className||e.id||e.tagName).toString().slice(0,40) + ' ' + Math.round(x) + 'x' + Math.round(y)); }); return JSON.stringify({ pill: true, hits: hits }); })()"));
+        out.plays = !ov.pill ? 'n/a (no pill)' : (ov.hits.length ? 'FAIL (' + ov.hits.join('; ') + ')' : 'PASS');
+        if (/^FAIL/.test(out.plays)) out.why.push('Plays-like pill covered: ' + ov.hits.join('; '));
         // 7 (URGENT-022): the list's ✓ GPS says what the map does - one answer for both.
         const mapHasGps = c.noGreens ? false : /^PASS/.test(out.gps);
         out.same = (out.badge === mapHasGps ? 'PASS' : 'FAIL') + ` (list ${out.badge ? '✓ GPS' : 'no ✓'}, map ${mapHasGps ? 'GPS' : 'no GPS'})`;

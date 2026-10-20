@@ -136,33 +136,53 @@
     // besides the GolfAPI file and the OSM holes, a course linked to its GolfAPI GPS (gps_links -
     // Dobson, Legacy...) and a course whose greens golfers have set (course_gps). Read once, small.
     var GPSK = { links: null, own: null, gc: null, asked: false };
+    // URGENT-024 (Manny's phone: duplicates and no ✓ the Chrome check never saw): the database lets a
+    // signed-in phone read gps_links/<key> and gps_courses/<id> ONE AT A TIME - never the whole node
+    // (that read is refused; the test browser applied no rules). So: one small read per course of
+    // ours, then one per linked GolfAPI course, kept on the phone for 6 hours.
+    var GPSK_LS = 'hardpan_gpskeys_v1', GPSK_MS = 6 * 3600 * 1000;
     function loadGpsKeys(done, again) {
         var fin = typeof done === 'function' ? done : function () {};
-        if (again) { GPSK = { links: null, own: null, gc: null, asked: false }; }   // a course was just set up (URGENT-021)
-        if (GPSK.links && GPSK.own) { fin(); return; }
+        if (again) { GPSK = { links: null, own: null, gc: null, asked: false }; try { W.localStorage.removeItem(GPSK_LS); } catch (e) {} }
+        if (GPSK.links && GPSK.gc) { fin(); return; }
+        if (!again) {
+            try {
+                var kept = JSON.parse(W.localStorage.getItem(GPSK_LS) || 'null');
+                if (kept && kept.at && Date.now() - kept.at < GPSK_MS && kept.links && kept.gc) { GPSK.links = kept.links; GPSK.gc = kept.gc; GPSK.own = {}; C.list = null; CR.rows = null; GA.t = null; fin(); return; }
+            } catch (e) {}
+        }
         var d = null; try { d = W.firebase && W.firebase.database ? W.firebase.database() : null; } catch (e) { d = null; }
         if (!d || GPSK.asked) { fin(); return; }
         GPSK.asked = true;
-        var left = 3, end = function () { if (--left === 0) { C.list = null; CR.rows = null; GA.t = null; fin(); } };
-        var read = function (path, put) {
-            var t = setTimeout(function () { put({}); t = null; end(); }, 6000);
-            try {
-                d.ref(path).once('value').then(function (snap) { if (!t) return; clearTimeout(t); put((snap && snap.val && snap.val()) || {}); end(); },
-                    function () { if (!t) return; clearTimeout(t); put({}); end(); });
-            } catch (e) { clearTimeout(t); put({}); end(); }
-        };
-        read('gps_links', function (v) { GPSK.links = v; });
-        read('course_gps', function (v) { var o = {}; Object.keys(v || {}).forEach(function (k) { o[k] = 1; }); GPSK.own = o; });
-        // Every course set up online, for everyone (~50 KB): what the map will draw for a linked course.
-        read('gps_courses', function (v) {
-            var o = {};
-            Object.keys(v || {}).forEach(function (id) {
-                var c = v[id]; if (!c || !c.h) return;
-                var h = {}; Object.keys(c.h).forEach(function (n) { var x = c.h[n]; if (x && typeof x === 'object' && Number(n) >= 1) h[String(Number(n))] = x; });
-                o[id] = Object.assign({}, c, { h: h });
+        var one = function (path) {
+            return new Promise(function (res) {
+                var t = setTimeout(function () { res(null); }, 6000);
+                try { d.ref(path).once('value').then(function (snap) { clearTimeout(t); res((snap && snap.val && snap.val()) || null); }, function () { clearTimeout(t); res(null); }); }
+                catch (e) { clearTimeout(t); res(null); }
             });
-            GPSK.gc = o;
-        });
+        };
+        var keys = {}, KEY_OK = /^[A-Za-z0-9_-]{1,80}$/;
+        allCourses().forEach(function (c) { if (c.key && KEY_OK.test(c.key)) keys[c.key] = 1; });
+        Object.keys(crShared()).forEach(function (k) { if (KEY_OK.test(k)) keys[k] = 1; });
+        var links = {}, gc = {};
+        Promise.all(Object.keys(keys).map(function (k) { return one('gps_links/' + k).then(function (id) { if (id && /^\d{6,30}$/.test(String(id))) links[k] = String(id); }); }))
+            .then(function () {
+                // A GolfAPI course set up online is its own link (gapi_<id> -> <id>): Papago.
+                Object.keys(keys).forEach(function (k) { var m = /^gapi_(\d{6,30})$/.exec(k); if (m && !links[k]) links[k] = m[1]; });
+                var ids = {}; Object.keys(links).forEach(function (k) { ids[links[k]] = 1; });
+                return Promise.all(Object.keys(ids).map(function (id) {
+                    return one('gps_courses/' + id).then(function (c) {
+                        if (!c || !c.h) return;
+                        var h = {}; Object.keys(c.h).forEach(function (n) { var x = c.h[n]; if (x && typeof x === 'object' && Number(n) >= 1) h[String(Number(n))] = x; });
+                        gc[id] = Object.assign({}, c, { h: h });
+                    });
+                }));
+            })
+            .then(function () {
+                GPSK.links = links; GPSK.gc = gc; GPSK.own = {};
+                try { W.localStorage.setItem(GPSK_LS, JSON.stringify({ at: Date.now(), links: links, gc: gc })); } catch (e) {}
+                C.list = null; CR.rows = null; GA.t = null; fin();
+            }, function () { GPSK.links = links; GPSK.gc = gc; GPSK.own = {}; fin(); });
     }
     // ✓ GPS = WHAT THE MAP WILL DRAW (URGENT-022: one answer for the list and the map). gps-geo
     // courseGps is the map's own rule; here it reads the GolfAPI courses the phone has (the app's
@@ -306,7 +326,7 @@
         });
         // A GolfAPI copy set up for a course of ours that is linked to it: ours is the course.
         var links = GPSK.links || {}, linked = {};
-        Object.keys(links).forEach(function (k) { if (have[k] || gc[k]) linked[String(links[k])] = k; });
+        Object.keys(links).forEach(function (k) { if ((have[k] || gc[k]) && k !== 'gapi_' + links[k]) linked[String(links[k])] = k; });   // not a GolfAPI course's link to itself
         out = out.filter(function (o) { var m = /^gapi_(\d+)$/.exec(o.key); if (m && linked[m[1]] && linked[m[1]] !== o.key) { alias[o.key] = linked[m[1]]; return false; } return true; });
         // The directory's row beside the shared record for the same course: the shared one stays.
         var SH = /^(gca_|gapi_|comm_)/;
@@ -1256,6 +1276,9 @@
     function simpleView() {
         var v = $('v-simple');
         if (!v) return;
+        // URGENT-024: the build on this phone, at the foot of Home.
+        if (!$('hs-build')) { var bd = W.document.createElement('div'); bd.id = 'hs-build'; bd.style.cssText = 'text-align:center;font-size:12px;opacity:.6;margin:14px 0 4px;'; v.appendChild(bd); }
+        $('hs-build').textContent = 'Build: ' + String(W.HARDPAN_BUILD || 'dev (not a build)');
         var hi = $('hs-hello'); if (hi) hi.textContent = 'HardPan';
         // GPS-1 and Games (History) get a way back to this Home.
         ['gps', 'games'].forEach(function (n) {

@@ -72,6 +72,20 @@ FILES.filter((f) => f.endsWith('.html')).forEach((page) => {
 if (broken.length) { console.error('INCOMPLETE - do not sync:\n  ' + broken.join('\n  ')); process.exit(1); }
 console.log('gps-beta/www: ' + FILES.length + ' files (the Consumer app + ' + GPS.length + ' GPS files, GPS on)');
 
+// THE BUILD ID ON SCREEN (URGENT-024, Manny: "make the app show its build id" - which build is on the
+// phone). Branch + commit (+ "*" when the tree has uncommitted changes) + when, stamped into the built
+// gps-config.js only; the Round Menu and Home show it.
+try {
+    const cp = require('child_process');
+    const br = cp.execSync('git rev-parse --abbrev-ref HEAD', { cwd: ROOT }).toString().trim();
+    const sha = cp.execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim();
+    const dirty = cp.execSync('git status --porcelain --untracked-files=no', { cwd: ROOT }).toString().trim() ? '*' : '';
+    const when = new Date().toISOString().slice(0, 16).replace('T', ' ');
+    const BUILD = br + ' ' + sha + dirty + ' · ' + when + 'Z';
+    fs.appendFileSync(path.join(OUT, 'gps-config.js'), '\n// Stamped by tools/build-gps-app.js (URGENT-024): the build on this phone.\nwindow.HARDPAN_BUILD = ' + JSON.stringify(BUILD) + ';\n');
+    console.log('Build id: ' + BUILD);
+} catch (e) { console.warn('Build id: not stamped (' + e.message + ')'); }
+
 // GOLFAPI DATA - THE APP ONLY (build 9). tools/golfapi-pull.js --build writes the
 // stripped GolfAPI file to golfapi/ (gitignored: the repo is public and the data
 // may not be redistributed). It is copied into the iOS app here and nowhere else:

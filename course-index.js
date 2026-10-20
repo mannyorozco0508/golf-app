@@ -64,7 +64,7 @@ var COURSE_INDEX_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // The version in the stored blob. Bump it and every device rebuilds the index
 // from the database on its next load, which is the only migration this needs.
-var COURSE_INDEX_VERSION = 2;   // 2 (URGENT-006): rebuild once so a record marked mergedInto leaves every picker
+var COURSE_INDEX_VERSION = 3;   // 3 (URGENT-024): rebuild once more - the six duplicates hidden on Oct 19 (Talking Stick 'Piipaash Course'...) stayed in indexes built between the two hides. 2 (URGENT-006): rebuild once so a record marked mergedInto leaves every picker
 
 // THE localStorage KEY. Shared per origin with nine Consumer pages and two
 // Tournament ones, so it is namespaced like golfapp-theme is.

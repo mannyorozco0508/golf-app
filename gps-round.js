@@ -177,7 +177,9 @@
             + '<button type="button" class="hs-way" data-hs="change-course"><b>\u26F3 Change course</b><span>' + (scored() ? 'Start a new round somewhere else - this one stays in History' : 'Pick another course - nothing scored yet') + '</span></button>'
             + '<button type="button" class="hs-way" data-hs="leave"><b>\uD83C\uDFE0 Leave round \u203a Home</b><span>It stays on Home under In progress - Resume picks up on this hole</span></button>'
             + '</div>'
-            + '<div class="hs-note">Trip, history, how it works and stats: <a href="home.html#more">Home › More</a></div>';
+            + '<div class="hs-note">Trip, history, how it works and stats: <a href="home.html#more">Home › More</a></div>'
+            // URGENT-024: which build this is (stamped by the build) - Manny checks his phone against the report.
+            + '<div class="hs-note hs-build" style="opacity:.7;font-size:12px;">Build: ' + esc(String(window.HARDPAN_BUILD || 'dev (not a build)')) + '</div>';
         return show('menu', html, 'Round Menu');
     }
     function tile(k) {
