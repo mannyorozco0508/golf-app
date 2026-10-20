@@ -351,9 +351,28 @@
         return true;
     }
     // EDIT: the side match as it is stored, read back into the sheet's own choices.
+    // Where a bet lives: a side match, or (skins from the sheet) a round game instance.
+    function betAt(id) {
+        var d = data() || {};
+        if ((d.sideMatches || {})[id]) return { slot: 'sideMatches', rec: d.sideMatches[id] };
+        var gi = (d.additionalGameInstances || {})[id];
+        if (gi && gi.format === 'skins') return { slot: 'additionalGameInstances', rec: gi };
+        return null;
+    }
     function prefill(id) {
-        var sm = ((data() || {}).sideMatches || {})[id];
-        if (!sm || !GAMES[sm.format] || GAMES[sm.format].kind !== 'side') return false;
+        var at0 = betAt(id); if (!at0) return false;
+        if (at0.slot === 'additionalGameInstances') {
+            // SKINS, a round game: who's in (everybody when it names nobody), the buy-in, net/gross, from.
+            var gi = at0.rec;
+            st.editId = id; st.game = 'skins'; st.more = true; st.field = true;
+            st.picks = (gi.participantIds || players().map(function (p) { return p.id; })).map(String);
+            st.scoring = gi.skinsScoring === 'net' ? 'net' : 'gross';
+            st.from = Number(gi.startHole) || null; st.stake = Number(gi.skinsBuyIn) || null;
+            st.custom = GAMES.skins.chips.indexOf(st.stake) === -1; st.step = 2;
+            return true;
+        }
+        var sm = at0.rec;
+        if (!GAMES[sm.format] || GAMES[sm.format].kind !== 'side') return false;
         var a = (sm.teamAIds || []).map(String), b = (sm.teamBIds || []).map(String);
         st.editId = id; st.game = sm.format; st.mode = a.length === 2 ? '2v2' : '1v1';
         st.picks = a.concat(b); st.field = true; st.scoring = sm.scoring === 'gross' ? 'gross' : 'net';
@@ -460,7 +479,7 @@
             var cd = (d.courseData || []).slice().sort(function (x, y) { return x.hole - y.hole; });
             var slot = /sideMatches$/.test(b.path) ? 'sideMatches' : 'additionalGameInstances';
             // EDITING: the round without the bet as it stands, then with it as changed.
-            if (o.skip) { d = JSON.parse(JSON.stringify(d)); if (d.sideMatches) delete d.sideMatches[o.skip]; }
+            if (o.skip) { d = JSON.parse(JSON.stringify(d)); if (d.sideMatches) delete d.sideMatches[o.skip]; if (d.additionalGameInstances) delete d.additionalGameInstances[o.skip]; }
             var d2 = JSON.parse(JSON.stringify(d));
             d2[slot] = d2[slot] || {}; d2[slot].__preview018 = b.value;
             var before = computeCombinedNetTotals(d, cd, d.scores || {}).exact || {};
@@ -609,7 +628,9 @@
         var key = editId || db.ref(b.path).push().key;
         var full = b.path + '/' + key, value = b.value;
         if (editId) {
-            var old = ((data() || {}).sideMatches || {})[editId] || {};
+            var old = (betAt(editId) || {}).rec || {};
+            // Skins keeps what the sheet does not ask: its carry-over and enabled state.
+            if (b.value.format === 'skins') { if (old.skinsCarryOver !== undefined) b.value.skinsCarryOver = old.skinsCarryOver; }
             value = JSON.parse(JSON.stringify(value));
             KEEP.forEach(function (k) { if (old[k] !== undefined) value[k] = old[k]; });
         }
@@ -646,7 +667,7 @@
         close();
         var text = (editId ? 'Bet changed: ' : 'Bet added: ') + betLine(res.value);
         var stay = rt && /\.html/.test(rt);
-        if (!stay) toastBet(text, b.value.format === 'skins' ? null : res.key);
+        if (!stay) toastBet(text, res.key);
         else { try { sessionStorage.setItem('hardpan_bet_toast', text); } catch (e) {} }
         var p = res.promise;
         if (p && typeof p.then === 'function') p.then(function () { refresh(); if (stay) afterSave(rt); }, function (err) { say('fail', 'Could not save: ' + (err && err.message)); });
@@ -665,15 +686,21 @@
             + '<button type="button" class="hb-go hb-cancel" data-hb="remove-no">Cancel</button>';
     }
     function removeBet() {
-        var id = st.editId, sm = ((data() || {}).sideMatches || {})[id];
+        var id = st.editId, at0 = betAt(id), sm = at0 && at0.rec;
         if (!sm) { close(); return; }
-        var g = locked(), m = groupMap();
-        var ids = (sm.teamAIds || []).concat(sm.teamBIds || []).map(String);
-        if (g && !ids.some(function (x) { return String(m[x]) === String(g); })) { var w = root().querySelector('.hb-why'); if (w) w.textContent = 'This is Group ' + g + '’s link - only a bet with a Group ' + g + ' golfer in it can be removed here.'; return; }
-        var path = 'events/' + code() + '/sideMatches/' + id, rt = st.returnTo, line = betLine(sm);
+        var g = locked(), m = groupMap(), skins = at0.slot === 'additionalGameInstances';
+        var ids = (skins ? (sm.participantIds || players().map(function (p) { return p.id; })) : (sm.teamAIds || []).concat(sm.teamBIds || [])).map(String);
+        // The same rules as creating one: a group link removes a skins game only inside its
+        // group, a match only with one of its golfers in it.
+        var okHere = !g || (skins ? ids.every(function (x) { return String(m[x]) === String(g); }) : ids.some(function (x) { return String(m[x]) === String(g); }));
+        if (!okHere) { var w = root().querySelector('.hb-why'); if (w) w.textContent = 'This is Group ' + g + '\u2019s link - ' + (skins ? 'only a Group ' + g + ' skins game' : 'only a bet with a Group ' + g + ' golfer in it') + ' can be removed here.'; return; }
+        // Removed at its own path - the round game the way Round Setup drops one (it is simply
+        // no longer in the map), the side match the way the Matches page does.
+        var path = 'events/' + code() + '/' + at0.slot + '/' + id, rt = st.returnTo, line = betLine(sm);
         try { if (typeof durableWrite === 'function') durableWrite(path, 'remove', null, path); else db.ref(path).remove(); } catch (e) { say('fail', 'Could not remove: ' + (e && e.message)); return; }
         close();
-        say('toast', 'Bet removed: ' + line);
+        if (rt && /\.html/.test(rt)) { try { sessionStorage.setItem('hardpan_bet_toast', 'Bet removed: ' + line); } catch (e) {} }
+        else say('toast', 'Bet removed: ' + line);
         setTimeout(refresh, 0);
         if (rt && /\.html/.test(rt)) goBack(rt);
     }

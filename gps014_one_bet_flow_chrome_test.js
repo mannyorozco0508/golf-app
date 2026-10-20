@@ -35,6 +35,9 @@ delete r.moneyPool; delete r.kpWinners; delete r.kpConfirmed;
 // A bet already on the round (to change / remove), with a press hung on it.
 r.sideMatches = { OLD1: { format: 'match', scoring: 'net', teamAIds: ['102'], teamBIds: ['101'], startHole: 1, createdAt: 111, stake: 10, pressRule: 'none',
     presses: { P1: { baseId: 'base', startHole: 3, stake: 10 } } } };
+// And a skins game added through the sheet earlier - a round game (additionalGameInstances).
+r.additionalGameInstances = { SK1: { format: 'skins', enabled: true, startHole: 1, createdAt: 222, scope: 'group', ownerGroup: 1, skinsBuyIn: 5, skinsPotFormat: 'gross',
+    skinsScoring: 'gross', skinsCarryOver: true, participantIds: ['101', '102', '103', '104'] } };
 const DB = { events: { [CODE]: r }, global_courses: {}, trips: {}, organizers: {}, tournaments: {} };
 const PRE = 'window.__hardpanDoors = true;' + iapStub({ active: true })
     + "try{localStorage.setItem('golfapp_me_" + CODE + "','102');sessionStorage.setItem('groupPickDismissed:" + CODE + "','1');localStorage.setItem('hardpan_round_side','bets|" + CODE + "');}catch(e){}";
@@ -48,6 +51,13 @@ async function pick(ids) { for (const id of ids) await tapIn('#hp-bet [data-hb-p
 // THE sheet: open, with the 1 v 1 / 2 v 2 switch at the top.
 const SHEET = '(function(){ var r = document.getElementById("hp-bet"); return !!(r && r.classList.contains("open") && r.querySelector("[data-hb-mode=\\"1v1\\"]") && r.querySelector("[data-hb-mode=\\"2v2\\"]")); })()';
 const lastSide = "JSON.stringify((function(){ var sm = window.__DB.events['" + CODE + "'].sideMatches || {}; var ks = Object.keys(sm).filter(function(k){ return k !== 'OLD1'; }).sort(); return ks.length ? sm[ks[ks.length - 1]] : null; })())";
+const TOAST = '(function(){ var t = Array.prototype.slice.call(document.querySelectorAll(".ui-toast, .hp-return-toast")).pop(); return t ? t.textContent.trim() : ""; })()';
+// Back on a page: wait for it, then its toast (polled - the page loads first).
+async function toastAfter(re, ms) {
+    const until = Date.now() + (ms || 8000); let t = '';
+    while (Date.now() < until) { try { t = await ev(TOAST); if (re.test(t)) return t; } catch (e) {} await sleep(250); }
+    return t;
+}
 const strip = (o) => { const c = Object.assign({}, o); delete c.createdAt; return c; };
 const terms1 = (t, a, b) => CH.sideMatchPayloadFromTerms(Object.assign({ scoring: 'gross', startHole: 4, pressRule: 'none' }, t), { teamAIds: a, teamBIds: b, startHole: t.startHole || 4, now: 1, scope: 'group', ownerGroup: 1 });
 
@@ -161,7 +171,7 @@ test('1b+4+5: the Bets page - "+ Add a bet" and a tap on a bet open the sheet on
     await pick(['102', '103']);
     await tapIn('#hp-bet [data-hb="next"]');
     await tapIn('#hp-bet [data-hb="start"]');
-    await sleep(3500);
+    assert.match(await toastAfter(/^Bet added/), /^Bet added: Manny vs Skeens · \$10 Match$/, 'no "Bet added" toast back on the Bets tab');
     assert.match(await ev('location.href'), /skins\.html/, 'not back on the Bets tab');
     // A tap on the old bet -> the sheet pre-filled; $20; Save -> same key, its press and createdAt kept.
     assert.ok(await ev('!!document.querySelector("#bets-matches [data-sm-id=\\"OLD1\\"]")'), 'the bet is not tappable');
@@ -210,4 +220,32 @@ test('1c: Results "+ Add a bet on this round", Matches SIDE BETS and CHALLENGE S
         await sleep(3000);
         assert.match(await ev('location.href'), new RegExp(page.replace('.', '\\.')), 'Close did not go back to ' + page);
     }
+});
+
+test('6: skins (a round game) - tapped on the Bets tab: the sheet pre-filled; Save keeps it (carry-over, createdAt); Remove; the toasts come back with it', { timeout: 120000 }, async () => {
+    await j.goto(fileUrl('skins.html', Q), 3500);
+    assert.ok(await ev('!!document.querySelector("#bets-games .bets-game[data-game-key=\\"SK1\\"][data-hp-bet]")'), 'the skins row is not tappable');
+    await tapIn('#bets-games .bets-game[data-game-key="SK1"]');
+    await sleep(4500);
+    const p = await ev('document.querySelector("#hp-bet .hb-panel").innerText');
+    assert.match(p, /Skins · \$ each/);
+    assert.match(p, /Save changes[\s\S]*Remove this bet/);
+    assert.equal(await ev('document.querySelector("#hp-bet [data-hb-stake=\\"5\\"]").classList.contains("on")'), true, 'the buy-in is not pre-filled');
+    await shot('edit-skins');
+    await tapIn('#hp-bet [data-hb-stake="10"]');
+    await tapIn('#hp-bet [data-hb="start"]');
+    if (await ev('!!document.querySelector("#hp-bet.open [data-hb=confirm-add]")')) await tapIn('#hp-bet [data-hb="confirm-add"]');
+    assert.match(await toastAfter(/^Bet changed/), /^Bet changed: .+ · \$10 Skins$/);
+    assert.match(await ev('location.href'), /skins\.html/);
+    const sk = JSON.parse(await ev("JSON.stringify(window.__DB.events['" + CODE + "'].additionalGameInstances.SK1)"));
+    assert.deepEqual([sk.skinsBuyIn, sk.createdAt, sk.skinsCarryOver, sk.format, sk.startHole], [10, 222, true, 'skins', 1]);
+    assert.deepEqual(sk.participantIds, ['101', '102', '103', '104']);
+    await tapIn('#bets-games .bets-game[data-game-key="SK1"]');
+    await sleep(4500);
+    await tapIn('#hp-bet [data-hb="remove"]');
+    assert.match(await ev('document.querySelector("#hp-bet .hb-panel").innerText'), /Everyone in the bet agreed\?/);
+    await tapIn('#hp-bet [data-hb="remove-yes"]');
+    assert.match(await toastAfter(/^Bet removed/), /^Bet removed: /);
+    assert.match(await ev('location.href'), /skins\.html/);
+    assert.equal(await ev("!!(window.__DB.events['" + CODE + "'].additionalGameInstances || {}).SK1"), false, 'not removed');
 });

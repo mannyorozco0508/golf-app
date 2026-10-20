@@ -1402,6 +1402,18 @@ html {
             + '&hpbet=1' + (editId ? '&hpedit=' + encodeURIComponent(editId) : '') + '&hpret=' + encodeURIComponent(page + location.search);
         return true;
     }
+    // BACK FROM THE SHEET: its "Bet added: ..." (or changed / removed) shows here too.
+    function hpToast(t) {
+        if (typeof uiToast === 'function') { try { uiToast(t, 6000); return; } catch (e) {} }
+        var d = document.createElement('div');
+        d.setAttribute('role', 'status'); d.className = 'hp-return-toast'; d.textContent = t;
+        d.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:4000;background:#0f4c3a;color:#F2EDE4;padding:12px 14px;border-radius:10px;font-size:.9rem;line-height:1.4;box-shadow:0 6px 18px rgba(0,0,0,.25);';
+        document.body.appendChild(d);
+        setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 6000);
+    }
+    (function () {
+        try { var t = sessionStorage.getItem('hardpan_bet_toast'); if (!t) return; sessionStorage.removeItem('hardpan_bet_toast'); hpToast(t); } catch (e) {}
+    })();
     // THE BETS TAB: "+ Add a bet" at the top, and a tap on a match opens it in the sheet (Edit / Remove).
     function hpTagBets(ids) {
         if (!hpSimpleFlow()) return;
@@ -1419,6 +1431,20 @@ html {
         b.style.cssText = 'display:block;width:100%;min-height:48px;margin:0 0 12px;border:0;border-radius:14px;background:#ffd60a;color:#0b0f0c;font-weight:800;font-size:1rem;cursor:pointer;';
         b.addEventListener('click', function () { hpOpenBet(); });
         host.parentNode.insertBefore(b, host);
+        // SKINS ADDED THROUGH THE SHEET are round games (additionalGameInstances): their rows open too.
+        var games = document.getElementById('bets-games');
+        var isSkins = function (k) { try { var gi = (currentData.additionalGameInstances || {})[k]; return !!(gi && gi.format === 'skins'); } catch (e) { return false; } };
+        var tagGames = function () {
+            if (!games) return;
+            Array.prototype.forEach.call(games.querySelectorAll('.bets-game[data-game-key]'), function (row) {
+                if (isSkins(row.getAttribute('data-game-key')) && !row.hasAttribute('data-hp-bet')) { row.setAttribute('data-hp-bet', '1'); row.style.cursor = 'pointer'; row.setAttribute('role', 'button'); row.setAttribute('aria-label', 'Change or remove this skins game'); }
+            });
+        };
+        if (games) {
+            games.addEventListener('click', function (e) { var row = e.target.closest && e.target.closest('.bets-game[data-game-key]'); if (row && isSkins(row.getAttribute('data-game-key'))) hpOpenBet(row.getAttribute('data-game-key')); });
+            if (window.MutationObserver) new MutationObserver(tagGames).observe(games, { childList: true });
+            tagGames();
+        }
         // A first paint from this phone's copy ran before this block: once more, so its matches are tappable.
         try { if (typeof renderBets === 'function' && currentData && currentData.players) renderBets(); } catch (e) {}
     })();
