@@ -636,7 +636,8 @@
         + '#hp-score-sheet .hp-ss-handle{width:42px;height:5px;border-radius:3px;background:#5b625a;margin:10px auto 2px;flex:0 0 auto;}'
         + '#hp-score-sheet .hp-ss-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:8px 18px 4px;flex:0 0 auto;}'
         + '#hp-score-sheet .hp-ss-title{font-size:clamp(20px,6vw,26px);font-weight:800;margin:0;color:#fff;}#hp-score-sheet .hp-ss-meta{font-size:14px;color:#a7aea4;white-space:nowrap;}'
-        + '#hp-score-sheet .hp-ss-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:4px 18px 14px;}'
+        + '#hp-score-sheet .hp-ss-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:4px 18px 32px;scroll-padding-bottom:32px;}'
+        // POLISH #34: room under the last row (Penalties, the note) so it always scrolls clear of the Save bar.
         + '#hp-score-sheet .hp-ss-chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px;}'
         + '#hp-score-sheet .hp-ss-chip{min-height:44px;padding:0 18px;border-radius:999px;background:#262c26;color:#f4f4ef;font-size:17px;font-weight:700;}'
         + '#hp-score-sheet .hp-ss-chip.on{background:#c8f07a;color:#0b0f0c;}'
@@ -832,6 +833,9 @@
             var rec = qLoad(c.code, pid);
             if (rec && rec.holes[String(c.hole)]) qSet(c, pid, c.hole, {}, n, c.par);
             if (ss.more && ssGrid(c.par).indexOf(n) === -1) ss.more = false;
+            // POLISH #34: on to the next golfer with no score on this hole - once this golfer's own
+            // stats rows (when shown) have their putts too, so a golfer's putts are never skipped.
+            if (!ssStatsFor(pid) || ssCell(pid).putts != null) ssAdvance(pid);
             ssRender(); return;
         }
         if ((b = t.closest('[data-ss-k]'))) {
@@ -841,10 +845,29 @@
             else if (k === 'fw') patch.fw = cell.fw === v ? null : v;
             else { var nv = Number(v); patch[k] = cell[k] === nv ? null : nv; }
             qSet(c, pid, c.hole, patch, ssStrokes(pid), c.par);
+            // POLISH #34: score and putts in - the next golfer with no score (other stats: tap back).
+            if (k === 'putts' && patch.putts != null && ssStrokes(pid) > 0) ssAdvance(pid);
             ssRender(); return;
         }
         if (t.closest('[data-ss-notes]')) { ss.notes = !ss.notes; ssRender(); if (ss.notes) { var ta = ss.wrap.querySelector('.hp-ss-notes'); if (ta) { try { ta.scrollIntoView({ block: 'center' }); ta.focus(); } catch (er) {} } } return; }
         if (t.closest('[data-ss-save]')) { ssSave(); return; }
+    }
+    // POLISH #34: the next golfer (after this one, wrapping) with no score on this hole, typed or
+    // saved; none left - the sheet stays where it is.
+    function ssNextOpen(pid) {
+        var gs = (ss.ctx && ss.ctx.golfers) || [], i = -1;
+        gs.forEach(function (g, k) { if (String(g.id) === String(pid)) i = k; });
+        for (var s2 = 1; s2 < gs.length; s2++) {
+            var g = gs[(i + s2 + gs.length) % gs.length];
+            if (!(ssStrokes(String(g.id)) > 0)) return String(g.id);
+        }
+        return null;
+    }
+    function ssAdvance(pid) {
+        var nx = ssNextOpen(pid);
+        if (nx == null) return false;
+        ss.sel = nx; ss.more = false; ss.notes = false; ss.toTop = true;
+        return true;
     }
     // SAVE: each score typed here, through the card's own save; then the next hole (the card's
     // own Next - play order, the KP question) unless this is the last one.
