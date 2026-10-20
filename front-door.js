@@ -1331,6 +1331,10 @@
     }
     function placeGpsPill() {
         if (!on() || !params().get('game')) return;
+        // SIMPLER HARDPAN (017, URGENT-015): the round's one bottom bar has the GPS button; this
+        // heading pill would be a second one. Old flow (switch off): the pill, as before.
+        // The same switch the bar reads (gps-bet.js on()), so the card never has zero GPS buttons.
+        if (W.HardPanBet && typeof W.HardPanBet.on === 'function' && W.HardPanBet.on()) { var old = $('fd-gps-btn'); if (old && old.parentNode) old.parentNode.removeChild(old); return; }
         var head = W.document.querySelector('#hole-view-card .hole-view-header') || W.document.querySelector('.hole-view-header');
         if (!head) return;
         var b = $('fd-gps-btn');

@@ -279,3 +279,25 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         assert.deepEqual(setup, { sf: false, mark: null, admin: 'block' });
     });
 });
+
+// URGENT-015 (live walk): on the round, the card side shows ONE GPS button - the bottom bar's - and
+// it opens the map. The heading's "📍 GPS" pill (front-door.js placeGpsPill) is the old flow's.
+describe('017 round page: one GPS button', () => {
+    const ROUND = wizardSavedRound({ code: 'ONEGPS', golfers: 4, ownerUid: 'anon-cold', thru: 2, courseData: CD,
+        overrides: { activeCourseKey: 'gca_zgkynkan', courseName: 'Dobson Ranch Golf Course' } });
+    const COUNT = "JSON.stringify({ gps: Array.prototype.filter.call(document.querySelectorAll('button'), function (b) { return /GPS/.test(b.textContent) && b.offsetParent !== null && getComputedStyle(b).visibility !== 'hidden'; }).map(function (b) { return b.id || b.className || b.textContent.trim(); }), side: (window.HardPanGps && typeof HardPanGps.side === 'function') ? HardPanGps.side() : null, stored: localStorage.getItem('hardpan_round_side') })";
+    for (const off of [false, true]) {
+        test(off ? 'switch off: the heading pill is still there (old flow)' : 'simpleFlow: exactly one GPS button on the card (the bar\'s), and it opens the map', { timeout: 90000 }, async () => {
+            const r = await arriveCold({ url: fileUrl('index.html', 'game=ONEGPS&group=1'), db: DB({ ONEGPS: ROUND }), settleMs: 4000, viewport: { width: 393, height: 852 },
+                preScript: BASE + (off ? OFF : 'window.__simpleFlow = true;') + "try{localStorage.setItem('hardpan_round_side','bets|ONEGPS');}catch(e){}", steps: [
+                    { sleep: 2500 }, X(COUNT),
+                    ...(off ? [] : [{ tap: '[data-hp-bar="gps"]' }, { sleep: 2500 }, X(COUNT)])] });
+            assert.equal(r.ok, true, r.reason);
+            const [card, after] = J(r);
+            if (off) { assert.ok(card.gps.includes('fd-gps-btn'), JSON.stringify(card)); return; }
+            assert.equal(card.gps.length, 1, 'one GPS button on the card: ' + JSON.stringify(card));
+            assert.ok(!card.gps.includes('fd-gps-btn'));
+            assert.equal(after.side, 'gps', 'the bar\'s GPS opened the map: ' + JSON.stringify(after));
+        });
+    }
+});
