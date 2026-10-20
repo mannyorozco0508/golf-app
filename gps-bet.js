@@ -637,6 +637,7 @@
         var p = (typeof durableWrite === 'function') ? durableWrite(full, 'set', value, full) : db.ref(full).set(value);
         return { key: key, promise: p, value: value };
     }
+    function withToast(url, text) { return url + (url.indexOf('?') > -1 ? '&' : '?') + 'hptoast=' + encodeURIComponent(text); }
     function goBack(url) { try { window.location.href = url; } catch (e) {} }
     // BACK WHERE THE GOLFER WAS (URGENT-014): a page it came from; Bets (the sheet is still
     // under this one); Settle up; otherwise a GPS round's map - the hole it is on, the map as it
@@ -668,7 +669,8 @@
         var text = (editId ? 'Bet changed: ' : 'Bet added: ') + betLine(res.value);
         var stay = rt && /\.html/.test(rt);
         if (!stay) toastBet(text, res.key);
-        else { try { sessionStorage.setItem('hardpan_bet_toast', text); } catch (e) {} }
+        // Back on its page, the same words (?hptoast=, read once there).
+        if (stay) rt = withToast(rt, text);
         var p = res.promise;
         if (p && typeof p.then === 'function') p.then(function () { refresh(); if (stay) afterSave(rt); }, function (err) { say('fail', 'Could not save: ' + (err && err.message)); });
         else if (stay) afterSave(rt);
@@ -699,10 +701,9 @@
         var path = 'events/' + code() + '/' + at0.slot + '/' + id, rt = st.returnTo, line = betLine(sm);
         try { if (typeof durableWrite === 'function') durableWrite(path, 'remove', null, path); else db.ref(path).remove(); } catch (e) { say('fail', 'Could not remove: ' + (e && e.message)); return; }
         close();
-        if (rt && /\.html/.test(rt)) { try { sessionStorage.setItem('hardpan_bet_toast', 'Bet removed: ' + line); } catch (e) {} }
-        else say('toast', 'Bet removed: ' + line);
+        if (!(rt && /\.html/.test(rt))) say('toast', 'Bet removed: ' + line);
         setTimeout(refresh, 0);
-        if (rt && /\.html/.test(rt)) goBack(rt);
+        if (rt && /\.html/.test(rt)) goBack(withToast(rt, 'Bet removed: ' + line));
     }
     // OTHER GAMES: the full New Action page (Dots, 9 Points ...), back to this round afterwards.
     function moreGames(rt) {

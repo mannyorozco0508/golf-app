@@ -1404,15 +1404,21 @@ html {
     }
     // BACK FROM THE SHEET: its "Bet added: ..." (or changed / removed) shows here too.
     function hpToast(t) {
-        if (typeof uiToast === 'function') { try { uiToast(t, 6000); return; } catch (e) {} }
         var d = document.createElement('div');
         d.setAttribute('role', 'status'); d.className = 'hp-return-toast'; d.textContent = t;
-        d.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:4000;background:#0f4c3a;color:#F2EDE4;padding:12px 14px;border-radius:10px;font-size:.9rem;line-height:1.4;box-shadow:0 6px 18px rgba(0,0,0,.25);';
+        d.style.cssText = 'position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom, 0px) + 16px);z-index:4000;background:#0f4c3a;color:#F2EDE4;padding:12px 14px;border-radius:10px;font-size:.9rem;line-height:1.4;box-shadow:0 6px 18px rgba(0,0,0,.25);';
         document.body.appendChild(d);
         setTimeout(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 6000);
     }
+    // The sheet sends the golfer back with ?hptoast=<words>: shown once, then dropped from the URL.
     (function () {
-        try { var t = sessionStorage.getItem('hardpan_bet_toast'); if (!t) return; sessionStorage.removeItem('hardpan_bet_toast'); hpToast(t); } catch (e) {}
+        try {
+            var q = new URLSearchParams(location.search), t = q.get('hptoast');
+            if (!t) return;
+            q.delete('hptoast');
+            history.replaceState(history.state, '', location.pathname + (q.toString() ? '?' + q.toString() : ''));
+            hpToast(t);
+        } catch (e) {}
     })();
     // THE BETS TAB: "+ Add a bet" at the top, and a tap on a match opens it in the sheet (Edit / Remove).
     function hpTagBets(ids) {
