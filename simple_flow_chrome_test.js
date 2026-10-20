@@ -37,6 +37,19 @@ const TEEROWS = "JSON.stringify({ tees: Array.prototype.map.call(document.queryS
 const BASE = 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true });
 const OFF = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{features:Object.assign({},v&&v.features,{simpleFlow:false})});}});})();";
 const X = (e) => ({ expression: e });
+// REAL TYPING (URGENT-013 5:17 PM): keys through DevTools Input, as a keyboard sends them.
+const TYPE = (text) => ({ cdp: { method: 'Input.insertText', params: { text } } });
+const ENTER = [{ cdp: { method: 'Input.dispatchKeyEvent', params: { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13, text: '\r' } } },
+    { cdp: { method: 'Input.dispatchKeyEvent', params: { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 } } }, { sleep: 120 }];
+const FOCUS = "(function(){ var a = document.activeElement; return 'F:' + (a ? (a.id || (a.getAttribute('data-sf-tname') ? 'name' : a.getAttribute('data-sf-thcp') ? 'hcp' : a.tagName)) + ':' + (a.closest && a.closest('#sf') ? 'in' : 'out') : 'none'); })()";
+const TO_PLAYERS = [
+    { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.3759, longitude: -111.8778, accuracy: 10 } } },
+    { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
+    { tap: '[data-hp-act="snew"]' },
+    { waitFor: "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-tee]')", timeout: 30000 }, { sleep: 500 },
+    { tap: '[data-sf="next"]' }, { sleep: 300 }];
+const SUM = "JSON.stringify({ sum: (document.getElementById('sf-summary') || {}).innerText || '', rows: document.querySelectorAll('#player-list .player-row').length })";
+
 const J = (r) => r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
 const SF = "JSON.stringify({ h1: (document.querySelector('#sf h1') || {}).textContent, text: (document.getElementById('sf') || {}).innerText || '' })";
 const WRITES = "JSON.stringify({ writes: (window.__coldWrites || []).filter(function (w) { return /^events\\//.test(w.path); }).map(function (w) { var v = w.value || {}; return { op: w.op, path: w.path, players: (v.players || []).map(function (p) { return [p.name, p.hcp, p.flight || null]; }), groups: v.groupSizeOverrides, pool: v.moneyPool || null, inst: Object.keys(v.additionalGameInstances || {}).map(function (k) { return v.additionalGameInstances[k]; }), side: Object.keys(v).filter(function (k) { return /^sideMatches\\//.test(k); }).map(function (k) { return v[k]; }), course: v.courseName, scores: v.scores || null }; }), last: localStorage.getItem('hardpan_last_round') })";
@@ -49,8 +62,9 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
             X("JSON.stringify({ home: document.getElementById('v-simple').innerText })"), ...SHOT('v2-home.png'),
             { tap: '[data-hp-act="snew"]' },
             { waitFor: "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-tee]')", timeout: 30000 }, { sleep: 800 }, X(SF), X(TEEROWS), ...SHOT('v2-course-tees.png'),
-            { tap: '[data-sf="next"]' }, { sleep: 300 },
+            { tap: '[data-sf="next"]' }, { sleep: 300 }, { tap: '[data-sf-pmode="paste"]' }, { sleep: 200 },
             X("(function(){ var t = document.getElementById('sf-paste'); t.value = " + JSON.stringify(PASTE) + "; t.dispatchEvent(new Event('input', { bubbles: true })); return 'pasted'; })()"),
+            { tap: '[data-sf="pastedone"]' },
             { waitFor: "/20 golfers/.test(document.getElementById('sf').innerText)", timeout: 8000 }, { sleep: 300 }, X(SF), ...SHOT('v2-players.png'),
             { tap: '[data-sf="next"]' }, { sleep: 300 }, X(SF),   // refused: the same names
             X("(function(){ var out = []; ['Matt S', 'Mike R'].forEach(function (v) { var i = document.querySelector('[data-sf-rename]'); if (!i) return; i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); out.push(v); }); return out.join(','); })()"),
@@ -139,6 +153,54 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         const [s] = J(r);
         assert.match(s.prog, /IN PROGRESS\nDobson Ranch Golf Course · Thru 9\nResume ›/);
         assert.deepEqual(s.forms, ['index.html?game=SALW01', 'index.html?game=SALW01&group=2', 'index.html?game=SALW01&group=2', 'index.html?game=SALW01&group=1&sk=ABCD']);
+    });
+
+    test('Players, Type names: 4 golfers typed one by one with Enter - the keyboard never leaves; the paste box keeps Enter as a new line; a pasted 4', { timeout: 120000 }, async () => {
+        const steps = TO_PLAYERS.concat([{ shot: process.env.SF_SHOTS ? require('path').join(process.env.SF_SHOTS, 'v2-players-type-empty.png') : '/dev/null', viewportOnly: true }].filter(() => !!process.env.SF_SHOTS), [{ tap: '[data-sf-tname]' }]);
+        [['Skeens', '2.0'], ['Bob', '5.0'], ['Manny', '+2.0'], ['Paul', '4.0']].forEach(([n, h]) => {
+            steps.push(TYPE(n.slice(0, 2)), X(FOCUS), TYPE(n.slice(2)), X(FOCUS), ...ENTER, X(FOCUS), TYPE(h), ...ENTER, X(FOCUS));
+        });
+        steps.push({ sleep: 400 }, X(SUM), ...SHOT('v2-players-type.png'),
+            { tap: '[data-sf-pmode="paste"]' }, { sleep: 200 }, { tap: '#sf-paste' }, TYPE('Glenn 12'), ...ENTER, X(FOCUS), TYPE('Marty 9'), ...ENTER, TYPE('Scott 6'), X(FOCUS),
+            X("JSON.stringify({ box: document.getElementById('sf-paste').value })"),
+            X("(function(){ var t = document.getElementById('sf-paste'); t.value = 'Glenn 12.0/B\\nMarty 9.0/B\\nScott 6.0/B\\nEddie 12.0/B'; t.dispatchEvent(new Event('input', { bubbles: true })); return 'set'; })()"),
+            { tap: '[data-sf="pastedone"]' }, { sleep: 300 }, X(SUM), ...SHOT('v2-players-paste.png'));
+        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE, steps });
+        assert.equal(r.ok, true, r.reason);
+        const focus = r.value.filter((v) => typeof v === 'string' && /^F:/.test(v));
+        const [typed, box, pasted] = J(r);
+        // per golfer: mid-name, name typed, Enter -> HCP, Enter -> the next golfer's name (a new row)
+        assert.deepEqual(focus.slice(0, 16), ['F:name:in', 'F:name:in', 'F:hcp:in', 'F:name:in', 'F:name:in', 'F:name:in', 'F:hcp:in', 'F:name:in', 'F:name:in', 'F:name:in', 'F:hcp:in', 'F:name:in', 'F:name:in', 'F:name:in', 'F:hcp:in', 'F:name:in']);
+        assert.match(typed.sum, /4 golfers · 1 group/);
+        assert.match(typed.sum, /Handicaps\n✓ all 4/);
+        assert.deepEqual(focus.slice(16), ['F:sf-paste:in', 'F:sf-paste:in'], 'Enter in the paste box is a new line; the box keeps the keyboard');
+        assert.equal(box.box, 'Glenn 12\nMarty 9\nScott 6');
+        assert.match(pasted.sum, /4 golfers · 1 group/);
+        assert.match(pasted.sum, /Flights\nA 0\nB 4|Flights\nA 0\nB 4/);
+    });
+
+    test('Players, mixed: paste 16, then type 4 more - the summary counts 20 and the saved round has 20', { timeout: 150000 }, async () => {
+        const sixteen = PASTE.replace('Matt 12.0/B', 'Matt K 12.0/B').split('\n').slice(0, 19).join('\n');   // four groups of four (one Matt with his initial)
+        const steps = TO_PLAYERS.concat([{ tap: '[data-sf-pmode="paste"]' }, { sleep: 200 },
+            X("(function(){ var t = document.getElementById('sf-paste'); t.value = " + JSON.stringify(sixteen) + "; t.dispatchEvent(new Event('input', { bubbles: true })); return 'set'; })()"),
+            { tap: '[data-sf="pastedone"]' }, { sleep: 300 }, X(SUM),
+            { tap: '[data-sf-pmode="type"]' }, { sleep: 300 }, { tap: '[data-sf="addgolfer"]' }, { sleep: 200 }]);
+        [['Crone', '10.0'], ['Todd', '14.0'], ['Mike R', '6.0'], ['Jim', '12.0']].forEach(([n, h], i) => {
+            steps.push(TYPE(n), ...ENTER, TYPE(h));
+            if (i < 3) steps.push(...ENTER);
+        });
+        steps.push({ sleep: 400 }, X(FOCUS), X(SUM), { tap: '[data-sf="next"]' }, { sleep: 300 }, X(SF), { tap: '[data-sf="start"]' }, { sleep: 1500 }, X(SF),
+            { waitFor: "!!document.getElementById('sf-code')", timeout: 20000 }, X(WRITES));
+        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE, steps });
+        assert.equal(r.ok, true, r.reason);
+        const [p16, p20, games, sheet, w] = J(r);
+        assert.equal(games.h1, "What are you playing?");
+        assert.match(sheet.text, /Round ready/);
+        assert.match(p16.sum, /16 golfers · 4 groups/);
+        assert.match(p20.sum, /20 golfers · 5 groups/);
+        assert.equal(w.writes.length, 1);
+        assert.equal(w.writes[0].players.length, 20);
+        assert.deepEqual(w.writes[0].players.slice(16).map((p) => p[0] + ' ' + p[1]), ['Crone 10', 'Todd 14', 'Mike R 6', 'Jim 12']);
     });
 
     test('GPS door: the same Course & Tees screen, "Start GPS" saves you as the golfer and opens the map', { timeout: 90000 }, async () => {
