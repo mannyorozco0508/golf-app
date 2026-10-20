@@ -106,6 +106,15 @@ describe('Weekly Game, Add a game, bet edit / remove - in place', () => {
         assert.deepEqual([s.url, s.nav], [s0.url, 1]);
     });
 
+    test('Round settings › QUICK EDITS › Weekly Game: the sheet', { timeout: 60000 }, async () => {
+        await h.ev("(function(){ if (typeof toggleRoundSheet === 'function') toggleRoundSheet(true); return 1; })()");
+        assert.ok(await h.until("!!document.querySelector('#hp-quick [data-hq=\"weekly\"]')", 6000), 'Weekly Game in QUICK EDITS');
+        await h.click('#hp-quick [data-hq="weekly"]');
+        await sleep(300);
+        assert.equal((await h.st()).weekly, true);
+        await h.ev('HardPanBet.closeWeekly()');
+    });
+
     test('the map\'s Add a game › Full game setup: the Add a game list over the map (no Round Setup)', { timeout: 60000 }, async () => {
         const s0 = await h.st();
         await h.ev("(function(){ var b=(document.querySelector('#hp-card-bet [data-hp-bar=gps]') || document.getElementById('fd-gps-btn')); if(b) b.click(); return 1; })()");
