@@ -81,7 +81,7 @@ test('gps-view: the default target asks pathTarget behind its own switch (featur
     const pt = v.slice(v.indexOf('function placeTarget('), v.indexOf('function drawTargetLines('));
     assert.ok(/HardPanFeature\('pathTarget'\) !== false/.test(v));
     assert.ok(/pathTargetOn\(\) && r\.tee && G\.pathTarget\s*\? G\.pathTarget\(/.test(pt) && /: G\.defaultTarget\(opts\)/.test(pt));
-    assert.ok(/G\.holePath\(\{ tee: r\.tee, mid: center, line: opts\.line, fairway: opts\.fairway, hazards: rec && rec\.hazards \}\)/.test(pt), 'never the dragged target');
+    assert.ok(/G\.holePath\(\{ tee: r\.tee, mid: center, line: opts\.line, fairway: opts\.fairway, hazards: sh\.hazards \}\)/.test(pt), 'never the dragged target');
     const sb = {}; sb.window = sb; require('vm').createContext(sb); require('vm').runInContext(read('gps-config.js'), sb);
     assert.strictEqual(sb.HARDPAN_GPS_CONFIG.features.pathTarget, true);
 });

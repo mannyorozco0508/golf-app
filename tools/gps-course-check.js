@@ -12,6 +12,11 @@
 //                                             gps_courses.json (firebase database:get dumps)
 // Runs on the BUILT app folder (gps-beta/www, or WWW=...) - what Cmd+R installs. Prints a markdown
 // table; exit 1 on any fail.
+//
+// (9, URGENT-026) THE TEE TARGET IN THE FAIRWAY: on every par 4 / 5 with fairway data, the default tee
+// target (HardPanGps.teeTargets - the same gps-geo.teeShot the map uses, the golfer's driver) lies
+// inside a fairway ring. Holes with NO path data are LISTED ("no fairway data"), not failed: their
+// target stays at the pre-023c default on the straight line.
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -68,7 +73,7 @@ const OLDINDEX = () => { const names = {}; Object.keys(DB.global_courses).forEac
     return "try{localStorage.setItem('golfapp-course-index-v1'," + JSON.stringify(JSON.stringify({ v: 2, at: Date.now() - 3600e3, names })) + ");}catch(e){}"; };
 
 async function check(c) {
-    const out = { label: c.label, once: '', tees: '', card: '', gps: '', map: '', bet: '', same: '', one: '', badge: null, why: [] };
+    const out = { label: c.label, once: '', tees: '', card: '', gps: '', map: '', bet: '', same: '', one: '', fw: '', noFw: [], badge: null, why: [] };
     const VIEW = (process.env.VIEW || '393x852').split('x').map(Number);
     const j = await openJourney({ db: DB, viewport: { width: VIEW[0], height: VIEW[1] }, webgl: true,
         preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + PHONE + RULES + OLDINDEX() + SLOWGPS(process.env.SLOW) + GEO(c.golfer || (process.env.AWAY ? process.env.AWAY.split(',').map(Number) : c.at)) + "try{sessionStorage.setItem('hardpan_simple_flow','gps');}catch(e){}" });
@@ -155,6 +160,20 @@ async function check(c) {
             out.why = out.why.filter((w) => !/^GPS:|^map:|^note:/.test(w));
             if (!okNg) out.why.push('no-greens map: ' + out.map + ' ' + out.gps);
         }
+        // 9 (URGENT-026): the default tee target inside a fairway ring on every par 4 / 5 with fairway data.
+        if (c.noGreens) out.fw = 'n/a (no greens)';
+        else {
+            const tt = JSON.parse(await ev("JSON.stringify(window.HardPanGps && HardPanGps.teeTargets ? HardPanGps.teeTargets() : null)"));
+            if (!Array.isArray(tt)) { out.fw = 'FAIL (' + JSON.stringify(tt) + ')'; out.why.push('tee targets: ' + out.fw); }
+            else {
+                const long = tt.filter((h) => !h.none && Number(h.par) !== 3);
+                const withFw = long.filter((h) => h.fw > 0), bad = withFw.filter((h) => !h.inFw);
+                out.noFw = long.filter((h) => !h.data).map((h) => h.n);
+                const savedN = long.filter((h) => h.saved).length;
+                out.fw = (bad.length ? 'FAIL' : 'PASS') + ` (${withFw.length - bad.length}/${withFw.length} in the fairway${savedN ? ', ' + savedN + ' saved lines' : ''}; no fairway data: ${out.noFw.length ? 'holes ' + out.noFw.join(', ') : 'none'})`;
+                if (bad.length) out.why.push('tee target outside the fairway: ' + bad.map((h) => 'hole ' + h.n + ' (' + h.yd + ' yds, ' + h.src + ')').join(', '));
+            }
+        }
         // URGENT-023: nothing on the map covers the Plays-like pill (any visible control or pill overlapping it).
         const ov = JSON.parse(await ev("(function(){ var p=document.querySelector('#gps-overlay .gps-ld-plays'); if(!p || !p.offsetParent) return JSON.stringify({ pill: false, hits: [] }); var r=p.getBoundingClientRect(); var hits=[]; Array.prototype.forEach.call(document.querySelectorAll('#gps-overlay button, #gps-overlay .gps-banner, #hp-card-bet, .hp-money-chip'), function(e){ if (e===p || p.contains(e) || e.contains(p) || !e.offsetParent) return; var cs=getComputedStyle(e); if (cs.visibility==='hidden' || cs.opacity==='0') return; var q=e.getBoundingClientRect(); if (q.width<2||q.height<2) return; var x=Math.min(r.right,q.right)-Math.max(r.left,q.left), y=Math.min(r.bottom,q.bottom)-Math.max(r.top,q.top); if (x>2 && y>2) hits.push((e.className||e.id||e.tagName).toString().slice(0,40) + ' ' + Math.round(x) + 'x' + Math.round(y)); }); return JSON.stringify({ pill: true, hits: hits }); })()"));
         out.plays = !ov.pill ? 'n/a (no pill)' : (ov.hits.length ? 'FAIL (' + ov.hits.join('; ') + ')' : 'PASS');
@@ -191,14 +210,16 @@ async function check(c) {
     const rows = [];
     for (const c of COURSES) { const r = await check(c); rows.push(r); console.error(c.label, JSON.stringify(r)); }
     const ok = (s) => /^PASS/.test(s || '');
-    console.log('| Course | 1 found once | 2 tees | 3 card (18) | 4 GPS hole 1 (F / MIDDLE / B) | 5 + Bet | 6 map frames hole 1 | 7 badge = map | 8 one record | Result |');
-    console.log('|---|---|---|---|---|---|---|---|---|---|');
+    console.log('| Course | 1 found once | 2 tees | 3 card (18) | 4 GPS hole 1 (F / MIDDLE / B) | 5 + Bet | 6 map frames hole 1 | 7 badge = map | 8 one record | 9 tee target in the fairway | Result |');
+    console.log('|---|---|---|---|---|---|---|---|---|---|---|');
     let fails = 0;
     rows.forEach((r) => {
-        const all = [r.once, r.tees, r.card, r.gps, r.bet, r.map, r.same, r.one].every(ok);
+        const all = [r.once, r.tees, r.card, r.gps, r.bet, r.map, r.same, r.one].every(ok) && (ok(r.fw) || /^n\/a/.test(r.fw));
         if (!all) fails++;
-        console.log(`| ${r.label} | ${r.once} | ${r.tees} | ${r.card} | ${r.gps} | ${r.bet} | ${r.map} | ${r.same} | ${r.one} | ${all ? 'PASS' : 'FAIL: ' + r.why.join('; ')} |`);
+        console.log(`| ${r.label} | ${r.once} | ${r.tees} | ${r.card} | ${r.gps} | ${r.bet} | ${r.map} | ${r.same} | ${r.one} | ${r.fw} | ${all ? 'PASS' : 'FAIL: ' + r.why.join('; ')} |`);
     });
+    console.log('\nNo fairway data (par 4 / 5, straight line, target at the pre-023c default):');
+    rows.forEach((r) => console.log(`- ${r.label}: ${r.noFw.length ? 'holes ' + r.noFw.join(', ') : (/^n\/a/.test(r.fw) ? 'no greens' : 'none')}`));
     console.log('\n' + (fails ? fails + ' of ' + rows.length + ' courses FAIL' : 'all ' + rows.length + ' courses PASS'));
     process.exit(fails ? 1 : 0);
 })();

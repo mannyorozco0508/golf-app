@@ -1032,17 +1032,67 @@
             if (al.d > TEE_HAZARD_LINE_M) return;
             var atM = al.t * total;
             if (atM <= 40 * M_PER_YD || atM > Math.min(wantM, room) + 2) return;
+            // URGENT-026: with the fairway mapped, a lay-up that would sit OUTSIDE it (a bunker the
+            // drive carries before the fairway starts, one at its edge) is not the target.
+            if (rings.length) { var lay = pointAlongHole(line, tee, Math.max(0, atM - TEE_HAZARD_SHORT_YD * M_PER_YD)); if (!lay || !rings.some(function (r) { return pointInRing(lay, r); })) return; }
             stops.push({ at: Math.max(0, atM - TEE_HAZARD_SHORT_YD * M_PER_YD), stop: 'hazard', hazard: { type: z.type, atM: atM } });
         });
         stops.sort(function (a, b) { return a.at - b.at; });
         var s0 = stops[0], alongM = s0 ? s0.at : wantM;
         var pt = pointAlongHole(line, tee, alongM) || o.mid;
-        // In the fairway when it is mapped (not past a hazard / corner stop: those keep the line).
-        if (!s0 || s0.stop === 'green') pt = snapToFairway(pt, rings);
+        // In the fairway when it is mapped (not past a hazard stop: that keeps the line). URGENT-026:
+        // the corner too - a dogleg's corner point can sit on the fairway's edge.
+        if (!s0 || s0.stop === 'green' || s0.stop === 'corner') pt = snapToFairway(pt, rings);
         var out = { pt: pt, alongM: alongM, wantM: wantM, stop: s0 ? s0.stop : null };
         if (s0 && s0.hazard) out.hazard = s0.hazard;
         return out;
     }
+    // ---- THE HOLE'S PATH, BEST SOURCE FIRST (URGENT-026, Manny 2026-10-20: "the line from the tee
+    // runs straight to the green - the 305 lands in the desert") -------------------------------
+    // Path data: a drawn hole line with a bend (OpenStreetMap's, matched by gps-geo.osmPathLines),
+    // else the fairway rings' middle (tee -> fairway centroid -> green), else GolfAPI's fairway
+    // points (none in our data today: GolfAPI gives a tee and a green per hole), else a line a golfer
+    // SAVED for the hole (course_gps/<key>/lines - used only where there is no other path). A hole
+    // with none of them has NO PATH DATA: the straight line, and the target at the pre-023c default
+    // (DEFAULT_SHOT_YD along it) - never the driver's distance into whatever is there.
+    function hasPathData(hp, fairway) {
+        if ((fairway || []).some(function (r) { return r && r.length >= 3; })) return true;
+        return !!(hp && hp.pts && hp.pts.length >= 3 && hp.src !== 'straight' && hp.src !== 'target');
+    }
+    // The tee shot on a hole. o: { par, tee, mid, line?, fairway?, hazards?, driverM? } ->
+    // { pt, path (holePath), data (has path data), drive (teeTarget's answer, or null) }.
+    //   path data + a driver: teeTarget along the path (min(driver, the corner / the fairway's end),
+    //                         in the fairway);
+    //   no path data:         defaultTarget on the straight line (DEFAULT_SHOT_YD, as before 023c).
+    function teeShot(o) {
+        if (!o || !pinPt(o.mid)) return null;
+        var tee = pinPt(o.tee);
+        var hp = tee ? holePath({ tee: tee, mid: o.mid, line: o.line, fairway: o.fairway, hazards: o.hazards }) : null;
+        var data = hasPathData(hp, o.fairway);
+        if (Number(o.par) === 3) return { pt: o.mid, path: hp, data: data, drive: null };
+        if (data && o.driverM > 0) {
+            var t = teeTarget({ par: o.par, tee: tee, mid: o.mid, line: hp && hp.pts, fairway: o.fairway, hazards: o.hazards, driverM: o.driverM });
+            if (t && t.pt) return { pt: t.pt, path: hp, data: true, drive: t };
+        }
+        var line = data && hp ? hp.pts : (tee ? [tee, pinPt(o.mid)] : null);
+        return { pt: defaultTarget({ par: o.par, tee: tee, mid: o.mid, line: line, fairway: o.fairway, from: 'tee' }), path: hp, data: data, drive: null };
+    }
+    // A SAVED LINE (URGENT-026 "Save this line"): course_gps/<key>/lines/hN = { pts: [[lat, lng], ...]
+    // tee -> target(s) -> green, at, ev } or { cleared: true, at, ev }. Usable when it has 3 to
+    // SAVED_LINE_MAX_PTS points, it ends within OSM_PATH_M of this hole's green center (a moved
+    // green: not used) and starts within SAVED_LINE_TEE_M of this tee (another tee box of the same
+    // hole: the line starts from THIS tee). -> the line or null.
+    var SAVED_LINE_MAX_PTS = 6, SAVED_LINE_TEE_M = 150;
+    function savedLine(rec, tee, mid) {
+        if (!rec || rec.cleared || !rec.pts) return null;
+        var raw = Array.isArray(rec.pts) ? rec.pts : Object.keys(rec.pts).sort(function (a, b) { return a - b; }).map(function (k) { return rec.pts[k]; });
+        var pts = raw.map(function (q) { return pinPt(q && !Array.isArray(q) && q[0] != null ? [q[0], q[1]] : q); }).filter(Boolean);
+        tee = pinPt(tee); mid = pinPt(mid);
+        if (pts.length < 3 || pts.length > SAVED_LINE_MAX_PTS || pts.length !== raw.length || !tee || !mid) return null;
+        if (haversineMeters(pts[0], tee) > SAVED_LINE_TEE_M || haversineMeters(pts[pts.length - 1], mid) > OSM_PATH_M) return null;
+        return [tee].concat(pts.slice(1, -1), [mid]);
+    }
+
     // The note under a stopped drive: "lay up 270 · water at 285" (yards or metres, unitM).
     function teeTargetNote(t, unitM) {
         if (!t || !t.stop || t.stop === 'green' || t.par3) return '';
@@ -2142,15 +2192,32 @@
         if (dE > OSM_PATH_M) return { reject: 'end ' + Math.round(dE) + ' m from the green' };
         return { line: [tee].concat(line.slice(1, -1), [mid]) };
     }
-    // The whole course: { key, how, lines: { n: line }, rejected: { n: why } } or null.
+    // URGENT-026: the same hole's FAIRWAY rings, guarded much the same way: its drawn line (2 points
+    // is enough, a straight hole) ends within 40 m of GolfAPI's green center and starts within
+    // OSM_FAIRWAY_TEE_M of GolfAPI's tee (OpenStreetMap draws from one tee box, GolfAPI may give
+    // another - the green decides the hole). The target is snapped into them; the flyover is as
+    // wide as they are.
+    var OSM_FAIRWAY_TEE_M = 150;
+    function osmPathFairway(gaHole, osmHole) {
+        var ga = gaHole && (gaHole.osm || gaHole), o = osmHole && (osmHole.osm || osmHole);
+        var tee = pinPt(ga && ga.tee), mid = pinPt(ga && (ga.mid || ga.end));
+        var fw = ((o && o.fairway) || []).filter(function (r) { return r && r.length >= 3; });
+        if (!tee || !mid || !fw.length || ((ga.fairway) || []).length) return null;
+        var line = ((o && o.line) || []).map(pinPt).filter(Boolean);
+        if (line.length < 2 || haversineMeters(line[0], tee) > OSM_FAIRWAY_TEE_M || haversineMeters(line[line.length - 1], mid) > OSM_PATH_M) return null;
+        return fw;
+    }
+    // The whole course: { key, how, lines: { n: line }, fairways: { n: rings }, rejected: { n: why } } or null.
     function osmPathLines(table, data, record, key, name, loc) {
         var m = osmPathCourse(table, data, record, key, name, loc);
         if (!m) return null;
-        var osm = osmCourse(table, m.key), out = { key: m.key, how: m.how, lines: {}, rejected: {} };
+        var osm = osmCourse(table, m.key), out = { key: m.key, how: m.how, lines: {}, fairways: {}, rejected: {} };
         Object.keys(record.holes).forEach(function (n) {
             var oh = osm && osm.holes && osm.holes[n];
             var r = oh ? osmPathLine(record.holes[n], oh) : { reject: 'no OSM hole ' + n };
             if (r.line) out.lines[n] = r.line; else out.rejected[n] = r.reject;
+            var fw = oh ? osmPathFairway(record.holes[n], oh) : null;
+            if (fw) out.fairways[n] = fw;
         });
         return out;
     }
@@ -2192,7 +2259,8 @@
         courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles, pickHoleSet: pickHoleSet, applyHoleSet: applyHoleSet,
         approachAxis: approachAxis, approachCarries: approachCarries, approachLine: approachLine, APPROACH_OFF_M: APPROACH_OFF_M,
         golfapiMatch: golfapiMatch, golfapiRecord: golfapiRecord, golfapiNines: golfapiNines, ellipseRing: ellipseRing,
-        osmPathCourse: osmPathCourse, osmPathLine: osmPathLine, osmPathLines: osmPathLines, OSM_PATH_M: OSM_PATH_M,
+        osmPathCourse: osmPathCourse, osmPathLine: osmPathLine, osmPathLines: osmPathLines, osmPathFairway: osmPathFairway,
+        teeShot: teeShot, hasPathData: hasPathData, savedLine: savedLine, SAVED_LINE_MAX_PTS: SAVED_LINE_MAX_PTS, OSM_PATH_M: OSM_PATH_M,
         bearingDeg: bearingDeg, holeCamera: holeCamera,
         destination: destination, yardageArcs: yardageArcs, parseNwsWind: parseNwsWind, parseNwsObservation: parseNwsObservation, compassName: compassName, dialDeg: dialDeg, windArrowRot: windArrowRot, windRelative: windRelative,
         parseNwsTempF: parseNwsTempF, playsLike: playsLike, alongLine: alongLine,

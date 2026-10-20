@@ -875,7 +875,7 @@
     // of GolfAPI's green center) - for the preview path and the default target ONLY. Every
     // number stays GolfAPI's: the GolfAPI record is never touched. Bundled data only.
     function osmPathOn() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('osmPath') !== false; } catch (e) { return true; } }
-    function osmPathFor(n) {
+    function osmPathAll() {
         if (!S || !osmPathOn() || !G.osmPathLines) return null;
         var rec = golfapiFor(S.courseKey);
         // The bundled table not loaded yet: nothing now, and nothing remembered.
@@ -885,9 +885,29 @@
             try { v = G.osmPathLines(window.HardPanGpsCourses, window.HardPanGolfApi || null, rec, S.courseKey, (S.round && S.round.courseName) || '', S.courseLoc || null); } catch (e) { v = null; }
             S.opCache = { rec: rec, v: v };
         }
-        var c = S.opCache.v;
-        return (c && c.lines && c.lines[String(n)]) || null;
+        return S.opCache.v;
     }
+    function osmPathFor(n) { var c = osmPathAll(); return (c && c.lines && c.lines[String(n)]) || null; }
+    // URGENT-026: the same hole's bundled FAIRWAY rings (gps-geo.osmPathFairway) - the target is
+    // snapped into them and the flyover is as wide as they are.
+    function osmFairwayFor(n) { var c = osmPathAll(); return (c && c.fairways && c.fairways[String(n)]) || null; }
+    // THE HOLE'S SHAPE, BEST SOURCE FIRST (URGENT-026, gps-geo.teeShot): its own drawn line, else the
+    // bundled OpenStreetMap line, with the fairway rings (its own, else the bundled ones); else -
+    // ONLY where none of that exists - the line a golfer saved for the hole ("Save this line",
+    // course_gps/<key>/lines/hN). { line, fairway, hazards, saved, data }; mid: the green center.
+    function holeShape(n, r, mid) {
+        var osm = osmRecord(S.courseKey), rec = (osm && osm.holes && osm.holes[String(n)] && osm.holes[String(n)].osm) || {};
+        var opl = osmPathFor(n), fw = (rec.fairway && rec.fairway.length) ? rec.fairway : osmFairwayFor(n);
+        var out = { line: opl || rec.line || null, fairway: fw || null, hazards: rec.hazards || null, saved: false, data: false };
+        if (!r || !r.tee || !mid || !G.holePath || !G.hasPathData) return out;
+        out.data = G.hasPathData(G.holePath({ tee: r.tee, mid: mid, line: out.line, fairway: out.fairway, hazards: out.hazards }), out.fairway);
+        if (!out.data && G.savedLine) {
+            var sv = G.savedLine(savedLineRec(n), r.tee, mid);
+            if (sv) { out.line = sv; out.saved = true; }
+        }
+        return out;
+    }
+    function savedLineRec(n) { return (S && S.courseRec && S.courseRec.lines && S.courseRec.lines[holeKey(n)]) || null; }
 
     // ---- IMAGERY: USGS FROM THE PHONE FIRST, ESRI ON TOP --------------------
     function cachedTile(url) {
@@ -1719,26 +1739,97 @@
         if (!S || S.targetMoved || !S.pro) return;
         var center = aimAt(r), o = origin(r);
         if (!o || !center) return;
-        var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
+        var sh = holeShape(S.hole, r, center);
         var opts = {
-            par: S.par, tee: r.tee, mid: center, line: osmPathFor(S.hole) || (rec && rec.line), fairway: rec && rec.fairway,
+            par: S.par, tee: r.tee, mid: center, line: sh.line, fairway: sh.fairway,
             from: o.from === 'me' ? 'me' : 'tee', pt: o.pt
         };
         S.teeShot = null;
         var onTee = r.tee && (o.from === 'tee' || (o.pt && G.haversineMeters(o.pt, r.tee) <= TEE_SHOT_YD * G.M_PER_YD));
-        var dc = onTee && Number(S.par) !== 3 && G.teeTarget ? driverCarryYd() : null;
+        var dc = onTee && Number(S.par) !== 3 && G.teeShot ? driverCarryYd() : null;
         if (dc) {
-            var hp = G.holePath ? G.holePath({ tee: r.tee, mid: center, line: opts.line, fairway: opts.fairway, hazards: rec && rec.hazards }) : null;
-            var tt = G.teeTarget({ par: S.par, tee: r.tee, mid: center, line: hp && hp.pts && hp.pts.length >= 2 && hp.src !== 'target' ? hp.pts : opts.line,
-                fairway: opts.fairway, hazards: rec && rec.hazards, driverM: driverGroundM(r, dc.yd) });
-            if (tt && tt.pt && !tt.par3) { S.target = tt.pt; S.teeShot = { carryYd: dc.yd, own: dc.own, t: tt }; return; }
+            // URGENT-026 (gps-geo.teeShot): along the hole's PATH - min(driver, the corner / the
+            // fairway's end), in the fairway. NO PATH DATA: the pre-023c default on the straight
+            // line, never the driver's distance.
+            var ts = G.teeShot({ par: S.par, tee: r.tee, mid: center, line: sh.line, fairway: sh.fairway, hazards: sh.hazards, driverM: driverGroundM(r, dc.yd) });
+            if (ts && ts.pt) { S.target = ts.pt; if (ts.drive) S.teeShot = { carryYd: dc.yd, own: dc.own, t: ts.drive }; return; }
         }
         // 009 (switch pathTarget): on the hole's path - at the dogleg when its corner is
         // in the landing zone (gps-geo.pathTarget). Never bent by a dragged target.
         var p = pathTargetOn() && r.tee && G.pathTarget
-            ? G.pathTarget(Object.assign(opts, { path: G.holePath({ tee: r.tee, mid: center, line: opts.line, fairway: opts.fairway, hazards: rec && rec.hazards }) }))
+            ? G.pathTarget(Object.assign(opts, { path: G.holePath({ tee: r.tee, mid: center, line: opts.line, fairway: opts.fairway, hazards: sh.hazards }) }))
             : G.defaultTarget(opts);
         if (p) S.target = p;
+    }
+    // ---- "SAVE THIS LINE" (URGENT-026 addition, Manny 12:21 PM) ---------------------------------
+    // ONLY on a hole with NO path data (holeShape: no drawn / bundled line, no fairway): once the
+    // golfer has DRAGGED the target, a small "Save this line for this hole?" by it. A tap saves the
+    // bent tee -> target -> green line for everyone at course_gps/<key>/lines/hN { pts, at, ev }
+    // (like a tapped green; the same permission shape as pins: the first line by any member of a
+    // round at the course, a change - or "Clear saved line" { cleared } - only by that round's
+    // organizer). The default target and the flyover then use it; it never replaces a real path.
+    // A drag that is not saved is never written. SHIPS DARK: features.lineSave must be exactly
+    // true, flipped only once the rules addition (docs/gps-lines-rules-proposal.json) is deployed.
+    function lineSaveOn() { try { var f = (window.HARDPAN_GPS_CONFIG || {}).features || {}; return f.lineSave === true; } catch (e) { return false; } }
+    function saveLineState() {
+        if (!S || !lineSaveOn() || !S.pro || !S.target || !S.targetMoved || S.lineAsked || S.mode !== 'measure' || S.side !== 'gps'
+            || S.flying || S.shotMode || S.shotAdjust || S.replay || readOnlyHere() || !S.db || Number(S.par) === 3) return null;
+        var r = resolved();
+        if (!r || !r.tee || !r.mid) return null;
+        var sh = holeShape(S.hole, r, r.mid);
+        if (sh.data) return null;
+        var org = creatorHere(roundData());
+        // A saved line already: only the organizer may change or clear it (the rule refuses anyone else).
+        var has = !!G.savedLine(savedLineRec(S.hole), r.tee, r.mid);
+        if (has && !org) return null;
+        return { r: r, clear: has && org };
+    }
+    function placeSaveLine() {
+        var box = S && S.el.querySelector('.gps-saveline');
+        if (!box) return;
+        var st = S.map && S.styleReady ? saveLineState() : null;
+        if (!st) { box.style.display = 'none'; return; }
+        var q; try { q = S.map.project(ll(S.target)); } catch (e) { q = null; }
+        if (!q) { box.style.display = 'none'; return; }
+        box.style.display = '';
+        show('.gps-saveline-clear', st.clear);
+        var tEl = S.targetMarker && S.targetMarker.getElement(), R = Math.max(10, Number(tEl && tEl.getAttribute('data-ring-px')) / 2 || 10);
+        var wrap = S.el.querySelector('.gps-map-wrap'), W = wrap ? wrap.clientWidth : 390, w = box.offsetWidth || 220;
+        box.style.left = Math.round(Math.max(8, Math.min(W - w - 8, q.x - w / 2))) + 'px';
+        box.style.top = Math.round(q.y + R + 10) + 'px';
+    }
+    function writeLine(v, done) {
+        if (!S || !S.db || typeof S.db.ref !== 'function') return;
+        var key = S.courseKey, k = holeKey(S.hole), mine = S;
+        S.lineAsked = true;
+        placeSaveLine();
+        var ok = function () {
+            if (S !== mine) return;
+            var cached = cacheRead(key) || {};
+            cached.lines = cached.lines || {};
+            cached.lines[k] = v;
+            cacheWrite(key, cached);
+            S.courseRec = Object.assign({}, S.courseRec || {}, { lines: Object.assign({}, (S.courseRec && S.courseRec.lines) || {}, (function () { var o = {}; o[k] = v; return o; })()) });
+            flash(done);
+            if (!v.cleared) { S.targetMoved = false; placeTarget(resolved()); }
+            render();
+        };
+        try {
+            var p = S.db.ref('course_gps/' + key + '/lines/' + k).set(v);
+            if (p && typeof p.then === 'function') p.then(ok, function () { if (S === mine) flash('Couldn\u2019t save the line - try again with signal'); });
+            else ok();
+        } catch (e) { flash('Couldn\u2019t save the line'); }
+    }
+    function saveLine() {
+        var st = saveLineState();
+        if (!st) return;
+        var r6 = function (p) { return [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6]; };
+        writeLine({ pts: [st.r.tee, S.target, st.r.mid].map(r6), at: Date.now(), ev: S.eventCode }, 'Line saved for hole ' + S.hole);
+    }
+    function clearLine() {
+        var st = saveLineState();
+        if (!st || !st.clear) return;
+        writeLine({ cleared: true, at: Date.now(), ev: S.eventCode }, 'Saved line cleared');
     }
     function drawTargetLines() {
         if (!S || !S.map || !S.styleReady) return;
@@ -1784,7 +1875,7 @@
             el.className = 'gps-target';
             el.innerHTML = '<span class="gps-ring"></span><span class="gps-ring-in"></span><span class="gps-ring-line"></span><span class="gps-ring-dot"></span><span class="gps-ring-lbl"></span>';
             var m = new (ML().Marker)({ element: el, draggable: true, anchor: 'center' }).setLngLat(ll(S.target)).addTo(S.map);
-            m.on('dragstart', function () { if (!S) return; S.dragging = true; S.targetMoved = true; });
+            m.on('dragstart', function () { if (!S) return; S.dragging = true; S.targetMoved = true; S.lineAsked = false; });
             m.on('drag', function () {
                 if (!S) return;
                 var p = m.getLngLat();
@@ -2077,31 +2168,29 @@
     // middle, else the bunkers either side, else straight) in about 5 s
     // (gps-geo.flyoverPlan / flyoverCamera): the whole hole first, then down the path
     // tilted - wide enough for the fairway and its hazards, turning at the dogleg - and
-    // flat on the green with its F / C / B pins, with "Hole 5 · Par 4 · 385 yds" over
-    // it, then back to the normal hole view. Drawn by MapLibre - no video. Any touch
+    // flat on the green with its F / C / B pins ("Hole 5 · Par 4 · 385 yds" only while the tiles
+    // load - never over the map in flight, URGENT-026), then back to the normal hole view. Drawn by MapLibre - no video. Any touch
     // stops it (back to the hole view). prefers-reduced-motion: no flight - the whole
     // hole framed at once, the same words, then the normal view.
     var FLY_STILL_MS = 2500, FLY_PITCH = 50;
     function flySwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('flyover') !== false; } catch (e) { return true; } }
     function reducedMotion() { try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (e) { return false; } }
-    function holeOsm() {
-        var osm = osmRecord(S.courseKey);
-        return (osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm) || null;
-    }
     // The path for hole r; dragged: the golfer's moved target bends it.
+    // URGENT-026: the SAME shape the target uses (holeShape: the drawn / bundled line, the fairway,
+    // a saved line where there is nothing else).
     function flyPath(r, dragged) {
-        var rec = holeOsm() || {};
-        return G.holePath({ tee: r.tee, mid: r.mid, line: osmPathFor(S.hole) || rec.line, fairway: rec.fairway, hazards: rec.hazards, target: dragged || null });
+        var sh = holeShape(S.hole, r, r.mid);
+        return G.holePath({ tee: r.tee, mid: r.mid, line: sh.line, fairway: sh.fairway, hazards: sh.hazards, target: dragged || null });
     }
     function flyPlan(r) {
         var path = flyPath(r, S.targetMoved ? S.target : null);
         if (!path) return null;
-        var rec = holeOsm() || {}, o = origin(r), nums = G.holeNumbers(o ? o.pt : null, r) || {};
-        var extra = (rec.hazards || []).map(function (z) { return z.pt; });
-        (rec.fairway || []).forEach(function (ring) { extra = extra.concat(ring); });
+        var sh = holeShape(S.hole, r, r.mid), o = origin(r), nums = G.holeNumbers(o ? o.pt : null, r) || {};
+        var extra = (sh.hazards || []).map(function (z) { return z.pt; });
+        (sh.fairway || []).forEach(function (ring) { extra = extra.concat(ring); });
         var el = S.el.querySelector('.gps-map');
         var plan = G.flyoverPlan({ path: path.pts, green: r.green || [], pins: [nums.front, r.mid, nums.back].filter(Boolean), extra: extra,
-            fairway: rec.fairway || [], par: S.par,
+            fairway: sh.fairway || [], par: S.par,
             view: { w: el ? el.clientWidth : 390, h: el ? el.clientHeight : 600 }, pad: S.pad || viewPad(), maxZoom: maxZoomNow() });
         if (plan) plan.src = path.src;
         return plan;
@@ -2188,6 +2277,8 @@
         try { map.setMaxPitch(FLY_PITCH); } catch (e) {}
         S.flying = { t0: Date.now(), frames: 0, trail: [] };
         flyMark('flying');
+        // URGENT-026: no "Hole 1 · Par 5 · 520 yds" over the map while it flies - it covered a bubble.
+        if (cap) cap.style.display = 'none';
         if (el) { el.setAttribute('data-fly-src', plan.src); el.setAttribute('data-fly-path', plan.pts.map(function (p) { return p[0].toFixed(6) + ',' + p[1].toFixed(6); }).join(';')); el.removeAttribute('data-fly-start-fit'); el.removeAttribute('data-fly-end-fit'); }
         var step = function () {
             if (S !== mine || !S.flying || S.flying.still) return;
@@ -2239,6 +2330,7 @@
     function hits(a, b) { return a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t; }
     function placePills() {
         if (!S) return;
+        placeSaveLine();
         var pTo = S.el.querySelector('.gps-pill-to'), pOn = S.el.querySelector('.gps-pill-on');
         if (!pTo || !pOn) return;
         pTo.style.display = 'none'; pOn.style.display = 'none';
@@ -2839,8 +2931,7 @@
     function myCellSwitch() { try { var f = (window.HARDPAN_GPS_CONFIG || {}).features || {}; return f.elevMyCell === true; } catch (e) { return false; } }
     var CELL_PREFIX = 'hardpan_elev_cell_v1_';
     function holeLineFor(r) {
-        var osm = osmRecord(S.courseKey), rec = osm && osm.holes && osm.holes[String(S.hole)] && osm.holes[String(S.hole)].osm;
-        var line = (osmPathFor(S.hole) || (rec && rec.line) || []).filter(Boolean);
+        var line = (holeShape(S.hole, r, r.mid).line || []).filter(Boolean);
         return [r.tee].concat(line).concat([r.mid]);
     }
     function ownSpotCell(r, pt) {
@@ -3539,6 +3630,7 @@
         // Tap anywhere: the target jumps there.
         S.target = pt;
         S.targetMoved = true;
+        S.lineAsked = false;
         clampTarget();
         render();
     }
@@ -4915,6 +5007,7 @@
         +   '<div class="gps-pill gps-pill-on" style="display:none"></div>'
         +   '<div class="gps-tiles-note" style="display:none">No satellite view here without signal — yardages still work.</div>'
         +   '<div class="gps-fly-cap" data-feature="flyover" style="display:none" role="status"></div>'
+        +   '<div class="gps-saveline" style="display:none"><button type="button" class="gps-saveline-yes">Save this line for this hole?</button><button type="button" class="gps-saveline-clear" style="display:none">Clear saved line</button></div>'
         + '</div>'
         // TOP PANEL: back, the hole (tap = pick a hole), CENTER big with F / B.
         + '<div class="gps-top">'
@@ -5354,6 +5447,8 @@
         + '#gps-overlay .gps-pop-info:empty{display:none;}'
         + '#gps-overlay .gps-tiles-note{position:absolute;bottom:calc(var(--gps-attrib-h) + 130px);left:8px;right:8px;z-index:4;text-align:center;font-size:13px;color:#d1d5db;text-shadow:0 0 3px #000;}'
         // MAP OVERLAYS: pills, arc labels, green labels, the flag
+        + '#gps-overlay .gps-saveline{position:absolute;z-index:6;display:flex;gap:6px;}'
+        + '#gps-overlay .gps-saveline button{background:rgba(11,15,12,.86);color:#fff;border:0;border-radius:999px;padding:8px 12px;font:800 13px/1 ' + FONT + ';white-space:nowrap;}'
         + '#gps-overlay .gps-pill{position:absolute;z-index:2;pointer-events:none;background:rgba(11,15,12,.86);color:#fff;font:800 13px/1 ' + FONT + ';padding:4px 8px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums;}'
         // BUILD 3: the two numbers on the lines - big, bold, white, a dark outline, no box.
         // BUILD 5: about 1.5x build 3's 26 px, as asked: 44 px, bold white, outlined.
@@ -6010,6 +6105,8 @@
         document.addEventListener('touchmove', blockPull, { passive: false });
         // Set / fix the green: by GPS first; the photo-tap way is the fallback link.
         on(el, '.gps-set-green', function () { S.mode = 'gpsMid'; S.draft = null; render(); });
+        on(el, '.gps-saveline-yes', saveLine);
+        on(el, '.gps-saveline-clear', clearLine);
         on(el, '.gps-fix-green', function () { S.mode = 'gpsMid'; S.draft = null; render(); });
         on(el, '.gps-tap-fallback', function () { S.mode = 'setMid'; S.draft = null; render(); });
         // "Set": the spot the golfer is STANDING on becomes the green's center /
@@ -6415,6 +6512,26 @@
         sunHours: sunHours, isDaylight: isDaylight,
         // URGENT-022 (the GPS course check): what the map frames on this hole - the tee and the green,
         // whether each is in view, and the course's own point.
+        // URGENT-026 (the course check): every hole's DEFAULT TEE TARGET as placeTarget makes it from
+        // the tee (gps-geo.teeShot on holeShape) - { n, par, fw (rings), data, saved, src, inFw, yd }.
+        teeTargets: function () {
+            try {
+                if (!S || !G.teeShot) return null;
+                var osm = osmRecord(S.courseKey), dc = driverCarryYd(), out = [];
+                Object.keys((osm && osm.holes) || {}).forEach(function (n) {
+                    var r = G.resolveHole(osm.holes[n], pinsFor(n));
+                    if (!r || !r.tee || !r.mid) { out.push({ n: Number(n), none: true }); return; }
+                    var m = (typeof S.holeMeta === 'function' ? S.holeMeta(Number(n)) : null) || {}, par = m.par != null ? m.par : (Number(n) === S.hole ? S.par : null);
+                    var sh = holeShape(n, r, r.mid);
+                    var ts = G.teeShot({ par: par, tee: r.tee, mid: r.mid, line: sh.line, fairway: sh.fairway, hazards: sh.hazards, driverM: (dc ? dc.yd : 250) * G.M_PER_YD });
+                    var rings = (sh.fairway || []).filter(function (x) { return x && x.length >= 3; });
+                    out.push({ n: Number(n), par: par, fw: rings.length, data: !!(ts && ts.data), saved: sh.saved, src: ts && ts.path ? ts.path.src : null,
+                        inFw: !!(ts && ts.pt && rings.some(function (x) { return G.pointInRing(ts.pt, x); })),
+                        yd: ts && ts.pt ? Math.round(G.haversineMeters(r.tee, ts.pt) / G.M_PER_YD) : null, driverYd: dc ? dc.yd : 250 });
+                });
+                return out.sort(function (a, b) { return a.n - b.n; });
+            } catch (e) { return { err: String(e && e.message || e) }; }
+        },
         holeCheck: function () {
             try {
                 var r = resolved(); if (!S || !S.map || !r) return null;

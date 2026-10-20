@@ -132,12 +132,19 @@ const COURSES = [
     // Palmbrook (Sun City): mapped in OSM 2026-10-10; hole 18 has a line from each
     // tee box - the picker keeps the back tee's.
     { key: 'gca_qbxhn8pj', file: 'palmbrook', osm: 'way(119067740)', parsFrom: 'directory', pick: {} },
+    // Papago (Phoenix), URGENT-026 2026-10-20: the round's key IS the GolfAPI course, so its
+    // own key names the bundle record; the hole LINES (and fairways) shape the tee target and
+    // the Preview flyover. Pars from our card (directory-pars.json).
+    { key: 'gapi_012141520636857668694', file: 'papago', osm: 'way(51990955)', parsFrom: 'directory' },
     { nines: true, file: 'thistle', osm: 'relation(21283499)', base: 'thistle_27',
       loops: { cameron: 'cameron', stewart: 'stewart', mackay: 'mckay' },
       nineNotes: { stewart: STEWART_NOTE } },
 ];
 
-const ALIASES = { wa_chambers: 'gca_50bc8qqa' };
+// URGENT-026: Talking Stick South's GolfAPI round (gapi_<id>, "Talking Stick Golf Club (South -
+// Piipaash)") has no link and its name is not the bundle's, so its hole lines and fairways were
+// never borrowed: the same course under its GolfAPI key.
+const ALIASES = { wa_chambers: 'gca_50bc8qqa', gapi_012141520639939791440: 'az_talking_piipaash' };
 
 function loadCourseData() {
     const src = fs.readFileSync(path.join(ROOT, 'course-data.js'), 'utf8');
