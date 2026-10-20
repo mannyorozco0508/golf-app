@@ -6522,6 +6522,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             holes: played, at: h => gpsSheetHole(Number(h), here.golfers),
             next: () => { if (Number(currentViewedHole) === n) gpsStepHole(1); },
             last: order.indexOf(n) === order.length - 1,
+            // POLISH #10: the last hole saved (every golfer scored) - "Finish & settle up" opens. It
+            // only shows the money (writes nothing); the round is finished by the golfer, never here.
+            finish: () => {
+                const R = window.HardPanRound;
+                if (R && typeof R.openFinish === 'function' && R.openFinish()) return;
+                if (typeof uiToast === 'function') uiToast('\uD83C\uDFC1 Last hole saved \u2014 \u2630 Menu \u203A Finish & settle up', 5000);
+            },
             host: overlay && document.body.classList.contains('gps-side-gps') ? overlay : document.body
         }));
     }
@@ -9827,6 +9834,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     var syncedHideTimer = null;
     var badgeHasSpoken = false;
     function renderOfflineBadge(sending) {
+        // GPS:BEGIN
+        // POLISH #4: the map's "📴 2 waiting" (on its Thru pill) follows the same queue, and goes
+        // when the last score is sent.
+        try { if (window.HardPanGps && typeof window.HardPanGps.queueChanged === 'function') window.HardPanGps.queueChanged(); } catch (e) {}
+        // GPS:END
         var el = document.getElementById('offline-badge');
         if (!el) return;
         var q = window.OfflineQueue;
@@ -9891,10 +9903,37 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         return true;
     }
 
+    // GPS:BEGIN
+    // POLISH #4: the queued score on the card / pill (see saveScore). Reads the offline queue only.
+    function hpShowQueuedScore(scoreKey, newVal) {
+        try {
+            const q = window.OfflineQueue, store = offlineStore();
+            if (!q || !store || !currentData || !currentData.players) return false;
+            const have = (currentData.scores || {})[scoreKey];
+            if ((have == null ? null : Number(have)) === newVal) return false;   // the listener already showed it
+            currentData = q.applyQueued(currentData, q.peek(store) || [], currentMode) || currentData;
+            renderScorecard();
+            return true;
+        } catch (e) { return false; }
+    }
+    // POLISH #4: "Saving…" NEVER STAYS. With no signal a write never settles, and the line used to
+    // read "Saving…" for the rest of the round. The score is already on this phone (the queue), so
+    // the line says that - at once when the phone says it is offline, else after a few seconds
+    // with no answer (one bar), and goes like "✓ Saved" does - the offline badge under it keeps
+    // the count ("2 waiting") until they are sent. A later answer still says "✓ Saved" or the error.
+    const HP_SAVED_HERE = '\uD83D\uDCF4 Saved on this phone';
+    // GPS:END
     // The promise is only OBSERVED. The write itself is unchanged, and the
     // original promise is what callers keep chaining.
     function trackWrite(promise) {
-        setSaveState('saving', 'Saving\u2026');
+        // GPS:BEGIN
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) setSaveState('saved', HP_SAVED_HERE);
+        else {
+            setSaveState('saving', 'Saving\u2026');
+            const tok = saveStateToken;
+            setTimeout(() => { if (tok === saveStateToken) setSaveState('saved', HP_SAVED_HERE); }, 5000);
+        }
+        // GPS:END
         return promise
             .then(() => setSaveState('saved', '\u2713 Saved'))
             .catch(() => setSaveState('error',
@@ -9940,6 +9979,15 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // Both watch the SAME promise - neither replaces the other, and the write
         // is untouched by either.
         trackWrite(writePromise);
+        // GPS:BEGIN
+        // POLISH #4: A SCORE QUEUED WITH NO SIGNAL IS ON THE CARD AT ONCE. Online the round's own
+        // listener fires on the local write and lays the queue over the round; with no signal (or a
+        // round opened from this phone's copy) it does not fire, and the card, the leaderboard line and
+        // the map's Thru pill kept the old round - the score looked lost. So: when the round in memory
+        // does not show this score yet, the offline queue is laid over it here (display only - the
+        // queue and the write above are untouched) and the card draws again.
+        hpShowQueuedScore(scoreKey, newVal);
+        // GPS:END
 
         // RYDER CUP MATCH LOCK. A Cup pairing freezes the moment the first score
         // for that match is posted, so a roster edit can never rewrite holes that
