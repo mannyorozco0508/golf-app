@@ -1256,6 +1256,36 @@
             box.innerHTML = tile(d.courseName, pr.thru);
         }, function () {});
     }
+    // ---- THIS PHONE'S ROUNDS: DATES AND HISTORY (2.0 polish #6, #7) ----------------------------
+    // The day a round was first opened on this phone (the scorecard's remember, below), per code -
+    // a round record carries no date of its own. A round from before this list: the time of its
+    // stored copy (the last time it was open here), the best this phone knows.
+    var SEEN = 'hardpan_round_seen_v1';
+    function seenMap() { try { var m = JSON.parse(ls(SEEN) || '{}'); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; } catch (e) { return {}; } }
+    function seenRound(code) {
+        code = String(code || '').toUpperCase();
+        if (!/^[A-Z0-9]{4,10}$/.test(code)) return;
+        var m = seenMap();
+        if (m[code]) return;
+        m[code] = Date.now();
+        var keys = Object.keys(m);
+        if (keys.length > 200) keys.sort(function (a, b) { return m[a] - m[b]; }).slice(0, keys.length - 200).forEach(function (k) { delete m[k]; });
+        ls(SEEN, JSON.stringify(m));
+    }
+    function roundDay(code, fallback) { return Number(seenMap()[String(code || '').toUpperCase()]) || Number(fallback) || 0; }
+    // "Today", "Yesterday", "Tue Oct 13" (", 2025" when it is not this year). Never "LAST WEEK".
+    function dayLabel(ts, now) {
+        if (!(Number(ts) > 0)) return '';
+        var d = new Date(Number(ts)), n = new Date(now || Date.now());
+        var day = function (x) { return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); };
+        var diff = Math.round((day(n) - day(d)) / 86400000);
+        if (diff === 0) return 'Today';
+        if (diff === 1) return 'Yesterday';
+        var DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        return DAYS[d.getDay()] + ' ' + MON[d.getMonth()] + ' ' + d.getDate() + (d.getFullYear() !== n.getFullYear() ? ', ' + d.getFullYear() : '');
+    }
+    function golfersText(n) { return n + ' golfer' + (n === 1 ? '' : 's'); }
+    function namedPlayers(d) { return d && Array.isArray(d.players) ? d.players.filter(function (p) { return p && String(p.name || '').trim(); }) : []; }
     // ---- JOIN WITH A BARE CODE ASKS WHICH GROUP (2.0 polish #9) ---------------------------------
     // A bare code (or the whole-round link) used to open a spectator view straight away - with
     // no question, and on the organizer's own phone a writable one. Now Home asks: each group with
@@ -1367,13 +1397,23 @@
         var box = $('hs-same');
         if (!box) return;
         var last = ls('lastRoomCode');
+        // 2.0 POLISH #7: each round once. A round still being played is the IN PROGRESS card's
+        // (Resume) - never also "Again"; one with scores but not finished has no "Again" either
+        // (History has it). The label is the round's day ("Today", "Yesterday", "Tue Oct 13"),
+        // never "LAST WEEK", and the count says "2 golfers".
+        var lr0 = null; try { lr0 = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr0 = null; }
+        var live = lr0 && lr0.code && Date.now() - (lr0.at || 0) <= 12 * 3600 * 1000 ? String(lr0.code).toUpperCase() : null;
         var paint = function (d) {
-            var ps = d && Array.isArray(d.players) ? d.players.filter(function (p) { return p && String(p.name || '').trim(); }) : [];
+            var ps = namedPlayers(d);
             if (!d || !ps.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+            var pr = progressOf(d);
+            if (!pr.finished && (pr.thru > 0 || String(last).toUpperCase() === live)) { box.innerHTML = ''; box.style.display = 'none'; return; }
+            var snap = null; try { snap = JSON.parse(ls('golfapp_snap_v1_' + String(last).toUpperCase()) || 'null'); } catch (e) { snap = null; }
+            var when = dayLabel(roundDay(last, (snap && snap.at) || (lr0 && String(lr0.code).toUpperCase() === String(last).toUpperCase() ? lr0.at : 0))) || 'Last round';
             var g = gamesOf(d);
             box.style.display = '';
-            box.innerHTML = '<button type="button" class="hs-card hs-same-card" data-hp-act="ssame" data-hs-from="' + esc(last) + '"><span><span class="h">LAST WEEK</span>'
-                + '<span class="n">' + esc(shownName(String(d.courseName || 'Your last round').split(' (')[0])) + ' \u00b7 ' + ps.length + (g.length ? ' \u00b7 ' + esc(g.join(' + ')) : '') + '</span></span><span class="go">\u21BB<br>Again</span></button>';
+            box.innerHTML = '<button type="button" class="hs-card hs-same-card" data-hp-act="ssame" data-hs-from="' + esc(last) + '"><span><span class="h">' + esc(when.toUpperCase()) + '</span>'
+                + '<span class="n">' + esc(shownName(String(d.courseName || 'Your last round').split(' (')[0])) + ' \u00b7 ' + golfersText(ps.length) + (g.length ? ' \u00b7 ' + esc(g.join(' + ')) : '') + '</span></span><span class="go">\u21BB<br>Again</span></button>';
         };
         if (!last) { paint(null); return; }
         var local = localRound(last);
@@ -1610,6 +1650,7 @@
         // gone, unreadable) is never the one Resume / the GPS door / a relaunch goes back to.
         // Not here within LOAD_MS: "Round X isn't available" + Go Home, never "Connecting..." for ever.
         var remember = function () {
+            seenRound(code);
             ls('hardpan_last_round', JSON.stringify({ code: code, at: Date.now(), course: lr && lr.code === code ? lr.course : '',
                 spectate: pr.get('spectate') === '1' ? 1 : 0, group: pr.get('group') || null, sk: pr.get('sk') || null }));
         };
@@ -2408,7 +2449,7 @@
         }, function () { return false; });
     }
 
-    W.HardPanDoors = { joinGroups: joinGroups, hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
+    W.HardPanDoors = { dayLabel: dayLabel, joinGroups: joinGroups, seenRound: seenRound, hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
         position: position, nearList: nearList, shownName: shownName, where: where, meName: meName, myHcp: myHcp, loadScriptTimed: loadScriptTimed, STATES: STATES, gamesOf: gamesOf, simpleOn: simpleOn,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         // URGENT-028: the round in progress as this phone has it (Start Round asks before replacing a scored one).
