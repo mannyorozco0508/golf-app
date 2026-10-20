@@ -100,7 +100,11 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
         // round (Course / Players / Games, one-tap Start, share sheet), one "+ Bet" sheet on GPS and
         // the card, the live money chip, the 6-tile Round Menu, Card/Bets as sheets over the map -
         // off: today's screens exactly. On in dev while Manny tries it.
-        simpleFlow: true },
+        // URGENT-016: simpleGames = the 3-step Games & Bets setup (Players / Games steps) and Home's
+        // "Same as last week" landing on its Games step. OFF (Manny, 2026-10-19): the Games & Bets
+        // door opens the ORIGINAL setup ("What are you setting up?" Road Trip / Game Day) unchanged;
+        // the GPS door's "Where are you playing?" -> Start GPS stays the new flow.
+        simpleFlow: true, simpleGames: false },
     // pathTarget (009 part A): the default target sits on the hole's path at the dogleg / landing zone.
     // osmPath (010): on a GolfAPI hole with no line of its own, the bundled OpenStreetMap hole
     // LINE (same course, same hole, its ends within 40 m of GolfAPI's tee and green) shapes the

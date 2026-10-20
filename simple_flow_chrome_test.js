@@ -36,6 +36,8 @@ const SHOT = (name) => (process.env.SF_SHOTS ? [{ shot: require('path').join(pro
 const TEEROWS = "JSON.stringify({ tees: Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-tee]'), function (b) { return b.innerText.replace(/\\n/g, ' | ') + (b.classList.contains('sf-sel') ? ' *' : ''); }) })";
 const BASE = 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true });
 const OFF = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{features:Object.assign({},v&&v.features,{simpleFlow:false})});}});})();";
+// URGENT-016: the 3-step Games & Bets setup ships behind features.simpleGames (off); these tests turn it on.
+const GAMES_ON = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{features:Object.assign({},v&&v.features,{simpleGames:true})});}});})();";
 const X = (e) => ({ expression: e });
 // REAL TYPING (URGENT-013 5:17 PM): keys through DevTools Input, as a keyboard sends them.
 const TYPE = (text) => ({ cdp: { method: 'Input.insertText', params: { text } } });
@@ -56,7 +58,7 @@ const WRITES = "JSON.stringify({ writes: (window.__coldWrites || []).filter(func
 
 describe('017 Simpler HardPan: Home and the 3-step New round', () => {
     test('New round: 3 steps with the 20-golfer paste (Add initial), Start in ONE tap, share sheet, Done opens your group on the GPS', { timeout: 150000 }, async () => {
-        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE, steps: [
+        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE + GAMES_ON, steps: [
             { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.3759, longitude: -111.8778, accuracy: 10 } } },
             { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
             X("JSON.stringify({ home: document.getElementById('v-simple').innerText })"), ...SHOT('v2-home.png'),
@@ -123,7 +125,7 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
 
     test('Same as last week: Home shows course · golfers · games; lands on Step 3 filled in; Start saves a NEW round', { timeout: 120000 }, async () => {
         const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB({ SALW01: SRC }), settleMs: 2000, viewport: { width: 393, height: 852 },
-            preScript: BASE + "try{localStorage.setItem('lastRoomCode','SALW01');}catch(e){}", steps: [
+            preScript: BASE + GAMES_ON + "try{localStorage.setItem('lastRoomCode','SALW01');}catch(e){}", steps: [
                 { waitFor: "!!document.querySelector('[data-hp-act=\"ssame\"]')", timeout: 10000 },
                 X("JSON.stringify({ same: document.getElementById('hs-same').innerText })"),
                 { tap: '[data-hp-act="ssame"]' },
@@ -165,7 +167,7 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
             X("JSON.stringify({ box: document.getElementById('sf-paste').value })"),
             X("(function(){ var t = document.getElementById('sf-paste'); t.value = 'Glenn 12.0/B\\nMarty 9.0/B\\nScott 6.0/B\\nEddie 12.0/B'; t.dispatchEvent(new Event('input', { bubbles: true })); return 'set'; })()"),
             { tap: '[data-sf="pastedone"]' }, { sleep: 300 }, X(SUM), ...SHOT('v2-players-paste.png'));
-        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE, steps });
+        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE + GAMES_ON, steps });
         assert.equal(r.ok, true, r.reason);
         const focus = r.value.filter((v) => typeof v === 'string' && /^F:/.test(v));
         const [typed, box, pasted] = J(r);
@@ -191,7 +193,7 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         });
         steps.push({ sleep: 400 }, X(FOCUS), X(SUM), { tap: '[data-sf="next"]' }, { sleep: 300 }, X(SF), { tap: '[data-sf="start"]' }, { sleep: 1500 }, X(SF),
             { waitFor: "!!document.getElementById('sf-code')", timeout: 20000 }, X(WRITES));
-        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE, steps });
+        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE + GAMES_ON, steps });
         assert.equal(r.ok, true, r.reason);
         const [p16, p20, games, sheet, w] = J(r);
         assert.equal(games.h1, "What are you playing?");

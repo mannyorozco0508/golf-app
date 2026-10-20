@@ -64,7 +64,7 @@
     // plugin's own timeout) is "Couldn't get your location - Tap to retry", never "turn on location".
     function whyNot(e) {
         var code = e && e.code, m = String((e && (e.message || e.errorMessage)) || e || '').toLowerCase();
-        if (code === 1 || code === 'PERMISSION_DENIED' || /denied|permission|not authori[sz]ed|disabled/.test(m)) return 'denied';
+        if (code === 1 || code === 'PERMISSION_DENIED' || /denied|permission|not authori[sz]ed|disabled|not enabled/.test(m)) return 'denied';
         return 'timeout';
     }
     function position(done) {
@@ -73,7 +73,15 @@
         var timer = setTimeout(function () { once(null, 'timeout'); }, LOC_MS);
         try {
             if (native() && G && typeof G.getCurrentPosition === 'function') {
-                G.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 }).then(function (p) { once([p.coords.latitude, p.coords.longitude]); }, function (e) { once(null, whyNot(e)); });
+                var ask = function () { G.getCurrentPosition({ enableHighAccuracy: false, timeout: 10000 }).then(function (p) { once([p.coords.latitude, p.coords.longitude]); }, function (e) { once(null, whyNot(e)); }); };
+                // THE APP'S OWN PERMISSION (URGENT-016): already refused in iOS Settings -> "denied" at
+                // once (the course list falls back to this phone's courses) instead of waiting out a
+                // request iOS will not show; not asked yet -> getCurrentPosition shows iOS's prompt.
+                if (typeof G.checkPermissions === 'function') {
+                    G.checkPermissions().then(function (st) { if (st && st.location === 'denied') once(null, 'denied'); else ask(); }, ask);
+                    return;
+                }
+                ask();
                 return;
             }
             if (W.navigator.geolocation) { W.navigator.geolocation.getCurrentPosition(function (p) { once([p.coords.latitude, p.coords.longitude]); }, function (e) { once(null, whyNot(e)); }, { timeout: 10000, maximumAge: 300000 }); return; }
@@ -1019,6 +1027,7 @@
     var SIMPLE = 'hardpan_simple_flow';
     function simpleOn() { try { return !!$('v-simple') && typeof W.HardPanFeature === 'function' && W.HardPanFeature('simpleFlow'); } catch (e) { return false; } }
     function homeView() { return simpleOn() ? 'simple' : 'main'; }
+    function simpleGames() { try { return typeof W.HardPanFeature === 'function' && ((W.HARDPAN_GPS_CONFIG || {}).features || {}).simpleGames === true; } catch (e) { return false; } }
     function hello() {
         var h = new Date().getHours(), n = meName();
         return (h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening') + (n && n !== 'Me' ? ', ' + n : '');
@@ -1077,8 +1086,11 @@
             + '<span class="n">' + esc(shownName(String(course || 'Your round').split(' (')[0])) + ' \u00b7 ' + (thru ? 'Thru ' + thru : 'Not started') + '</span></span><span class="go">Resume \u203A</span></button>';
     }
     function simpleAct(a, b) {
-        if (a === 'snew') { ss(QUICK, null); ss(SIMPLE, 'new'); W.location.href = 'admin.html?start=quick'; return true; }
-        if (a === 'ssame') { ss(QUICK, null); ss(SIMPLE, 'same'); W.location.href = 'admin.html?start=same'; return true; }
+        // URGENT-016: with features.simpleGames off (the default) Games & Bets is the ORIGINAL setup -
+        // Round Setup's own "What are you setting up?" (Road Trip / Game Day), no session mark - and
+        // Same as last week is its own copier exactly (lands on Players). On: the 3-step screens.
+        if (a === 'snew') { ss(QUICK, null); if (!simpleGames()) { ss(SIMPLE, null); W.location.href = 'admin.html?start=lobby'; return true; } ss(SIMPLE, 'new'); W.location.href = 'admin.html?start=quick'; return true; }
+        if (a === 'ssame') { ss(QUICK, null); ss(SIMPLE, simpleGames() ? 'same' : null); W.location.href = 'admin.html?start=same'; return true; }
         if (a === 'sjoinopen') { var jb = $('hs-join'); if (jb) { jb.style.display = jb.style.display === 'none' ? '' : 'none'; var ji = $('hs-code'); if (ji && jb.style.display === '') ji.focus(); } return true; }
         // THE GPS DOOR (URGENT-013): the one Course & Tees screen, then "Start GPS" -> the map.
         if (a === 'sgpsdoor') { gpsGate(homeCourse(), function () { setDoor('gps'); ss(QUICK, null); ss(SIMPLE, 'gps'); W.location.href = 'admin.html?start=quick'; }); return true; }
@@ -1118,6 +1130,8 @@
             return;
         }
         if (p.get('account') && typeof W.openAccountPanel === 'function') { setTimeout(function () { try { W.openAccountPanel(); } catch (e) {} }, 300); return; }
+        // URGENT-016: Home's Games & Bets door - the lobby itself ("What are you setting up?"), as it is.
+        if (p.get('start') === 'lobby' && !p.get('game')) return;
         if (p.get('start') === 'quick' && !p.get('game')) {
             // AN UNSAVED SETUP WAITING (URGENT-009): asked before a new code is minted.
             draftAsk().then(function (went) { if (!went && typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); });
@@ -2085,6 +2099,32 @@
                     if (W.document.body) go(); else W.document.addEventListener('DOMContentLoaded', go);
                 }, LAUNCH_MS);
             }
+        } catch (e) {}
+    })();
+    // THE GPS DOOR NEVER SHOWS THE LOBBY (URGENT-016, Manny on the Cmd+R build: GPS flashed the old
+    // "HARDPAN / What are you setting up?" before "Where are you playing?"). The door goes Home ->
+    // admin.html?start=quick (the lobby's own createRoom mints the code) -> admin.html?game=CODE,
+    // where simple-flow.js paints its screen. Both pages are covered from <head> - before their
+    // first paint - with the screen's own background and title; only simple-flow's screen (#sf) and
+    // the app's own dialogs (the unsaved-setup question) show through. simple-flow.js lifts it
+    // once its screen is up; if the hop stalls (no signal), the page shows again after 8 s.
+    (function gpsCover() {
+        try {
+            var path = String(W.location.pathname || ''), p = params(), m = ss(SIMPLE), mode = m;
+            if (!/admin\.html$/.test(path) || !m) return;
+            try { var o = JSON.parse(m); if (o && o.mode) { mode = o.mode; if (o.code && p.get('game') && String(p.get('game')).toUpperCase() !== o.code) return; } } catch (e) {}
+            if (mode !== 'gps' || !(p.get('game') || p.get('start') === 'quick')) return;
+            var D = W.document, st = D.createElement('style');
+            st.id = 'sf-pre-css';
+            st.textContent = 'html.sf-pre,html.sf-pre body{background:#f2f4ef!important}'
+                + 'html.sf-pre body>*:not(#sf):not(#ui-sheet):not(#ui-toast-wrap){visibility:hidden!important}'
+                + 'html.sf-pre body::before{content:"Where are you playing?";position:fixed;left:16px;right:16px;top:calc(env(safe-area-inset-top) + 64px);'
+                + 'font:800 25px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#13241d;max-width:488px;margin:0 auto}';
+            (D.head || D.documentElement).appendChild(st);
+            D.documentElement.classList.add('sf-pre');
+            setTimeout(function () { D.documentElement.classList.remove('sf-pre'); }, 8000);
+            // The code-minting hop is never a place to come back to: Back onto it goes Home.
+            if (!p.get('game')) W.addEventListener('pageshow', function (ev) { if (ev.persisted) W.location.replace('home.html'); });
         } catch (e) {}
     })();
     if (W.document && !/home\.html$/.test(String(W.location.pathname || ''))) {

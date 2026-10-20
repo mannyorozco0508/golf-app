@@ -199,8 +199,12 @@
     function nearList(here) {
         var H = HD();
         if (!here || typeof H.miles !== 'function') return [];
-        return courses().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: H.miles(here, c.pt) }; })
-            .filter(function (x) { return x.d <= 25; }).sort(function (a, b) { return a.d - b.d; }).slice(0, 8);
+        // URGENT-016: up to 8 - everything within 25 miles, topped up from the next closest within
+        // 100 (a course with few neighbours still gets a list to choose from).
+        var all = courses().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: H.miles(here, c.pt) }; })
+            .filter(function (x) { return x.d <= 100; }).sort(function (a, b) { return a.d - b.d; });
+        var near = all.filter(function (x) { return x.d <= 25; });
+        return (near.length >= 8 ? near : all).slice(0, 9);
     }
     function nameOf(c) { var H = HD(); return typeof H.shownName === 'function' ? H.shownName(c.name) : c.name; }
     function ready(key) { var H = HD(); try { return !!(key && typeof H.ready === 'function' && H.ready(key)); } catch (e) { return false; } }
@@ -361,14 +365,19 @@
                 + '<span class="s" style="text-align:right;line-height:1.35;">' + (r.yards ? r.yards.toLocaleString('en-US') + ' yds<br>' : '') + esc(Number(r.rating).toFixed(1)) + ' / ' + esc(r.slope) + '</span></button>';
         }).join('');
     }
-    function courseCard() {
+    // THE PICKED COURSE, ON TOP AND HIGHLIGHTED (URGENT-016: the NEAR YOU list sits right under it).
+    function courseHead() {
         var key = courseKey(), name = courseName();
         if (!name) return '';
         var c = courses().filter(function (x) { return x.key === key; })[0];
         var d = c ? distTo(c) : null;
-        var h = '<div class="sf-card" id="sf-course" style="padding:12px 14px;"><div class="sf-line" style="border:0;padding:0;"><span class="n" style="font-size:16px;font-weight:800;">' + esc(c ? nameOf(c) : String(name).split(' (')[0]) + '</span>'
+        return '<div class="sf-card sf-sel" id="sf-course" style="padding:12px 14px;"><div class="sf-line" style="border:0;padding:0;"><span class="n" style="font-size:16px;font-weight:800;">' + esc(c ? nameOf(c) : String(name).split(' (')[0]) + '</span>'
             + '<span class="sf-note">' + esc(miStr(d)) + (ready(key) ? (d != null ? ' · ' : '') + '✓ GPS' : '') + ' · <button type="button" class="sf-link" data-sf="change" style="padding:0;min-height:0;font-size:13px;">Change</button></span></div></div>';
-        h += teeList(key);
+    }
+    function courseCard() {
+        var key = courseKey(), name = courseName();
+        if (!name) return '';
+        var h = teeList(key);
         var loops = key && typeof nineHoleLoops !== 'undefined' && nineHoleLoops ? nineHoleLoops[key] : null;
         var len = $('round-length-select'), full = !len || len.value === '18';
         var ts = $('tee-start-select'), at = ts ? ts.value : '1';
@@ -398,21 +407,33 @@
                 .sort(function (a, b) { return (b.ready - a.ready) || (a.name.toLowerCase().indexOf(q) - b.name.toLowerCase().indexOf(q)); }).slice(0, 10);
             body += '<div class="sf-h">RESULTS</div>' + (hits.length ? hits.map(function (c) { return rowHtml(c, distTo(c), c.key === key); }).join('') : '<div class="sf-note">No course in the list by that name.</div>');
         }
-        if (!S.changing) body += courseCard();
-        if (q.length < 2 && (S.changing || !courseName())) {
-            body += '<div class="sf-h">NEAR YOU</div>';
-            if (S.near === 'asking' || S.near === null) body += '<div class="sf-note">Finding courses near you…</div>';
-            else if (S.near === 'none') {
-                // NO POSITION (Safari asked and was told no, or it never answered): say which, offer a
-                // retry, and list this phone's own courses instead of nothing.
-                body += '<div class="sf-note">' + (S.nearWhy === 'denied' ? 'Location is off for this page. To see courses near you, allow it (Safari: aA \u203a Website Settings \u203a Location), or search above.'
-                    : 'Couldn\u2019t get your location yet. Search above, or try again.') + ' <button type="button" class="sf-link" data-sf="relocate" style="padding:0 0 0 4px;min-height:0;">Try again</button></div>';
+        if (!S.changing) body += courseHead();
+        // NEAR YOU, ALWAYS (URGENT-016: with a course already picked the list was gone - only the
+        // course and "Change"). The picked course is the card above; the list under it is the
+        // others, closest first; a tap switches the course and its tees redraw in place.
+        if (q.length < 2) {
+            var yours = function () {
                 var rec = recentCourses().filter(function (c) { return c.key !== key; });
-                if (rec.length) body += '<div class="sf-h">YOUR COURSES</div>' + rec.map(function (c) { return rowHtml(c, null, false); }).join('');
+                return rec.length ? '<div class="sf-h">YOUR COURSES</div>' + rec.map(function (c) { return rowHtml(c, null, false); }).join('') : '';
+            };
+            body += '<div class="sf-h">NEAR YOU</div>';
+            if (S.near === 'asking' || S.near === null) body += '<div class="sf-note" style="margin-bottom:10px;">Finding courses near you…</div>';
+            else if (S.near === 'none') {
+                // NO POSITION (location denied, or it never answered): say which, offer a retry, and
+                // list this phone's own courses instead of nothing.
+                var nat = false; try { nat = !!(W.Capacitor && W.Capacitor.isNativePlatform && W.Capacitor.isNativePlatform()); } catch (e) {}
+                body += '<div class="sf-note" style="margin-bottom:10px;">' + (S.nearWhy === 'denied' ? (nat ? 'Location is off for HardPan. To see courses near you, turn it on in Settings \u203a HardPan \u203a Location, or search above.'
+                    : 'Location is off for this page. To see courses near you, allow it (Safari: aA \u203a Website Settings \u203a Location), or search above.')
+                    : 'Couldn\u2019t get your location yet. Search above, or try again.') + ' <button type="button" class="sf-link" data-sf="relocate" style="padding:0 0 0 4px;min-height:0;">Try again</button></div>';
+                body += yours();
             }
-            else if (!S.near.length) body += '<div class="sf-note">No courses we know of within 25 miles — search above.</div>';
-            else body += S.near.slice(0, 6).map(function (x) { return rowHtml(x.c, x.d, x.c.key === key); }).join('');
+            else {
+                var others = S.near.filter(function (x) { return x.c.key !== key; }).slice(0, 8);
+                if (!others.length) body += '<div class="sf-note" style="margin-bottom:10px;">No other courses we know of nearby — search above.</div>' + yours();
+                else body += others.map(function (x) { return rowHtml(x.c, x.d, false); }).join('');
+            }
         }
+        if (!S.changing) body += courseCard();
         body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Search online or add a course ›</button>';
         var ok = courseName() ? '' : ' disabled';
         var foot = S.mode === 'gps'
@@ -1054,14 +1075,18 @@
         if (!/admin\.html$/.test(String(W.location.pathname || ''))) return;
         var code = String(params().get('game') || '').toUpperCase();
         if (!code) return;
+        // URGENT-016: front-door.js covered this page from <head> (the GPS door never shows the
+        // lobby); lifted here, once this screen is painted or is not wanted.
+        var uncover = function () { D.documentElement.classList.remove('sf-pre'); };
         var m = claim(code);
-        if (!m) return;
-        if (!switchOn()) { ss(MARK, null); return; }
+        if (!m) { uncover(); return; }
+        if (!switchOn()) { ss(MARK, null); uncover(); return; }
         S.mode = m.mode === 'same' || m.mode === 'gps' ? m.mode : 'new';
         S.code = code;
         // Painted at once (the wizard boots underneath); the steps fill in when it is up.
         show(true);
-        el().innerHTML = shell(S.mode === 'same' ? 'Same as last week' : S.mode === 'gps' ? 'Where are you playing?' : 'New round', '<div class="sf-note">Getting things ready…</div>', '', S.mode === 'same' ? 3 : 1);
+        el().innerHTML = shell(S.mode === 'same' ? 'Same as last week' : S.mode === 'gps' ? 'Where are you playing?' : 'New round', '<div class="sf-note">Getting things ready…</div>', '', S.mode === 'same' ? 3 : S.mode === 'gps' ? 0 : 1);
+        uncover();
         whenReady(m, function () {
             hookSave();
             readBack();
