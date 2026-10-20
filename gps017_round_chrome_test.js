@@ -169,7 +169,7 @@ test('Finish & settle up: one screen, exactly who-pays-who, Share; writes nothin
 test('Back: card from the map -> the map; never the join screen', { timeout: 60000 }, async () => {
     await ev('HardPanRound.toCard()');
     await sleep(200);
-    assert.equal(await ev('GolfBack.press({ canGoBack: true })'), 'hp-card-to-map');
+    assert.equal(await ev('GolfBack.press({ canGoBack: true })'), 'hp-previous');
     let s = await st();
     assert.deepEqual([s.side, s.hole, s.mark, s.join], ['gps', 4, 'same-map', false]);
     await ev('HardPanRound.openMenu()');

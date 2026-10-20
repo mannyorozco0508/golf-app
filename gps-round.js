@@ -61,6 +61,8 @@
         + '.hp-sheet .hs-grab{width:44px;height:5px;border-radius:3px;background:#cfd8d3;margin:2px auto 10px;}'
         + '.hp-sheet .hs-head{display:flex;align-items:center;gap:8px;margin:2px 0 14px;}'
         + '.hp-sheet .hs-title{flex:1;font:800 22px/1.2 ' + FONT + ';}'
+        + '.hp-sheet .hs-mtitle{display:flex;align-items:center;gap:8px;min-width:0;}.hp-sheet .hs-course{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+        + '.hp-sheet .hs-codechip{flex:0 0 auto;font:800 13px/1 ' + FONT + ';letter-spacing:.06em;background:#0f4d3a;color:#fff;border-radius:999px;padding:6px 10px;}'
         + '.hp-sheet .hs-x{border:0;background:#e3e9e5;color:#0f3d2e;border-radius:999px;min-width:40px;height:40px;font:800 18px/1 ' + FONT + ';cursor:pointer;}'
         + '.hp-sheet .hs-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;}'
         + '.hp-sheet .hs-tile{text-align:left;border:1.5px solid #dfe6e2;background:#fff;border-radius:16px;padding:14px 12px;min-height:96px;cursor:pointer;color:#0f1f17;display:flex;flex-direction:column;gap:4px;}'
@@ -156,12 +158,16 @@
         if (!on() || !code()) return false;
         if (!again) stack = [];
         var d = data() || {};
-        var html = head((d.courseName || d.eventName || 'This round') + ' · ' + code())
+        // The course on one line (ellipsis), the code beside it in its own chip (the mockup).
+        var html = '<div class="hs-head"><div class="hs-title hs-mtitle"><span class="hs-course">' + esc(d.courseName || d.eventName || 'This round') + '</span>'
+            + '<span class="hs-codechip">' + esc(code()) + '</span></div><button type="button" class="hs-x" data-hs="close" aria-label="Close">✕</button></div>'
             + '<div class="hs-tiles">' + TILES.filter(function (t) { return t.k !== 'gps' || gpsUp(); }).map(function (t) {
                 return '<button type="button" class="hs-tile" data-hs-tile="' + t.k + '"><b>' + t.ico + ' ' + esc(t.t) + '</b><span>' + esc(t.s) + '</span></button>';
             }).join('') + '</div>'
             + '<button type="button" class="hs-finish" data-hs="finish">Finish &amp; settle up</button>'
-            + '<div class="hs-note">Trip, history, how it works and stats: <a href="home.html#more">Home › More</a></div>';
+            + '<div class="hs-note">Trip, history, how it works and stats: <a href="home.html#more">Home › More</a></div>'
+            // THE WAY OUT of a round (part D: Back never leaves it). The round stays In progress on Home.
+            + '<div class="hs-note"><a href="home.html" data-hs-leave="1">Leave the round › Home</a> · it stays under In progress</div>';
         return show('menu', html, 'Round Menu');
     }
     function tile(k) {
@@ -361,7 +367,7 @@
         f = document.createElement('iframe');
         f.setAttribute('data-k', k);
         f.setAttribute('title', k === 'bets' ? 'Bets' : 'Leaderboard');
-        f.addEventListener('load', function () { tidyFrame(f); });
+        f.addEventListener('load', function () { tidyFrame(f); fed[k] = null; feed(true); });
         f.src = pageUrl(k === 'bets' ? 'skins.html' : 'leaderboard.html');
         body.appendChild(f);
         return f;
@@ -389,6 +395,31 @@
                 }, true);
             }
         } catch (e) {}
+    }
+    // INSTANT (part D): this page's round - with the score just typed, before any server round trip,
+    // and with no signal at all - is handed to the Bets and Leaderboard frames, which paint it with
+    // their own renderers (same origin; their top-level currentData / currentBoardData). Their own
+    // Firebase listener still runs and wins on the next snapshot. Display only.
+    var FEED = { bets: 'currentData = d; renderBets(); renderSkinsEngine(); renderBirdieGame();', board: 'currentBoardData = d; renderBoard();' };
+    var fed = {}, feedTimer = null;
+    function feed(now) {
+        if (feedTimer && !now) return;
+        var run = function () {
+            feedTimer = null;
+            var d = data(); if (!d || !d.players) return;
+            var json; try { json = JSON.stringify(d); } catch (e) { return; }
+            Array.prototype.forEach.call(document.querySelectorAll('#hp-bets iframe'), function (f) {
+                var k = f.getAttribute('data-k');
+                if (!FEED[k] || fed[k] === json) return;
+                try {
+                    var w = f.contentWindow;
+                    if (!w || !w.document || w.document.readyState !== 'complete' || typeof w.eval !== 'function') return;
+                    w.eval('(function (d) { try { ' + FEED[k] + ' } catch (e) {} })(' + json + ')');
+                    fed[k] = json;
+                } catch (e) {}
+            });
+        };
+        if (now) run(); else feedTimer = setTimeout(run, 0);
     }
     function betsOpen() { return document.body.classList.contains('hp-bets-open'); }
     function betsShow(k) {
@@ -419,14 +450,20 @@
     }
 
     // ---- 5. THE CARD AS A SHEET OVER THE MAP --------------------------------------
+    // ALWAYS A SHEET (part D): with GPS Map the map is built BEHIND the card when it is not built
+    // yet (no location watch until it is shown), so the card is a sheet over it from the start.
     function sheetMode() {
         var g = G();
-        return on() && !onGps() && gpsUp() && !!(g.mapReady && g.mapReady());
+        return on() && !onGps() && gpsUp() && !!(g.canMap && g.canMap());
     }
     function syncCardSheet() {
         var want = sheetMode();
         if (document.body.classList.contains('hp-card-sheet') !== want) document.body.classList.toggle('hp-card-sheet', want);
-        if (want) strip();
+        if (want) {
+            strip();
+            var g = G();
+            if (g.mapReady && !g.mapReady() && g.prepareMap) { try { g.prepareMap(); } catch (e) {} }
+        }
     }
     function strip() {
         if (document.getElementById('hp-strip')) return;
@@ -475,39 +512,75 @@
         if (g && gpsUp() && onGps()) g.showSide('bets', { remember: false });
         return true;
     }
+    // ENTER SCORE, from any screen: on the map (or Bets over it) the GPS's own score entry; on the
+    // card the first empty box of this hole (or this phone's golfer's), focused.
+    function enterScore() {
+        closeBets(); closeSheet(true);
+        if (onGps()) { var b = document.querySelector('#gps-overlay .gps-score'); if (b) { b.click(); return true; } }
+        var h = (function () { try { return currentViewedHole; } catch (e) { return null; } })();   /* global currentViewedHole */
+        var all = Array.prototype.slice.call(document.querySelectorAll('#hole-view-card .score-input' + (h != null ? '[data-hole="' + Number(h) + '"]' : '') + ':not([disabled])'));
+        var me = (function () { try { return typeof resolvedMeId === 'function' ? resolvedMeId() : null; } catch (e) { return null; } })();   /* global resolvedMeId */
+        var box = all.filter(function (i) { return !String(i.value || '').trim(); })[0] || all.filter(function (i) { return i.getAttribute('data-player-id') === String(me); })[0] || all[0];
+        if (!box) return false;
+        try { box.scrollIntoView({ block: 'center' }); } catch (e) {}
+        try { box.focus(); } catch (e) {}
+        return true;
+    }
     function go(k) {
         if (k === 'menu') { closeBets(); return openMenu(); }
         if (k === 'gps') return toGps();
         if (k === 'card') return toCard();
         if (k === 'bets') return openBets();
+        if (k === 'score') return enterScore();
         return false;
     }
-    // What the one bar shows: Menu always; GPS when the map is not showing; Card over Bets.
+    // THE ONE BAR (card and Bets): ☰ | Card (over Bets) | Enter score | + Bet | GPS (off the map).
     function barFor() {
-        return { menu: true, gps: gpsUp() && (!onGps() || betsOpen()), card: betsOpen() };
+        return { menu: true, gps: gpsUp() && (!onGps() || betsOpen()) && !!(G().canMap && G().canMap()), card: betsOpen(), score: true };
     }
 
-    // ---- BACK (Android; GolfBack) ------------------------------------------------
-    // One layer per press: an open sheet closes (Share / Settle up go back to the menu),
-    // Bets closes, then the card that came from the map is the map again. Only after
-    // all of that does the page's own back run - and on a round that is the Round
-    // Menu's job, never Home or "How are you joining?".
-    // The screen before this one ('gps' | 'card'); a Back move consumes it, so two Backs never
-    // ping-pong between the map and the card - the second one is the page's own Back.
-    var prevScreen = null, lastScreen = null, backing = false;
+    // ---- BACK (Android; GolfBack) - ALWAYS THE PREVIOUS SCREEN ---------------------
+    // One layer per press: an open sheet closes (Share / Settle up go back to the menu; Round
+    // settings, Bets and the bet sheet close), then the screen before this one - map or card,
+    // as many as were visited, the card at the scroll it had. With nothing before it, Back on a
+    // round opens the Round Menu (its "Leave the round" is the way out): never Home, never
+    // "How are you joining?" mid-round.
+    var trail = [], lastScreen = null, backing = false, cardY = 0;
     function backTo(s) { backing = true; if (s === 'gps') toGps(); else toCard(); track(); }
+    function settingsOpen() { var sh = document.getElementById('round-sheet'); return !!(sh && sh.classList.contains('open')); }
+    function inRound() { var d = data(); return !!(code() && d && (d.players || []).length); }
+    function joinShown() { var j = document.getElementById('group-pick-overlay'); return !!(j && j.style.display === 'flex'); }
     function registerBack() {
         var GB = window.GolfBack;
         if (!GB || typeof GB.register !== 'function') return;
         GB.register({ name: 'hp-round-sheet', priority: 1, isOpen: function () { return on() && sheetOpen(); }, close: function () { closeSheet(false); } });
         GB.register({ name: 'hp-bets', priority: 1, isOpen: function () { return on() && betsOpen(); }, close: closeBets });
-        GB.register({ name: 'hp-card-to-map', priority: 4, isOpen: function () { track(); return on() && !onGps() && gpsUp() && prevScreen === 'gps'; }, close: function () { backTo('gps'); } });
-        GB.register({ name: 'hp-map-to-card', priority: 4, isOpen: function () { track(); return on() && onGps() && gpsUp() && prevScreen === 'card'; }, close: function () { backTo('card'); } });
+        GB.register({ name: 'hp-settings', priority: 1, isOpen: function () { return on() && settingsOpen(); }, close: function () { (origToggle || window.toggleRoundSheet)(false); } });
+        GB.register({ name: 'hp-previous', priority: 4, isOpen: function () { track(); return on() && inRound() && trail.length > 0; },
+            close: function () { var s = trail.pop(); backTo(s); } });
+        GB.register({ name: 'hp-round-root', priority: 5, isOpen: function () { return on() && inRound() && !joinShown(); }, close: function () { openMenu(); } });
     }
     function track() {
         var s = onGps() ? 'gps' : 'card';
-        if (s !== lastScreen) { prevScreen = backing ? null : lastScreen; lastScreen = s; }
+        if (s !== lastScreen) {
+            if (lastScreen && !backing) { trail.push(lastScreen); if (trail.length > 20) trail.shift(); }
+            if (s === 'card' && lastScreen === 'gps') restoreCard();
+            lastScreen = s;
+        }
         backing = false;
+    }
+    // THE CARD COMES BACK WHERE IT WAS: the scroll it had when the map came up (unless a score
+    // box was just focused - Enter score scrolls to its own box).
+    function restoreCard() {
+        var a = document.activeElement;
+        if (a && a.classList && a.classList.contains('score-input')) return;
+        var y = cardY;
+        if (Math.abs((window.scrollY || 0) - y) > 2) { try { window.scrollTo(0, y); } catch (e) {} }
+    }
+    function watchScroll() {
+        if (window.__hpScroll) return;
+        window.__hpScroll = true;
+        window.addEventListener('scroll', function () { if (!onGps() && !betsOpen()) cardY = window.scrollY || 0; }, { passive: true });
     }
 
     function refresh() {
@@ -522,6 +595,7 @@
         var lb = document.getElementById('round-sheet-label');
         if (lb && lb.textContent !== '\u2699\uFE0F Round settings') lb.textContent = '\u2699\uFE0F Round settings';
         bindPull();
+        watchScroll();
         syncCardSheet();
         track();
         warm();
@@ -540,6 +614,6 @@
         openMenu: function () { return openMenu(); }, openShare: openShare, openFinish: openFinish, openSettings: openSettings,
         openBets: openBets, closeBets: closeBets, closeSheet: closeSheet, go: go, barFor: barFor, refresh: refresh,
         toGps: toGps, toCard: toCard, screen: screen, sheetKind: function () { return sheetOpen() ? sheetKind : null; },
-        payText: function () { return payText(settle()); }
+        payText: function () { return payText(settle()); }, feed: feed, enterScore: enterScore
     };
 })();

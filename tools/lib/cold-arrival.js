@@ -351,6 +351,13 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
     if (!/__freshPhone\s*=\s*true/.test(preScript || '')) {
         preScript = "try { if (!localStorage.getItem('hardpan_round_side')) localStorage.setItem('hardpan_round_side', 'bets'); } catch (e) {}\n" + (preScript || '');
     }
+    // TODAY'S SCREENS (017): HardPan's simpler flow (features.simpleFlow - the + Bet bar, the
+    // 6-tile Round Menu, the Card as a sheet) is turned off on this phone, because every check here
+    // is about the screens it replaces; the new flow has its own (gps017_*_chrome_test.js use
+    // tools/lib/journey.js). A check of the new flow sets window.__simpleFlow = true first.
+    if (!/__simpleFlow\s*=\s*true/.test(preScript || '')) {
+        preScript = "try { if (!localStorage.getItem('hardpan_simple_flow')) localStorage.setItem('hardpan_simple_flow', 'off'); } catch (e) {}\n" + preScript;
+    }
     const keepProfile = !!profileDir;
     const profile = profileDir || fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
     if (keepProfile) {
