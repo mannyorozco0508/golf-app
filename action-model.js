@@ -164,11 +164,38 @@ function mainGameStake(data) {
 // The holes a given game actually covers. Uses the round's OWN configured hole
 // list, so a front-nine round yields H5-9 and a back-nine round yields H14-18 -
 // never an assumed H5-18.
+//
+// IN PLAY ORDER, NOT BY NUMBER (2026-10-19 Manny OK: gameHoles play order). A game
+// added "from H3" on a round off the 10th tee covers 3..9 - the holes still to PLAY
+// - and not 10..18, which were played before it existed. The round's tee comes from
+// game.config (getRoundGames copies the round into every game's config), read with
+// play-order.js teeStartHole exactly as settlement-engine.js playOrderOf does; a
+// two-tee start follows the round's own startingHole. A round off its first hole -
+// or a game with no config, or a page without play-order.js - takes the original
+// number filter, so every such round covers exactly the holes it always did.
+function amPlayOrderFns() {
+    /* global playOrder, teeStartHole */
+    if (typeof playOrder === 'function' && typeof teeStartHole === 'function') return { playOrder, teeStartHole };
+    if (typeof module !== 'undefined' && module.exports && typeof require === 'function') {
+        try { return require('./play-order.js'); } catch (e) { return null; }
+    }
+    return null;
+}
+
 function gameHoles(game, courseData) {
     const holes = courseData || [];
     const start = (game && game.startHole) || 1;
     if (start <= 1) return holes;
-    return holes.filter(h => h.hole >= start);
+    const byNumber = holes.filter(h => h.hole >= start);
+    const round = game && game.config;
+    const po = round ? amPlayOrderFns() : null;
+    if (!po || holes.length === 0) return byNumber;
+    const sorted = holes.slice().sort((a, b) => Number(a.hole) - Number(b.hole));
+    const tee = po.teeStartHole(round, sorted);
+    if (Number(tee) === Number(sorted[0].hole)) return byNumber;
+    const ordered = po.playOrder(sorted, tee);
+    const at = ordered.findIndex(h => Number(h.hole) === Number(start));
+    return at === -1 ? byNumber : ordered.slice(at);
 }
 
 // THE HOLES A SIDE MATCH IS PLAYED OVER.
@@ -228,8 +255,22 @@ function sideMatchRangeText(sm, courseData) {
 
 // Dot events are keyed "h4", "h11". Anything earned before the game existed is
 // dropped, so junk added on hole 5 cannot pay out for a greenie on hole 2.
-function scopeDotsToRange(dots, startHole) {
+// `round` (optional): on a round off another tee the range is the play-order one
+// from gameHoles (a dot on 12 is BEFORE a game "from H3" on a 10th-tee round).
+function scopeDotsToRange(dots, startHole, round) {
     if (!dots || !startHole || startHole <= 1) return dots;
+    const po = (round && Array.isArray(round.courseData) && round.courseData.length) ? amPlayOrderFns() : null;
+    const sorted = po ? round.courseData.slice().sort((a, b) => Number(a.hole) - Number(b.hole)) : [];
+    if (po && Number(po.teeStartHole(round, sorted)) !== Number(sorted[0].hole)) {
+        const covered = {};
+        gameHoles({ startHole: startHole, config: round }, round.courseData).forEach(h => { covered[Number(h.hole)] = true; });
+        const scoped = {};
+        Object.keys(dots).forEach(key => {
+            const holeNum = parseInt(String(key).replace(/^h/i, ''), 10);
+            if (!isNaN(holeNum) && covered[holeNum]) scoped[key] = dots[key];
+        });
+        return scoped;
+    }
     const out = {};
     Object.keys(dots).forEach(key => {
         const holeNum = parseInt(String(key).replace(/^h/i, ''), 10);
@@ -246,7 +287,7 @@ function gameRangeText(game, courseData) {
     const start = holes[0].hole;
     const end = holes[holes.length - 1].hole;
     const full = (courseData || []);
-    if (full.length > 0 && start === full[0].hole) return '';
+    if (full.length > 0 && (start === full[0].hole || holes.length === full.length)) return '';
     return `H${start}\u2013${end}`;
 }
 
@@ -485,7 +526,7 @@ function getRoundGames(data) {
         // Dots reads its events from config, not from courseData, so its range has to
         // be applied here rather than by filtering holes downstream.
         if (format === 'dots' && startHole > 1) {
-            merged.dots = scopeDotsToRange(merged.dots, startHole);
+            merged.dots = scopeDotsToRange(merged.dots, startHole, data);
         }
 
         return {

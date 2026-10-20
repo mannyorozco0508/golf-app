@@ -141,7 +141,11 @@ describe('THE FOOTER SAYS WHAT IS IN THE TOTAL', () => {
             // in settlement-engine.js so it is covered by the footer's own category
             // "the main game" - covered() below has the rule, and the sentence a
             // golfer reads is untouched.
-            ["'Birdie Pool'", "'KP'", 'MAIN_POOL_LEDGER_LABEL', 'aLabel', 'label', 'mLabel', 'smLabel', 'smLabel2'],
+            // hlLabel since 016: the Hi-Lo 2v2 side bet's ledger line. Prefixed
+            // "Side Match ·" in settlement-engine.js, so the footer's existing
+            // category "side matches and presses" covers it - a Hi-Lo IS a side
+            // match - and the sentence a golfer reads is untouched.
+            ["'Birdie Pool'", "'KP'", 'MAIN_POOL_LEDGER_LABEL', 'aLabel', 'hlLabel', 'label', 'mLabel', 'smLabel', 'smLabel2'],
             'settlement-engine gained or renamed a money source; the trip footer '
             + 'must name it too. Found: ' + JSON.stringify(seen));
     });

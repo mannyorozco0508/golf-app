@@ -1115,6 +1115,15 @@
                 segments: [], net: 0, netTo: null
             };
 
+            // HI-LO (016, ADDITIVE): a format this branch had never seen. hilo-engine.js
+            // owns the rules and every number; this only hands it the receipt's own
+            // fields and range. Absent the file, a Hi-Lo wager adds no receipt.
+            if (sm.format === 'hilo') {
+                const hiloRc = (typeof hiloReceipt === 'function')
+                    ? hiloReceipt(receipt, sm, teamA, teamB, smCourse, savedScores, firstHole, lastHole) : null;
+                if (hiloRc) receipts.push(hiloRc);
+                return;
+            }
             if (sm.format === 'stroke') {
                 const sides = { sideA: teamA, sideB: teamB };
 
@@ -1571,6 +1580,23 @@
                 ? sideMatchHoles(sm, courseData)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
 
+            // HI-LO (016, ADDITIVE): hilo-engine.js decides every point and every
+            // dollar; the split per side is the even split every 2v2 bet above and
+            // below uses. Its ledger line reads like every side match's - "Side Match ·
+            // <A> vs <B>" - then "· Hi-Lo": trip totals file it under "side matches
+            // and presses", and settlement.html's Pay out knows the Low Ball / High
+            // Ball notes below explain it (it matches on that prefix), so it is not
+            // counted twice.
+            if (sm.format === 'hilo') {
+                const hl = (typeof hiloForSideMatch === 'function')
+                    ? hiloForSideMatch(sm, teamAPlayers, teamBPlayers, smCourse, savedScores) : null;
+                if (!hl) return;
+                smDetail[matchId] = { teamA: teamAPlayers.slice(), teamB: teamBPlayers.slice() };
+                const hlLabel = `Side Match \u00B7 ${teamAPlayers.map(p => p.name).join('/')} vs ${teamBPlayers.map(p => p.name).join('/')} \u00B7 Hi-Lo`;
+                teamAPlayers.forEach(p => addAmount(p, hl.toSideA / teamAPlayers.length, hlLabel));
+                teamBPlayers.forEach(p => addAmount(p, -hl.toSideA / teamBPlayers.length, hlLabel));
+                return;
+            }
             if (sm.format === 'stroke') {
                 const p1 = teamAPlayers[0], p2 = teamBPlayers[0];
                 if (!p1 || !p2) return;

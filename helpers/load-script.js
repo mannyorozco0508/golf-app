@@ -209,6 +209,10 @@ const MODULE_PREREQS = {
     // bet-strip.js: betStripPlayOrder() calls the same two globals, with the same
     // typeof guard and the same silent-pass risk if they are absent.
     'bet-strip.js': ['play-order.js'],
+    // action-model.js gameHoles() (2026-10-19 Manny OK: gameHoles play order): a game
+    // "from H3" on a 10th-tee round covers the holes still to PLAY, via the same two
+    // globals and the same typeof guard - without them it silently filters by number.
+    'action-model.js': ['play-order.js'],
     // ryder-cup.js calls parseHcp for the Foursomes allowance and
     // calculateMatchEngine for Four-Ball, both as plain globals, exactly as the
     // browser supplies them. Without them the Foursomes path throws

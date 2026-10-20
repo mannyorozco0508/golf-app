@@ -49,7 +49,7 @@ const SHARED_SHELL = [
     'qr-encode.js', 'qr-codes.js',
     'tap-feedback.js',
     'trip-recap-image.js',
-    'grouping.js', 'handicap.js', 'player-tees.js', 'handicap-labels.js', 'aloha-bet.js', 'payouts.js', 'course-data.js', 'score-marks.js',
+    'grouping.js', 'handicap.js', 'player-tees.js', 'handicap-labels.js', 'aloha-bet.js', 'hilo-engine.js', 'payouts.js', 'course-data.js', 'score-marks.js',
     // scorecard-rows.js: the hole-by-hole rows, drawn once. settlement.html
     // (the Receipt) and leaderboard.html (the tap-a-name card) load it.
     'scorecard-rows.js',

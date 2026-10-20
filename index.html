@@ -60,6 +60,7 @@
          Aloha - two pages showing two different totals, which is the one failure
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="side-match-lines.js"></script>
     <script src="push-notify.js"></script>
@@ -7169,14 +7170,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             'dot-context-row',          // the Dots: selector, on rounds that have one
             'view-mode-toggle',         // Hole View / Full Card
             'group-filter-container',   // All Players, Edit round setup, Players
-            // GPS:BEGIN
             // SCOREKEEPER LINKS, right under the "Group Links" button that opens it
             // (mailbox 015). It stayed on the page BEHIND the open sheet, so the
             // button looked dead: the panel opened where nobody could see it.
-            // (HardPan only for now: the Consumer index.html is pinned byte for
-            // byte by gps_flag_test.js.)
+            // Shared code: HardPan and Consumer both (2026-10-19, Manny OK).
             'group-links-panel',
-            // GPS:END
             'qr-share-mount',           // Show QR code (every golfer, not just the organizer)
             'scorecard-footer',         // Save & exit, Receipt, the guide
             'end-round-mount'           // Delete this round (organizer only)
@@ -9036,14 +9034,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (!canReachSetup()) return;
         groupLinksPanelOpen = !groupLinksPanelOpen;
         renderGroupLinksPanel();
-        // GPS:BEGIN
         // In view when it opens (mailbox 015) - the Round Menu's body scrolls, and
         // the panel can start below its fold.
         const panel = document.getElementById('group-links-panel');
         if (groupLinksPanelOpen && panel && panel.style.display !== 'none' && typeof panel.scrollIntoView === 'function') {
             try { panel.scrollIntoView({ block: 'nearest' }); } catch (e) { /* older engines: the panel is still open */ }
         }
-        // GPS:END
     }
 
     function renderGroupLinksPanel() {

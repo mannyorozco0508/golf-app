@@ -210,7 +210,7 @@ describe('3. NO MONEY FILE MOVED FOR THIS', () => {
         const crypto = require('crypto');
         const sha = crypto.createHash('sha256')
             .update(fs.readFileSync(path.join(__dirname, 'settlement-engine.js'))).digest('hex').slice(0, 16);
-        assert.equal(sha, '9f6a4fa7e4def756',
+        assert.equal(sha, '88c8b8a76c24f6f3',   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
             'settlement-engine.js changed. This wave reads it and changes nothing in it; '
             + 'if that is deliberate it needs saying out loud and re-approving.');
     });

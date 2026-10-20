@@ -85,7 +85,7 @@ test('Vegas: 10+ leads, both birdie = no flip, a hole counts only with all 4 sco
 // on gps-features - byte for byte. The new games live in their own files only.
 const UNCHANGED = {
     'money-engine.js': '12bfa41c2c8e6b8abfd397fbffb9b8606428a9229a605b87ad30fc0f7b51dbf0',
-    'settlement-engine.js': '9f6a4fa7e4def7563a3fa0e48b1930fb5bc1e8f9bab7492ed25726ed14b042f5',
+    'settlement-engine.js': '88c8b8a76c24f6f379668d41420677e4829e766ef01e5dd1cdebdaff580803c4',   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
     'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     'match-engine.js': '42bb272d11814cafba0d9ad48322b1b14fbbbfab6677268ce231787f347e7fde',
     'pool-engine.js': '1530a0b955e2e8705748808a79a221a4790fe67419de06fb010cb9f59ec7e153',
@@ -95,7 +95,7 @@ const UNCHANGED = {
     'live-skins.js': '632bbb1a1dd3078a9ba79755581c0f44e46acca8bac94c37ea29f3b156ac4e1b',
     'trip-pots.js': '3d1b2506d3a716ced0f086996043e8f6736ff766db16e732eba60f80167e08a0',
     'tournament-engine.js': '3626301cf0c2a61438c5d8e566ffbc0094f8b980968f9c45d2e11fc2a426996c',
-    'action-model.js': '399ba26f0025b8d18fb240968c0922e7de8d7a22b616ac936cd4afa76ffd771b',
+    'action-model.js': 'f67a7b4390f5776f11e8ab5eb80308b914c6bb817b518b0480d186a7f518dd8f',   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)
     'helpers/side-match-cards.js': 'dd02985ef9a151b72c28554b525eebc01cfe33e6402f31a03c3ddace1df106f8'
 };
 test('the existing money engines, settlement, side bets and game catalog are byte-identical to main', () => {
