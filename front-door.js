@@ -129,9 +129,31 @@
         var pre = Object.keys(L).filter(function (k) { return k.indexOf(key + '_') === 0; })[0];   // thistle_27 -> thistle_27_cameron_stewart
         return pre || null;
     }
+    // ✓ GPS ON EVERY COURSE WITH LIVE GPS (021, Manny: "YES, show it on every course with live GPS"):
+    // besides the GolfAPI file and the OSM holes, a course linked to its GolfAPI GPS (gps_links -
+    // Dobson, Legacy...) and a course whose greens golfers have set (course_gps). Read once, small.
+    var GPSK = { links: null, own: null, asked: false };
+    function loadGpsKeys(done) {
+        var fin = typeof done === 'function' ? done : function () {};
+        if (GPSK.links && GPSK.own) { fin(); return; }
+        var d = null; try { d = W.firebase && W.firebase.database ? W.firebase.database() : null; } catch (e) { d = null; }
+        if (!d || GPSK.asked) { fin(); return; }
+        GPSK.asked = true;
+        var left = 2, end = function () { if (--left === 0) { C.list = null; fin(); } };
+        var read = function (path, put) {
+            var t = setTimeout(function () { put({}); t = null; end(); }, 6000);
+            try {
+                d.ref(path).once('value').then(function (snap) { if (!t) return; clearTimeout(t); put((snap && snap.val && snap.val()) || {}); end(); },
+                    function () { if (!t) return; clearTimeout(t); put({}); end(); });
+            } catch (e) { clearTimeout(t); put({}); end(); }
+        };
+        read('gps_links', function (v) { GPSK.links = v; });
+        read('course_gps', function (v) { var o = {}; Object.keys(v || {}).forEach(function (k) { o[k] = 1; }); GPSK.own = o; });
+    }
     function ready(key) {
         if (!key) return false;
-        if (live()) return !!golfapiLink(key) || /^gapi_\d+$/.test(key);
+        if (GPSK.own && GPSK.own[key]) return true;
+        if (live()) return !!golfapiLink(key) || /^gapi_\d+$/.test(key) || !!(GPSK.links && GPSK.links[key]);
         var b = bundled(); return !!(b && b[key] && b[key].holes && Object.keys(b[key].holes).length);
     }
     function stateOf(name) { var m = /\(([A-Z]{2})\b/.exec(name || ''); return m ? m[1] : ''; }
@@ -311,6 +333,7 @@
         STATES.forEach(function (s) { if (!(W.HardPanGpsCoverage && W.HardPanGpsCoverage[s])) needs.push('gps-coverage-' + s.toLowerCase() + '.js'); });
         var left = needs.length;
         draw();
+        loadGpsKeys(function () { draw(); if (!left) near(); });   // 021: ✓ GPS for linked / set-green courses too
         if (!left) { near(); return; }
         needs.forEach(function (src) { loadScriptTimed(src, function () { if (--left === 0) { C.list = null; draw(); near(); } }); });
     }
@@ -2153,7 +2176,7 @@
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         // URGENT-019: the course list is worked out once; a page that loads the GPS course files after
         // that (simple-flow's Course & Tees) asks for it again, as the GPS-1 picker does (C.list = null).
-        refreshCourses: function () { C.list = null; },
+        refreshCourses: function () { C.list = null; }, loadGpsKeys: loadGpsKeys,
         holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld,
         roundBackGuard: roundBackGuard };
     W.HardPanHome = { start: homeStart, show: show };

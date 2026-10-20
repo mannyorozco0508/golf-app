@@ -168,6 +168,10 @@
     function gpsFiles(done) {
         if (S.gpsFiles) { done(); return; }
         var H = HD(), need = [];
+        // The app's GPS settings first (021): which courses have GPS on THIS phone (GolfAPI in the app,
+        // OpenStreetMap on the web) is read from them - Round Setup loads them late, and the list was
+        // judged by the web's rules in the app (O'odham "✓ GPS", Thistle without it).
+        if (!W.HARDPAN_GPS_CONFIG) need.push('gps-config.js');
         if (!W.HardPanGpsCourses) need.push('gps-courses.js');
         if (!W.HardPanGolfApi && !W.__fdGolfApiTried) { W.__fdGolfApiTried = 1; need.push('gps-golfapi.js'); }
         (H.STATES || []).forEach(function (s) { if (!(W.HardPanGpsCoverage && W.HardPanGpsCoverage[s])) need.push('gps-coverage-' + s.toLowerCase() + '.js'); });
@@ -176,7 +180,11 @@
         // is worked out ONCE (front-door allCourses) - and on the phone it was worked out before these
         // files landed, so it never held the app's GolfAPI courses (Talking Stick South - Piipaash, ✓ GPS,
         // Black / Gold / Jade) and its GPS-ready flags were all off. Worked out again once they are in.
-        var fin = function () { S.gpsFiles = true; if (typeof H.refreshCourses === 'function') H.refreshCourses(); S.near = S.here ? nearList(S.here) : S.near; done(); };
+        var fin = function () {
+            S.gpsFiles = true; if (typeof H.refreshCourses === 'function') H.refreshCourses(); S.near = S.here ? nearList(S.here) : S.near; done();
+            // 021: ✓ GPS on every course with live GPS - the GPS links and set greens, read once.
+            if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (S.here && S.near && S.near.length !== undefined) S.near = nearList(S.here); if (S.open && S.step === 1) render(); });
+        };
         if (!left || typeof H.loadScriptTimed !== 'function') { fin(); return; }
         need.forEach(function (src) { H.loadScriptTimed(src, function () { if (--left === 0) fin(); }); });
     }

@@ -25,7 +25,7 @@ const wwwUrl = (page, q) => 'file://' + path.join(WWW, page) + (q ? '?' + q : ''
 const dir = process.argv[2];
 if (!dir) { console.error('usage: node tools/gps-course-check.js <dumps dir>'); process.exit(2); }
 const rd = (f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) || {};
-const DB = { events: {}, global_courses: rd('global_courses.json'), gps_links: rd('gps_links.json'), gps_courses: rd('gps_courses.json'), trips: {}, tournaments: {}, organizers: {} };
+const DB = { events: {}, global_courses: rd('global_courses.json'), gps_links: rd('gps_links.json'), gps_courses: rd('gps_courses.json'), course_gps: fs.existsSync(path.join(dir, 'course_gps.json')) ? rd('course_gps.json') : {}, trips: {}, tournaments: {}, organizers: {} };
 if (!fs.existsSync(path.join(WWW, 'admin.html'))) { console.error('no build at ' + WWW + ' - run tools/build-gps-app.js first'); process.exit(2); }
 if (!fs.existsSync(path.join(WWW, 'gps-golfapi.js'))) console.error('WARNING: the build has no gps-golfapi.js - the bundled GolfAPI courses are missing from this check');
 
@@ -72,7 +72,8 @@ async function check(c) {
         await sleep(1200);
         const found = JSON.parse(await ev("(function(){ var re=new RegExp(" + JSON.stringify(re) + "," + JSON.stringify(fl) + "); return JSON.stringify(Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return [b.getAttribute('data-sf-course'), (b.querySelector('.n')||{}).textContent||'', /✓ GPS/.test(b.textContent)]; }).filter(function(r){return re.test(r[1]);})); })()"));
         const nearN = near.hits.length, searchN = found.length;
-        out.once = (nearN === 1 && searchN === 1 ? 'PASS' : 'FAIL') + ` (near ${nearN}, search ${searchN})`;
+        const badge = near.hits.concat(found).some((h) => h[2]) ? ', ✓ GPS' : ', no ✓ GPS';
+        out.once = (nearN === 1 && searchN === 1 ? 'PASS' : 'FAIL') + ` (near ${nearN}, search ${searchN}${badge})`;
         if (nearN !== 1) out.why.push('NEAR YOU lists it ' + nearN + 'x: ' + near.hits.map((h) => h[1]).join(' / '));
         if (searchN !== 1) out.why.push('search lists it ' + searchN + 'x: ' + found.map((h) => h[1] + ' (' + h[0] + ')').join(' / '));
         // Pick it (the GPS row when there are two).
