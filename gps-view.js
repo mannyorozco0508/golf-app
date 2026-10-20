@@ -3671,7 +3671,7 @@
         // would push FRONT / CENTER / BACK off the screen.
         var d = function (m) { return G.shownDistance(m, u); };
 
-        txt('.gps-title', 'Hole ' + S.hole + (S.par ? ' · Par ' + S.par : ''));
+        txt('.gps-title', holeLabel() + (S.par ? ' · Par ' + S.par : ''));
         txt('.gps-hole-num', S.hole);
         txt('.gps-meta', holeMetaLine(r));
         txt('.gps-units', 'Units: ' + (u === 'm' ? 'Meters' : 'Yards'));
@@ -4426,7 +4426,7 @@
         if (!lcOn()) return;
         var m = (typeof S.holeMeta === 'function') ? (S.holeMeta(S.hole) || {}) : {};
         var par = m.par != null ? m.par : S.par;
-        txt('.gps-lc-l1', 'Hole ' + S.hole + (par != null ? ' · Par ' + par : '') + ' ▾');
+        txt('.gps-lc-l1', holeLabel() + (par != null ? ' · Par ' + par : '') + ' ▾');
         txt('.gps-lc-meta', holeMetaLine(r).replace(/^Par \d+( · )?/, ''));
         // No front / back for this hole: MIDDLE alone, no blank columns.
         var edges = !!(r && ((r.useGreenForEdges && r.green) || r.front || r.back));
@@ -4573,6 +4573,22 @@
         }
         return out;
     }
+    // URGENT-028 (Manny: Start Round at Aguila showed Papago's hole 1 - a wrong course must be obvious):
+    // on the round's FIRST open of the map, the header's hole label reads "Aguila · Hole 1" for 2 s,
+    // then "Hole 1" again. The label that is already there, nothing added (URGENT-025's clean map).
+    var NAMED = 'hardpan_gps_named_';
+    function nameFlash() {
+        if (!S || S.named || !S.eventCode) return;
+        S.named = true;
+        try { if (localStorage.getItem(NAMED + S.eventCode)) return; localStorage.setItem(NAMED + S.eventCode, '1'); } catch (e) { return; }
+        var nm = String((S.round && S.round.courseName) || '').split(' (')[0].trim();
+        nm = nm.replace(/\s+(golf\s+(club|course|links|resort|center)|country\s+club|gc|cc)$/i, '').trim() || nm;
+        if (!nm) return;
+        var mine = S;
+        S.nameText = nm; S.nameUntil = Date.now() + 2000;
+        setTimeout(function () { if (S === mine) { S.nameUntil = 0; render(); } }, 2000);
+    }
+    function holeLabel() { return (S.nameUntil && Date.now() < S.nameUntil ? S.nameText + ' \u00b7 ' : '') + 'Hole ' + S.hole; }
     // What render fills in layout D only.
     function syncLayoutD(r, o, nums) {
         if (!ldOn()) return;
@@ -4580,7 +4596,7 @@
         var par = m.par != null ? m.par : S.par;
         txt('.gps-ld-par1', par != null ? 'Par ' + par : '');
         txt('.gps-ld-hcp', m.si != null && isFinite(m.si) ? 'HCP ' + m.si : '');
-        txt('.gps-ld-holelbl', 'Hole ' + S.hole);
+        txt('.gps-ld-holelbl', holeLabel());
         txt('.gps-side-bets .gps-cap', 'Card');
         // No front / back for this hole: MIDDLE alone.
         var edges = !!(r && ((r.useGreenForEdges && r.green) || r.front || r.back));
@@ -5631,6 +5647,7 @@
         + '#gps-overlay.gps-ld .gps-score-col{align-items:center;justify-content:center;gap:1px;}'
         + '#gps-overlay .gps-ld-l1{display:flex;align-items:baseline;justify-content:center;max-width:100%;min-width:0;}'
         + '#gps-overlay .gps-ld-holelbl{flex:0 0 auto;font:800 18px/1.15 ' + FONT + ';color:#0b0f0c;white-space:nowrap;cursor:pointer;}'
+        + '#gps-overlay .gps-ld-holelbl{max-width:62vw;overflow:hidden;text-overflow:ellipsis;}'
         + '#gps-overlay.gps-ld .gps-ld-l1 .gps-who{flex:0 1 auto;min-width:0;padding:0 0 0 2px;font:800 16px/1.15 ' + FONT + ';opacity:.8;}'
         + '#gps-overlay.gps-ld .gps-ld-l1 .gps-who::before{content:"\\00a0\\00b7\\00a0";}'
         + '#gps-overlay .gps-ld-l1.gps-ld-short .gps-ld-holelbl{display:none;}#gps-overlay.gps-ld .gps-ld-short .gps-who::before{content:none;}'
@@ -6314,6 +6331,7 @@
         if (a) a.setAttribute('aria-pressed', side === 'gps' ? 'true' : 'false');
         closeMenus();
         if (side === 'gps') {
+            nameFlash();
             S.windKick = true;
             startWindTick();
             ensureMap();

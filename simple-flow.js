@@ -159,6 +159,7 @@
         else if (S.step === 2) html = step2();
         else if (S.step === 3) html = step3();
         else html = share();
+        if (S.ask && S.step === 1) html += askHtml();
         e.innerHTML = html;
         if (S.step === 3 && S.moreOpen) placePool(true);
         e.scrollTop = y;
@@ -405,12 +406,23 @@
         });
         return rows.length ? '<div id="sf-web">' + rows.map(webRowHtml).join('') + '</div>' : '';
     }
+    // URGENT-028 (Manny, 1:03 PM: Papago open -> back -> Aguila from search -> Start Round -> Papago
+    // hole 1 again). THE CAUSE: a tapped online course is only the pick once its pull (gpsCourse) and
+    // its card record are in - seconds on a phone. Until then Round Setup's course (course-select)
+    // still held the course picked before it (the closest one: Papago), and Start Round was live, so
+    // a tap in that window started Papago. A pull that failed (no signal, an error) left it the same.
+    // Now the tapped course is the PENDING pick (S.pend) from the tap until its card and tees are in:
+    // the selected card is that course, Start Round reads "Loading <Course>…" and is off, and no other
+    // course is ever started in its place. No signal: it waits and pulls again when the signal is back.
+    function clubName(n) { return String(n || '').split(' (')[0].trim(); }
     function webPull(id, name) {
         var L = W.HardPanGpsLive, w = S.web;
-        if (!w || !L || !L.course) return;
+        if (!L || !L.course) return;
         var me = { id: id, name: name, state: 'busy' };
-        w.pull = me; render1();
-        var say = function (st) { if (S.web && S.web.pull === me) { me.state = st; render1(); } };
+        if (w) w.pull = me;
+        S.pend = me; S.err1 = '';
+        render1();
+        var say = function (st) { if (S.pend === me) { me.state = st; render1(); } };
         if (typeof navigator !== 'undefined' && navigator.onLine === false) { say('offline'); return; }
         try { (W.__sfPull = W.__sfPull || []).push(id); } catch (e) {}
         L.course(id).then(function (r) {
@@ -422,17 +434,32 @@
             return wizDb().ref('global_courses/' + r.cardKey).once('value').then(function (snap) {
                 var rec = snap && snap.val ? snap.val() : null;
                 if (!(rec && rec.name)) return say('none');
-                if (!S.web || S.web.pull !== me) return;
+                if (S.pend !== me) return;   // the golfer picked another course meanwhile
                 if (typeof globalCourses !== 'undefined' && globalCourses) globalCourses[r.cardKey] = rec;   /* global globalCourses */
                 try { if (HC() && HC().refresh) HC().refresh(); } catch (e) {}
-                S.web = null; S.q = ''; S.changing = false; S.noCard = null; S.lookup = null; S.err1 = '';
-                pick(r.cardKey, rec.name);
+                if (S.web && S.web.pull === me) S.web = null;
+                S.q = ''; S.changing = false; S.noCard = null; S.lookup = null; S.err1 = '';
+                me.state = 'card'; me.key = r.cardKey; me.rec = rec;
+                pick(r.cardKey, rec.name);   // held as S.pend until the card and tees are in
                 render(); try { el().scrollTop = 0; } catch (e) {}
                 var H = HD();
                 if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.step === 1) render(); }, true);
             }, function () { say('error'); });
         }, function () { say('error'); });
     }
+    // The pending online course is in: its key is the pick, its card is in hand, its tees are listed.
+    function pendDone() {
+        var p = S.pend;
+        if (!p) return true;
+        if (p.state !== 'card' || courseKey() !== p.key || !cardInHand(p.key)) return false;
+        var t = p.rec && p.rec.tees, need = !!(t && typeof t === 'object' && Object.keys(t).some(function (g) { var v = t[g]; return v && (Array.isArray(v) ? v.length : Object.keys(v).length); }));
+        if (need && !teeRows(p.key).length) return false;
+        S.pend = null;
+        return true;
+    }
+    function pendBusy() { return !pendDone(); }
+    // No signal while it waited: pulled again as soon as the signal is back.
+    try { W.addEventListener('online', function () { var p = S.pend; if (p && p.state === 'offline' && S.open && S.step === 1) webPull(p.id, p.name); }); } catch (e) {}
     function pick(key, name) {
         var f = fn('selectCourse');
         if (!f) return;
@@ -481,6 +508,7 @@
         }, function () { return { ok: false }; });
     }
     function needCard(errKey, then) {
+        if (pendBusy()) { render(); return; }   // URGENT-028: never another course while the picked one loads
         holdPick();
         var key = courseKey(), nm = courseName();
         if (!nm) return;
@@ -577,6 +605,15 @@
         return '<div class="sf-card sf-sel" id="sf-course" style="padding:12px 14px;"><div class="sf-line" style="border:0;padding:0;"><span class="n" style="font-size:16px;font-weight:800;">' + esc(c ? nameOf(c) : String(name).split(' (')[0]) + '</span>'
             + '<span class="sf-note">' + esc(miStr(d)) + ((c ? c.ready : readyOf(key)) ? (d != null ? ' · ' : '') + '✓ GPS' : '') + ' · <button type="button" class="sf-link" data-sf="change" style="padding:0;min-height:0;font-size:13px;">Change</button></span></div></div>';
     }
+    // THE PENDING ONLINE COURSE AS THE SELECTED CARD (URGENT-028): its name, and where its load is.
+    function pendHead(p) {
+        var why = p.state === 'busy' ? 'Getting its scorecard and tees\u2026'
+            : p.state === 'offline' ? 'No signal \u2014 it loads when the signal is back.'
+            : p.state === 'signin' ? 'Sign in to load it.'
+            : p.state === 'none' ? 'It isn\u2019t in our course data yet.' : 'Couldn\u2019t load it right now.';
+        return '<div class="sf-card sf-sel" id="sf-course" data-sf-pend="' + esc(p.id) + '" style="padding:12px 14px;"><div class="sf-line" style="border:0;padding:0;"><span class="n" style="font-size:16px;font-weight:800;">' + esc(clubName(p.name)) + '</span>'
+            + '<span class="sf-note">' + (p.state === 'busy' || p.state === 'offline' ? '\u23f3 ' : '') + esc(why) + (p.state === 'busy' ? '' : ' \u00b7 <button type="button" class="sf-link" data-sf="webback" style="padding:0;min-height:0;font-size:13px;">Pick another course</button>') + '</span></div></div>';
+    }
     function courseCard() {
         var key = courseKey(), name = courseName();
         if (!name) return '';
@@ -615,7 +652,10 @@
                 + (!hits.length && !web && !waiting ? '<div class="sf-note">' + (q.trim().length < 3 ? 'Keep typing — 3 letters searches all courses.' : 'No course found by that name.') + '</div>' : '')
                 + '<button type="button" class="sf-link muted" data-sf="fullcourse" style="font-size:13px;">Not listed? Add a course ›</button>';
         }
-        if (!S.changing) body += courseHead() + lookupBox(key, courseName());
+        // URGENT-028: a tapped online course still loading IS the selected card (never the one before it).
+        var pend = pendBusy() ? S.pend : null, pendOld = pend && pend.state !== 'card';
+        if (pendOld) body += pendHead(pend);
+        else if (!S.changing) body += courseHead() + lookupBox(key, courseName());
         // NEAR YOU, ALWAYS (URGENT-016: with a course already picked the list was gone - only the
         // course and "Change"). The picked course is the card above; the list under it is the
         // others, closest first; a tap switches the course and its tees redraw in place.
@@ -641,13 +681,14 @@
                 else body += others.map(function (x) { return rowHtml(x.c, x.d, false); }).join('');
             }
         }
-        if (!S.changing) body += courseCard();
+        if (!S.changing && !pendOld) body += courseCard();
         if (q.length < 2) body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Add a course ›</button>';
-        var ok = courseName() ? '' : ' disabled';
+        var ok = courseName() && !pend ? '' : ' disabled';
+        var pendLbl = pend ? (pend.state === 'busy' || pend.state === 'offline' || pend.state === 'card' ? 'Loading ' + tidy(pend.name) + '\u2026' : 'Start Round') : '';
         var foot = S.mode === 'gps'
-            ? '<button type="button" class="sf-cta lime" data-sf="startgps"' + (ok || (S.saving || (S.lookup && S.lookup.key === key && S.lookup.state === 'busy') || (S.noCard === key && !hasCard(key)) ? ' disabled' : '')) + '>' + (S.saving ? 'Starting…' : S.cardWait ? 'Loading the course card…' : (S.lookup && S.lookup.key === key && S.lookup.state === 'busy') ? 'Getting the course\u2026' : 'Start Round') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '')
+            ? '<button type="button" class="sf-cta lime" data-sf="startgps"' + (ok || (S.saving || (S.lookup && S.lookup.key === key && S.lookup.state === 'busy') || (S.noCard === key && !hasCard(key)) ? ' disabled' : '')) + '>' + (pend ? esc(pendLbl) : S.saving ? 'Starting…' : S.cardWait ? 'Loading the course card…' : (S.lookup && S.lookup.key === key && S.lookup.state === 'busy') ? 'Getting the course\u2026' : 'Start Round') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '')
 
-            : '<button type="button" class="sf-cta" data-sf="next"' + (ok || (S.cardWait ? ' disabled' : '')) + '>' + (S.cardWait ? 'Loading the course card\u2026' : 'Next: Players \u203a') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '');
+            : '<button type="button" class="sf-cta" data-sf="next"' + (ok || (S.cardWait ? ' disabled' : '')) + '>' + (pend ? esc(pendLbl === 'Start Round' ? 'Next: Players \u203a' : pendLbl) : S.cardWait ? 'Loading the course card\u2026' : 'Next: Players \u203a') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '');
         return shell('Where are you playing?', body, foot, S.mode === 'gps' ? 0 : 1);
     }
     // This phone's own courses: the GPS recents and the last round's course, matched to the list.
@@ -978,7 +1019,7 @@
     // ---- START ROUND: ONE TAP -----------------------------------------------------
     function start() {
         S.err3 = '';
-        if (!courseName()) { go(1); return; }
+        if (!courseName() || pendBusy()) { go(1); return; }
         pruneEmpty();
         if (!players().length) { S.err2 = 'Paste or type who\u2019s playing first.'; go(2); return; }
         if (dupList().length) { S.dupOpen = true; S.err2 = 'Two golfers have the same name — add an initial, then Start.'; go(2); return; }
@@ -1018,7 +1059,51 @@
         if (hb && !String(hb.value || '').trim() && mh) { hb.value = mh; hb.dispatchEvent(new Event('input', { bubbles: true })); }
         var first1 = players()[0];
         S.meName = first1 ? first1.name.trim() : 'Me';
-        runSave('err1');
+        if (pendBusy()) { render(); return; }
+        // URGENT-028: A ROUND ALREADY IN PROGRESS AT ANOTHER COURSE. No scores: replaced, without a word
+        // (it is no longer the round Home resumes). Scores in: asked - "End your Papago round (thru 3)
+        // and start at Aguila?" [Start new] [Resume Papago]. Start new is a NEW round (this screen's own
+        // code, never the old one's); the old round is never deleted - it stays in History.
+        S.saving = true; render();
+        inProgress(function (o) {
+            if (!S.open || S.step !== 1) return;
+            if (!o || o.finished || sameCourse(o)) { runSave('err1'); return; }
+            if (!o.scored || ss(CHANGE_FROM) === o.code) { forgetOld(o.code); runSave('err1'); return; }
+            S.saving = false; S.ask = o; render();
+        });
+    }
+    var CHANGE_FROM = 'hardpan_change_from';   // gps-round.js Change course: "New round" already said yes
+    function tidy(n) { return clubName(n).replace(/\s+(golf\s+(club|course|links|resort|center)|country\s+club|gc|cc)$/i, '').trim() || clubName(n); }
+    function forgetOld(code) { var H = HD(); try { if (typeof H.forgetRound === 'function') H.forgetRound(code, false); } catch (e) {} }
+    function sameCourse(o) { return !!((o.key && o.key === courseKey()) || (o.course && nk(clubName(o.course)) === nk(clubName(courseName())))); }
+    // The phone's round in progress (Home's Resume): its course, whether it has scores, thru N.
+    function inProgress(done) {
+        var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
+        var old = lr && lr.code ? String(lr.code).toUpperCase() : '';
+        if (!old || old === S.code || lr.spectate || Date.now() - (Number(lr.at) || 0) > 12 * 3600 * 1000) { done(null); return; }
+        var H = HD(), fin = false;
+        var use = function (d) {
+            if (fin) return; fin = true;
+            if (!d || !Array.isArray(d.players) || !d.players.length) { done(null); return; }
+            var sc = d.scores || {}, scored = Object.keys(sc).some(function (k) { return Number(sc[k]) > 0; });
+            var pr = null; try { pr = typeof H.progressOf === 'function' ? H.progressOf(d) : null; } catch (e) { pr = null; }
+            var thru = pr ? pr.thru : (typeof H.thruOf === 'function' ? H.thruOf(d) : 0);
+            done({ code: old, course: d.courseName || lr.course || '', key: d.activeCourseKey || '', scored: scored, thru: thru, finished: !!(pr && pr.finished) });
+        };
+        var local = function () { var l = null; try { l = typeof H.localRound === 'function' ? H.localRound(old) : null; } catch (e) { l = null; } use(l && l.data); };
+        var dbr = wizDb();
+        if (!dbr) { local(); return; }
+        var t = setTimeout(local, 4000);
+        try { dbr.ref('events/' + old).once('value').then(function (s2) { clearTimeout(t); var d = s2 && s2.val ? s2.val() : null; if (d) use(d); else local(); }, function () { clearTimeout(t); local(); }); } catch (e) { clearTimeout(t); local(); }
+    }
+    function askHtml() {
+        var o = S.ask, from = tidy(o.course), to = tidy(courseName());
+        return '<div id="sf-ask" data-sf="askclose" style="position:fixed;inset:0;z-index:5;background:rgba(10,20,15,.45);display:flex;align-items:flex-end;justify-content:center;">'
+            + '<div class="sf-card" style="width:100%;max-width:520px;margin:0 12px calc(env(safe-area-inset-bottom) + 12px);padding:18px 16px;" role="alertdialog" aria-labelledby="sf-ask-t">'
+            + '<div id="sf-ask-t" style="font-size:18px;font-weight:800;line-height:1.3;margin-bottom:6px;">End your ' + esc(from) + ' round (thru ' + esc(o.thru || 0) + ') and start at ' + esc(to) + '?</div>'
+            + '<div class="sf-note" style="margin-bottom:14px;">Your ' + esc(from) + ' round keeps its scores \u2014 it stays in History.</div>'
+            + '<button type="button" class="sf-cta" data-sf="asknew" style="margin-bottom:8px;">Start new</button>'
+            + '<button type="button" class="sf-btn" data-sf="askresume" style="width:100%;min-height:50px;">Resume ' + esc(from) + '</button></div></div>';
     }
 
     // ---- THE SHARE SHEET, THEN DONE -----------------------------------------------
@@ -1117,7 +1202,7 @@
         // (Only once the GPS course files are read - until then a GPS-door round keeps the map.)
         var gps = S.gpsFiles ? readyOf(courseKey() || d.activeCourseKey) : (S.mode === 'gps' || readyOf(courseKey() || d.activeCourseKey));
         ls('hardpan_round_side', (gps ? 'gps|' : 'bets|') + S.code);
-        ss(MARK, null);
+        ss(MARK, null); ss(CHANGE_FROM, null);
         var h = 'index.html?game=' + encodeURIComponent(S.code) + (m.group ? '&group=' + m.group : '') + (m.me ? '&me=' + encodeURIComponent(m.me.id) : '');
         W.location.href = h;
     }
@@ -1146,7 +1231,7 @@
         var t = ev.target, b;
         if (!t || !t.closest) return;
         if ((b = t.closest('[data-sf-web]'))) { webPull(b.getAttribute('data-sf-web'), b.getAttribute('data-sf-name')); return; }
-        if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; lookup(pk, pn); return; }
+        if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.pend = null; S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; lookup(pk, pn); return; }
         if ((b = t.closest('[data-sf-tee]'))) {
             var tk = b.getAttribute('data-sf-tee'), tr = teeRows(courseKey()).filter(function (x) { return x.key === tk; })[0];
             setVal('tee-rating-select', tk); if (fn('applySelectedTee')) W.applySelectedTee();
@@ -1200,10 +1285,19 @@
         if (a === 'change') { S.changing = true; render(); var q = $('sf-q'); if (q) q.focus(); return; }
         if (a === 'relocate') { S.near = null; S.nearWhy = null; locate(); render(); return; }
         if (a === 'startgps') { needCard('err1', startGps); return; }
+        if (a === 'askclose') { if (t.closest('.sf-card')) return; S.ask = null; render(); return; }
+        if (a === 'asknew') { S.ask = null; runSave('err1'); return; }
+        if (a === 'askresume') {
+            var ao = S.ask; S.ask = null;
+            ss(MARK, null);
+            ls('hardpan_round_side', 'gps|' + ao.code);
+            W.location.href = typeof HD().roundHref === 'function' ? HD().roundHref(ao.code) : 'index.html?game=' + encodeURIComponent(ao.code);
+            return;
+        }
         if (a === 'mix') { away(step('players'), 'Tees set'); return; }
         if (a === 'fullcourse') { away(step('course'), 'Course picked'); return; }
         if (a === 'signin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t2 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t2); show(true); S.lookup = null; lookup(courseKey(), courseName()); render(); } }, 600); } return; }
-        if (a === 'webback') { if (S.web) S.web.pull = null; render1(); var q2 = $('sf-q'); if (q2) q2.focus(); return; }
+        if (a === 'webback') { if (S.web) S.web.pull = null; S.pend = null; render1(); var q2 = $('sf-q'); if (q2) q2.focus(); return; }
         if (a === 'webretry') { S.web = null; webSearch(); return; }
         if (a === 'websignin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t3 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t3); show(true); S.web = null; webSearch(); render1(); } }, 600); } return; }
         if (a === 'webrequest') {
