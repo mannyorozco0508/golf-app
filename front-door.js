@@ -955,6 +955,13 @@
             show(homeView());
             gpsGate(homeCourse(), function () { setDoor('gps'); show('gps'); });
         }
+        // CHANGE COURSE (URGENT-019, gps-round.js changeCourse): straight on to the GPS door's Course &
+        // Tees screen for a NEW round - the hash is spent first, so Back from there is plain Home.
+        else if (h === 'gpsdoor') {
+            try { if (W.history && W.history.replaceState) W.history.replaceState(null, '', 'home.html'); } catch (e) {}
+            show(homeView());
+            if (simpleOn()) simpleAct('sgpsdoor'); else gpsGate(homeCourse(), function () { setDoor('gps'); show('gps'); });
+        }
         else if (h === 'gps') { show(homeView()); gpsGate(homeCourse(), function () { if (backToGpsRound()) return; show('gps'); }); }
         else show(h === 'games' ? h : homeView());
         mainDecor();
@@ -2170,7 +2177,9 @@
     (function gpsCover() {
         try {
             var path = String(W.location.pathname || ''), p = params(), m = ss(SIMPLE), mode = m;
-            if (!/admin\.html$/.test(path) || !m) return;
+            // URGENT-019: Change course hops through Home (home.html#gpsdoor) - covered the same way.
+            if (/home\.html$/.test(path) && W.location.hash === '#gpsdoor') { m = 'gps'; mode = 'gps'; p = { get: function (k) { return k === 'start' ? 'quick' : null; } }; }
+            else if (!/admin\.html$/.test(path) || !m) return;
             try { var o = JSON.parse(m); if (o && o.mode) { mode = o.mode; if (o.code && p.get('game') && String(p.get('game')).toUpperCase() !== o.code) return; } } catch (e) {}
             if (mode !== 'gps' || !(p.get('game') || p.get('start') === 'quick')) return;
             var D = W.document, st = D.createElement('style');

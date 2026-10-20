@@ -4668,7 +4668,7 @@
         + '</div>'
         // TOP PANEL: back, the hole (tap = pick a hole), CENTER big with F / B.
         + '<div class="gps-top">'
-        +   '<button type="button" class="gps-back gps-float" aria-label="Back to the scorecard">‹</button>'
+        +   '<button type="button" class="gps-back gps-float" aria-label="Back">‹</button>'
         +   '<div class="gps-holebox gps-float">'
         +     '<div class="gps-holerow">'
         +       '<button type="button" class="gps-prev" aria-label="Previous hole">‹</button>'
@@ -5223,7 +5223,7 @@
         + '#gps-overlay .gps-ld-head{position:absolute;z-index:8;left:8px;right:8px;top:calc(env(safe-area-inset-top) + 8px);display:flex;flex-direction:column;gap:10px;pointer-events:none;}'
         + '#gps-overlay .gps-ld-head > *{pointer-events:auto;}'
         + '#gps-overlay .gps-ld-top{display:flex;align-items:center;gap:8px;padding:6px 12px 6px 2px;border-radius:20px;background:rgba(11,15,12,.95);box-shadow:0 6px 18px rgba(0,0,0,.35);color:#f4f4ef;min-width:0;}'
-        + '#gps-overlay.gps-ld .gps-back{position:static;flex:0 0 auto;width:34px;height:52px;padding:0 0 3px;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;font-size:30px;color:#f4f4ef;}'
+        + '#gps-overlay.gps-ld .gps-back{position:static;flex:0 0 auto;width:44px;height:52px;padding:0 0 3px;background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;font-size:30px;color:#f4f4ef;}'
         + '#gps-overlay.gps-ld .gps-hole-btn{flex:0 0 auto;display:grid;grid-template-columns:auto auto;align-items:end;column-gap:2px;min-height:52px;padding:0 2px;text-align:left;}'
         + '#gps-overlay.gps-ld .gps-hole-lbl{grid-column:1 / 3;font-size:11px;letter-spacing:.1em;}'
         + '#gps-overlay.gps-ld .gps-hole-num{font-size:34px;line-height:1;}'
@@ -5431,7 +5431,17 @@
             });
         });
         on(el, '.gps-side-bets', function () { S.userChoseSide = true; showSide('bets'); });
-        on(el, '.gps-back', function () { S.userChoseSide = true; showSide('bets'); });
+        // "‹" IS THE WAY OUT (URGENT-019, simpleFlow, in a round): nothing scored yet -> Change course
+        // (the Course & Tees screen for a new round); scores in -> Home, the round kept as Resume.
+        // The card stays one tap away on the bottom bar. Off / no round: the card, as before.
+        on(el, '.gps-back', function () {
+            var R = window.HardPanRound;
+            if (sfOn() && S.eventCode && R && typeof R.changeCourse === 'function') {
+                if (typeof R.scored === 'function' && R.scored()) { R.leaveRound(); return; }
+                R.changeCourse(); return;
+            }
+            S.userChoseSide = true; showSide('bets');
+        });
         var ci = el.querySelector('.gps-credit-i');
         if (ci) ci.addEventListener('click', function (e) { e.preventDefault(); toggleCredits(e); });
         // Tap anywhere (the map included) closes the credits.
@@ -5531,6 +5541,8 @@
             var rd = null; try { rd = typeof currentData !== 'undefined' ? currentData : (S && S.round); } catch (e) { rd = S && S.round; }   /* global currentData */
             var inRound = !!(S && S.eventCode && rd && (rd.players || []).length);
             if (!inRound) { window.location.href = 'home.html#pick'; return; }
+            // URGENT-019: the round's own Change course (asks only when scores are in).
+            if (sfOn() && window.HardPanRound && typeof window.HardPanRound.changeCourse === 'function') { window.HardPanRound.changeCourse(); return; }
             var go = function () { window.location.href = 'admin.html?game=' + encodeURIComponent(S.eventCode); };
             if (typeof window.uiConfirm !== 'function') return;
             window.uiConfirm({ title: 'Change the course for this round?', body: 'That\u2019s Full setup - the round\u2019s whole setup, then back here.', confirmText: 'Full setup', cancelText: 'Not now', danger: false })
