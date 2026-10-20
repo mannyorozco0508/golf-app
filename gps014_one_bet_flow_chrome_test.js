@@ -129,6 +129,12 @@ test('2+3: 1v1 Match, 2v2 Match, 2v2 Hi-Lo, 1v1 Nassau with presses, 1v1 Stroke 
     assert.equal(asked, true, 'no confirm for a start before now');
     assert.equal(got.startHole, 1);
     assert.equal(got.format, 'nassau');
+    // URGENT-015: a Nassau side bet does not turn this Stroke Play round into "Match Play" (header + card).
+    await ev('HardPanRound.toCard(); 1');
+    await sleep(500);
+    const hdr = JSON.parse(await ev('JSON.stringify({ sub: document.getElementById("format-subtitle").textContent, card: (document.getElementById("landing-scoring") || {}).textContent })'));
+    assert.match(hdr.sub, /STROKE PLAY \((NET|GROSS)\)$/, 'header: ' + hdr.sub);
+    assert.doesNotMatch(hdr.sub + ' ' + hdr.card, /Match Play|MATCH PLAY/i, JSON.stringify(hdr));
 });
 
 test('4: after Start - a GPS round goes to the GPS on the same hole and map; no map -> the card; the toast', { timeout: 60000 }, async () => {

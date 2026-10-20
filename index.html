@@ -5919,6 +5919,17 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // format, because the card shows the scoring only in that case and the header
     // always shows it - the one place their formatting legitimately differs.
     function roundScoringBasis() {
+        // GPS:BEGIN
+        // URGENT-015 (017 simpleFlow): SIDE BETS DON'T CHANGE THE ROUND'S FORMAT. With "+ Bet" a
+        // Nassau between two golfers is a side bet, not the round's game, and the header read
+        // "Match Play · Net" on a Stroke Play round. In the new flow the main format is named,
+        // with its own net/gross setting - display only (the old flow keeps Wave 27b's reading).
+        if (window.HardPanBet && typeof window.HardPanBet.on === 'function' && window.HardPanBet.on()) {
+            const gf0 = (currentData && currentData.gameFormat) || 'stroke';
+            const st0 = (typeof window !== 'undefined' && window.__scScoringType) || 'net';
+            return { label: (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[gf0]) || 'Stroke Play', fromWager: false, scoring: st0 === 'gross' ? 'Gross' : 'Net' };
+        }
+        // GPS:END
         const gf = (currentData && currentData.gameFormat) || 'stroke';
         const primaryNassau = Object.values((currentData && currentData.sideMatches) || {})
             .find(sm => sm && sm.format === 'nassau');
