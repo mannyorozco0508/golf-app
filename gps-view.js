@@ -4401,7 +4401,8 @@
         if (!d || !w || !w.player) { b.style.display = 'none'; return; }
         var rs = roundScore({ courseData: d.courseData || [], scores: w.scores, id: w.id, hcp: w.player.hcp, strokes: cardStrokes() });
         var tp = function (n) { return n === 0 ? '' : (n < 0 ? 'gps-tp-under' : 'gps-tp-over'); };
-        var key = JSON.stringify(rs);
+        var wait = queuedHere();
+        var key = JSON.stringify(rs) + '|' + wait;
         b.style.display = '';
         if (b.getAttribute('data-rs') === key) return;
         b.setAttribute('data-rs', key);
@@ -4419,7 +4420,18 @@
             part(rs.gross + ' ', rs.grossToPar);
             if (rs.net != null) part('· Net ' + rs.net + ' ', rs.netToPar);
         }
-        b.setAttribute('aria-label', roundScoreText(rs) + ' - open the scorecard');
+        // POLISH #4: scores saved on this phone with no signal, not sent yet - one small part of the
+        // pill (no new map label), gone when the queue empties.
+        if (wait) { var wq = document.createElement('span'); wq.className = 'gps-lc-wait'; wq.textContent = '\uD83D\uDCF4 ' + wait + ' waiting'; b.appendChild(document.createTextNode(' ')); b.appendChild(wq); }
+        b.setAttribute('aria-label', roundScoreText(rs) + (wait ? ', ' + wait + ' saved on this phone, waiting for signal' : '') + ' - open the scorecard');
+    }
+    // POLISH #4: this round's writes still in the offline queue (offline-queue.js, read only).
+    function queuedHere() {
+        try {
+            var Q = window.OfflineQueue;
+            if (!Q || !S || !S.eventCode || typeof Q.countFor !== 'function') return 0;
+            return Q.countFor(window.localStorage, 'events/' + String(S.eventCode) + '/') || 0;
+        } catch (e) { return 0; }
     }
     // What render fills in layout C only.
     function syncLayoutC(r, nums, acc) {
@@ -5534,6 +5546,7 @@
         // Wraps between its parts, never inside one ("Net 12 (+1)" stays whole) - big text, small phone.
         + '#gps-overlay .gps-lc-score > span{white-space:nowrap;}'
         + '#gps-overlay .gps-lc-score .gps-tp-under{color:#4ade80;}'
+        + '#gps-overlay .gps-lc-score .gps-lc-wait{white-space:nowrap;color:#fcd34d;font-weight:700;}'
         // THE PANEL
         + '#gps-overlay .gps-panel{position:absolute;z-index:7;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;'
         +   'padding:0 10px calc(env(safe-area-inset-bottom) + 8px);background:rgba(12,18,14,.96);border-radius:24px 24px 0 0;border-top:1px solid rgba(217,249,157,.14);box-shadow:0 -6px 18px rgba(0,0,0,.3);color:#f4f4ef;touch-action:none;}'
@@ -6514,6 +6527,8 @@
         // The Wi-Fi iPad sentence (gps_ipad_test.js).
         ipadNoGps: ipadNoGps,
         isMounted: function () { return !!S; },
+        // POLISH #4: the offline queue changed (index.html renderOfflineBadge) - the pill's "📴 N waiting".
+        queueChanged: function () { if (!S || !rsSwitch()) return; try { syncRoundChip(); syncLayoutVars(); } catch (e) {} },
         courseKey: function () { return S ? S.courseKey : null; },
         tournament: function () { return tournament(); },
         // 012: the plays-like number, its club and the (i) sheet - for every layout (old, C, D).
