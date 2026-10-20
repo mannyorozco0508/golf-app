@@ -86,9 +86,10 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         assert.match(s1.text, /Dobson Ranch Golf Course\n0\.0 mi · (✓ GPS · )?Change/, 'the closest course, picked');
         // URGENT-013: the tee NAMES (the first look showed the gender: Men, Men, Men, Men, Women, Women),
         // Men/Women small, yards, rating / slope; the women's White and Red (same yards) not repeated.
-        assert.deepEqual(tees.tees, ['Back | Men | 6,586 yds | 71.1 / 123 *', 'DRGA Tournament | Men | 6,394 yds | 70.2 / 121', 'White | Men | 6,187 yds | 69.0 / 118', 'Red | Men | 5,645 yds | 66.9 / 112']);
-        assert.match(s2.text, /Tees\nBack for all · Mix/);
-        assert.match(s1.text, /Start\nHole 1\n10\nShotgun/);
+        // (polish 029 #11: the first-time tee is a middle one - White here - not the tips.)
+        assert.deepEqual(tees.tees, ['Back | Men | 6,586 yds | 71.1 / 123', 'DRGA Tournament | Men | 6,394 yds | 70.2 / 121', 'White | Men | 6,187 yds | 69.0 / 118 *', 'Red | Men | 5,645 yds | 66.9 / 112']);
+        assert.match(s2.text, /Tees\nWhite for all · Mix/);   // polish 029 #11: the middle tee
+        assert.match(s1.text, /Start\nHole 1\nHole 10\nShotgun/);
         assert.match(s2.text, /20 golfers · 5 groups/);
         assert.match(s2.text, /Flights\nA 10\nB 10/);
         assert.match(s2.text, /Handicaps\n✓ all 20/);

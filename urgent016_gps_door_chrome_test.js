@@ -58,11 +58,12 @@ describe('URGENT-016: the GPS door', () => {
         assert.equal(fr.frames.start.lobby, 0, 'the old lobby flashed on the code-minting hop: ' + JSON.stringify(fr.frames));
         assert.equal(fr.frames.game.lobby, 0, 'the old lobby flashed on the round page: ' + JSON.stringify(fr.frames));
         assert.equal(fr.cover, false, 'the cover is lifted once the screen is up');
-        // the picked course on top, highlighted; NEAR YOU right under it (before the tees); 6+ others
+        // the picked course on top, highlighted; its TEES right under it, then NEAR YOU (polish 029 #11,
+        // Manny: the tees sat under 8 NEAR YOU rows, below the fold); 6+ others
         assert.equal(s1.key, 'gca_zgkynkan');
         assert.match(s1.head, /Dobson Ranch Golf Course\n0\.0 mi · (✓ GPS · )?Change/);   // ✓ GPS = what the map draws (URGENT-022)
         assert.equal(s1.headSel, true);
-        assert.ok(s1.order[0] > 0 && s1.order[0] < s1.order[1], 'NEAR YOU sits above the tees: ' + JSON.stringify(s1.order));
+        assert.ok(s1.order[1] > 0 && s1.order[1] < s1.order[0], 'polish #11: the TEES sit under the picked course, above NEAR YOU: ' + JSON.stringify(s1.order));
         assert.ok(s1.near.length >= 6, 'at least 6 nearby courses: ' + JSON.stringify(s1.near));
         assert.ok(s1.near.every((t) => !/^Dobson Ranch Golf Course \|/.test(t)), 'the picked course is not repeated in the list');
         assert.ok(s1.near.every((t) => / mi/.test(t)), 'each row shows its distance: ' + JSON.stringify(s1.near));

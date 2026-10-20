@@ -14,10 +14,12 @@
 //   each, keeps one that is this uid's (ownerUid), UNFINISHED (some golfer
 //   is missing some hole) and shares at least half the new roster's names
 //   (normalised: case, spaces, a trailing dot). Round Ready then shows
-//     ☑ Retire ZZ47KK — anyone who opens it is sent here.
-//   CHECKED BY DEFAULT: the write events/ZZ47KK/supersededBy = "X7Z8HM"
-//   fires when the row renders; unticking writes null (undo); ticking again
-//   writes it back. One key on the old round, nothing else.
+//     ☐ Retire ZZ47KK — anyone who opens it is sent here.
+//   POLISH 029 #3: UNCHECKED, and only for a round on the SAME COURSE saved the
+//   SAME DAY. Nothing is written until the organizer ticks it: ticking writes
+//   events/ZZ47KK/supersededBy = "X7Z8HM", unticking writes null (undo).
+//   One key on the old round, nothing else. (Before: checked and written on
+//   render - the walk retired a Dobson round in progress from a new Papago round.)
 //   index.html - a round carrying supersededBy shows a full-width banner
 //   "This round was replaced by X7Z8HM — tap to open your group there"
 //   (index.html?game=X7Z8HM, &group= carried), every score box disabled on
@@ -43,6 +45,9 @@ const J = v => JSON.parse(JSON.stringify(v));
 const tick = ms => new Promise(r => setTimeout(r, ms || 40));
 const CD = makeCourseData(18);
 const DAY = 24 * 3600 * 1000;
+const MIN = 60 * 1000;
+// The new round in wizardSave is saved at 'comm_links' / Test Links: an old round there.
+const atLinks = (r) => Object.assign(r, { activeCourseKey: 'comm_links', courseName: 'Test Links' });
 
 // ---------------------------------------------------------------------------
 describe('THE DETECTION (admin.html, pure)', () => {
@@ -64,25 +69,28 @@ describe('THE DETECTION (admin.html, pure)', () => {
         assert.equal(run(sb, 'roundUnfinished(' + JSON.stringify(none) + ')'), true);
         assert.equal(run(sb, 'roundUnfinished({ players: [], courseData: [], scores: {} })'), false);
     });
-    test('supersedeCandidate: this uid, unfinished, < 7 days, at least half the names, not the new code itself', () => {
+    test('supersedeCandidate: this uid, unfinished, same course, same day, at least half the names, not the new code itself', () => {
         const NEW = wizardSavedRound({ code: 'NEW1', courseData: CD, thru: 0 });
         const old = wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 9, ownerUid: 'me' });
         const now = Date.now();
         const pick = (entries, records) => run(sb, 'supersedeCandidate(' + JSON.stringify(NEW) + ', "NEW1", "me", ' + JSON.stringify(entries) + ', ' + JSON.stringify(records) + ', ' + now + ')');
-        assert.equal(pick([{ code: 'OLD1', at: now - DAY }], { OLD1: old }), 'OLD1');
+        assert.equal(pick([{ code: 'OLD1', at: now - MIN }], { OLD1: old }), 'OLD1');
         assert.equal(pick([{ code: 'OLD1', at: now - 8 * DAY }], { OLD1: old }), null, 'CONTROL: 8 days old');
-        assert.equal(pick([{ code: 'OLD1', at: now - DAY }], { OLD1: Object.assign({}, old, { ownerUid: 'somebody-else' }) }), null, 'CONTROL: another owner');
-        assert.equal(pick([{ code: 'OLD1', at: now - DAY }], { OLD1: wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 18, ownerUid: 'me' }) }), null, 'CONTROL: finished');
+        assert.equal(pick([{ code: 'OLD1', at: now - DAY }], { OLD1: old }), null, 'polish #3: yesterday\'s round is not offered');
+        assert.equal(pick([{ code: 'OLD1', at: now - MIN }], { OLD1: Object.assign({}, old, { activeCourseKey: 'dobson', courseName: 'Dobson Ranch' }) }), null, 'polish #3: another course is not offered');
+        assert.equal(pick([{ code: 'OLD1', at: now - MIN }], { OLD1: Object.assign({}, old, { activeCourseKey: 'gca_other' }) }), 'OLD1', 'the same course under another key (same name) is still the same course');
+        assert.equal(pick([{ code: 'OLD1', at: now - MIN }], { OLD1: Object.assign({}, old, { ownerUid: 'somebody-else' }) }), null, 'CONTROL: another owner');
+        assert.equal(pick([{ code: 'OLD1', at: now - MIN }], { OLD1: wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 18, ownerUid: 'me' }) }), null, 'CONTROL: finished');
         // 23 golfers: half is 12. Rename 12 -> 11 shared (below); restore one -> 12 shared (at).
         const few = J(old); few.players = few.players.map((p, i) => (i < 12 ? Object.assign({}, p, { name: 'Stranger ' + i }) : p));
         assert.equal(rosterOverlapOf(NEW.players, few.players), 11);
-        assert.equal(pick([{ code: 'OLD1', at: now - DAY }], { OLD1: few }), null, 'CONTROL: fewer than half the names');
+        assert.equal(pick([{ code: 'OLD1', at: now - MIN }], { OLD1: few }), null, 'CONTROL: fewer than half the names');
         const half = J(few); half.players[11] = old.players[11];
         assert.equal(rosterOverlapOf(NEW.players, half.players), 12);
-        assert.equal(pick([{ code: 'OLD1', at: now - DAY }], { OLD1: half }), 'OLD1');
+        assert.equal(pick([{ code: 'OLD1', at: now - MIN }], { OLD1: half }), 'OLD1');
         assert.equal(pick([{ code: 'NEW1', at: now }], { NEW1: old }), null, 'never itself');
-        assert.equal(pick([{ code: 'OLD1', at: now - DAY }], {}), null, 'a record that did not load is not a candidate');
-        assert.equal(pick([{ code: 'OLD2', at: now - DAY }, { code: 'OLD1', at: now - 2 * DAY }], { OLD1: old, OLD2: Object.assign({}, old, { supersededBy: 'X' }) }), 'OLD1', 'an already-retired round is skipped');
+        assert.equal(pick([{ code: 'OLD1', at: now - MIN }], {}), null, 'a record that did not load is not a candidate');
+        assert.equal(pick([{ code: 'OLD2', at: now - MIN }, { code: 'OLD1', at: now - 2 * MIN }], { OLD1: old, OLD2: Object.assign({}, old, { supersededBy: 'X' }) }), 'OLD1', 'an already-retired round is skipped');
     });
     test('the device list: a save appends {code, at, names}, keeps 7 days, dedupes by code', () => {
         const sb2 = loadHtmlInlineScript('admin.html', [], { localStorage: true });
@@ -128,33 +136,49 @@ async function wizardSave(opts) {
 }
 const NAMES23 = wizardSavedRound({ code: 'X', courseData: CD }).players.map(p => p.name);
 
-describe('THE SAVE (admin.html): Round Ready offers to retire the old round, checked, and writes the one key', () => {
-    test('a new round sharing the roster with yesterday\'s unfinished round: the row, checked, and events/OLD1/supersededBy = NEW1 written once', async () => {
-        const old = wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 9, ownerUid: 'me' });
-        const r = await wizardSave({ names: NAMES23, list: [{ code: 'OLD1', at: Date.now() - DAY }], records: { OLD1: old } });
-        assert.match(r.retire(), /<input type="checkbox" id="rr-retire-box" checked[^>]*>/);
+describe('THE SAVE (admin.html): Round Ready offers to retire the old round, UNCHECKED, and writes only on the tick', () => {
+    test('a new round sharing the roster with today\'s unfinished round at the same course: the row, unchecked, NOTHING written', async () => {
+        const old = atLinks(wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 9, ownerUid: 'me' }));
+        const r = await wizardSave({ names: NAMES23, list: [{ code: 'OLD1', at: Date.now() - MIN }], records: { OLD1: old } });
+        assert.match(r.retire(), /<input type="checkbox" id="rr-retire-box"[^>]*>/);
+        assert.doesNotMatch(r.retire(), /<input[^>]*\schecked(\s|>|=)/, 'polish #3: the box must start unchecked');
         assert.match(r.retire(), /Retire OLD1 — anyone who opens it is sent here\./);
+        assert.deepEqual(r.writes().filter(x => /supersededBy/.test(x.path)), [], 'polish #3: written before the organizer ticked it');
+        run(r.sb, "retireRound('OLD1', true)"); await tick();
         const w = r.writes().filter(x => x.path === 'events/OLD1/supersededBy');
-        assert.deepEqual(w.map(x => [x.op, x.value]), [['set', 'NEW1']]);
+        assert.deepEqual(w.map(x => [x.op, x.value]), [['set', 'NEW1']], 'the tick writes the one key');
         assert.ok(!r.writes().some(x => /^events\/OLD1\/(?!supersededBy)/.test(x.path)), 'nothing else on the old round');
     });
-    test('untick: the key is cleared (null); tick again: written back', async () => {
-        const old = wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 9, ownerUid: 'me' });
-        const r = await wizardSave({ names: NAMES23, list: [{ code: 'OLD1', at: Date.now() - DAY }], records: { OLD1: old } });
+    test('tick, untick: the key is written then cleared (null); tick again: written back', async () => {
+        const old = atLinks(wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 9, ownerUid: 'me' }));
+        const r = await wizardSave({ names: NAMES23, list: [{ code: 'OLD1', at: Date.now() - MIN }], records: { OLD1: old } });
+        run(r.sb, "retireRound('OLD1', true)"); await tick();
         run(r.sb, "retireRound('OLD1', false)"); await tick();
         run(r.sb, "retireRound('OLD1', true)"); await tick();
         const w = r.writes().filter(x => x.path === 'events/OLD1/supersededBy').map(x => x.value);
         assert.deepEqual(w, ['NEW1', null, 'NEW1']);
     });
-    test('CONTROL - a finished old round: no row, no write', async () => {
-        const old = wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 18, ownerUid: 'me' });
+    test('polish #3 - an unfinished round at ANOTHER course today: no row, no write', async () => {
+        const old = Object.assign(wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 5, ownerUid: 'me' }), { activeCourseKey: 'dobson', courseName: 'Dobson Ranch Golf Course' });
+        const r = await wizardSave({ names: NAMES23, list: [{ code: 'OLD1', at: Date.now() - MIN }], records: { OLD1: old } });
+        assert.equal(r.retire(), '');
+        assert.ok(!r.writes().some(x => /supersededBy/.test(x.path)));
+    });
+    test('polish #3 - the same course but YESTERDAY: no row, no write', async () => {
+        const old = atLinks(wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 9, ownerUid: 'me' }));
         const r = await wizardSave({ names: NAMES23, list: [{ code: 'OLD1', at: Date.now() - DAY }], records: { OLD1: old } });
         assert.equal(r.retire(), '');
         assert.ok(!r.writes().some(x => /supersededBy/.test(x.path)));
     });
+    test('CONTROL - a finished old round: no row, no write', async () => {
+        const old = atLinks(wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 18, ownerUid: 'me' }));
+        const r = await wizardSave({ names: NAMES23, list: [{ code: 'OLD1', at: Date.now() - MIN }], records: { OLD1: old } });
+        assert.equal(r.retire(), '');
+        assert.ok(!r.writes().some(x => /supersededBy/.test(x.path)));
+    });
     test('CONTROL - a different roster: no row, no write', async () => {
-        const old = wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 9, ownerUid: 'me' });
-        const r = await wizardSave({ names: NAMES23.map((n, i) => 'Other ' + i), list: [{ code: 'OLD1', at: Date.now() - DAY }], records: { OLD1: old } });
+        const old = atLinks(wizardSavedRound({ code: 'OLD1', courseData: CD, thru: 9, ownerUid: 'me' }));
+        const r = await wizardSave({ names: NAMES23.map((n, i) => 'Other ' + i), list: [{ code: 'OLD1', at: Date.now() - MIN }], records: { OLD1: old } });
         assert.equal(r.retire(), '');
         assert.ok(!r.writes().some(x => /supersededBy/.test(x.path)));
     });
