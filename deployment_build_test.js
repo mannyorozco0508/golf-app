@@ -95,7 +95,7 @@ describe('MEMBERSHIP — each output holds its own product and the shared core',
         // inside a GPS block; in a Consumer tree they are not there at all). Six
         // until 2026-10-10, when the five per-state coverage lists and gps-match.js joined.
         const GPS = declared('GPS_SHELL');
-        assert.ok(GPS.length === 35, 'positive: GPS_SHELL parsed');  // 35: simple-flow.js joined (017 simpler HardPan, 2026-10-19). 34: gps-round.js joined (017 Round Menu, 2026-10-19). 33: gps-bet.js joined (017 + Bet, 2026-10-19). 32: hp-index.js joined (008 HardPan Index, 2026-10-18). 31: gps-entitlement.js joined (gps-store-iap, 2026-10-17)
+        assert.ok(GPS.length === 37, 'positive: GPS_SHELL parsed');  // 37: gps-add-golfer.js + gps-round-edit.js joined (URGENT-017/018, 2026-10-19). 35: simple-flow.js joined (017 simpler HardPan, 2026-10-19). 34: gps-round.js joined (017 Round Menu, 2026-10-19). 33: gps-bet.js joined (017 + Bet, 2026-10-19). 32: hp-index.js joined (008 HardPan Index, 2026-10-18). 31: gps-entitlement.js joined (gps-store-iap, 2026-10-17)
         assert.deepEqual(listing(outDir('consumer')), SHARED.concat(CONSUMER).filter(f => !GPS.includes(f)).sort());
         GPS.forEach(f => assert.ok(!listing(outDir('consumer')).includes(f), 'Consumer ships ' + f));
     });
