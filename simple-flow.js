@@ -239,7 +239,11 @@
                 S.here = p;
                 S.near = nearList(p);
                 // THE CLOSEST, ALREADY PICKED (a round with no course yet).
-                var cand = S.mode === 'gps' ? S.near.filter(function (x) { return x.c.ready; }).concat(S.near) : S.near;
+                // THE COURSE YOU ARE AT (URGENT-019): the closest one - a GPS-ready one only when it is that
+                // same spot (within a mile of the closest), never a GPS course across town over the one
+                // you are standing on (on the phone, ✓ GPS is only the app's GolfAPI courses).
+                var c0 = S.near[0], cand = c0 ? S.near.filter(function (x) { return x.c.ready && x.d - c0.d <= 1; }).concat(S.near) : S.near;
+                if (S.mode !== 'gps') cand = S.near;
                 if (!courseKey() && !courseName() && cand.length) pick(cand[0].c.key, cand[0].c.name);
                 if (S.step === 1) render();
             });
