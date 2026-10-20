@@ -1477,7 +1477,7 @@
         if (agPlayers().length >= agNeed(id)) return false;
         if (agInPlace() && W.HardPanAddGolfer && typeof W.HardPanAddGolfer.open === 'function') {
             closeAddGame();
-            W.HardPanAddGolfer.open({ onDone: function () {
+            W.HardPanAddGolfer.open({ why: agGameName(id) + ' needs ' + agNeed(id) + ' golfers - add ' + (agNeed(id) - agPlayers().length) + ' more.', onDone: function () {
                 // The round's listener lands the new golfers a moment after the write.
                 var n = 0, t = setInterval(function () {
                     if (agPlayers().length >= agNeed(id) || ++n > 20) {
