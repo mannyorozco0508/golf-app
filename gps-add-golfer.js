@@ -339,6 +339,7 @@
     function open(opts) {
         var o = opts || {};
         if (!data() || !code()) return false;
+        if (teesCode !== code()) { teesCode = code(); S.tees = null; }
         S = { open: true, list: [], name: o.name || '', hcp: '', tee: '', group: o.group || myGroup(), err: '', saving: false, paste: false, pasteText: '', tees: S.tees, chips: null, onDone: o.onDone || null };
         if (S.tees && S.tees.length) S.tee = roundTeeKey(S.tees);
         loadTees(); loadChips();
@@ -350,9 +351,10 @@
     }
     function close() { S.open = false; var e = D.getElementById('hp-addg'); if (e) { e.classList.remove('open'); e.innerHTML = ''; } }
     function isOpen() { return !!S.open; }
-    // A NEW ROUND'S TEES ARE THE COURSE'S: forget them when the round changes (a new code).
-    var lastCode = null;
-    setInterval(function () { var c = code(); if (c !== lastCode) { lastCode = c; S.tees = null; } }, 2000);
+    // A NEW ROUND'S TEES ARE THE COURSE'S: forgotten when the sheet opens on another round (a new
+    // code) - checked on open, not on a timer (a never-ending interval kept every harness test that
+    // loads this page from exiting).
+    var teesCode = null;
 
     // Every "+ Add a player" in a GPS round (the card's "Just scores" box, anywhere a link
     // still points at Round Setup's Players step for THIS round) opens the sheet instead.
