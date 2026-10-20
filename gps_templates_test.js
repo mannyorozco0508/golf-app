@@ -40,7 +40,10 @@ test('no money engine, settlement or side-bet file differs from gps-live (acfe6c
     // settlement-engine.js and pool-engine.js moved for that fix ONLY - accepted
     // at exactly these contents, so any other edit still fails here.
     // 2026-10-19 Manny OK: gameHoles play order - action-model.js accepted at exactly these contents.
-    const APPROVED = { 'settlement-engine.js': '88c8b8a7', 'pool-engine.js': '1530a0b9', 'action-model.js': 'f67a7b43' };
+    // 2026-10-19 Manny OK: "side matches use play order (sideMatchHoles), hole-1 rounds unchanged" -
+    // action-model.js, settlement-engine.js, money-engine.js and side-match-lines.js accepted at exactly these contents.
+    const APPROVED = { 'settlement-engine.js': '2b75e349', 'pool-engine.js': '1530a0b9', 'action-model.js': 'bb89aa4c',
+        'money-engine.js': 'ae0bfcd9', 'side-match-lines.js': 'b555fbf5' };
     const sha8 = (f) => require('crypto').createHash('sha256').update(read(f)).digest('hex').slice(0, 8);
     changed = changed.split('\n').filter(f => f && !(APPROVED[f] && sha8(f) === APPROVED[f])).join('\n');
     assert.equal(changed, '', 'engine files untouched');

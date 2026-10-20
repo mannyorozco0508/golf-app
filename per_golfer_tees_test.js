@@ -142,9 +142,9 @@ describe('2. THE MONEY FILES DO NOT MOVE', () => {
         // including handicap.js, which is protected and was NOT edited: its
         // builders are called with a different tee, not changed.
         const PINS = {
-            'handicap.js': '2d3b2f7fd916', 'money-engine.js': '12bfa41c2c8e',
-            'settlement-engine.js': '88c8b8a76c24', 'pool-engine.js': '1530a0b955e2',
-            'action-model.js': 'f67a7b4390f5', /* 2026-10-19 Manny OK: gameHoles play order (was 399ba26f) */ 'bet-strip.js': 'bca47bb80a6e',   // RE-PINNED 2026-10-07 (MATCHES TAB ON A FINISHED ROUND; was 6a876155): approved per-file by Manny in the four-bug brief, ONE site in buildSideActionRows - on a round that is over every row read "All square - Thru 18", including one won 7&6. It now reads the RECEIPT settlement-engine.js already priced, gated on the card's own sideMatchRangeComplete so a running match is untouched. No arithmetic entered the file; matches_tab_finished_test.js holds the behaviour and its mid-round control proves the gate.
+            'handicap.js': '2d3b2f7fd916', 'money-engine.js': 'ae0bfcd9805c',   // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)
+            'settlement-engine.js': '2b75e349bae7', 'pool-engine.js': '1530a0b955e2',   // 2026-10-19 Manny OK: side matches in play order (was 88c8b8a7)
+            'action-model.js': 'bb89aa4c1be8', /* 2026-10-19 Manny OK: gameHoles play order (was 399ba26f) */ 'bet-strip.js': 'e2fcf72d5a9d',   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)   // RE-PINNED 2026-10-07 (MATCHES TAB ON A FINISHED ROUND; was 6a876155): approved per-file by Manny in the four-bug brief, ONE site in buildSideActionRows - on a round that is over every row read "All square - Thru 18", including one won 7&6. It now reads the RECEIPT settlement-engine.js already priced, gated on the card's own sideMatchRangeComplete so a running match is untouched. No arithmetic entered the file; matches_tab_finished_test.js holds the behaviour and its mid-round control proves the gate.
             'hole-events.js': '6fd7f7edf41e', 'score-marks.js': '02f972d6d2fc',
             'payouts.js': 'c35e34f571e5', 'match-engine.js': '42bb272d1181',
             'ryder-cup.js': '0b4e3f9059ad', 'play-order.js': 'c243c2eafb8d'

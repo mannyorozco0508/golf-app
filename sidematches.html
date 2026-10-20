@@ -1786,7 +1786,7 @@ html {
             const holes = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
             const parts = players.filter(p => chosenIds.includes(String(p.id)));
             const auto = (typeof sideMatchStartHole === 'function')
-                ? sideMatchStartHole(parts.length ? parts : players, holes, currentData.scores || {})
+                ? sideMatchStartHole(parts.length ? parts : players, holes, currentData.scores || {}, currentData)
                 : 1;
             startSel.innerHTML = holes.map(h =>
                 `<option value="${h.hole}" ${h.hole === auto ? 'selected' : ''}>Hole ${h.hole}</option>`).join('');
@@ -2342,7 +2342,7 @@ html {
         const parts = (currentData.players || [])
             .filter(p => teamAIds.includes(String(p.id)) || teamBIds.includes(String(p.id)));
         const auto = (typeof sideMatchStartHole === 'function')
-            ? sideMatchStartHole(parts, holes, currentData.scores || {})
+            ? sideMatchStartHole(parts, holes, currentData.scores || {}, currentData)
             : (holes.length ? holes[0].hole : 1);
 
         sel.innerHTML = holes.map(h =>
@@ -2572,7 +2572,7 @@ html {
         const smParticipants = (currentData.players || [])
             .filter(p => teamAIds.includes(String(p.id)) || teamBIds.includes(String(p.id)));
         const autoStart = (typeof sideMatchStartHole === 'function')
-            ? sideMatchStartHole(smParticipants, currentData.courseData || [], currentData.scores || {})
+            ? sideMatchStartHole(smParticipants, currentData.courseData || [], currentData.scores || {}, currentData)
             : 1;
         const chosenEl = document.getElementById('sm-start-hole');
         const chosen = chosenEl ? parseInt(chosenEl.value, 10) : NaN;
@@ -3114,7 +3114,7 @@ html {
     }
     function alohaCourseFor(sm) {
         return (typeof sideMatchHoles === 'function')
-            ? sideMatchHoles(sm, currentData.courseData || [])
+            ? sideMatchHoles(sm, currentData.courseData || [], currentData)
             : (currentData.courseData || []);
     }
     function alohaCalcFor(sm) {
@@ -4264,7 +4264,7 @@ html {
         const parts = (currentData.players || [])
             .filter(p => String(p.id) === String(ch.from) || String(p.id) === String(ch.to));
         const auto = (typeof sideMatchStartHole === 'function')
-            ? sideMatchStartHole(parts, currentData.courseData || [], currentData.scores || {}) : 1;
+            ? sideMatchStartHole(parts, currentData.courseData || [], currentData.scores || {}, currentData) : 1;
         const startHole = Math.max(Number(ch.terms.startHole) || 1, auto || 1);
 
         const payload = sideMatchPayloadFromTerms(ch.terms, {
@@ -4366,7 +4366,7 @@ html {
             // Only holes from this match's own start hole forward. A match with no
             // startHole covers the whole round, exactly as before.
             const smCourse = (typeof sideMatchHoles === 'function')
-                ? sideMatchHoles(sm, courseData)
+                ? sideMatchHoles(sm, courseData, currentData)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
 
             const sideName = (side) => side.map(pl => pl.name.split(' ')[0]).join(' / ');
