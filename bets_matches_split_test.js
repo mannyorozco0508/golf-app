@@ -453,7 +453,8 @@ describe('THE SEAM — what each page loads, and what it no longer carries', () 
         const inline = s.replace(/<script src=[^>]*><\/script>/g, '');
         ['calculateMatchEngine', 'nassauStakeConfig', 'formatMatchPill', 'strokePressHistory', 'buildRoundGameCards'].forEach(fn =>
             assert.ok(!new RegExp('function ' + fn + '\\s*\\(').test(inline), fn + ' must not be defined inline any more'));
-        assert.match(inline, /buildSideActionRows\(currentData, courseData, savedScores, players\)/, 'the result line comes from bet-strip.js');
+        // polish 029 #2: the same call on the round's display copy (two of one first name -> "Test A" / "Test B").
+        assert.match(inline, /buildSideActionRows\((?:currentData|shownRound\(\)), courseData, savedScores, (?:players|shownList\(players\))\)/, 'the result line comes from bet-strip.js');
     });
 
     test('skins.html loads grouping.js, money-engine.js and bet-strip.js before its inline block', () => {

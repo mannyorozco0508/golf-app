@@ -38,7 +38,10 @@ const NAMES = ['Randy T', 'Ryan H', 'Anthony', 'Danny', 'Andy', 'Tim K', 'Jim B'
 // initial and a dot; a unique first name stands alone - so the stored "Ryan H",
 // "Tim K", "Jim B", "Chris S" read Ryan, Tim, Jim, Chris here exactly as on the
 // leaderboard (their initials are not needed to tell them apart).
-const SHOWN = ['Randy T.', 'Ryan', 'Anthony', 'Danny', 'Andy', 'Tim', 'Jim', 'Chris', 'Randy C.', 'Marty', 'Mike', 'Tanner', 'Glen', 'Manny', 'Kopp', 'Dalen', 'Matt M.', 'Lance', 'Matt B.', 'Paul', 'Bobby', 'Rocco', 'Matt H.', 'Jeremy', 'Carl'];
+// POLISH 029 #16 (2026-10-20, Manny's pick): a stored last name that is ONE letter is
+// already an initial, so it shows with no dot - "Randy T", not "Randy T." (the dot
+// only marks a cut: "Randy Thompson" still reads "Randy T.").
+const SHOWN = ['Randy T', 'Ryan', 'Anthony', 'Danny', 'Andy', 'Tim', 'Jim', 'Chris', 'Randy C', 'Marty', 'Mike', 'Tanner', 'Glen', 'Manny', 'Kopp', 'Dalen', 'Matt M', 'Lance', 'Matt B', 'Paul', 'Bobby', 'Rocco', 'Matt H', 'Jeremy', 'Carl'];
 const shown = n => SHOWN[NAMES.indexOf(n)];
 
 function round() {
@@ -62,10 +65,10 @@ function gameTab(data) {
 
 describe('EVERY GAME-TAB CARD renders the name the Board would', () => {
     const g = gameTab(round());
-    test('the Flights card: Randy T. and Randy C., Matt M. / Matt B. / Matt H.; every unique first name bare (Ryan H -> Ryan, as on the Board)', () => {
+    test('the Flights card: Randy T and Randy C, Matt M / Matt B / Matt H (no dot on a one-letter last name, #16); every unique first name bare (Ryan H -> Ryan, as on the Board)', () => {
         const c = g.card('Flights');
-        assert.match(c, /Flight A \(12\): Randy T\., Ryan, Anthony, Danny, Andy, Tim, Jim, Chris, Randy C\., Marty, Mike, Tanner/);
-        assert.match(c, /Flight B \(13\): Glen, Manny, Kopp, Dalen, Matt M\., Lance, Matt B\., Paul, Bobby, Rocco, Matt H\., Jeremy, Carl/);
+        assert.match(c, /Flight A \(12\): Randy T, Ryan, Anthony, Danny, Andy, Tim, Jim, Chris, Randy C, Marty, Mike, Tanner/);
+        assert.match(c, /Flight B \(13\): Glen, Manny, Kopp, Dalen, Matt M, Lance, Matt B, Paul, Bobby, Rocco, Matt H, Jeremy, Carl/);
     });
     test('the Groups-in-tee-order card: the same names, group by group', () => {
         const c = g.card('Groups, in tee order');
@@ -73,13 +76,13 @@ describe('EVERY GAME-TAB CARD renders the name the Board would', () => {
         for (let i = 0; i < 25; i += 4) groups.push(NAMES.slice(i, i + 4).map(shown).join(', '));
         groups.forEach((names, i) => assert.match(c, new RegExp('Group ' + (i + 1) + ' ' + names.replace(/\./g, '\\.') + '(?: YOUR GROUP)?' + (i < 6 ? ' Group' : '$'))));
     });
-    test('the side-match teams: "Randy T. & Matt M. vs Randy C. & Matt H."', () => {
-        assert.match(g.card('Side action'), /Randy T\. & Matt M\. vs Randy C\. & Matt H\. — Nassau/);
+    test('the side-match teams: "Randy T & Matt M vs Randy C & Matt H"', () => {
+        assert.match(g.card('Side action'), /Randy T & Matt M vs Randy C & Matt H — Nassau/);
     });
     test('NO bare "Randy" or "Matt" anywhere on the page - the initials survived every card', () => {
         const t = g.html.replace(/<[^>]+>/g, ' ');
-        assert.doesNotMatch(t, /\bRandy\b(?! [TC]\.)/);
-        assert.doesNotMatch(t, /\bMatt\b(?! [MBH]\.)/);
+        assert.doesNotMatch(t, /\bRandy\b(?! [TC]\b)/);
+        assert.doesNotMatch(t, /\bMatt\b(?! [MBH]\b)/);
     });
     test('the Weekly Game card rendered and carries no golfer names (so the assertions above are not satisfied by an empty page)', () => {
         const c = g.card('Weekly Game');
@@ -106,7 +109,7 @@ describe('ONE BUILDER: the formatter lives in text-safe.js and nowhere else', ()
     test('text-safe.js defines and exports it; leaderboard.html and game.html call it and define no copy', () => {
         const ts = read('text-safe.js');
         assert.match(ts, /^function getSmartDisplayName\(player, allPlayers\) \{/m);
-        assert.match(ts, /module\.exports = \{ escapeHtml, getSmartDisplayName \};/);
+        assert.match(ts, /module\.exports = \{ escapeHtml, getSmartDisplayName[,}]/);
         const lb = read('leaderboard.html'), gm = read('game.html');
         assert.doesNotMatch(lb, /function getSmartDisplayName/); assert.doesNotMatch(gm, /function getSmartDisplayName/);
         assert.equal((lb.match(/getSmartDisplayName\(p, players\)/g) || []).length, 2, "the leaderboard's two call sites, unchanged");
@@ -117,7 +120,8 @@ describe('ONE BUILDER: the formatter lives in text-safe.js and nowhere else', ()
     test('the body is the leaderboard\'s, verbatim (the 2026-09-21 lift)', () => {
         const ts = read('text-safe.js');
         const fn = ts.slice(ts.indexOf('function getSmartDisplayName'), ts.indexOf('\n}\n', ts.indexOf('function getSmartDisplayName')) + 3);
-        assert.match(fn, /if \(sameFirstAndInitial\.length === 1\) return `\$\{first\} \$\{lastInitial\}\.`;/);
+        // #16: the initial-and-dot line, with no dot when the last name is one letter.
+        assert.match(fn, /if \(sameFirstAndInitial\.length === 1\) return last\.length === 1 \? `\$\{first\} \$\{lastInitial\}` : `\$\{first\} \$\{lastInitial\}\.`;/);
         assert.match(fn, /return `\$\{first\} \$\{last\}`;/);
         assert.match(fn, /if \(sameFirstName\.length === 1\) return first;/);
     });

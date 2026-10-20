@@ -296,7 +296,8 @@ describe('THE RENDERER USES THE CANONICAL NORMALIZER', () => {
             assert.ok(!/additionalGameInstances\[/.test(fn), 'no hand-rolled storage decoding');
             assert.ok(!/data\.gameFormat ===/.test(fn));
         });
-        assert.ok(/buildActionRows\(currentData/.test(bets), 'the Bets rows are the presenter\'s');
+        // polish 029 #2: on the round's display copy (two of one first name -> "Test A" / "Test B").
+        assert.ok(/buildActionRows\((?:currentData|shownRound\(\))/.test(bets), 'the Bets rows are the presenter\'s');
     });
 
     test('the Matches pointer degrades safely if the round model has not loaded', () => {

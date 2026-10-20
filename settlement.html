@@ -1167,7 +1167,9 @@ html {
 
     function buildReceiptBlock(matchId, data, courseData, savedScores) {
         if (typeof buildSideMatchReceipts !== 'function') return '';
-        const r = buildSideMatchReceipts(data, courseData, savedScores).find(x => x.matchId === matchId);
+        // Labels only (polish #2): two golfers with one first name read "Test A" / "Test B".
+        const shownData = (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(data) : data;
+        const r = buildSideMatchReceipts(shownData, courseData, savedScores).find(x => x.matchId === matchId);
         if (!r) return '';
 
         let html = `<div class="receipt-match">`;
@@ -2394,7 +2396,8 @@ html {
 
         if (gameFormat === 'hilo') {
             const hiloNet = computeHiLoSettlementNet(data, courseData, savedScores);
-            const calc = calculateHiLoEngine(moneyPlayers, courseData, savedScores);
+            // The points line's team names only (polish #2); the money is hiloNet, above.
+            const calc = calculateHiLoEngine((typeof playersForDisplay === 'function') ? playersForDisplay(moneyPlayers, data.players) : moneyPlayers, courseData, savedScores);
             let ledgerHtml = "";
             moneyPlayers.forEach(p => {
                 const money = hiloNet[p.id] || 0;
@@ -2591,7 +2594,7 @@ html {
             pressSet.pressResults.forEach(pr => {
                 const winnerName = pr.roundComplete && pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name) : null;
                 const prStatus = !pr.roundComplete
-                    ? `Not yet final — thru ${pr.holesCompleted} holes of this press`
+                    ? `Not yet final — thru ${pr.holesCompleted} hole${pr.holesCompleted === 1 ? '' : 's'} of this press`
                     : (winnerName ? `${escapeHtml(winnerName)} won $${pr.stake}` : 'Tied, no money');
                 pressBreakdownHtml += `<div class="breakdown-item"><span>Press ${pr.pressNum} (Hole ${pr.startHole}, $${pr.stake}):</span> <span>${prStatus}</span></div>`;
             });
@@ -2641,7 +2644,8 @@ html {
             if (typeof playOrder !== 'function' || typeof teeStartHole !== 'function') return holes;
             return playOrder(holes, teeStartHole(data || {}, holes));
         }
-        const matchData = calculateMatchEngine(moneyPlayers, mainGamePlayOrder(courseData), savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
+        // Team labels only (polish #2): "Test A" / "Test B" for two of one first name.
+        const matchData = calculateMatchEngine((typeof playersForDisplay === 'function') ? playersForDisplay(moneyPlayers, data.players) : moneyPlayers, mainGamePlayOrder(courseData), savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses);
 
         if (!matchData) {
             const sideHtml = buildSideGamesHtml(data, courseData, savedScores);

@@ -916,11 +916,13 @@
         return { a: ids.slice(0, n / 2), b: ids.slice(n / 2) };
     }
     // A golfer's short name: the first name, plus the last initial when another golfer shares it
-    // ("Test A." / "Test B."), so the who's-in chips and the "vs" line tell them apart.
+    // ("Test A" / "Test B" - no dot on a one-letter last name, polish #16), so the who's-in
+    // chips and the "vs" line tell them apart.
     function shortName(ps, p) {
+        if (typeof golferShortName === 'function' && p && p.name && String(p.name).trim()) return golferShortName(p, ps);
         var f = first(p.name), parts = String(p.name || '').trim().split(/\s+/);
         var clash = ps.some(function (x) { return x !== p && first(x.name).toLowerCase() === f.toLowerCase(); });
-        return clash && parts.length > 1 ? f + ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + '.' : (clash ? String(p.name).trim() : f);
+        return clash && parts.length > 1 ? f + ' ' + parts[parts.length - 1].charAt(0).toUpperCase() + (parts[parts.length - 1].length > 1 ? '.' : '') : (clash ? String(p.name).trim() : f);
     }
     function nameById(ps, id) { var p = ps.filter(function (x) { return String(x.id) === String(id); })[0]; return p ? shortName(ps, p) : '?'; }
     function whoBox(k, ps) {

@@ -229,7 +229,7 @@
             + '<button type="button" class="hs-btn alt" data-hs="qr">📷 Show QR code</button>';
         if (gs.length > 1 && organizer()) {
             html += '<div class="hs-h">Scorekeeper links · one per group</div>' + gs.map(function (b) {
-                var names = players.slice(b.startIdx, b.startIdx + b.size).map(function (p) { return String(p.name || '').split(' ')[0]; }).join(', ');
+                var names = players.slice(b.startIdx, b.startIdx + b.size).map(function (p) { return typeof golferShortName === 'function' ? golferShortName(p, players) : String(p.name || '').split(' ')[0]; }).join(', ');
                 return '<div class="hs-row"><div class="hs-grow"><b>Group ' + b.group + '</b><small>' + esc(names) + '</small></div>'
                     + '<button type="button" data-hs-copy="' + b.group + '">Copy</button><button type="button" data-hs-sharegroup="' + b.group + '">Share</button></div>';
             }).join('');
@@ -284,7 +284,7 @@
         var html = head('Settle up', true);
         if (!res) html += '<div class="hs-gate">Couldn’t total the money - open the full review below.</div>';
         else if (missing) html += '<div class="hs-gate">Money so far - not final: ' + missing + ' score' + (missing === 1 ? '' : 's') + ' still missing.</div>';
-        html += '<div class="hs-h">' + (!tx.length ? 'Who pays who' : (tx.length === 1 ? 'One payment' : tx.length + ' payments') + ' settle everything') + '</div>';
+        html += '<div class="hs-h">' + (!tx.length ? 'Who pays who' : (tx.length === 1 ? 'One payment settles' : tx.length + ' payments settle') + ' everything') + '</div>';
         html += tx.length ? tx.map(function (t) {
             return '<div class="hs-row hs-pay"><div class="hs-grow"><b>' + esc(t.from) + '</b> → <b>' + esc(t.to) + '</b></div><span class="hs-amt">$' + whole(t.amount) + '</span></div>';
         }).join('') : '<div class="hs-row">Everyone’s square - nobody owes anybody.</div>';
