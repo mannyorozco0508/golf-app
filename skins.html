@@ -1139,6 +1139,9 @@ html {
                 buildSideActionRows(currentData, courseData, savedScores, players).forEach(r => { rowsById[r.key] = r; });
                 document.getElementById('bets-matches').innerHTML =
                     visible.map(id => buildBetsMatchCard(id, sideMatches[id], rowsById[id], players, courseData, savedScores)).join('');
+                // GPS:BEGIN
+                if (typeof hpTagBets === 'function') hpTagBets(visible);   // 017/URGENT-014: a tap opens the bet in the + Bet sheet
+                // GPS:END
             }
         }
 
@@ -1374,5 +1377,52 @@ html {
 
 </script>
 
+<!-- GPS:BEGIN -->
+<!-- URGENT-014 (017 simpleFlow): every way to a side bet opens the ONE "+ Bet" sheet - on the
+     round's page (index.html ?hpbet=1, which comes back here after Start), or, inside the Bets
+     sheet, the sheet over it. The switch is gps-config.js features.simpleFlow and this phone's
+     "hardpan_simple_flow" (off = today's forms exactly). -->
+<script src="gps-config.js"></script>
+<script>
+    function hpSimpleFlow() {
+        try {
+            if (!(((window.HARDPAN_GPS_CONFIG || {}).features || {}).simpleFlow === true)) return false;
+            return localStorage.getItem('hardpan_simple_flow') !== 'off';
+        } catch (e) { return false; }
+    }
+    function hpOpenBet(editId) {
+        var q = new URLSearchParams(location.search), g = q.get('group');
+        // Inside the round's Bets sheet: the sheet opens over it, and Bets is still there after.
+        try {
+            var P = window.parent !== window ? window.parent.HardPanBet : null;
+            if (P && P.on()) { P.open(null, { returnTo: 'bets', editId: editId || null }); return true; }
+        } catch (e) {}
+        var page = location.pathname.split('/').pop() || 'index.html';
+        location.href = 'index.html?game=' + encodeURIComponent(q.get('game') || '') + (g ? '&group=' + encodeURIComponent(g) : '')
+            + '&hpbet=1' + (editId ? '&hpedit=' + encodeURIComponent(editId) : '') + '&hpret=' + encodeURIComponent(page + location.search);
+        return true;
+    }
+    // THE BETS TAB: "+ Add a bet" at the top, and a tap on a match opens it in the sheet (Edit / Remove).
+    function hpTagBets(ids) {
+        if (!hpSimpleFlow()) return;
+        var box = document.getElementById('bets-matches'); if (!box) return;
+        var cards = Array.prototype.filter.call(box.children, function (c) { return c.classList && c.classList.contains('bets-match'); });
+        if (cards.length !== (ids || []).length) return;
+        cards.forEach(function (c, i) { c.setAttribute('data-sm-id', ids[i]); c.style.cursor = 'pointer'; c.setAttribute('role', 'button'); c.setAttribute('aria-label', 'Change or remove this bet'); });
+        if (!box.__hpTap) { box.__hpTap = true; box.addEventListener('click', function (e) { var c = e.target.closest && e.target.closest('[data-sm-id]'); if (c && !e.target.closest('a,button,input,select')) hpOpenBet(c.getAttribute('data-sm-id')); }); }
+    }
+    (function () {
+        if (!hpSimpleFlow()) return;
+        var host = document.getElementById('bets-matches-card'); if (!host || !host.parentNode) return;
+        var b = document.createElement('button');
+        b.type = 'button'; b.id = 'hp-add-bet'; b.textContent = '+ Add a bet';
+        b.style.cssText = 'display:block;width:100%;min-height:48px;margin:0 0 12px;border:0;border-radius:14px;background:#ffd60a;color:#0b0f0c;font-weight:800;font-size:1rem;cursor:pointer;';
+        b.addEventListener('click', function () { hpOpenBet(); });
+        host.parentNode.insertBefore(b, host);
+        // A first paint from this phone's copy ran before this block: once more, so its matches are tappable.
+        try { if (typeof renderBets === 'function' && currentData && currentData.players) renderBets(); } catch (e) {}
+    })();
+</script>
+<!-- GPS:END -->
 </body>
 </html>

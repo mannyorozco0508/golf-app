@@ -2739,5 +2739,43 @@ html {
 </script>
 <!-- GPS:END -->
 
+<!-- GPS:BEGIN -->
+<!-- URGENT-014 (017 simpleFlow): every way to a side bet opens the ONE "+ Bet" sheet - on the
+     round's page (index.html ?hpbet=1, which comes back here after Start), or, inside the Bets
+     sheet, the sheet over it. The switch is gps-config.js features.simpleFlow and this phone's
+     "hardpan_simple_flow" (off = today's forms exactly). -->
+<script src="gps-config.js"></script>
+<script>
+    function hpSimpleFlow() {
+        try {
+            if (!(((window.HARDPAN_GPS_CONFIG || {}).features || {}).simpleFlow === true)) return false;
+            return localStorage.getItem('hardpan_simple_flow') !== 'off';
+        } catch (e) { return false; }
+    }
+    function hpOpenBet(editId) {
+        var q = new URLSearchParams(location.search), g = q.get('group');
+        // Inside the round's Bets sheet: the sheet opens over it, and Bets is still there after.
+        try {
+            var P = window.parent !== window ? window.parent.HardPanBet : null;
+            if (P && P.on()) { P.open(null, { returnTo: 'bets', editId: editId || null }); return true; }
+        } catch (e) {}
+        var page = location.pathname.split('/').pop() || 'index.html';
+        location.href = 'index.html?game=' + encodeURIComponent(q.get('game') || '') + (g ? '&group=' + encodeURIComponent(g) : '')
+            + '&hpbet=1' + (editId ? '&hpedit=' + encodeURIComponent(editId) : '') + '&hpret=' + encodeURIComponent(page + location.search);
+        return true;
+    }
+    // RESULTS: "+ Add a bet on this round" (018: a bet on holes already played, after the round too).
+    (function () {
+        if (!hpSimpleFlow()) return;
+        var main = document.getElementById('main-content'); if (!main) return;
+        var nav = main.querySelector('.app-nav-wrap');
+        var b = document.createElement('button');
+        b.type = 'button'; b.id = 'hp-add-bet'; b.textContent = '+ Add a bet on this round';
+        b.style.cssText = 'display:block;width:100%;min-height:48px;margin:0 0 12px;border:0;border-radius:14px;background:#ffd60a;color:#0b0f0c;font-weight:800;font-size:1rem;cursor:pointer;';
+        b.addEventListener('click', function () { hpOpenBet(); });
+        if (nav && nav.parentNode === main) main.insertBefore(b, nav.nextSibling); else main.insertBefore(b, main.firstChild);
+    })();
+</script>
+<!-- GPS:END -->
 </body>
 </html>

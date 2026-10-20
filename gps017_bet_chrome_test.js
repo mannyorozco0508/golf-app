@@ -78,7 +78,7 @@ test('+ Bet Match 2v2 mid-round writes New Action\'s record (sideMatchPayloadFro
     await tapIn('#gps-overlay .gps-bet-btn');
     const tiles = JSON.parse(await ev('JSON.stringify(Array.prototype.map.call(document.querySelectorAll("#hp-bet .hb-tile b"), function(b){return b.innerText;}))'));
     // Hi-Lo is in the tree (gps-features 3e7654b): the first row is Match · Nassau · Hi-Lo · Skins (018).
-    assert.deepEqual(tiles, ['Match', 'Nassau', 'Hi-Lo', 'Skins', 'More games ›']);
+    assert.deepEqual(tiles, ['Match', 'Nassau', 'Hi-Lo', 'Stroke play', 'More ›'], 'URGENT-014: 2 v 2 (a group of four) - Match · Nassau · Hi-Lo · Stroke play · More');
     await tapIn('#hp-bet [data-hb-game="match"]');
     await pick(['101', '102', '103', '104']);
     assert.equal(await ev('document.querySelector("#hp-bet .hb-vs").innerText'), 'Bob + Manny vs Skeens + Paul');
@@ -130,10 +130,10 @@ test('Hi-Lo: a tile only with the Hi-Lo module (the real hilo-engine.js); four g
     // WITHOUT the module (simulated: its two entry points hidden for one open) there is no tile.
     const without = JSON.parse(await ev('(function(){ var a = window.hiloShapeOk, b = window.hiloForSideMatch; window.hiloShapeOk = undefined; window.hiloForSideMatch = undefined; '
         + 'HardPanBet.open(); var t = Array.prototype.map.call(document.querySelectorAll("#hp-bet .hb-tile b"), function(x){ return x.innerText; }); HardPanBet.close(); window.hiloShapeOk = a; window.hiloForSideMatch = b; return JSON.stringify(t); })()'));
-    assert.deepEqual(without, ['Match', 'Nassau', 'Skins', 'More games ›']);
+    assert.deepEqual(without, ['Match', 'Nassau', 'Stroke play', 'More ›']);
     await ev('HardPanBet.open()');
     const tiles = JSON.parse(await ev('JSON.stringify(Array.prototype.map.call(document.querySelectorAll("#hp-bet .hb-tile b"), function(b){return b.innerText;}))'));
-    assert.deepEqual(tiles, ['Match', 'Nassau', 'Hi-Lo', 'Skins', 'More games ›']);
+    assert.deepEqual(tiles, ['Match', 'Nassau', 'Hi-Lo', 'Stroke play', 'More ›'], 'URGENT-014: 2 v 2 (a group of four) - Match · Nassau · Hi-Lo · Stroke play · More');
     await tapIn('#hp-bet [data-hb-game="hilo"]');
     await pick(['101', '102']);
     assert.equal(await ev('document.querySelector("#hp-bet [data-hb=next]").disabled'), true, 'Hi-Lo needs four');
@@ -154,6 +154,8 @@ test('a score entered on the card moves the money chip on the card and the GPS',
     await ev("(function(){ var sm = window.__DB.events['" + CODE + "'].sideMatches; Object.keys(sm).forEach(function(k){ db.ref('events/" + CODE + "/sideMatches/' + k).remove(); }); return 1; })()");
     await sleep(300);
     await ev('HardPanBet.open("match")');
+    await tapIn('#hp-bet [data-hb-mode="1v1"]');
+    await tapIn('#hp-bet [data-hb-game="match"]');
     await pick(['102', '101']);
     await tapIn('#hp-bet [data-hb="next"]');
     await tapIn('#hp-bet [data-hb-stake="20"]');

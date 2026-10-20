@@ -4496,5 +4496,42 @@ html {
     }
 
 </script>
+<!-- GPS:BEGIN -->
+<!-- URGENT-014 (017 simpleFlow): every way to a side bet opens the ONE "+ Bet" sheet - on the
+     round's page (index.html ?hpbet=1, which comes back here after Start), or, inside the Bets
+     sheet, the sheet over it. The switch is gps-config.js features.simpleFlow and this phone's
+     "hardpan_simple_flow" (off = today's forms exactly). -->
+<script src="gps-config.js"></script>
+<script>
+    function hpSimpleFlow() {
+        try {
+            if (!(((window.HARDPAN_GPS_CONFIG || {}).features || {}).simpleFlow === true)) return false;
+            return localStorage.getItem('hardpan_simple_flow') !== 'off';
+        } catch (e) { return false; }
+    }
+    function hpOpenBet(editId) {
+        var q = new URLSearchParams(location.search), g = q.get('group');
+        // Inside the round's Bets sheet: the sheet opens over it, and Bets is still there after.
+        try {
+            var P = window.parent !== window ? window.parent.HardPanBet : null;
+            if (P && P.on()) { P.open(null, { returnTo: 'bets', editId: editId || null }); return true; }
+        } catch (e) {}
+        var page = location.pathname.split('/').pop() || 'index.html';
+        location.href = 'index.html?game=' + encodeURIComponent(q.get('game') || '') + (g ? '&group=' + encodeURIComponent(g) : '')
+            + '&hpbet=1' + (editId ? '&hpedit=' + encodeURIComponent(editId) : '') + '&hpret=' + encodeURIComponent(page + location.search);
+        return true;
+    }
+    // THE MATCHES PAGE: SIDE BETS (New Action) and CHALLENGE SOMEBODY open the sheet. "Other games"
+    // in the sheet comes here with hpfull=1 for Dots / 9 Points, which only New Action builds.
+    (function () {
+        if (!hpSimpleFlow() || new URLSearchParams(location.search).get('hpfull') === '1') return;
+        ['button[onclick="openSideMatchModal()"]', '#sm-challenge-btn'].forEach(function (sel) {
+            var b = document.querySelector(sel); if (!b) return;
+            b.removeAttribute('onclick');
+            b.addEventListener('click', function (e) { e.preventDefault(); hpOpenBet(); });
+        });
+    })();
+</script>
+<!-- GPS:END -->
 </body>
 </html>

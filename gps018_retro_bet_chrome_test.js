@@ -137,6 +137,8 @@ test('2: Hi-Lo on 18 for 1-18 = the Hi-Lo made on hole 1 (the real engine, its r
 test('3: a Nassau added after the front nine, from hole 1 = the Nassau made on hole 1', { timeout: 60000 }, async () => {
     await j.goto(fileUrl('index.html', 'game=R9&group=1'), 4500);
     await ev('HardPanBet.open("nassau")');
+    await tapIn('#hp-bet [data-hb-mode="1v1"]');
+    await tapIn('#hp-bet [data-hb-game="nassau"]');
     await pick(['102', '103']);
     await tapIn('#hp-bet [data-hb="next"]');
     assert.equal(await ev('document.querySelector("#hp-bet .hb-from").value'), '10', 'the default is still now');
@@ -207,6 +209,8 @@ test('5: off the 10th - play order: the list starts at 10, now is 1, "Holes 10-1
     assert.equal(m.sum, 0);
     // From now (hole 1 on this round): no played line, no confirm.
     await ev('HardPanBet.open("match")');
+    await tapIn('#hp-bet [data-hb-mode="1v1"]');
+    await tapIn('#hp-bet [data-hb-game="match"]');
     await pick(['102', '103']);
     await tapIn('#hp-bet [data-hb="next"]');
     await tapIn('#hp-bet [data-hb="start"]');

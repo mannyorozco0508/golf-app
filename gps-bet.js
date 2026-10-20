@@ -71,22 +71,33 @@
     // kind: 'side' = a sideMatches record (sideMatchPayloadFromTerms); 'skins' = an
     // additionalGameInstances entry (New Action's saveFieldAction shape).
     var GAMES = {
-        match:  { label: 'Match', sub: '1v1 / 2v2', kind: 'side', stakeWord: '$ a side', chips: [5, 10, 20] },
-        nassau: { label: 'Nassau', sub: 'F9 / B9 / 18', kind: 'side', stakeWord: '$ each nine + 18', chips: [2, 5, 10] },
-        hilo:   { label: 'Hi-Lo', sub: '2v2 · low + high ball', kind: 'side', stakeWord: '$ per point', chips: [1, 5, 10] },
-        skins:  { label: 'Skins', sub: '$ per golfer', kind: 'skins', stakeWord: '$ each', chips: [5, 10, 20] }
+        match:  { label: 'Match', sub: '1 v 1', sub2: 'Best ball', kind: 'side', stakeWord: '$ a side', chips: [5, 10, 20], presses: true },
+        nassau: { label: 'Nassau', sub: 'F9 / B9 / 18', kind: 'side', stakeWord: '$ each nine + 18', chips: [2, 5, 10], presses: true },
+        hilo:   { label: 'Hi-Lo', sub: 'Low + high ball', kind: 'side', stakeWord: '$ per point', chips: [1, 5, 10] },
+        stroke: { label: 'Stroke play', sub: 'Lowest total', kind: 'side', stakeWord: '$ overall', chips: [5, 10, 20] },
+        skins:  { label: 'Skins', sub: 'Pick who’s in · $ each', kind: 'skins', stakeWord: '$ each', chips: [5, 10, 20] }
     };
-    function tiles() { return ['match', 'nassau'].concat(hiloHere() ? ['hilo'] : []).concat(['skins']); }
+    // URGENT-014: 1 v 1 / 2 v 2 first, then the games for that mode. Skins (any number) under More.
+    function tiles(mode) {
+        if (mode === '1v1') return ['match', 'nassau', 'stroke'];
+        if (mode === '2v2') return ['match', 'nassau'].concat(hiloHere() ? ['hilo'] : []).concat(['stroke']);
+        return ['match', 'nassau'].concat(hiloHere() ? ['hilo'] : []).concat(['skins']);
+    }
 
     // ---- WHAT A PICK MAKES ------------------------------------------------------
-    // The tap order: Match / Nassau with two = 1v1 (first vs second), four = 2v2
-    // (first two vs the last two). Hi-Lo: four. Skins: two or more, one pot.
-    function shapeOf(game, picks) {
+    // The tap order: 1 v 1 = two golfers (first vs second); 2 v 2 = four (the first two one
+    // side). Hi-Lo: four. Skins: two or more, one pot. No mode given: two = 1v1, four = 2v2.
+    function shapeOf(game, picks, mode) {
         var n = picks.length;
         if (game === 'skins') return n >= 2 ? { ok: true, all: picks.slice() } : { ok: false, why: 'Tap at least two golfers' };
-        if (game === 'hilo') {
-            if (n !== 4) return { ok: false, why: n < 4 ? 'Tap ' + (4 - n) + ' more (Hi-Lo is 2v2)' : 'Hi-Lo is 2v2 - four golfers' };
-            return { ok: true, a: picks.slice(0, 2), b: picks.slice(2, 4) };
+        if (game === 'hilo') mode = '2v2';
+        if (mode === '1v1') {
+            if (n === 2) return { ok: true, a: [picks[0]], b: [picks[1]] };
+            return { ok: false, why: n < 2 ? 'Tap ' + (2 - n) + ' more (1 v 1)' : '1 v 1 is two golfers - tap one off' };
+        }
+        if (mode === '2v2') {
+            if (n === 4) return { ok: true, a: picks.slice(0, 2), b: picks.slice(2, 4) };
+            return { ok: false, why: n < 4 ? 'Tap ' + (4 - n) + ' more (2 v 2)' : '2 v 2 is four golfers - tap one off' };
         }
         if (n === 2) return { ok: true, a: [picks[0]], b: [picks[1]] };
         if (n === 4) return { ok: true, a: picks.slice(0, 2), b: picks.slice(2, 4) };
@@ -94,13 +105,13 @@
         if (n === 3) return { ok: false, why: 'Tap one more for a 2v2' };
         return { ok: false, why: 'A match is 1v1 or 2v2' };
     }
-    function vsLine(game, picks) {
+    function vsLine(game, picks, mode) {
         if (!picks.length) return '';
-        var sh = shapeOf(game, picks);
+        var sh = shapeOf(game, picks, mode);
         var nm = function (ids) { return ids.map(function (id) { return first(byId(id)); }).join(' + '); };
         if (game === 'skins') return picks.map(function (id) { return first(byId(id)); }).join(' · ');
         if (sh.ok) return '<b>' + esc(nm(sh.a)) + '</b> vs <b>' + esc(nm(sh.b)) + '</b>';
-        var half = (picks.length >= 3 || game === 'hilo') ? 2 : 1;
+        var half = (mode === '2v2' || game === 'hilo' || picks.length >= 3) ? 2 : 1;
         return '<b>' + esc(nm(picks.slice(0, half))) + '</b>' + (picks.length > half ? ' vs <b>' + esc(nm(picks.slice(half))) + '</b>' : ' vs …');
     }
     // THE HOLES IN PLAY ORDER (018 follow-up): play-order.js, as the carry-order and gameHoles
@@ -147,7 +158,7 @@
         else if (game === 'hilo') amt = 2 * left * stake / per;
         else amt = stake / per;
         var mine = game === 'skins' ? (sh.all || []).indexOf(me) > -1 : !!side;
-        return { amount: Math.round(amt), mine: mine, presses: game === 'match' || game === 'nassau' };
+        return { amount: Math.round(amt), mine: mine, presses: !!(GAMES[game] && GAMES[game].presses) };
     }
 
     // ---- PERMISSIONS, the same as New Action ----------------------------------
@@ -176,7 +187,7 @@
     // Returns { path, value } - the exact record New Action would write - or { refuse }.
     function buildBet(o) {
         var game = o.game, ids = (o.picks || []).map(String), stake = Number(o.stake) || 0;
-        var sh = shapeOf(game, ids);
+        var sh = shapeOf(game, ids, o.mode);
         if (!GAMES[game] || (game === 'hilo' && !hiloHere())) return { refuse: 'Pick a game.' };
         if (!sh.ok) return { refuse: sh.why };
         if (!(stake > 0)) return { refuse: 'Pick an amount.' };
@@ -201,16 +212,15 @@
             return { path: 'events/' + c + '/additionalGameInstances', value: entry };
         }
         if (typeof sideMatchPayloadFromTerms !== 'function') return { refuse: 'Bets are still loading - try again in a moment.' };
-        var terms = { format: game, scoring: o.scoring === 'gross' ? 'gross' : 'net', startHole: from, stake: stake, pressRule: 'none' };
+        // PRESSES (Match / Nassau only): Off = 'none', or New Action's own "Auto @ 2 Down".
+        var press = (GAMES[game].presses && o.press === '2down') ? '2down' : 'none';
+        var terms = { format: game, scoring: o.scoring === 'gross' ? 'gross' : 'net', startHole: from, stake: stake, pressRule: press };
         if (game === 'nassau') { terms.frontStake = stake; terms.backStake = stake; terms.overallStake = stake; terms.autoPressStake = null; }
+        // STROKE PLAY: the stake is the overall bet; New Action's own defaults for the rest
+        // (tied hole void, strokes overall, carried across the turn).
+        if (game === 'stroke') { terms = { format: 'stroke', scoring: terms.scoring, startHole: from, holeStake: 0, overallStake: stake, tieRule: 'void', overallMode: 'stroke', segment: 'full' }; }
         var payload = sideMatchPayloadFromTerms(terms, { teamAIds: sh.a, teamBIds: sh.b, startHole: from, now: now, scope: sc.scope, ownerGroup: sc.ownerGroup });
         return { path: 'events/' + c + '/sideMatches', value: payload };
-    }
-    function write(b) {
-        var key = db.ref(b.path).push().key;
-        var full = b.path + '/' + key;
-        if (typeof durableWrite === 'function') return durableWrite(full, 'set', b.value, full);
-        return db.ref(full).set(b.value);
     }
 
     // ---- THE MONEY CHIP ---------------------------------------------------------
@@ -268,6 +278,11 @@
         + '#hp-bet .hb-go{display:block;width:100%;border:0;border-radius:16px;min-height:56px;margin-top:14px;font:800 19px/1 ' + FONT + ';cursor:pointer;background:#c8f075;color:#0f1f17;}'
         + '#hp-bet .hb-go[disabled]{opacity:.45;cursor:default;}'
         + '#hp-bet .hb-go.hb-cancel{background:#fff;border:1.5px solid #0f4d3a;color:#0f4d3a;margin-top:10px;}'
+        + '#hp-bet .hb-go.hb-danger{background:#b3261e;color:#fff;}#hp-bet .hb-go.hb-remove{color:#b3261e;border-color:#b3261e;}'
+        + '#hp-bet .hb-modes{display:flex;background:#eef2ef;border-radius:14px;padding:4px;margin:0 0 14px;}'
+        + '#hp-bet .hb-modes button{flex:1;border:0;background:none;border-radius:11px;min-height:52px;font:800 20px/1 ' + FONT + ';color:#0f1f17;cursor:pointer;}#hp-bet .hb-modes button.on{background:#0f4d3a;color:#fff;}'
+        + '#hp-bet .hb-vsrow{display:flex;gap:8px;align-items:stretch;}#hp-bet .hb-vsrow .hb-vs{flex:1;}'
+        + '#hp-bet .hb-swap{margin-top:12px;border:1.5px solid #0f4d3a;background:#fff;color:#0f4d3a;border-radius:12px;padding:0 12px;font:800 14px/1 ' + FONT + ';cursor:pointer;white-space:nowrap;}'
         + '#hp-bet .hb-played{font:600 13px/1.4 ' + FONT + ';color:#6b4e00;background:#fff7e0;border:1px solid #f0d58a;border-radius:10px;padding:8px 10px;margin-bottom:8px;}'
         + '#hp-bet .hb-result{font:500 14px/1.4 ' + FONT + ';color:#0f1f17;margin:0 0 8px;}'
         + '#hp-bet .hb-card{border:1.5px solid #dfe6e2;border-radius:14px;padding:4px 12px;margin-top:14px;}'
@@ -313,13 +328,39 @@
         return r;
     }
     function isOpen() { var r = document.getElementById('hp-bet'); return !!(r && r.classList.contains('open')); }
-    function open(game) {
+    // OPEN - from every entry point (URGENT-014): open(game?, { mode, returnTo, editId }).
+    //   returnTo: 'bets' (the Bets sheet stays under it), 'finish' (Settle up comes back),
+    //             a page URL (the Bets / Results / Matches page it was opened from), or
+    //             nothing - then a GPS round goes back to the GPS (current hole), else the card.
+    //   editId:   a side match to change or remove, pre-filled.
+    function defaultMode() {
+        var mg = myGroup(), m = groupMap();
+        return players().filter(function (p) { return String(m[String(p.id)]) === String(mg); }).length >= 4 ? '2v2' : '1v1';
+    }
+    function open(game, opts) {
         if (!on()) return false;
         if (!data() || !code()) return false;
-        st = { step: 1, game: GAMES[game] ? game : null, picks: [], field: false, stake: null, custom: false, scoring: 'net', from: null };
-        if (st.game === 'hilo' && !hiloHere()) st.game = null;
+        var o = (game && typeof game === 'object') ? game : (opts || {});
+        if (game && typeof game === 'object') game = o.game;
+        st = { step: 1, mode: o.mode === '1v1' || o.mode === '2v2' ? o.mode : defaultMode(), game: GAMES[game] ? game : null, picks: [], field: false,
+            stake: null, custom: false, scoring: 'net', from: null, press: 'none', more: game === 'skins', returnTo: o.returnTo || null, editId: null };
+        if (st.game === 'hilo') { if (!hiloHere()) st.game = null; else st.mode = '2v2'; }
+        if (o.editId && !prefill(o.editId)) return false;
         var r = root(); r.classList.add('open');
         draw();
+        return true;
+    }
+    // EDIT: the side match as it is stored, read back into the sheet's own choices.
+    function prefill(id) {
+        var sm = ((data() || {}).sideMatches || {})[id];
+        if (!sm || !GAMES[sm.format] || GAMES[sm.format].kind !== 'side') return false;
+        var a = (sm.teamAIds || []).map(String), b = (sm.teamBIds || []).map(String);
+        st.editId = id; st.game = sm.format; st.mode = a.length === 2 ? '2v2' : '1v1';
+        st.picks = a.concat(b); st.field = true; st.scoring = sm.scoring === 'gross' ? 'gross' : 'net';
+        st.from = Number(sm.startHole) || null; st.press = sm.pressRule === '2down' ? '2down' : 'none';
+        var stake = sm.format === 'stroke' ? Number(sm.overallStake) : (sm.format === 'nassau' ? Number(sm.frontStake || sm.stake) : Number(sm.stake));
+        st.stake = stake || null; st.custom = GAMES[sm.format].chips.indexOf(st.stake) === -1;
+        st.step = 2;
         return true;
     }
     function close() { var r = document.getElementById('hp-bet'); if (r) r.classList.remove('open'); st = null; }
@@ -333,38 +374,51 @@
         if (!st) return;
         var html = '<div class="hb-grab"></div>';
         if (st.step === 1) {
-            html += '<div class="hb-head"><div class="hb-title">New bet</div><button type="button" class="hb-x" data-hb="close" aria-label="Close">✕</button></div>';
-            html += '<div class="hb-tiles">' + tiles().map(function (k) {
-                var g = GAMES[k];
-                return '<button type="button" class="hb-tile' + (st.game === k ? ' on' : '') + '" data-hb-game="' + k + '"><b>' + esc(g.label) + '</b><span>' + esc(g.sub) + '</span></button>';
-            }).join('') + '<button type="button" class="hb-tile" data-hb="more"><b>More games ›</b><span>Dots, 9 Points, Stroke…</span></button></div>';
+            html += '<div class="hb-head"><div class="hb-title">' + (st.editId ? 'Change this bet' : 'New bet') + '</div><button type="button" class="hb-x" data-hb="close" aria-label="Close">\u2715</button></div>';
+            // URGENT-014: 1 v 1 / 2 v 2 FIRST - big, at the top.
+            html += '<div class="hb-modes" role="tablist" aria-label="1 v 1 or 2 v 2">'
+                + '<button type="button" role="tab" data-hb-mode="1v1" class="' + (st.mode === '1v1' ? 'on' : '') + '" aria-selected="' + (st.mode === '1v1') + '">1 v 1</button>'
+                + '<button type="button" role="tab" data-hb-mode="2v2" class="' + (st.mode === '2v2' ? 'on' : '') + '" aria-selected="' + (st.mode === '2v2') + '">2 v 2</button></div>';
+            if (!st.more) {
+                html += '<div class="hb-tiles">' + tiles(st.mode).map(function (k) {
+                    var g = GAMES[k], sub = (k === 'match' && st.mode === '2v2') ? g.sub2 : (k === 'match' ? '1 v 1' : g.sub);
+                    return '<button type="button" class="hb-tile' + (st.game === k ? ' on' : '') + '" data-hb-game="' + k + '"><b>' + esc(g.label) + '</b><span>' + esc(sub) + '</span></button>';
+                }).join('') + '<button type="button" class="hb-tile' + (st.game === 'skins' ? ' on' : '') + '" data-hb="more"><b>More \u203a</b><span>Skins, Dots, 9 Points\u2026</span></button></div>';
+            } else {
+                html += '<div class="hb-tiles"><button type="button" class="hb-tile' + (st.game === 'skins' ? ' on' : '') + '" data-hb-game="skins"><b>Skins</b><span>Any number \u00b7 pick who\u2019s in</span></button>'
+                    + '<button type="button" class="hb-tile" data-hb="other"><b>Other games \u203a</b><span>Dots, 9 Points, Birdies\u2026</span></button>'
+                    + '<button type="button" class="hb-tile" data-hb="less"><b>\u2039 Back</b><span>Match, Nassau\u2026</span></button></div>';
+            }
             if (st.game) {
                 var mg = myGroup(), m = groupMap();
                 var mine = players().filter(function (p) { return String(m[String(p.id)]) === String(mg); });
                 var others = players().filter(function (p) { return String(m[String(p.id)]) !== String(mg); });
-                html += '<div class="hb-h">Tap who’s in' + (st.game === 'skins' ? '' : ' (first two = your side)') + '</div>';
+                var want = st.game === 'skins' ? 'Tap who\u2019s in' : (st.mode === '1v1' || (st.game !== 'hilo' && st.mode !== '2v2') ? 'Tap 2 golfers' : 'Tap 4 golfers (the first two = one side)');
+                html += '<div class="hb-h">' + want + '</div>';
                 html += '<div class="hb-chips">' + mine.map(function (p) { return chipFor(p, st.picks.indexOf(String(p.id))); }).join('') + '</div>';
                 if (others.length) {
                     if (st.field || others.some(function (p) { return st.picks.indexOf(String(p.id)) > -1; })) {
                         html += '<div class="hb-h">Anyone in the field</div><div class="hb-chips">' + others.map(function (p) { return chipFor(p, st.picks.indexOf(String(p.id))); }).join('') + '</div>';
                     } else {
-                        html += '<button type="button" class="hb-field" data-hb="field">+ Anyone in the field ›</button>';
+                        html += '<button type="button" class="hb-field" data-hb="field">+ Anyone in the field \u203a</button>';
                     }
                 }
-                var sh = shapeOf(st.game, st.picks);
-                html += '<div class="hb-vs" aria-live="polite">' + (vsLine(st.game, st.picks) || '<span style="color:#8a958f">Tap the golfers in the order of the sides</span>') + '</div>';
+                var sh = shapeOf(st.game, st.picks, st.mode);
+                html += '<div class="hb-vsrow"><div class="hb-vs" aria-live="polite">' + (vsLine(st.game, st.picks, st.mode) || '<span style="color:#8a958f">Tap the golfers in the order of the sides</span>') + '</div>'
+                    + (st.game !== 'skins' && st.picks.length >= 2 ? '<button type="button" class="hb-swap" data-hb="swap" aria-label="Swap sides">\u21C4 Swap</button>' : '') + '</div>';
                 html += '<div class="hb-why">' + (st.picks.length && !sh.ok ? esc(sh.why) : '') + '</div>';
-                html += '<button type="button" class="hb-go" data-hb="next"' + (sh.ok ? '' : ' disabled') + '>Next: amount ›</button>';
+                html += '<button type="button" class="hb-go" data-hb="next"' + (sh.ok ? '' : ' disabled') + '>Next: amount \u203a</button>';
             }
         } else {
-            var g = GAMES[st.game], ids = st.picks.slice(), shp = shapeOf(st.game, ids);
+            var g = GAMES[st.game], ids = st.picks.slice(), shp = shapeOf(st.game, ids, st.mode);
             var hs = ordered(), nowHole = startHole(ids);   // play order: the list reads 10..18, 1..9 off the 10th
             // 018: ANY hole, the played ones too; the default is still now (the first hole once all are played).
             if (st.from == null) st.from = nowHole || (hs[0] && hs[0].hole) || 1;
             if (st.stake == null) st.stake = g.chips[1];
             if (st.step === 3) { html += confirmHtml(g, ids); panel.innerHTML = html; return; }
+            if (st.step === 4) { html += removeHtml(g, ids); panel.innerHTML = html; return; }
             html += '<div class="hb-head"><button type="button" class="hb-back" data-hb="back" aria-label="Back">‹</button><div class="hb-title">' + esc(g.label) + ' · ' + esc(g.stakeWord) + '</div><button type="button" class="hb-x" data-hb="close" aria-label="Close">✕</button></div>';
-            html += '<div class="hb-vs" style="margin-top:0">' + vsLine(st.game, ids) + '</div>';
+            html += '<div class="hb-vs" style="margin-top:0">' + vsLine(st.game, ids, st.mode) + '</div>';
             html += '<div class="hb-chips" style="margin-top:14px">' + g.chips.map(function (v) {
                 return '<button type="button" class="hb-chip' + (!st.custom && st.stake === v ? ' on' : '') + '" data-hb-stake="' + v + '">$' + v + '</button>';
             }).join('') + (st.custom
@@ -374,10 +428,14 @@
                 + '<div class="hb-row"><span>Scoring</span><span class="hb-seg"><button type="button" data-hb-scoring="net" class="' + (st.scoring === 'net' ? 'on' : '') + '">Net</button><button type="button" data-hb-scoring="gross" class="' + (st.scoring === 'gross' ? 'on' : '') + '">Gross</button></span></div>'
                 + '<div class="hb-row"><span>Counts from</span><select class="hb-from" aria-label="Counts from">' + hs.map(function (h) {
                     return '<option value="' + h.hole + '"' + (h.hole === st.from ? ' selected' : '') + '>Hole ' + h.hole + (h.hole === nowHole ? ' (now)' : '') + '</option>';
-                }).join('') + '</select></div></div>';
+                }).join('') + '</select></div>'
+                // PRESSES, one row (Match / Nassau only), default Off.
+                + (g.presses ? '<div class="hb-row"><span>Presses</span><span class="hb-seg"><button type="button" data-hb-press="none" class="' + (st.press !== '2down' ? 'on' : '') + '">Off</button><button type="button" data-hb-press="2down" class="' + (st.press === '2down' ? 'on' : '') + '">Auto @ 2 down</button></span></div>' : '')
+                + '</div>';
             html += '<div class="hb-worst" aria-live="polite">' + outlookHtml() + '</div>';
             html += '<div class="hb-why"></div>';
-            html += '<button type="button" class="hb-go" data-hb="start"' + (Number(st.stake) > 0 ? '' : ' disabled') + '>Start bet ✓</button>';
+            html += '<button type="button" class="hb-go" data-hb="start"' + (Number(st.stake) > 0 ? '' : ' disabled') + '>' + (st.editId ? 'Save changes \u2713' : 'Start bet \u2713') + '</button>';
+            if (st.editId) html += '<button type="button" class="hb-go hb-cancel hb-remove" data-hb="remove">Remove this bet</button>';
         }
         panel.innerHTML = html;
     }
@@ -400,8 +458,10 @@
         var b = buildBet(o); if (b.refuse) return null;
         try {
             var cd = (d.courseData || []).slice().sort(function (x, y) { return x.hole - y.hole; });
-            var d2 = JSON.parse(JSON.stringify(d));
             var slot = /sideMatches$/.test(b.path) ? 'sideMatches' : 'additionalGameInstances';
+            // EDITING: the round without the bet as it stands, then with it as changed.
+            if (o.skip) { d = JSON.parse(JSON.stringify(d)); if (d.sideMatches) delete d.sideMatches[o.skip]; }
+            var d2 = JSON.parse(JSON.stringify(d));
             d2[slot] = d2[slot] || {}; d2[slot].__preview018 = b.value;
             var before = computeCombinedNetTotals(d, cd, d.scores || {}).exact || {};
             var after = computeCombinedNetTotals(d2, cd, d2.scores || {}).exact || {};
@@ -449,12 +509,12 @@
     // The line under the terms: the worst case (holes still to play), or - with holes already
     // played - which ones, and the result so far; a bet over holes all played shows its result.
     function outlookHtml() {
-        var ids = st.picks.slice(), shp = shapeOf(st.game, ids), from = st.from || 1, stake = Number(st.stake) || 0;
+        var ids = st.picks.slice(), shp = shapeOf(st.game, ids, st.mode), from = st.from || 1, stake = Number(st.stake) || 0;
         var pr = playedRange(ids, from);
         var html = '';
         if (pr) {
             html += '<div class="hb-played">' + (pr.single ? 'Hole ' : 'Holes ') + pr.text + ' already played: this bet settles from the scores already in.</div>';
-            var pv = stake > 0 ? preview({ game: st.game, picks: ids, stake: stake, scoring: st.scoring, startHole: from }) : null;
+            var pv = stake > 0 ? preview({ game: st.game, mode: st.mode, press: st.press, picks: ids, stake: stake, scoring: st.scoring, startHole: from, skip: st.editId }) : null;
             var t = previewText(st.game, ids, pv);
             if (t) html += '<div class="hb-result">' + (pr.full ? 'Result: ' : 'So far: ') + '<b>' + t + '</b></div>';
             if (pr.full) return html;
@@ -466,10 +526,10 @@
     // ONE CONFIRM, in the sheet (never a native dialog), only for a start before now.
     function confirmHtml(g, ids) {
         var pr = playedRange(ids, st.from || 1);
-        var pv = preview({ game: st.game, picks: ids, stake: st.stake, scoring: st.scoring, startHole: st.from });
+        var pv = preview({ game: st.game, mode: st.mode, press: st.press, picks: ids, stake: st.stake, scoring: st.scoring, startHole: st.from, skip: st.editId });
         var t = previewText(st.game, ids, pv);
         return '<div class="hb-head"><div class="hb-title">Add this bet for holes already played?</div></div>'
-            + '<div class="hb-vs" style="margin-top:0">' + esc(g.label) + ' · $' + esc(st.stake) + ' · ' + vsLine(st.game, ids) + '</div>'
+            + '<div class="hb-vs" style="margin-top:0">' + esc(g.label) + ' · $' + esc(st.stake) + ' · ' + vsLine(st.game, ids, st.mode) + '</div>'
             + '<div class="hb-worst">Everyone in it should agree.' + (pr ? ' Counts from hole ' + pr.a + (pr.full ? ' - every hole is in.' : '.') : '') + '</div>'
             + (t ? '<div class="hb-result">' + (pr && pr.full ? 'Result: ' : 'So far: ') + '<b>' + t + '</b></div>' : '')
             + '<button type="button" class="hb-go" data-hb="confirm-add">Add bet</button>'
@@ -487,11 +547,17 @@
     }
     function onClick(e) {
         var t = e.target;
-        if (t.classList && t.classList.contains('hb-scrim')) { close(); return; }
+        if (t.classList && t.classList.contains('hb-scrim')) { var rt1 = st && st.returnTo; close(); if (rt1 && /\.html/.test(rt1)) goBack(rt1); return; }
         var b = t.closest ? t.closest('button') : null;
         if (!b || !st) return;
         var a = b.getAttribute('data-hb');
-        if (b.hasAttribute('data-hb-game')) { var g = b.getAttribute('data-hb-game'); if (g !== st.game) { st.game = g; } draw(); return; }
+        if (b.hasAttribute('data-hb-mode')) {
+            var md = b.getAttribute('data-hb-mode');
+            if (md !== st.mode) { st.mode = md; st.picks = []; st.more = false; if (st.game && tiles(md).indexOf(st.game) === -1) st.game = null; }
+            draw(); return;
+        }
+        if (b.hasAttribute('data-hb-game')) { var g = b.getAttribute('data-hb-game'); if (g !== st.game) { st.game = g; if (g === 'hilo') st.mode = '2v2'; } draw(); return; }
+        if (b.hasAttribute('data-hb-press')) { st.press = b.getAttribute('data-hb-press') === '2down' ? '2down' : 'none'; draw(); return; }
         if (b.hasAttribute('data-hb-pick')) {
             var id = String(b.getAttribute('data-hb-pick')), i = st.picks.indexOf(id);
             if (i > -1) st.picks.splice(i, 1); else st.picks.push(id);
@@ -500,12 +566,22 @@
         }
         if (b.hasAttribute('data-hb-stake')) { st.stake = Number(b.getAttribute('data-hb-stake')); st.custom = false; draw(); return; }
         if (b.hasAttribute('data-hb-scoring')) { st.scoring = b.getAttribute('data-hb-scoring'); draw(); return; }
-        if (a === 'close') { close(); return; }
+        if (a === 'close') { var rt0 = st.returnTo; close(); if (rt0 && /\.html/.test(rt0)) goBack(rt0); return; }
         if (a === 'field') { st.field = true; draw(); return; }
         if (a === 'custom') { st.custom = true; draw(); var inp = root().querySelector('.hb-custom'); if (inp) inp.focus(); return; }
         if (a === 'back') { st.step = 1; draw(); return; }
-        if (a === 'more') { close(); moreGames(); return; }
-        if (a === 'next') { if (shapeOf(st.game, st.picks).ok) { st.step = 2; st.from = null; draw(); } return; }
+        if (a === 'more') { st.more = true; draw(); return; }
+        if (a === 'less') { st.more = false; if (st.game === 'skins') { st.game = null; st.picks = []; } draw(); return; }
+        if (a === 'other') { var rt = st.returnTo; close(); moreGames(rt); return; }
+        if (a === 'swap') {
+            var n = st.picks.length;
+            st.picks = (n >= 4 || (st.mode === '2v2' && n > 2)) ? st.picks.slice(2).concat(st.picks.slice(0, 2)) : st.picks.slice().reverse();
+            st.from = null; draw(); return;
+        }
+        if (a === 'remove') { st.step = 4; draw(); return; }
+        if (a === 'remove-yes') { removeBet(); return; }
+        if (a === 'remove-no') { st.step = 2; draw(); return; }
+        if (a === 'next') { if (shapeOf(st.game, st.picks, st.mode).ok) { st.step = 2; if (!st.editId) st.from = null; draw(); } return; }
         if (a === 'start') { if (playedRange(st.picks.slice(), st.from || 1)) { st.step = 3; draw(); } else start(); return; }
         if (a === 'confirm-add') { start(); return; }
         if (a === 'confirm-cancel') { st.step = 2; draw(); return; }
@@ -517,22 +593,94 @@
             if (typeof uiToast === 'function') return uiToast(msg);
         } catch (e) {}
     }
-    function start() {
-        var b = buildBet({ game: st.game, picks: st.picks, stake: st.stake, scoring: st.scoring, startHole: st.from });
-        if (b.refuse) { var w = root().querySelector('.hb-why'); if (w) w.textContent = b.refuse; return; }
-        var label = GAMES[st.game].label + ' · ' + shapeOf(st.game, st.picks.map(String)).ok + '';
-        var line = vsLine(st.game, st.picks).replace(/<[^>]+>/g, '');
-        var p;
-        try { p = write(b); } catch (e) { say('fail', 'Could not save: ' + (e && e.message)); return; }
-        close();
-        say('toast', '✅ ' + GAMES[b.value.format === 'skins' ? 'skins' : b.value.format].label + ' started · ' + line);
-        if (p && typeof p.then === 'function') p.then(function () { refresh(); }, function (err) { say('fail', 'Could not save: ' + (err && err.message)); });
-        setTimeout(refresh, 0);
+    function betLine(rec) {
+        var nm = function (ids) { return (ids || []).map(function (id) { return first(byId(id)); }).join(' + '); };
+        var g = GAMES[rec.format] || {}, amt = rec.format === 'skins' ? rec.skinsBuyIn : (rec.format === 'stroke' ? rec.overallStake : (rec.stake || rec.frontStake));
+        var who = rec.format === 'skins' ? ((rec.participantIds || players().map(function (p) { return String(p.id); })).map(function (id) { return first(byId(id)); }).join(', '))
+            : nm(rec.teamAIds) + ' vs ' + nm(rec.teamBIds);
+        return who + ' · $' + (Number(amt) || 0) + ' ' + (g.label || rec.format);
     }
-    // MORE GAMES: the full New Action page, back to this round afterwards (hpback=1).
-    function moreGames() {
+    // THE WRITE: a new bet at a new key (New Action's path), or - editing - the same record
+    // rebuilt by the same builder at its own key, keeping what was hung on it since (presses,
+    // the Aloha) and when it was made. New Action has no edit of its own: there a change was a
+    // remove and a new bet; this keeps the bet's identity instead.
+    var KEEP = ['presses', 'holePresses', 'overallPresses', 'aloha', 'createdAt'];
+    function write(b, editId) {
+        var key = editId || db.ref(b.path).push().key;
+        var full = b.path + '/' + key, value = b.value;
+        if (editId) {
+            var old = ((data() || {}).sideMatches || {})[editId] || {};
+            value = JSON.parse(JSON.stringify(value));
+            KEEP.forEach(function (k) { if (old[k] !== undefined) value[k] = old[k]; });
+        }
+        var p = (typeof durableWrite === 'function') ? durableWrite(full, 'set', value, full) : db.ref(full).set(value);
+        return { key: key, promise: p, value: value };
+    }
+    function goBack(url) { try { window.location.href = url; } catch (e) {} }
+    // BACK WHERE THE GOLFER WAS (URGENT-014): a page it came from; Bets (the sheet is still
+    // under this one); Settle up; otherwise a GPS round's map - the hole it is on, the map as it
+    // was (no reload) - or the scorecard.
+    function afterSave(rt) {
+        if (rt && /\.html/.test(rt)) { goBack(rt); return; }
+        var R = window.HardPanRound;
+        if (rt === 'bets') return;
+        if (rt === 'finish') { if (R && R.openFinish) R.openFinish(); return; }
+        var g = window.HardPanGps;
+        if (R && g && g.isMounted && g.isMounted() && g.canMap && g.canMap()) { if (g.side() !== 'gps') R.toGps(); }
+        else if (R && R.toCard) R.toCard();
+    }
+    function toastBet(text, key) {
+        var el = null;
+        try { if (typeof uiToast === 'function') el = uiToast(text); } catch (e) {}
+        if (el && key && el.addEventListener) {
+            el.style.pointerEvents = 'auto'; el.style.cursor = 'pointer'; el.setAttribute('role', 'button');
+            el.addEventListener('click', function () { open(null, { editId: key }); });
+        }
+        return el;
+    }
+    function start() {
+        var b = buildBet({ game: st.game, mode: st.mode, press: st.press, picks: st.picks, stake: st.stake, scoring: st.scoring, startHole: st.from });
+        if (b.refuse) { var w = root().querySelector('.hb-why'); if (w) w.textContent = b.refuse; return; }
+        var editId = st.editId, rt = st.returnTo, res;
+        try { res = write(b, editId); } catch (e) { say('fail', 'Could not save: ' + (e && e.message)); return; }
+        close();
+        var text = (editId ? 'Bet changed: ' : 'Bet added: ') + betLine(res.value);
+        var stay = rt && /\.html/.test(rt);
+        if (!stay) toastBet(text, b.value.format === 'skins' ? null : res.key);
+        else { try { sessionStorage.setItem('hardpan_bet_toast', text); } catch (e) {} }
+        var p = res.promise;
+        if (p && typeof p.then === 'function') p.then(function () { refresh(); if (stay) afterSave(rt); }, function (err) { say('fail', 'Could not save: ' + (err && err.message)); });
+        else if (stay) afterSave(rt);
+        setTimeout(refresh, 0);
+        if (!stay) afterSave(rt);
+    }
+    // REMOVE: in the sheet, "Everyone in the bet agreed?" - then the record goes, the way the
+    // Matches page removes one (its own path, the same group rule: the organizer, or a group
+    // with a golfer in it).
+    function removeHtml(g, ids) {
+        return '<div class="hb-head"><div class="hb-title">Remove this bet?</div></div>'
+            + '<div class="hb-vs" style="margin-top:0">' + esc(g.label) + ' · ' + vsLine(st.game, ids, st.mode) + '</div>'
+            + '<div class="hb-worst">Everyone in the bet agreed?</div><div class="hb-why"></div>'
+            + '<button type="button" class="hb-go hb-danger" data-hb="remove-yes">Yes - remove it</button>'
+            + '<button type="button" class="hb-go hb-cancel" data-hb="remove-no">Cancel</button>';
+    }
+    function removeBet() {
+        var id = st.editId, sm = ((data() || {}).sideMatches || {})[id];
+        if (!sm) { close(); return; }
+        var g = locked(), m = groupMap();
+        var ids = (sm.teamAIds || []).concat(sm.teamBIds || []).map(String);
+        if (g && !ids.some(function (x) { return String(m[x]) === String(g); })) { var w = root().querySelector('.hb-why'); if (w) w.textContent = 'This is Group ' + g + '’s link - only a bet with a Group ' + g + ' golfer in it can be removed here.'; return; }
+        var path = 'events/' + code() + '/sideMatches/' + id, rt = st.returnTo, line = betLine(sm);
+        try { if (typeof durableWrite === 'function') durableWrite(path, 'remove', null, path); else db.ref(path).remove(); } catch (e) { say('fail', 'Could not remove: ' + (e && e.message)); return; }
+        close();
+        say('toast', 'Bet removed: ' + line);
+        setTimeout(refresh, 0);
+        if (rt && /\.html/.test(rt)) goBack(rt);
+    }
+    // OTHER GAMES: the full New Action page (Dots, 9 Points ...), back to this round afterwards.
+    function moreGames(rt) {
         var g = locked();
-        window.location.href = 'sidematches.html?game=' + encodeURIComponent(code() || '') + (g ? '&group=' + g : '') + '&hpback=1';
+        window.location.href = 'sidematches.html?game=' + encodeURIComponent(code() || '') + (g ? '&group=' + g : '') + '&hpback=1&hpfull=1';
     }
 
     // ---- THE CARD SIDE: money chip + "+ Bet" -----------------------------------
@@ -553,7 +701,7 @@
             var b = e.target && e.target.closest ? e.target.closest('button') : null;
             if (!b) return;
             e.preventDefault();
-            if (b.classList.contains('hp-bet-btn')) { open(); return; }
+            if (b.classList.contains('hp-bet-btn')) { open(null, { returnTo: document.body.classList.contains('hp-bets-open') ? 'bets' : null }); return; }
             if (b.classList.contains('hp-money-chip')) { openBets(); return; }
             var R = window.HardPanRound, k = b.getAttribute('data-hp-bar');
             if (R && typeof R.go === 'function') R.go(k);
@@ -570,6 +718,20 @@
         if (el.__hp !== html) { el.innerHTML = html; el.__hp = html; }
         el.setAttribute('aria-label', m.text + ' - open Bets');
     }
+    // FROM ANOTHER PAGE (URGENT-014): index.html?hpbet=1[&hpedit=<id>]&hpret=<page> - the Bets tab,
+    // Results or the Matches page sent the golfer here for the ONE sheet; Start / Cancel go back.
+    var urlDone = false;
+    function fromUrl() {
+        if (urlDone) return;
+        var q; try { q = new URLSearchParams(window.location.search); } catch (e) { urlDone = true; return; }
+        urlDone = true;
+        if (q.get('hpbet') !== '1') return;
+        var ret = q.get('hpret');
+        if (ret && !/^[a-z0-9_-]+\.html(\?|$)/i.test(ret)) ret = null;
+        var edit = q.get('hpedit');
+        try { ['hpbet', 'hpret', 'hpedit'].forEach(function (k) { q.delete(k); }); history.replaceState(history.state, '', window.location.pathname + '?' + q.toString()); } catch (e) {}
+        setTimeout(function () { if (!open(null, { returnTo: ret, editId: edit }) && ret) goBack(ret); }, 0);
+    }
     var last = null;
     function refresh() {
         if (!on()) { document.body.classList.toggle('hp-sf-card', false); return null; }   // toggle: no write when unchanged (gps-round.js observes <body>)
@@ -577,6 +739,7 @@
         var live = !!(d && code() && (d.players || []).length);
         document.body.classList.toggle('hp-sf-card', live);
         if (!live) return null;
+        fromUrl();
         var m = moneyNow();
         last = m;
         var bar = cardBar();
