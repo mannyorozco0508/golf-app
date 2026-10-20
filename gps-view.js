@@ -1852,8 +1852,7 @@
             lbl.style.display = '';
             var w = units() === 'm' ? Math.round(2 * TARGET_RADIUS_YD * G.M_PER_YD) + ' m' : (2 * TARGET_RADIUS_YD) + ' yd';
             // 023c: a drive that stops short says why ("lay up 270 · water at 285").
-            var note = S.teeShot && !S.targetMoved && G.teeTargetNote ? G.teeTargetNote(S.teeShot.t, units() === 'm' ? 1 : G.M_PER_YD) : '';
-            if (note) w = note;
+            // URGENT-025 (Manny: "Too busy. Go back to the way it was."): no lay-up note on the ring.
             if (lbl.textContent !== w) lbl.textContent = w;
             var lw = lbl.offsetWidth || 36, lh = lbl.offsetHeight || 14;
             var ux = Math.cos(ang * Math.PI / 180), uy = Math.sin(ang * Math.PI / 180);
@@ -2355,12 +2354,12 @@
         if (aim && !onCenter) {
             var eOn = edgeOf(aim, S.target);
             // 023c: "120 left" after a tee shot - layout D writes the unit after the number (data-u), so there "left" rides with it.
-            if (eOn) put(pOn, P(eOn), P(aim), G.shownDistance(G.haversineMeters(S.target, aim), u) + (S.teeShot && !S.targetMoved && !ldOn() ? ' left' : ''));
+            if (eOn) put(pOn, P(eOn), P(aim), G.shownDistance(G.haversineMeters(S.target, aim), u));   // URGENT-025: the number only
         }
         // To the target, on the you / tee -> circle line (the incoming line).
         if (o) {
             var eTo = edgeOf(o.pt, S.target);
-            if (eTo) put(pTo, P(o.pt), P(eTo), (S.teeShot && !S.targetMoved ? 'Driver ' : '') + G.shownDistance(G.haversineMeters(o.pt, S.target), u));
+            if (eTo) put(pTo, P(o.pt), P(eTo), G.shownDistance(G.haversineMeters(o.pt, S.target), u));   // URGENT-025: no "Driver" 
         }
         placeArcLabels(obstacles);
     }
@@ -3679,11 +3678,7 @@
         // Never a dead end: it says what to do (anyone on the round can set it).
         // 017 (simpleFlow): no "Tools" on the bar any more - the short line (Round settings > GPS tools sets it).
         else if (noGreen) banner = canTapGreen() ? 'Tap the middle of the green' : 'No green mapped for this hole yet';
-        // OFF THE COURSE (URGENT-022): the map is the hole, and the numbers are from the tee - say why.
-        else if (fix && r && o && o.from === 'tee' && courseCenter() && G.haversineMeters(fix.pt, courseCenter()) > 1500) {
-            var away = G.haversineMeters(fix.pt, courseCenter());
-            banner = (u === 'm' ? (away / 1000).toFixed(1) + ' km' : (away / 1609.344).toFixed(1) + ' mi') + ' from the course \u00b7 yards from the tee';
-        }
+        // (URGENT-025: no "from the course" banner - the map still frames the hole off the course.)
         txt('.gps-banner', banner);
         show('.gps-banner', !!banner);
 
@@ -4501,10 +4496,7 @@
         var mb = S.el.querySelector('.gps-mark-shot');
         if (mb && mb.textContent.indexOf('📍') === 0) mb.textContent = '◎' + mb.textContent.slice(2);
         var u = units() === 'm' ? 'm' : 'y';
-        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on'), function (p) {
-            var uu = u + (p.classList.contains('gps-pill-on') && S.teeShot && !S.targetMoved ? ' left' : '');   // 023c: "170y left"
-            if (p.getAttribute('data-u') !== uu) p.setAttribute('data-u', uu);
-        });
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on'), function (p) { if (p.getAttribute('data-u') !== u) p.setAttribute('data-u', u); });   // URGENT-025: "283y", no "left" 
         var pill = S.el.querySelector('.gps-ld-plays');
         if (pill) {
             var p = ldPlays(r, o, nums);
@@ -4528,8 +4520,9 @@
     // the course), per phone, default Auto. Daylight is worked out ON THE PHONE from the course's
     // point and today's date (NOAA sunrise / sunset) - no network, nothing leaves the phone.
     var DISPLAY_KEY = 'hardpan_display';
-    function displayPref() { var v = null; try { v = localStorage.getItem(DISPLAY_KEY); } catch (e) {} return v === 'standard' || v === 'sun' ? v : 'auto'; }
-    function setDisplay(v) { try { localStorage.setItem(DISPLAY_KEY, v === 'standard' || v === 'sun' ? v : 'auto'); } catch (e) {} sunCache = null; sunSync(); }
+    // URGENT-025: the default is STANDARD (the original colours); Sun / Auto only when the golfer picks them.
+    function displayPref() { var v = null; try { v = localStorage.getItem(DISPLAY_KEY); } catch (e) {} return v === 'sun' || v === 'auto' ? v : 'standard'; }
+    function setDisplay(v) { try { localStorage.setItem(DISPLAY_KEY, v === 'sun' || v === 'auto' ? v : 'standard'); } catch (e) {} sunCache = null; sunSync(); }
     // Sunrise and sunset (UTC hours) at [lat, lng] on date d - the NOAA almanac method (zenith 90.833°).
     // { rise, set } or { polar: 'day' | 'night' }.
     function sunHours(lat, lng, d) {

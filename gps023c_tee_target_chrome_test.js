@@ -64,18 +64,20 @@ after(async () => { if (j) await j.close(); });
 
 test('straight par 4: the tee shot is the driver, 300 out - "Driver 300", "130 left"', { timeout: 60000 }, async () => {
     const s = await hole(1);
-    assert.match(s.to, /^Driver 30\d$/, JSON.stringify(s));
-    assert.match(s.on, /^1[23]\d( left)?$/, JSON.stringify(s)); assert.equal(await ev("document.querySelector('#gps-overlay .gps-pill-on').getAttribute('data-u')"), 'y left');
+    // URGENT-025 (Manny: "Too busy"): the bubbles are the number only; the POSITION is still the driver.
+    assert.match(s.to, /^30\d$/, JSON.stringify(s));
+    assert.match(s.on, /^1[23]\d$/, JSON.stringify(s)); assert.equal(await ev("document.querySelector('#gps-overlay .gps-pill-on').getAttribute('data-u')"), 'y');
+    assert.equal(s.note, '20 yd', 'no lay-up note on the ring');
 });
 test('dogleg left: the drive stops at the corner - "Driver 250", "lay up 250 · the corner"', { timeout: 60000 }, async () => {
     const s = await hole(2);
-    assert.match(s.to, /^Driver 2[45]\d$/, JSON.stringify(s));
-    assert.match(s.note, /^lay up 2[45]\d · the corner$/, JSON.stringify(s));
+    assert.match(s.to, /^2[45]\d$/, JSON.stringify(s));   // stops at the corner (position), no label
+    assert.equal(s.note, '20 yd', JSON.stringify(s));
 });
 test('par 5 with water at 285: "Driver 275", "lay up 275 · water at 285"', { timeout: 60000 }, async () => {
     const s = await hole(3);
-    assert.match(s.to, /^Driver 27\d$/, JSON.stringify(s));
-    assert.match(s.note, /^lay up 27\d · water at 28\d$/, JSON.stringify(s));
+    assert.match(s.to, /^27\d$/, JSON.stringify(s));   // stops short of the water (position), no label
+    assert.equal(s.note, '20 yd', JSON.stringify(s));
 });
 test('a dragged target is kept for the hole (no "Driver" label)', { timeout: 60000 }, async () => {
     await ev("(function(){ var m=document.querySelector('#gps-overlay .gps-map'); return 1; })()");

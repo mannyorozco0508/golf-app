@@ -67,12 +67,12 @@ before(async () => {
 });
 after(async () => { if (j) await j.close(); });
 
-test('default is Auto, and the Tools sheet\'s Display row sets Standard / Sun / Auto (kept on the phone)', { timeout: 60000 }, async () => {
-    assert.equal(await ev('HardPanGps.display()'), 'auto');
+test('URGENT-025: default is STANDARD, and the Tools sheet\'s Display row sets Standard / Sun / Auto (kept on the phone)', { timeout: 60000 }, async () => {
+    assert.equal(await ev('HardPanGps.display()'), 'standard');   // URGENT-025: Sun only when picked
     await ev("HardPanGps.openTools ? HardPanGps.openTools() : 0");
     await sleep(600);
     const row = await ev("JSON.stringify(Array.prototype.map.call(document.querySelectorAll('#gps-overlay [data-ts-seg=display] button'), function(b){ return b.textContent + (b.classList.contains('on') ? '*' : ''); }))");
-    assert.deepEqual(JSON.parse(row), ['Standard', 'Sun', 'Auto*']);
+    assert.deepEqual(JSON.parse(row), ['Standard*', 'Sun', 'Auto']);
     await ev("document.querySelector('#gps-overlay [data-ts-seg=display] [data-v=sun]').click()");
     await sleep(300);
     assert.equal(await ev("localStorage.getItem('hardpan_display')"), 'sun');
