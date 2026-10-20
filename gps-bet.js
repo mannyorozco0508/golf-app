@@ -158,8 +158,9 @@
         if (!sh.ok) return { refuse: sh.why };
         if (!(stake > 0)) return { refuse: 'Pick an amount.' };
         var why = refuseWhy(game, ids); if (why) return { refuse: why };
-        var from = Number(o.startHole) || startHole(ids);
-        if (!from) return { refuse: 'No holes are left to bet on.' };
+        // 018: any hole, the played ones included (the engines settle a range from the scores in).
+        var from = Number(o.startHole) || startHole(ids) || ((holes()[0] || {}).hole);
+        if (!from) return { refuse: 'This round has no holes yet.' };
         var sc = scopeOf(ids), now = Number(o.now) || Date.now(), c = code();
         if (game === 'skins') {
             var mode = o.scoring === 'net' ? 'net' : 'gross';
@@ -237,6 +238,9 @@
         + '#hp-bet .hb-why{font:500 13px/1.3 ' + FONT + ';color:#8a5a00;margin-top:8px;min-height:17px;}'
         + '#hp-bet .hb-go{display:block;width:100%;border:0;border-radius:16px;min-height:56px;margin-top:14px;font:800 19px/1 ' + FONT + ';cursor:pointer;background:#c8f075;color:#0f1f17;}'
         + '#hp-bet .hb-go[disabled]{opacity:.45;cursor:default;}'
+        + '#hp-bet .hb-go.hb-cancel{background:#fff;border:1.5px solid #0f4d3a;color:#0f4d3a;margin-top:10px;}'
+        + '#hp-bet .hb-played{font:600 13px/1.4 ' + FONT + ';color:#6b4e00;background:#fff7e0;border:1px solid #f0d58a;border-radius:10px;padding:8px 10px;margin-bottom:8px;}'
+        + '#hp-bet .hb-result{font:500 14px/1.4 ' + FONT + ';color:#0f1f17;margin:0 0 8px;}'
         + '#hp-bet .hb-card{border:1.5px solid #dfe6e2;border-radius:14px;padding:4px 12px;margin-top:14px;}'
         + '#hp-bet .hb-row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:50px;border-bottom:1px solid #edf1ee;font:500 15px/1.2 ' + FONT + ';}#hp-bet .hb-row:last-child{border-bottom:0;}'
         + '#hp-bet .hb-seg{display:flex;background:#eef2ef;border-radius:10px;padding:3px;}#hp-bet .hb-seg button{border:0;background:none;border-radius:8px;min-height:36px;padding:0 16px;font:700 14px/1 ' + FONT + ';color:#0f1f17;cursor:pointer;}#hp-bet .hb-seg button.on{background:#0f4d3a;color:#fff;}'
@@ -325,9 +329,11 @@
             }
         } else {
             var g = GAMES[st.game], ids = st.picks.slice(), shp = shapeOf(st.game, ids);
-            if (st.from == null) st.from = startHole(ids);
             var hs = holes(), nowHole = startHole(ids);
+            // 018: ANY hole, the played ones too; the default is still now (the first hole once all are played).
+            if (st.from == null) st.from = nowHole || (hs[0] && hs[0].hole) || 1;
             if (st.stake == null) st.stake = g.chips[1];
+            if (st.step === 3) { html += confirmHtml(g, ids); panel.innerHTML = html; return; }
             html += '<div class="hb-head"><button type="button" class="hb-back" data-hb="back" aria-label="Back">‹</button><div class="hb-title">' + esc(g.label) + ' · ' + esc(g.stakeWord) + '</div><button type="button" class="hb-x" data-hb="close" aria-label="Close">✕</button></div>';
             html += '<div class="hb-vs" style="margin-top:0">' + vsLine(st.game, ids) + '</div>';
             html += '<div class="hb-chips" style="margin-top:14px">' + g.chips.map(function (v) {
@@ -337,24 +343,97 @@
                 : '<button type="button" class="hb-chip" data-hb="custom">Custom</button>') + '</div>';
             html += '<div class="hb-card">'
                 + '<div class="hb-row"><span>Scoring</span><span class="hb-seg"><button type="button" data-hb-scoring="net" class="' + (st.scoring === 'net' ? 'on' : '') + '">Net</button><button type="button" data-hb-scoring="gross" class="' + (st.scoring === 'gross' ? 'on' : '') + '">Gross</button></span></div>'
-                + '<div class="hb-row"><span>Counts from</span><select class="hb-from" aria-label="Counts from">' + hs.filter(function (h) { return !nowHole || h.hole >= nowHole; }).map(function (h) {
+                + '<div class="hb-row"><span>Counts from</span><select class="hb-from" aria-label="Counts from">' + hs.map(function (h) {
                     return '<option value="' + h.hole + '"' + (h.hole === st.from ? ' selected' : '') + '>Hole ' + h.hole + (h.hole === nowHole ? ' (now)' : '') + '</option>';
                 }).join('') + '</select></div></div>';
-            var w = worstCase(st.game, Number(st.stake) || 0, shp, st.from || 1);
-            html += '<div class="hb-worst">' + (w.mine ? 'Worst case for you: ' : 'Worst case each: ') + '<b>−$' + w.amount + '</b>'
-                + (w.presses ? ' (no presses)' : '') + (st.game === 'hilo' ? ' · Ties are a wash' : '') + '</div>';
-            var ok = !!nowHole && Number(st.stake) > 0;
-            html += '<div class="hb-why">' + (!nowHole ? 'No holes are left to bet on.' : '') + '</div>';
-            html += '<button type="button" class="hb-go" data-hb="start"' + (ok ? '' : ' disabled') + '>Start bet ✓</button>';
+            html += '<div class="hb-worst" aria-live="polite">' + outlookHtml() + '</div>';
+            html += '<div class="hb-why"></div>';
+            html += '<button type="button" class="hb-go" data-hb="start"' + (Number(st.stake) > 0 ? '' : ' disabled') + '>Start bet ✓</button>';
         }
         panel.innerHTML = html;
+    }
+    // ---- 018: BETS ON HOLES ALREADY PLAYED --------------------------------------
+    // The holes of [from ..] that are already played (before "now" - the first hole nobody in
+    // the bet has posted; every hole once all are in): { a, b, full } or null.
+    function playedRange(ids, from) {
+        var hs = holes(); if (!hs.length) return null;
+        var now = startHole(ids), last = hs[hs.length - 1].hole;
+        var end = now == null ? last : (hs.filter(function (h) { return h.hole < now; }).pop() || {}).hole;
+        if (end == null || from > end) return null;
+        return { a: from, b: end, full: now == null };
+    }
+    // THE RESULT SO FAR, read only: the round with this bet added, through the SAME
+    // computeCombinedNetTotals every bet settles by, minus the round without it - per golfer,
+    // exact (before whole-dollar rounding). Nothing is written.
+    function preview(o) {
+        var d = data(); if (!d || typeof computeCombinedNetTotals !== 'function') return null;
+        var b = buildBet(o); if (b.refuse) return null;
+        try {
+            var cd = (d.courseData || []).slice().sort(function (x, y) { return x.hole - y.hole; });
+            var d2 = JSON.parse(JSON.stringify(d));
+            var slot = /sideMatches$/.test(b.path) ? 'sideMatches' : 'additionalGameInstances';
+            d2[slot] = d2[slot] || {}; d2[slot].__preview018 = b.value;
+            var before = computeCombinedNetTotals(d, cd, d.scores || {}).exact || {};
+            var after = computeCombinedNetTotals(d2, cd, d2.scores || {}).exact || {};
+            var out = {};
+            players().forEach(function (p) {
+                var k = String(p.name).trim().toLowerCase();
+                var v = ((after[k] || {}).net || 0) - ((before[k] || {}).net || 0);
+                if (Math.abs(v) > 0.004) out[String(p.id)] = v;
+            });
+            return out;
+        } catch (e) { return null; }
+    }
+    function moneyWord(v) { var r = Math.round(v * 100) / 100; return (r > 0 ? '+' : (r < 0 ? '−' : '')) + '$' + (Math.abs(r) % 1 ? Math.abs(r).toFixed(2) : Math.abs(r)); }
+    function previewText(game, ids, pv) {
+        if (!pv) return '';
+        var sh = shapeOf(game, ids);
+        var nm = function (list) { return list.map(function (id) { return first(byId(id)); }).join(' + '); };
+        if (sh.ok && sh.a) {
+            var va = pv[sh.a[0]] || 0;
+            if (Math.abs(va) < 0.005) return 'All square → $0';
+            var win = va > 0 ? sh.a : sh.b, lose = va > 0 ? sh.b : sh.a, amt = Math.abs(va);
+            return esc(nm(win)) + (win.length > 1 ? ' win' : ' wins') + ' → ' + moneyWord(amt) + (win.length > 1 ? ' each' : '')
+                + ' · ' + esc(nm(lose)) + ' ' + moneyWord(-Math.abs(pv[lose[0]] || amt)) + (lose.length > 1 ? ' each' : '');
+        }
+        var rows = Object.keys(pv).map(function (id) { return { id: id, v: pv[id] }; }).sort(function (x, y) { return y.v - x.v; });
+        if (!rows.length) return 'Nobody has won anything yet → $0';
+        return rows.map(function (r) { return esc(first(byId(r.id))) + ' ' + moneyWord(r.v); }).join(' · ');
+    }
+    // The line under the terms: the worst case (holes still to play), or - with holes already
+    // played - which ones, and the result so far; a bet over holes all played shows its result.
+    function outlookHtml() {
+        var ids = st.picks.slice(), shp = shapeOf(st.game, ids), from = st.from || 1, stake = Number(st.stake) || 0;
+        var pr = playedRange(ids, from);
+        var html = '';
+        if (pr) {
+            html += '<div class="hb-played">' + (pr.a === pr.b ? 'Hole ' + pr.a : 'Holes ' + pr.a + '-' + pr.b) + ' already played: this bet settles from the scores already in.</div>';
+            var pv = stake > 0 ? preview({ game: st.game, picks: ids, stake: stake, scoring: st.scoring, startHole: from }) : null;
+            var t = previewText(st.game, ids, pv);
+            if (t) html += '<div class="hb-result">' + (pr.full ? 'Result: ' : 'So far: ') + '<b>' + t + '</b></div>';
+            if (pr.full) return html;
+        }
+        var w = worstCase(st.game, stake, shp, from);
+        return html + (w.mine ? 'Worst case for you: ' : 'Worst case each: ') + '<b>−$' + w.amount + '</b>'
+            + (w.presses ? ' (no presses)' : '') + (st.game === 'hilo' ? ' · Ties are a wash' : '');
+    }
+    // ONE CONFIRM, in the sheet (never a native dialog), only for a start before now.
+    function confirmHtml(g, ids) {
+        var pr = playedRange(ids, st.from || 1);
+        var pv = preview({ game: st.game, picks: ids, stake: st.stake, scoring: st.scoring, startHole: st.from });
+        var t = previewText(st.game, ids, pv);
+        return '<div class="hb-head"><div class="hb-title">Add this bet for holes already played?</div></div>'
+            + '<div class="hb-vs" style="margin-top:0">' + esc(g.label) + ' · $' + esc(st.stake) + ' · ' + vsLine(st.game, ids) + '</div>'
+            + '<div class="hb-worst">Everyone in it should agree.' + (pr ? ' Counts from hole ' + pr.a + (pr.full ? ' - every hole is in.' : '.') : '') + '</div>'
+            + (t ? '<div class="hb-result">' + (pr && pr.full ? 'Result: ' : 'So far: ') + '<b>' + t + '</b></div>' : '')
+            + '<button type="button" class="hb-go" data-hb="confirm-add">Add bet</button>'
+            + '<button type="button" class="hb-go hb-cancel" data-hb="confirm-cancel">Cancel</button>';
     }
     function onInput(e) {
         if (e.target && e.target.classList.contains('hb-custom') && st) {
             st.stake = Number(e.target.value) || 0;
             var go = root().querySelector('[data-hb="start"]'); if (go) go.disabled = !(st.stake > 0);
-            var shp = shapeOf(st.game, st.picks), w = worstCase(st.game, st.stake, shp, st.from || 1);
-            var wb = root().querySelector('.hb-worst b'); if (wb) wb.textContent = '−$' + w.amount;
+            var wo = root().querySelector('.hb-worst'); if (wo) wo.innerHTML = outlookHtml();
         }
     }
     function onChange(e) {
@@ -381,7 +460,9 @@
         if (a === 'back') { st.step = 1; draw(); return; }
         if (a === 'more') { close(); moreGames(); return; }
         if (a === 'next') { if (shapeOf(st.game, st.picks).ok) { st.step = 2; st.from = null; draw(); } return; }
-        if (a === 'start') { start(); return; }
+        if (a === 'start') { if (playedRange(st.picks.slice(), st.from || 1)) { st.step = 3; draw(); } else start(); return; }
+        if (a === 'confirm-add') { start(); return; }
+        if (a === 'confirm-cancel') { st.step = 2; draw(); return; }
     }
     function say(kind, msg) {
         try {
@@ -467,7 +548,7 @@
 
     var api = {
         on: on, open: open, close: close, isOpen: isOpen, refresh: refresh, openBets: openBets,
-        hiloHere: hiloHere, tiles: tiles,
+        hiloHere: hiloHere, tiles: tiles, preview: preview, playedRange: playedRange,
         // Pure-ish pieces for the tests.
         shapeOf: shapeOf, buildBet: buildBet, worstCase: worstCase, moneyNow: moneyNow,
         money: function () { return last; },
@@ -475,6 +556,6 @@
     };
     window.HardPanBet = api;
     if (window.GolfBack && typeof window.GolfBack.register === 'function') {
-        try { window.GolfBack.register({ name: 'hp-bet', priority: 1, isOpen: isOpen, close: function () { if (st && st.step === 2) { st.step = 1; draw(); } else close(); } }); } catch (e) {}
+        try { window.GolfBack.register({ name: 'hp-bet', priority: 1, isOpen: isOpen, close: function () { if (st && st.step > 1) { st.step -= 1; draw(); } else close(); } }); } catch (e) {}
     }
 })();
