@@ -63,7 +63,8 @@
         games: { weekly: false, skins: false, nassau: false, match: false, hilo: false },
         stake: { weekly: 40, skins: 10, nassau: 5, match: 10, hilo: 1 },
         who: { nassau: null, match: null, hilo: null }, whoAll: {},
-        scoring: 'net', press: '2down', carry: true, moreOpen: false, dupOpen: false
+        scoring: 'net', press: '2down', carry: true, moreOpen: false, dupOpen: false,
+        web: null, webLocal: []
     };
     function hiloHere() { return typeof W.hiloShapeOk === 'function' || !!W.HardPanHiLo; }
 
@@ -301,6 +302,137 @@
             + '<div style="text-align:center;margin-top:6px;"><button type="button" class="sf-link muted" data-sf="enterpars" style="font-size:13px;">Enter pars yourself</button></div></div>';
         return '';
     }
+    // ---- THE SEARCH BOX LOOKS ONLINE BY ITSELF (URGENT-027, Manny 12:25 PM: "Aguila" showed "No course
+    // in the list by that name." and nothing else) ----------------------------------------------------
+    // Local first, forgiving: case, punctuation, "Golf Course" / "GC" / "Golf Club" ignored, a letter or
+    // two off ("agulia"). Fewer than 3 good local matches, 3+ letters, a 600 ms pause: every US course
+    // through gps-live search (our gpsSearch Cloud Function - the phone never calls GolfAPI), "Searching
+    // all courses…", then the rows with city/state and ✓ GPS where GolfAPI has the greens. A course we
+    // already list stays one row. Each query's answer is kept on this phone 30 days (the function keeps
+    // it 30 days for everyone too: 0.1 credit the first time anyone asks, then 0). A tap pulls it once
+    // for everyone (gpsCourse: card + tees + greens, URGENT-021's path) and its card record is the pick.
+    var WEB = 'hardpan_websearch_', WEB_MS = 30 * 24 * 3600 * 1000;
+    var GEN = { golf: 1, course: 1, courses: 1, club: 1, gc: 1, cc: 1, the: 1, country: 1, links: 1, resort: 1, and: 1, at: 1, of: 1, municipal: 1, muni: 1 };
+    function qWords(s) { return String(s || '').toLowerCase().replace(/['’`.]/g, '').split(/[^a-z0-9]+/).filter(function (w) { return w && !GEN[w]; }); }
+    function editDist(a, b) {   // a word typed a letter or two off
+        if (Math.abs(a.length - b.length) > 2) return 9;
+        var p = [], i, j;
+        for (j = 0; j <= b.length; j++) p[j] = j;
+        for (i = 1; i <= a.length; i++) { var c = [i]; for (j = 1; j <= b.length; j++) c[j] = Math.min(p[j] + 1, c[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); p = c; }
+        return p[b.length];
+    }
+    function wordHit(q, w) {
+        if (w.indexOf(q) === 0) return true;
+        var tol = q.length >= 7 ? 2 : q.length >= 4 ? 1 : 0;
+        return tol > 0 && (editDist(q, w) <= tol || editDist(q, w.slice(0, q.length)) <= tol);
+    }
+    // 3: the text as typed, 2: its words (no "golf club"), 1: close enough (a typo), 0: no.
+    function matchScore(c, raw) {
+        var nm = String(c.name || '').toLowerCase(), q = raw.toLowerCase();
+        if (nm.indexOf(q) !== -1 || String(c.city || '').toLowerCase().indexOf(q) !== -1) return 3;
+        var qw = qWords(raw), nw = qWords(c.name);
+        if (!qw.length) return 0;
+        if (nw.join(' ').indexOf(qw.join(' ')) !== -1) return 2;
+        return qw.every(function (x) { return nw.some(function (w) { return wordHit(x, w); }); }) ? 1 : 0;
+    }
+    function localHits(all, raw) {
+        return all.map(function (c) { return { c: c, s: matchScore(c, raw) }; }).filter(function (x) { return x.s > 0; })
+            .sort(function (a, b) { return (b.s - a.s) || (b.c.ready - a.c.ready) || a.c.name.localeCompare(b.c.name); });
+    }
+    function webKey(raw) { var w = qWords(raw).join(' '); return w.length >= 3 ? w : String(raw || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+    function webSearch() {
+        var raw = String(S.q || '').trim(), L = W.HardPanGpsLive;
+        if (S.step !== 1 || raw.length < 3 || !liveOn() || !L || !L.search) return;
+        var k = webKey(raw);
+        if (k.length < 3 || (S.web && S.web.k === k && S.web.state !== 'error')) return;
+        if (localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3) return;
+        var hit = null; try { hit = JSON.parse(ls(WEB + k) || 'null'); } catch (e) {}
+        if (hit && hit.at && Date.now() - hit.at < WEB_MS) { S.web = { k: k, state: 'ok', results: hit.results || [] }; render1(); return; }
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) { S.web = { k: k, state: 'offline' }; render1(); return; }
+        S.web = { k: k, state: 'busy' };
+        try { (W.__sfWeb = W.__sfWeb || []).push(k); } catch (e) {}   // (the tests count the online searches)
+        render1();
+        var done = false, t = setTimeout(function () { if (!done) { done = true; if (S.web && S.web.k === k) { S.web = { k: k, state: 'error' }; render1(); } } }, 20000);
+        Promise.resolve().then(function () { return L.search(k); }).then(function (r) {
+            if (done) return; done = true; clearTimeout(t);
+            if (!S.web || S.web.k !== k) return;
+            var st = r && r.status;
+            if (st === 'ok') { var res = (r.results || []).slice(0, 25); ls(WEB + k, JSON.stringify({ at: Date.now(), results: res })); S.web = { k: k, state: 'ok', results: res }; }
+            else S.web = { k: k, state: st === 'signin' || st === 'account' ? 'signin' : st === 'offline' ? 'offline' : 'error' };
+            render1();
+        }, function () { if (done) return; done = true; clearTimeout(t); if (S.web && S.web.k === k) { S.web = { k: k, state: 'error' }; render1(); } });
+    }
+    // Redraw the course step, keeping the golfer's place in the search box.
+    function render1() {
+        if (S.step !== 1) return;
+        var a = W.document.activeElement, typing = a && a.id === 'sf-q';
+        render();
+        var q = $('sf-q'); if (typing && q) { q.focus(); try { q.setSelectionRange(q.value.length, q.value.length); } catch (e) {} }
+    }
+    function webRowHtml(m) {
+        var where = [m.city, m.state].filter(Boolean).join(', ');
+        return '<button type="button" class="sf-row" data-sf-web="' + esc(m.id) + '" data-sf-name="' + esc(m.name || m.club) + '"><span class="n">' + esc(m.name || m.club) + '</span>'
+            + '<span class="s">' + esc(where) + (m.gps ? (where ? ' · ' : '') + '✓ GPS' : '') + '</span></button>';
+    }
+    // The online part of RESULTS. shown: the local keys already listed; a course we already have is
+    // added to webLocal (drawn as its own local row) instead of a second, online row.
+    function webBox(shown) {
+        var w = S.web, raw = String(S.q || '').trim();
+        S.webLocal = [];
+        if (!w || w.k !== webKey(raw)) return '';
+        var p = w.pull;
+        if (p) {
+            var pn = esc(String(p.name).split(' (')[0]);
+            if (p.state === 'busy') return '<div class="sf-card" id="sf-web" style="display:flex;align-items:center;gap:10px;"><span class="sf-spin" aria-hidden="true">⏳</span><span class="sf-note" style="font-size:15px;">Getting ' + pn + '’s scorecard…</span></div>';
+            if (p.state === 'signin') return '<div class="sf-card" id="sf-web"><div style="font-weight:800;font-size:16px;margin-bottom:6px;">Sign in to load ' + pn + '.</div><div class="sf-note" style="margin-bottom:10px;">Setting up a new course needs a signed-in golfer (Apple, Google or email). Once, for everyone.</div>'
+                + '<button type="button" class="sf-cta" data-sf="websignin" style="margin-bottom:8px;">Sign in</button><button type="button" class="sf-btn" data-sf="webback" style="width:100%;min-height:46px;">Pick another course</button></div>';
+            return '<div class="sf-card" id="sf-web"><div style="font-weight:800;font-size:16px;margin-bottom:10px;">' + (p.state === 'offline' ? 'No signal — loading a new course needs a connection.' : p.state === 'error' ? 'Couldn’t load ' + pn + ' right now.' : pn + ' isn’t in our course data yet.') + '</div>'
+                + '<button type="button" class="sf-cta" data-sf="webback" style="margin-bottom:8px;">Pick another course</button>'
+                + '<button type="button" class="sf-btn" data-sf="webrequest" style="width:100%;min-height:46px;">Request this course</button></div>';
+        }
+        if (w.state === 'busy') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;display:flex;align-items:center;gap:8px;"><span class="sf-spin" aria-hidden="true">⏳</span>Searching all courses…</div>';
+        if (w.state === 'offline') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">No signal — searching all courses needs a connection.</div>';
+        if (w.state === 'signin') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">Sign in to search all courses. <button type="button" class="sf-link" data-sf="websignin" style="padding:0 0 0 4px;min-height:0;">Sign in</button></div>';
+        if (w.state === 'error') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">Couldn’t search all courses right now. <button type="button" class="sf-link" data-sf="webretry" style="padding:0 0 0 4px;min-height:0;">Try again</button></div>';
+        var HCx = HC(), all = courses(), ck = function (t) { return String(t || '').toLowerCase().replace(/[^a-z]/g, ''); };
+        var rows = (w.results || []).filter(function (m) {
+            var rv = null; try { rv = HCx ? HCx.resolve({ key: 'gapi_' + m.id, name: m.name }) : null; } catch (e) {}
+            // ...or the same name (no "golf club") in the same town: "Papago Golf Club" = "Papago Golf Course".
+            var mc = qWords(m.name).join(' ');
+            if (!(rv && rv.row) && mc) { var tw = all.filter(function (c) { return qWords(c.name).join(' ') === mc && (!c.city || !m.city || ck(c.city) === ck(m.city)); })[0]; if (tw) rv = { row: tw }; }
+            if (rv && rv.row) { if (shown.indexOf(rv.row.key) === -1) { shown.push(rv.row.key); S.webLocal.push(rv.row); } return false; }
+            return true;
+        });
+        return rows.length ? '<div id="sf-web">' + rows.map(webRowHtml).join('') + '</div>' : '';
+    }
+    function webPull(id, name) {
+        var L = W.HardPanGpsLive, w = S.web;
+        if (!w || !L || !L.course) return;
+        var me = { id: id, name: name, state: 'busy' };
+        w.pull = me; render1();
+        var say = function (st) { if (S.web && S.web.pull === me) { me.state = st; render1(); } };
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) { say('offline'); return; }
+        try { (W.__sfPull = W.__sfPull || []).push(id); } catch (e) {}
+        L.course(id).then(function (r) {
+            var st = r && r.status;
+            if (st === 'account' || st === 'signin') return say('signin');
+            if (st === 'offline') return say('offline');
+            if (st !== 'ready') return say(st === 'nogps' || st === 'unknown' ? 'none' : 'error');
+            if (!r.cardKey || !wizDb()) return say('none');
+            return wizDb().ref('global_courses/' + r.cardKey).once('value').then(function (snap) {
+                var rec = snap && snap.val ? snap.val() : null;
+                if (!(rec && rec.name)) return say('none');
+                if (!S.web || S.web.pull !== me) return;
+                if (typeof globalCourses !== 'undefined' && globalCourses) globalCourses[r.cardKey] = rec;   /* global globalCourses */
+                try { if (HC() && HC().refresh) HC().refresh(); } catch (e) {}
+                S.web = null; S.q = ''; S.changing = false; S.noCard = null; S.lookup = null; S.err1 = '';
+                pick(r.cardKey, rec.name);
+                render(); try { el().scrollTop = 0; } catch (e) {}
+                var H = HD();
+                if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.step === 1) render(); }, true);
+            }, function () { say('error'); });
+        }, function () { say('error'); });
+    }
     function pick(key, name) {
         var f = fn('selectCourse');
         if (!f) return;
@@ -474,9 +606,14 @@
         var all = S.gpsFiles ? courses() : [], q = S.q.toLowerCase(), key = courseKey();
         var body = '<input type="search" class="sf-search" id="sf-q" placeholder="🔍 Search courses" value="' + esc(S.q) + '" autocomplete="off" style="margin-bottom:12px;">';
         if (q.length >= 2) {
-            var hits = all.filter(function (c) { return c.name.toLowerCase().indexOf(q) !== -1 || String(c.city || '').toLowerCase().indexOf(q) !== -1; })
-                .sort(function (a, b) { return (b.ready - a.ready) || (a.name.toLowerCase().indexOf(q) - b.name.toLowerCase().indexOf(q)); }).slice(0, 10);
-            body += '<div class="sf-h">RESULTS</div>' + (hits.length ? hits.map(function (c) { return rowHtml(c, distTo(c), c.key === key); }).join('') : '<div class="sf-note">No course in the list by that name.</div>');
+            // URGENT-027: forgiving local matches first, then every US course online (webBox).
+            var hits = localHits(all, S.q.trim()).slice(0, 10).map(function (x) { return x.c; });
+            var shown = hits.map(function (c) { return c.key; }), web = webBox(shown);
+            hits = hits.concat(S.webLocal);
+            var waiting = S.web && S.web.k === webKey(S.q.trim()) && (S.web.state === 'busy' || S.web.pull);
+            body += '<div class="sf-h">RESULTS</div>' + hits.map(function (c) { return rowHtml(c, distTo(c), c.key === key); }).join('') + web
+                + (!hits.length && !web && !waiting ? '<div class="sf-note">' + (q.trim().length < 3 ? 'Keep typing — 3 letters searches all courses.' : 'No course found by that name.') + '</div>' : '')
+                + '<button type="button" class="sf-link muted" data-sf="fullcourse" style="font-size:13px;">Not listed? Add a course ›</button>';
         }
         if (!S.changing) body += courseHead() + lookupBox(key, courseName());
         // NEAR YOU, ALWAYS (URGENT-016: with a course already picked the list was gone - only the
@@ -505,7 +642,7 @@
             }
         }
         if (!S.changing) body += courseCard();
-        body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Search online or add a course ›</button>';
+        if (q.length < 2) body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Add a course ›</button>';
         var ok = courseName() ? '' : ' disabled';
         var foot = S.mode === 'gps'
             ? '<button type="button" class="sf-cta lime" data-sf="startgps"' + (ok || (S.saving || (S.lookup && S.lookup.key === key && S.lookup.state === 'busy') || (S.noCard === key && !hasCard(key)) ? ' disabled' : '')) + '>' + (S.saving ? 'Starting…' : S.cardWait ? 'Loading the course card…' : (S.lookup && S.lookup.key === key && S.lookup.state === 'busy') ? 'Getting the course\u2026' : 'Start Round') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '')
@@ -1008,6 +1145,7 @@
     function onClick(ev) {
         var t = ev.target, b;
         if (!t || !t.closest) return;
+        if ((b = t.closest('[data-sf-web]'))) { webPull(b.getAttribute('data-sf-web'), b.getAttribute('data-sf-name')); return; }
         if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; lookup(pk, pn); return; }
         if ((b = t.closest('[data-sf-tee]'))) {
             var tk = b.getAttribute('data-sf-tee'), tr = teeRows(courseKey()).filter(function (x) { return x.key === tk; })[0];
@@ -1065,6 +1203,14 @@
         if (a === 'mix') { away(step('players'), 'Tees set'); return; }
         if (a === 'fullcourse') { away(step('course'), 'Course picked'); return; }
         if (a === 'signin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t2 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t2); show(true); S.lookup = null; lookup(courseKey(), courseName()); render(); } }, 600); } return; }
+        if (a === 'webback') { if (S.web) S.web.pull = null; render1(); var q2 = $('sf-q'); if (q2) q2.focus(); return; }
+        if (a === 'webretry') { S.web = null; webSearch(); return; }
+        if (a === 'websignin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t3 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t3); show(true); S.web = null; webSearch(); render1(); } }, 600); } return; }
+        if (a === 'webrequest') {
+            var wp = (S.web && S.web.pull) || {};
+            try { W.location.href = 'mailto:support@rattlegolf.com?subject=' + encodeURIComponent('Please add ' + (wp.name || S.q)) + '&body=' + encodeURIComponent('GolfAPI course id: ' + (wp.id || '') + '\nFrom the HardPan GPS app.'); } catch (e) {}
+            return;
+        }
         if (a === 'request') {
             var rc = courses().filter(function (x) { return x.key === courseKey(); })[0] || {};
             var subj = 'Please add ' + courseName() + (rc.city || rc.state ? ' (' + [rc.city, rc.state].filter(Boolean).join(', ') + ')' : '');
@@ -1097,7 +1243,12 @@
     }
     function onInput(ev) {
         var t = ev.target;
-        if (t.id === 'sf-q') { S.q = t.value; clearTimeout(S.qt); S.qt = setTimeout(function () { render(); var q = $('sf-q'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }, 250); return; }
+        if (t.id === 'sf-q') {
+            S.q = t.value; clearTimeout(S.qt); clearTimeout(S.wt);
+            S.qt = setTimeout(function () { render(); var q = $('sf-q'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }, 250);
+            S.wt = setTimeout(webSearch, 600);   // URGENT-027: online after a pause, never per letter
+            return;
+        }
         if (t.id === 'sf-paste') { S.pasted = t.value; return; }   // read on paste / leaving the box / Done
         if (t.getAttribute('data-sf-tname') || t.getAttribute('data-sf-thcp')) {
             var tid = t.getAttribute('data-sf-tname') || t.getAttribute('data-sf-thcp'), wr = wizRow(tid);
