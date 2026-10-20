@@ -141,6 +141,16 @@
   <div class="hs-slim"><button type="button" data-hp-act="sjoinopen">Join with a code</button> &middot; <button type="button" data-hp-act="strip">Trip</button> &middot; <button type="button" data-hp-act="shistory">History</button><span data-hs-stats> &middot; <button type="button" data-hp-act="sstats">My stats</button></span></div>
 </div>
 
+<!-- HISTORY (2.0 polish #6): this phone's past rounds, newest first - course, day, golfers, the
+     result once finished. A tap opens the round's Results (finished) or Resume (not). front-door.js
+     historyView; storage first (works with no signal), then each row refreshed from the server. -->
+<div class="hp-view" id="v-history">
+  <button type="button" class="hp-link" data-hp-act="shome" style="align-self:flex-start;">&lsaquo; Home</button>
+  <h1 style="margin:4px 0 4px;font-size:28px;">History</h1>
+  <div class="hp-note" style="text-align:left;margin-bottom:12px;">Rounds on this phone, newest first.</div>
+  <div id="hp-history-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+</div>
+
 <!-- MAIN: two doors -->
 <div class="hp-view" id="v-main">
   <div class="hp-brand" style="margin-top:24px;">HARDPAN</div>

@@ -127,7 +127,10 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
     });
 
     test('Same as last week: Home shows course · golfers · games; lands on Step 3 filled in; Start saves a NEW round', { timeout: 120000 }, async () => {
-        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB({ SALW01: SRC }), settleMs: 2000, viewport: { width: 393, height: 852 },
+        // 2.0 polish #7: "Again" is offered for a FINISHED round only (an unfinished one is Resume's),
+        // labelled by its day - this phone never opened it, so "Last round" - and "8 golfers".
+        const FIN = JSON.parse(JSON.stringify(SRC)); CD.forEach((h) => FIN.players.forEach((p) => { FIN.scores['p' + p.id + '_h' + h.hole] = h.par; }));
+        const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB({ SALW01: FIN }), settleMs: 2000, viewport: { width: 393, height: 852 },
             preScript: BASE + GAMES_ON + "try{localStorage.setItem('lastRoomCode','SALW01');}catch(e){}", steps: [
                 { waitFor: "!!document.querySelector('[data-hp-act=\"ssame\"]')", timeout: 10000 },
                 X("JSON.stringify({ same: document.getElementById('hs-same').innerText })"),
@@ -137,7 +140,7 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
                 { waitFor: "!!document.getElementById('sf-code')", timeout: 20000 }, X(WRITES)] });
         assert.equal(r.ok, true, r.reason);
         const [home, s3, w] = J(r);
-        assert.match(home.same, /LAST WEEK\nDobson Ranch Golf Course · 8 · Weekly Game\n↻\nAgain/);
+        assert.match(home.same, /LAST ROUND\nDobson Ranch Golf Course · 8 golfers · Weekly Game\n↻\nAgain/);
         assert.match(s3.text, /Weekly Game\n\$40/);
         assert.equal(w.writes.length, 1);
         assert.notEqual(w.writes[0].path, 'events/SALW01', 'a NEW round');
