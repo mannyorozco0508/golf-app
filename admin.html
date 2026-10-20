@@ -2715,9 +2715,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     <div class="lobby-divider"><span>OR</span></div>
     <button class="btn-outline" onclick="editRoundFromReady()" style="margin-bottom:8px;">✏️ Edit Round Setup</button>
     <!-- THE supersededBy GUARD (v191). Filled by offerRetire() after a NEW round is
-         saved when this device saved an unfinished round with the same golfers in
-         the last 7 days: "Retire OLD — anyone who opens it is sent here.", checked
-         by default (the write fires on render; unticking clears it). Empty otherwise. -->
+         saved when this device saved an unfinished round with the same golfers, on the
+         same course, the same day: "Retire OLD — anyone who opens it is sent here.",
+         UNCHECKED (polish 029 #3: nothing is written until the organizer ticks it;
+         unticking clears it). Empty otherwise. -->
     <div id="rr-retire"></div>
     <div id="rr-links-box" style="margin-top:12px;"></div>
 </div>
@@ -3564,9 +3565,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const scores = (data && data.scores) || {};
         return players.some(p => holes.some(h => !(scores['p' + p.id + '_h' + h.hole] > 0)));
     }
+    // POLISH 029 #3: ONLY THE SAME COURSE AND THE SAME DAY. The walk offered (and
+    // wrote) "Retire TC47A7" - a Dobson round in progress - on a new Papago round,
+    // so anyone opening the Dobson round was sent to Papago. A replaced round is
+    // today's round at today's course; anything else is a different round.
+    const courseIdOf = (d) => String((d && d.courseName) || '').split(' (')[0].trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    function sameCourseRound(a, b) {
+        const ka = a && a.activeCourseKey, kb = b && b.activeCourseKey;
+        if (ka && kb && ka === kb) return true;
+        const na = courseIdOf(a), nb = courseIdOf(b);
+        return !!(na && nb && na === nb);
+    }
+    function sameLocalDay(t1, t2) {
+        const a = new Date(t1), b = new Date(t2);
+        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
     // The one code to offer, or null: this uid's, unfinished, not already
-    // retired, saved within the window, sharing at least half the NEW roster's
-    // names; the most recently saved such round wins.
+    // retired, saved today on this device, on the same course, sharing at least
+    // half the NEW roster's names; the most recently saved such round wins.
     function supersedeCandidate(newData, newCode, uid, entries, records, now) {
         const need = Math.ceil(((newData && newData.players) || []).length / 2);
         if (need === 0) return null;
@@ -3578,6 +3594,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (!rec) continue;
             if (!uid || rec.ownerUid !== uid) continue;
             if (rec.supersededBy) continue;
+            if (!sameLocalDay(e.at || 0, now)) continue;
+            if (!sameCourseRound(newData, rec)) continue;
             if (!roundUnfinished(rec)) continue;
             if (rosterOverlap(newData.players, rec.players) < need) continue;
             return e.code;
@@ -3585,7 +3603,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return null;
     }
     // After a NEW round's save: read the remembered rounds, pick one, render the
-    // row, and - checked by default - write. Never for an edit of an existing round.
+    // row UNCHECKED, and write nothing - the organizer's tick is the write
+    // (polish 029 #3). Never for an edit of an existing round.
     function offerRetire(newCode, newData, uid) {
         const mount = document.getElementById('rr-retire');
         if (!mount) return Promise.resolve(null);
@@ -3597,9 +3616,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const records = {}; pairs.forEach(([c, v]) => { if (v) records[c] = v; });
             const code = supersedeCandidate(newData, newCode, uid, entries, records, Date.now());
             if (!code) return null;
-            mount.innerHTML = '<label class="rr-retire-row"><input type="checkbox" id="rr-retire-box" checked onchange="retireRound(\'' + code + '\', this.checked)"> '
+            mount.innerHTML = '<label class="rr-retire-row"><input type="checkbox" id="rr-retire-box" onchange="retireRound(\'' + code + '\', this.checked)"> '
                 + '<span>Retire ' + code + ' \u2014 anyone who opens it is sent here.</span></label>';
-            retireRound(code, true);
             return code;
         });
     }
