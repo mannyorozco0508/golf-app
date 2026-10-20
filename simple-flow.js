@@ -114,7 +114,7 @@
         + '#sf .sf-tile.on{border:2px solid #0f4c3a;background:#f3f8f4}#sf .sf-tile.on .n:after{content:" \\2713";color:#0f4c3a}'
         + '#sf .sf-money{display:flex;align-items:center;gap:6px}#sf .sf-money input{width:76px;height:40px;border:1px solid #dfe5df;border-radius:10px;padding:0 8px;font-size:16px;text-align:right;font-family:inherit}'
         + '#sf .sf-seg{display:flex;background:#e9eee9;border-radius:12px;padding:3px}#sf .sf-seg button{border:0;background:none;border-radius:10px;padding:8px 18px;font-weight:800;font-size:15px;font-family:inherit;cursor:pointer;color:#13241d}#sf .sf-seg button.on{background:#0f4c3a;color:#fff}'
-        + '#sf .sf-note{font-size:13px;color:#667;line-height:1.4}'
+        + '#sf .sf-note{font-size:13px;color:#667;line-height:1.4}#sf .sf-dot{width:22px;height:22px;border-radius:50%;flex:none;display:inline-block}#sf .sf-tee{padding:12px 14px}'
         + '#sf .sf-err{color:#b42318;font-weight:700;font-size:14px;margin:6px 0}'
         + '#sf .sf-big{font:800 34px/1.1 ui-monospace,Menlo,monospace;letter-spacing:.12em;color:#0f4c3a;text-align:center;margin:4px 0}'
         + '#sf .sf-btn{min-height:40px;padding:6px 14px;border-radius:12px;border:1px solid #0f4c3a;background:#fff;color:#0f4c3a;font-weight:800;font-size:14px;font-family:inherit;cursor:pointer;white-space:nowrap}'
@@ -139,7 +139,7 @@
     function shell(title, body, foot, n) {
         var bar = '';
         if (n) for (var i = 1; i <= 3; i++) bar += '<i class="' + (i <= n ? 'on' : '') + '"></i>';
-        return '<div class="sf-in"><div class="sf-top">' + (S.step === 4 ? '<span class="sf-kick">Share with your groups</span>' : '<button type="button" class="sf-back" data-sf="back" aria-label="Back">\u2039</button><span class="sf-kick">' + (S.mode === 'same' ? 'Same as last week' : 'New round') + '</span>')
+        return '<div class="sf-in"><div class="sf-top">' + (S.step === 4 ? '<span class="sf-kick">Share with your groups</span>' : '<button type="button" class="sf-back" data-sf="back" aria-label="Back">\u2039</button><span class="sf-kick">' + (S.mode === 'same' ? 'Same as last week' : S.mode === 'gps' ? 'GPS' : 'Games & Bets') + '</span>')
             + (n ? '<span class="sf-bar" aria-label="Step ' + n + ' of 3">' + bar + '</span>' : '') + '</div>'
             + '<h1>' + title + '</h1>' + body + '<div class="sf-foot">' + foot + '</div></div>';
     }
@@ -232,21 +232,74 @@
         }, 200);
     }
     function chip(label, on, attrs) { return '<button type="button" class="sf-chip' + (on ? ' on' : '') + '" ' + attrs + '>' + esc(label) + '</button>'; }
+    // THE TEES, AS ROWS (URGENT-013). Read from the course record Round Setup itself uses
+    // (courseRecordForTees(key) - the picked key, e.g. gca_zgkynkan for Dobson) through its own
+    // courseTeeChoices (same keys as the tee select), so a tap sets the wizard's select. The
+    // first look labelled each tee with the select option's first word, which is the GENDER
+    // ("Men · Back") - hence "Men, Men, Men, Men, Women, Women".
+    var TEE_COLORS = { black: '#111', blue: '#2f6fdb', white: '#fff', red: '#d7262e', gold: '#d4a017', yellow: '#f2d22e', green: '#2e8b3d', silver: '#b8bec6', copper: '#b87333', purple: '#7b3fb5', orange: '#f08a24', grey: '#9aa0a6', gray: '#9aa0a6', tan: '#d2b48c', maroon: '#800000', burgundy: '#800020', teal: '#2a9d8f', pink: '#f28cb1', bronze: '#a97142', platinum: '#e5e4e2', combo: '#9aa0a6' };
+    function teeColor(name) {
+        var n = String(name || '').toLowerCase(), hit = null;
+        Object.keys(TEE_COLORS).forEach(function (c) { if (!hit && new RegExp('\\b' + c + '\\b').test(n)) hit = TEE_COLORS[c]; });
+        if (!hit && /\bback\b|\btips?\b|\bchampionship\b/.test(n)) hit = TEE_COLORS.black;
+        return hit || '#c4c9c4';
+    }
+    function rawTee(rec, key) {
+        var g = String(key).split(':'), list = rec && rec.tees && rec.tees[g[0]];
+        if (list && !Array.isArray(list) && typeof list === 'object') list = Object.keys(list).sort(function (a, b) { return a - b; }).map(function (k) { return list[k]; });
+        return list ? list[Number(g[1])] : null;
+    }
+    function yardsOf(t) {
+        if (!t) return 0;
+        var y = Number(t.totalYards != null ? t.totalYards : t.total_yards);
+        if (!(y > 0)) { var hs = t.holes ? (Array.isArray(t.holes) ? t.holes : Object.keys(t.holes).map(function (k) { return t.holes[k]; })) : []; y = hs.reduce(function (s, h) { return s + (Number(h && (h.yardage != null ? h.yardage : h.yards)) || 0); }, 0); }
+        return y > 0 ? Math.round(y) : 0;
+    }
+    function teeRows(key) {
+        var rec = fn('courseRecordForTees') ? W.courseRecordForTees(key) : null;
+        var choices = fn('courseTeeChoices') ? W.courseTeeChoices(rec) : [];
+        var seen = {}, out = [];
+        choices.forEach(function (c) {
+            var y = yardsOf(rawTee(rec, c.key)), id = c.name.trim().toLowerCase() + '|' + y;
+            if (seen[id]) return;          // the same tee twice (a women's row with the men's yards)
+            seen[id] = 1;
+            out.push({ key: c.key, name: c.name.replace(/\s+tees?$/i, ''), gender: c.gender, yards: y, rating: c.courseRating, slope: c.slope });
+        });
+        return out;
+    }
+    // THE ROUND'S / LAST-USED TEE: remembered by name per course on this phone.
+    var TEE_MEM = 'hardpan_last_tee_';
+    function preferTee(key) {
+        var want = ls(TEE_MEM + key), sel = $('tee-rating-select');
+        if (!want || !sel || S.teeChosen === key) return;
+        var rows = teeRows(key), hit = rows.filter(function (r) { return r.name.toLowerCase() === want.toLowerCase(); })[0];
+        if (hit && sel.value !== hit.key) { sel.value = hit.key; if (fn('applySelectedTee')) W.applySelectedTee(); }
+        S.teeChosen = key;
+    }
+    function teeList(key) {
+        var rows = teeRows(key), sel = $('tee-rating-select');
+        if (!rows.length) return '';
+        if (S.mode !== 'same') preferTee(key);
+        return '<div class="sf-h">TEES</div>' + rows.map(function (r) {
+            var on = sel && sel.value === r.key, col = teeColor(r.name);
+            return '<button type="button" class="sf-row sf-tee' + (on ? ' sf-sel' : '') + '" data-sf-tee="' + esc(r.key) + '" aria-pressed="' + on + '">'
+                + '<span style="display:flex;align-items:center;gap:12px;"><span class="sf-dot" style="background:' + col + ';' + (col === '#fff' ? 'border:1.5px solid #9aa0a6;' : '') + '"></span>'
+                + '<span><span class="n" style="display:block;">' + esc(r.name) + '</span><span class="sf-note">' + (r.gender === 'female' ? 'Women' : 'Men') + '</span></span></span>'
+                + '<span class="s" style="text-align:right;line-height:1.35;">' + (r.yards ? r.yards.toLocaleString('en-US') + ' yds<br>' : '') + esc(Number(r.rating).toFixed(1)) + ' / ' + esc(r.slope) + '</span></button>';
+        }).join('');
+    }
     function courseCard() {
         var key = courseKey(), name = courseName();
         if (!name) return '';
         var c = courses().filter(function (x) { return x.key === key; })[0];
         var d = c ? distTo(c) : null;
-        var h = '<div class="sf-card sf-sel" id="sf-course"><div class="sf-line" style="border:0;padding-top:0;"><span class="n" style="font-size:16px;font-weight:800;">' + esc(c ? nameOf(c) : name) + '</span>'
-            + '<span class="sf-note">' + esc(miStr(d)) + (ready(key) ? (d != null ? ' · ' : '') + '✓ GPS' : '') + '</span></div>';
-        var sel = $('tee-rating-select');
-        var tees = sel ? Array.prototype.filter.call(sel.options, function (o) { return o.value; }) : [];
-        if (tees.length) {
-            h += '<div class="sf-line"><span class="l">Tees</span><span class="sf-chips">' + tees.map(function (o) {
-                return chip(String(o.textContent || o.value).split(/\s[·(-]/)[0].trim(), sel.value === o.value, 'data-sf-tee="' + esc(o.value) + '"');
-            }).join('') + '</span></div>';
-        }
+        var h = '<div class="sf-card" id="sf-course" style="padding:12px 14px;"><div class="sf-line" style="border:0;padding:0;"><span class="n" style="font-size:16px;font-weight:800;">' + esc(c ? nameOf(c) : String(name).split(' (')[0]) + '</span>'
+            + '<span class="sf-note">' + esc(miStr(d)) + (ready(key) ? (d != null ? ' · ' : '') + '✓ GPS' : '') + ' · <button type="button" class="sf-link" data-sf="change" style="padding:0;min-height:0;font-size:13px;">Change</button></span></div></div>';
+        h += teeList(key);
         var loops = key && typeof nineHoleLoops !== 'undefined' && nineHoleLoops ? nineHoleLoops[key] : null;
+        var len = $('round-length-select'), full = !len || len.value === '18';
+        var ts = $('tee-start-select'), at = ts ? ts.value : '1';
+        h += '<div class="sf-card" style="padding:4px 14px;">';
         if (loops) {
             ['front', 'back'].forEach(function (side) {
                 var s = $(side + '-nine-select');
@@ -256,34 +309,36 @@
                 }).join('') + '</span></div>';
             });
         }
-        var len = $('round-length-select'), full = !len || len.value === '18';
-        var ts = $('tee-start-select'), at = ts ? ts.value : '1';
         h += '<div class="sf-line"><span class="l">Start</span><span class="sf-chips">'
             + chip('Hole 1', !S.shotgun && at !== '10', 'data-sf-start="1"')
             + (full ? chip('10', !S.shotgun && at === '10', 'data-sf-start="10"') : '')
-            + chip('Shotgun', S.shotgun, 'data-sf-start="shotgun"') + '</span></div>';
-        if (S.shotgun) h += '<div class="sf-note">Shotgun: Group 1 goes off hole 1, Group 2 hole 2, and so on. You can change a group’s hole on the share screen.</div>';
-        return h + '</div>';
+            + chip('Shotgun', S.shotgun, 'data-sf-start="shotgun"') + '</span></div></div>';
+        if (S.shotgun) h += '<div class="sf-note" style="margin:-4px 2px 10px;">Shotgun: Group 1 goes off hole 1, Group 2 hole 2, and so on.</div>';
+        return h;
     }
     function step1() {
         locate();
         var all = S.gpsFiles ? courses() : [], q = S.q.toLowerCase(), key = courseKey();
-        var body = '<input type="search" class="sf-search" id="sf-q" placeholder="🔍 Search courses" value="' + esc(S.q) + '" autocomplete="off">';
+        var body = '<input type="search" class="sf-search" id="sf-q" placeholder="🔍 Search courses" value="' + esc(S.q) + '" autocomplete="off" style="margin-bottom:12px;">';
         if (q.length >= 2) {
             var hits = all.filter(function (c) { return c.name.toLowerCase().indexOf(q) !== -1 || String(c.city || '').toLowerCase().indexOf(q) !== -1; })
                 .sort(function (a, b) { return (b.ready - a.ready) || (a.name.toLowerCase().indexOf(q) - b.name.toLowerCase().indexOf(q)); }).slice(0, 10);
             body += '<div class="sf-h">RESULTS</div>' + (hits.length ? hits.map(function (c) { return rowHtml(c, distTo(c), c.key === key); }).join('') : '<div class="sf-note">No course in the list by that name.</div>');
         }
-        body += courseCard();
-        if (q.length < 2) {
+        if (!S.changing) body += courseCard();
+        if (q.length < 2 && (S.changing || !courseName())) {
             body += '<div class="sf-h">NEAR YOU</div>';
             if (S.near === 'asking' || S.near === null) body += '<div class="sf-note">Finding courses near you…</div>';
             else if (S.near === 'none') body += '<div class="sf-note">Turn on location to see courses near you. Search works without it.</div>';
             else if (!S.near.length) body += '<div class="sf-note">No courses we know of within 25 miles — search above.</div>';
-            else body += S.near.filter(function (x) { return x.c.key !== key; }).slice(0, 6).map(function (x) { return rowHtml(x.c, x.d, false); }).join('');
+            else body += S.near.slice(0, 6).map(function (x) { return rowHtml(x.c, x.d, x.c.key === key); }).join('');
         }
         body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Search online or add a course ›</button>';
-        return shell('Where are you playing?', body, '<button type="button" class="sf-cta" data-sf="next"' + (courseName() ? '' : ' disabled') + '>Next: Players ›</button>', 1);
+        var ok = courseName() ? '' : ' disabled';
+        var foot = S.mode === 'gps'
+            ? '<button type="button" class="sf-cta lime" data-sf="startgps"' + (ok || (S.saving ? ' disabled' : '')) + '>' + (S.saving ? 'Starting…' : '📍 Start GPS') + '</button>' + (S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '')
+            : '<button type="button" class="sf-cta" data-sf="next"' + ok + '>Next: Players ›</button>';
+        return shell('Where are you playing?', body, foot, S.mode === 'gps' ? 0 : 1);
     }
     function rowHtml(c, d, on) {
         return '<button type="button" class="sf-row' + (on ? ' sf-sel' : '') + '" data-sf-course="' + esc(c.key) + '" data-sf-name="' + esc(c.name) + '"><span class="n">' + esc(nameOf(c)) + '</span>'
@@ -324,6 +379,11 @@
             h += '<div class="sf-line"><span class="l">Flights</span><span class="sf-chips"><span class="sf-chip on">A ' + a + '</span><span class="sf-chip on">B ' + (ps.length - a) + '</span></span></div>';
         } else if (ps.length >= 8) {
             h += '<div class="sf-line"><span class="l">Flights</span><button type="button" class="sf-btn" data-sf="split">Split A / B by handicap</button></div>';
+        }
+        var tsel = $('tee-rating-select'), topt = tsel && tsel.selectedIndex >= 0 ? tsel.options[tsel.selectedIndex] : null;
+        if (topt && topt.value) {
+            var tname = teeRows(courseKey()).filter(function (r) { return r.key === topt.value; })[0];
+            h += '<div class="sf-line"><span class="l">Tees</span><span>' + esc(tname ? tname.name : topt.textContent) + ' for all \u00b7 <button type="button" class="sf-link" data-sf="mix" style="padding:0;min-height:0;">Mix</button></span></div>';
         }
         h += '<div class="sf-line"><span class="l">Handicaps</span><span>' + (withHcp === ps.length ? '✓ all ' + ps.length : withHcp + ' of ' + ps.length + ' · <button type="button" class="sf-link" data-sf="roster" style="padding:0;min-height:0;">add</button>') + '</span></div>';
         var me = meDefault(ps);
@@ -419,8 +479,9 @@
             + '<div class="sf-line"><span class="l">Scoring</span><span class="sf-seg"><button type="button" data-sf-scoring="net" class="' + (S.scoring === 'net' ? 'on' : '') + '">Net</button><button type="button" data-sf-scoring="gross" class="' + (S.scoring === 'gross' ? 'on' : '') + '">Gross</button></span></div>'
             + '<div class="sf-line"><button type="button" class="sf-link" data-sf="more" style="color:#334;font-weight:600;">More options</button><span class="sf-note">' + (S.moreOpen ? 'hide ˄' : 'payouts, carry ›') + '</span></div>'
             + (S.moreOpen ? moreBox() : '') + '</div>'
+            + '<div class="sf-note" style="text-align:center;margin:4px 8px 8px;">Side bets get added during the round with + Bet (any hole, even ones already played)</div>'
             + (S.err3 ? '<div class="sf-err">' + esc(S.err3) + '</div>' : '');
-        var foot = '<button type="button" class="sf-cta lime" data-sf="start"' + (S.saving ? ' disabled' : '') + '>' + (S.saving ? 'Starting…' : 'Start round ▶') + '<span class="sub">' + (picked.length ? 'Group links are ready to share' : 'Just scores — add a game any time') + '</span></button>';
+        var foot = '<button type="button" class="sf-cta lime" data-sf="start"' + (S.saving ? ' disabled' : '') + '>' + (S.saving ? 'Starting…' : 'Start round ▶') + '<span class="sub">' + (picked.length ? 'Share group links \u2192 opens GPS' : 'Just scores \u2014 add a game any time') + '</span></button>';
         return shell('What are you playing?', body, foot, 3);
     }
     function moreBox() {
@@ -517,16 +578,35 @@
         var bad = ['nassau', 'match', 'hilo'].filter(function (k) { return S.games[k] && (k !== 'hilo' || hiloHere()) && !sides(k, players()); });
         if (bad.length) { S.err3 = 'Pick who’s in the ' + bad.map(function (k) { return k === 'hilo' ? 'Hi-Lo' : k.replace(/^\w/, function (c) { return c.toUpperCase(); }); }).join(' and ') + '.'; render(); return; }
         apply();
+        runSave('err3');
+    }
+    function runSave(errKey) {
         hookSave();
         var save = fn('saveSettings');
-        if (!save) { S.err3 = 'Round Setup is not ready — reload and try again.'; render(); return; }
+        if (!save) { S[errKey] = 'Round Setup is not ready \u2014 reload and try again.'; render(); return; }
         S.saving = true; render();
         var pr;
-        try { pr = save(); } catch (e) { S.saving = false; S.err3 = 'Could not start: ' + (e && e.message || e); render(); return; }
+        try { pr = save(); } catch (e) { S.saving = false; S[errKey] = 'Could not start: ' + (e && e.message || e); render(); return; }
         Promise.resolve(pr).then(function () {
             // A refusal (a sentence in a dialog) gives the button back; a write in flight keeps it.
             setTimeout(function () { var b = $('main-save-btn'); if (!S.saved && !(b && b.disabled)) { S.saving = false; render(); } }, 400);
-        }, function (e) { S.saving = false; S.err3 = 'Could not start: ' + (e && e.message || e); render(); });
+        }, function (e) { S.saving = false; S[errKey] = 'Could not start: ' + (e && e.message || e); render(); });
+    }
+    // THE GPS DOOR: Course & Tees, then "Start GPS" - the round is saved with you as its golfer
+    // (Round Setup's own save, as the old GPS quick start did) and the map opens. Games: + Bet.
+    function startGps() {
+        S.err1 = '';
+        if (!courseName()) return;
+        var boxes = D.querySelectorAll('#player-list .p-name-input');
+        var named = Array.prototype.some.call(boxes, function (i) { return String(i.value || '').trim(); });
+        if (!named) {
+            if (!boxes.length && fn('addNewPlayerAndRefresh')) W.addNewPlayerAndRefresh();
+            var f = D.querySelector('#player-list .p-name-input'), H = HD();
+            if (f) f.value = (typeof H.meName === 'function' ? H.meName() : '') || 'Me';
+        }
+        var first1 = players()[0];
+        S.meName = first1 ? first1.name.trim() : 'Me';
+        runSave('err1');
     }
 
     // ---- THE SHARE SHEET, THEN DONE -----------------------------------------------
@@ -546,6 +626,7 @@
             try { currentSavedRound = S.round; } catch (e) {}
             shotgun();
             remember();
+            if (S.mode === 'gps') { done(); return; }
             render();
         };
         W.__sfRound = null;
@@ -612,7 +693,7 @@
     }
     function done() {
         var m = meIn(), d = S.round || {};
-        var gps = ready(courseKey() || d.activeCourseKey);
+        var gps = S.mode === 'gps' || ready(courseKey() || d.activeCourseKey);
         ls('hardpan_round_side', (gps ? 'gps|' : 'bets|') + S.code);
         ss(MARK, null);
         var h = 'index.html?game=' + encodeURIComponent(S.code) + (m.group ? '&group=' + m.group : '') + (m.me ? '&me=' + encodeURIComponent(m.me.id) : '');
@@ -641,8 +722,15 @@
     function onClick(ev) {
         var t = ev.target, b;
         if (!t || !t.closest) return;
-        if ((b = t.closest('[data-sf-course]'))) { pick(b.getAttribute('data-sf-course'), b.getAttribute('data-sf-name')); S.q = ''; render(); return; }
-        if ((b = t.closest('[data-sf-tee]'))) { setVal('tee-rating-select', b.getAttribute('data-sf-tee')); if (fn('applySelectedTee')) W.applySelectedTee(); render(); return; }
+        if ((b = t.closest('[data-sf-course]'))) { pick(b.getAttribute('data-sf-course'), b.getAttribute('data-sf-name')); S.q = ''; S.changing = false; render(); el().scrollTop = 0; return; }
+        if ((b = t.closest('[data-sf-tee]'))) {
+            var tk = b.getAttribute('data-sf-tee'), tr = teeRows(courseKey()).filter(function (x) { return x.key === tk; })[0];
+            setVal('tee-rating-select', tk); if (fn('applySelectedTee')) W.applySelectedTee();
+            if (tr) ls(TEE_MEM + courseKey(), tr.name);
+            S.teeChosen = courseKey();
+            if (fn('refreshRowTeeControls')) try { W.refreshRowTeeControls(); } catch (e) {}
+            render(); return;
+        }
         if ((b = t.closest('[data-sf-nine]'))) { setVal(b.getAttribute('data-sf-nine') + '-nine-select', b.getAttribute('data-v'), true); render(); return; }
         if ((b = t.closest('[data-sf-start]'))) {
             var v = b.getAttribute('data-sf-start');
@@ -681,6 +769,9 @@
             return;
         }
         if (a === 'next') { S.err2 = ''; if (S.step === 1 && !courseName()) return; if (S.step === 2 && !players().length) { S.err2 = 'Paste or type who’s playing.'; render(); return; } if (S.step === 2 && dupList().length) { S.dupOpen = true; S.err2 = 'Two golfers have the same name \u2014 add an initial first.'; render(); return; } go(S.step + 1); return; }
+        if (a === 'change') { S.changing = true; render(); var q = $('sf-q'); if (q) q.focus(); return; }
+        if (a === 'startgps') { startGps(); return; }
+        if (a === 'mix') { away(step('players'), 'Tees set'); return; }
         if (a === 'fullcourse') { away(step('course'), 'Course picked'); return; }
         if (a === 'roster') { away(step('players'), 'Roster done'); return; }
         if (a === 'moregames') { apply(); away(step('action'), 'Games done'); return; }
@@ -771,11 +862,11 @@
         var m = claim(code);
         if (!m) return;
         if (!switchOn()) { ss(MARK, null); return; }
-        S.mode = m.mode === 'same' ? 'same' : 'new';
+        S.mode = m.mode === 'same' || m.mode === 'gps' ? m.mode : 'new';
         S.code = code;
         // Painted at once (the wizard boots underneath); the steps fill in when it is up.
         show(true);
-        el().innerHTML = shell(S.mode === 'same' ? 'Same as last week' : 'New round', '<div class="sf-note">Getting things ready…</div>', '', S.mode === 'same' ? 3 : 1);
+        el().innerHTML = shell(S.mode === 'same' ? 'Same as last week' : S.mode === 'gps' ? 'Where are you playing?' : 'New round', '<div class="sf-note">Getting things ready…</div>', '', S.mode === 'same' ? 3 : 1);
         whenReady(m, function () {
             hookSave();
             readBack();

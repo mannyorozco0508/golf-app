@@ -99,33 +99,46 @@
   .hs-join button { height: 50px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--hp-green); color: #fff; font-size: 16px; font-weight: 800; font-family: inherit; cursor: pointer; }
   .hs-join .hint { font-size: 13px; color: var(--hp-muted); line-height: 1.4; }
   #hs-progress .hp-resume { margin: 0; } #hs-progress .hp-note { margin: 6px 0 0 !important; }
-  .hs-prog { display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left; background: #fff; border: 1px solid var(--hp-line); border-radius: 16px; padding: 14px 16px; font-family: inherit; cursor: pointer; color: var(--hp-text); }
+  .hs-prog.x { display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left; background: #fff; border: 1px solid var(--hp-line); border-radius: 16px; padding: 14px 16px; font-family: inherit; cursor: pointer; color: var(--hp-text); }
   .hs-prog .h { font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--hp-muted); }
   .hs-prog .r { display: flex; justify-content: space-between; align-items: center; gap: 10px; } .hs-prog .n { font-size: 17px; font-weight: 800; } .hs-prog .go { font-size: 16px; font-weight: 800; color: var(--hp-green); white-space: nowrap; }
   .hs-more { margin-top: auto; padding-top: 18px; }
   .hs-more .h { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--hp-muted); text-align: center; margin-bottom: 6px; }
   .hs-more .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
   .hs-more button { border: 1px solid var(--hp-line); background: #fff; border-radius: 999px; padding: 8px 14px; min-height: 40px; font-size: 14px; font-weight: 700; font-family: inherit; color: var(--hs-ink); cursor: pointer; }
+  .hs-door { min-height: 190px; margin-bottom: 12px; justify-content: flex-end; }
+  .hs-door .hs-ic { font-size: 40px; line-height: 1; } .hs-door .t { font-size: 32px; } .hs-door .d { font-size: 15px; }
+  .hp-door.gps.hs-door { background: linear-gradient(160deg, #2d6a4f, #0f4c3a); } .hp-door.games.hs-door { background: #1d2f4f; }
+  .hs-card { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; background: #fff; border: 1px solid var(--hp-line); border-radius: 16px; padding: 12px 16px; font-family: inherit; cursor: pointer; color: var(--hp-text); margin-bottom: 10px; }
+  .hs-card .h { display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--hp-muted); } .hs-card .n { display: block; font-size: 17px; font-weight: 800; margin-top: 2px; } .hs-card .go { font-size: 17px; font-weight: 800; color: var(--hp-green); white-space: nowrap; text-align: center; }
+  .hs-slim { text-align: center; font-size: 14px; color: var(--hp-green); margin-top: 6px; }
+  .hs-slim button { border: 0; background: none; color: var(--hp-green); font-weight: 800; font-size: 14px; font-family: inherit; padding: 8px 2px; min-height: 40px; cursor: pointer; }
+  #v-simple .hs-hello { font-size: 24px; margin: 18px 0 6px; }
 </style>
 </head>
 <body>
 <!-- SIMPLER HARDPAN HOME (mailbox 017): four doors + Resume. Shown instead of MAIN when
      features.simpleFlow is on (front-door.js simpleView); off, MAIN below exactly as before. -->
 <div class="hp-view" id="v-simple">
-  <div class="hs-hello" id="hs-hello">Good morning</div>
+  <div class="hs-hello" id="hs-hello">HardPan</div>
+  <!-- URGENT-013 (setup v2): the original two doors. Both open the one Course & Tees screen
+       (simple-flow.js); GPS: "Start GPS" -> the map; Games & Bets: Players -> Games -> Start. -->
+  <button type="button" class="hp-door gps hs-door" data-hp-act="sgpsdoor">
+    <span class="hs-ic" aria-hidden="true">&#x1F4CD;</span>
+    <span><span class="t">GPS</span><br><span class="d">Yardages for your round &middot; add games anytime</span></span>
+  </button>
+  <button type="button" class="hp-door games hs-door" data-hp-act="snew">
+    <span class="hs-ic" aria-hidden="true">&#x1F3B2;</span>
+    <span><span class="t">Games &amp; Bets</span><br><span class="d">Set up the group, games and money</span></span>
+  </button>
   <div id="hs-same" style="display:none;"></div>
-  <button type="button" class="hs-new" data-hp-act="snew">+ New round</button>
-  <button type="button" class="hs-out" data-hp-act="sjoinopen">Join with a code</button>
+  <div id="hs-progress"></div>
   <div class="hs-join" id="hs-join" style="display:none;">
     <div class="row"><input type="text" id="hs-code" placeholder="Code, link or QR" aria-label="Game code, link or QR" maxlength="300" autocapitalize="characters" autocorrect="off" spellcheck="false"><button type="button" data-hp-act="sjoin">Join</button></div>
     <div class="hint">The code (QNXF83), the code and your group (QNXF83 2), or paste the link. A QR: point the camera at it - it opens the round.</div>
     <div id="hs-code-msg" class="hp-status" role="status"></div>
   </div>
-  <button type="button" class="hs-out" data-hp-act="sgps">📍 Just GPS (no games)</button>
-  <div id="hs-progress"></div>
-  <div class="hs-more"><div class="h">MORE</div><div class="row">
-    <button type="button" data-hp-act="strip">Trip</button><button type="button" data-hp-act="shistory">History</button><button type="button" data-hp-act="show">How it works</button><button type="button" data-hp-act="sstats">My stats</button>
-  </div></div>
+  <div class="hs-slim"><button type="button" data-hp-act="sjoinopen">Join with a code</button> &middot; <button type="button" data-hp-act="strip">Trip</button> &middot; <button type="button" data-hp-act="shistory">History</button><span data-hs-stats> &middot; <button type="button" data-hp-act="sstats">My stats</button></span></div>
 </div>
 
 <!-- MAIN: two doors -->

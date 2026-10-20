@@ -1038,7 +1038,7 @@
     function simpleView() {
         var v = $('v-simple');
         if (!v) return;
-        var hi = $('hs-hello'); if (hi) hi.textContent = hello();
+        var hi = $('hs-hello'); if (hi) hi.textContent = 'HardPan';
         // GPS-1 and Games (History) get a way back to this Home.
         ['gps', 'games'].forEach(function (n) {
             var view = $('v-' + n);
@@ -1049,7 +1049,7 @@
         // The IN PROGRESS card is mainDecor's Resume (one painter), moved here once.
         var prog = $('hs-progress'), res = $('hp-resume');
         if (prog && res && res.parentNode !== prog) prog.appendChild(res);
-        var st = W.document.querySelector('[data-hp-act="sstats"]');
+        var st = W.document.querySelector('[data-hs-stats]');
         if (st) st.style.display = W.HardPanGpsStats && typeof W.HardPanFeature === 'function' && W.HardPanFeature('quickStats') ? '' : 'none';
         simpleSame();
     }
@@ -1063,8 +1063,8 @@
             if (!d || !ps.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
             var g = gamesOf(d);
             box.style.display = '';
-            box.innerHTML = '<button type="button" class="hs-same" data-hp-act="ssame" data-hs-from="' + esc(last) + '"><span class="t">↻ Same as last week</span>'
-                + '<span class="s">' + esc(shownName(String(d.courseName || 'Your last round').split(' (')[0])) + ' · ' + ps.length + ' golfer' + (ps.length === 1 ? '' : 's') + (g.length ? ' · ' + esc(g.join(' + ')) : '') + '</span></button>';
+            box.innerHTML = '<button type="button" class="hs-card hs-same-card" data-hp-act="ssame" data-hs-from="' + esc(last) + '"><span><span class="h">LAST WEEK</span>'
+                + '<span class="n">' + esc(shownName(String(d.courseName || 'Your last round').split(' (')[0])) + ' \u00b7 ' + ps.length + (g.length ? ' \u00b7 ' + esc(g.join(' + ')) : '') + '</span></span><span class="go">\u21BB<br>Again</span></button>';
         };
         if (!last) { paint(null); return; }
         var local = localRound(last);
@@ -1073,13 +1073,15 @@
         timeout(H.db.ref('events/' + last).once('value'), 6000, 'round').then(function (s) { var d = s && s.val ? s.val() : null; if (d || !local) paint(d); }, function () {});
     }
     function simpleProgress(code, course, thru) {
-        return '<button type="button" class="hs-prog" data-hp-open="' + esc(code) + '"><span class="h">IN PROGRESS</span>'
-            + '<span class="r"><span class="n">' + esc(shownName(String(course || 'Your round').split(' (')[0])) + ' · ' + (thru ? 'Thru ' + thru : 'Not started') + '</span><span class="go">Resume ›</span></span></button>';
+        return '<button type="button" class="hs-card hs-prog" data-hp-open="' + esc(code) + '"><span><span class="h">IN PROGRESS</span>'
+            + '<span class="n">' + esc(shownName(String(course || 'Your round').split(' (')[0])) + ' \u00b7 ' + (thru ? 'Thru ' + thru : 'Not started') + '</span></span><span class="go">Resume \u203A</span></button>';
     }
     function simpleAct(a, b) {
         if (a === 'snew') { ss(QUICK, null); ss(SIMPLE, 'new'); W.location.href = 'admin.html?start=quick'; return true; }
         if (a === 'ssame') { ss(QUICK, null); ss(SIMPLE, 'same'); W.location.href = 'admin.html?start=same'; return true; }
-        if (a === 'sjoinopen') { var jb = $('hs-join'); if (jb) { jb.style.display = ''; b.style.display = 'none'; var ji = $('hs-code'); if (ji) ji.focus(); } return true; }
+        if (a === 'sjoinopen') { var jb = $('hs-join'); if (jb) { jb.style.display = jb.style.display === 'none' ? '' : 'none'; var ji = $('hs-code'); if (ji && jb.style.display === '') ji.focus(); } return true; }
+        // THE GPS DOOR (URGENT-013): the one Course & Tees screen, then "Start GPS" -> the map.
+        if (a === 'sgpsdoor') { gpsGate(homeCourse(), function () { setDoor('gps'); ss(QUICK, null); ss(SIMPLE, 'gps'); W.location.href = 'admin.html?start=quick'; }); return true; }
         if (a === 'sjoin') { join('hs-code', 'hs-code-msg'); return true; }
         if (a === 'sgps') { gpsGate(homeCourse(), function () { setDoor('gps'); show('gps'); }); return true; }
         if (a === 'shome') { show('simple'); mainDecor(); return true; }
