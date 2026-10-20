@@ -400,6 +400,9 @@
 				AA0220000000000000000007 /* HardPanRoundAttributes.swift in Sources */,
 				AA0220000000000000000008 /* HardPanLiveActivityPlugin.swift in Sources */,
 				AA0220000000000000000009 /* HardPanBridgeViewController.swift in Sources */,
+				D022A000000000000000006A /* WatchProtocol.swift in Sources */,
+				D022A000000000000000006C /* HardPanWatchPlugin.swift in Sources */,
+				D022A000000000000000006D /* PhoneWatchSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -409,9 +412,6 @@
 			files = (
 				AA022000000000000000000A /* HardPanRoundAttributes.swift in Sources */,
 				AA022000000000000000000B /* HardPanLiveActivityWidget.swift in Sources */,
-				D022A000000000000000006A /* WatchProtocol.swift in Sources */,
-				D022A000000000000000006C /* HardPanWatchPlugin.swift in Sources */,
-				D022A000000000000000006D /* PhoneWatchSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
