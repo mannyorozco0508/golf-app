@@ -199,7 +199,9 @@
     function HC() { return W.HardPanCourse || null; }
     function courses() { var c = HC(); try { return c ? c.list() : []; } catch (e) { return []; } }
     function nearList(here) { var c = HC(); try { return c && here ? c.near(here, 9) : []; } catch (e) { return []; } }
-    function nameOf(c) { var H = HD(); return typeof H.shownName === 'function' ? H.shownName(c.name) : c.name; }
+    // POLISH #22 (map helper, SHARED): a trailing "(Papago)" that repeats the name is dropped (gps-round.js tidyCourse).
+    function dropRepeat(n) { var s = String(n == null ? '' : n), m = /^(.*\S)\s*\(([^()]+)\)\s*$/.exec(s.trim()); if (!m) return s; var w = function (t) { return String(t).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean); }, h = w(m[1]), t = w(m[2]); return t.length && t.every(function (x) { return h.indexOf(x) >= 0; }) ? m[1] : s; }
+    function nameOf(c) { var H = HD(); return dropRepeat(typeof H.shownName === 'function' ? H.shownName(c.name) : c.name); }
     function readyOf(key) { var c = HC(); try { return !!(c && key && c.resolve(key).hasGps); } catch (e) { return false; } }
     function distTo(c) { var H = HD(); return S.here && c.pt && typeof H.miles === 'function' ? H.miles(S.here, c.pt) : null; }
     function miStr(d) { return d == null ? '' : (d < 10 ? d.toFixed(1) : Math.round(d)) + ' mi'; }

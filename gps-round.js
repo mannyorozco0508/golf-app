@@ -49,6 +49,15 @@
     function gpsUp() { var g = G(); return !!(g && g.isMounted && g.isMounted()); }
     function base() { try { return typeof shareBaseUrl === 'function' ? shareBaseUrl() : ''; } catch (e) { return ''; } }
     function roundUrl() { return base() + 'index.html?game=' + encodeURIComponent(code() || ''); }
+    // POLISH #22: "Papago Golf Club (Papago)" -> "Papago Golf Club" - a trailing "(Name)" that only
+    // repeats words already in the name goes; "(Championship)", "(South - Piipaash)" stay.
+    function tidyCourse(name) {
+        var s = String(name == null ? '' : name).trim(), m = /^(.*\S)\s*\(([^()]+)\)\s*$/.exec(s);
+        if (!m) return s;
+        var words = function (t) { return String(t).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean); };
+        var head = words(m[1]), tail = words(m[2]);
+        return tail.length && tail.every(function (w) { return head.indexOf(w) >= 0; }) ? m[1] : s;
+    }
     function say(t) { try { if (typeof uiToast === 'function') uiToast(t); } catch (e) {} }
 
     var FONT = '-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif';
@@ -61,7 +70,7 @@
         + '.hp-sheet .hs-grab{width:44px;height:5px;border-radius:3px;background:#cfd8d3;margin:2px auto 10px;}'
         + '.hp-sheet .hs-head{display:flex;align-items:center;gap:8px;margin:2px 0 14px;}'
         + '.hp-sheet .hs-title{flex:1;font:800 22px/1.2 ' + FONT + ';}'
-        + '.hp-sheet .hs-mtitle{display:flex;align-items:center;gap:8px;min-width:0;}.hp-sheet .hs-course{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+        + '.hp-sheet .hs-mtitle{display:flex;align-items:center;gap:8px;min-width:0;}.hp-sheet .hs-course{min-width:0;overflow-wrap:anywhere;}'
         + '.hp-sheet .hs-codechip{flex:0 0 auto;font:800 13px/1 ' + FONT + ';letter-spacing:.06em;background:#0f4d3a;color:#fff;border-radius:999px;padding:6px 10px;}'
         + '.hp-sheet .hs-x{border:0;background:#e3e9e5;color:#0f3d2e;border-radius:999px;min-width:40px;height:40px;font:800 18px/1 ' + FONT + ';cursor:pointer;}'
         + '.hp-sheet .hs-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;}'
@@ -167,8 +176,9 @@
         if (!on() || !code()) return false;
         if (!again) stack = [];
         var d = data() || {};
-        // The course on one line (ellipsis), the code beside it in its own chip (the mockup).
-        var html = '<div class="hs-head"><div class="hs-title hs-mtitle"><span class="hs-course">' + esc(d.courseName || d.eventName || 'This round') + '</span>'
+        // The course, the code beside it in its own chip (the mockup). POLISH #22: the name WRAPS (it
+        // was cut to "Papago Golf Club (P…") and a "(Papago)" that repeats it is dropped.
+        var html = '<div class="hs-head"><div class="hs-title hs-mtitle"><span class="hs-course">' + esc(tidyCourse(d.courseName || d.eventName || 'This round')) + '</span>'
             + '<span class="hs-codechip">' + esc(code()) + '</span></div><button type="button" class="hs-x" data-hs="close" aria-label="Close">✕</button></div>'
             + '<div class="hs-tiles">' + TILES.filter(function (t) { return t.k !== 'gps' || gpsUp(); }).map(function (t) {
                 return '<button type="button" class="hs-tile" data-hs-tile="' + t.k + '"><b>' + t.ico + ' ' + esc(t.t) + '</b><span>' + esc(t.s) + '</span></button>';
