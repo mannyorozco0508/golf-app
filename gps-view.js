@@ -4426,6 +4426,8 @@
         // THE SLOT for "Track stats for others" (gps-012s, HardPanGpsStats.trackOthers / setTrackOthers):
         // shown only when that API is in the page.
         +   '<div class="gps-ts-row" data-ts-row="others"><span>Track stats for others</span><button type="button" class="gps-ts-sw" data-ts-sw="others" role="switch" aria-label="Track stats for others"><i></i></button></div>'
+        // 020: "Practice round" (gps-stats.js setPractice, per round): nothing from this round goes into My stats.
+        +   '<div class="gps-ts-row" data-ts-row="practice"><span>Practice round<span style="display:block;font-size:12px;font-weight:600;opacity:.75;">Nothing from this round goes into My stats</span></span><button type="button" class="gps-ts-sw" data-ts-sw="practice" role="switch" aria-label="Practice round"><i></i></button></div>'
         + '</div>'
         + '<div class="gps-ts-h">MORE</div><div class="gps-ts-grid">'
         + TS_TILES.map(function (t) { return '<button type="button" class="gps-ts-tile" data-ts-tile="' + t[0] + '"><span class="gps-ts-ico" aria-hidden="true">' + t[1] + '</span><span>' + t[2] + '</span></button>'; }).join('')
@@ -4447,6 +4449,8 @@
         sw('aa', aaOn(), !!S.el.querySelector('.gps-aa-toggle'));
         var H = tsStats();
         sw('others', H ? H.trackOthers() : false, !!H);
+        var PS = window.HardPanGpsStats, pc = String(S.eventCode || '');
+        sw('practice', !!(PS && PS.practiceOn && pc && PS.practiceOn(pc)), !!(PS && PS.setPractice && pc));
         Array.prototype.forEach.call(t.querySelectorAll('[data-ts-tile]'), function (b) {
             var m = S.el.querySelector('.gps-tools-menu ' + b.getAttribute('data-ts-tile'));
             b.style.display = m && m.style.display !== 'none' ? '' : 'none';
@@ -4483,6 +4487,7 @@
             if (w === 'tourney') tsRun('.gps-tourney-toggle');
             else if (w === 'aa') tsRun('.gps-aa-toggle');
             else if (w === 'others') { var H = tsStats(); if (H) { H.setTrackOthers(!H.trackOthers()); tsSync(); } }
+            else if (w === 'practice') { var P = window.HardPanGpsStats, c = String(S.eventCode || ''); if (P && P.setPractice && c) { P.setPractice(c, !P.practiceOn(c)); tsSync(); } }
             return;
         }
         if ((b = t.closest('[data-ts-tile]'))) {

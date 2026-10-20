@@ -166,8 +166,17 @@
             tee: { name: String(t.teeName || t.name || ''), slope: num(t.slope), rating: num(t.courseRating), par: num(t.par) }, holes: holes };
     }
     // Called by the scorecard on every render. Writes only when something changed.
+    // 020: a round kept out of My stats (gps-stats.js: hardpan_nostats_<code> = practice / removed).
+    function skippedRound(code) { var s = ls(); if (!s || !code) return false; try { return !!s.getItem('hardpan_nostats_' + code); } catch (e) { return false; } }
+    function removeRound(code) {
+        var st = readStore(), n = st.rounds.length;
+        st.rounds = st.rounds.filter(function (r) { return !r || String(r.code) !== String(code); });
+        return st.rounds.length !== n ? writeStore(st) : false;
+    }
+    function clear() { var s = ls(); if (!s) return false; try { s.removeItem(KEY); return true; } catch (e) { return false; } }
     function noteRound(code, data, meId) {
         if (!featureOn()) return false;
+        if (skippedRound(code)) return false;
         var rec = roundRecord(code, data, meId);
         if (!rec) return false;
         var st = readStore(), at = -1;
@@ -309,7 +318,7 @@
 
     var api = { r1: r1, table: table, indexFrom: indexFrom, courseHandicap: courseHandicap, strokesOnHole: strokesOnHole, holeMax: holeMax,
         skipReason: skipReason, differential: differential, compute: compute, fmt: fmt, roundRecord: roundRecord,
-        noteRound: noteRound, rounds: rounds, current: current, ownName: ownName, gate: gate,
+        noteRound: noteRound, rounds: rounds, current: current, ownName: ownName, gate: gate, removeRound: removeRound, clear: clear,
         showInAccount: showInAccount, syncChips: syncChips, WORDS: WORDS, KEY: KEY, LABEL: LABEL };
     W.HardPanIndex = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
