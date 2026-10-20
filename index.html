@@ -2478,7 +2478,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     const hpSpectateParam = urlParams.get('spectate') === '1';
     let hpKeyState = 'none';            // 'none' | 'pending' | 'ok' | 'bad'
     let hpKeyFor = null;
-    function hpSpectating() { return window.__hpReadOnly === true || (hpSpectateParam && !hasGroupLock && !(typeof canReachSetup === 'function' && canReachSetup())); }
+    // 2.0 POLISH #9: ?spectate=1 is READ-ONLY for everyone, the round's organizer included. Home's
+    // Join asks "Which group are you in?" first, so this link is only ever "Just watching" (or a
+    // leaderboard / spectator link). Before, the owner's phone kept full scoring here and Save wrote.
+    function hpSpectating() { return window.__hpReadOnly === true || (hpSpectateParam && !hasGroupLock); }
     window.hpSpectating = hpSpectating;
     // THE TEE MOVED (gps-start10, 2026-10-14): Round Setup saved "Start on 10" (or this group's own
     // tee) while the round was open on 1. Before anyone has a score, the card - and GPS with it -

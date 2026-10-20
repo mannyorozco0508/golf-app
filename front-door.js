@@ -1082,12 +1082,13 @@
             var d = s && typeof s.val === 'function' ? s.val() : null;
             return joinProblem(j, d).then(function (why) {
                 if (why) { forgetRound(j.code, false); say(why, true); return; }
+                if (j.bare) { say(''); joinAsk(j, d); return; }   // 2.0 polish #9: which group, or just watching
                 W.location.href = joinHref(j, d);
             });
         }, function () {
             // No answer (no signal): a round this phone already has a copy of still opens (the
             // offline round is a feature); one it has never seen cannot - it would never load.
-            if (ls('golfapp_snap_v1_' + j.code)) { W.location.href = j.href; return; }
+            if (ls('golfapp_snap_v1_' + j.code)) { var lc = j.bare ? localRound(j.code) : null; if (lc) { say(''); joinAsk(j, lc.data); return; } W.location.href = j.href; return; }
             say('Couldn\u2019t reach round ' + j.code + ' \u2014 check your signal and try again.', true);
         });
     }
@@ -1113,9 +1114,18 @@
         if (lr && String(lr.code) === String(code)) {
             if (lr.group) h += '&group=' + encodeURIComponent(lr.group);
             if (lr.sk) h += '&sk=' + encodeURIComponent(lr.sk);
-            if (lr.spectate) h += '&spectate=1';
+            // A watcher resumes watching (read-only). Not this phone's OWN round: a round its organizer
+            // opened by the bare code before Join asked for a group (2.0 polish #9) goes back as the
+            // organizer's, not as a locked spectator view.
+            if (lr.spectate && !ownRound(code)) h += '&spectate=1';
         }
         return h;
+    }
+    function ownRound(code) {
+        try {
+            var uid = (W.authBootState || {}).uid, sn = JSON.parse(ls('golfapp_snap_v1_' + String(code).toUpperCase()) || 'null');
+            return !!(uid && sn && sn.data && sn.data.ownerUid && sn.data.ownerUid === uid);
+        } catch (e) { return false; }
     }
     function activeRound() {
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
@@ -1246,6 +1256,60 @@
             box.innerHTML = tile(d.courseName, pr.thru);
         }, function () {});
     }
+    // ---- JOIN WITH A BARE CODE ASKS WHICH GROUP (2.0 polish #9) ---------------------------------
+    // A bare code (or the whole-round link) used to open a spectator view straight away - with
+    // no question, and on the organizer's own phone a writable one. Now Home asks: each group with
+    // its golfers' names (-> that group's card), or "Just watching" (-> ?spectate=1, read-only).
+    function joinGroups(d) {
+        var ps = d && Array.isArray(d.players) ? d.players : [];
+        var b = [];
+        try { if (typeof W.computeGroupBoundaries === 'function') b = W.computeGroupBoundaries(ps.length, (d && d.groupSizeOverrides) || {}) || []; } catch (e) { b = []; }   /* grouping.js */
+        if (!b.length && ps.length) b = [{ group: 1, startIdx: 0, size: ps.length }];
+        return b.map(function (x) {
+            return { group: x.group, names: ps.slice(x.startIdx, x.startIdx + x.size).map(function (p) { return String((p && p.name) || '').trim(); }).filter(Boolean),
+                keyed: !!(d && d.scoreKeys && d.scoreKeys[String(x.group)]) };
+        });
+    }
+    function joinAsk(j, d) {
+        var doc = W.document, el = $('hp-join-ask');
+        if (!el) {
+            el = doc.createElement('div'); el.id = 'hp-join-ask'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+            el.style.cssText = 'position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);font-family:-apple-system,system-ui,sans-serif;';
+            (doc.body || doc.documentElement).appendChild(el);
+        }
+        var row = 'display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;text-align:left;border:1px solid #d0e1db;border-radius:14px;background:#fff;padding:12px 14px;font:inherit;color:#1a1a1a;cursor:pointer;margin-top:8px;';
+        var groups = joinGroups(d);
+        var many = groups.length > 1;
+        el.innerHTML = '<div style="width:100%;max-width:520px;box-sizing:border-box;max-height:88vh;overflow:auto;background:#f0f4f2;border-radius:18px 18px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 16px);">'
+            + '<div style="font-size:20px;font-weight:800;color:#12392e;">Which group are you in?</div>'
+            + '<div style="font-size:14px;color:#555;margin-top:4px;">' + esc(shownName(String((d && d.courseName) || '').split(' (')[0]) || 'Round') + ' · ' + esc(j.code) + '</div>'
+            + groups.map(function (g) {
+                return '<button type="button" data-hp-ja="' + g.group + '"' + (g.keyed ? ' data-hp-ja-keyed="1"' : '') + ' style="' + row + '">'
+                    + '<span style="font-size:17px;font-weight:800;">' + (many ? 'Group ' + g.group : 'I’m in this group') + '</span>'
+                    + '<span style="font-size:14px;color:#555;">' + esc(g.names.join(', ') || 'No golfers yet') + '</span>'
+                    + (g.keyed ? '<span style="font-size:13px;color:#8a5a00;">Has a scorekeeper code — type ' + esc(j.code + '-' + g.group + '-CODE') + ' or open your group’s link</span>' : '')
+                    + '</button>';
+            }).join('')
+            + '<button type="button" data-hp-ja="watch" style="' + row + '"><span style="font-size:17px;font-weight:800;">👀 Just watching</span><span style="font-size:14px;color:#555;">See the scores and the course. You can’t enter scores.</span></button>'
+            + '<button type="button" data-hp-ja="cancel" style="display:block;width:100%;min-height:48px;margin-top:10px;border:0;background:none;font:inherit;font-size:16px;font-weight:700;color:#0f4c3a;cursor:pointer;">Cancel</button>'
+            + '<div data-hp-ja-msg role="status" style="font-size:14px;color:#9b1c1c;min-height:0;"></div></div>';
+        el.style.display = 'flex';
+        el.onclick = function (ev) {
+            var b = ev.target && ev.target.closest ? ev.target.closest('[data-hp-ja]') : null;
+            if (!b) { if (ev.target === el) el.style.display = 'none'; return; }
+            var v = b.getAttribute('data-hp-ja');
+            if (v === 'cancel') { el.style.display = 'none'; return; }
+            if (v === 'watch') { W.location.href = 'index.html?game=' + encodeURIComponent(j.code) + '&spectate=1'; return; }
+            if (b.getAttribute('data-hp-ja-keyed') === '1') {
+                var m = el.querySelector('[data-hp-ja-msg]');
+                if (m) m.textContent = 'Group ' + v + ' keeps score with its own code. Type ' + j.code + '-' + v + '-<code> in Join, or open the Group ' + v + ' link from whoever set it up.';
+                return;
+            }
+            W.location.href = 'index.html?game=' + encodeURIComponent(j.code) + '&group=' + encodeURIComponent(v);
+        };
+        return el;
+    }
+
     // ---- SIMPLER HARDPAN: HOME (mailbox 017, features.simpleFlow) ---------------------
     // Four doors + Resume, from Manny's mockup (~/Desktop/claude-code-reports/017):
     //   ↻ Same as last week   (lime, big) last round's course · golfers · games -> Round Setup's own
@@ -1911,7 +1975,7 @@
             var st = d.createElement('style'); st.id = 'hp-spec-style';
             st.textContent = 'html.hp-spectating #setup-entry-mount,html.hp-spectating #end-round-mount,html.hp-spectating #fd-menu-games,html.hp-spectating #fd-gps3,'
                 + 'html.hp-spectating #gps-overlay .gps-door-add,html.hp-spectating #gps-overlay .gps-add-game,'
-                + 'html.hp-spectating .score-input-wrapper input:not([disabled]){display:none !important;}'
+                + 'html.hp-spectating .score-input-wrapper input:not([disabled]),html.hp-spectating #hp-card-bet .hp-bar-score{display:none !important;}'
                 + '#hp-spec-badge{position:fixed;z-index:2147482000;top:calc(env(safe-area-inset-top) + 6px);left:50%;transform:translateX(-50%);background:#1d3557;color:#fff;font:800 12px/1 -apple-system,system-ui,sans-serif;padding:6px 12px;border-radius:999px;letter-spacing:.04em;pointer-events:none;}';
             d.head.appendChild(st);
         }
@@ -2344,7 +2408,7 @@
         }, function () { return false; });
     }
 
-    W.HardPanDoors = { hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
+    W.HardPanDoors = { joinGroups: joinGroups, hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
         position: position, nearList: nearList, shownName: shownName, where: where, meName: meName, myHcp: myHcp, loadScriptTimed: loadScriptTimed, STATES: STATES, gamesOf: gamesOf, simpleOn: simpleOn,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         // URGENT-028: the round in progress as this phone has it (Start Round asks before replacing a scored one).
