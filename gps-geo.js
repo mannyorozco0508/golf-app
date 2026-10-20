@@ -823,7 +823,11 @@
     // short of the green, the detour at most 1.6x the straight line); a bend made from
     // the fairway or bunkers that turns less than 8 degrees is the straight line.
     // Pure: { pts: [tee, ..., green], src } or null.
-    var PATH_MIN_TURN_DEG = 8, PATH_MAX_DETOUR = 1.6, FLYOVER_MS = 5200, FLY_GLIDE_PITCH = 40;
+    var PATH_MIN_TURN_DEG = 8, PATH_MAX_DETOUR = 1.6, FLYOVER_MS = 5500, FLY_GLIDE_PITCH = 40;
+    // 023b (Manny: "the screen should be filled with the hole itself... like a low drone pass"): the
+    // flight's length by par (+ a short hold on the green), and the corridor it fills edge to edge:
+    // the fairway (its own outline, else ~40 yds) plus 25 yds of rough each side.
+    var FLYOVER_MS_BY_PAR = { 3: 3000, 4: 5500, 5: 7500 }, FLY_HOLD_MS = 1100, FLY_ROUGH_M = 25 * 0.9144, FLY_FAIRWAY_HALF_M = 18;
     function polyLen(pts) { var m = 0; for (var i = 1; i < pts.length; i++) m += haversineMeters(pts[i - 1], pts[i]); return m; }
     function turnAt(a, b, c) { var d = Math.abs(bearingDeg(b, c) - bearingDeg(a, b)) % 360; return d > 180 ? 360 - d : d; }
     function maxTurn(pts) { var m = 0; for (var i = 1; i + 1 < pts.length; i++) m = Math.max(m, turnAt(pts[i - 1], pts[i], pts[i + 1])); return m; }
@@ -917,16 +921,20 @@
         var view = o.view || { w: 390, h: 600 }, pad = o.pad || {}, maxZ = o.maxZoom == null ? 22 : o.maxZoom;
         var green = ((o.green) || []).map(pinPt).filter(Boolean), pins = ((o.pins) || []).map(pinPt).filter(Boolean);
         var start = fitCamera(pts.concat(green, pins), bearingDeg(pts[0], pts[pts.length - 1]), view, pad, maxZ);
-        var hw = 60;
-        ((o.extra) || []).forEach(function (p) { p = pinPt(p); if (!p) return; var a = alongLine(p, pts); if (a.t > 0.02 && a.t < 0.98) hw = Math.max(hw, a.d + 20); });
-        hw = Math.min(hw, 130);
-        var availW = Math.max(40, view.w - (pad.left || 0) - (pad.right || 0));
+        // 023b: THE CORRIDOR fills the screen's width - the fairway's own half-width (its outline,
+        // measured off the path between the ends), else ~40 yds wide, plus 25 yds of rough each side.
+        var fwHalf = 0;
+        ((o.fairway) || []).forEach(function (ring) { (ring || []).forEach(function (p) { p = pinPt(p); if (!p) return; var a = alongLine(p, pts); if (a.t > 0.05 && a.t < 0.95) fwHalf = Math.max(fwHalf, a.d); }); });
+        fwHalf = fwHalf ? Math.max(12, Math.min(fwHalf, 40)) : FLY_FAIRWAY_HALF_M;
+        var hw = fwHalf + FLY_ROUGH_M;
+        var availW = Math.max(40, view.w);   // edge to edge (the side buttons sit over the rough)
         var k = EQUATOR_M * Math.cos(toRad(pts[0][0])) / 512;
-        var glideZoom = Math.max(start.zoom, Math.min(Math.log2(k * availW / (2 * hw)), start.zoom + 1.2, maxZ));
+        var glideZoom = Math.max(start.zoom, Math.min(Math.log2(k * availW / (2 * hw)), maxZ));
         var endB = pathBearing(pts, 1), ring = [];
         (green.length ? green : []).concat(pins, [pts[pts.length - 1]]).forEach(function (p) { [0, 90, 180, 270].forEach(function (b) { ring.push(destination(p, b, 18)); }); });
         var end = fitCamera(ring, endB, view, pad, maxZ);
-        return { pts: pts, start: start, end: end, glideZoom: glideZoom, ms: FLYOVER_MS };
+        var fly = FLYOVER_MS_BY_PAR[Number(o.par)] || FLYOVER_MS;
+        return { pts: pts, start: start, end: end, glideZoom: glideZoom, corridorM: 2 * hw, flyMs: fly, holdMs: FLY_HOLD_MS, ms: fly + FLY_HOLD_MS };
     }
     // The camera a fraction t (0..1) of the way through the flight: { center, zoom,
     // bearing, pitch, along }. Holds the whole hole a moment, dives toward the tee while
@@ -934,7 +942,10 @@
     function flyoverCamera(plan, t) {
         if (!plan) return null;
         t = Math.max(0, Math.min(1, Number(t) || 0));
-        var s = smooth01((t - 0.08) / 0.82), wA = smooth01((t - 0.04) / 0.30), wE = smooth01((t - 0.70) / 0.22);
+        // 023b: the flight is plan.flyMs of plan.ms; the rest holds on the green. Down to the tee
+        // fast (the first 12%), the corridor all the way, settling on the green in the last 15%.
+        var ft = plan.flyMs && plan.ms ? Math.min(1, t * plan.ms / plan.flyMs) : t;
+        var s = smooth01((ft - 0.04) / 0.84), wA = smooth01(ft / 0.12), wE = smooth01((ft - 0.82) / 0.16);
         var glide = { center: alongPts(plan.pts, s), zoom: plan.glideZoom, bearing: pathBearing(plan.pts, s) };
         var c = blendCam(blendCam(plan.start, glide, wA), plan.end, wE);
         c.pitch = FLY_GLIDE_PITCH * wA * (1 - wE);
@@ -1091,6 +1102,46 @@
         });
         rows.sort(function (a, b) { return (a.behind ? 1 : 0) - (b.behind ? 1 : 0) || (a.reachM || 0) - (b.reachM || 0); });
         return rows;
+    }
+    // ---- THE APPROACH VIEW (022 part 3) -------------------------------------------------
+    // The line the golfer plays along: from them (or the target ring, off the hole) through the
+    // green's center. approachAxis = its bearing; null without both points.
+    function approachAxis(from, mid) {
+        from = pinPt(from); mid = pinPt(mid);
+        if (!from || !mid || haversineMeters(from, mid) < 1) return null;
+        return bearingDeg(from, mid);
+    }
+    // CARRY / CLEAR on the approach (022): the hazards NEAR THE LINE from `me` to the green, ahead of
+    // them and not past the green: "carry bunker 142" (a bunker's far edge), "clear water 155" (the
+    // water's far edge); one point = that point. A hazard off the line (more than offM, default 35 m,
+    // either side) or behind is left out. Nearest first:
+    //   [{ verb: 'carry' | 'clear', what: 'bunker' | 'water', meters, pt (the far edge), offM, alongM }]
+    var APPROACH_OFF_M = 35;
+    function approachCarries(me, mid, hz, offM) {
+        me = pinPt(me); mid = pinPt(mid);
+        if (!me || !mid) return [];
+        var lim = isNum(offM) ? offM : APPROACH_OFF_M;
+        var proj = projector(me), gv = proj.fwd(mid), gl = Math.sqrt(gv[0] * gv[0] + gv[1] * gv[1]);
+        if (!(gl > 0)) return [];
+        var ux = gv[0] / gl, uy = gv[1] / gl;
+        var out = [];
+        hazardGroups(hz).forEach(function (g) {
+            var pts = g.pts.map(function (p) { var q = proj.fwd(p); return { p: p, along: q[0] * ux + q[1] * uy, off: Math.abs(q[0] * uy - q[1] * ux) }; });
+            if (pts.every(function (x) { return x.along <= 0; })) return;                 // behind
+            if (Math.min.apply(null, pts.map(function (x) { return x.along; })) > gl + 15) return;   // past the green
+            var off = Math.min.apply(null, pts.map(function (x) { return x.off; }));
+            if (off > lim) return;
+            var far = pts.reduce(function (a, b) { return haversineMeters(me, b.p) > haversineMeters(me, a.p) ? b : a; });
+            out.push({ verb: g.type === 'w' ? 'clear' : 'carry', what: g.type === 'w' ? 'water' : 'bunker', type: g.type, side: g.side,
+                       meters: haversineMeters(me, far.p), pt: far.p, offM: off, alongM: far.along });
+        });
+        out.sort(function (a, b) { return a.meters - b.meters; });
+        return out;
+    }
+    // "carry bunker 142 · clear water 155" in the golfer's unit (unitM 0.9144 for yards).
+    function approachLine(rows, unitM) {
+        var u = unitM || M_PER_YD;
+        return (rows || []).map(function (r) { return r.verb + ' ' + r.what + ' ' + Math.round(r.meters / u); }).join(' \u00b7 ');
     }
     // LAY UP TO 50 / 75 / 100 / 125 / 150 (in the golfer's unit; unitM 0.9144 for yards,
     // 1 for metres): how far from the golfer that leaves them, straight at the green.
@@ -2065,6 +2116,7 @@
         defaultTarget: defaultTarget, pointAlongHole: pointAlongHole, snapToFairway: snapToFairway, lengthAlong: lengthAlong, simplifyLine: simplifyLine,
         DEFAULT_SHOT_YD: DEFAULT_SHOT_YD, MIN_LEFT_YD: MIN_LEFT_YD, GREEN_REACH_YD: GREEN_REACH_YD,
         courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles, pickHoleSet: pickHoleSet, applyHoleSet: applyHoleSet,
+        approachAxis: approachAxis, approachCarries: approachCarries, approachLine: approachLine, APPROACH_OFF_M: APPROACH_OFF_M,
         golfapiMatch: golfapiMatch, golfapiRecord: golfapiRecord, golfapiNines: golfapiNines, ellipseRing: ellipseRing,
         osmPathCourse: osmPathCourse, osmPathLine: osmPathLine, osmPathLines: osmPathLines, OSM_PATH_M: OSM_PATH_M,
         bearingDeg: bearingDeg, holeCamera: holeCamera,
@@ -2076,7 +2128,7 @@
         nextInPlayOrder: nextInPlayOrder, onNextTee: onNextTee, NEXT_TEE_M: NEXT_TEE_M, GREEN_CLEAR_M: GREEN_CLEAR_M,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
         flyoverFrame: flyoverFrame, holePath: holePath, flyoverPlan: flyoverPlan, flyoverCamera: flyoverCamera, pathTarget: pathTarget, fitCamera: fitCamera, pathBearing: pathBearing,
-        FLYOVER_MS: FLYOVER_MS, PATH_MIN_TURN_DEG: PATH_MIN_TURN_DEG,
+        FLYOVER_MS: FLYOVER_MS, FLYOVER_MS_BY_PAR: FLYOVER_MS_BY_PAR, FLY_HOLD_MS: FLY_HOLD_MS, FLY_ROUGH_M: FLY_ROUGH_M, PATH_MIN_TURN_DEG: PATH_MIN_TURN_DEG,
         courseGpsKey: courseGpsKey, osmCourse: osmCourse, bundleKeyFor: bundleKeyFor, stripNineSuffix: stripNineSuffix, KNOWN_ALIASES: KNOWN_ALIASES, courseNameKey: courseNameKey,
         EARTH_RADIUS_M: EARTH_RADIUS_M, M_PER_YD: M_PER_YD, WEAK_GPS_YARDS: WEAK_GPS_YARDS, GREEN_MATCH_M: GREEN_MATCH_M,
         haversineMeters: haversineMeters, haversineYards: haversineYards, distanceIn: distanceIn,

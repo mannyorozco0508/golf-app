@@ -1837,11 +1837,11 @@
     // like anywhere. "Hole" (the same button) goes back to the hole's view.
     // Depth and width are measured on the outline turned to the line of play; a
     // green tapped without an outline has a depth only when its front and back were.
-    function greenShape(r) {
+    function greenShape(r, axisDeg, extra) {
         if (!r || !r.mid) return null;
-        var axis = r.tee ? G.bearingDeg(r.tee, r.mid) : (S.camera ? S.camera.bearing : 0);
+        var axis = axisDeg != null ? axisDeg : (r.tee ? G.bearingDeg(r.tee, r.mid) : (S.camera ? S.camera.bearing : 0));
         var outline = !!(r.green && r.green.length >= 3 && r.useGreenForEdges);
-        var pts = outline ? r.green : [r.front, r.mid, r.back].filter(Boolean);
+        var pts = (outline ? r.green : [r.front, r.mid, r.back].filter(Boolean)).concat(extra || []);
         var al = [], ac = [];
         pts.forEach(function (p) {
             var d = G.haversineMeters(r.mid, p);
@@ -1849,8 +1849,10 @@
             al.push(d * Math.cos(t)); ac.push(d * Math.sin(t));
         });
         var a0 = Math.min.apply(null, al), a1 = Math.max.apply(null, al), c0 = Math.min.apply(null, ac), c1 = Math.max.apply(null, ac);
-        var depthM = (outline || (r.front && r.back)) ? a1 - a0 : null;
-        var widthM = outline ? c1 - c0 : null;
+        // Depth and width are the GREEN's own (the carry hazards only widen what the view holds).
+        var gal = al.slice(0, al.length - (extra || []).length), gac = ac.slice(0, ac.length - (extra || []).length);
+        var depthM = (outline || (r.front && r.back)) ? Math.max.apply(null, gal) - Math.min.apply(null, gal) : null;
+        var widthM = outline ? Math.max.apply(null, gac) - Math.min.apply(null, gac) : null;
         return {
             axis: axis, depthM: depthM, widthM: widthM,
             // What the view must hold: the green, or 25 m when it is only a point.
@@ -1859,9 +1861,46 @@
         };
     }
     var GREEN_PAD = { left: 80, right: 80 };
+    // ---- THE APPROACH VIEW (022 part 3) ----------------------------------------------
+    // The green view is the APPROACH: turned to the golfer's LINE (them - or the target ring, off the
+    // hole - through the green's center; the tee's line only when neither is there), holding the
+    // green and the hazards near that line, each with "carry bunker 142" / "clear water 155". It
+    // opens BY ITSELF on the hole inside 200 yds (gps-geo measureOrigin "me" - never off the course,
+    // URGENT-022), closes again past 230, and "⛳ Hole" keeps the full hole for this hole.
+    var APPR_IN_M = 200 * 0.9144, APPR_OUT_M = 230 * 0.9144;
+    function apprFrom(r) {
+        var o = origin(r);
+        if (o && o.from === 'me') return o.pt;
+        return (S && S.target) || (r && r.tee) || null;
+    }
+    function apprHazards(r) {
+        var rec = osmRecord(S.courseKey), h = rec && rec.holes && rec.holes[String(S.hole)];
+        var hz = (h && h.osm && h.osm.hazards) || [], from = apprFrom(r);
+        return from && r && r.mid && G.approachCarries ? G.approachCarries(from, r.mid, hz) : [];
+    }
+    function maybeApproach(r) {
+        if (!S || !S.map || !S.styleReady || S.side !== 'gps' || S.mode !== 'measure' || S.flying || !r || !r.mid) return;
+        var o = origin(r);
+        var onHole = !!(fix && o && o.from === 'me');
+        var toGreen = onHole ? G.haversineMeters(o.pt, r.mid) : null;
+        S.apprOff = S.apprOff || {};
+        if (S.view === 'green') {
+            // Walked back out (or off the hole): the full hole again - only when it opened by itself.
+            if (S.apprAuto && !S.userMoved && (!onHole || toGreen > APPR_OUT_M)) { S.apprAuto = false; frameHole(false); return; }
+            // Walked across the line (15°+): turned to the new line, unless the golfer moved the map.
+            var ax = G.approachAxis ? G.approachAxis(apprFrom(r), r.mid) : null;
+            if (!S.userMoved && ax != null && S.apprAxis != null && Math.abs((((ax - S.apprAxis) % 360) + 540) % 360 - 180) > 15) frameGreen();
+            return;
+        }
+        if (!onHole || toGreen > APPR_IN_M || S.apprOff[S.hole] || S.userMoved || S.zoomStep) return;
+        if (frameGreen()) S.apprAuto = true;
+    }
     function frameGreen() {
         if (!S || !S.map || !S.styleReady) return false;
-        var g = greenShape(resolved());
+        var r0 = resolved(), axis = r0 && r0.mid && G.approachAxis ? G.approachAxis(apprFrom(r0), r0.mid) : null;
+        S.apprAxis = axis;
+        var carries = r0 ? apprHazards(r0) : [];
+        var g = greenShape(r0, axis, carries.map(function (c) { return c.pt; }));
         var box = S.el.querySelector('.gps-map');
         if (!g || !box || box.clientWidth < 10) return false;
         var vp = viewPad();
@@ -1869,8 +1908,8 @@
         var availH = Math.max(60, box.clientHeight - pad.top - pad.bottom), availW = Math.max(60, box.clientWidth - pad.left - pad.right);
         var mpp = Math.max(g.spanA * 1.15 / availH, g.spanC * 1.15 / availW);
         var zoom = Math.min(Math.log2(40075016.686 * Math.cos(g.center[0] * Math.PI / 180) / (512 * mpp)), maxZoomNow());
-        // The SAME turn as the hole view: tee -> green points up.
-        var bearing = S.camera ? S.camera.bearing : g.axis;
+        // The golfer's line points up (022: the approach); the tee's line when there is no golfer or target.
+        var bearing = axis != null ? axis : (S.camera ? S.camera.bearing : g.axis);
         S.map.jumpTo({ center: ll(g.center), zoom: zoom, bearing: bearing, padding: pad });
         S.view = 'green'; S.zoomStep = 0; S.userMoved = false;
         render();
@@ -1879,8 +1918,11 @@
     }
     function toggleGreenView() {
         if (!S) return;
-        if (S.view === 'green') { frameHole(false); render(); }
-        else frameGreen();
+        S.apprOff = S.apprOff || {};
+        // "⛳ Hole": the full hole, and it STAYS for this hole (no auto approach again here);
+        // "⛳ Green": the approach now, whatever the distance.
+        if (S.view === 'green') { S.apprOff[S.hole] = true; S.apprAuto = false; frameHole(false); render(); }
+        else { delete S.apprOff[S.hole]; S.apprAuto = false; frameGreen(); }
     }
     // The labels beside F, C, B and the pin, and the depth x width line.
     function placeGreenLabels() {
@@ -1910,9 +1952,30 @@
             el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.style.visibility = '';
             placed.push({ l: x, t: y, r: x + w, b: y + h });
         });
-        var g = greenShape(r);
+        // 022: CARRY / CLEAR at each hazard near the golfer's line, at its far edge.
+        var carries = apprHazards(r), um = u === 'm' ? 1 : G.M_PER_YD;
+        Array.prototype.forEach.call(box.querySelectorAll('.gps-appr-lbl'), function (e) { e.remove(); });
+        carries.forEach(function (c, i) {
+            var el = document.createElement('span');
+            el.className = 'gps-green-lbl gps-appr-lbl gps-appr-' + c.what;
+            el.setAttribute('data-appr', c.verb + ' ' + c.what);
+            el.textContent = c.verb + ' ' + c.what + ' ' + Math.round(c.meters / um);
+            box.appendChild(el);
+            var q = S.map.project(ll(c.pt)), w = el.offsetWidth, h = el.offsetHeight;
+            var x = q.x - w / 2, y = q.y + 10;
+            placed.forEach(function (b) { if (x < b.r && x + w > b.l && y < b.b && y + h > b.t) y = b.b + 2; });
+            el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px';
+            placed.push({ l: x, t: y, r: x + w, b: y + h });
+        });
+        var mapEl = S.el.querySelector('.gps-map');
+        if (mapEl) mapEl.setAttribute('data-approach', G.approachLine ? G.approachLine(carries, um) : '');
+        var axis = r && r.mid && G.approachAxis ? G.approachAxis(apprFrom(r), r.mid) : null;
+        var g = greenShape(r, axis);
+        var cl = carries.length && G.approachLine ? G.approachLine(carries, um) : '';
+        if (cl && !(g && g.depthM != null)) { dims.textContent = cl.replace(/^./, function (c) { return c.toUpperCase(); }); dims.style.display = ''; }
         if (g && g.depthM != null) {
             var yd = function (m) { return u === 'm' ? Math.round(m) + ' m' : Math.round(m / G.M_PER_YD) + ' yds'; };
+            // The carries are ON THE MAP (at each hazard); this line stays the green's size - one line, never under the rail.
             dims.textContent = 'Green ' + yd(g.depthM) + ' deep' + (g.widthM != null ? ' · ' + yd(g.widthM) + ' wide' : '');
             dims.style.display = '';
             var mel = S.el.querySelector('.gps-map');
@@ -2000,6 +2063,7 @@
         (rec.fairway || []).forEach(function (ring) { extra = extra.concat(ring); });
         var el = S.el.querySelector('.gps-map');
         var plan = G.flyoverPlan({ path: path.pts, green: r.green || [], pins: [nums.front, r.mid, nums.back].filter(Boolean), extra: extra,
+            fairway: rec.fairway || [], par: S.par,
             view: { w: el ? el.clientWidth : 390, h: el ? el.clientHeight : 600 }, pad: S.pad || viewPad(), maxZoom: maxZoomNow() });
         if (plan) plan.src = path.src;
         return plan;
@@ -2016,6 +2080,35 @@
         try {
             return pts.every(function (p) { var q = map.project(ll(p)); return q.x >= 0 && q.y >= 0 && q.x <= el.clientWidth && q.y <= el.clientHeight; }) ? '1' : '0';
         } catch (e) { return ''; }
+    }
+    // The imagery's tile URLs for the flight's camera positions (zoom floor and the next, a 3 x 3 block
+    // around each), fetched into the browser cache; resolves after 4 s whatever is left.
+    function flyPrefetch(map, plan, el) {
+        var urls = {}, tmpls = [];
+        try {
+            var st = map.getStyle(), srcs = (st && st.sources) || {};
+            (st.layers || []).forEach(function (l) {
+                if (l.type !== 'raster' || !srcs[l.source] || !(srcs[l.source].tiles || []).length) return;
+                var vis = 'visible'; try { vis = map.getLayoutProperty(l.id, 'visibility') || 'visible'; } catch (e) {}
+                if (vis !== 'none') tmpls.push(srcs[l.source].tiles[0]);
+            });
+        } catch (e) {}
+        if (!tmpls.length) return Promise.resolve();
+        var tile = function (lat, lng, z) { var n = Math.pow(2, z), x = Math.floor((lng + 180) / 360 * n), r = lat * Math.PI / 180, y = Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n); return [x, y]; };
+        for (var i = 0; i <= 20; i++) {
+            var c = G.flyoverCamera(plan, i / 20);
+            if (!c) continue;
+            [Math.floor(c.zoom), Math.floor(c.zoom) + 1].forEach(function (z) {
+                var t = tile(c.center[0], c.center[1], z);
+                for (var dx = -1; dx <= 1; dx++) for (var dy = -1; dy <= 1; dy++) tmpls.forEach(function (u) {
+                    urls[u.replace('{z}', z).replace('{x}', t[0] + dx).replace('{y}', t[1] + dy)] = 1;
+                });
+            });
+        }
+        var list = Object.keys(urls).slice(0, 160);
+        if (el) el.setAttribute('data-fly-prefetch', String(list.length));
+        var all = Promise.all(list.map(function (u) { try { return fetch(u, { mode: 'no-cors', cache: 'force-cache' }).catch(function () {}); } catch (e) { return Promise.resolve(); } }));
+        return Promise.race([all, new Promise(function (res) { setTimeout(res, 4000); })]);
     }
     function startFlyover() {
         if (!S || !S.map || !S.styleReady || S.flying || !G.flyoverPlan) return;
@@ -2034,8 +2127,24 @@
             render();
             return;
         }
+        // 023b: no signal, no flight (it would fly over blank tiles).
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) { if (cap) cap.style.display = 'none'; flash('Preview needs a signal'); return; }
         var plan = flyPlan(r);
         if (!plan) return;
+        // 023b: THE TILES ALONG THE PATH FIRST - never a blank tile mid-flight. The flight's own camera
+        // positions, the imagery's tiles around each, fetched into the cache (4 s at most); then fly.
+        if (!S.flyLoaded || S.flyLoaded !== S.hole + '|' + S.courseKey) {
+            S.flying = { loading: true };
+            flyMark('loading');
+            if (cap) cap.textContent = flyCaption(r) + ' \u00b7 loading\u2026';
+            flyPrefetch(map, plan, el).then(function () {
+                if (S !== mine || !S.flying || !S.flying.loading) return;
+                S.flying = null; S.flyLoaded = S.hole + '|' + S.courseKey;
+                startFlyover();
+            });
+            return;
+        }
+        S.flyLoaded = null;
         var pad = S.pad || viewPad(), o = origin(r), nums = G.holeNumbers(o ? o.pt : null, r) || {};
         var pins = [nums.front, r.mid, nums.back].filter(Boolean);
         try { map.setMaxPitch(FLY_PITCH); } catch (e) {}
@@ -3446,6 +3555,7 @@
         // URGENT-022: the hole is in and the map is still on the course / the golfer / the world (it was
         // framed before the hole's data landed): the hole, tee to green - unless the golfer moved it.
         if (r && S.map && S.styleReady && S.framed !== 'hole' && !S.userMoved && !S.zoomStep && S.view !== 'green' && holeView()) { frameHole(false); }
+        maybeApproach(r);   // 022: the approach view by itself inside 200 yds on the hole
         dropStaleFix();
         var acc = S.geoError ? null : (fix ? G.accuracyLabel(fix.acc, u) : { text: 'Finding you…', weak: false });
         // OFF THE HOLE (more than 1,000 yds from the green) or NO GPS: everything is
@@ -5137,6 +5247,7 @@
         // BUILD 7: the F / C / B number pills about 25% bigger (12 -> 15 px).
         + '#gps-overlay .gps-green-lbl{position:absolute;background:rgba(11,15,12,.86);color:#fff;font:800 15px/1 ' + FONT + ';padding:4px 8px;border-radius:999px;white-space:nowrap;font-variant-numeric:tabular-nums;}'
         + '#gps-overlay .gps-green-lbl-p{color:#fca5a5;border:1px solid rgba(239,68,68,.7);}'
+        + '#gps-overlay .gps-appr-lbl{font-size:13px;padding:4px 9px;}#gps-overlay .gps-appr-bunker{border:1.5px solid #e9d8a6;}#gps-overlay .gps-appr-water{border:1.5px solid #60a5fa;}'
         + '#gps-overlay .gps-btn.gps-off{opacity:.45;}'
         + '#gps-overlay .gps-tap-fallback{flex:1 1 100%;min-height:32px;color:#c8d1ca;text-decoration:underline;font-size:13px;font-weight:600;}'
         // NO PULL-DOWN while GPS shows: nothing on the page scrolls, refreshes or bounces.
@@ -6065,6 +6176,7 @@
         S.measureFrom = null; S.measureShot = null;
         // AUTO-ADVANCE (008): a new hole starts any wait over.
         S.aaDwell = null;
+        S.apprAuto = false;   // 022: a new hole - its own approach (S.apprOff is per hole)
         S.framed = null;
         frameHole(false);
         render();
@@ -6138,6 +6250,8 @@
         // 012 part 4: both legs - { toTarget, toGreen: { yards, plays, unit, text: '60 · plays 63' } | null, single, par3 }.
         playsLegs: function () { try { return playsLegsOut(); } catch (e) { return null; } },
         hole: function () { return S ? Number(S.hole) : null; },
+        // 022: which view the map is in - 'hole' or 'green' (the approach).
+        screenView: function () { return S ? S.view || null : null; },
         // URGENT-022 (the GPS course check): what the map frames on this hole - the tee and the green,
         // whether each is in view, and the course's own point.
         holeCheck: function () {
