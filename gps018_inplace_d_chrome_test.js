@@ -128,7 +128,7 @@ test('Share (Round Menu) over the map: the code, the link, the QR codes on top o
     assert.deepEqual([s.mark, s.side, s.map, s.setup], ['same-page', 'gps', 6, false], JSON.stringify(s));
 });
 
-test('Tools > Other course in a round: asks first (over the map); "Not now" stays on hole 6 - Full setup only on yes', { timeout: 60000 }, async () => {
+test('Tools > Other course in a round with scores: asks first (over the map) - URGENT-019 Change course; "Not now" stays on hole 6', { timeout: 60000 }, async () => {
     assert.ok(await ev('HardPanGps.openTools()'));
     await sleep(400);
     // The tile runs the menu's own button (tsRun); the button itself, whether or not this course shows the tile.
@@ -136,7 +136,7 @@ test('Tools > Other course in a round: asks first (over the map); "Not now" stay
     await sleep(300);
     const ask = await ev("(function(){ var s=document.getElementById('ui-sheet'); var e=document.elementFromPoint(196, 500); return JSON.stringify({ text: s ? s.innerText : '', onTop: !!(s && e && s.contains(e)) }); })()");
     const a = JSON.parse(ask);
-    assert.match(a.text, /Change the course for this round\?[\s\S]*Full setup/);
+    assert.match(a.text, /Start a new round at another course\?[\s\S]*stays in History/);
     assert.equal(a.onTop, true, 'the question shows over the map');
     await ev("(function(){ var b=Array.prototype.filter.call(document.querySelectorAll('#ui-sheet button'), function(x){ return /Not now/.test(x.textContent); })[0]; if (b) b.click(); return 1; })()");
     await sleep(400);

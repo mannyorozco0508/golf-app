@@ -67,6 +67,9 @@
         + '.hp-sheet .hs-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;}'
         + '.hp-sheet .hs-tile{text-align:left;border:1.5px solid #dfe6e2;background:#fff;border-radius:16px;padding:14px 12px;min-height:96px;cursor:pointer;color:#0f1f17;display:flex;flex-direction:column;gap:4px;}'
         + '.hp-sheet .hs-tile b{font:800 17px/1.2 ' + FONT + ';}.hp-sheet .hs-tile span{font:500 13px/1.3 ' + FONT + ';color:#5d6b64;}'
+        + '.hp-sheet .hs-ways{display:grid;gap:8px;margin-top:12px;}'
+        + '.hp-sheet .hs-way{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-height:56px;padding:10px 14px;border:1px solid #d6dfd9;background:#fff;color:#0f1f17;border-radius:14px;text-align:left;cursor:pointer;font-family:' + FONT + ';}'
+        + '.hp-sheet .hs-way b{font-size:16px;font-weight:800;}.hp-sheet .hs-way span{font-size:12.5px;color:#5b6b63;}'
         + '.hp-sheet .hs-finish{display:block;width:100%;margin-top:16px;min-height:56px;border:2px solid #0f4d3a;background:#fff;color:#0f4d3a;border-radius:16px;font:800 18px/1 ' + FONT + ';cursor:pointer;}'
         + '.hp-sheet .hs-note{text-align:center;font:500 13px/1.4 ' + FONT + ';color:#5d6b64;margin-top:12px;}.hp-sheet .hs-note a{color:#0f4d3a;font-weight:700;}'
         + '.hp-sheet .hs-h{font:700 12px/1.3 ' + FONT + ';letter-spacing:.04em;color:#5d6b64;text-transform:uppercase;margin:18px 0 8px;}'
@@ -167,9 +170,13 @@
                 return '<button type="button" class="hs-tile" data-hs-tile="' + t.k + '"><b>' + t.ico + ' ' + esc(t.t) + '</b><span>' + esc(t.s) + '</span></button>';
             }).join('') + '</div>'
             + '<button type="button" class="hs-finish" data-hs="finish">Finish &amp; settle up</button>'
-            + '<div class="hs-note">Trip, history, how it works and stats: <a href="home.html#more">Home › More</a></div>'
-            // THE WAY OUT of a round (part D: Back never leaves it). The round stays In progress on Home.
-            + '<div class="hs-note"><a href="home.html" data-hs-leave="1">Leave the round › Home</a> · it stays under In progress</div>';
+            // THE WAY OUT (URGENT-019, Manny stuck in a Talking Stick round): Change course and Leave
+            // round are rows of their own, not footnotes.
+            + '<div class="hs-ways">'
+            + '<button type="button" class="hs-way" data-hs="change-course"><b>\u26F3 Change course</b><span>' + (scored() ? 'Start a new round somewhere else - this one stays in History' : 'Pick another course - nothing scored yet') + '</span></button>'
+            + '<button type="button" class="hs-way" data-hs="leave"><b>\uD83C\uDFE0 Leave round \u203a Home</b><span>It stays on Home under In progress - Resume picks up on this hole</span></button>'
+            + '</div>'
+            + '<div class="hs-note">Trip, history, how it works and stats: <a href="home.html#more">Home › More</a></div>';
         return show('menu', html, 'Round Menu');
     }
     function tile(k) {
@@ -287,6 +294,8 @@
         if (a === 'close') { closeSheet(true); return; }
         if (a === 'back') { closeSheet(false); return; }
         if (a === 'finish') { openFinish(); return; }
+        if (a === 'change-course') { closeSheet(true); changeCourse(); return; }
+        if (a === 'leave') { closeSheet(true); leaveRound(); return; }
         if (a === 'share-link') { var d = data() || {}; shareText(d.eventName || 'Our round', 'Join ' + (d.courseName || 'the round') + ' - code ' + code(), roundUrl()); return; }
         if (a === 'qr') {
             closeSheet(true);
@@ -301,6 +310,44 @@
             if (typeof openFinishRoundModal === 'function') openFinishRoundModal();
             return;
         }
+    }
+
+    // ---- THE WAY OUT (URGENT-019) ----------------------------------------------
+    // CHANGE COURSE. Nothing scored yet: this round is dropped as the phone's round in progress
+    // (Home does not offer an empty round as Resume) and the GPS door's Course & Tees screen opens
+    // for a NEW round (home.html#gpsdoor - no lobby, URGENT-016's cover). Scores in: it asks first;
+    // the old round keeps its scores and stays in History (Games), and Resume until the new one starts.
+    function scored() {
+        var sc = (data() || {}).scores || {};
+        return Object.keys(sc).some(function (k) { return Number(sc[k]) > 0; });
+    }
+    function changeCourse() {
+        var c = code(), has = scored();
+        var go = function () {
+            var H = window.HardPanDoors;
+            if (!has && c && H && typeof H.forgetRound === 'function') { try { H.forgetRound(c, false); } catch (e) {} }
+            window.location.href = 'home.html#gpsdoor';
+        };
+        if (!has || typeof window.uiConfirm !== 'function') { go(); return true; }
+        window.uiConfirm({ title: 'Start a new round at another course?', body: 'This round keeps its scores - it stays in History (and Resume on Home).',
+            confirmText: 'New round', cancelText: 'Not now', danger: false }).then(function (yes) { if (yes) go(); }, function () {});
+        return true;
+    }
+    // LEAVE ROUND: Home; the round stays In progress there (Resume opens it on the same side + hole).
+    function leaveRound() {
+        var c = code();
+        try {
+            if (c) {
+                var side = onGps() ? 'gps' : 'bets';
+                localStorage.setItem('hardpan_round_side', side + '|' + c);
+                // The hole Resume lands on: the map's, when leaving from the map (the card's own key,
+                // index.html hpLastHoleKey - read on the next load).
+                var g0 = G(), h = side === 'gps' && g0 && typeof g0.hole === 'function' ? Number(g0.hole()) : 0;
+                if (h > 0) localStorage.setItem('hardpan_last_hole_' + c + (locked() ? '_g' + locked() : ''), String(h));
+            }
+        } catch (e) {}
+        window.location.href = 'home.html';
+        return true;
     }
 
     // ---- ROUND SETTINGS = today's Round Menu, plus GPS tools ---------------------
@@ -622,6 +669,7 @@
         openMenu: function () { return openMenu(); }, openShare: openShare, openFinish: openFinish, openSettings: openSettings,
         openBets: openBets, closeBets: closeBets, closeSheet: closeSheet, go: go, barFor: barFor, refresh: refresh,
         toGps: toGps, toCard: toCard, screen: screen, sheetKind: function () { return sheetOpen() ? sheetKind : null; },
-        payText: function () { return payText(settle()); }, feed: feed, enterScore: enterScore
+        payText: function () { return payText(settle()); }, feed: feed, enterScore: enterScore,
+        changeCourse: changeCourse, leaveRound: leaveRound, scored: scored
     };
 })();
