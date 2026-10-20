@@ -126,6 +126,9 @@
         var d = W.HardPanGolfApi, L = d && d.links;
         if (!L || !key) return null;
         if (L[key]) return key;
+        // A 27-hole pairing's own record ("thistle_mackay_cameron") is the bundle's "thistle_27_mackay_cameron".
+        var alias = String(key).replace(/^([a-z]+)_/, '$1_27_');
+        if (alias !== key && L[alias]) return alias;
         var pre = Object.keys(L).filter(function (k) { return k.indexOf(key + '_') === 0; })[0];   // thistle_27 -> thistle_27_cameron_stewart
         return pre || null;
     }

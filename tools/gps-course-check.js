@@ -37,7 +37,7 @@ const COURSES = (process.env.ONLY ? null : null) || [
     { label: 'Papago', name: /^Papago/i, q: 'papago', at: [33.4560, -111.9480] },
     { label: 'Legacy', name: /Legacy Golf/i, q: 'legacy', at: [33.3850, -112.0197] },
     { label: 'Caledonia (Myrtle)', name: /^Caledonia/i, q: 'caledonia', at: [33.4528, -79.1547] },
-    { label: 'Thistle (MacKay/Stewart)', name: /^Thistle/i, q: 'thistle', at: [33.8890, -78.5350], nines: ['MacKay', 'Stewart'] }
+    { label: 'Thistle (MacKay/Cameron)', name: /^Thistle.*MacKay.*Cameron/i, q: 'thistle', at: [33.8890, -78.5350] }
 ].filter((c) => !process.env.ONLY || new RegExp(process.env.ONLY, 'i').test(c.label));
 
 // The phone's GPS rules: gps-live on (liveTest), loaded on Round Setup too (the app loads it there).

@@ -202,10 +202,17 @@
         out.forEach(function (c) { have[c.key] = 1; });
         var gc = typeof globalCourses !== 'undefined' && globalCourses ? globalCourses : {};   /* global globalCourses */
         Object.keys(gc).forEach(function (k) {
-            if (have[k] || !/^(gca_|gapi_|comm_)/.test(k) || !gc[k] || !gc[k].name) return;
+            // Any shared record the directory does not list itself (021 course check: Thistle's rated
+            // pairings "thistle_mackay_cameron" / "thistle_cameron_stewart" carry the tees - the 27-hole
+            // directory row has none), not only gca_ / gapi_ / comm_; never one the directory names.
+            if (have[k] || !gc[k] || !gc[k].name || gc[k].mergedInto) return;
+            if (!/^(gca_|gapi_|comm_)/.test(k) && base.some(function (b) { return nk(b.name) === nk(gc[k].name); })) return;
             var cov = base.filter(function (c) { return !c.key && nk(c.name) === nk(gc[k].name); })[0];
+            // A record with no place of its own (a 27-hole pairing): its club's directory row's place.
+            var clubOf = function (n) { return nk(String(n).split('(')[0]); };
+            var sib = base.filter(function (b) { return b.pt && clubOf(b.name) === clubOf(gc[k].name); })[0];
             var loc = gc[k].location, lpt = loc && isFinite(Number(loc.latitude)) && isFinite(Number(loc.longitude)) && loc.latitude !== null ? [Number(loc.latitude), Number(loc.longitude)] : null;
-            out.push({ key: k, name: gc[k].name, ready: ready(k), pt: pointOf(k) || (cov && cov.pt) || lpt, city: (cov && cov.city) || (loc && loc.city) || '', state: (cov && cov.state) || (loc && loc.state) || '' });
+            out.push({ key: k, name: gc[k].name, ready: ready(k), pt: pointOf(k) || (cov && cov.pt) || lpt || (sib && sib.pt) || null, city: (cov && cov.city) || (loc && loc.city) || '', state: (cov && cov.state) || (loc && loc.state) || '' });
         });
         // ONE ROW PER COURSE (URGENT-019/020 course check): the directory's own row for a course
         // ("Talking Stick Golf Club (Piipaash)" - no tees) beside the shared record for the same
