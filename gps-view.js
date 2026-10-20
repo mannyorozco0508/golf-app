@@ -4866,6 +4866,8 @@
         +   'background:rgba(11,15,12,.92);color:#f4f4ef;font:600 13px/1.35 ' + FONT + ';padding:8px 12px;border-radius:12px;text-align:center;}'
         + '#gps-side-toggle button{font-family:inherit;font-weight:800;font-size:15px;line-height:1;color:#0b0f0c;background:#d9f99d;border:0;border-radius:999px;padding:10px 16px;min-height:42px;cursor:pointer;}'
         + 'body.has-gps-toggle #main-content{padding-bottom:132px !important;}'
+        // 018: the app's own question (ui-dialogs.js #ui-sheet, z-index 4100) asked over the map shows over it.
+        + 'body.gps-side-gps #ui-sheet.open{z-index:10400;}'
         + '#gps-overlay{position:fixed;inset:0;z-index:10050;display:none;background:#0b0f0c;color:#f4f4ef;font-family:' + FONT + ';--gps-attrib-h:20px;--gps-top-b:110px;}'
         + 'body.gps-side-gps #gps-overlay{display:block;}'
         + '#gps-overlay .gps-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}'
@@ -5521,7 +5523,19 @@
         on(el, '.gps-door-add', function () { openAddGame(); });
         on(el, '.gps-bet-btn', function () { if (window.HardPanBet) window.HardPanBet.open(); });
         on(el, '.gps-money', function () { if (window.HardPanBet) window.HardPanBet.openBets(); });
-        on(el, '.gps-pick-course', function () { closeMenus(); window.location.href = 'home.html#pick'; });
+        // OTHER COURSE (018, DETOURS #18): outside a round, the course picker as before. IN a round it is
+        // not a quick edit - it changes the round - so it asks first, and only a yes goes to Full setup
+        // (Round Setup for this round); no stays on this hole.
+        on(el, '.gps-pick-course', function () {
+            closeMenus();
+            var rd = null; try { rd = typeof currentData !== 'undefined' ? currentData : (S && S.round); } catch (e) { rd = S && S.round; }   /* global currentData */
+            var inRound = !!(S && S.eventCode && rd && (rd.players || []).length);
+            if (!inRound) { window.location.href = 'home.html#pick'; return; }
+            var go = function () { window.location.href = 'admin.html?game=' + encodeURIComponent(S.eventCode); };
+            if (typeof window.uiConfirm !== 'function') return;
+            window.uiConfirm({ title: 'Change the course for this round?', body: 'That\u2019s Full setup - the round\u2019s whole setup, then back here.', confirmText: 'Full setup', cancelText: 'Not now', danger: false })
+                .then(function (yes) { if (yes) go(); }, function () {});
+        });
         // "Games" IN A ROUND STAYS IN THE ROUND (Manny, 2026-10-16): the card side with this round's
         // games in view, or - no games yet - this round's own Add a game. Never the course picker;
         // Home's Games only when no round is open. The hole, the golfer pick and GPS stay (no reload).

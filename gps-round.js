@@ -523,6 +523,9 @@
         closeBets(); closeSheet(true);
         if (onGps()) { var b = document.querySelector('#gps-overlay .gps-score'); if (b) { b.click(); return true; } }
         var h = (function () { try { return currentViewedHole; } catch (e) { return null; } })();   /* global currentViewedHole */
+        // 018: THE CARD'S "Enter score" IS THE SAME SHEET AS THE MAP'S - this hole, and ‹ for an
+        // earlier one - over the card, which stays on its hole (index.html gpsOpenSheet).
+        try { if (h != null && typeof gpsSheetOn === 'function' && gpsSheetOn() && typeof gpsOpenSheet === 'function' && gpsOpenSheet(h)) return true; } catch (e) {}   /* global gpsSheetOn, gpsOpenSheet */
         var all = Array.prototype.slice.call(document.querySelectorAll('#hole-view-card .score-input' + (h != null ? '[data-hole="' + Number(h) + '"]' : '') + ':not([disabled])'));
         var me = (function () { try { return typeof resolvedMeId === 'function' ? resolvedMeId() : null; } catch (e) { return null; } })();   /* global resolvedMeId */
         var box = all.filter(function (i) { return !String(i.value || '').trim(); })[0] || all.filter(function (i) { return i.getAttribute('data-player-id') === String(me); })[0] || all[0];
