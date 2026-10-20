@@ -317,6 +317,9 @@
         + '#hp-card-bet .hp-money-chip{position:absolute;right:10px;bottom:calc(100% + 8px);}'
         + '.hp-money-chip{border:0;border-radius:999px;background:rgba(11,15,12,.92);color:#f4f4ef;min-height:40px;padding:0 14px;font:700 14px/1 -apple-system,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;}'
         + '.hp-money-chip b{color:#c8f075;font-weight:800;}.hp-money-chip b.neg{color:#ff9b8a;}'
+        // 022 SUN MODE (body.hp-sun): the card bar black with white outlines, Enter score white.
+        + 'body.hp-sun #hp-card-bet .hp-bar-btn{background:#000 !important;color:#fff !important;border:2px solid #fff !important;}'
+        + 'body.hp-sun #hp-card-bet .hp-bar-score{background:#fff !important;color:#000 !important;border-color:#000 !important;}'
         + '.hp-bet-btn{border:0;border-radius:16px;background:#ffd60a;color:#0b0f0c;min-height:48px;padding:0 18px;font:800 17px/1 -apple-system,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;}';
     function ensureCss() {
         if (document.getElementById('hp-bet-css')) return;

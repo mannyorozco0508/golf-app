@@ -90,6 +90,9 @@
         + '#hp-bets .hb2-head{display:flex;align-items:center;gap:8px;padding:12px 14px 8px;}'
         + '#hp-bets .hb2-tabs{flex:1;display:flex;background:#e3e9e5;border-radius:12px;padding:3px;}'
         + '#hp-bets .hb2-tabs button{flex:1;border:0;background:none;border-radius:10px;min-height:38px;font:800 15px/1 ' + FONT + ';color:#0f1f17;cursor:pointer;}#hp-bets .hb2-tabs button.on{background:#0f4d3a;color:#fff;}'
+        // 022 SUN MODE (body.hp-sun, set by the GPS screen): the Menu's "+ Bet" tile yellow, the tiles black and outlined.
+        + 'body.hp-sun #hp-sheet .hs-tile{background:#000;color:#fff;border:2px solid #fff;}body.hp-sun #hp-sheet .hs-tile span{color:#fff;opacity:1;}'
+        + 'body.hp-sun #hp-sheet .hs-tile[data-hs-tile="bet"]{background:#ffe600;color:#000;border-color:#000;}body.hp-sun #hp-sheet .hs-tile[data-hs-tile="bet"] span{color:#000;}'
         + '#hp-bets .hb2-x{border:0;background:#e3e9e5;color:#0f3d2e;border-radius:999px;min-width:40px;height:40px;font:800 18px/1 ' + FONT + ';cursor:pointer;}'
         + '#hp-bets .hb2-me{padding:0 16px 8px;font:700 15px/1.3 ' + FONT + ';color:#0f1f17;}'
         + '#hp-bets .hb2-body{position:relative;flex:1;}#hp-bets iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff;}'

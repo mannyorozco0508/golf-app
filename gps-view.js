@@ -4355,8 +4355,67 @@
     // ---- 017 SIMPLE FLOW (features.simpleFlow): + Bet and the money chip, layouts D and C ----
     function sfSwitch() { try { var f = (window.HARDPAN_GPS_CONFIG || {}).features || {}; return f.simpleFlow === true; } catch (e) { return false; } }
     function sfOn() { return !!(S && (S.ld || S.lc) && sfSwitch() && window.HardPanBet && window.HardPanBet.on()); }
+    // ---- 022 SUN MODE (Manny, option C of ~/Desktop/claude-code-reports/022/mockup-sun-mode.png) ------
+    // Solid black panels with white outlines, white labels, the MIDDLE number ~30% bigger, yellow
+    // (#ffe600) for F / B and accents, a white "Enter score", distance bubbles with yellow rings - for
+    // reading the screen in full sun. Tools > Display: Standard | Sun | Auto (Sun during daylight at
+    // the course), per phone, default Auto. Daylight is worked out ON THE PHONE from the course's
+    // point and today's date (NOAA sunrise / sunset) - no network, nothing leaves the phone.
+    var DISPLAY_KEY = 'hardpan_display';
+    function displayPref() { var v = null; try { v = localStorage.getItem(DISPLAY_KEY); } catch (e) {} return v === 'standard' || v === 'sun' ? v : 'auto'; }
+    function setDisplay(v) { try { localStorage.setItem(DISPLAY_KEY, v === 'standard' || v === 'sun' ? v : 'auto'); } catch (e) {} sunCache = null; sunSync(); }
+    // Sunrise and sunset (UTC hours) at [lat, lng] on date d - the NOAA almanac method (zenith 90.833°).
+    // { rise, set } or { polar: 'day' | 'night' }.
+    function sunHours(lat, lng, d) {
+        var rad = Math.PI / 180, start = Date.UTC(d.getUTCFullYear(), 0, 0), N = Math.floor((d.getTime() - start) / 864e5), lh = lng / 15;
+        var one = function (rising) {
+            var t = N + ((rising ? 6 : 18) - lh) / 24, M = 0.9856 * t - 3.289;
+            var L = (M + 1.916 * Math.sin(M * rad) + 0.020 * Math.sin(2 * M * rad) + 282.634 + 720) % 360;
+            var RA = (Math.atan(0.91764 * Math.tan(L * rad)) / rad + 720) % 360;
+            RA = (RA + Math.floor(L / 90) * 90 - Math.floor(RA / 90) * 90) / 15;
+            var sinDec = 0.39782 * Math.sin(L * rad), cosDec = Math.cos(Math.asin(sinDec));
+            var cosH = (Math.cos(90.833 * rad) - sinDec * Math.sin(lat * rad)) / (cosDec * Math.cos(lat * rad));
+            if (cosH > 1) return 'night'; if (cosH < -1) return 'day';
+            var H = (rising ? 360 - Math.acos(cosH) / rad : Math.acos(cosH) / rad) / 15;
+            return ((H + RA - 0.06571 * t - 6.622 - lh) % 24 + 24) % 24;
+        };
+        var r = one(true), st = one(false);
+        if (typeof r === 'string') return { polar: r };
+        if (typeof st === 'string') return { polar: st };
+        return { rise: r, set: st };
+    }
+    function isDaylight(pt, when) {
+        if (!pt) return false;
+        var d = when || new Date(), h = sunHours(Number(pt[0]), Number(pt[1]), d);
+        if (h.polar) return h.polar === 'day';
+        var now = d.getUTCHours() + d.getUTCMinutes() / 60;
+        return h.rise < h.set ? (now >= h.rise && now < h.set) : (now >= h.rise || now < h.set);
+    }
+    var sunCache = null;
+    function sunOn() {
+        var p = displayPref();
+        if (p !== 'auto') return p === 'sun';
+        var now = Date.now();
+        if (sunCache && now - sunCache.at < 60000) return sunCache.on;
+        // The course's own point (its saved location), else where the phone is - read as they are, never
+        // through courseCenter() (that asks the course resolver, which must not be asked before the
+        // round's course data is in). No point yet: Standard for now, asked again on the next draw.
+        var pt = (S && S.courseLoc) || (fix && fix.pt) || null;
+        if (!pt) return false;
+        var at = window.__hpSunNow ? new Date(window.__hpSunNow) : new Date(now);   // (tests set the clock)
+        var on = isDaylight(pt, at);
+        sunCache = { at: window.__hpSunNow ? 0 : now, on: on };
+        return on;
+    }
+    function sunSync() {
+        if (!S || !S.el) return;
+        var on = !!((S.ld || S.lc) && sunOn());
+        if (S.el.classList.contains('gps-sun') !== on) S.el.classList.toggle('gps-sun', on);
+        if (document.body.classList.contains('hp-sun') !== on) document.body.classList.toggle('hp-sun', on);
+    }
     function syncSimple() {
         if (!S) return;
+        sunSync();
         var sf = sfOn();
         S.el.classList.toggle('gps-sf', sf);
         // URGENT-023 (Manny): no "+ Bet" on the map's bar (it is in the Menu and on Bets), and no money
@@ -4435,6 +4494,8 @@
         ['.gps-rechoose', '①', 'Hole 1 again']];
     var TS_MARKUP = '<div class="gps-ts-head"><span class="gps-ts-grip" aria-hidden="true"></span><div class="gps-ts-title">Tools</div></div>'
         + '<div class="gps-ts-h" data-ts-sec="layout">SCREEN LAYOUT</div><div class="gps-ts-seg" data-ts-seg="layout" role="radiogroup" aria-label="Screen layout"><button type="button" data-v="d" role="radio">HardPan</button><button type="button" data-v="c" role="radio">Bottom panel</button></div>'
+        + '<div class="gps-ts-h" data-ts-sec="display">DISPLAY</div><div class="gps-ts-seg" data-ts-seg="display" role="radiogroup" aria-label="Display"><button type="button" data-v="standard" role="radio">Standard</button><button type="button" data-v="sun" role="radio">Sun</button><button type="button" data-v="auto" role="radio">Auto</button></div>'
+        + '<div class="gps-ts-note" data-ts-note="display" style="font-size:12px;opacity:.75;margin:4px 2px 0;">Auto: Sun during daylight at the course</div>'
         + '<div class="gps-ts-h">UNITS</div><div class="gps-ts-seg" data-ts-seg="units" role="radiogroup" aria-label="Units"><button type="button" data-v="yd" role="radio">Yards</button><button type="button" data-v="m" role="radio">Meters</button></div>'
         + '<div class="gps-ts-h">ROUND</div><div class="gps-ts-rows">'
         +   '<div class="gps-ts-row" data-ts-row="tourney"><span>🏆 Tournament mode</span><button type="button" class="gps-ts-sw" data-ts-sw="tourney" role="switch" aria-label="Tournament mode"><i></i></button></div>'
@@ -4456,6 +4517,9 @@
         seg('layout', lay === 'd' ? 'd' : 'c', ldSwitch());
         var lh = t.querySelector('[data-ts-sec="layout"]'); if (lh) lh.style.display = ldSwitch() ? '' : 'none';
         seg('units', u === 'm' ? 'm' : 'yd', true);
+        seg('display', displayPref(), !!(S.ld || S.lc));   // 022 Sun mode
+        var dh = t.querySelector('[data-ts-sec="display"]'), dn = t.querySelector('[data-ts-note="display"]');
+        if (dh) dh.style.display = (S.ld || S.lc) ? '' : 'none'; if (dn) dn.style.display = (S.ld || S.lc) ? '' : 'none';
         var sw = function (k, on, shown, locked) {
             var b = t.querySelector('[data-ts-sw="' + k + '"]'), row = t.querySelector('[data-ts-row="' + k + '"]');
             if (row) row.style.display = shown ? '' : 'none';
@@ -4496,6 +4560,7 @@
             var k = b.parentNode.getAttribute('data-ts-seg'), v = b.getAttribute('data-v');
             if (k === 'layout' && v !== layoutNow()) { S.tsKeep = true; try { setLayout(v); } finally { S.tsKeep = false; } tsSync(); }
             if (k === 'units' && v !== (units() === 'm' ? 'm' : 'yd')) tsRun('.gps-units');
+            if (k === 'display') { setDisplay(v); tsSync(); }
             return;
         }
         if ((b = t.closest('[data-ts-sw]'))) {
@@ -5329,6 +5394,42 @@
         + '#gps-overlay.gps-ld .gps-pill-to,#gps-overlay.gps-ld .gps-pill-on{display:flex;align-items:baseline;justify-content:center;box-sizing:border-box;min-width:2.5em;height:2.5em;line-height:2.5em;padding:0 .35em;border-radius:1.25em;'
         +   'background:rgba(11,15,12,.92);color:#fff;font-weight:800;text-shadow:none;box-shadow:0 3px 10px rgba(0,0,0,.4);}'
         + '#gps-overlay.gps-ld .gps-pill-to::after,#gps-overlay.gps-ld .gps-pill-on::after{content:attr(data-u);font-size:.6em;margin-left:1px;}'
+        // 022 SUN MODE (#gps-overlay.gps-sun, layouts D and C): solid black, white outlines, white labels,
+        // a bigger MIDDLE, yellow (#ffe600) F / B and accents, a white Enter score, yellow-ringed bubbles.
+        + '#gps-overlay.gps-sun{--gps-ld-lime:#ffe600;}'
+        + '#gps-overlay.gps-sun .gps-ld-top,#gps-overlay.gps-sun .gps-ld-score,#gps-overlay.gps-sun.gps-ld .gps-ld-rail > *,#gps-overlay.gps-sun .gps-banner,'
+        +   '#gps-overlay.gps-sun .gps-lc-hole,#gps-overlay.gps-sun .gps-lc-score{background:#000 !important;border:2px solid #fff !important;color:#fff !important;box-shadow:0 4px 14px rgba(0,0,0,.45);}'
+        + '#gps-overlay.gps-sun .gps-lbl,#gps-overlay.gps-sun .gps-hole-lbl,#gps-overlay.gps-sun .gps-hole-num,#gps-overlay.gps-sun.gps-ld .gps-hole-caret,#gps-overlay.gps-sun.gps-ld .gps-back,'
+        +   '#gps-overlay.gps-sun .gps-ld-par,#gps-overlay.gps-sun .gps-lc-l1,#gps-overlay.gps-sun .gps-lc-l2,#gps-overlay.gps-sun .gps-lc-acc{color:#fff !important;opacity:1 !important;}'
+        + '#gps-overlay.gps-sun .gps-ld-div,#gps-overlay.gps-sun .gps-ld-par{border-color:#fff;}#gps-overlay.gps-sun .gps-ld-div{background:#fff;}'
+        + '#gps-overlay.gps-sun.gps-ld .gps-ld-top .gps-num-mid .gps-big{color:#fff;font-size:clamp(46px,15.5vw,60px);}'
+        + '#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-lbl,#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-big{color:#ffe600 !important;font-weight:800;}'
+        + '#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-big{font-size:19px;}'
+        + '#gps-overlay.gps-sun .gps-door-games{background:#ffe600 !important;color:#000 !important;border:2px solid #000;}'
+        + '#gps-overlay.gps-sun .gps-ld-plays{background:#000 !important;color:#fff !important;border:2px solid #fff;}'
+        + '#gps-overlay.gps-sun .gps-ld-pl small,#gps-overlay.gps-sun .gps-ld-i{color:#fff !important;}'
+        + '#gps-overlay.gps-sun .gps-ld-raw{background:#000;color:#fff;border:3px solid #ffe600;}'
+        + '#gps-overlay.gps-sun.gps-ld .gps-ld-bottom .gps-mark-shot{background:#000;border:2px solid #fff;color:#ffe600;}'
+        + '#gps-overlay.gps-sun .gps-side-bets,#gps-overlay.gps-sun .gps-tools{background:#000 !important;border:2px solid #fff !important;}'
+        + '#gps-overlay.gps-sun .gps-side-bets .gps-ico,#gps-overlay.gps-sun .gps-side-bets .gps-cap,#gps-overlay.gps-sun .gps-tools .gps-ico,#gps-overlay.gps-sun .gps-tools .gps-cap{color:#fff !important;}'
+        + '#gps-overlay.gps-sun .gps-scorebox{background:#fff !important;border:2px solid #000;}'
+        + '#gps-overlay.gps-sun .gps-scorebox,#gps-overlay.gps-sun .gps-scorebox *{color:#000;}'
+        + '#gps-overlay.gps-sun.gps-ld .gps-pill-to,#gps-overlay.gps-sun.gps-ld .gps-pill-on{background:#000;color:#fff;border:3px solid #ffe600;}'
+        + '#gps-overlay.gps-sun .gps-pill{background:#000;color:#fff;}'
+        + '#gps-overlay.gps-sun .gps-panel{background:#000;border-top:2px solid #fff;}'
+        + '#gps-overlay.gps-sun.gps-lc .gps-lc-nums .gps-num-mid .gps-big{color:#fff;font-size:clamp(48px,16.5vw,62px);}'
+        + '#gps-overlay.gps-sun.gps-lc .gps-lc-nums .gps-num-f .gps-big,#gps-overlay.gps-sun.gps-lc .gps-lc-nums .gps-num-b .gps-big,#gps-overlay.gps-sun.gps-lc .gps-lc-nums .gps-num-f .gps-lbl,#gps-overlay.gps-sun.gps-lc .gps-lc-nums .gps-num-b .gps-lbl{color:#ffe600 !important;}'
+        + '#gps-overlay.gps-sun.gps-lc .gps-lc-acts > *{background:#000;border:2px solid #fff;color:#fff;}'
+        + '#gps-overlay.gps-sun.gps-lc .gps-lc-plays .gps-pl-line,#gps-overlay.gps-sun.gps-lc .gps-lc-plays .gps-suggest,#gps-overlay.gps-sun.gps-lc .gps-lc-plays .gps-pl-info{color:#ffe600;}'
+        + '#gps-overlay.gps-sun .gps-credit{background:#000;color:#fff;}'
+        // A small phone (SE): the MIDDLE keeps its ~30% - the hole number, F / B and Par give it room.
+        + '@media (max-width:389px){#gps-overlay.gps-sun.gps-ld .gps-ld-top{gap:4px;padding-right:8px;}#gps-overlay.gps-sun.gps-ld .gps-back{width:30px;font-size:26px;}'
+        +   '#gps-overlay.gps-sun.gps-ld .gps-hole-num{font-size:28px;}#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-big{font-size:16px;}#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-lbl{font-size:12px;}'
+        +   '#gps-overlay.gps-sun .gps-ld-par{font-size:13px;padding-left:6px;}}'
+        // The round map buttons (Recenter, zoom, back in C): black with a white outline too.
+        + '#gps-overlay.gps-sun .gps-recenter,#gps-overlay.gps-sun .gps-zoom-side,#gps-overlay.gps-sun.gps-lc .gps-back{background:#000 !important;border:2px solid #fff !important;color:#fff !important;-webkit-backdrop-filter:none;backdrop-filter:none;}'
+        // Layout C's distance numbers (outlined text there): the same black bubble with a yellow ring.
+        + '#gps-overlay.gps-sun.gps-lc .gps-pill-to,#gps-overlay.gps-sun.gps-lc .gps-pill-on{background:#000;color:#fff;border:3px solid #ffe600;border-radius:999px;padding:.12em .35em;font-size:32px;text-shadow:none;box-shadow:0 3px 10px rgba(0,0,0,.4);}'
         // THE TOOLS SHEET (012, switch toolsSheet): layouts D and C only.
         // A tall sheet (big text, SE, the score sheet's extra switch) stops 48px under the top bar: a strip
         // of the dimmed map always shows, to tap outside.
@@ -6138,6 +6239,9 @@
         // 012 part 4: both legs - { toTarget, toGreen: { yards, plays, unit, text: '60 · plays 63' } | null, single, par3 }.
         playsLegs: function () { try { return playsLegsOut(); } catch (e) { return null; } },
         hole: function () { return S ? Number(S.hole) : null; },
+        // 022 Sun mode: the setting, whether it is on now, and the daylight maths (pure, for tests).
+        display: function () { return displayPref(); }, setDisplay: function (v) { setDisplay(v); }, sunOn: function () { return !!(S && S.el && S.el.classList.contains('gps-sun')); },
+        sunHours: sunHours, isDaylight: isDaylight,
         // URGENT-022 (the GPS course check): what the map frames on this hole - the tee and the green,
         // whether each is in view, and the course's own point.
         holeCheck: function () {
