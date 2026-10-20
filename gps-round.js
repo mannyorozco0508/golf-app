@@ -263,7 +263,7 @@
         var html = head('Settle up', true);
         if (!res) html += '<div class="hs-gate">Couldn’t total the money - open the full review below.</div>';
         else if (missing) html += '<div class="hs-gate">Money so far - not final: ' + missing + ' score' + (missing === 1 ? '' : 's') + ' still missing.</div>';
-        html += '<div class="hs-h">' + (!tx.length ? 'Who pays who' : (tx.length === 1 ? 'One payment' : tx.length + ' payments') + ' settle everything') + '</div>';
+        html += '<div class="hs-h">' + (!tx.length ? 'Who pays who' : (tx.length === 1 ? 'One payment settles' : tx.length + ' payments settle') + ' everything') + '</div>';
         html += tx.length ? tx.map(function (t) {
             return '<div class="hs-row hs-pay"><div class="hs-grow"><b>' + esc(t.from) + '</b> → <b>' + esc(t.to) + '</b></div><span class="hs-amt">$' + whole(t.amount) + '</span></div>';
         }).join('') : '<div class="hs-row">Everyone’s square - nobody owes anybody.</div>';

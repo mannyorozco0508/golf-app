@@ -2591,7 +2591,7 @@ html {
             pressSet.pressResults.forEach(pr => {
                 const winnerName = pr.roundComplete && pr.winner ? (pr.winner === pr.p1.id ? pr.p1.name : pr.p2.name) : null;
                 const prStatus = !pr.roundComplete
-                    ? `Not yet final — thru ${pr.holesCompleted} holes of this press`
+                    ? `Not yet final — thru ${pr.holesCompleted} hole${pr.holesCompleted === 1 ? '' : 's'} of this press`
                     : (winnerName ? `${escapeHtml(winnerName)} won $${pr.stake}` : 'Tied, no money');
                 pressBreakdownHtml += `<div class="breakdown-item"><span>Press ${pr.pressNum} (Hole ${pr.startHole}, $${pr.stake}):</span> <span>${prStatus}</span></div>`;
             });
