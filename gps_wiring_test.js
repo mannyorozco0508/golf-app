@@ -163,8 +163,8 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     assert.ok(Object.entries(cfg.features).filter(([k]) => k !== 'elevMyCell' && k !== 'simpleGames' && k !== 'lineSave').every(([, v]) => v === true));
     // URGENT-016: the 3-step Games setup ships OFF (Games & Bets = the original setup).
     assert.strictEqual(cfg.features.simpleGames, false, 'simpleGames ships off');
-    // URGENT-026: "Save this line" ships OFF until its rules addition is deployed (Manny's typed OK).
-    assert.strictEqual(cfg.features.lineSave, false, 'lineSave ships off');
+    // URGENT-026: "Save this line" ON - its rules addition is deployed (Manny's typed OK, 2026-10-20).
+    assert.strictEqual(cfg.features.lineSave, true, 'lineSave is on');
     // 012: the golfer's ~10 m cell height fetch ships OFF (the location rule - Manny's own OK).
     assert.strictEqual(cfg.features.elevMyCell, false, 'elevMyCell ships off');
     // 009: the My bag account sync is built but ships OFF (its rule is phase 2, not live).

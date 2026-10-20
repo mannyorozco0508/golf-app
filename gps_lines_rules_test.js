@@ -46,14 +46,21 @@ test('TODAY (the live rules): a line is refused - $other is write:false; the gre
     assert.strictEqual(REPO_RULES.rules.course_gps, undefined, 'database.rules.json is not touched');
 });
 
-test('the app ships DARK: features.lineSave is false until the rules are deployed', () => {
+test('the app ships ON: features.lineSave is true now the rules are deployed (Manny, 2026-10-20: "OK lineSave on")', () => {
     const src = fs.readFileSync(path.join(__dirname, 'gps-config.js'), 'utf8');
-    assert.match(src, /lineSave: false/);
+    assert.match(src, /lineSave: true/);
     const view = fs.readFileSync(path.join(__dirname, 'gps-view.js'), 'utf8');
     assert.match(view, /f\.lineSave === true/, 'the button needs the switch exactly true');
     // ONE writer for a line (writeLine), reached only from the button's tap - no test write to feature-detect.
     assert.strictEqual((view.match(/\/lines\/' \+ k\)\.set\(/g) || []).length, 1);
     assert.match(view, /function saveLine\(\) \{\s*var st = saveLineState\(\);\s*if \(!st\) return;/);
+});
+
+test('DEPLOYED: the live rules (read back 2026-10-20) carry exactly the proposed lines block', () => {
+    const live = path.join(process.env.HOME || '', 'Desktop/claude-code-reports/026/rules-deploy/live-after-2026-10-20.json');
+    if (!fs.existsSync(live)) return;
+    const r = JSON.parse(fs.readFileSync(live, 'utf8'));
+    assert.deepStrictEqual(r.rules.course_gps.$courseKey.lines, PROPOSAL.lines);
 });
 
 test('proposed: any signed-in member of a round AT the course saves an EMPTY hole\'s line', () => {

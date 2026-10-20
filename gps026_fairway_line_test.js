@@ -149,7 +149,7 @@ test('the view: one shape for the target and the flyover; the caption hidden in 
     assert.match(v, /flyMark\('flying'\);\s*\/\/ URGENT-026[^\n]*\n\s*if \(cap\) cap\.style\.display = 'none';/);
     assert.match(v, /if \(!out\.data && G\.savedLine\)/, 'a saved line only where there is no path data');
     assert.match(v, /f\.lineSave === true/);
-    assert.match(fs.readFileSync(path.join(__dirname, 'gps-config.js'), 'utf8'), /lineSave: false/);
+    assert.match(fs.readFileSync(path.join(__dirname, 'gps-config.js'), 'utf8'), /lineSave: true/);
 });
 
 test('a bunker the drive carries before the fairway starts (the lay-up would sit outside the fairway) is not the target', () => {
