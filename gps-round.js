@@ -260,6 +260,8 @@
             }).join('');
         }
         html += '<button type="button" class="hs-btn lime" data-hs="share-pay">Share who pays who</button>'
+            // 018: a bet on holes already played, still possible once the round is over.
+            + '<button type="button" class="hs-btn alt" data-hs="add-bet">+ Add a bet on this round</button>'
             + '<button type="button" class="hs-btn alt" data-hs="review">Review scores · Receipt</button>';
         return show('finish', html, 'Settle up');
     }
@@ -289,6 +291,7 @@
             if (typeof openRoundQrSheet === 'function') openRoundQrSheet(null);
             return;
         }
+        if (a === 'add-bet') { closeSheet(true); if (B()) B().open(); return; }
         if (a === 'share-pay') { shareText('Settle up', payText(settle()), ''); return; }
         if (a === 'review') {
             closeSheet(true); closeBets();
