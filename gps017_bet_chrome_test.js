@@ -77,7 +77,8 @@ test('the card and the GPS have "+ Bet" and the money chip', { timeout: 60000 },
 test('+ Bet Match 2v2 mid-round writes New Action\'s record (sideMatchPayloadFromTerms)', { timeout: 60000 }, async () => {
     await tapIn('#gps-overlay .gps-bet-btn');
     const tiles = JSON.parse(await ev('JSON.stringify(Array.prototype.map.call(document.querySelectorAll("#hp-bet .hb-tile b"), function(b){return b.innerText;}))'));
-    assert.deepEqual(tiles, ['Match', 'Nassau', 'Skins', 'More games ›'], 'no Hi-Lo tile without hilo-engine.js');
+    // Hi-Lo is in the tree (gps-features 3e7654b): the first row is Match · Nassau · Hi-Lo · Skins (018).
+    assert.deepEqual(tiles, ['Match', 'Nassau', 'Hi-Lo', 'Skins', 'More games ›']);
     await tapIn('#hp-bet [data-hb-game="match"]');
     await pick(['101', '102', '103', '104']);
     assert.equal(await ev('document.querySelector("#hp-bet .hb-vs").innerText'), 'Bob + Manny vs Skeens + Paul');
@@ -124,11 +125,12 @@ test('Skins: New Action\'s additionalGameInstances entry; a Group 1 link cannot 
         skinsScoring: 'gross', skinsCarryOver: false, participantIds: ['101', '102', '103'] });
 });
 
-test('Hi-Lo: a tile only with the Hi-Lo module; four golfers; the same builder', { timeout: 60000 }, async () => {
-    // The 016 module when this tree has it; otherwise its two entry points stood in (the tile's gate).
-    const src = fs.existsSync(path.join(__dirname, 'hilo-engine.js')) ? fs.readFileSync(path.join(__dirname, 'hilo-engine.js'), 'utf8')
-        : 'window.hiloShapeOk = function (a, b) { return a.length === 2 && b.length === 2; }; window.hiloForSideMatch = function () { return null; };';
-    await ev(src + ';1');
+test('Hi-Lo: a tile only with the Hi-Lo module (the real hilo-engine.js); four golfers; the same builder', { timeout: 60000 }, async () => {
+    assert.equal(await ev('typeof calculateHiLoSideMatch === "function" && typeof hiloShapeOk === "function"'), true, 'hilo-engine.js is not loaded');
+    // WITHOUT the module (simulated: its two entry points hidden for one open) there is no tile.
+    const without = JSON.parse(await ev('(function(){ var a = window.hiloShapeOk, b = window.hiloForSideMatch; window.hiloShapeOk = undefined; window.hiloForSideMatch = undefined; '
+        + 'HardPanBet.open(); var t = Array.prototype.map.call(document.querySelectorAll("#hp-bet .hb-tile b"), function(x){ return x.innerText; }); HardPanBet.close(); window.hiloShapeOk = a; window.hiloForSideMatch = b; return JSON.stringify(t); })()'));
+    assert.deepEqual(without, ['Match', 'Nassau', 'Skins', 'More games ›']);
     await ev('HardPanBet.open()');
     const tiles = JSON.parse(await ev('JSON.stringify(Array.prototype.map.call(document.querySelectorAll("#hp-bet .hb-tile b"), function(b){return b.innerText;}))'));
     assert.deepEqual(tiles, ['Match', 'Nassau', 'Hi-Lo', 'Skins', 'More games ›']);
