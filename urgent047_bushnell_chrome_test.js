@@ -1,13 +1,14 @@
-// URGENT-047 B - LAUNCH MONITOR QUICK ENTRY, IN REAL CHROME (393x852 and 375x667).
+// URGENT-047 B - TYPE MY CARRIES (8:15 AM: typed grid only), IN REAL CHROME (393x852 and 375x667).
 // A made-up course (synthetic - no licensed data), 2 golfers; Ann is this phone's golfer.
-//   1  GPS map > Tools > My bag: the "Enter carries from my Bushnell" door (list view)
-//   2  the grid: a row per My bag club, "My bag now" per row, on screen, no sideways scroll
+//   1  GPS map > Tools > My bag: the "Type my carries" door (list view)
+//   2  the grid: titled "Type my carries", a row per My bag club, "My bag now" per row, on screen,
+//      no sideways scroll, no Bushnell / Launch Pro / Foresight text on screen
 //   3  a bad carry (600) is flagged and NOTHING is written
 //   4  Driver 247, 7-iron 158, PW 121 typed -> Update my bag -> hardpan_bag_v1 set = those
 //      (the 6-iron typed earlier in My bag kept: blank rows keep their number)
 //   5  Open My bag: the rows show 247 / 158 / 121 "entered"
 //   6  the guard: no database write, no request carries a carry or a position
-// Screenshots into SHOTS_047 when set.
+// Screenshots (393x852 only) into SHOTS_047 when set, named type-my-carries-<n>.png.
 'use strict';
 const fs = require('fs'), path = require('path');
 if (!fs.existsSync(path.join(__dirname, 'gps-view.js'))) { console.log('Consumer tree - skipped.'); process.exit(0); }
@@ -40,7 +41,7 @@ const SHOTS = process.env.SHOTS_047 || '';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
-    test('Bushnell quick entry at ' + vp.width + 'x' + vp.height, { timeout: 180000 }, async () => {
+    test('Type my carries at ' + vp.width + 'x' + vp.height, { timeout: 180000 }, async () => {
         const r0 = round(), ann = String(r0.players[0].id);
         const PRE = 'window.__hardpanDoors = true; window.__simpleFlow = true;' + iapStub({ active: true }) + CFG + GEO + 'window.HardPanGolfApi = ' + JSON.stringify(GAPI) + ';'
             + "try{localStorage.setItem('golfapp_me_" + CODE + "','" + ann + "');localStorage.setItem('hardpan_round_side','gps|" + CODE + "');sessionStorage.setItem('groupPickDismissed:" + CODE + "','1');"
@@ -50,7 +51,9 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             viewport: vp, webgl: true, preScript: PRE });
         const ev = (x) => j.evaluate(x);
         const until = async (x, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await ev(x)) return true; await sleep(250); } return false; };
-        const shot = async (n) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await sleep(1200); await j.shot(path.join(SHOTS, 'chrome-' + vp.width + 'x' + vp.height + '-' + n + '.png')); } };
+        const shot = async (n) => { if (SHOTS && vp.width === 393) { fs.mkdirSync(SHOTS, { recursive: true }); await sleep(1200); await j.shot(path.join(SHOTS, 'type-my-carries-' + n + '.png')); } };
+        const BRANDS = /bushnell|launch ?pro|foresight/i;
+        const screenText = () => ev("document.getElementById('gps-overlay') ? document.getElementById('gps-overlay').innerText + ' ' + Array.prototype.map.call(document.querySelectorAll('#gps-overlay [aria-label],#gps-overlay [placeholder]'), function (e) { return (e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('placeholder') || ''); }).join(' ') : ''");
         const shown = (sel) => "(function(){ var s = document.querySelector('#gps-overlay " + sel + "'); return !!s && s.style.display !== 'none' && s.getBoundingClientRect().height > 0; })()";
         try {
             await j.goto(fileUrl('index.html', 'game=' + CODE), 5000);
@@ -62,7 +65,8 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             await ev("document.querySelector('#gps-overlay .gps-my-bag').click()");
             assert.ok(await until(shown('.gps-bag') + " && document.querySelector('#gps-overlay .gps-bag').getAttribute('data-bag-view') === 'list'", 8000), 'My bag (list)');
             assert.ok(await until(shown('.gps-bag-lm'), 4000), 'the door');
-            assert.equal(await ev("document.querySelector('#gps-overlay .gps-bag-lm').textContent.trim()"), 'Enter carries from my Bushnell');
+            assert.equal(await ev("document.querySelector('#gps-overlay .gps-bag-lm').textContent.trim()"), 'Type my carries');
+            assert.doesNotMatch(await screenText(), BRANDS, 'My bag: no Bushnell / Launch Pro / Foresight');
             await shot('1-my-bag-door');
             await ev("document.querySelector('#gps-overlay .gps-bag-lm').click()");
             // 2. the grid
@@ -74,8 +78,12 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             assert.equal(g.rows, g.clubs, 'a row per My bag club');
             assert.equal(g.now6, '168 · entered'); assert.equal(g.nowDr, '—');
             assert.ok(g.top >= 0 && g.right <= g.w && g.sw <= g.w, 'on screen, no sideways scroll');
-            assert.match(g.text, /Type the CARRY your Bushnell showed/);
-            assert.match(g.text, /no Bushnell sign-in/);
+            assert.equal(await ev("document.querySelector('#gps-overlay .gps-lm-title').textContent"), 'Type my carries · Ann');
+            assert.equal(await ev("document.querySelector('#gps-overlay .gps-lm').getAttribute('aria-label')"), 'Type my carries');
+            assert.match(g.text, /Type the CARRY for each club/);
+            assert.match(g.text, /Saved on this phone only/);
+            assert.doesNotMatch(await screenText(), BRANDS, 'the sheet: no Bushnell / Launch Pro / Foresight');
+            assert.equal(await ev("document.querySelectorAll('#gps-overlay .gps-lm input[type=file]').length"), 0, 'no file import');
             assert.doesNotMatch(g.text, /password|email/i);
             const type = (c, v) => ev("(function(){ var i = document.querySelector('#gps-overlay [data-lm-club=\"" + c + "\"]'); i.focus(); i.value = '" + v + "'; i.dispatchEvent(new Event('input', { bubbles: true })); return 1; })()");
             // 3. a bad number: flagged, nothing written
@@ -94,6 +102,7 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             const rec = JSON.parse(await ev("localStorage.getItem('hardpan_bag_v1')"));
             assert.deepEqual(rec.golfers['n:ann alpha'].set, { '6i': 168, Dr: 247, '7i': 158, PW: 121 });
             assert.deepEqual(Object.keys(rec.golfers), ['n:ann alpha'], 'Ann only');
+            assert.doesNotMatch(await screenText(), BRANDS, 'after the update: no brand names');
             await shot('3-grid-updated');
             // 5. My bag after the update
             await ev("document.querySelector('#gps-overlay .gps-lm-openbag').click()");

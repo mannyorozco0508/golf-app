@@ -1,29 +1,28 @@
 // ============================================================================
-// HARDPAN GPS - LAUNCH MONITOR QUICK ENTRY (URGENT-047 part B, Bushnell Launch Pro)
+// HARDPAN GPS - TYPE MY CARRIES (URGENT-047 part B, changed 8:15 AM: typed grid only)
 //
-// My bag > "Enter carries from my Bushnell": ONE grid, a row per club in My bag, the golfer
-// types the carry the launch monitor showed. "Update my bag" writes the typed carries into
-// the EXISTING My bag with gps-shots.js HardPanGpsBag.set - the same { set: { <club>: yd } }
-// a number typed in My bag writes (and the same call Range, 047 part A, uses), so My bag
-// shows them as "entered" and the account sync (clubsSync, off today) carries them exactly
-// as it carries any typed number. A blank row keeps that club's number as it is.
-//
-// WHY TYPING: the Launch Pro's iPhone app is Foresight Sports' "Foresight" app; its export
-// format is not documented anywhere public (see claude-code-reports/047/bushnell/FACTS.md),
-// so there is no file import and no screenshot reading here.
+// My bag > "Type my carries": ONE grid, a row per club in My bag, the golfer types each
+// club's carry. "Update my bag" writes the typed carries into the EXISTING My bag with
+// gps-shots.js HardPanGpsBag.set - the same { set: { <club>: yd } } a number typed in My bag
+// writes (and the same call Range, 047 part A, uses), so My bag shows them as "entered" and
+// the account sync (clubsSync, off today) carries them exactly as it carries any typed number.
+// A blank row keeps that club's number as it is. No file import, no screenshot reading.
+// (The file keeps its old name, gps-bushnell.js, so the shell lists do not churn.)
 //
 // PRIVACY: yards only. Nothing is stored here (the numbers go straight into My bag on this
-// phone), nothing is sent anywhere, and no Bushnell / Foresight sign-in is ever asked for
-// (gps_bushnell_test.js is the guard).
+// phone), nothing is sent anywhere, and no sign-in is ever asked for (gps_bushnell_test.js
+// is the guard).
 //
 // API (window.HardPanLaunchEntry):
 //   open(ctx) / close() / isOpen()   ctx = { el, golfer, units(), flash(t), saved(), openBag() }
 //   parse(values, metres) -> { carries: { <club>: yd }, bad: [<club>] }   (pure)
 //   applyToBag(B, golfer, carries) -> { <club>: yd } written with B.set
+//   TITLE = 'Type my carries'
 // ============================================================================
 (function () {
     'use strict';
     var W = typeof window !== 'undefined' ? window : {};
+    var TITLE = 'Type my carries';
     var M_PER_YD = 0.9144, MIN_YD = 1, MAX_YD = 449;
     var CLUBS = ['Dr', '3w', '5w', 'Hy', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
     var NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
@@ -95,13 +94,13 @@
                 + '<span class="gps-lm-name">' + esc(nameOf(c)) + '</span>'
                 + '<span class="gps-lm-now" data-lm-now="' + c + '">' + esc(now) + '</span>'
                 + '<input type="number" inputmode="decimal" min="1" max="449" class="gps-lm-yd" data-lm-club="' + c + '" value="' + esc(val) + '" placeholder="' + unit()
-                +   '" aria-label="' + esc(nameOf(c)) + ' carry from the launch monitor, ' + (m() ? 'meters' : 'yards') + '"></div>';
+                +   '" aria-label="' + esc(nameOf(c)) + ' carry, ' + (m() ? 'meters' : 'yards') + '"></div>';
         }).join('');
         var done = st.done ? '<div class="gps-lm-done" role="status">✓ My bag updated: ' + esc(Object.keys(st.done).map(function (c) { return shortOf(c) + ' ' + shown(st.done[c]); }).join(', '))
             + ' <button type="button" class="gps-lm-openbag">Open My bag</button></div>' : '';
         sh.innerHTML = ''
-            + '<div class="gps-lm-head"><div class="gps-lm-title">Launch monitor carries' + (who ? ' · ' + esc(who) : '') + '</div><button type="button" class="gps-lm-x">Done</button></div>'
-            + '<div class="gps-lm-sub">Type the CARRY your Bushnell showed for each club (' + unit() + '). Leave a club blank to keep its number. On this phone only - no Bushnell sign-in.</div>'
+            + '<div class="gps-lm-head"><div class="gps-lm-title">' + TITLE + (who ? ' · ' + esc(who) : '') + '</div><button type="button" class="gps-lm-x">Done</button></div>'
+            + '<div class="gps-lm-sub">Type the CARRY for each club (' + unit() + '). Leave a club blank to keep its number. Saved on this phone only.</div>'
             + '<div class="gps-lm-cols"><span class="gps-lm-name">Club</span><span class="gps-lm-now">My bag now</span><span class="gps-lm-yd-h">Carry</span></div>'
             + '<div class="gps-lm-grid">' + rows + '</div>'
             + (st.err ? '<div class="gps-lm-err" role="alert">' + esc(st.err) + '</div>' : '')
@@ -126,7 +125,7 @@
         if (!sh) {
             sh = document.createElement('div');
             sh.className = 'gps-lm gps-float gps-scroll-ok';
-            sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-label', 'Launch monitor carries');
+            sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-label', TITLE);
             sh.addEventListener('click', onClick);
             // Return in a box goes to the next club's box (the last one: Update my bag).
             sh.addEventListener('keydown', function (e) {
@@ -167,7 +166,7 @@
         var s = document.createElement('style'); s.id = 'gps-lm-css'; s.textContent = CSS; (document.head || document.documentElement).appendChild(s);
     }
 
-    var api = { open: open, close: close, isOpen: isOpen, parse: parse, applyToBag: applyToBag, ensureCss: ensureCss, MAX_YD: MAX_YD };
+    var api = { open: open, close: close, isOpen: isOpen, parse: parse, applyToBag: applyToBag, ensureCss: ensureCss, MAX_YD: MAX_YD, TITLE: TITLE };
     W.HardPanLaunchEntry = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
