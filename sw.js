@@ -4748,6 +4748,8 @@ const SHELL_FILES = [
     './gps-round-edit.js',
     // 022 (1): Lock Screen / Dynamic Island yardages (the app only).
     './gps-live-activity.js',
+    // URGENT-045: the shared "Mark ..." button (KP by GPS, Long Drive; distances only).
+    './gps-mark-distance.js',
     // Simpler HardPan (017): the 3-step New round on Round Setup.
     './simple-flow.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).

@@ -3953,6 +3953,24 @@
         syncWind();
         maybeAskWho();
         aaTick();
+        markTick(r);
+    }
+    // URGENT-045 THE "MARK ..." BUTTON (gps-mark-distance.js; KP by GPS gps-kp.js, Long Drive): on the
+    // holes a feature claims. What it is handed: the hole, a getter for the live fix (read on the
+    // phone, never kept there), the tee and the green, the fairway rings and the saved line - the
+    // features record DISTANCES only.
+    function markTick(r) {
+        try {
+            var K = window.HardPanMark;
+            if (!K || typeof K.sync !== 'function' || !S) return;
+            var sh = r && r.tee && r.mid ? holeShape(S.hole, r, r.mid) : null;
+            var sv = r && r.tee && r.mid && G.savedLine ? G.savedLine(savedLineRec(S.hole), r.tee, r.mid) : null;
+            K.sync({ el: S.el, hole: S.hole, par: S.par, eventCode: S.eventCode, golfer: scoreFor(), flash: flash,
+                on: !!(S.pro && S.mode === 'measure' && S.side === 'gps' && !S.replay && !S.flying && !readOnlyHere() && !tournament()),
+                fix: function () { dropStaleFix(); return fix ? { pt: [fix.pt[0], fix.pt[1]], acc: fix.acc, at: fix.at } : null; },
+                tee: r && r.tee ? r.tee : null, mid: r && r.mid ? r.mid : null,
+                fairway: sh && sh.fairway ? sh.fairway : null, savedLine: sv || null });
+        } catch (e) {}
     }
     // ---- SHOT BY SHOT (gps-features): mark, then replay - on this phone only ------
     function shotsApi() { return window.HardPanGpsShots || null; }
