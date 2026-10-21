@@ -163,7 +163,7 @@ test('the likely club: My bag carries vs the yards to the green (shortest that g
     assert.equal(env.C.likelyClub(env.B, 'Manny', 5), null, 'too close: no guess');
 });
 
-test('swipe-to-delete hook: remove(id) deletes that one shot from the log', { skip }, () => {
+test('delete by id: remove(id) deletes that one shot from the log', { skip }, () => {
     const env = sandbox(), T = track(env), green = off(TEE, 160, 0);
     T.mark(TEE, info(green, { club: '7i' }));
     const r = T.mark(off(TEE, 150, 0), info(green, { club: '8i' }));
@@ -171,7 +171,7 @@ test('swipe-to-delete hook: remove(id) deletes that one shot from the log', { sk
     assert.equal(env.L.list({ golfer: 'Manny' }).length, 2);
     assert.equal(env.C.remove(r.closed.id), true);
     assert.deepEqual(env.L.list({ golfer: 'Manny' }).map((s) => s.club), ['8i']);
-    assert.equal(typeof env.C.swipeDelete, 'function');
+    assert.equal(env.C.swipeDelete, undefined, 'int-049: one delete path - Shot history (gps-shot-bag.js)');
 });
 
 test('gps-view wiring: every mark asks; tournament / spectator never; the green and the hole\'s end close; looking ahead does not', { skip }, () => {

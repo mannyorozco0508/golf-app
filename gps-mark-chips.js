@@ -17,7 +17,7 @@
 // (HardPanWindLearn.relAngle, part 2) with its along / across parts, temperature,
 // elevation change, course, hole, date. NEVER a coordinate: the marks live in memory
 // on this phone only while a shot is open and are not in the record.
-// Pure (no DOM) except swipeDelete(); gps-view.js draws the chip row.
+// Pure (no DOM); gps-view.js draws the chip row.
 // ============================================================================
 (function () {
     'use strict';
@@ -141,48 +141,15 @@
         };
     }
 
-    // DELETE A SHOT MARKED BY MISTAKE (the shot list is part 3's): remove(id) calls
-    // HardPanShotLog.remove. swipeDelete(listEl, onDone) makes every row with data-shot-id
-    // swipe-left-to-delete (past 80 px, or a fast flick past 40) - the hook part 3's list uses.
+    // DELETE A SHOT MARKED BY MISTAKE: ONE PATH (int-049). The Shot history sheet (gps-shot-bag.js,
+    // part 3: swipe a row left, tap Delete) is the only list and the only swipe; it removes through
+    // HardPanShotLog.remove once. remove(id) here is the same call for code that holds an id
+    // (e.g. the last counted shot). The chips' own swipe handler (data-shot-id rows) is gone - no
+    // list ever used it, and two swipe handlers on one row could delete twice.
     function remove(id, golfer) { var L = log(); if (!L || !id || typeof L.remove !== 'function') return false; return L.remove(id, golfer) !== false; }
-    function swipeDelete(listEl, onDone) {
-        if (!listEl || listEl.__hpSwipe) return;
-        listEl.__hpSwipe = true;
-        var row = null, x0 = 0, y0 = 0, t0 = 0, dx = 0, horiz = null;
-        listEl.addEventListener('pointerdown', function (e) {
-            row = e.target && e.target.closest ? e.target.closest('[data-shot-id]') : null;
-            if (!row) return;
-            x0 = e.clientX; y0 = e.clientY; t0 = Date.now(); dx = 0; horiz = null;
-        });
-        listEl.addEventListener('pointermove', function (e) {
-            if (!row) return;
-            var mx = e.clientX - x0, my = e.clientY - y0;
-            if (horiz === null && (Math.abs(mx) > 8 || Math.abs(my) > 8)) horiz = Math.abs(mx) > Math.abs(my);
-            if (!horiz) return;
-            dx = Math.min(0, mx);
-            row.style.transform = 'translateX(' + dx + 'px)';
-        });
-        function end() {
-            if (!row) return;
-            var r = row, fast = Date.now() - t0 < 250 && dx < -40;
-            row = null;
-            if (horiz && (dx < -80 || fast)) {
-                var id = r.getAttribute('data-shot-id');
-                if (remove(id, r.getAttribute('data-shot-golfer') || undefined)) {
-                    r.style.transition = 'transform .15s'; r.style.transform = 'translateX(-110%)';
-                    setTimeout(function () { if (r.parentNode) r.parentNode.removeChild(r); if (onDone) onDone(id); }, 160);
-                    return;
-                }
-            }
-            r.style.transition = 'transform .15s'; r.style.transform = '';
-            setTimeout(function () { r.style.transition = ''; }, 160);
-        }
-        listEl.addEventListener('pointerup', end);
-        listEl.addEventListener('pointercancel', end);
-    }
 
     var api = { create: create, buildRecord: buildRecord, likelyClub: likelyClub, wxHour: wxHour, srcOf: srcOf,
-        remove: remove, swipeDelete: swipeDelete, M_PER_YD: M_PER_YD };
+        remove: remove, M_PER_YD: M_PER_YD };
     W.HardPanMarkChips = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
