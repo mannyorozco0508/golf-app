@@ -4281,7 +4281,7 @@
                 var ws = document.createElement('span'); ws.textContent = wl.text; wd.appendChild(ws);
                 var hbt = document.createElement('button'); hbt.type = 'button'; hbt.className = 'gps-bag-hist'; hbt.setAttribute('data-bag-hist', c);
                 hbt.textContent = 'Shot history' + (logged ? ' (' + logged + ')' : ''); hbt.setAttribute('aria-label', B.NAMES[c] + ' shot history');
-                wd.appendChild(hbt);
+                if (logged) wd.appendChild(hbt);
                 row.appendChild(wd);
             }
             list.appendChild(row);
