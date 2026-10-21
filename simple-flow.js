@@ -668,6 +668,9 @@
         if (!rows.length) return;
         var want = ls(TEE_MEM + key);
         var hit = want ? rows.filter(function (r) { return r.name.toLowerCase() === want.toLowerCase(); })[0] : null;
+        // URGENT-048: a course this phone has not played yet takes Profile's default tees (hp-auth.js) when it has them.
+        var dflt = !want ? String(ls('hardpan_default_tees') || '').trim().toLowerCase() : '';
+        if (!hit && dflt) hit = rows.filter(function (r) { return r.name.toLowerCase() === dflt; })[0] || null;
         if (!hit) hit = middleTee(rows);
         // Only once the round select holds THIS course's tees (it fills one read after the pick).
         if (!hit || !Array.prototype.some.call(sel.options, function (o) { return o.value === hit.key; })) return;
