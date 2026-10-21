@@ -626,6 +626,8 @@
     function ssStrokes(pid) { return ss.pend[pid] || ssSaved(pid); }
     // URGENT-005: the stats rows are for the golfer this phone IS (ctx.own - index.html qsOwnId), not
     // whoever's chip is picked; nobody's when the phone is nobody; everyone's with Track stats for others.
+    // URGENT-034: the golfer this phone IS (the same rule as the stats rows). They never auto-advance.
+    function ssIsOwn(pid) { var c = ss.ctx; var me = ('own' in c) ? c.own : c.pick; return me != null && String(pid) === String(me); }
     function ssStatsFor(pid) { var c = ss.ctx; var me = ('own' in c) ? c.own : c.pick; return !!(c.stats && !practiceOn(c.code) && ((me != null && String(pid) === String(me)) || othersOn())); }
     function ssCell(pid) { var c = ss.ctx; return qHole(c.code, pid, c.hole, ssStrokes(pid), c.par); }
     function ssIsOpen() { return !!(ss && ss.wrap && ss.wrap.style.display !== 'none'); }
@@ -787,7 +789,12 @@
         var showStats = ssStatsFor(pid);
         foot.querySelector('[data-ss-notes]').style.display = showStats ? '' : 'none';
         foot.querySelector('[data-ss-notes]').classList.toggle('on', !!ss.notes);
-        foot.querySelector('[data-ss-save]').textContent = away ? 'Save · back to hole ' + c.home : (c.last ? 'Save' : 'Save · Next hole ›');
+        // URGENT-034: while another golfer still has no score (and this one has), the button says where
+        // it goes - "Next: Paul ›" - and only moves the sheet there (nothing is saved or lost). Everyone
+        // scored, or this golfer not yet: Save, as before.
+        var sv = foot.querySelector('[data-ss-save]'), nxt = ssNextTarget(), nxg = nxt == null ? null : c.golfers.filter(function (g) { return String(g.id) === nxt; })[0];
+        if (nxg) sv.setAttribute('data-ss-next', nxt); else sv.removeAttribute('data-ss-next');
+        sv.textContent = nxg ? 'Next: ' + (nxg.name || ('Player ' + nxg.id)) + ' \u203a' : (away ? 'Save · back to hole ' + c.home : (c.last ? 'Save' : 'Save · Next hole ›'));
         if (showStats) {
             var cell = ssCell(pid);
             var row = function (title, sub, key, cols, opts, on) {
@@ -836,7 +843,8 @@
             if (ss.more && ssGrid(c.par).indexOf(n) === -1) ss.more = false;
             // POLISH #34: on to the next golfer with no score on this hole - once this golfer's own
             // stats rows (when shown) have their putts too, so a golfer's putts are never skipped.
-            if (!ssStatsFor(pid) || ssCell(pid).putts != null) ssAdvance(pid);
+            // URGENT-034: never the phone's own golfer - they stay until they tap to move on.
+            if (!ssIsOwn(pid) && (!ssStatsFor(pid) || ssCell(pid).putts != null)) ssAdvance(pid);
             ssRender(); return;
         }
         if ((b = t.closest('[data-ss-k]'))) {
@@ -847,11 +855,17 @@
             else { var nv = Number(v); patch[k] = cell[k] === nv ? null : nv; }
             qSet(c, pid, c.hole, patch, ssStrokes(pid), c.par);
             // POLISH #34: score and putts in - the next golfer with no score (other stats: tap back).
-            if (k === 'putts' && patch.putts != null && ssStrokes(pid) > 0) ssAdvance(pid);
+            // URGENT-034: never the phone's own golfer (Tee shot, Green in reg, Bunker, Penalties still to come).
+            if (k === 'putts' && patch.putts != null && ssStrokes(pid) > 0 && !ssIsOwn(pid)) ssAdvance(pid);
             ssRender(); return;
         }
         if (t.closest('[data-ss-notes]')) { ss.notes = !ss.notes; ssRender(); if (ss.notes) { var ta = ss.wrap.querySelector('.hp-ss-notes'); if (ta) { try { ta.scrollIntoView({ block: 'center' }); ta.focus(); } catch (er) {} } } return; }
-        if (t.closest('[data-ss-save]')) { ssSave(); return; }
+        if (t.closest('[data-ss-save]')) {
+            // URGENT-034: "Next: Paul ›" - to that golfer; what was typed stays in the sheet until Save.
+            var nt = ssNextTarget();
+            if (nt != null) { ss.sel = nt; ss.more = false; ss.notes = false; ss.toTop = true; ssRender(); return; }
+            ssSave(); return;
+        }
     }
     // POLISH #34: the next golfer (after this one, wrapping) with no score on this hole, typed or
     // saved; none left - the sheet stays where it is.
@@ -864,6 +878,9 @@
         }
         return null;
     }
+    // URGENT-034: where the bottom button goes - the next golfer with no score, once the one shown has
+    // a score (so a golfer who is not playing the hole never blocks Save).
+    function ssNextTarget() { return ss && ss.ctx && ssStrokes(ss.sel) > 0 ? ssNextOpen(ss.sel) : null; }
     function ssAdvance(pid) {
         var nx = ssNextOpen(pid);
         if (nx == null) return false;
