@@ -11,14 +11,26 @@
 // PRIVACY: DISTANCES ONLY. The GPS reading at the ball is held in memory until the second
 // Mark, the yards are worked out, and both readings are dropped. Nothing here stores a
 // position or sends anything: the sessions live ON THIS PHONE (localStorage
-// hardpan_range_v1) - { club, yd, by, at } per shot (gps_range_test.js is the guard).
+// hardpan_range_v1) - { c, yd, by, at } per shot, plus mis: true on a Mishit
+// (gps_range_test.js is the guard).
+//
+// GOOD / MISHIT (URGENT-047, added 7:55 AM - Manny: "I only wanna know how far the good shots
+// are"): after each shot (Mark or typed) a one-tap Good / Mishit chip, Good by default. A Mishit
+// is kept (greyed in the session list) but left out of the club's median, its longest and
+// "Update my bag". Tap or swipe a shot in the list to flip it. The line per club reads
+// "Driver · 5 good / 2 mishits · 241 (median of good)"; a club with no good shot reads
+// "no good shots yet" and is not written to My bag. Shots saved before this have no mis flag
+// and count as good.
 //
 // API (window.HardPanRange):
 //   open(ctx) / close() / isOpen()   ctx = { el, golfer, units(), fix(), flash(t), saved(), openBag() }
-//   summarize(shots) -> [{ club, name, n, avg, longest }] in bag order (pure)
-//   bagUpdate(summary) -> { <club>: avg } - what "Update my bag" writes (pure)
+//   summarize(shots) -> [{ club, name, n, good, mis, avg, longest }] in bag order (pure);
+//                        avg (the median) and longest are of GOOD shots only, null with none
+//   clubLine(row, show?) -> "Driver · 5 good / 2 mishits · 241 (median of good)" (pure)
+//   bagUpdate(summary) -> { <club>: avg } - what "Update my bag" writes (pure; good shots only)
 //   applyToBag(B, golfer, summary) -> the same map, written with B.set
 //   sessions(golfer) / current(golfer) / addShot(golfer, club, yd, by) / undo(golfer) / newSession(golfer)
+//   setMishit(golfer, i, mis) / flip(golfer, i)   shot i of the session in play -> Good / Mishit
 //   carryYds(a, b) -> whole yards between two [lat, lng] (pure; the points are not kept)
 //   openHome({ account }) / closeHome() / homeGolfer(account)   Range from HOME, with no round
 //
@@ -49,12 +61,16 @@
     function lsSet(r) { try { W.localStorage.setItem(KEY, JSON.stringify(r)); return true; } catch (e) { return false; } }
     function gKey(name) { var B = bagApi(); if (B && B.golferKey) return B.golferKey(name); var n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' '); return n ? 'n:' + n : 'me'; }
     function okYd(v) { v = Math.round(Number(v)); return isFinite(v) && v >= MIN_YD && v <= MAX_YD ? v : null; }
-    // A shot as kept: exactly these four fields, checked. Anything else is dropped.
+    // A shot as kept: exactly these four fields, checked, plus mis: true on a Mishit. Anything else is dropped.
     function cleanShot(s) {
         if (!s || clubs().indexOf(s.c) === -1) return null;
         var yd = okYd(s.yd); if (!yd) return null;
-        return { c: s.c, yd: yd, by: s.by === 'gps' ? 'gps' : 'typed', at: Math.round(Number(s.at)) || Date.now() };
+        var o = { c: s.c, yd: yd, by: s.by === 'gps' ? 'gps' : 'typed', at: Math.round(Number(s.at)) || Date.now() };
+        if (s.mis === true) o.mis = true;
+        return o;
     }
+    // No mis flag (every shot saved before Good / Mishit) = a good shot.
+    function isMis(s) { return !!(s && s.mis === true); }
     function golferRec(r, g) { return r.golfers[g] || (r.golfers[g] = { sessions: [] }); }
     function sessions(golfer) { var g = lsGet().golfers[gKey(golfer)]; return g && Array.isArray(g.sessions) ? g.sessions.slice() : []; }
     function lastAt(s) { var t = s.at || 0; (s.shots || []).forEach(function (x) { if (x.at > t) t = x.at; }); return t; }
@@ -88,6 +104,17 @@
         s.closed = true;
         return lsSet(r);
     }
+    // Shot i of the session in play -> Mishit (mis true) or Good (the flag removed).
+    function setMishit(golfer, i, mis) {
+        var r = lsGet(), g = r.golfers[gKey(golfer)], s = g && g.sessions[g.sessions.length - 1];
+        if (!s || s.closed || !s.shots || !s.shots[i]) return null;
+        if (mis) s.shots[i].mis = true; else delete s.shots[i].mis;
+        return lsSet(r) ? s.shots[i] : null;
+    }
+    function flip(golfer, i) {
+        var cur = current(golfer), s = cur && cur.shots && cur.shots[i];
+        return s ? setMishit(golfer, i, !isMis(s)) : null;
+    }
     function markApplied(golfer, map) {
         var r = lsGet(), g = r.golfers[gKey(golfer)], s = g && g.sessions[g.sessions.length - 1];
         if (!s) return;
@@ -96,20 +123,31 @@
     }
 
     // ---- THE NUMBERS (pure) ----------------------------------------------------------
-    // Per club, in bag order: shots, the AVERAGE carry and the longest. The average is the MEDIAN
-    // (Manny, 2026-10-21: one chunked shot must not drag a club's number down), rounded.
+    // Per club, in bag order: shots, good / mishit counts, the AVERAGE carry and the longest. The
+    // average is the MEDIAN (Manny, 2026-10-21: one chunked shot must not drag a club's number down),
+    // rounded. Both the median and the longest are of GOOD shots only (Manny, 7:55 AM: "I only wanna
+    // know how far the good shots are"); with no good shot they are null.
     function summarize(shots) {
         var by = {};
         (shots || []).forEach(function (s) {
             var c = s && s.c, yd = okYd(s && s.yd);
             if (clubs().indexOf(c) === -1 || !yd) return;
-            (by[c] = by[c] || []).push(yd);
+            var b = by[c] = by[c] || { good: [], mis: 0 };
+            if (isMis(s)) b.mis++; else b.good.push(yd);
         });
         return clubs().filter(function (c) { return by[c]; }).map(function (c) {
-            var v = by[c], o = v.slice().sort(function (a, b) { return a - b; }), m = o.length >> 1;
-            var med = o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2;
-            return { club: c, name: nameOf(c), n: v.length, avg: Math.round(med), longest: Math.max.apply(null, v) };
+            var v = by[c].good, o = v.slice().sort(function (a, b) { return a - b; }), m = o.length >> 1;
+            var med = !o.length ? null : o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2;
+            return { club: c, name: nameOf(c), n: v.length + by[c].mis, good: v.length, mis: by[c].mis,
+                avg: med === null ? null : Math.round(med), longest: v.length ? Math.max.apply(null, v) : null };
         });
+    }
+    // "Driver · 5 good / 2 mishits · 241 (median of good)"; no good shot: "... · no good shots yet".
+    function clubLine(r, show) {
+        if (!r) return '';
+        var f = typeof show === 'function' ? show : function (y) { return y; };
+        return r.name + ' · ' + r.good + ' good / ' + r.mis + ' mishit' + (r.mis === 1 ? '' : 's') + ' · '
+            + (r.good ? f(r.avg) + ' (median of good)' : 'no good shots yet');
     }
     // What "Update my bag" writes: { <club>: average } - the shape of My bag's set map.
     function bagUpdate(summary) {
@@ -189,7 +227,7 @@
         var B = bagApi(), cur = ctx && current(ctx.golfer);
         if (!B || !cur) return;
         var done = applyToBag(B, ctx.golfer, summarize(cur.shots));
-        if (!Object.keys(done).length) return;
+        if (!Object.keys(done).length) { st.err = 'No good shots yet - nothing to write'; paint(); return; }
         markApplied(ctx.golfer, done);
         call(ctx.saved);
         st.applied = done;
@@ -205,10 +243,25 @@
         }).join('');
         var label = st.busy ? 'Reading GPS…' : st.start ? '📍 Mark where it landed' : '📍 Mark the ball';
         var step = !st.club ? 'Pick a club, then Mark at the ball.' : st.start ? 'Walk to where it landed, then Mark.' : 'Stand at the ball (or the mat) and Mark.';
-        var last = shots.length ? shots[shots.length - 1] : null;
+        var last = shots.length ? shots[shots.length - 1] : null, li = shots.length - 1;
+        // The one-tap Good / Mishit chip for the shot just saved (Good by default).
+        var q = last ? '<div class="gps-range-q" role="group" aria-label="That shot">'
+            + '<button type="button" data-range-q="good" aria-pressed="' + (isMis(last) ? 'false' : 'true') + '">Good</button>'
+            + '<button type="button" data-range-q="mis" aria-pressed="' + (isMis(last) ? 'true' : 'false') + '">Mishit</button></div>' : '';
+        // Per club: "Driver · 5 good / 2 mishits · 241 (median of good)", then the longest good one.
         var rows = sum.map(function (r) {
-            return '<tr data-range-row="' + r.club + '"><td class="c">' + esc(r.name) + '</td><td>' + r.n + '</td><td class="a">' + shown(r.avg) + '</td><td>' + shown(r.longest) + '</td></tr>';
+            return '<div class="gps-range-line' + (r.good ? '' : ' none') + '" data-range-row="' + r.club + '"><span class="t">' + esc(clubLine(r, shown)) + '</span>'
+                + (r.good ? '<span class="lg">longest good ' + shown(r.longest) + '</span>' : '') + '</div>';
         }).join('');
+        // Every shot, newest first; a Mishit greyed. Tap or swipe one to flip it.
+        var list = shots.map(function (x, i) {
+            var mis = isMis(x);
+            return '<button type="button" class="gps-range-shot' + (mis ? ' mis' : '') + '" data-range-shot="' + i + '" aria-pressed="' + (mis ? 'true' : 'false') + '" aria-label="'
+                + esc(nameOf(x.c) + ' ' + shown(x.yd) + ' ' + unit() + ', ' + (mis ? 'Mishit' : 'Good') + '. Tap to flip.') + '">'
+                + '<span class="n">' + esc(nameOf(x.c)) + '</span><span class="y">' + shown(x.yd) + ' ' + unit() + (x.by === 'typed' ? ' · typed' : '') + '</span>'
+                + '<span class="k">' + (mis ? 'Mishit' : 'Good') + '</span></button>';
+        }).reverse().join('');
+        var anyGood = sum.some(function (r) { return r.good > 0; });
         var applied = st.applied ? '<div class="gps-range-done" role="status">✓ My bag updated' + (typeof ctx.openBag === 'function' ? ' <button type="button" class="gps-range-openbag">Open My bag</button>' : '') + '</div>' : '';
         sh.innerHTML = ''
             + '<div class="gps-range-head"><div class="gps-range-title">Range' + (who ? ' · ' + esc(who) : '') + '</div><button type="button" class="gps-range-x">Done</button></div>'
@@ -219,19 +272,51 @@
             +   (st.start && !st.busy ? '<button type="button" class="gps-range-cancel">Cancel</button>' : '') + '</div>'
             + '<div class="gps-range-typerow"><span>or type the carry</span><input type="number" inputmode="numeric" min="1" max="449" class="gps-range-typed" aria-label="Carry, ' + (m() ? 'meters' : 'yards') + '" placeholder="' + unit() + '"><button type="button" class="gps-range-add">Add</button></div>'
             + (st.err ? '<div class="gps-range-err" role="alert">' + esc(st.err) + '</div>' : '')
-            + (last ? '<div class="gps-range-last">Last: ' + esc(nameOf(last.c)) + ' · ' + shown(last.yd) + ' ' + unit() + (last.by === 'typed' ? ' (typed)' : '') + ' <button type="button" class="gps-range-undo">Undo</button></div>' : '')
+            + (last ? '<div class="gps-range-last' + (isMis(last) ? ' mis' : '') + '" data-range-last="' + li + '"><span class="w">Last: ' + esc(nameOf(last.c)) + ' · ' + shown(last.yd) + ' ' + unit() + (last.by === 'typed' ? ' (typed)' : '') + '</span>'
+                + q + '<button type="button" class="gps-range-undo">Undo</button></div>' : '')
             + '<div class="gps-range-h">THIS SESSION' + (shots.length ? ' · ' + shots.length + ' shot' + (shots.length === 1 ? '' : 's') : '') + '</div>'
-            + (rows ? '<table class="gps-range-sum"><thead><tr><th class="c">Club</th><th>Shots</th><th>Avg</th><th>Longest</th></tr></thead><tbody>' + rows + '</tbody></table>'
-                : '<div class="gps-range-empty">No shots yet.</div>')
-            + (rows ? '<button type="button" class="gps-range-bag">Update my bag</button><div class="gps-range-note">Writes each club’s average into My bag.</div>' : '')
+            + (rows ? '<div class="gps-range-sum">' + rows + '</div>' : '<div class="gps-range-empty">No shots yet.</div>')
+            + (rows ? '<button type="button" class="gps-range-bag"' + (anyGood ? '' : ' disabled') + '>Update my bag</button><div class="gps-range-note">Writes each club’s median of good shots into My bag. Mishits are left out.</div>' : '')
             + applied
+            + (list ? '<div class="gps-range-h">SHOTS · tap or swipe one to flip Good / Mishit</div><div class="gps-range-shots">' + list + '</div>' : '')
             + (shots.length ? '<button type="button" class="gps-range-new">New session</button>' : '');
+    }
+    function flipShot(i, mis) {
+        if (!ctx || !(i >= 0)) return;
+        var s = mis === undefined ? flip(ctx.golfer, i) : setMishit(ctx.golfer, i, mis);
+        if (!s) return;
+        st.applied = null; st.err = '';
+        paint();
+    }
+    // SWIPE a shot row sideways to flip it (a tap does the same - easier to find and to test).
+    var sw = null, swipedAt = 0;
+    function rowOf(t) { return t && t.closest ? t.closest('[data-range-shot]') : null; }
+    function onTouchStart(e) {
+        var r = rowOf(e.target), t = e.touches && e.touches[0];
+        sw = r && t ? { i: Number(r.getAttribute('data-range-shot')), x: t.clientX, y: t.clientY, el: r } : null;
+    }
+    function onTouchMove(e) {
+        var t = e.touches && e.touches[0]; if (!sw || !t) return;
+        var dx = t.clientX - sw.x, dy = t.clientY - sw.y;
+        if (Math.abs(dy) > 24 && Math.abs(dy) > Math.abs(dx)) { sw.el.style.transform = ''; sw = null; return; }
+        sw.el.style.transform = 'translateX(' + Math.max(-60, Math.min(60, dx)) + 'px)';
+    }
+    function onTouchEnd(e) {
+        var t = e.changedTouches && e.changedTouches[0]; if (!sw) return;
+        var s = sw; sw = null; s.el.style.transform = '';
+        if (!t) return;
+        var dx = t.clientX - s.x, dy = t.clientY - s.y;
+        if (Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.5) { swipedAt = Date.now(); flipShot(s.i); }
     }
     function onClick(e) {
         var b = e.target && e.target.closest ? e.target.closest('button') : null; if (!b || !ctx) return;
         e.preventDefault(); e.stopPropagation();
         var c = b.getAttribute('data-range-club');
         if (c) { st.club = c; st.err = ''; paint(); return; }
+        var q = b.getAttribute('data-range-q');
+        if (q) { var cur = current(ctx.golfer); if (cur && cur.shots.length) flipShot(cur.shots.length - 1, q === 'mis'); return; }
+        var si = b.getAttribute('data-range-shot');
+        if (si !== null) { if (Date.now() - swipedAt > 500) flipShot(Number(si)); return; }
         var k = b.className;
         if (k === 'gps-range-x') { close(); return; }
         if (k === 'gps-range-mark') { mark(); return; }
@@ -253,6 +338,10 @@
             sh.className = 'gps-range-sheet gps-float gps-scroll-ok';
             sh.setAttribute('role', 'dialog'); sh.setAttribute('aria-label', 'Range');
             sh.addEventListener('click', onClick);
+            sh.addEventListener('touchstart', onTouchStart, { passive: true });
+            sh.addEventListener('touchmove', onTouchMove, { passive: true });
+            sh.addEventListener('touchend', onTouchEnd);
+            sh.addEventListener('touchcancel', function () { if (sw) { sw.el.style.transform = ''; sw = null; } });
             sh.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.classList && e.target.classList.contains('gps-range-typed')) { e.preventDefault(); typed(); } });
             c.el.appendChild(sh);
         }
@@ -287,10 +376,21 @@
         + '#gps-overlay .gps-range-err{margin-top:8px;padding:8px 10px;border-radius:10px;background:#7f1d1d;color:#fff;font-weight:700;}'
         + '#gps-overlay .gps-range-last{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-weight:700;}'
         + '#gps-overlay .gps-range-h{margin:12px 0 4px;font:800 11px/1 ' + F + ';letter-spacing:.1em;color:#a7b3aa;}'
-        + '#gps-overlay .gps-range-sum{width:100%;border-collapse:collapse;font:700 15px/1.2 ' + F + ';}'
-        + '#gps-overlay .gps-range-sum th{font:700 11px/1 ' + F + ';color:#a7b3aa;text-align:right;padding:4px 4px;}'
-        + '#gps-overlay .gps-range-sum td{text-align:right;padding:7px 4px;border-top:1px solid rgba(255,255,255,.08);}'
-        + '#gps-overlay .gps-range-sum .c{text-align:left;}#gps-overlay .gps-range-sum td.a{color:#d9f99d;font-weight:800;}'
+        + '#gps-overlay .gps-range-line{padding:7px 0;border-top:1px solid rgba(255,255,255,.08);}'
+        + '#gps-overlay .gps-range-line .t{display:block;font:800 15px/1.25 ' + F + ';color:#d9f99d;}'
+        + '#gps-overlay .gps-range-line.none .t{color:#a7b3aa;}'
+        + '#gps-overlay .gps-range-line .lg{display:block;font:600 12px/1.2 ' + F + ';color:#a7b3aa;margin-top:2px;}'
+        + '#gps-overlay .gps-range-last .w{flex:1;min-width:0;}#gps-overlay .gps-range-last.mis .w{color:#8a948c;}'
+        + '#gps-overlay .gps-range-q{display:flex;flex:0 0 auto;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,.25);}'
+        + '#gps-overlay .gps-range-q button{min-height:42px;min-width:60px;border:0;background:transparent;color:#fff;font:800 14px/1 ' + F + ';padding:0 10px;}'
+        + '#gps-overlay .gps-range-q button[data-range-q="good"][aria-pressed="true"]{background:#d9f99d;color:#0b0f0c;}'
+        + '#gps-overlay .gps-range-q button[data-range-q="mis"][aria-pressed="true"]{background:#5b6360;color:#fff;}'
+        + '#gps-overlay .gps-range-shots{display:flex;flex-direction:column;}'
+        + '#gps-overlay .gps-range-shot{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:0 4px;border:0;border-top:1px solid rgba(255,255,255,.08);background:transparent;color:#fff;font:700 15px/1.2 ' + F + ';text-align:left;transition:transform .12s;touch-action:pan-y;}'
+        + '#gps-overlay .gps-range-shot .n{flex:1;min-width:0;}#gps-overlay .gps-range-shot .y{flex:0 0 auto;}'
+        + '#gps-overlay .gps-range-shot .k{flex:0 0 64px;text-align:right;font:800 12px/1 ' + F + ';color:#d9f99d;}'
+        + '#gps-overlay .gps-range-shot.mis{color:#7d8780;}#gps-overlay .gps-range-shot.mis .y{text-decoration:line-through;}#gps-overlay .gps-range-shot.mis .k{color:#7d8780;}'
+        + '#gps-overlay .gps-range-bag[disabled]{opacity:.45;}'
         + '#gps-overlay .gps-range-empty{color:#a7b3aa;padding:6px 0;}'
         + '#gps-overlay .gps-range-bag{display:block;width:100%;margin-top:10px;min-height:48px;border-radius:14px;border:0;background:#d9f99d;color:#0b0f0c;font:800 16px/1 ' + F + ';}'
         + '#gps-overlay .gps-range-note{font-size:12px;color:#a7b3aa;text-align:center;margin-top:4px;}'
@@ -458,6 +558,7 @@
 
     var api = { open: open, close: close, isOpen: isOpen, summarize: summarize, bagUpdate: bagUpdate, applyToBag: applyToBag,
         sessions: sessions, current: current, addShot: addShot, undo: undo, newSession: newSession, carryYds: carryYds,
+        setMishit: setMishit, flip: flip, isMis: isMis, clubLine: clubLine,
         openHome: openHome, closeHome: closeHome, homeGolfer: homeGolfer, NAME_KEY: NAME_KEY,
         KEY: KEY, MAX_YD: MAX_YD, SESSION_GAP_MS: SESSION_GAP_MS, state: function () { return { club: st.club, marking: !!st.start, busy: st.busy }; } };
     W.HardPanRange = api;

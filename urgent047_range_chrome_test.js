@@ -3,8 +3,13 @@
 //   1  Tools > Range: the Range sheet (the tile next to My bag)
 //   2  Driver: Mark at the mat, walk 240 yds, Mark; again 251; type 236
 //   3  7-iron: Mark / walk 150 / Mark; 155; type 148
-//   4  the session: Driver avg 240, longest 251; 7-iron avg 150, longest 155
-//   5  Update my bag -> Open My bag: Driver 240, 7-iron 150 ("entered")
+//   4  GOOD / MISHIT (7:55 AM): the chip after each shot (Good by default); a typed Driver 180 ->
+//      Mishit on the chip; a 7-iron 120 flipped by a TAP on its row, a Sand wedge 60 by a SWIPE;
+//      mishits greyed in the list
+//   4b the session lines: "Driver · 3 good / 1 mishit · 240 (median of good)" (with the 180 it
+//      would be 238), "7-iron · 3 good / 1 mishit · 150 ...", "Sand wedge · 0 good / 1 mishit ·
+//      no good shots yet"; longest of good only
+//   5  Update my bag -> Open My bag: Driver 240, 7-iron 150 ("entered"); no Sand wedge written
 //   6  THE GUARD: the phone's storage and every database write - no coordinate, no lat / lng
 // Screenshots into SHOTS_047 when set.
 'use strict';
@@ -115,14 +120,60 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             lands.push(await gpsShot('7i', 10, 155));
             await typedShot('7i', 148);
             // 4. the session
-            const rows = JSON.parse(await ev("JSON.stringify(Array.from(" + R + ".querySelectorAll('[data-range-row]')).map(function(r){ return Array.from(r.children).map(function(c){ return c.textContent; }); }))"));
-            assert.deepEqual(rows, [['Driver', '3', '240', '251'], ['7-iron', '3', '150', '155']]);
-            assert.match(await ev(rangeText), /THIS SESSION · 6 shots/);
+            // 4. GOOD / MISHIT
+            const chip = () => ev("(function(){ var q = " + R + ".querySelector('.gps-range-q'); if (!q) return ''; return Array.from(q.querySelectorAll('button')).map(function(b){ return b.textContent + '=' + b.getAttribute('aria-pressed'); }).join(','); })()");
+            assert.equal(await chip(), 'Good=true,Mishit=false', 'the chip after a typed shot, Good by default');
+            const shotRows = () => ev("JSON.stringify(Array.from(" + R + ".querySelectorAll('[data-range-shot]')).map(function(r){ return { i: +r.getAttribute('data-range-shot'), t: r.querySelector('.n').textContent + ' ' + r.querySelector('.y').textContent + ' ' + r.querySelector('.k').textContent, mis: r.classList.contains('mis'), op: getComputedStyle(r).color }; }))").then(JSON.parse);
+            const misFlags = () => ev("JSON.stringify(HardPanRange.current('Ann Alpha').shots.map(function(s){ return s.mis === true; }))").then(JSON.parse);
+            await typedShot('Dr', 180);
+            assert.equal(await chip(), 'Good=true,Mishit=false');
+            await shot('3a-chip-after-shot');
+            assert.equal(await tapR('[data-range-q="mis"]'), true, 'one tap: Mishit');
+            assert.equal(await chip(), 'Good=false,Mishit=true');
+            assert.deepEqual(await misFlags(), [false, false, false, false, false, false, true]);
+            // the chip after a GPS (Mark) shot as well
+            lands.push(await gpsShot('7i', 20, 120));
+            assert.equal(await chip(), 'Good=true,Mishit=false', 'the chip after a Mark shot, Good by default');
+            // a TAP on the shot row flips it (the newest is first in the list)
+            let list = await shotRows();
+            assert.equal(list.length, 8);
+            assert.match(list[0].t, /^7-iron 120 yds Good$/);
+            assert.match(list[1].t, /^Driver 180 yds · typed Mishit$/);
+            assert.equal(list[1].mis, true); assert.equal(list[0].mis, false);
+            assert.notEqual(list[1].op, list[0].op, 'the mishit is greyed');
+            assert.equal(await tapR('[data-range-shot="7"]'), true);
+            assert.equal((await shotRows())[0].mis, true, 'tap: 7-iron 120 -> Mishit');
+            assert.equal(await chip(), 'Good=false,Mishit=true', 'the chip follows');
+            // a SWIPE flips too: Sand wedge 60 typed, swiped to Mishit; swiped twice more = back and forth
+            await typedShot('SW', 60);
+            const swipe = (i, dx) => ev("(function(){ var r = " + R + ".querySelector('[data-range-shot=\"" + i + "\"]'); var b = r.getBoundingClientRect(), x = b.left + b.width / 2, y = b.top + b.height / 2;"
+                + " var T = function (cx) { return new Touch({ identifier: 1, target: r, clientX: cx, clientY: y }); };"
+                + " r.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [T(x)], changedTouches: [T(x)] }));"
+                + " r.dispatchEvent(new TouchEvent('touchmove', { bubbles: true, cancelable: true, touches: [T(x + " + dx + " / 2)], changedTouches: [T(x + " + dx + " / 2)] }));"
+                + " r.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], changedTouches: [T(x + " + dx + ")] })); return 1; })()");
+            await swipe(8, -80);
+            assert.equal((await misFlags())[8], true, 'swipe left: Sand wedge 60 -> Mishit');
+            await swipe(8, 80);
+            assert.equal((await misFlags())[8], false, 'swipe right: back to Good');
+            await swipe(8, 12);
+            assert.equal((await misFlags())[8], false, 'a nudge is not a swipe');
+            await swipe(8, -80);
+            assert.deepEqual(await misFlags(), [false, false, false, false, false, false, true, true, true]);
+            // 4b. the session lines
+            const rows = JSON.parse(await ev("JSON.stringify(Array.from(" + R + ".querySelectorAll('[data-range-row]')).map(function(r){ return r.innerText.replace(/\\s*\\n\\s*/g, ' | '); }))"));
+            assert.deepEqual(rows, ['Driver · 3 good / 1 mishit · 240 (median of good) | longest good 251',
+                '7-iron · 3 good / 1 mishit · 150 (median of good) | longest good 155',
+                'Sand wedge · 0 good / 1 mishit · no good shots yet']);
+            assert.match(await ev(rangeText), /THIS SESSION · 9 shots/);
+            list = await shotRows();
+            assert.deepEqual(list.filter((x) => x.mis).map((x) => x.t), ['Sand wedge 60 yds · typed Mishit', '7-iron 120 yds Mishit', 'Driver 180 yds · typed Mishit']);
             const fit = JSON.parse(await ev("(function(){ var r = " + R + ".getBoundingClientRect(); return JSON.stringify({ top: r.top, bottom: r.bottom, right: r.right, h: innerHeight, w: innerWidth, sw: document.documentElement.scrollWidth }); })()"));
             assert.ok(fit.top >= 0 && fit.bottom <= fit.h + 1 && fit.right <= fit.w + 1, 'the sheet is on screen ' + JSON.stringify(fit));
             assert.ok(fit.sw <= fit.w, 'no sideways scroll');
-            await ev(R + ".scrollTop = 99999");
+            await ev("(function(){ var r = " + R + ".querySelector('[data-range-row]'); r.scrollIntoView({ block: 'start' }); return 1; })()");
             await shot('3-range-session');
+            await ev("(function(){ var r = " + R + ".querySelector('.gps-range-shot.mis'); r.scrollIntoView({ block: 'center' }); return 1; })()");
+            await shot('3b-mishit-greyed');
             // 5. Update my bag, then My bag
             await tapR('.gps-range-bag');
             assert.ok(await until(rangeText + ".indexOf('My bag updated') > -1", 4000), 'updated');
@@ -132,6 +183,7 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             assert.equal(await ev("HardPanRange.isOpen()"), false, 'Range closed');
             const bag = JSON.parse(await ev("(function(){ var o = {}; ['Dr','7i'].forEach(function(c){ var r = document.querySelector('#gps-overlay [data-bag-row=\"' + c + '\"]'); o[c] = { v: r.querySelector('[data-bag-edit]').value, src: r.querySelector('[data-bag-src]').getAttribute('data-bag-src') }; }); return JSON.stringify(o); })()"));
             assert.deepEqual(bag, { Dr: { v: '240', src: 'entered' }, '7i': { v: '150', src: 'entered' } });
+            assert.deepEqual(JSON.parse(await ev("localStorage.getItem('hardpan_bag_v1')")).golfers['n:ann alpha'].set, { Dr: 240, '7i': 150 }, 'the median of GOOD shots; no Sand wedge (0 good)');
             await ev("(function(){ var r = document.querySelector('#gps-overlay [data-bag-row=\"Dr\"]'); if (r) r.scrollIntoView({ block: 'center' }); return 1; })()");
             await shot('5-my-bag-after-update');
             // 6. THE GUARD
@@ -257,8 +309,12 @@ for (const c of [{ vp: { width: 393, height: 852 }, who: 'Ann Alpha', seeded: tr
             }
             await typedShot('Dr', 250);
             await typedShot('7i', 160);
-            const rows = JSON.parse(await ev("JSON.stringify(Array.from(" + R + ".querySelectorAll('[data-range-row]')).map(function(r){ return Array.from(r.children).map(function(c){ return c.textContent; }); }))"));
-            assert.deepEqual(rows, [['Driver', '2', '245', '250'], ['7-iron', '2', '155', '160']]);
+            // a topped Driver, marked Mishit on the chip: left out of the median and the bag
+            await typedShot('Dr', 90);
+            await ev("(function(){ " + R + ".querySelector('[data-range-q=\"mis\"]').click(); return 1; })()");
+            const rows = JSON.parse(await ev("JSON.stringify(Array.from(" + R + ".querySelectorAll('[data-range-row]')).map(function(r){ return r.querySelector('.t').textContent; }))"));
+            assert.deepEqual(rows, ['Driver · 2 good / 1 mishit · 245 (median of good)', '7-iron · 2 good / 0 mishits · 155 (median of good)']);
+            assert.equal(await ev(R + ".querySelectorAll('.gps-range-shot.mis').length"), 1, 'the mishit greyed in the list');
             await ev(R + ".scrollTop = 99999");
             await shot('4-range-session');
             await tapR('.gps-range-bag');
