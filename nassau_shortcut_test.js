@@ -17,7 +17,7 @@
 // the golfer's INTENT through the wizard and is normalized to 'stroke' at the
 // single save-time read. The Nassau itself is the modern sideMatches wager that
 // Step 6 already builds - one source of truth for the stakes, with the card's
-// existing 10/10/20 defaults and no second prefill.
+// existing defaults (5/5/5, no presses since URGENT-038 #27; 10/10/20 before) and no second prefill.
 //
 // THE LOAD-BEARING PROOF: 'nassau-modern' must never reach persisted data, and
 // this new-round path must never create gameFormat:'nassau'. Everything else
@@ -223,13 +223,13 @@ describe('STEP 6 IS ALREADY OPEN AND READY', () => {
             .forEach(f => assert.equal(wizard(f).nassauChecked, false, f + ' must not assume a Nassau'));
     });
 
-    test('the card keeps its own 10 / 10 / 20 defaults', () => {
+    test('the card keeps its own 5 / 5 / 5 defaults (URGENT-038 #27; were 10 / 10 / 20)', () => {
         // Deliberately no second prefill: the card is the single source of truth
         // for the stakes, so Step 3 expresses intent and nothing more.
         const r = wizard('nassau-modern');
-        assert.equal(r.front, '10');
-        assert.equal(r.back, '10');
-        assert.equal(r.overall, '20');
+        assert.equal(r.front, '5');
+        assert.equal(r.back, '5');
+        assert.equal(r.overall, '5');
     });
 
     test('Step 3 adds no prefill mechanism of its own', () => {
@@ -269,9 +269,11 @@ describe('THE WAGER IT PRODUCES', () => {
         assert.equal(w.format, 'nassau');
         assert.deepEqual(w.teamAIds, ['101']);
         assert.deepEqual(w.teamBIds, ['102']);
-        assert.equal(w.frontStake, 10);
-        assert.equal(w.backStake, 10);
-        assert.equal(w.overallStake, 20);
+        // URGENT-038 #27: the card's one default, $5 / $5 / $5, presses off (was 10 / 10 / 20).
+        assert.equal(w.frontStake, 5);
+        assert.equal(w.backStake, 5);
+        assert.equal(w.overallStake, 5);
+        assert.equal(w.pressRule, 'none');
         assert.equal(w.startHole, 1);
     });
 
@@ -309,7 +311,11 @@ describe('SETTLEMENT: ONE RECEIPT, NO SYNTHETIC DUPLICATE', () => {
         // the collapsed stake - every segment priced at the OVERALL amount - which is
         // the defect nassau_split_stake_test.js now guards. The wager is unchanged;
         // only what it costs is.
-        assert.equal(r.marty, 30);
+        // URGENT-038 #27 RE-PIN: the card now starts at $5 / $5 / $5, presses off, so the
+        // same scores pay Marty $5 (front) + $5 (overall) = $10. The engines did not move -
+        // the wager the default builds did (urgent038_27_totals_proof_chrome_test.js holds
+        // every saved round's money identical).
+        assert.equal(r.marty, 10);
         assert.equal(r.sum, 0);
     });
 
@@ -324,7 +330,7 @@ describe('SETTLEMENT: ONE RECEIPT, NO SYNTHETIC DUPLICATE', () => {
         // shapes really do agree - but they have to be given the same wager first.
         const modern = wizard('nassau-modern').wager;
         const paid = settle('stroke', modern).marty;
-        assert.equal(paid, 30, 'Marty won two holes on the front');
+        assert.equal(paid, 10, 'Marty wins the front and the overall: $5 + $5 (URGENT-038 #27 defaults)');
         assert.equal(settle('nassau', null, {
             nassauFrontStake: modern.frontStake,
             nassauBackStake: modern.backStake,

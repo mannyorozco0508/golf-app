@@ -253,7 +253,12 @@ html {
     padding-right: env(safe-area-inset-right, 0px);
     background-color: var(--bg-page, transparent);
 }
+/* URGENT-038 #24: INSIDE THE ROUND'S BETS SHEET (gps-round.js loads this page in a frame with
+   &hpsheet=1) the sheet already sits below the status bar, so the root inset above is a second
+   one - on an iPhone 15 a 59pt empty band under "You: +$X · N bets". No inset in the sheet. */
+html.hp-in-sheet { padding: 0 !important; }
 </style>
+<script>try { if (/[?&]hpsheet=1(&|$)/.test(location.search)) document.documentElement.classList.add('hp-in-sheet'); } catch (e) {}</script>
 </head>
 <body>
 
@@ -274,7 +279,7 @@ html {
     </div>
     </div>
 
-    <div style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
+    <div id="bets-matches-note" style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
         Your group's action. Build or press a match on <a href="sidematches.html" class="nav-link" style="color: var(--brand-navy); font-weight: bold;">⚔️ Matches</a>.
     </div>
 
@@ -1096,6 +1101,13 @@ html {
             `<div class="bets-row bets-sub"><span>${prefix}${i + 1} · ${fmt(pr)}</span></div>`).join('');
     }
 
+    // How many groups the round has (grouping.js's own slicing): true for one (or none).
+    function betsRoundHasOneGroup(players, groupOf) {
+        const seen = {};
+        (players || []).forEach(p => { const g = (groupOf || {})[String(p && p.id)]; if (g != null) seen[g] = true; });
+        return Object.keys(seen).length <= 1;
+    }
+
     function renderBets() {
         const matchesCard = document.getElementById('bets-matches-card');
         const gamesCard = document.getElementById('bets-games-card');
@@ -1109,9 +1121,15 @@ html {
         // The same "who may see it" question the Matches tab asks, through the same
         // grouping.js function. lockedGroup is null on the bare link: it sees everything.
         const lock = hasGroupLock ? lockedGroup : null;
+        // URGENT-038 #24: ONE GROUP = NO GROUP NOTES. On a round with a single group the lock
+        // badge, the "Build or press a match on Matches" note and "Group 1's" say nothing the
+        // golfer needs. Words only: which matches show (canLinkSeeWager below) is unchanged.
+        const oneGroup = betsRoundHasOneGroup(players, groupOf);
+        const matchesNote = document.getElementById('bets-matches-note');
+        if (matchesNote) matchesNote.style.display = oneGroup ? 'none' : '';
 
         if (badge) {
-            if (hasGroupLock) {
+            if (hasGroupLock && !oneGroup) {
                 badge.textContent = `🔒 Group ${lockedGroup} — your group's matches and games. Round-wide games show for everyone.`;
                 badge.style.display = 'block';
             } else {
@@ -1133,7 +1151,7 @@ html {
             } else {
                 matchesCard.style.display = 'block';
                 const head = document.getElementById('bets-matches-head');
-                if (head) head.textContent = hasGroupLock ? `⚔️ Group ${lockedGroup}’s Matches` : '⚔️ Matches';
+                if (head) head.textContent = hasGroupLock && !oneGroup ? `⚔️ Group ${lockedGroup}’s Matches` : '⚔️ Matches';
                 // Progress and waiting-on text from the presenter, one row per match.
                 const rowsById = {};
                 buildSideActionRows(shownRound(), courseData, savedScores, shownList(players)).forEach(r => { rowsById[r.key] = r; });
