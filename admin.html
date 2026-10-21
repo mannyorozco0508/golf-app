@@ -3903,6 +3903,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     
 
     let currentSavedRound = null;   // the round Round Ready is showing - the share reads its token
+    // URGENT-038 #28: THE SCORING LINE WHEN NASSAU WAS PICKED. Step 1's Nassau saves a stroke
+    // round plus a Nassau side bet, so the line read "Stroke Play" - not what the organizer
+    // picked. A stroke round carrying a Nassau side bet says so. WORDS ONLY: gameFormat, the
+    // side bet and every engine are untouched; any other format reads exactly as before.
+    function roundReadyScoringLabel(data) {
+        const d = data || {};
+        const format = d.gameFormat || 'stroke';
+        if (format === 'stroke') {
+            const sm = d.sideMatches || {};
+            const nassau = Object.keys(sm).some(k => sm[k] && sm[k].format === 'nassau');
+            if (nassau) return 'Nassau (side bet) \u00B7 scores kept as stroke play';
+        }
+        return (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[format]) || 'Stroke Play';
+    }
     function renderRoundReady(data) {
         currentSavedRound = data || null;
         renderOrganizerStanding();
@@ -3920,7 +3934,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // at once: they organise the scoring AND carry the wager, so they honestly appear
         // in both lists rather than being forced into one.
         const format = data.gameFormat || 'stroke';
-        const scoringLabel = (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[format]) || 'Stroke Play';
+        const scoringLabel = roundReadyScoringLabel(data);
         document.getElementById('rr-scoring-text').textContent = scoringLabel;
 
         const actionLines = [];
