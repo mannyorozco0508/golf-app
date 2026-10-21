@@ -4718,6 +4718,8 @@ const SHELL_FILES = [
     './gps-stats.js',
     // Shot by shot: mark, replay - on the phone (gps-features).
     './gps-shots.js',
+    // URGENT-047 A: Range - carry by club, Update my bag (distances only, on the phone).
+    './gps-range.js',
     // Paste the whole trip / round: parser + review + drafts (gps-paste).
     './trip-setup-paste.js',
     './setup-paste-ui.js',
