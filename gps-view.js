@@ -5540,8 +5540,6 @@
         + '#gps-overlay .gps-who{flex:0 0 auto;background:none;border:0;color:#0b0f0c;font-size:12px;font-weight:800;line-height:1;padding:4px 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85;}'
         + '#gps-overlay .gps-score-col.gps-slide-l{animation:gpsSlideL .22s ease-out;}#gps-overlay .gps-score-col.gps-slide-r{animation:gpsSlideR .22s ease-out;}'
         + '@keyframes gpsSlideL{from{transform:translateX(40%);opacity:.2;}to{transform:none;opacity:1;}}@keyframes gpsSlideR{from{transform:translateX(-40%);opacity:.2;}to{transform:none;opacity:1;}}'
-        // URGENT-034: the \u25BE is the "Whose score?" picker's own tap area (the rest of the bar = Enter score).
-        + '#gps-overlay .gps-who-pick{display:inline-block;padding:6px 10px;margin:-6px -6px -6px -4px;}'
         + '#gps-overlay .gps-who-sheet{position:absolute;inset:0;z-index:30;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;}'
         + '#gps-overlay .gps-who-card{width:100%;max-width:520px;max-height:70%;overflow:auto;box-sizing:border-box;background:#fff;color:#1a1a1a;border-radius:18px 18px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom) + 14px);}'
         + '#gps-overlay .gps-who-title{font-weight:800;font-size:17px;margin-bottom:10px;}'
@@ -6303,7 +6301,12 @@
         var scoreCol = el.querySelector('.gps-score-col');
         if (scoreCol) scoreCol.addEventListener('click', function (e) {
             e.preventDefault();
-            if (e.target && e.target.closest && e.target.closest('.gps-who-pick')) { if (S && !(S.swipedAt && Date.now() - S.swipedAt < 450)) openWho(false); return; }
+            // The \u25BE's tap area: the glyph, or the last 28px of the name line (a thumb-sized target with
+            // no change to the bar's layout).
+            var whoB = el.querySelector('.gps-who'), wr = whoB && whoB.style.display !== 'none' ? whoB.getBoundingClientRect() : null;
+            var onPick = (e.target && e.target.closest && e.target.closest('.gps-who-pick'))
+                || (wr && wr.width > 0 && e.clientX >= wr.right - 28 && e.clientX <= wr.right + 6 && e.clientY >= wr.top - 6 && e.clientY <= wr.bottom + 4);
+            if (onPick) { if (S && !(S.swipedAt && Date.now() - S.swipedAt < 450)) openWho(false); return; }
             openScoreHere();
         });
         var whoSheet = el.querySelector('.gps-who-sheet');
