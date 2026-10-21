@@ -335,7 +335,7 @@ function checkD(a, f, tag, o) {
             // T3: every tile shown runs its action (Other course last: it leaves for Home).
             const TILE_OK = { '.gps-my-bag': (x) => x.bag, '.gps-my-stats': (x) => x.stats, '.gps-replay': (x) => x.shotbar, '.gps-mark-shots': (x) => x.shotbar,
                 '.gps-refresh-gps': (x) => !!x.banner, '.gps-fix-green': (x) => x.actions || /Stand|Tap|green/i.test(x.banner || ''), '.gps-pick-course': (x) => /^home\.html/.test(x.url) };
-            const RESET = { expression: "(function(){ ['.gps-bag-done', '.gps-sb-done', '.gps-cancel', '.gps-range-x'].forEach(function (s) { var b = document.querySelector('#gps-overlay ' + s); if (b && b.offsetParent !== null) b.click(); }); var st = document.getElementById('hp-my-stats'); if (st) st.style.display = 'none'; var ss = document.querySelector('.gps-stats-sheet'); if (ss) ss.style.display = 'none'; return 'reset'; })()" };
+            const RESET = { expression: "(function(){ ['.gps-bag-done', '.gps-sb-done', '.gps-cancel', '.gps-range-x', '.gps-shist-done'].forEach(function (s) { var b = document.querySelector('#gps-overlay ' + s); if (b && b.offsetParent !== null) b.click(); }); var st = document.getElementById('hp-my-stats'); if (st) st.style.display = 'none'; var ss = document.querySelector('.gps-stats-sheet'); if (ss) ss.style.display = 'none'; return 'reset'; })()" };
             const tiles = (o0.tiles || []).filter((x) => x !== '.gps-pick-course').concat((o0.tiles || []).indexOf('.gps-pick-course') !== -1 ? ['.gps-pick-course'] : []);
             const steps = START.slice();
             tiles.forEach((tl) => steps.push(TAP('.gps-tools'), W(400), TSC('[data-ts-tile="' + tl + '"]'), W(1500), TS, RESET, W(500)));
