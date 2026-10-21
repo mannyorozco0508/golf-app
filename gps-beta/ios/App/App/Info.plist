@@ -25,6 +25,8 @@
 	<!-- ITMS-90683 (Apple's warning on builds 2-5): the location plugin's binary
 	     can ask for "Always", so Apple wants this key present. HardPan GPS never
 	     asks for Always - only When In Use - and the text says so. -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>HardPan saves your round recap image to Photos when you choose Save Image.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>HardPan GPS only uses your location while the app is open, to show your yardages to the green. It never tracks you in the background.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
