@@ -1020,6 +1020,9 @@
             display: block; text-align: center; padding: 11px; border-radius: 8px; border: 1px solid var(--brand-green);
             color: var(--brand-green); font-weight: bold; text-decoration: none; font-size: 0.9rem;
         }
+        /* POLISH #32: the app's Round Complete - one main button and a quiet Done. */
+        .fr-one #fr-skip-btn { display: none; }
+        .fr-one .fr-close-btn { background: transparent; color: var(--brand-green); border: 2px solid var(--brand-green); }
         .fr-close-btn { width: 100%; margin-top: 12px; padding: 12px; background: var(--brand-green); color: #fff; border: none; border-radius: 8px; font-weight: bold; font-size: 0.95rem; cursor: pointer; }
 
         .group-btn {
@@ -2399,8 +2402,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             </div>
             <div id="fr-player-list"></div>
             <div id="fr-kp-block"></div>
-            <button class="btn-primary" style="margin-top:14px;" onclick="frShowResults(true)">✓ Scores Look Right — View Results</button>
-            <button class="fr-secondary-btn" onclick="frShowResults(false)">Skip Review &amp; View Results</button>
+            <button class="btn-primary" id="fr-confirm-btn" style="margin-top:14px;" onclick="frShowResults(true)">✓ Scores Look Right — View Results</button>
+            <button class="fr-secondary-btn" id="fr-skip-btn" onclick="frShowResults(false)">Skip Review &amp; View Results</button>
         </div>
 
         <!-- STATE 2: ONE GOLFER, ALL 18 HOLES -->
@@ -2427,7 +2430,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             <div id="fr-jump-links" class="fr-jump-links"></div>
         </div>
 
-        <button class="fr-close-btn" onclick="closeFinishRoundModal()">Done</button>
+        <button class="fr-close-btn" id="fr-done-btn" onclick="closeFinishRoundModal()">Done</button>
     </div>
 </div>
 
@@ -10510,8 +10513,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const incomplete = rows.filter(r => !r.complete).length;
         const note = document.getElementById('fr-review-note');
         if (note) {
+            // POLISH #32: "Both golfers" for two (it read "All 2 golfers").
             note.innerHTML = incomplete === 0
-                ? 'All ' + rows.length + ' golfers have a complete card.'
+                ? (rows.length === 2 ? 'Both golfers have a complete card.'
+                    : rows.length === 1 ? 'The card is complete.'
+                    : 'All ' + rows.length + ' golfers have a complete card.')
                 : '\u26A0\uFE0F ' + incomplete + ' golfer' + (incomplete === 1 ? '' : 's')
                   + ' still incomplete \u2014 those rounds have no final score yet.';
             note.className = 'fr-review-note' + (incomplete === 0 ? '' : ' fr-review-warn');
@@ -10569,7 +10575,24 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // `reviewed` records intent: the organizer pressed the confirm button rather
     // than skipping. Wave C decides whether that intent is persisted on the round;
     // nothing is written to Firebase here.
+    // POLISH #32: in the HardPan app Round Complete has ONE main button, "View results",
+    // and "Done" - not three exits that did about the same thing. View results is the
+    // old "Scores Look Right" (it records the check) when there is signal; with none it
+    // shows the results without the confirm (the skip), never an offline refusal.
+    // The web page keeps both buttons as they were.
+    function frOneWay() {
+        try { return !!(window.HardPanBet && typeof window.HardPanBet.on === 'function' && window.HardPanBet.on()); } catch (e) { return false; }
+    }
+    function frOneWayOn() {
+        const one = frOneWay();
+        const ov = document.getElementById('finish-round-modal-overlay');
+        if (ov) ov.classList.toggle('fr-one', one);
+        const c = document.getElementById('fr-confirm-btn');
+        if (c) c.textContent = one ? 'View results' : '\u2713 Scores Look Right \u2014 View Results';
+    }
     function frShowResults(reviewed) {
+        // POLISH #32: the app's one "View results" never stops on the offline refusal.
+        if (reviewed && frOneWay() && typeof navigator !== 'undefined' && navigator.onLine === false) reviewed = false;
         // Only the deliberate confirm persists. Skipping shows the money and records
         // nothing, which is the whole point of having two buttons.
         if (reviewed) {
@@ -11218,6 +11241,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         frSection('fr-state-detail', false);
         frSection('fr-state-results', false);
         renderFinishRoundKp();
+        frOneWayOn();
 
         document.getElementById('finish-round-modal-overlay').style.display = 'flex';
     }
