@@ -6028,6 +6028,8 @@
         on(el, '.gps-side-bets', function () {
             S.userChoseSide = true;
             var cap = el.querySelector('.gps-side-bets .gps-cap'), R = window.HardPanRound;
+            // URGENT-034 FIX 4: the compact card over the map first; its "Full card ›" is the page above.
+            if (cap && cap.textContent === 'Card' && R && typeof R.openCompactCard === 'function' && R.openCompactCard()) return;
             if (cap && cap.textContent === 'Card' && R && typeof R.toFullCard === 'function') { R.toFullCard(); return; }
             showSide('bets');
         });

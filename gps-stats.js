@@ -901,16 +901,24 @@
     // To an earlier (or back to a later) hole: what was typed here is saved first, through the
     // card's own save; then the sheet shows that hole (ctx.at: its par, its golfers, its scores).
     function ssStep(dir) {
-        var c = ss.ctx, rng = ssRange(), i = rng.indexOf(Number(c.hole)), to = rng[i + dir];
-        if (to == null) return;
+        var c = ss.ctx, rng = ssRange(), i = rng.indexOf(Number(c.hole));
+        ssGoto(rng[i + dir]);
+    }
+    // URGENT-034 (the compact card): straight to one hole of the stepper's range, as ‹ / › would.
+    function ssGoto(to) {
+        var c = ss && ss.ctx, rng = ssRange();
+        if (!c || to == null || rng.indexOf(Number(to)) === -1) return false;
+        to = Number(to);
+        if (to === Number(c.hole)) return true;
         var nx = c.at(to);
-        if (!nx || !nx.golfers || !nx.golfers.length) return;
+        if (!nx || !nx.golfers || !nx.golfers.length) return false;
         ssKeep();
         Object.keys(nx).forEach(function (k) { c[k] = nx[k]; });
         c.hole = to;
         ss.pend = {}; ss.more = false; ss.notes = false;
         if (!nx.golfers.some(function (g) { return String(g.id) === String(ss.sel); })) ss.sel = String(nx.golfers[0].id);
         ssRender();
+        return true;
     }
     // One golfer's typed score on the hole shown, through the card's own save (once per change).
     function ssKeepOne(pid) {
@@ -991,5 +999,5 @@
         get setTrackOthers() { return trackShown() ? setTrackOthers : undefined; },
         trackOthersShown: function () { return trackShown(); },
         // The score sheet (012).
-        sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? (ss.ctx.home != null ? ss.ctx.home : ss.ctx.hole) : null; }, shownHole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
+        sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? (ss.ctx.home != null ? ss.ctx.home : ss.ctx.hole) : null; }, shownHole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, go: function (h) { return ssGoto(h); }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
 })();
