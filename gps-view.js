@@ -4776,9 +4776,28 @@
         S.cl = { k: k, at: now, placed: !!p.city, v: courseLine(nm, p.city, p.state) };
         return S.cl.v;
     }
+    // URGENT-047 C: THE CADDIE NOTE - the phone's own note for this course's hole (gps-stats.js
+    // HardPanGpsStats.caddie, this phone only), one small line right under the course line, in
+    // layouts D and C. There only while this hole has a note; no note - no element at all.
+    function caddieNow() {
+        try { var C = window.HardPanGpsStats && window.HardPanGpsStats.caddie; return C && S && !tournament() ? String(C.line(S.courseKey, S.hole) || '') : ''; } catch (e) { return ''; }
+    }
+    function syncCaddieLine() {
+        var cl = S && S.el.querySelector('.gps-ld-course, .gps-lc-course');
+        var e = S && S.el.querySelector('.gps-caddie');
+        var t = cl ? caddieNow() : '';
+        if (!t) { if (e && e.parentNode) e.parentNode.removeChild(e); return; }
+        if (!e) { e = document.createElement('div'); e.className = 'gps-caddie'; e.setAttribute('role', 'note'); }
+        if (e.parentNode !== cl.parentNode || e.previousSibling !== cl) cl.parentNode.insertBefore(e, cl.nextSibling);
+        var shown = '✎ ' + t;
+        if (e.textContent !== shown) e.textContent = shown;
+        if (e.getAttribute('title') !== t) e.setAttribute('title', t);
+        if (e.getAttribute('aria-label') !== 'Your note for hole ' + S.hole + ': ' + t) e.setAttribute('aria-label', 'Your note for hole ' + S.hole + ': ' + t);
+    }
     function syncCourseLine() {
         var e = S && S.el.querySelector('.gps-ld-course, .gps-lc-course');
         if (!e) return;
+        try { syncCaddieLine(); } catch (er) {}
         var t = courseLineNow();
         if (e.textContent !== t) e.textContent = t;
         if (e.getAttribute('title') !== t) e.setAttribute('title', t);
@@ -5859,6 +5878,9 @@
         + '#gps-overlay .gps-ld-course{flex:0 0 calc(100% - 10px);margin:0 0 0 10px;box-sizing:border-box;min-width:0;padding:2px 4px 0;border-top:1px solid rgba(244,244,239,.16);'
         +   'font:600 11px/14px ' + FONT + ';color:#b9c4b5;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;}'
         + '#gps-overlay .gps-ld-course:empty,#gps-overlay .gps-lc-course:empty{display:none;}'
+        // URGENT-047 C: the caddie note - one small line under the course line (only while this hole has one).
+        + '#gps-overlay .gps-caddie{box-sizing:border-box;min-width:0;padding:1px 4px 0;font:600 12px/15px ' + FONT + ';color:#f2e3a0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '#gps-overlay.gps-ld .gps-ld-top:has(> .gps-caddie){flex-wrap:wrap;row-gap:0;}#gps-overlay.gps-ld .gps-ld-top:has(> .gps-caddie) .gps-num-mid{flex-basis:0;}#gps-overlay .gps-ld-top > .gps-caddie{flex:0 0 calc(100% - 10px);margin:0 0 0 10px;}#gps-overlay .gps-panel > .gps-caddie{margin:-3px 8px -3px;}'
         + '#gps-overlay .gps-ld-row2{display:flex;align-items:center;gap:8px;min-height:0;pointer-events:none;}'
         + '#gps-overlay .gps-ld-row2 > *{pointer-events:auto;}'
         + '#gps-overlay .gps-ld-gap{flex:1 1 auto;pointer-events:none !important;}'
@@ -5938,6 +5960,7 @@
         +   '#gps-overlay.gps-sun .gps-ld-par,#gps-overlay.gps-sun .gps-lc-l1,#gps-overlay.gps-sun .gps-lc-l2,#gps-overlay.gps-sun .gps-lc-acc{color:#fff !important;opacity:1 !important;}'
         + '#gps-overlay.gps-sun .gps-ld-div,#gps-overlay.gps-sun .gps-ld-par{border-color:#fff;}#gps-overlay.gps-sun .gps-ld-div{background:#fff;}'
         + '#gps-overlay.gps-sun .gps-ld-course,#gps-overlay.gps-sun .gps-lc-course{color:#fff;border-top-color:rgba(255,255,255,.6);}'   // URGENT-030: white in Sun
+        + '#gps-overlay.gps-sun .gps-caddie{color:#ffd60a;}'   // URGENT-047 C
         + '#gps-overlay.gps-sun.gps-ld .gps-ld-top .gps-num-mid .gps-big{color:#fff;font-size:clamp(46px,15.5vw,60px);}'
         + '#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-lbl,#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-big{color:#ffe600 !important;font-weight:800;}'
         + '#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-big{font-size:19px;}'
@@ -6808,6 +6831,10 @@
         // POLISH #4: the offline queue changed (index.html renderOfflineBadge) - the pill's "📴 N waiting".
         queueChanged: function () { if (!S || !rsSwitch()) return; try { syncRoundChip(); syncLayoutVars(); } catch (e) {} },
         courseKey: function () { return S ? S.courseKey : null; },
+        // URGENT-047 C: a caddie note was saved / cleared (gps-stats.js) - the line on the bar now.
+        caddieChanged: function () { if (!S) return; try { syncCaddieLine(); syncLayoutVars(); } catch (e) {} },
+        caddieLine: function () { return S ? caddieNow() : ''; },
+        accountUid: function () { return bagUid(); },
         tournament: function () { return tournament(); },
         // 012: the plays-like number, its club and the (i) sheet - for every layout (old, C, D).
         playsLine: function () { try { return playsLineNow(); } catch (e) { return null; } },

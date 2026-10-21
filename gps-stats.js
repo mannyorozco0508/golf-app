@@ -723,6 +723,8 @@
         wrap.addEventListener('input', function (e) {
             var t = e.target;
             if (!ss || !ss.ctx || !t || !t.classList || !t.classList.contains('hp-ss-notes')) return;
+            // URGENT-047 C: the phone's own golfer - the caddie note for this course's hole (every round).
+            if (t.getAttribute('data-ss-caddie')) { caddieSet(t.getAttribute('data-ss-caddie'), ss.ctx.hole, t.value); return; }
             qSet(ss.ctx, ss.sel, ss.ctx.hole, { note: t.value }, ssStrokes(ss.sel), ss.ctx.par);
         });
         // SWIPE DOWN TO CLOSE: from the handle / title, or anywhere once the list is at its top.
@@ -845,7 +847,15 @@
             row('Green in reg', 'auto from score + putts', 'gd', 5, [['hit', 'Hit', gv.auto ? 'auto' : ''], ['short', 'Short'], ['long', 'Long'], ['L', 'Left'], ['R', 'Right']], function (v) { return gv.v === v; });
             row('Bunker shots', null, 'bunker', 4, [[0, '0'], [1, '1'], [2, '2'], [3, '3+']], function (v) { return cell.bunker === v; });
             row('Penalties', null, 'pen', 4, [[0, '0'], [1, '1'], [2, '2'], [3, '3+']], function (v) { return cell.pen === v; });
-            if (ss.notes) {
+            if (ss.notes && ssCaddieFor(pid)) {
+                // URGENT-047 C: the caddie note - this course's hole, shown on it every time you play here.
+                var ck = ssCourseKey(), ch = el('div', 'hp-ss-h', 'Caddie note'); ch.appendChild(el('small', null, ' · hole ' + c.hole));
+                body.appendChild(ch);
+                var cta = el('textarea', 'hp-ss-notes hp-ss-caddie'); cta.value = caddieLine(ck, c.hole); cta.maxLength = CADDIE_MAX;
+                cta.setAttribute('data-ss-caddie', ck); cta.setAttribute('aria-label', 'Caddie note for hole ' + c.hole); cta.setAttribute('placeholder', 'e.g. don’t go left');
+                body.appendChild(cta);
+                body.appendChild(el('div', 'hp-ss-note', 'Shows on hole ' + c.hole + ' every time you play here. Only on this phone.'));
+            } else if (ss.notes) {
                 body.appendChild(el('div', 'hp-ss-h', 'Notes'));
                 var ta = el('textarea', 'hp-ss-notes'); ta.value = cell.note || ''; ta.setAttribute('aria-label', 'Notes for this hole'); ta.maxLength = 500;
                 body.appendChild(ta);
@@ -1058,6 +1068,51 @@
         return b;
     }
 
+    // ---- URGENT-047 C: CADDIE NOTES PER HOLE ---------------------------------------------------
+    // The score sheet's Notes, for the golfer this phone IS, is a caddie note for THE COURSE'S hole
+    // ("don't go left"): kept by course key + hole number, not by round, and shown as one small line
+    // on that hole's GPS bar every time this phone plays there (gps-view.js syncCaddieLine).
+    // PRIVATE: on this phone only (localStorage hardpan_caddie_v1) - the live rules have no private
+    // per-user path that takes it, so nothing here touches Firebase. A note saved while an account is
+    // signed in carries that account's uid, and another signed-in account on the same phone never
+    // sees it. Each note holds its text and when it was written - NO LOCATION, no round, no golfer name.
+    // The other golfers' Notes (Track stats for others) stay what they were: a note on this round.
+    var CADDIE_KEY = 'hardpan_caddie_v1', CADDIE_MAX = 140;
+    // The signed-in (not anonymous) account, as the GPS screen knows it (gps-view.js bagUid) - this file reads no database.
+    function caddieUid() { try { var G = W.HardPanGps, u = G && typeof G.accountUid === 'function' ? G.accountUid() : null; return u ? String(u) : null; } catch (e) { return null; } }
+    function caddieAll() { var v = lsGet(CADDIE_KEY); return v && v.v === 1 && v.notes && typeof v.notes === 'object' ? v : { v: 1, notes: {} }; }
+    function caddieText(t) { return String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, CADDIE_MAX); }
+    function caddieOk(courseKey, hole) { return !!courseKey && Number(hole) > 0; }
+    // The note's record { t, at, uid } for this phone's account, or null.
+    function caddieGet(courseKey, hole) {
+        if (!caddieOk(courseKey, hole)) return null;
+        var c = caddieAll().notes[String(courseKey)], n = c && c[String(Number(hole))];
+        if (!n || !n.t) return null;
+        var me = caddieUid();
+        if (n.uid && me && n.uid !== me) return null;   // another account's note on this phone
+        return n;
+    }
+    function caddieLine(courseKey, hole) { var n = caddieGet(courseKey, hole); return n ? n.t : ''; }
+    // Empty text removes the note. Returns the text kept ('' when none).
+    function caddieSet(courseKey, hole, text) {
+        if (!caddieOk(courseKey, hole)) return '';
+        var st = caddieAll(), k = String(courseKey), h = String(Number(hole)), t = caddieText(text);
+        var c = st.notes[k] || {};
+        if (t) { var rec = { t: t, at: Date.now() }, u = caddieUid(); if (u) rec.uid = u; c[h] = rec; } else delete c[h];
+        if (Object.keys(c).length) st.notes[k] = c; else delete st.notes[k];
+        lsSet(CADDIE_KEY, st);
+        try { if (W.HardPanGps && typeof W.HardPanGps.caddieChanged === 'function') W.HardPanGps.caddieChanged(); } catch (e) {}
+        return t;
+    }
+    // The course the score sheet is on: the ctx's own key, else the GPS screen's mounted course.
+    function ssCourseKey() {
+        var c = ss && ss.ctx;
+        if (c && c.courseKey) return String(c.courseKey);
+        try { var k = W.HardPanGps && typeof W.HardPanGps.courseKey === 'function' ? W.HardPanGps.courseKey() : null; return k ? String(k) : null; } catch (e) { return null; }
+    }
+    // Notes on the sheet is a caddie note for the phone's own golfer when the course is known.
+    function ssCaddieFor(pid) { return ssIsOwn(pid) && caddieOk(ssCourseKey(), ss.ctx.hole); }
+
     function setTrackOthers(v) { setOthers(!!v); if (ssIsOpen()) ssRender(); return othersOn(); }
     function trackShown() {
         try {
@@ -1082,5 +1137,7 @@
         get setTrackOthers() { return trackShown() ? setTrackOthers : undefined; },
         trackOthersShown: function () { return trackShown(); },
         // The score sheet (012).
+        // URGENT-047 C: caddie notes per course hole (this phone only; no location).
+        caddie: { key: CADDIE_KEY, max: CADDIE_MAX, get: caddieGet, line: caddieLine, set: caddieSet },
         sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? (ss.ctx.home != null ? ss.ctx.home : ss.ctx.hole) : null; }, shownHole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, go: function (h) { return ssGoto(h); }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
 })();
