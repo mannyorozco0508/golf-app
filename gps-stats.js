@@ -789,9 +789,9 @@
         var showStats = ssStatsFor(pid);
         foot.querySelector('[data-ss-notes]').style.display = showStats ? '' : 'none';
         foot.querySelector('[data-ss-notes]').classList.toggle('on', !!ss.notes);
-        // URGENT-034: while another golfer still has no score (and this one has), the button says where
-        // it goes - "Next: Paul ›" - and only moves the sheet there (nothing is saved or lost). Everyone
-        // scored, or this golfer not yet: Save, as before.
+        // URGENT-034: while another golfer still has no score, the button says where it goes - "Next:
+        // Paul ›" - and only moves the sheet there (each score is already saved). Everyone else scored:
+        // Save, as before.
         var sv = foot.querySelector('[data-ss-save]'), nxt = ssNextTarget(), nxg = nxt == null ? null : c.golfers.filter(function (g) { return String(g.id) === nxt; })[0];
         if (nxg) sv.setAttribute('data-ss-next', nxt); else sv.removeAttribute('data-ss-next');
         sv.textContent = nxg ? 'Next: ' + (nxg.name || ('Player ' + nxg.id)) + ' \u203a' : (away ? 'Save · back to hole ' + c.home : (c.last ? 'Save' : 'Save · Next hole ›'));
@@ -880,9 +880,10 @@
         }
         return null;
     }
-    // URGENT-034: where the bottom button goes - the next golfer with no score, once the one shown has
-    // a score (so a golfer who is not playing the hole never blocks Save).
-    function ssNextTarget() { return ss && ss.ctx && ssStrokes(ss.sel) > 0 ? ssNextOpen(ss.sel) : null; }
+    // URGENT-034: where the bottom button goes - while any OTHER golfer still has no score on this hole,
+    // the next one of them after the golfer shown (wrapping). Every score is saved at its tap, so the
+    // button only moves the sheet; with everyone else scored it is Save again.
+    function ssNextTarget() { return ss && ss.ctx ? ssNextOpen(ss.sel) : null; }
     function ssAdvance(pid) {
         var nx = ssNextOpen(pid);
         if (nx == null) return false;
