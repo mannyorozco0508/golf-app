@@ -1707,7 +1707,7 @@
         .ps-head span:first-child { text-align: left; }
         /* POLISH #20: in the HardPan app, Golfers is a screen of its own - not a card
            floating over the score sheet. Full height, solid background, above the
-           GPS overlay (#gps-overlay 10050) like the other quick edits (#hp-redit 10300). */
+           map (z-index 10050) like the other quick edits (#hp-redit 10300). */
         #players-sheet.ps-own { z-index: 10300; padding: 0; align-items: stretch; justify-content: stretch; background: var(--bg-page, #f4f6f3); }
         #players-sheet.ps-own .ps-content { box-sizing: border-box; overflow-y: auto; max-width: none; width: 100%; max-height: none; height: 100%; border-radius: 0; box-shadow: none; padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 20px); }
         /* v212: the Index/Course line, on its own line across the row so the
@@ -3973,7 +3973,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         } catch (e) { games = []; }
         const lines = [];
         // POLISH #25: in the HardPan app stroke play is how the scores are KEPT, not a game -
-        // a GPS-only round listed "Stroke Play" under TODAY'S GAMES. The app drops the main
+        // a map-only round listed "Stroke Play" under TODAY'S GAMES. The app drops the main
         // game when it is plain stroke; a real main game (Nassau, skins...) still shows.
         try {
             if (window.HardPanBet && typeof window.HardPanBet.on === 'function' && window.HardPanBet.on())
@@ -8169,7 +8169,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         psSnapshot = rosterSignature(currentData.players);
         renderPlayersSheet(currentData);
         const el = document.getElementById('players-sheet');
-        // POLISH #20: in the HardPan app (gps-bet.js on()) Golfers opens ON ITS OWN - a full
+        // POLISH #20: in the HardPan app (HardPanBet.on()) Golfers opens ON ITS OWN - a full
         // screen, named the way Round settings names it - not a sheet on the score sheet.
         // Every door (Round settings' Golfers row, the quick edit, ?players=1) lands here.
         const own = psOwnScreen();
