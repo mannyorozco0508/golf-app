@@ -711,6 +711,176 @@
                 '\u2192 hit ' + hit + sfx + (sg ? ' \u00b7 ' + ((B.SHORT && B.SHORT[sg.club]) || sg.club) : ''));
         });
     }
+    // ---- DISTANCE ARCS + TEE PLAN (URGENT-052 A, 2026-10-21) -------------------------
+    // "Distance arcs" (GPS tools; OFF by default, remembered per golfer on this phone): thin arcs
+    // where the golfer's clubs LAND in today's wind (gps-arcs-plan.js: their carries, wind-adjusted
+    // with HardPanWindLearn.windTerm - their own numbers once a club qualifies, else generic, and
+    // labelled "generic" by the 049 (i) rule), from the tee (on the tee box, or off the hole) or
+    // from the golfer. OFF: nothing is added to the map - no source, no layer, no label - and the
+    // arcs script is not even loaded. THE TEE PLAN (tap the tee, or Tools > Tee plan; toggle on or
+    // off): each tee club -> the yards left in, and the hazards it brings into play (the hole's
+    // hazard points, by distance window). Tournament mode and a spectator: neither. Worked out on
+    // the phone; the only thing kept is the toggle (localStorage, never the account, never sent).
+    var ARCS_KEY = 'hardpan_gps_arcs_v1', TEE_TAP_YD = 15;
+    function arcsGolferKey() { var n = String(bagGolfer() || '').trim().toLowerCase().replace(/\s+/g, ' '); return n ? 'n:' + n : 'me'; }
+    function arcsRec() { try { var v = JSON.parse(localStorage.getItem(ARCS_KEY) || 'null'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
+    function arcsPref() { return arcsRec()[arcsGolferKey()] === 1; }
+    function setArcsPref(on) {
+        var v = arcsRec(), k = arcsGolferKey();
+        if (on) v[k] = 1; else delete v[k];
+        try { if (Object.keys(v).length) localStorage.setItem(ARCS_KEY, JSON.stringify(v)); else localStorage.removeItem(ARCS_KEY); } catch (e) {}
+    }
+    function planAllowed() { return !!(S && S.pro && !tournament() && !readOnlyHere() && bagSwitch()); }
+    function arcsLive() { return !!(planAllowed() && arcsPref() && S.mode === 'measure' && !S.replay); }
+    function arcsApi() { return window.HardPanArcsPlan || null; }
+    function withArcs(fn) { withShots(function () { loadScript('gps-arcs-plan.js', function () { return !!arcsApi(); }, function () { if (S && arcsApi()) fn(arcsApi()); }); }); }
+    function toggleArcs() { setArcsPref(!arcsPref()); arcsMenuText(); render(); }
+    function arcsMenuText() { txt('.gps-arcs-toggle', 'Distance arcs: ' + (arcsPref() ? 'On' : 'Off')); }
+    // The golfer's carries (My bag, else the setup's for their handicap), the clubs' wind fits, hand, wind.
+    function arcsInputs() {
+        var B = bagApi(), SB = shotBag(), SL = window.HardPanShotLog || null, g = bagGolfer();
+        if (!B) return null;
+        var cs = layupCarries(B, true), fits = {};
+        try { fits = SB ? SB.fits(g) : {}; } catch (e) { fits = {}; }
+        var w = effectiveWind();
+        return { bag: cs.bag, own: cs.own, fits: fits || {}, hand: SL ? SL.hand(g) : 'R', wind: w && !w.none ? w : null };
+    }
+    function holeHazards() { var rec = osmRecord(S.courseKey), hr = rec && rec.holes && rec.holes[String(S.hole)]; return (hr && hr.osm && hr.osm.hazards) || []; }
+    function drawCarryArcs(r, o) {
+        if (!S || !S.map || !S.styleReady) return;
+        var A = arcsApi(), live = arcsLive(), list = [];
+        if (live && !A && !S.arcsLoad) { S.arcsLoad = true; withArcs(function () { render(); }); }
+        if (live && A && r && r.mid && o && o.pt) {
+            var inp = arcsInputs();
+            if (inp) {
+                var nearTee = !!(r.tee && (o.from === 'tee' || G.haversineMeters(o.pt, r.tee) <= TEE_SHOT_YD * G.M_PER_YD));
+                var from = nearTee ? { pt: r.tee, kind: 'tee' } : { pt: o.pt, kind: 'me' };
+                try {
+                    list = A.arcs({ bag: inp.bag, fits: inp.fits, hand: inp.hand, wind: inp.wind, from: from, mid: r.mid, aim: nearTee && S.target ? S.target : r.mid,
+                        par: S.par, holeYd: r.tee ? G.haversineMeters(r.tee, r.mid) / G.M_PER_YD : null });
+                } catch (e) { list = []; }
+                S.carryFrom = from.kind;
+            }
+        }
+        var map = S.map, mel = S.el.querySelector('.gps-map');
+        try {
+            if (!list.length) {
+                ['carry052-still', 'carry052'].forEach(function (id) { if (map.getLayer(id)) map.removeLayer(id); });
+                if (map.getSource('carry052')) map.removeSource('carry052');
+            } else {
+                if (!map.getSource('carry052')) {
+                    map.addSource('carry052', { type: 'geojson', data: EMPTY });
+                    map.addLayer({ id: 'carry052-still', type: 'line', source: 'carry052', filter: ['==', ['get', 'k'], 'still'], paint: { 'line-color': '#ffffff', 'line-width': 1.2, 'line-opacity': 0.6, 'line-dasharray': [2, 2] } });
+                    map.addLayer({ id: 'carry052', type: 'line', source: 'carry052', filter: ['!=', ['get', 'k'], 'still'], paint: { 'line-color': ['case', ['==', ['get', 'k'], 'gen'], '#ffffff', '#d9f99d'], 'line-width': 1.6 } });
+                }
+                var feats = [];
+                list.forEach(function (a) {
+                    feats.push({ type: 'Feature', properties: { k: a.generic ? 'gen' : 'own', c: a.club }, geometry: { type: 'LineString', coordinates: a.pts.map(ll) } });
+                    if (a.stillPts) feats.push({ type: 'Feature', properties: { k: 'still', c: a.club }, geometry: { type: 'LineString', coordinates: a.stillPts.map(ll) } });
+                });
+                setData('carry052', { type: 'FeatureCollection', features: feats });
+            }
+        } catch (e) {}
+        // THE LABELS: "Dr 249" (+ "generic") just past each arc's right-hand end. None when off.
+        var keep = {}, u = units();
+        list.forEach(function (a, i) {
+            var k = 'c52_' + i; keep[k] = 1;
+            S.markers = S.markers || {};
+            var m = S.markers[k];
+            if (!m) { var e0 = document.createElement('div'); e0.className = 'gps-carry-lbl'; e0.style.pointerEvents = 'none'; m = new (ML().Marker)({ element: e0, anchor: 'left', offset: [4, 0] }).setLngLat(ll(a.end)).addTo(S.map); S.markers[k] = m; }
+            else m.setLngLat(ll(a.end));
+            var el = m && m.getElement();
+            if (!el) return;
+            var want = a.short + ' ' + G.shownDistance(a.yd * G.M_PER_YD, u) + (a.generic ? '|g' : '');
+            if (el.getAttribute('data-l') !== want) {
+                el.setAttribute('data-l', want); el.textContent = '';
+                var b = document.createElement('b'); b.textContent = a.short + ' ' + G.shownDistance(a.yd * G.M_PER_YD, u); el.appendChild(b);
+                if (a.generic) { var s = document.createElement('small'); s.textContent = 'generic'; el.appendChild(s); }
+                el.classList.toggle('gps-carry-gen', !!a.generic);
+            }
+        });
+        Object.keys(S.markers || {}).forEach(function (k) { if (/^c52_/.test(k) && !keep[k]) marker(k, null); });
+        spreadCarryLbls();
+        if (mel) {
+            if (list.length) { mel.setAttribute('data-carry-arcs', list.map(function (a) { return a.club + ':' + Math.round(a.yd) + (a.generic ? ':g' : ''); }).join(' ')); mel.setAttribute('data-carry-from', S.carryFrom || ''); }
+            else { mel.removeAttribute('data-carry-arcs'); mel.removeAttribute('data-carry-from'); }
+        }
+    }
+    // Two clubs landing close together: their labels step down the screen, never on top of each other.
+    function spreadCarryLbls() {
+        if (!S || !S.map || !S.markers) return;
+        var items = Object.keys(S.markers).filter(function (k) { return /^c52_/.test(k); }).map(function (k) {
+            var m = S.markers[k], q = null, el = m.getElement();
+            try { q = S.map.project(m.getLngLat()); } catch (e) {}
+            return { m: m, y: q ? q.y : 0, h: (el && el.offsetHeight) || 20 };
+        }).sort(function (a, b) { return a.y - b.y; });
+        var bottom = -1e9;
+        items.forEach(function (it) {
+            var top = it.y - it.h / 2, dy = top < bottom + 2 ? bottom + 2 - top : 0;
+            try { it.m.setOffset([4, Math.round(dy)]); } catch (e) {}
+            bottom = top + dy + it.h;
+        });
+    }
+    // THE TEE PLAN sheet (the Hazards sheet's look).
+    function tplanSheet() { return S && S.el.querySelector('.gps-tplan'); }
+    function tplanOpen() { var t = tplanSheet(); return !!(t && t.style.display !== 'none'); }
+    function openTeePlan() {
+        var t = tplanSheet(); if (!t || !planAllowed()) return;
+        closeMenus(); closeHazards();
+        t.style.display = ''; t.scrollTop = 0; S.tplanSig = null;
+        fillTeePlan();
+        if (!arcsApi() || !bagApi()) withArcs(function () { if (tplanOpen()) { S.tplanSig = null; fillTeePlan(); } });
+    }
+    function closeTeePlan() { var t = tplanSheet(); if (t) t.style.display = 'none'; if (S) S.tplanSig = null; }
+    function fillTeePlan() {
+        var t = tplanSheet(); if (!t || !S) return;
+        var A = arcsApi(), r = resolved(), u = units(), m = u === 'm', k = m ? G.M_PER_YD : 1, sfx = m ? ' m' : '';
+        var n = function (yd) { return String(Math.round(yd * k)); };
+        var inp = A ? arcsInputs() : null, hz = holeHazards();
+        var sig = [S.hole, u, !!A, !!inp, r && r.tee ? r.tee.join() : '', r && r.mid ? r.mid.join() : '', JSON.stringify(inp ? [inp.bag, inp.wind && [inp.wind.mph, inp.wind.fromDeg], inp.hand] : null), hz.length, S.par].join('|');
+        if (S.tplanSig === sig) return;
+        S.tplanSig = sig;
+        t.querySelector('.gps-tplan-title').textContent = 'Tee plan · Hole ' + S.hole;
+        var sub = t.querySelector('.gps-tplan-sub'), sum = t.querySelector('.gps-tplan-sum'), list = t.querySelector('.gps-tplan-list');
+        list.textContent = ''; sum.textContent = ''; sum.style.display = 'none';
+        var line = function (cls, text) { var e = document.createElement('div'); e.className = cls; e.textContent = text; list.appendChild(e); return e; };
+        if (!A || !inp) { sub.textContent = 'Working it out…'; return; }
+        if (!r || !r.tee || !r.mid) { sub.textContent = ''; line('gps-hzs-none', 'No tee or green for this hole yet.'); return; }
+        var sh = holeShape(S.hole, r, r.mid), path = null;
+        try { path = G.holePath ? G.holePath({ tee: r.tee, mid: r.mid, line: sh.line, fairway: sh.fairway, hazards: sh.hazards }) : null; } catch (e) { path = null; }
+        var p = A.plan({ bag: inp.bag, fits: inp.fits, hand: inp.hand, wind: inp.wind, tee: r.tee, mid: r.mid, path: path && path.pts, hazards: hz, par: S.par });
+        if (!p) { line('gps-hzs-none', 'No tee or green for this hole yet.'); return; }
+        var SB = shotBag();
+        sub.textContent = (S.par ? 'Par ' + S.par + ' · ' : '') + n(p.holeYd) + sfx + ' to the middle · '
+            + (p.wind ? (SB ? SB.windWords(p.wind.mph, p.wind.rel) : Math.round(p.wind.mph) + ' mph') : 'no wind reading');
+        if (!p.rows.length) { line('gps-hzs-none', 'No club numbers yet - set them in My bag.'); return; }
+        sum.textContent = p.rows.map(function (x) { return x.name + ' → ' + (x.green ? 'on the green' : n(x.inYd) + sfx + ' in'); }).join(' · ');
+        sum.style.display = '';
+        if (!p.hazardData) line('gps-hzs-none gps-tplan-nohz', 'No hazard data for this hole.');
+        p.rows.forEach(function (x) {
+            var box = document.createElement('div'); box.className = 'gps-tplan-club'; box.setAttribute('data-tplan', x.club);
+            var hd = document.createElement('div'); hd.className = 'gps-hzs-row gps-tplan-h';
+            var a = document.createElement('span'); a.className = 'gps-hzs-name'; a.textContent = x.name;
+            if (x.generic) { var g = document.createElement('small'); g.className = 'gps-tplan-gen'; g.textContent = 'generic'; a.appendChild(g); }
+            var b = document.createElement('span'); b.className = 'gps-hzs-nums'; b.textContent = x.green ? 'on the green' : n(x.inYd) + sfx + ' in';
+            hd.appendChild(a); hd.appendChild(b); box.appendChild(hd);
+            var src = x.generic ? (x.n ? 'only ' + x.n + ' marked shot' + (x.n === 1 ? '' : 's') + ', generic wind' : 'generic wind') : 'from ' + x.n + ' marked shots';
+            if (!inp.own) src = 'starting carry for your handicap · generic wind';
+            var d = document.createElement('div'); d.className = 'gps-tplan-d';
+            d.textContent = 'Carry ' + n(x.carry) + sfx + ' still air · ' + (x.wind ? 'lands ~' + n(x.lands) + sfx + ' in this wind' : 'no wind reading') + ' · ' + src;
+            box.appendChild(d);
+            if (p.hazardData) {
+                if (!x.hazards.length) { var c = document.createElement('div'); c.className = 'gps-tplan-hz gps-tplan-clear'; c.textContent = 'Clear of the hole’s hazards'; box.appendChild(c); }
+                x.hazards.forEach(function (z) {
+                    var e = document.createElement('div'); e.className = 'gps-tplan-hz ' + (z.type === 'w' ? 'gps-tplan-water' : 'gps-tplan-bunker');
+                    e.textContent = z.name + ' in play · reach ' + n(z.reachYd) + sfx + (z.carryYd != null ? ' · carry ' + n(z.carryYd) + sfx : '');
+                    box.appendChild(e);
+                });
+            }
+            list.appendChild(box);
+        });
+        line('gps-tplan-foot', '“In play” = the club lands from ' + n(A.IN_PLAY_SHORT_YD) + sfx + ' short of a hazard’s near edge to its far edge (a hazard with one point: ' + n(A.ONE_POINT_YD) + sfx + ' either side). Hazards: this hole’s hazard points. Worked out on this phone; nothing is sent.');
+    }
     function drawHoleAsk() {
         var want = S.holeAsk || [];
         Object.keys(S.markers || {}).forEach(function (k) { if (/^ask/.test(k) && !want.some(function (c) { return 'ask' + c.id === k; })) marker(k, null); });
@@ -1130,6 +1300,7 @@
             var r = resolved();
             if (S.arcs && S.arcStep !== arcStepNow(aimAt(r))) drawArcs(r, origin(r));
             spreadPins();
+            spreadCarryLbls();   // 052 A (no labels while Distance arcs is off: nothing to do)
             placePills();
         });
         map.on('resize', function () {
@@ -1613,6 +1784,7 @@
         marker('tee', o && o.from === 'tee' ? o.pt : null, function () { return pinEl('gps-pin-tee', 'T'); });
         spreadPins();
         drawArcs(r, o);
+        drawCarryArcs(r, o);   // 052 A: nothing at all while Distance arcs is off
     }
     // POLISH #17: F / C / B LESS THAN ~20 px APART ON SCREEN (a small green seen whole) drew on top
     // of each other - F hidden behind C. F and B step out along their own line from C (or straight
@@ -3733,6 +3905,9 @@
         // MARKING SHOTS: a tap is where the ball finished (gps-shots.js, this phone only).
         if (S.shotMode) { addShot(pt, 'tap'); return; }
         if (S.replay) return;
+        // 052 A: a tap ON THE TEE opens the tee plan (Distance arcs on or off).
+        var rt = resolved();
+        if (planAllowed() && rt && rt.tee && rt.mid && G.haversineMeters(pt, rt.tee) <= TEE_TAP_YD * G.M_PER_YD) { openTeePlan(); return; }
         // Tap anywhere: the target jumps there.
         S.target = pt;
         S.targetMoved = true;
@@ -3980,6 +4155,10 @@
         // HAZARDS SHEET (008): its button while measuring; open, it follows the golfer.
         show('.gps-hz-btn', S.pro && S.mode === 'measure' && !S.replay && courseHasAnyData());
         if (hzOpen()) { if (S.mode !== 'measure') closeHazards(); else fillHazards(); }
+        // 052 A: the tee plan follows the hole / wind; tournament mode or a spectator closes it.
+        if (tplanOpen()) { if (S.mode !== 'measure' || !planAllowed()) closeTeePlan(); else fillTeePlan(); }
+        show('.gps-arcs-toggle', planAllowed()); arcsMenuText();
+        show('.gps-tee-plan', planAllowed() && S.mode === 'measure' && !!(r && r.tee && r.mid));
         drawShots();
         syncLayoutC(r, nums, acc);
         syncLayoutD(r, o, nums);
@@ -5134,7 +5313,7 @@
     // MORE: [the menu item it runs, icon, label]. Shown only when that item is.
     var TS_TILES = [['.gps-set-green', '⛳', 'Set the green'], ['.gps-fix-green', '⛳', 'Fix the green'], ['.gps-undo-green', '↶', 'Undo last fix'],
         ['.gps-refresh-gps', '↻', 'Refresh GPS'], ['.gps-my-stats', '▦', 'My stats'], ['.gps-my-bag', '🏌️', 'My bag'], ['.gps-range', '🎯', 'Range'],
-        ['.gps-mark-shots', '📍', 'Mark shots'], ['.gps-replay', '▶', 'Replay round'], ['.gps-pick-course', '⚑', 'Other course'],
+        ['.gps-mark-shots', '📍', 'Mark shots'], ['.gps-tee-plan', '⛳', 'Tee plan'], ['.gps-replay', '▶', 'Replay round'], ['.gps-pick-course', '⚑', 'Other course'],
         ['.gps-rechoose', '①', 'Hole 1 again']];
     var TS_MARKUP = '<div class="gps-ts-head"><span class="gps-ts-grip" aria-hidden="true"></span><div class="gps-ts-title">Tools</div></div>'
         + '<div class="gps-ts-h" data-ts-sec="layout">SCREEN LAYOUT</div><div class="gps-ts-seg" data-ts-seg="layout" role="radiogroup" aria-label="Screen layout"><button type="button" data-v="d" role="radio">HardPan</button><button type="button" data-v="c" role="radio">Bottom panel</button></div>'
@@ -5144,6 +5323,8 @@
         + '<div class="gps-ts-h">ROUND</div><div class="gps-ts-rows">'
         +   '<div class="gps-ts-row" data-ts-row="tourney"><span>🏆 Tournament mode</span><button type="button" class="gps-ts-sw" data-ts-sw="tourney" role="switch" aria-label="Tournament mode"><i></i></button></div>'
         +   '<div class="gps-ts-row" data-ts-row="aa"><span>Auto-advance holes</span><button type="button" class="gps-ts-sw" data-ts-sw="aa" role="switch" aria-label="Auto-advance holes"><i></i></button></div>'
+        // 052 A: Distance arcs - per golfer, off by default; off = the map exactly as before.
+        +   '<div class="gps-ts-row" data-ts-row="arcs"><span>Distance arcs<span style="display:block;font-size:12px;font-weight:600;opacity:.75;">Where your clubs land in this wind</span></span><button type="button" class="gps-ts-sw" data-ts-sw="arcs" role="switch" aria-label="Distance arcs"><i></i></button></div>'
         // THE SLOT for "Track stats for others" (gps-012s, HardPanGpsStats.trackOthers / setTrackOthers):
         // shown only when that API is in the page.
         +   '<div class="gps-ts-row" data-ts-row="others"><span>Track stats for others</span><button type="button" class="gps-ts-sw" data-ts-sw="others" role="switch" aria-label="Track stats for others"><i></i></button></div>'
@@ -5173,6 +5354,7 @@
         };
         sw('tourney', tournament(), true, tourneyRound());
         sw('aa', aaOn(), !!S.el.querySelector('.gps-aa-toggle'));
+        sw('arcs', arcsPref(), planAllowed());
         var H = tsStats();
         sw('others', H ? H.trackOthers() : false, !!H);
         var PS = window.HardPanGpsStats, pc = String(S.eventCode || '');
@@ -5215,6 +5397,7 @@
             var w = b.getAttribute('data-ts-sw');
             if (w === 'tourney') tsRun('.gps-tourney-toggle');
             else if (w === 'aa') tsRun('.gps-aa-toggle');
+            else if (w === 'arcs') { if (planAllowed()) toggleArcs(); tsSync(); }
             else if (w === 'others') { var H = tsStats(); if (H) { H.setTrackOthers(!H.trackOthers()); tsSync(); } }
             else if (w === 'lockscreen') { var LAc = window.HardPanLiveActivity; if (LAc) { LAc.setOn(!LAc.isOn()); tsSync(); render(); } }
             else if (w === 'practice') { var P = window.HardPanGpsStats, c = String(S.eventCode || ''); if (P && P.setPractice && c) { P.setPractice(c, !P.practiceOn(c)); tsSync(); } }
@@ -5607,6 +5790,9 @@
         // URGENT-047 A: Range - carry by club at the range, "Update my bag" (gps-range.js, distances only).
         +   '<button type="button" class="gps-menu-item gps-range" data-feature="clubs">Range</button>'
         +   '<button type="button" class="gps-menu-item gps-mark-shots">Mark shots</button>'
+        // 052 A: Distance arcs (per golfer, off by default) and the tee plan.
+        +   '<button type="button" class="gps-menu-item gps-arcs-toggle" style="display:none"></button>'
+        +   '<button type="button" class="gps-menu-item gps-tee-plan" style="display:none">Tee plan</button>'
         +   '<button type="button" class="gps-menu-item gps-replay">Replay round</button>'
         +   '<button type="button" class="gps-menu-item gps-add-game">\u2795 Add a game</button>'
         +   '<button type="button" class="gps-menu-item gps-pick-course" style="display:none">\u26F3 Pick another course</button>'
@@ -5624,6 +5810,11 @@
         + '<div class="gps-hzs gps-float gps-scroll-ok" data-feature="hazards" style="display:none" role="dialog" aria-label="Hazards and layups">'
         +   '<div class="gps-hzs-head"><div><div class="gps-hzs-title"></div><div class="gps-hzs-sub"></div></div><button type="button" class="gps-hzs-done">Done</button></div>'
         +   '<div class="gps-hzs-list"></div><div class="gps-hzs-layh">LAY UP</div><div class="gps-hzs-layfrom" style="display:none"></div><div class="gps-hzs-lay"></div>'
+        + '</div>'
+        // 052 A: THE TEE PLAN - the Hazards sheet's look (tap the tee, or Tools > Tee plan).
+        + '<div class="gps-tplan gps-float gps-scroll-ok" style="display:none" role="dialog" aria-label="Tee plan">'
+        +   '<div class="gps-hzs-head"><div><div class="gps-hzs-title gps-tplan-title"></div><div class="gps-hzs-sub gps-tplan-sub"></div></div><button type="button" class="gps-hzs-done gps-tplan-done">Done</button></div>'
+        +   '<div class="gps-tplan-sum" style="display:none"></div><div class="gps-tplan-list"></div>'
         + '</div>'
         + '<div class="gps-wind-sheet gps-float" style="display:none" role="dialog" aria-label="Set the wind">'
         +   '<div class="gps-ws-head"><div class="gps-ws-title">Wind<small class="gps-ws-state"></small></div>'
@@ -5728,6 +5919,19 @@
         + '#gps-overlay .gps-hzs-none{padding:10px 2px;font:600 15px/1.3 ' + FONT + ';color:#f4f4ef;}'
         + '#gps-overlay .gps-hzs-layfrom{font:700 13px/1.2 ' + FONT + ';color:#c8d1ca;margin:0 2px 2px;}'
         + '#gps-overlay .gps-hzs-layh{font:800 11px/1 ' + FONT + ';letter-spacing:.1em;color:#a7b3aa;margin:12px 2px 4px;}'
+        // 052 A: THE TEE PLAN (the Hazards sheet's look, a little taller) and the arc labels.
+        + '#gps-overlay .gps-tplan{position:absolute;z-index:46;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:72%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font-family:' + FONT + ';touch-action:pan-y;}'
+        + '#gps-overlay .gps-tplan-sum{margin:2px 0 4px;padding:9px 10px;border-radius:12px;background:rgba(217,249,157,.10);font:800 15px/1.3 ' + FONT + ';color:#f4f4ef;}'
+        + '#gps-overlay .gps-tplan-club{padding-bottom:6px;}'
+        + '#gps-overlay .gps-tplan-gen{font:800 11px/1 ' + FONT + ';color:#f4f4ef;background:rgba(255,255,255,.18);border-radius:6px;padding:2px 6px;margin-left:6px;vertical-align:2px;}'
+        + '#gps-overlay .gps-tplan-d{font:600 12.5px/1.35 ' + FONT + ';color:#c8d1ca;margin:-4px 2px 4px;}'
+        + '#gps-overlay .gps-tplan-hz{display:inline-block;margin:2px 4px 2px 0;padding:4px 8px;border-radius:8px;font:700 12.5px/1.3 ' + FONT + ';}'
+        + '#gps-overlay .gps-tplan-water{background:rgba(159,211,255,.14);color:#9fd3ff;}#gps-overlay .gps-tplan-bunker{background:rgba(243,227,181,.14);color:#f3e3b5;}'
+        + '#gps-overlay .gps-tplan-clear{background:rgba(217,249,157,.10);color:#d9f99d;}'
+        + '#gps-overlay .gps-tplan-foot{margin-top:8px;font:600 11.5px/1.35 ' + FONT + ';color:#9ca3af;}'
+        + '#gps-overlay .gps-carry-lbl{transform-origin:left center;margin-left:4px;white-space:nowrap;padding:2px 6px;border-radius:7px;background:rgba(11,15,12,.82);color:#d9f99d;font:800 11.5px/1.15 ' + FONT + ';}'
+        + '#gps-overlay .gps-carry-lbl > b{font-weight:800;}#gps-overlay .gps-carry-lbl > small{display:block;font:700 9.5px/1.1 ' + FONT + ';color:#cbd5e1;}'
+        + '#gps-overlay .gps-carry-lbl.gps-carry-gen{color:#ffffff;}'
         + '#gps-overlay .gps-ask-hole1{font:800 14px/1 ' + FONT + ';color:#0b0f0c;background:#d9f99d;border:2px solid #0b0f0c;border-radius:999px;padding:10px 14px;min-height:44px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.45);white-space:nowrap;}'
         + '#gps-overlay .gps-wind-calm .gps-wind-arrow{display:none;}'
         + '#gps-overlay .gps-wind-tagged{padding-bottom:13px !important;}'
@@ -6590,6 +6794,9 @@
         if (!hzSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="hazards"]'), function (n) { n.parentNode.removeChild(n); });
         on(el, '.gps-hz-btn', function () { if (!S) return; if (hzOpen()) closeHazards(); else openHazards(); });
         on(el, '.gps-hzs-done', closeHazards);
+        on(el, '.gps-tplan-done', closeTeePlan);
+        on(el, '.gps-tee-plan', function () { if (S) openTeePlan(); });
+        on(el, '.gps-arcs-toggle', function () { if (S && planAllowed()) toggleArcs(); });
         on(el, '.gps-wind', function () { if (!S) return; if (windSheetOpen()) closeWindSheet(); else openWindSheet(); });
         var wsheet = el.querySelector('.gps-wind-sheet');
         if (wsheet) { wsheet.addEventListener('click', windSheetClick); bindDial(wsheet); }
