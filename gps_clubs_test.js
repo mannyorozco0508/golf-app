@@ -222,7 +222,8 @@ test('gps-view: setup behind bagSetup; sync only for the signed-in golfer\'s own
     assert.ok(/B\.defaultCarries\(hcp\)/.test(v) && /I\.current\(\)/.test(v), 'from the round\'s handicap, else the HardPan Index');
     assert.ok(/u && !u\.isAnonymous && u\.uid/.test(v) && /String\(w\.id\) === String\(me\)/.test(v), 'own bag, real sign-in');
     assert.ok(/function bagSyncCan\(B\) \{ return !!\(B && B\.syncOn\(\)/.test(v), 'behind clubsSync');
-    assert.equal((v.match(/bagSaved\(\);/g) || []).length, 5, 'saved after a club pick, a typed number, a reset, reset all and the setup');
+    // int-049: 4 - a marked shot's club pick goes to the shot log (gps-shot-log.js), not the old bag, so there is no bag save for it.
+    assert.equal((v.match(/bagSaved\(\);/g) || []).length, 4, 'saved after a typed number, a reset, reset all and the setup');
     assert.ok(/'learned \\u00b7 '/.test(v) && /'entered'/.test(v), 'learned vs entered in My bag');
 });
 
