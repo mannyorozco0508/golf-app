@@ -45,11 +45,11 @@ test('045: phone -> watch carries numbers only - the plugin copies a fixed list 
     assert.ok(!/URLSession|http/i.test(sess.replace(/\/\/.*$/gm, '')), 'WatchConnectivity only, no network');
 });
 
-test('045: the watch screen shows the hole, its par and F / C (middle) / B from the phone', () => {
+test('045: the watch screen shows the hole, its par and F / M (middle) / B from the phone', () => {
     const v = read('Watch/HardPanWatch/ContentView.swift');
     assert.ok(/Text\("Hole \\\(hole\)"\)/.test(v), 'hole number');
     assert.ok(/Text\("Par \\\(par\)"\)/.test(v), 'par');
-    for (const [l, k] of [['F', 'front'], ['C', 'center'], ['B', 'back']]) assert.ok(new RegExp('number\\("' + l + '", [^\\n]*s\\.' + k).test(v), l + ' = ' + k);
+    for (const [l, k] of [['F', 'front'], ['M', 'center'], ['B', 'back']]) assert.ok(new RegExp('number\\("' + l + '", [^\\n]*s\\.' + k).test(v), l + ' = ' + k);
     const mgr = read('Watch/HardPanWatch/WatchSessionManager.swift');
     assert.ok(/didReceiveApplicationContext/.test(mgr) && /didReceiveMessage/.test(mgr), 'updates from the phone (latest context + live message)');
 });
@@ -60,4 +60,12 @@ test('045: the Live Activity is untouched - still its own target, still embedded
     assert.ok(/HardPanLiveActivity\.appex in Embed Foundation Extensions/.test(pbx), 'embedded');
     const app = /\/\* App \*\/ = \{\s*isa = PBXNativeTarget;[\s\S]*?productType/.exec(pbx)[0];
     assert.ok(/Embed Foundation Extensions/.test(app) && /Embed Watch Content/.test(app), 'the App target embeds both');
+});
+
+test('045: a hole sent before the watch can take it is re-sent by the phone once it can (activation, app installed, reachable)', () => {
+    const s = read('App/PhoneBridge/PhoneWatchSession.swift');
+    assert.ok(/func sendHole\(_ d: \[String: Any\]\) \{\s*lock\.lock\(\); lastHole = d; lock\.unlock\(\)/.test(s), 'the last hole is kept');
+    for (const cb of ['activationDidCompleteWith activationState: WCSessionActivationState, error: Error\\?\\) \\{ resendLast\\(\\) \\}',
+        'func sessionWatchStateDidChange\\(_ session: WCSession\\) \\{ resendLast\\(\\) \\}',
+        'func sessionReachabilityDidChange\\(_ session: WCSession\\) \\{ resendLast\\(\\) \\}']) assert.ok(new RegExp(cb).test(s), cb);
 });

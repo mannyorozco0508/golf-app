@@ -1,7 +1,7 @@
 // ContentView.swift - the watch's one screen: F / C / B for the current hole, hole +/-, Score.
 //
 // SCAFFOLD (feature 10, docs/WATCH-APP-PLAN.md). Not in the Xcode project and never compiled.
-// Accessibility: every number has a spoken label ("Center, 243 yards"), the hole buttons say
+// Accessibility: every number has a spoken label ("Middle, 243 yards"), the hole buttons say
 // "Previous hole" / "Next hole", and the numbers use Dynamic Type (.title / .largeTitle) with
 // .minimumScaleFactor so the largest sizes still fit a 41 mm screen.
 
@@ -50,10 +50,10 @@ struct ContentView: View {
             .buttonStyle(.plain)
 
             if session.numbersShown, let s {
-                // CENTER big, FRONT / BACK either side - the phone's own order.
+                // MIDDLE big, FRONT / BACK either side - the phone's own order (045: "M", the phone says MIDDLE).
                 HStack(alignment: .lastTextBaseline) {
                     number("F", s.onGreen ? nil : s.front, label: "Front", spoken: spoken, size: .title3, onGreen: s.onGreen)
-                    number("C", s.center, label: "Center", spoken: spoken, size: .largeTitle)
+                    number("M", s.center, label: "Middle", spoken: spoken, size: .largeTitle)
                     number("B", s.back, label: "Back", spoken: spoken, size: .title3)
                 }
                 // v1: the phone is the GPS. A locked / backgrounded phone stops measuring (gps-view.js
