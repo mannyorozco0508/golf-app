@@ -895,6 +895,7 @@
             timeout(H.db.ref('events/' + last).once('value'), 6000, 'round').then(function (s) {
                 var d = s && s.val ? s.val() : null;
                 if (!d) { heldCard(); return; }
+                d = withQueued(d, last);   // URGENT-036: scores still waiting count too
                 var ps = d.players || [], sc = d.scores || {}, thru = 0;
                 salwRow(d, last);
                 thru = thruOf(d);
@@ -1193,6 +1194,15 @@
         var thru = thruOf(d);   // in play order (audit): off the 10th, "thru 2" after 10..18, 1, 2
         return { thru: thru, finished: !!(all && thru) };
     }
+    // URGENT-036 #36 (POLISH 029 #36: Home said "Thru 4" offline, then "Thru 2" right after the
+    // signal came back, until the queue had sent). The server's copy plus this phone's scores still
+    // waiting in the offline queue (OfflineQueue.peek / applyQueued - read only, display only), so
+    // Thru N never goes backwards while the queue sends. Nothing in the queue: the server's copy.
+    function withQueued(d, code) {
+        var q = oq(), s = lstore();
+        if (!d || !code || !q || !s || typeof q.applyQueued !== 'function' || typeof q.peek !== 'function') return d;
+        try { var ops = q.peek(s) || []; return ops.length ? (q.applyQueued(d, ops, String(code).toUpperCase()) || d) : d; } catch (e) { return d; }
+    }
     // The round as THIS PHONE has it: the scorecard's stored copy plus its own unsent edits.
     function localRound(code) {
         var q = oq(), s = lstore();
@@ -1252,6 +1262,7 @@
             if (!d && heldFor(lr.code)) return;
             if (!d) { forgetRound(lr.code, true); if (!heldFor(lr.code)) box.innerHTML = ''; return; }
             if (!d.players || !d.courseData) return;
+            d = withQueued(d, lr.code);   // URGENT-036: scores still waiting count too
             var pr = progressOf(d);
             H.activeChecked = true; H.active = pr.finished ? null : lr.code;
             if (pr.finished) { if (!heldFor(lr.code)) box.innerHTML = ''; return; }   // finished
@@ -1500,7 +1511,7 @@
         var local = localRound(last);
         if (local) paint(local.data);
         if (!H.db) return;
-        timeout(H.db.ref('events/' + last).once('value'), 6000, 'round').then(function (s) { var d = s && s.val ? s.val() : null; if (d || !local) paint(d); }, function () {});
+        timeout(H.db.ref('events/' + last).once('value'), 6000, 'round').then(function (s) { var d = withQueued(s && s.val ? s.val() : null, last); if (d || !local) paint(d); }, function () {});
     }
     function simpleProgress(code, course, thru) {
         return '<button type="button" class="hs-card hs-prog" data-hp-open="' + esc(code) + '"><span><span class="h">IN PROGRESS</span>'
