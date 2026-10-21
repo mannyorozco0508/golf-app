@@ -24,6 +24,11 @@ final class PhoneWatchSession: NSObject {
     private let pendingKey = "hardpan_watch_pending"
     private let maxPending = 50
     private var seenIds: [String] = []
+    /// 045: the last hole JS asked to send. A send before WCSession is activated / the watch app is
+    /// installed / reachable is dropped, and gps-view.js only re-sends when a number changes - so the
+    /// session re-sends this one itself as soon as it can (a golfer standing on the tee still gets numbers).
+    private var lastHole: [String: Any]?
+    private let lock = NSLock()
 
     private override init() { super.init() }
 
@@ -42,6 +47,17 @@ final class PhoneWatchSession: NSObject {
 
     /// Only for a paired watch with the app installed - otherwise nothing is sent anywhere.
     func sendHole(_ d: [String: Any]) {
+        lock.lock(); lastHole = d; lock.unlock()
+        deliver(d)
+    }
+
+    /// 045: re-send the last hole once the session can deliver it (activation, watch app installed, reachable).
+    private func resendLast() {
+        lock.lock(); let d = lastHole; lock.unlock()
+        if let d { deliver(d) }
+    }
+
+    private func deliver(_ d: [String: Any]) {
         guard WCSession.isSupported() else { return }
         let s = WCSession.default
         guard s.activationState == .activated, s.isPaired, s.isWatchAppInstalled else { return }
@@ -82,7 +98,9 @@ final class PhoneWatchSession: NSObject {
 }
 
 extension PhoneWatchSession: WCSessionDelegate {
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {}
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) { resendLast() }
+    func sessionWatchStateDidChange(_ session: WCSession) { resendLast() }
+    func sessionReachabilityDidChange(_ session: WCSession) { resendLast() }
     // iOS only: a golfer can swap watches mid-season - re-activate for the new one.
     func sessionDidBecomeInactive(_ session: WCSession) {}
     func sessionDidDeactivate(_ session: WCSession) { WCSession.default.activate() }
