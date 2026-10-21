@@ -2,9 +2,10 @@
 // URGENT-048 part 3 - THE NEEDS-AN-ACCOUNT PROMPT ON SETTLE UP, IN REAL CHROME.
 //
 // A finished round (tools/extra-games-backcompat.js's, as tools/venmo-check.js
-// uses it) opened cold on settlement.html as Ann (?me=11), with stand-ins for
-// 048 part 2's REAL hp-auth.js (HardPanAuth, 505379f) over the harness's auth stand-in,
-// and a stand-in for part 1 (HardPanAccountUI) - tools/lib/hp-auth-stub.js.
+// uses it) opened cold on settlement.html as Ann (?me=11), with 048 part 2's REAL
+// hp-auth.js (HardPanAuth) over the harness's auth stand-in, and part 1's REAL
+// hp-account-ui.js (HardPanAccountUI) - since int-048 settlement.html loads both. A
+// counter wraps the real sheet's openSignIn() (tools/lib/hp-auth-stub.js).
 // Real taps only. The rule under test: a NUDGE, NEVER A WALL.
 //   1. Signed out: Pay with Venmo -> the sheet ("Sign in to use Venmo", the why,
 //      Sign in, Not now, the "keeps working" note; no words for staking money)
@@ -13,11 +14,11 @@
 //      today. Mark paid -> no sheet (once per round per feature), the tick is
 //      written exactly as today.
 //   2. Signed out, Mark paid first -> the sheet -> Not now -> the tick is written.
-//   3. Signed out -> Mark paid -> Sign in -> openSignIn() is called; once
-//      HardPanAuth reports signed in, the promise resolves 'signin' and the tick
-//      is written.
+//   3. Signed out -> Mark paid -> Sign in -> openSignIn() is called and the REAL
+//      sign-in sheet is up (Apple, Google, email); once HardPanAuth reports signed
+//      in, that sheet closes, the promise resolves 'signin' and the tick is written.
 //   4. Signed in -> Pay with Venmo opens directly, Mark paid writes directly, no sheet.
-//   5. No sign-in on the page (no HardPanAuth): no sheet, exactly today.
+//   5. No sign-in on the page (a build without hp-auth.js - no HardPanAuth): no sheet, exactly today.
 // At 393x852 and 375x667. Screens -> HPNA_SHOTS=<dir> (optional).
 // ============================================================================
 'use strict';
@@ -27,7 +28,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
 const { round } = require('./tools/extra-games-backcompat.js');
-const { accountUIStub, hpAuthScript } = require('./tools/lib/hp-auth-stub.js');
+const { accountUIStub, hpAuthScript, noAuthScript } = require('./tools/lib/hp-auth-stub.js');
 const SIGNED_OUT = accountUIStub() + hpAuthScript();   // the harness default: an anonymous user
 const SIGNED_IN = { uid: 'u-ann', email: 'ann@example.com', isAnonymous: false };
 
@@ -56,7 +57,9 @@ const LOOK = `JSON.stringify({
   noHref: (document.querySelector('.hpna-root a[data-hpna-no]') || { getAttribute: function () { return null; } }).getAttribute('href'),
   venmoHref: (document.querySelector('#vm-mount a.vm-venmo') || { getAttribute: function () { return null; } }).getAttribute('href'),
   clicks: window.__clicks, opens: window.__opens, answers: window.__answers, errs: window.__hpErr,
-  opened: window.__hpUI ? window.__hpUI.opened : null, signedIn: window.HardPanAuth ? window.HardPanAuth.state().signedIn : null,
+  opened: window.__hpUI ? window.__hpUI.opened : null, realUI: window.__hpUI ? window.__hpUI.real : null,
+  realSheet: (document.getElementById('hpa-sheet') || { getAttribute: function () { return null; } }).getAttribute('data-hpa-sheet'),
+  realSheetText: ((document.getElementById('hpa-sheet') || {}).innerText || '').replace(/\\s+/g, ' ').trim(), signedIn: window.HardPanAuth ? window.HardPanAuth.state().signedIn : null,
   ticks: (window.__coldWrites || []).filter(function (w) { return /settleUp/.test(w.path); }).map(function (w) { return w.path + '=' + JSON.stringify(w.value && w.value.by); }),
   paidRows: document.querySelectorAll('#vm-mount .vm-row.vm-done').length,
   hasNA: !!window.HardPanNeedsAccount })`;
@@ -82,6 +85,7 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             { tap: '#vm-mount a.vm-venmo' }, { sleep: 400 }, look,
             { tap: '#vm-mount [data-vm-paid]' }, { sleep: 500 }, look]);
         assert.ok(a0.hasNA, 'hp-needs-account.js is on the page');
+        assert.equal(a0.realUI, true, 'the REAL hp-account-ui.js is on Settle up');
         assert.equal(a0.signedIn, false, 'the real HardPanAuth: anonymous = not signed in');
         assert.ok(a0.venmoHref && /^https:\/\/venmo\.com\/u\/bob-baker-1\?txn=pay/.test(a0.venmoHref), 'fixture: Ann has Pay with Venmo: ' + a0.venmoHref);
         assert.equal(a0.sheet, false);
@@ -130,8 +134,11 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             { expression: 'window.__signInAs(' + JSON.stringify(SIGNED_IN) + ')' }, { sleep: 400 }, look]);
         assert.ok(c1.sheet);
         assert.equal(c2.sheet, false); assert.equal(c2.opened, 1, 'HardPanAccountUI.openSignIn() called');
+        assert.equal(c2.realSheet, 'signin', 'the REAL sign-in sheet is up');
+        assert.match(c2.realSheetText, /Sign in with Apple Sign in with Google Use email instead/);
         assert.deepEqual(c2.answers, [], 'not resolved before signed in'); assert.deepEqual(c2.ticks, []);
         assert.deepEqual(c3.answers, ['signin']);
+        assert.equal(c3.realSheet, null, 'signed in: the real sheet closed itself');
         assert.equal(c3.ticks.length, 1); assert.deepEqual(c3.errs, []);
     });
 
@@ -146,8 +153,8 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
         assert.deepEqual(d2.answers, []); assert.deepEqual(d2.errs, []);
     });
 
-    test(tag + ' no sign-in sheet on the page (no HardPanAccountUI): no prompt, exactly today', async () => {
-        const [e1, e2] = await run(vp, '', [
+    test(tag + ' no sign-in on the page (no HardPanAuth): no prompt, exactly today', async () => {
+        const [e1, e2] = await run(vp, noAuthScript(), [
             { tap: '#vm-mount a.vm-venmo' }, { sleep: 400 }, look,
             { tap: '#vm-mount [data-vm-paid]' }, { sleep: 500 }, look]);
         assert.equal(e1.sheet, false); assert.equal(e1.clicks[0].prevented, false);
