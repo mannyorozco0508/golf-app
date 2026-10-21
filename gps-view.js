@@ -4970,7 +4970,7 @@
     function tsOpen() { var t = tsSheet(); return !!(t && t.style.display !== 'none'); }
     // MORE: [the menu item it runs, icon, label]. Shown only when that item is.
     var TS_TILES = [['.gps-set-green', '⛳', 'Set the green'], ['.gps-fix-green', '⛳', 'Fix the green'], ['.gps-undo-green', '↶', 'Undo last fix'],
-        ['.gps-refresh-gps', '↻', 'Refresh GPS'], ['.gps-my-stats', '▦', 'My stats'], ['.gps-my-bag', '🏌️', 'My bag'],
+        ['.gps-refresh-gps', '↻', 'Refresh GPS'], ['.gps-my-stats', '▦', 'My stats'], ['.gps-my-bag', '🏌️', 'My bag'], ['.gps-range', '🎯', 'Range'],
         ['.gps-mark-shots', '📍', 'Mark shots'], ['.gps-replay', '▶', 'Replay round'], ['.gps-pick-course', '⚑', 'Other course'],
         ['.gps-rechoose', '①', 'Hole 1 again']];
     var TS_MARKUP = '<div class="gps-ts-head"><span class="gps-ts-grip" aria-hidden="true"></span><div class="gps-ts-title">Tools</div></div>'
@@ -5437,6 +5437,8 @@
         +   '<button type="button" class="gps-menu-item gps-aa-toggle" data-feature="autoAdvance"></button>'
         +   '<button type="button" class="gps-menu-item gps-my-stats">My stats</button>'
         +   '<button type="button" class="gps-menu-item gps-my-bag" data-feature="clubs">My bag</button>'
+        // URGENT-047 A: Range - carry by club at the range, "Update my bag" (gps-range.js, distances only).
+        +   '<button type="button" class="gps-menu-item gps-range" data-feature="clubs">Range</button>'
         +   '<button type="button" class="gps-menu-item gps-mark-shots">Mark shots</button>'
         +   '<button type="button" class="gps-menu-item gps-replay">Replay round</button>'
         +   '<button type="button" class="gps-menu-item gps-add-game">\u2795 Add a game</button>'
@@ -6331,6 +6333,20 @@
         on(el, '.gps-bag-setup-skip', function () { var B = bagApi(); if (!B || !S) return; B.skipSetup(bagGolfer()); fillBag(); });
         on(el, '.gps-bag-setup-open', function () { if (bagApi() && S) fillSetup(); });
         on(el, '.gps-my-bag', openBag);
+        // URGENT-047 A: RANGE (gps-range.js): the same golfer and bag as My bag; the GPS reading through
+        // HardPanMark.readFix, yards worked out and the reading dropped - distances only, on this phone.
+        on(el, '.gps-range', function () {
+            if (!S) return;
+            closeMenus();
+            withShots(function () {
+                loadScript('gps-range.js', function () { return !!window.HardPanRange; }, function () {
+                    if (!S || !window.HardPanRange) return;
+                    closeBag();
+                    window.HardPanRange.open({ el: S.el, golfer: bagGolfer(), units: units, flash: flash, saved: bagSaved, openBag: openBag,
+                        fix: function () { dropStaleFix(); return fix ? { pt: [fix.pt[0], fix.pt[1]], acc: fix.acc, at: fix.at } : null; } });
+                });
+            });
+        });
         on(el, '.gps-bag-done', function () { closeBag(); render(); });
         on(el, '.gps-bagask-skip', bagSkip);
         var bagRow = el.querySelector('.gps-bagask-row');
