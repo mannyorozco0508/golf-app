@@ -4765,6 +4765,8 @@ const SHELL_FILES = [
     './round-recap.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).
     './gps-entitlement.js',
+    // URGENT-048: Home's Sign in pill, the sign-in sheet and the profile sheet.
+    './hp-account-ui.js',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
