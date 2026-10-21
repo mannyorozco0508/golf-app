@@ -240,7 +240,7 @@ test('012-5 gps-view: behind bagAltitude, never in tournament mode; the club for
     assert.ok(/if \(base === undefined\) return out;/.test(fnSrc(v, 'altNow')), 'Don\'t adjust: no altitude');
     assert.ok(/q\.altFt = al\.altFt; q\.altBaseFt = al\.altBaseFt;/.test(fnSrc(v, 'playsAir')));
     assert.ok(/var q = playsAir\(w, r\);/.test(fnSrc(v, 'playsTo')), 'every plays-like number (line, suggestion, pill) goes through it');
-    assert.ok(/B\.suggestClub\(B\.bag\(bagGolfer\(\)\), yd\)/.test(fnSrc(v, 'syncSuggest')) && /var yd = pl \? pl\.exact :/.test(fnSrc(v, 'syncSuggest')), 'the club for the adjusted plays-like');
+    assert.ok(/B\.suggestClub\((B\.bag\(bagGolfer\(\)\)|bagNow\(B\)), yd\)/.test(fnSrc(v, 'syncSuggest')) && /var yd = pl \? pl\.exact :/.test(fnSrc(v, 'syncSuggest')), 'the club for the adjusted plays-like');
     const fc = fnSrc(v, 'fetchCourseFt');
     assert.ok(/!inUS\(p\)/.test(fc) && /onLine === false/.test(fc) && /lsGet\(k\)/.test(fc) && !/\bfix\b|origin\(|o\.pt/.test(fc), 'US only, online, once; never the golfer');
     assert.ok(/altPickCourse\(\(S\.round && S\.round\.courseName\) \|\| 'This course', r && \(r\.mid \|\| r\.tee\), ft\)/.test(v), 'this course: its own green / tee point');

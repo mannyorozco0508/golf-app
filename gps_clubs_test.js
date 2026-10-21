@@ -232,7 +232,7 @@ test('gps-view: the plays-like line - behind playsBreakdown, never in tournament
     assert.ok(/if \(!plSwitch\(\)\) Array\.prototype\.forEach\.call\(el\.querySelectorAll\('\[data-feature="playsBreakdown"\]'\)/.test(v), 'switch off: removed');
     assert.ok(/if \(plSwitch\(\) && !tournament\(\) && S\.pro && S\.mode === 'measure'/.test(sec), 'never in tournament mode');
     assert.ok(/G\.playsParts\(pl, has \? w\.mph : null, units\(\)\)/.test(sec) && /'Plays ' \+/.test(sec));
-    assert.ok(/B\.suggestClub\(B\.bag\(bagGolfer\(\)\), pl\.exact\)/.test(sec), 'the club for the plays-like distance');
+    assert.ok(/B\.suggestClub\((B\.bag\(bagGolfer\(\)\)|bagNow\(B\)), pl\.exact\)/.test(sec), 'the club for the plays-like distance');
     assert.ok(/bagSwitch\(\) && B && o\.from === 'me'/.test(sec), 'the club only with the clubs switch on, from the golfer');
     assert.ok(/G\.windAim\(D, rel\.cross\)/.test(sec), 'crosswind: the aim-off');
     assert.ok(/if \(S\.plClub\) text = '';/.test(v), 'the plain Suggested line steps aside');
