@@ -8,8 +8,8 @@
 // Caledonia's bundled holes, and a stand-in GPS that reports where the golfer is
 // once a second (window.__moveTo walks them). The golfer:
 //   A  stands on hole 4's green (no jump), walks to hole 5's tee, waits: after ~10 s
-//      GPS is on 5 with "Hole 5 >"; Undo -> hole 4 and no second jump while still on
-//      that tee; off the tee and back -> 5 again.
+//      GPS is on 5 with "Hole 5 ->"; Undo -> hole 4 and no second jump for 2 min
+//      (URGENT-045), even off the tee and back.
 //   B  taps Enter score on 4 (the card's score box - the 012 score sheet switched off) and
 //      walks to 5's tee: no jump while the score is open; back to the map -> 5.
 //   B2 the same with the score sheet (012): no jump while the sheet is up; closed -> 5.
@@ -83,10 +83,11 @@ const START = [WAIT(2500), OPEN, WAIT(2500)];
     f(s[0].hole === 4 && s[0].side === 'gps', 'A: did not open GPS on hole 4: ' + JSON.stringify(s[0]));
     f(s[1].hole === 4, 'A: jumped while the golfer stood on hole 4\'s green: ' + s[1].hole);
     f(s[2].hole === 4 && !s[2].toast, 'A: jumped before ~10 s on the tee: ' + JSON.stringify([s[2].hole, s[2].toast]));
-    f(s[3].hole === 5 && s[3].card === 5 && s[3].toast === 'Hole 5 › Undo', 'A: ~10 s on hole 5\'s tee did not move GPS (and the card) to 5 with "Hole 5 >": ' + JSON.stringify([s[3].hole, s[3].card, s[3].toast]));
+    f(s[3].hole === 5 && s[3].card === 5 && s[3].toast === 'Hole 5 \u2192 Undo', 'A: ~10 s on hole 5\'s tee did not move GPS (and the card) to 5 with "Hole 5 >": ' + JSON.stringify([s[3].hole, s[3].card, s[3].toast]));
     f(s[4].hole === 4 && s[4].card === 4 && !s[4].toast, 'A: Undo did not go back to hole 4: ' + JSON.stringify([s[4].hole, s[4].card, s[4].toast]));
     f(s[5].hole === 4, 'A: jumped again on the same tee visit after Undo: ' + s[5].hole);
-    f(s[6].hole === 5, 'A: a new visit to 5\'s tee (after walking off it) did not advance: ' + s[6].hole);
+    // URGENT-045: Undo holds auto-advance for 2 minutes - a new visit inside them does not advance.
+    f(s[6].hole === 4, 'A: advanced again within 2 min of Undo: ' + s[6].hole);
     errs(s, 'A');
 
     // B: Enter score is open (the card's box, the 012 score sheet off) - no jump; back to the map - the jump.
@@ -117,7 +118,7 @@ const START = [WAIT(2500), OPEN, WAIT(2500)];
     // D: start on 10 - from 18 to 1.
     s = await go({ round: round({ startingHole: 10 }), hole: 18, at: G18, steps: START.concat([ST, MOVE(T1), WAIT(12500), ST]) });
     report.D = s.map((x) => [x.hole, x.toast]);
-    f(s[0].hole === 18 && s[1].hole === 1 && s[1].toast === 'Hole 1 › Undo', 'D: start on 10: 18 -> 1 did not happen: ' + JSON.stringify(report.D));
+    f(s[0].hole === 18 && s[1].hole === 1 && s[1].toast === 'Hole 1 \u2192 Undo', 'D: start on 10: 18 -> 1 did not happen: ' + JSON.stringify(report.D));
     errs(s, 'D');
 
     // E: Tools > Auto-advance holes -> Off.

@@ -5092,14 +5092,15 @@
     // The golfer walks off the green to the NEXT hole's tee (next in PLAY ORDER - the
     // picker's list: start on 10, a shotgun hole) and stays there ~10 s: GPS moves to
     // that hole, through the card's own goToHole (the KP gate holds), and says so - a
-    // small "Hole 5 >" toast with Undo (back to the hole it left; no second jump until
-    // the golfer has walked off that tee). Never while a score is being entered (the
+    // small "Hole 5 ->" toast with Undo (back to the hole it left; no auto-advance for 2 min).
+    // URGENT-045: ~30 yds of the tee; the finished hole's score sheet opens when it has no
+    // score; a manual hole change wins for 2 min. Never while a score is being entered (the
     // card showing, a box focused) or any sheet / menu is open on the map, never while
     // setting a green, marking shots or replaying, and never from the current green
     // (gps-geo.onNextTee). Tools > "Auto-advance holes" turns it off on this phone
     // (hardpan_gps_autoadvance = '0'); the switch off = none of it exists.
     // PRIVACY: the position is compared, never stored - only the On / Off choice is.
-    var AA_KEY = 'hardpan_gps_autoadvance', AA_DWELL_MS = 10000, AA_TOAST_MS = 8000, AA_LEAVE_M = 40;
+    var AA_KEY = 'hardpan_gps_autoadvance', AA_TOAST_MS = 8000, AA_FIX_OK_MS = 30000;   // the wait (~10 s) and the 2-min hold: gps-geo AA_DWELL_MS / AA_HOLD_MS
     function aaSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('autoAdvance') !== false; } catch (e) { return true; } }
     function aaOn() { if (!aaSwitch()) return false; try { return localStorage.getItem(AA_KEY) !== '0'; } catch (e) { return true; } }
     function aaHoleRec(n) {
@@ -5116,29 +5117,73 @@
         if (kp && kp.style.display === 'flex') return true;
         return Array.prototype.some.call(S.el.querySelectorAll('[role="dialog"],[role="menu"]'), function (d) { return d.style.display !== 'none' && d.offsetParent !== null; });
     }
+    // URGENT-045: the decision is gps-geo autoAdvanceDecision (pure); this feeds it the SAME fix the
+    // map already has (no new watcher, nothing new kept awake) and acts on its answer.
+    function aaSheetOpen() { try { var ss = window.HardPanGpsStats && window.HardPanGpsStats.sheet; return !!(ss && ss.isOpen && ss.isOpen()); } catch (e) { return false; } }
     function aaTick() {
-        if (!S || !G || !G.onNextTee) return;
-        var nx = aaOn() && typeof S.holeList === 'function' ? G.nextInPlayOrder(S.holeList() || [], S.hole) : null;
-        var nr = nx != null ? aaHoleRec(nx) : null;
+        if (!S || !G || !G.autoAdvanceDecision) return;
+        // A phone standing still on the tee may stop reporting: the map drops a fix after 10 s
+        // (FIX_STALE_MS, the same as the wait), so auto-advance keeps the last one for 30 s.
+        // In memory only, for this comparison - never stored or sent.
+        if (fix && fix.pt) S.aaLast = { pt: fix.pt, acc: fix.acc, at: fix.at || Date.now() };
         dropStaleFix();
-        // UNDONE: no second jump while the golfer is still on that tee.
-        if (S.aaSkip != null && (!fix || !nr || !nr.tee || S.aaSkip !== nx || G.haversineMeters(fix.pt, nr.tee) > AA_LEAVE_M)) S.aaSkip = null;
-        var cur = resolved(), nums = cur && fix ? G.holeNumbers(fix.pt, cur) : null;
-        var there = !!(fix && nr && nr.tee && G.onNextTee({ me: fix.pt, acc: fix.acc, tee: nr.tee, green: cur && cur.mid, onGreen: !!(nums && nums.onGreen) }));
-        if (!there || S.aaSkip === nx || aaBusy()) { S.aaDwell = null; return; }
-        var now = Date.now();
-        if (!S.aaDwell || S.aaDwell.hole !== nx) {
-            S.aaDwell = { hole: nx, since: now };
-            clearTimeout(S.aaTimer);
-            // A phone standing still may report less often: look again when the wait is up.
-            S.aaTimer = setTimeout(function () { if (S) render(); }, AA_DWELL_MS + 150);
+        var lf = fix || (S.aaLast && Date.now() - S.aaLast.at <= AA_FIX_OK_MS ? S.aaLast : null);
+        var cur = resolved(), nums = cur && lf ? G.holeNumbers(lf.pt, cur) : null;
+        var vis = true; try { vis = document.visibilityState !== 'hidden'; } catch (e) {}
+        var on = aaOn() && typeof S.holeList === 'function';
+        var d = G.autoAdvanceDecision({
+            on: on, visible: vis, hole: S.hole, order: on ? (S.holeList() || []) : [],
+            me: lf ? lf.pt : null, acc: lf ? lf.acc : null,
+            teeOf: function (n) { var r = aaHoleRec(n); return r ? r.tee : null; },
+            green: cur && cur.mid, onGreen: !!(nums && nums.onGreen),
+            sheetOpen: aaSheetOpen(), busy: aaBusy(), now: Date.now(),
+            manualAt: S.aaManualAt, holdUntil: S.aaHoldUntil, armed: S.aaArmed, dwell: S.aaDwell
+        });
+        S.aaArmed = d.armed;
+        S.aaReason = d.reason;
+        if (!d.go) {
+            if (d.dwell && (!S.aaDwell || S.aaDwell !== d.dwell)) {
+                S.aaDwell = d.dwell;
+                clearTimeout(S.aaTimer);
+                // A phone standing still may report less often: look again when the wait is up.
+                S.aaTimer = setTimeout(function () { if (S) render(); }, G.AA_DWELL_MS + 150);
+            } else if (!d.dwell) S.aaDwell = null;
             return;
         }
-        if (now - S.aaDwell.since < AA_DWELL_MS) return;
-        var from = S.hole;
+        var from = S.hole, nx = d.to;
         S.aaDwell = null;
-        if (typeof S.gotoHole === 'function') S.gotoHole(nx); else setHole(nx);
-        if (S && Number(S.hole) === Number(nx)) aaToast(from, nx);
+        aaMove(nx);
+        if (S && Number(S.hole) === Number(nx)) { aaToast(from, nx); aaSheetFor(from); }
+    }
+    // A hole change made BY auto-advance (or its Undo) - every other change is manual (setHole).
+    function aaMove(h) {
+        S.aaMoving = true;
+        try { if (typeof S.gotoHole === 'function') S.gotoHole(h); else setHole(h); } finally { if (S) S.aaMoving = false; }
+    }
+    // THE HOLE JUST FINISHED, NO SCORE YET (the golfer the map shows): its score sheet opens - on the
+    // new hole's sheet, stepped back to it ("An earlier hole - Save goes back to hole N"), so the
+    // map and the card stay on the new hole. Only the 012 score sheet; never the card's box (that
+    // would pull the golfer off the map), never read-only.
+    function aaSheetFor(h) {
+        try {
+            var ss = window.HardPanGpsStats && window.HardPanGpsStats.sheet;
+            if (!ss || typeof S.openScoreHere !== 'function' || readOnlyHere()) return;
+            if (typeof window.HardPanFeature === 'function' && !window.HardPanFeature('scoreSheet')) return;
+            var w = scoreFor();
+            if (!w || w.id == null || Number(w.scores['p' + w.id + '_h' + h]) > 0) return;
+            S.openScoreHere(w.id);
+            if (!ss.isOpen()) return;
+            if (!ss.go(h)) { ss.close(); return; }
+            // The toast (and its Undo) stays in sight: over the top bar, above the sheet.
+            var t = S.el.querySelector('.gps-aa-toast');
+            if (t && t.style.display !== 'none') {
+                t.classList.add('gps-aa-over');
+                var pn = document.querySelector('#hp-score-sheet .hp-ss'), top0 = S.el.getBoundingClientRect().top;
+                var y = pn ? pn.getBoundingClientRect().top - top0 - t.offsetHeight - 6 : null;
+                // Never under the status bar / Dynamic Island: below the safe area, at worst over the sheet's grab handle.
+                if (y != null && isFinite(y)) t.style.top = 'max(calc(env(safe-area-inset-top, 0px) + 6px), ' + Math.max(4, Math.round(y)) + 'px)';
+            }
+        } catch (e) {}
     }
     function aaToast(from, to) {
         var t = S && S.el.querySelector('.gps-aa-toast');
@@ -5146,20 +5191,23 @@
         t.setAttribute('data-from', String(from));
         t.setAttribute('data-to', String(to));
         var l = t.querySelector('.gps-aa-text');
-        if (l) l.textContent = 'Hole ' + to + ' \u203A';
+        if (l) l.textContent = 'Hole ' + to + ' \u2192';
+        t.classList.remove('gps-aa-over'); t.style.top = '';
         t.style.display = '';
         clearTimeout(S.aaToastTimer);
         S.aaToastTimer = setTimeout(function () { if (S) aaHideToast(); }, AA_TOAST_MS);
     }
-    function aaHideToast() { var t = S && S.el.querySelector('.gps-aa-toast'); if (t) t.style.display = 'none'; }
+    function aaHideToast() { var t = S && S.el.querySelector('.gps-aa-toast'); if (t) { t.style.display = 'none'; t.classList.remove('gps-aa-over'); t.style.top = ''; } }
+    // UNDO: back to the hole it left, and no auto-advance for 2 minutes.
     function aaUndo() {
         var t = S && S.el.querySelector('.gps-aa-toast');
         if (!t) return;
         var from = Number(t.getAttribute('data-from')), to = Number(t.getAttribute('data-to'));
         aaHideToast();
         if (!from || Number(S.hole) !== to) return;
-        S.aaSkip = to;
-        if (typeof S.gotoHole === 'function') S.gotoHole(from); else setHole(from);
+        S.aaHoldUntil = Date.now() + G.AA_HOLD_MS;
+        try { var ss = window.HardPanGpsStats && window.HardPanGpsStats.sheet; if (ss && ss.isOpen() && Number(ss.hole()) === to) ss.close(); } catch (e) {}
+        aaMove(from);
     }
     function aaToggleText() { txt('.gps-aa-toggle', 'Auto-advance holes: ' + (aaOn() ? 'On' : 'Off')); }
 
@@ -5569,6 +5617,8 @@
         + '#gps-overlay .gps-banner{position:absolute;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(var(--gps-attrib-h) + 74px);padding:10px 14px;border-radius:999px;font-weight:800;font-size:14px;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;}'
         + '#gps-overlay.gps-banner-up .gps-banner{bottom:calc(var(--gps-attrib-h) + 128px);}'
         + '#gps-overlay .gps-aa-toast{position:absolute;z-index:8;left:50%;transform:translateX(-50%);top:calc(var(--gps-top-b) + 6px);display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;border-radius:999px;font:800 16px/1 ' + FONT + ';white-space:nowrap;}'
+        // URGENT-045: with the finished hole's score sheet up, the toast sits just above the sheet (over the top bar), on top of it.
+        + '#gps-overlay .gps-aa-toast.gps-aa-over{z-index:2147482001;box-shadow:0 4px 18px rgba(0,0,0,.55);}'
         + '#gps-overlay .gps-aa-undo{min-height:40px;padding:0 14px;border-radius:999px;background:#d9f99d !important;color:#0b0f0c !important;font:800 14px/1 ' + FONT + ' !important;}'
         + '#gps-overlay.gps-pinning .gps-banner{bottom:calc(var(--gps-attrib-h) + var(--gps-actions-h,58px) + 16px);}'
         + '#gps-overlay .gps-actions{position:absolute;z-index:6;left:8px;right:8px;bottom:calc(var(--gps-attrib-h) + 8px);display:flex;flex-wrap:wrap;gap:8px;padding:8px;}'
@@ -6686,8 +6736,10 @@
         S.target = null; S.targetMoved = false;
         // Mark shot starts over on a new hole (audit C8): it measured from the last hole's spot.
         S.measureFrom = null; S.measureShot = null;
-        // AUTO-ADVANCE (008): a new hole starts any wait over.
-        S.aaDwell = null;
+        // AUTO-ADVANCE (008): a new hole starts any wait over. URGENT-045: a change the golfer made
+        // (picker, arrows, the card, the watch) wins for 2 minutes; the new hole starts unarmed.
+        S.aaDwell = null; S.aaArmed = false;
+        if (!S.aaMoving) S.aaManualAt = Date.now();
         S.apprAuto = false;   // 022: a new hole - its own approach (S.apprOff is per hole)
         S.framed = null;
         frameHole(false);
@@ -6764,6 +6816,8 @@
         // 012 part 4: both legs - { toTarget, toGreen: { yards, plays, unit, text: '60 · plays 63' } | null, single, par3 }.
         playsLegs: function () { try { return playsLegsOut(); } catch (e) { return null; } },
         hole: function () { return S ? Number(S.hole) : null; },
+        // URGENT-045: why auto-advance did / did not move (tests, the sim) - no position in it.
+        aaState: function () { return S ? { on: aaOn(), reason: S.aaReason || null, armed: !!S.aaArmed, dwell: S.aaDwell ? S.aaDwell.hole : null, manualAgoMs: S.aaManualAt ? Date.now() - S.aaManualAt : null, holdMs: S.aaHoldUntil ? Math.max(0, S.aaHoldUntil - Date.now()) : 0 } : null; },
         // 022: which view the map is in - 'hole' or 'green' (the approach).
         screenView: function () { return S ? S.view || null : null; },
         // 022 Sun mode: the setting, whether it is on now, and the daylight maths (pure, for tests).
