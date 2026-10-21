@@ -272,9 +272,11 @@ describe('THE MODERN SHORTCUT IS UNAFFECTED', () => {
     test('Step 6 arrives open at the card defaults', () => {
         const r = modern();
         assert.equal(r.checked, true);
-        assert.equal(r.wager.frontStake, 10);
-        assert.equal(r.wager.backStake, 10);
-        assert.equal(r.wager.overallStake, 20);
+        // URGENT-038 #27: one Nassau default, $5 / $5 / $5, presses off (was 10 / 10 / 20).
+        assert.equal(r.wager.frontStake, 5);
+        assert.equal(r.wager.backStake, 5);
+        assert.equal(r.wager.overallStake, 5);
+        assert.equal(r.wager.pressRule, 'none');
     });
 
     test('the three stakes stay independent', () => {
@@ -293,7 +295,10 @@ describe('THE MODERN SHORTCUT IS UNAFFECTED', () => {
         // the collapsed stake - every segment priced at the OVERALL amount - which is
         // the defect nassau_split_stake_test.js now guards. The wager is unchanged;
         // only what it costs is.
-        assert.equal(r.marty, 30);
+        // URGENT-038 #27 RE-PIN: the card's default is now $5 / $5 / $5, presses off, so the
+        // same scores pay Marty $5 (front) + $5 (overall) = $10. No engine moved - the wager
+        // the default builds did; a legacy Nassau below still settles at exactly $40.
+        assert.equal(r.marty, 10);
         assert.equal(r.sum, 0);
     });
 });
