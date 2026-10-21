@@ -464,5 +464,5 @@
 
     try { if (W.GolfBack && typeof W.GolfBack.register === 'function') W.GolfBack.register({ name: 'hp-redit', priority: 3, isOpen: isOpen, close: close }); } catch (e) {}
 
-    W.HardPanRoundEdit = { open: open, close: close, isOpen: isOpen, decorate: decorate, teeChoices: teeChoices, teePlan: teePlan, currentNines: currentNines };
+    W.HardPanRoundEdit = { open: open, close: close, isOpen: isOpen, decorate: decorate, teeChoices: teeChoices, teePlan: teePlan, currentNines: currentNines, teeColor: teeColor };
 })();
