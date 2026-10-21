@@ -402,7 +402,6 @@
         if (!body) return;
         fullSetup();
         if (!organizer() || !data() || !code()) { var old = D.getElementById('hp-quick'); if (old) old.remove(); return; }
-        if (D.getElementById('hp-quick')) return;
         css();
         var d = data(), q = D.createElement('div');
         q.id = 'hp-quick';
@@ -417,6 +416,11 @@
         if (W.HardPanBet && typeof W.HardPanBet.openWeekly === 'function') items.push(['weekly', 'Weekly Game', d.moneyPool && d.moneyPool.enabled !== false ? 'Pot, KP, net, skins' : 'Off - tap to set up']);
         // URGENT-019: switch courses without the full setup (gps-round.js changeCourse - a new round).
         if (W.HardPanRound && typeof W.HardPanRound.changeCourse === 'function') items.push(['course', '\u26F3 Change course', 'A new round somewhere else']);
+        // Built again only when the list changes (POLISH #21: drawn before the round had loaded, it
+        // kept a list without Groups for good).
+        var sigq = JSON.stringify(items), was = D.getElementById('hp-quick');
+        if (was && was.getAttribute('data-hq-sig') === sigq) return;
+        q.setAttribute('data-hq-sig', sigq);
         q.innerHTML = '<div class="hq-h">QUICK EDITS</div>' + items.map(function (x) { return '<button type="button" data-hq="' + x[0] + '">' + esc(x[1]) + '<span>' + esc(x[2]) + '</span></button>'; }).join('');
         q.addEventListener('click', function (ev) {
             var b = ev.target.closest ? ev.target.closest('[data-hq]') : null;
@@ -428,7 +432,7 @@
             if (k === 'course') { closeSettings(); W.HardPanRound.changeCourse(); return; }
             open(k);
         });
-        body.insertBefore(q, body.firstChild);
+        if (was) was.parentNode.replaceChild(q, was); else body.insertBefore(q, body.firstChild);
     }
     // ONE "Full setup ›" (DETOURS #10/#11): Round settings' Edit Round Setup is relabelled; the
     // group strip's duplicate "Edit round setup" doors are hidden in the simple flow (the first one
@@ -464,5 +468,5 @@
 
     try { if (W.GolfBack && typeof W.GolfBack.register === 'function') W.GolfBack.register({ name: 'hp-redit', priority: 3, isOpen: isOpen, close: close }); } catch (e) {}
 
-    W.HardPanRoundEdit = { open: open, close: close, isOpen: isOpen, decorate: decorate, teeChoices: teeChoices, teePlan: teePlan, currentNines: currentNines };
+    W.HardPanRoundEdit = { open: open, close: close, isOpen: isOpen, decorate: decorate, teeChoices: teeChoices, teePlan: teePlan, currentNines: currentNines, teeColor: teeColor };
 })();

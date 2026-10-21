@@ -388,6 +388,7 @@
         legacyOK = true;
         addToolsButton();
         try { (origToggle || window.toggleRoundSheet)(true); } finally { legacyOK = false; }
+        rsSetup(true);   // POLISH #21: the simpler look, in a GPS round
         return true;
     }
     function addToolsButton() {
@@ -414,8 +415,291 @@
             var sh = document.getElementById('round-sheet');
             var opening = force === undefined ? !(sh && sh.classList.contains('open')) : !!force;
             if (opening && on() && !legacyOK && code()) { openMenu(); return; }
+            if (!opening && sh && sh.classList.contains('hp-rs')) { var res = origToggle.apply(this, arguments); rsSetup(false); return res; }
             return origToggle.apply(this, arguments);
         };
+    }
+
+    // ---- ROUND SETTINGS, SIMPLER (POLISH #21, URGENT-040: the 039 proposal) ------------------
+    // In a GPS round the Round settings sheet shows five rows on top - Golfers, Tee, Start (Hole 1 /
+    // 10 / Shotgun), Add a game, Change course - and "More" under them, which opens the rest in three
+    // groups: THIS ROUND, THIS PHONE, GO TO; then Save & exit and Delete round.
+    // NOTHING IS REBUILT: every row is a PROXY for the control that is in the sheet today (the quick
+    // edits, front-door's Add a game / Paste, Full setup, Dark Mode, History, the nav links, the view
+    // and group buttons, Group Links, Players, My stats, Share, Save & exit, Delete). Those stay in
+    // the sheet with their ids, handlers and renderers, only hidden; a tap on a row clicks the very
+    // control it stands for, so it goes to the same place by the same function. A control that is
+    // not drawn today (organizer-only, spectating, one group...) has no row. Anything in the sheet
+    // that has no row of its own (a receipt button after the finish...) still shows, under GO TO.
+    // Non-GPS rounds (Consumer, Game Day, simpleFlow off): untouched - the class is never set.
+    var RS = { more: false, timer: null, obs: null };
+    var RS_NAV = { 'index.html': ['📝', 'Scorecard'], 'leaderboard.html': ['🏆', 'Leaderboard'], 'skins.html': ['💰', 'Bets'], 'settlement.html': ['🤝', 'Results'],
+        'sidematches.html': ['⚔️', 'Matches'], 'game.html': ['📖', 'Game'], 'trip.html': ['🚐', 'Trip'], 'instructions.html': ['🧭', 'How it works'], 'admin.html': ['🏠', 'Home'] };
+    var RS_CSS = '#round-sheet.hp-rs{background:#f2f4ef;color:#13241d;color-scheme:light;}'
+        + '#round-sheet.hp-rs #round-sheet-handle{min-height:20px;padding:8px 0 2px;}#round-sheet.hp-rs #round-sheet-pill{display:none;}'
+        + '#round-sheet.hp-rs #round-sheet-handle::before{background:#c9d1cc;width:40px;height:5px;border-radius:3px;top:7px;}'
+        + '#round-sheet.hp-rs #round-sheet-body{padding:0 16px max(16px,env(safe-area-inset-bottom,0px));}'
+        + '#round-sheet.hp-rs #round-sheet-body>:not(#hp-rs):not(#hp-rs-end):not(#dot-context-row):not(#group-links-panel){display:none !important;}'
+        + '#round-sheet.hp-rs:not(.hp-rs-more) #hp-rs-end,#round-sheet.hp-rs:not(.hp-rs-more) #dot-context-row,#round-sheet.hp-rs:not(.hp-rs-more) #group-links-panel{display:none !important;}'
+        + '#hp-rs,#hp-rs-end{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;color:#13241d;}'
+        + '#hp-rs *,#hp-rs-end *{box-sizing:border-box;}'
+        + '#hp-rs button,#hp-rs-end button{font-family:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;}'
+        + '#hp-rs .rs-top{position:sticky;top:0;z-index:2;background:#f2f4ef;padding:2px 0 12px;}'
+        + '#hp-rs .rs-hd{display:flex;align-items:center;gap:10px;min-height:44px;}'
+        + '#hp-rs .rs-t{flex:1;margin:0;font-size:24px;font-weight:800;letter-spacing:-.01em;line-height:1.15;}'
+        + '#hp-rs .rs-x{flex:none;width:44px;height:44px;border:0;border-radius:50%;background:#e9eee9;font-size:17px;}'
+        + '#hp-rs .rs-sub{margin:0 2px;font-size:14px;color:#5d6b64;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '#hp-rs .rs-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1px solid #dfe5df;border-radius:16px;padding:12px 14px;margin:0 0 10px;min-height:66px;}'
+        + '#hp-rs .rs-em{width:40px;height:40px;border-radius:12px;background:#eef1ee;display:flex;align-items:center;justify-content:center;font-size:21px;flex:none;}'
+        + '#hp-rs .rs-txt{flex:1;min-width:0;}'
+        + '#hp-rs .rs-tt{display:block;font-size:17px;font-weight:800;color:#0f4c3a;}'
+        + '#hp-rs .rs-dd{display:block;font-size:13.5px;color:#5d6b64;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '#hp-rs .rs-go{flex:none;font-size:24px;color:#9aa0a6;}'
+        + '#hp-rs .rs-dot{width:22px;height:22px;border-radius:50%;border:2px solid #9aa0a6;background:#fff;}'
+        + '#hp-rs .rs-golf{padding:0;gap:0;}#hp-rs .rs-gmain{display:flex;align-items:center;gap:12px;flex:1;min-width:0;min-height:64px;border:0;background:none;text-align:left;padding:12px 8px 12px 14px;border-radius:16px;}'
+        + '#hp-rs .rs-addp{flex:none;margin-right:12px;border:0;border-radius:999px;padding:0 14px;min-height:44px;background:#0f4c3a;color:#fff !important;font-size:14px;font-weight:700;white-space:nowrap;}'
+        + '#hp-rs .rs-start{cursor:default;}#hp-rs .rs-chips{display:flex;gap:6px;margin-left:auto;flex:none;}'
+        + '#hp-rs .rs-chips button{white-space:nowrap;border:0;border-radius:999px;padding:0 13px;min-height:40px;background:#e9eee9;font-size:14px;font-weight:600;}'
+        + '#hp-rs .rs-chips button.on{background:#0f4c3a;color:#fff;}'
+        + '#hp-rs .rs-addg{display:flex;align-items:center;gap:12px;width:100%;border:0;border-radius:16px;background:#0f4c3a;color:#fff;padding:0 16px;min-height:58px;margin:0 0 10px;font-size:18px;font-weight:800;text-align:left;}'
+        + '#hp-rs .rs-addg .rs-tt{display:inline;color:#fff;font-size:18px;}#hp-rs .rs-addg .rs-plus{font-size:22px;color:#d4f27c;}#hp-rs .rs-addg .rs-dd{color:#fff;opacity:.75;font-size:13px;font-weight:600;margin:0 0 0 auto;}'
+        + '#hp-rs .rs-more{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1.5px dashed #b8c4bd;border-radius:16px;padding:12px 14px;min-height:60px;background:transparent;margin:0;}'
+        + '#hp-rs .rs-more .rs-tt{color:#13241d;}#hp-rs .rs-more .rs-dd{white-space:normal;font-size:13px;}#hp-rs .rs-more .rs-go{font-size:16px;color:#0f4c3a;font-weight:800;}'
+        + '#hp-rs.open .rs-more{border:2px solid #0f4c3a;background:#f3f8f4;min-height:48px;margin-bottom:4px;}'
+        + '#hp-rs .rs-hint{display:none;font-size:12.5px;color:#5d6b64;margin:0 2px 8px;}#hp-rs.open .rs-hint{display:block;}'
+        + '#hp-rs .rs-foot{text-align:center;margin-top:14px;}#hp-rs.open .rs-foot{display:none;}'
+        + '#hp-rs .rs-code{display:inline-flex;align-items:center;border-radius:999px;padding:5px 11px;background:#0f4c3a;color:#fff;letter-spacing:.08em;font-weight:800;font-size:12px;line-height:1;}'
+        + '#hp-rs .rs-open{display:none;}#hp-rs.open .rs-open{display:block;}'
+        + '#hp-rs .rs-h{font-size:12px;font-weight:800;letter-spacing:.08em;color:#667;margin:12px 2px 5px;text-transform:uppercase;}'
+        + '#hp-rs .rs-list,#hp-rs-end .rs-list{background:#fff;border:1px solid #dfe5df;border-radius:16px;overflow:hidden;margin-bottom:10px;}'
+        + '#hp-rs .rs-li,#hp-rs-end .rs-li{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;border-top:1px solid #dfe5df;background:#fff;padding:0 14px;min-height:44px;font-size:15px;font-weight:600;}'
+        + '#hp-rs .rs-li:first-child,#hp-rs-end .rs-li:first-child{border-top:0;}'
+        + '#hp-rs .rs-ic{width:24px;text-align:center;font-size:16px;flex:none;}'
+        + '#hp-rs .rs-r,#hp-rs-end .rs-r{margin-left:auto;font-size:13.5px;color:#5d6b64;font-weight:500;white-space:nowrap;}'
+        + '#hp-rs .rs-r b,#hp-rs-end .rs-r b{font-size:20px;color:#9aa0a6;font-weight:400;margin-left:4px;vertical-align:-2px;}'
+        + '#hp-rs .rs-plain{cursor:default;}#hp-rs .rs-lock{color:#b3261e;}'
+        + '#hp-rs .rs-tog{display:inline-block;vertical-align:middle;width:44px;height:26px;border-radius:13px;background:#d5dbd7;position:relative;transition:background .15s;}'
+        + '#hp-rs .rs-tog:after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .15s;}'
+        + '#hp-rs .rs-tog.on{background:#0f4c3a;}#hp-rs .rs-tog.on:after{left:21px;}'
+        + '#hp-rs .rs-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}'
+        + '#hp-rs .rs-grid button{background:#fff;border:1px solid #dfe5df;border-radius:999px;padding:0 10px;min-height:36px;font-size:13px;font-weight:600;}'
+        + '#hp-rs .rs-grid button.on{border:1.5px solid #0f4c3a;color:#0f4c3a;}'
+        + '#hp-rs-end .rs-danger{display:block;width:100%;border:0;background:none;color:#b3261e;font-size:14px;font-weight:700;text-align:center;padding:4px 0 10px;min-height:44px;}';
+    function rsOn() { var sh = document.getElementById('round-sheet'); return !!(sh && sh.classList.contains('hp-rs')); }
+    // What a control in the sheet IS, so its row finds it again after a re-render (the group strip
+    // and the nav are repainted on every snapshot).
+    function rsKey(e) {
+        var id = e.id, oc = e.getAttribute('onclick') || '', m;
+        if (id === 'hp-gps-tools') return 'gps';
+        if (id === 'theme-toggle-btn') return 'dark';
+        if (id === 'qs-menu-mystats') return 'mystats';
+        if (id === 'sc-foot-save') return 'save';
+        if (id === 'sc-foot-guide') return 'guide';
+        if (id === 'view-mode-full-btn') return 'full';
+        if (id === 'view-mode-hole-btn') return 'holeview';
+        if (e.getAttribute('data-hq')) return 'q-' + e.getAttribute('data-hq');
+        if (e.getAttribute('data-fdm')) return 'fdm-' + e.getAttribute('data-fdm');
+        if (e.getAttribute('data-hp-full') === '1') return 'fullsetup';
+        if (/openHistoryModal/.test(oc)) return 'history';
+        if (/toggleGroupLinksPanel/.test(oc)) return 'grouplinks';
+        if (/openPlayersSheet/.test(oc)) return 'players';
+        if (/endAndClearRound/.test(oc)) return 'delete';
+        if ((m = /filterGroup\(\s*'?(\w+)'?\s*\)/.exec(oc))) return 'f-' + m[1];
+        if (e.closest('#qr-share-mount')) return 'share';
+        if (e.tagName === 'A' && e.closest('#app-nav-wrap')) return 'nav-' + String(e.getAttribute('href') || '').split('?')[0].split('/').pop();
+        return null;
+    }
+    // Shown in the sheet: laid out, and not display:none inside it. (Visibility is not asked: the
+    // sheet is still coming up when the rows are drawn, and a control with a CSS transition - the
+    // .btn-outline links - still reads "hidden" at that instant.)
+    function rsShown(e, body) {
+        var r = e.getBoundingClientRect();
+        if (!(r.width > 0 && r.height > 0)) return false;
+        for (var x = e; x && x !== body; x = x.parentElement) { if (getComputedStyle(x).display === 'none') return false; }
+        return true;
+    }
+    // Today's controls, as today's sheet shows them (measured with the new look switched off for a
+    // moment - one synchronous pass, nothing is painted in between).
+    function rsControls() {
+        var sh = document.getElementById('round-sheet'), body = document.getElementById('round-sheet-body'), out = [], seen = {};
+        if (!sh || !body) return out;
+        var had = sh.classList.contains('hp-rs');
+        if (had) sh.classList.remove('hp-rs');
+        try {
+            Array.prototype.forEach.call(body.querySelectorAll('button, a[href]'), function (e) {
+                if (e.closest('#hp-rs, #hp-rs-end, #group-links-panel, #dot-context-row') || !rsShown(e, body)) return;
+                var k = rsKey(e), text = String(e.textContent || '').replace(/\s+/g, ' ').trim();
+                if (!k) { k = 'x-' + text; }
+                if (seen[k]) return;
+                seen[k] = 1;
+                out.push({ k: k, el: e, text: text, on: e.tagName === 'BUTTON' && (/\bactive\b/.test(e.className) || e.getAttribute('aria-pressed') === 'true') });
+            });
+        } finally { if (had) sh.classList.add('hp-rs'); }
+        return out;
+    }
+    function rsFind(k) { var c = rsControls().filter(function (x) { return x.k === k; })[0]; return c ? c.el : null; }
+    function rsNames(ps) {
+        return ps.map(function (p) { try { return typeof golferLabel === 'function' ? golferLabel(p) : String(p.name || ''); } catch (e) { return String((p && p.name) || ''); } });
+    }
+    function rsStartNow(d) {
+        var m = d.groupStartingHoles || {};
+        if (Object.keys(m).some(function (g) { return Number(m[g]) > 0; })) return 'shotgun';
+        var s = 1;
+        try { s = typeof teeStartHole === 'function' ? teeStartHole(d, d.courseData || []) : (Number(d.startingHole) || 1); } catch (e) {}
+        return s === 10 ? '10' : '1';
+    }
+    function rsRender() {
+        var sh = document.getElementById('round-sheet'), body = document.getElementById('round-sheet-body');
+        if (!sh || !body || !rsOn()) return;
+        try { if (window.HardPanRoundEdit && window.HardPanRoundEdit.decorate) window.HardPanRoundEdit.decorate(); } catch (e) {}
+        addToolsButton();
+        var d = data() || {}, ps = d.players || [], names = rsNames(ps), C = rsControls(), has = {}, used = {};
+        C.forEach(function (c) { has[c.k] = c; });
+        var take = function (k) { used[k] = 1; return has[k]; };
+        var row = function (k, em, tt, dd, extra) {
+            if (!take(k)) return '';
+            return '<button type="button" class="rs-row" data-rs="' + esc(k) + '"' + (extra || '') + '><span class="rs-em">' + em + '</span><span class="rs-txt"><span class="rs-tt">' + esc(tt) + '</span>'
+                + (dd ? '<span class="rs-dd">' + esc(dd) + '</span>' : '') + '</span><span class="rs-go" aria-hidden="true">›</span></button>';
+        };
+        var li = function (k, ic, tt, r) {
+            if (!take(k)) return '';
+            return '<button type="button" class="rs-li" data-rs="' + esc(k) + '"><span class="rs-ic">' + ic + '</span>' + esc(tt) + '<span class="rs-r">' + esc(r || '') + '<b aria-hidden="true">›</b></span></button>';
+        };
+        var chip = function (k, ic, tt) {
+            if (!take(k)) return '';
+            return '<button type="button" data-rs="' + esc(k) + '"' + (has[k].on ? ' class="on" aria-pressed="true"' : '') + '>' + (ic ? ic + ' ' : '') + esc(tt) + '</button>';
+        };
+        // THE TOP: Golfers, Tee, Start, Add a game, Change course.
+        var who = ps.slice(0, 3).map(function (p, i) { return names[i] + (p.hcp !== undefined && p.hcp !== '' ? ' ' + p.hcp : ''); }).join(' · ') + (ps.length > 3 ? ' +' + (ps.length - 3) : '');
+        var tr = d.teeRating || null, teeName = tr && tr.teeName ? String(tr.teeName).replace(/^(Men|Women)\s*·\s*/, '') : '';
+        var dotCol = null;
+        try { if (teeName && window.HardPanRoundEdit && window.HardPanRoundEdit.teeColor) dotCol = window.HardPanRoundEdit.teeColor(teeName); } catch (e) {}
+        var dot = '<span class="rs-dot"' + (dotCol && dotCol !== '#fff' ? ' style="background:' + dotCol + ';border-color:' + dotCol + '"' : '') + '></span>';
+        // URGENT-040 (9:23 PM): the Golfers row carries its own "+ Add golfer" on the right - the
+        // same proxy as More's Add golfer (today's quick edit -> HardPanAddGolfer.open).
+        var top = row('q-players', '👥', 'Golfers', (who ? who + ' · ' : '') + 'add, rename');
+        if (top && has['q-addgolfer']) top = '<div class="rs-row rs-golf">' + top.replace('class="rs-row"', 'class="rs-gmain"').replace(/<span class="rs-go"[^>]*>›<\/span>/, '')
+            + '<button type="button" class="rs-addp" data-rs="q-addgolfer">＋ Add golfer</button></div>';
+        top += row('q-tee', dot, 'Tee', teeName ? teeName + ' · handicaps set' : 'Everyone’s tee and the handicaps');
+        if (take('q-start')) {
+            var holes = (d.courseData || []).map(function (h) { return Number(h && h.hole); }), now = rsStartNow(d);
+            var ten = holes.indexOf(10) > -1 && holes.length >= 18, gs = groups().length > 1;
+            top += '<div class="rs-row rs-start"><span class="rs-txt"><span class="rs-tt">Start</span><span class="rs-dd">' + (now === 'shotgun' ? 'Shotgun' : now === '10' ? 'Back nine first' : 'First tee') + '</span></span>'
+                + '<span class="rs-chips" role="group" aria-label="Start">'
+                + '<button type="button" data-rs="q-start" data-rs-start="1"' + (now === '1' ? ' class="on" aria-pressed="true"' : '') + '>Hole 1</button>'
+                + (ten ? '<button type="button" data-rs="q-start" data-rs-start="10"' + (now === '10' ? ' class="on" aria-pressed="true"' : '') + '>10</button>' : '')
+                + (gs ? '<button type="button" data-rs="q-start" data-rs-start="shotgun"' + (now === 'shotgun' ? ' class="on" aria-pressed="true"' : '') + '>Shotgun</button>' : '')
+                + '</span></div>';
+        }
+        if (take('fdm-add')) top += '<button type="button" class="rs-addg" data-rs="fdm-add"><span class="rs-plus">＋</span><span class="rs-tt">Add a game</span><span class="rs-dd">Nassau, skins, bets</span></button>';
+        top += row('q-course', '⛳', 'Change course', 'A new round somewhere else');
+        // MORE: the rest, grouped.
+        var weekly = d.moneyPool && d.moneyPool.enabled !== false ? 'On' : 'Off';
+        var thisRound = li('q-addgolfer', '＋', 'Add golfer', 'Name, HCP, tee') + li('q-groups', '🫂', 'Groups', 'Who plays with who') + li('q-nines', '9️⃣', 'Nines', 'Front / back')
+            + li('q-weekly', '🏆', 'Weekly Game', weekly) + li('fdm-paste', '📋', 'Paste the whole round', '') + li('fdm-trip', '🗓️', 'Paste a multi-round match', '')
+            + li('fullsetup', '🧰', 'Full setup', 'Every step');
+        var dark = document.documentElement.classList.contains('dark-mode');
+        var thisPhone = li('gps', '🛠', 'GPS tools', 'Layout, units, bag');
+        if (take('dark')) thisPhone += '<button type="button" class="rs-li" data-rs="dark" role="switch" aria-checked="' + dark + '"><span class="rs-ic">🌙</span>Dark Mode<span class="rs-r"><span class="rs-tog' + (dark ? ' on' : '') + '"></span></span></button>';
+        var badge = document.getElementById('group-lock-badge');
+        if (badge && badge.style.display !== 'none' && String(badge.textContent || '').trim()) {
+            var bt = String(badge.textContent).replace(/^[^A-Za-z0-9]+/, '').replace(/^Scorekeeper:\s*/i, '').replace(/\bOnly\b/, 'only');
+            thisPhone += '<div class="rs-li rs-plain"><span class="rs-ic">🔒</span>Scorekeeper<span class="rs-r rs-lock">' + esc(bt) + '</span></div>';
+        }
+        used.guide = 1;   // the footer's 🧭 goes where "How it works" goes (the same guide link)
+        var go = chip('nav-index.html', '📝', 'Scorecard') + chip('full', '📋', 'Full Card') + chip('holeview', '', 'Hole View')
+            + chip('nav-leaderboard.html', '🏆', 'Leaderboard') + chip('nav-skins.html', '💰', 'Bets') + chip('nav-settlement.html', '🤝', 'Results')
+            + chip('nav-sidematches.html', '⚔️', 'Matches') + chip('nav-game.html', '📖', 'Game') + chip('nav-trip.html', '🚐', 'Trip')
+            + chip('grouplinks', '🔗', 'Group Links') + chip('players', '👥', 'Players');
+        C.forEach(function (c) { if (/^f-/.test(c.k)) go += chip(c.k, '', c.text); });
+        go += chip('history', '🕘', 'History') + chip('mystats', '📊', 'My stats') + chip('share', '📤', 'Share')
+            + chip('nav-instructions.html', '🧭', 'How it works') + chip('nav-admin.html', '🏠', 'Home');
+        // Anything else the sheet has today keeps a way in.
+        C.forEach(function (c) {
+            if (used[c.k] || c.k === 'save' || c.k === 'delete') return;
+            var nv = /^nav-/.test(c.k) ? RS_NAV[c.k.slice(4)] : null;
+            go += chip(c.k, nv ? nv[0] : '', nv ? nv[1] : c.text);
+        });
+        var hasTop = !!top;
+        if (!hasTop) RS.more = true;
+        var host = document.getElementById('hp-rs');
+        if (!host) { host = document.createElement('div'); host.id = 'hp-rs'; host.addEventListener('click', rsClick); }
+        if (body.firstChild !== host) body.insertBefore(host, body.firstChild);
+        var course = tidyCourse(d.courseName || d.eventName || 'This round');
+        var sub = course + (names.length ? ' · ' + names.slice(0, 4).join(', ') + (names.length > 4 ? ' +' + (names.length - 4) : '') : '');
+        var y = body.scrollTop;
+        host.className = RS.more ? 'open' : '';
+        host.innerHTML = '<div class="rs-top"><div class="rs-hd"><h2 class="rs-t">Round settings</h2><button type="button" class="rs-x" data-rs="close" aria-label="Close">✕</button></div>'
+            + '<div class="rs-sub">' + esc(sub) + '</div></div>'
+            + top
+            + '<div class="rs-hint" id="hp-rs-hint">' + (hasTop ? '↑ Golfers, Tee, Start, Add a game, Change course stay above' : '') + '</div>'
+            + '<button type="button" class="rs-more" data-rs="more" aria-expanded="' + RS.more + '"><span class="rs-txt"><span class="rs-tt">More</span>'
+            + (RS.more ? '' : '<span class="rs-dd">Weekly Game, paste a round, Dark Mode, scorekeeper lock, full setup…</span>') + '</span><span class="rs-go" aria-hidden="true">' + (RS.more ? '▴' : '▾') + '</span></button>'
+            + '<div class="rs-foot"><span class="rs-code">GAME · ' + esc(code() || '') + '</span></div>'
+            + '<div class="rs-open">'
+            + (thisRound ? '<div class="rs-h">This round</div><div class="rs-list">' + thisRound + '</div>' : '')
+            + (thisPhone ? '<div class="rs-h">This phone</div><div class="rs-list">' + thisPhone + '</div>' : '')
+            + (go ? '<div class="rs-h">Go to</div><div class="rs-grid">' + go + '</div>' : '')
+            + '</div>';
+        var end = document.getElementById('hp-rs-end');
+        if (!end) { end = document.createElement('div'); end.id = 'hp-rs-end'; end.addEventListener('click', rsClick); }
+        end.innerHTML = (has.save ? '<div class="rs-list"><button type="button" class="rs-li" data-rs="save"><span class="rs-ic">⬅️</span>Save &amp; exit<span class="rs-r">GAME · ' + esc(code() || '') + '<b aria-hidden="true">›</b></span></button></div>' : '')
+            + (has['delete'] ? '<button type="button" class="rs-danger" data-rs="delete">🗑️ Delete round for everyone</button>' : '');
+        if (body.lastChild !== end) body.appendChild(end);
+        sh.classList.toggle('hp-rs-more', RS.more);
+        body.scrollTop = y;
+    }
+    function rsClick(ev) {
+        var b = ev.target && ev.target.closest ? ev.target.closest('[data-rs]') : null;
+        if (!b) return;
+        var k = b.getAttribute('data-rs');
+        if (k === 'close') { window.toggleRoundSheet(false); return; }
+        if (k === 'more') {
+            RS.more = !RS.more; rsRender();
+            var body = document.getElementById('round-sheet-body'), hint = document.getElementById('hp-rs-hint'), topb = document.querySelector('#hp-rs .rs-top');
+            if (body) body.scrollTop = RS.more && hint && topb ? Math.max(0, body.scrollTop + hint.getBoundingClientRect().top - topb.getBoundingClientRect().bottom - 2) : 0;
+            return;
+        }
+        var el = rsFind(k);
+        if (!el) { rsRender(); return; }
+        var st = b.getAttribute('data-rs-start');
+        el.click();   // today's control, today's handler
+        if (st && window.HardPanRoundEdit && window.HardPanRoundEdit.isOpen && window.HardPanRoundEdit.isOpen()) {
+            // Start's chips open today's Start sheet with that choice made - its own Save writes it.
+            var c = document.querySelector(st === 'shotgun' ? '#hp-redit [data-re="shotgun"]' : '#hp-redit [data-re-start="' + st + '"]');
+            if (c) c.click();
+        }
+        if (k === 'grouplinks') setTimeout(function () { var p = document.getElementById('group-links-panel'); if (p && p.offsetHeight) { try { p.scrollIntoView({ block: 'nearest' }); } catch (e) {} } }, 60);
+        rsSoon();
+    }
+    function rsSoon() { if (RS.timer) return; RS.timer = setTimeout(function () { RS.timer = null; if (settingsOpen() && rsOn()) rsRender(); }, 60); }
+    function rsWatch() {
+        var body = document.getElementById('round-sheet-body');
+        if (!body || RS.obs || !window.MutationObserver) return;
+        var mine = function (n) { return !!(n && n.nodeType === 1 ? (n.id === 'hp-rs' || n.id === 'hp-rs-end' || (n.closest && n.closest('#hp-rs, #hp-rs-end'))) : n && n.parentNode && mine(n.parentNode)); };
+        RS.obs = new MutationObserver(function (list) {
+            if (!rsOn() || !settingsOpen()) return;
+            for (var i = 0; i < list.length; i++) {
+                var m = list[i];
+                if (mine(m.target)) continue;
+                var nodes = Array.prototype.slice.call(m.addedNodes).concat(Array.prototype.slice.call(m.removedNodes));
+                if (m.type === 'childList' && nodes.length && nodes.every(mine)) continue;
+                rsSoon(); return;
+            }
+        });
+        RS.obs.observe(body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['style', 'class'] });
+    }
+    function rsSetup(open) {
+        var sh = document.getElementById('round-sheet');
+        if (!sh) return;
+        var want = !!(open && on() && gpsUp() && code());
+        sh.classList.toggle('hp-rs', want);
+        if (!want) { sh.classList.remove('hp-rs-more'); return; }
+        if (!document.getElementById('hp-rs-css')) { var s = document.createElement('style'); s.id = 'hp-rs-css'; s.textContent = RS_CSS; document.head.appendChild(s); }
+        RS.more = false;
+        rsWatch();
+        rsRender();
+        var body = document.getElementById('round-sheet-body'); if (body) body.scrollTop = 0;
     }
 
     // ---- 5. BETS AS A SHEET ---------------------------------------------------

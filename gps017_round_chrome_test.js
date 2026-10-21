@@ -141,10 +141,12 @@ test('Round settings: today\'s Round Menu sheet, with GPS tools -> the map\'s To
     await ev('HardPanRound.openMenu()');
     await click('#hp-sheet [data-hs-tile="settings"]');
     await sleep(400);
-    const rs = JSON.parse(await ev('(function(){' + VIS + ' return JSON.stringify({ open: document.getElementById("round-sheet").classList.contains("open"), side: HardPanGps.side(), tools: vis(document.getElementById("hp-gps-tools")), text: document.getElementById("round-sheet-body").innerText.slice(0, 600) }); })()'));
+    // POLISH #21: in a GPS round GPS tools is under More › THIS PHONE (a row for today's #hp-gps-tools).
+    await click('#hp-rs [data-rs="more"]');
+    const rs = JSON.parse(await ev('(function(){' + VIS + ' return JSON.stringify({ open: document.getElementById("round-sheet").classList.contains("open"), side: HardPanGps.side(), tools: !!document.getElementById("hp-gps-tools") && vis(document.querySelector("#hp-rs [data-rs=gps]")), text: document.getElementById("round-sheet-body").innerText.slice(0, 600) }); })()'));
     assert.deepEqual([rs.open, rs.side, rs.tools], [true, 'bets', true], JSON.stringify(rs));
     await shot('settings');
-    await click('#hp-gps-tools');
+    await click('#hp-rs [data-rs="gps"]');
     await sleep(500);
     const t = JSON.parse(await ev('(function(){' + VIS + ' return JSON.stringify({ side: HardPanGps.side(), sheet: vis(document.querySelector("#gps-overlay .gps-tsheet")), rs: document.getElementById("round-sheet").classList.contains("open") }); })()'));
     assert.deepEqual(t, { side: 'gps', sheet: true, rs: false });

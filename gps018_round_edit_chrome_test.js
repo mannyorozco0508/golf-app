@@ -63,14 +63,16 @@ after(async () => { if (j) await j.close(); });
 
 test('Round settings: QUICK EDITS on top, and the wizard is "Full setup ›"', { timeout: 60000 }, async () => {
     await ev('HardPanRound.openSettings()');
-    assert.ok(await until("!!document.getElementById('hp-quick') && /Full setup/.test(document.getElementById('round-sheet-body').innerText)", 6000), 'quick edits and Full setup drawn');
+    // POLISH #21 (a GPS round): Golfers, Tee, Start on top; Add golfer, Groups and Full setup under More ›
+    // THIS ROUND - rows for today's quick edits and today's one "Full setup ›" link.
+    assert.ok(await until("!!document.getElementById('hp-quick') && !!document.querySelector('#hp-rs [data-rs=\"fullsetup\"]')", 6000), 'quick edits and Full setup drawn');
+    await click('#hp-rs [data-rs="more"]');
     const t = await ev("document.getElementById('round-sheet-body').innerText");
-    assert.match(t, /QUICK EDITS[\s\S]*\+ Add golfer[\s\S]*Groups[\s\S]*Start[\s\S]*Tee for everyone/);
-    assert.match(t, /Full setup › · every step/);
-    const full = JSON.parse(await ev("JSON.stringify(Array.prototype.filter.call(document.querySelectorAll('a'), function (a) { return /admin\\.html\\?game=/.test(a.getAttribute('href') || '') && a.offsetParent !== null; }).map(function (a) { return a.textContent; }))"));
+    assert.match(t, /Golfers[\s\S]*Tee[\s\S]*Start[\s\S]*More[\s\S]*THIS ROUND[\s\S]*Add golfer[\s\S]*Groups[\s\S]*Full setup/i);
+    const full = JSON.parse(await ev("JSON.stringify(Array.prototype.filter.call(document.querySelectorAll('a'), function (a) { return /admin\\.html\\?game=/.test(a.getAttribute('href') || '') && !a.closest('#hp-rs') && (a.getAttribute('data-hp-full') === '1' || a.offsetParent !== null); }).map(function (a) { return a.textContent; }))"));
     assert.equal(full.length, 1, 'exactly one way into the full setup: ' + JSON.stringify(full));
     assert.match(full[0], /^Full setup ›/);
-    await click('#hp-quick [data-hq="groups"]');
+    await click('#hp-rs [data-rs="q-groups"]');
     assert.equal((await st()).sheet, true, 'Groups opens as a sheet');
     await click('#hp-redit [data-re="close"]');
 });
