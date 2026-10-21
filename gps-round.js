@@ -610,6 +610,138 @@
         return true;
     }
     function holeView() { cardMode('hole'); return true; }
+    // URGENT-034 FIX 4: THE MAP'S CARD IS A COMPACT CARD (Manny's pick) - a half-height sheet over the map
+    // with only the hole-by-hole grid: Hole / Par / the golfers, Out / In / Total. No leaderboard, no
+    // skins. A box opens the score sheet for that golfer and hole; "Full card ›" is today's full page
+    // (toFullCard, unchanged); a swipe down or a tap on the map closes it. Display only - every score
+    // still goes through the score sheet and the card's own save.
+    var CC_CSS = '#hp-compact-card{position:absolute;inset:0;z-index:2147481000;background:rgba(0,0,0,.25);font:600 16px/1.25 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;color:#f4f4ef;}'
+        + 'body > #hp-compact-card{position:fixed;}'
+        + '#hp-compact-card .hp-cc{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;height:52%;display:flex;flex-direction:column;background:#111611;border-radius:24px 24px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.45);transition:transform .18s ease;}'
+        + '#hp-compact-card .hp-cc-handle{width:42px;height:5px;border-radius:3px;background:#5b625a;margin:10px auto 2px;flex:0 0 auto;}'
+        + '#hp-compact-card .hp-cc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 16px 8px;flex:0 0 auto;}'
+        + '#hp-compact-card .hp-cc-title{font-size:20px;font-weight:800;margin:0;color:#fff;}'
+        + '#hp-compact-card .hp-cc-full{min-height:40px;padding:0 14px;border-radius:12px;background:#262c26;color:#c8f07a;font-size:16px;font-weight:800;white-space:nowrap;}'
+        + '#hp-compact-card .hp-cc-body{flex:1 1 auto;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 10px calc(10px + env(safe-area-inset-bottom));}'
+        + '#hp-compact-card table{width:100%;border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;}'
+        + '#hp-compact-card th{position:sticky;top:0;background:#111611;color:#a7aea4;font-size:13px;font-weight:800;padding:6px 2px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;z-index:1;}'
+        + '#hp-compact-card td{text-align:center;padding:2px;border-top:1px solid #1f251f;}'
+        + '#hp-compact-card td.hp-cc-h{font-weight:800;color:#fff;width:44px;}#hp-compact-card td.hp-cc-p{color:#a7aea4;width:40px;}'
+        + '#hp-compact-card tr.hp-cc-now td.hp-cc-h{color:#c8f07a;}'
+        + '#hp-compact-card tr.hp-cc-sum td{font-weight:800;color:#fff;background:#1b211b;padding:8px 2px;}'
+        + '#hp-compact-card button.hp-cc-box{width:100%;min-width:40px;min-height:40px;border-radius:10px;background:#1b211b;color:#f4f4ef;font-size:18px;font-weight:800;}'
+        + '#hp-compact-card tr.hp-cc-now button.hp-cc-box{box-shadow:inset 0 0 0 2px #c8f07a;}';
+    var cc = null;   // { wrap, sig, timer }
+    function ccGolfers() {
+        var d = data(), ps = (d && d.players) || [];
+        var list = [];
+        try { if (typeof gpsScoreGolfers === 'function') list = gpsScoreGolfers(currentViewedHole); } catch (e) { list = []; }   /* global gpsScoreGolfers, currentViewedHole */
+        var ids = list.map(function (g) { return String(g.id); });
+        if (!ids.length) {
+            var lg = locked();
+            ps.forEach(function (p) { if (p && p.out !== true && (!lg || (typeof playerGroupOf === 'function' && Number(playerGroupOf(p.id)) === lg))) ids.push(String(p.id)); });   /* global playerGroupOf */
+        }
+        return ids.map(function (id) { return ps.filter(function (p) { return p && String(p.id) === id; })[0]; }).filter(Boolean);
+    }
+    function ccName(p, ps) {
+        try { if (typeof golferShortName === 'function') return golferShortName(p, ps); } catch (e) {}   /* global golferShortName */
+        return String(p.name || ('Player ' + p.id)).trim().split(/\s+/)[0];
+    }
+    function ccSig() { var d = data(); return JSON.stringify([(d && d.scores) || {}, (function () { try { return currentViewedHole; } catch (e) { return null; } })()]); }
+    function ccRender() {
+        if (!cc || !cc.wrap) return;
+        var d = data(); if (!d) return;
+        var ps = d.players || [], gs = ccGolfers(), sc = d.scores || {};
+        var holes = ((d.courseData) || []).map(function (h) { return { n: parseInt(h.hole, 10), par: Number(h.par) || 0 }; }).filter(function (h) { return h.n > 0; }).sort(function (a, b) { return a.n - b.n; });
+        var now = (function () { try { return Number(currentViewedHole); } catch (e) { return null; } })();
+        var val = function (pid, n) { var v = Number(sc['p' + pid + '_h' + n]); return v > 0 ? v : null; };
+        var h = '<table><thead><tr><th>Hole</th><th>Par</th>' + gs.map(function (p) { return '<th>' + esc(ccName(p, ps)) + '</th>'; }).join('') + '</tr></thead><tbody>';
+        var sum = function (label, part) {
+            var par = 0; part.forEach(function (x) { par += x.par; });
+            return '<tr class="hp-cc-sum" data-cc-sum="' + label + '"><td class="hp-cc-h">' + label + '</td><td class="hp-cc-p">' + (par || '') + '</td>' + gs.map(function (p) {
+                var t = 0, any = false; part.forEach(function (x) { var v = val(p.id, x.n); if (v) { t += v; any = true; } }); return '<td>' + (any ? t : '') + '</td>';
+            }).join('') + '</tr>';
+        };
+        var front = holes.filter(function (x) { return x.n <= 9; }), back = holes.filter(function (x) { return x.n > 9; });
+        var rows = function (part) { return part.map(function (x) {
+            return '<tr' + (x.n === now ? ' class="hp-cc-now"' : '') + '><td class="hp-cc-h">' + x.n + '</td><td class="hp-cc-p">' + (x.par || '') + '</td>' + gs.map(function (p) {
+                var v = val(p.id, x.n);
+                return '<td><button type="button" class="hp-cc-box" data-cc-hole="' + x.n + '" data-cc-player="' + esc(p.id) + '" aria-label="Hole ' + x.n + ', ' + esc(ccName(p, ps)) + (v ? ', ' + v : ', no score') + '">' + (v || '') + '</button></td>';
+            }).join('') + '</tr>'; }).join(''); };
+        if (front.length) h += rows(front) + sum('Out', front);
+        if (back.length) h += rows(back) + sum('In', back);
+        if (front.length && back.length) h += sum('Total', holes);
+        h += '</tbody></table>';
+        cc.wrap.querySelector('.hp-cc-body').innerHTML = h;
+        cc.sig = ccSig();
+    }
+    function ccBuild() {
+        var w = document.createElement('div');
+        w.id = 'hp-compact-card'; w.className = 'gps-scroll-ok';
+        w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-label', 'Scorecard');
+        w.innerHTML = '<style>' + CC_CSS + '</style><div class="hp-cc"><div class="hp-cc-handle"></div><div class="hp-cc-head"><h2 class="hp-cc-title">Scorecard</h2>'
+            + '<button type="button" class="hp-cc-full" data-cc-full="1">Full card ›</button></div><div class="hp-cc-body"></div></div>';
+        w.addEventListener('click', function (e) {
+            var t = e.target, b;
+            if (t === w) { closeCompactCard(); return; }   // the map above the sheet
+            if (t.closest('[data-cc-full]')) { closeCompactCard(); toFullCard(); return; }
+            if ((b = t.closest('[data-cc-hole]'))) ccOpen(Number(b.getAttribute('data-cc-hole')), b.getAttribute('data-cc-player'));
+        });
+        // SWIPE DOWN TO CLOSE: from the handle / title, or anywhere once the grid is at its top.
+        var card = w.querySelector('.hp-cc'), y0 = null, dy = 0;
+        card.addEventListener('touchstart', function (e) {
+            var body = card.querySelector('.hp-cc-body');
+            y0 = (!body.contains(e.target) || body.scrollTop <= 0) && e.touches.length === 1 ? e.touches[0].clientY : null; dy = 0;
+        }, { passive: true });
+        card.addEventListener('touchmove', function (e) {
+            if (y0 == null) return;
+            dy = e.touches[0].clientY - y0;
+            if (dy > 0) { card.style.transition = 'none'; card.style.transform = 'translateY(' + dy + 'px)'; }
+        }, { passive: true });
+        card.addEventListener('touchend', function () {
+            if (y0 == null) return;
+            card.style.transition = '';
+            if (dy > 90) closeCompactCard(); else card.style.transform = '';
+            y0 = null; dy = 0;
+        });
+        return w;
+    }
+    // A box: the score sheet for that golfer, on that hole. The hole on the map, or one played before it
+    // (the sheet's own earlier-hole step - Save goes back to the map's hole); a later hole moves the
+    // round there first (the card's own goToHole), as its ‹ › would.
+    function ccOpen(n, pid) {
+        var cur = (function () { try { return Number(currentViewedHole); } catch (e) { return null; } })();
+        var order = []; try { if (typeof gpsHoleList === 'function') order = gpsHoleList(); } catch (e) {}   /* global gpsHoleList */
+        if (cur != null && n !== cur && order.indexOf(n) > order.indexOf(cur)) { try { if (typeof goToHole === 'function') goToHole(n); } catch (e) {} cur = n; }   /* global goToHole */
+        if (typeof gpsOpenScore !== 'function') return false;   /* global gpsOpenScore */
+        gpsOpenScore(cur, pid);
+        var S = window.HardPanGpsStats && window.HardPanGpsStats.sheet;
+        if (n !== cur && S && S.isOpen() && typeof S.go === 'function') S.go(n);
+        return true;
+    }
+    function compactOpen() { return !!(cc && cc.wrap && cc.wrap.parentNode && cc.wrap.style.display !== 'none'); }
+    function openCompactCard() {
+        if (!data()) return false;
+        closeBets(); closeSheet(true);
+        if (!cc) cc = { wrap: ccBuild() };
+        var host = document.getElementById('gps-overlay');
+        host = host && onGps() ? host : document.body;
+        if (cc.wrap.parentNode !== host) host.appendChild(cc.wrap);
+        cc.wrap.style.display = '';
+        cc.wrap.querySelector('.hp-cc').style.transform = '';
+        ccRender();
+        var now = cc.wrap.querySelector('tr.hp-cc-now');
+        if (now) { try { var body = cc.wrap.querySelector('.hp-cc-body'); body.scrollTop = Math.max(0, now.offsetTop - body.clientHeight / 2); } catch (e) {} }
+        // A score saved from the sheet over it shows here at once.
+        if (cc.timer) clearInterval(cc.timer);
+        cc.timer = setInterval(function () { if (!compactOpen()) { clearInterval(cc.timer); cc.timer = null; return; } if (ccSig() !== cc.sig) ccRender(); }, 400);
+        return true;
+    }
+    function closeCompactCard() {
+        if (!cc || !cc.wrap) return;
+        cc.wrap.style.display = 'none';
+        if (cc.timer) { clearInterval(cc.timer); cc.timer = null; }
+    }
     // ENTER SCORE, from any screen: on the map (or Bets over it) the GPS's own score entry; on the
     // card the first empty box of this hole (or this phone's golfer's), focused.
     function enterScore() {
@@ -715,7 +847,7 @@
     window.HardPanRound = {
         openMenu: function () { return openMenu(); }, openShare: openShare, openFinish: openFinish, openSettings: openSettings,
         openBets: openBets, closeBets: closeBets, closeSheet: closeSheet, go: go, barFor: barFor, refresh: refresh,
-        toGps: toGps, toCard: toCard, toFullCard: toFullCard, holeView: holeView, tidyCourse: tidyCourse, screen: screen, sheetKind: function () { return sheetOpen() ? sheetKind : null; },
+        toGps: toGps, toCard: toCard, toFullCard: toFullCard, holeView: holeView, openCompactCard: openCompactCard, closeCompactCard: closeCompactCard, compactCardOpen: compactOpen, tidyCourse: tidyCourse, screen: screen, sheetKind: function () { return sheetOpen() ? sheetKind : null; },
         payText: function () { return payText(settle()); }, feed: feed, enterScore: enterScore,
         changeCourse: changeCourse, leaveRound: leaveRound, scored: scored
     };

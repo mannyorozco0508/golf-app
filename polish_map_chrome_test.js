@@ -110,7 +110,7 @@ test('#19 the toast on the map sits under the top bar, clear of the Plays-like p
     assert.equal(say({ mph: 7 }), '7 mph');
 });
 
-test('#8 Card is the 18-hole grid - the last score posts on the map, Card opens the grid, no results pop-up; Enter score is the hole again', { timeout: 150000 }, async () => {
+test('#8 + URGENT-034: Card is the compact card, Full card › the 18-hole grid - the last score posts on the map, no results pop-up; Enter score is the hole again', { timeout: 150000 }, async () => {
     const { j } = await startRound('PMAP08', 17);
     // The 18th scores post while the map is up (the pop-up used to open behind it).
     await j.evaluate("HardPanGps.setHole ? 0 : 0");
@@ -118,6 +118,13 @@ test('#8 Card is the 18-hole grid - the last score posts on the map, Card opens 
     await sleep(1500);
     assert.equal(await j.evaluate("HardPanGps.side()"), 'gps', 'still on the map');
     await j.evaluate("document.querySelector('#gps-overlay .gps-side-bets').click()");
+    await sleep(900);
+    // URGENT-034 FIX 4: Card opens the COMPACT card over the map first; "Full card ›" is the grid page.
+    const cc = JSON.parse(await j.evaluate("JSON.stringify({ side: HardPanGps.side(), open: HardPanRound.compactCardOpen(), boxes: document.querySelectorAll('#hp-compact-card [data-cc-hole]').length, pop: (document.getElementById('card-in-popup')||{style:{}}).style.display })"));
+    assert.deepEqual([cc.side, cc.open], ['gps', true], 'the compact card, over the map: ' + JSON.stringify(cc));
+    assert.ok(cc.boxes >= 36, 'hole by hole for both golfers: ' + cc.boxes);
+    assert.notEqual(cc.pop, 'flex', 'no "Final results are in" pop-up');
+    await j.evaluate("document.querySelector('#hp-compact-card [data-cc-full]').click()");
     await sleep(900);
     const s = JSON.parse(await j.evaluate("JSON.stringify({ side: HardPanGps.side(), mode: currentViewMode, full: getComputedStyle(document.getElementById('full-card-container')).display, hole: getComputedStyle(document.getElementById('hole-view-container')).display, pop: (document.getElementById('card-in-popup')||{style:{}}).style.display, sheet: document.body.classList.contains('hp-card-sheet'), cap: document.querySelector('#gps-overlay .gps-side-bets .gps-cap').textContent })"));
     assert.equal(s.cap, 'Card');
