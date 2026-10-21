@@ -176,7 +176,7 @@ test('gps-arcs-plan.js is pure: no DOM, storage, network, account, money or posi
 test('gps-view.js wiring: off by default, per golfer, tournament / spectator gated, map untouched while off, nothing sent', () => {
     const v = fs.readFileSync(path.join(__dirname, 'gps-view.js'), 'utf8');
     const at0 = v.indexOf('// ---- DISTANCE ARCS + TEE PLAN (URGENT-052 A');
-    const sec = v.slice(at0, v.indexOf('\n    function drawHoleAsk', at0));
+    const sec = v.slice(at0, v.indexOf('\n    // HAZARD CARRIES (GolfAPI courses)', at0));
     assert.ok(at0 > 0 && /function drawCarryArcs\(/.test(sec) && /function fillTeePlan\(/.test(sec), 'positive: the section');
     assert.match(sec, /function arcsPref\(\) \{ return arcsRec\(\)\[arcsGolferKey\(\)\] === 1; \}/, 'on only when this golfer turned it on');
     assert.match(sec, /var ARCS_KEY = 'hardpan_gps_arcs_v1'/);

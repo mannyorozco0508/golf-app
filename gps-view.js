@@ -585,132 +585,6 @@
             frameHole(false); render();
         });
     }
-    // HAZARD CARRIES (GolfAPI courses): each bunker / water point on this hole, with
-    // the distance to it from you (or the tee), at the point. Past the green or
-    // behind you: not shown.
-    function drawHazards() {
-        var keep = {};
-        var rec = osmRecord(S.courseKey), h = rec && rec.holes && rec.holes[String(S.hole)];
-        var hz = (h && h.osm && h.osm.hazards) || [];
-        var r = resolved(), o = r && origin(r);
-        if (S.map && ML() && S.mode === 'measure' && o && r && r.mid && hz.length) {
-            var toGreen = G.haversineMeters(o.pt, r.mid), dir = G.bearingDeg(o.pt, r.mid);
-            hz.forEach(function (z, i) {
-                var d = G.haversineMeters(o.pt, z.pt);
-                var off = Math.abs((((G.bearingDeg(o.pt, z.pt) - dir) % 360) + 540) % 360 - 180);
-                if (d > toGreen + 25 || off > 75) return;
-                var k = 'hz' + i;
-                keep[k] = 1;
-                var m = marker(k, z.pt, function () {
-                    var e = document.createElement('div');
-                    e.className = 'gps-hz ' + (z.type === 'w' ? 'gps-hz-water' : 'gps-hz-bunker');
-                    return e;
-                });
-                var t = (z.type === 'w' ? 'W ' : 'B ') + G.shownDistance(d, units());
-                var el = m && m.getElement();
-                if (el && el.textContent !== t) el.textContent = t;
-            });
-        }
-        Object.keys(S.markers || {}).forEach(function (k) { if (/^hz/.test(k) && !keep[k]) marker(k, null); });
-    }
-    // ---- HAZARDS + LAYUPS SHEET (008, switch hazards) --------------------------------
-    // "Hazards" on the map: every hazard GolfAPI marks on this hole, with REACH (its near
-    // edge) and CARRY (its far edge) from the golfer - or from the tee, off the hole - and
-    // the layups: "Lay up to 100 = 164 from you" (50 / 75 / 100 / 125 / 150, only those
-    // short of the green). The points the app already has (gps-geo.hazardRows); nothing is
-    // fetched. Redrawn on every fix while it is open. A hole with no hazard data says so.
-    function hzSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('hazards') !== false; } catch (e) { return true; } }
-    function hzSheet() { return S && S.el.querySelector('.gps-hzs'); }
-    function hzOpen() { var h = hzSheet(); return !!(h && h.style.display !== 'none'); }
-    function openHazards() { var h = hzSheet(); if (!h || !S) return; closeMenus(); h.style.display = ''; fillHazards(); }
-    function closeHazards() { var h = hzSheet(); if (h) h.style.display = 'none'; }
-    function fillHazards() {
-        var h = hzSheet();
-        if (!h || !S || !G.hazardRows) return;
-        var u = units(), sfx = u === 'm' ? ' m' : '', d = function (m) { return G.shownDistance(m, u); };
-        var rec = osmRecord(S.courseKey), hr = rec && rec.holes && rec.holes[String(S.hole)];
-        var hz = (hr && hr.osm && hr.osm.hazards) || [];
-        var r = resolved(), o = origin(r);
-        var who = o && o.from === 'tee' ? 'from the tee' : 'from you';
-        h.querySelector('.gps-hzs-title').textContent = 'Hazards \u00b7 Hole ' + S.hole;
-        h.querySelector('.gps-hzs-sub').textContent = !o ? 'Finding you\u2026' : (u === 'm' ? 'Meters ' : 'Yards ') + who;
-        var list = h.querySelector('.gps-hzs-list'), lay = h.querySelector('.gps-hzs-lay');
-        list.textContent = ''; lay.textContent = '';
-        var row = function (box, cls, name, nums) {
-            var e = document.createElement('div'); e.className = 'gps-hzs-row ' + cls;
-            var a = document.createElement('span'); a.className = 'gps-hzs-name'; a.textContent = name;
-            var b = document.createElement('span'); b.className = 'gps-hzs-nums'; b.textContent = nums;
-            e.appendChild(a); e.appendChild(b); box.appendChild(e);
-        };
-        if (!hz.length) {
-            var none = document.createElement('div'); none.className = 'gps-hzs-none';
-            none.textContent = 'No hazard data for this hole.';
-            list.appendChild(none);
-        } else if (o) {
-            G.hazardRows(o.pt, hz, r && r.mid).forEach(function (z) {
-                var cls = z.type === 'w' ? 'gps-hzs-water' : 'gps-hzs-bunker';
-                if (z.behind) row(list, cls + ' gps-hzs-behind', z.name, 'behind ' + (o.from === 'tee' ? 'the tee' : 'you'));
-                else row(list, cls, z.name, 'reach ' + d(z.reachM) + sfx + ' \u00b7 carry ' + (z.carryM == null ? '\u2014' : d(z.carryM) + sfx));
-            });
-        }
-        var lf = h.querySelector('.gps-hzs-layfrom');
-        if (layupSwitch() && G.layupFromYou) { fillLayups(h, lay, lf, r, o, hz, row); return; }
-        if (lf) lf.style.display = 'none';
-        var toGreen = o && r && r.mid ? G.haversineMeters(o.pt, r.mid) : null;
-        var lays = toGreen ? G.layupTargets(toGreen, u === 'm' ? 1 : G.M_PER_YD) : [];
-        h.querySelector('.gps-hzs-layh').style.display = lays.length ? '' : 'none';
-        lays.forEach(function (l) { row(lay, 'gps-hzs-layup', 'Lay up to ' + l.leave + sfx, '= ' + d(l.fromM) + sfx + ' ' + who); });
-    }
-    // ---- LAYUPS FROM YOU (014, switch layupFromYou) ----------------------------------
-    // Each layup row is the SHOT from the golfer's spot: "Lay up to 100 → hit 135 · 9i"
-    // (gps-geo.layupFromYou). The shot is plays-like'd the way the main number is (the same
-    // wind / temperature / altitude baseline - playsAir - and the heights already on the
-    // phone); the club is My bag's, else the bag setup's carries for the golfer's handicap.
-    // Only shots from ~40 yds to their longest carry + 5%; "Lay up short of [hazard]" rows
-    // when the hole has hazard points. On the tee box, or nothing fits from their spot: from
-    // the target ring ("From your target (223)"). Tournament mode: raw yards, no club, no
-    // plays-like. Worked out on the phone; nothing is fetched, stored or sent from here.
-    // Off: the 008 rows ("Lay up to 100 = 164 from you").
-    function layupSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('layupFromYou') !== false; } catch (e) { return true; } }
-    // { bag: { club: { yd } }, own } - My bag when it has a number, else the setup's defaults.
-    function layupCarries(B, useBag) {
-        var b = useBag ? bagNow(B) : null;
-        if (b && Object.keys(b).length) return { bag: b, own: true };
-        var dc = B.defaultCarries(bagHcp()), out = {};
-        Object.keys(dc).forEach(function (c) { out[c] = { yd: dc[c] }; });
-        return { bag: out, own: false };
-    }
-    function fillLayups(h, lay, lf, r, o, hz, row) {
-        var u = units(), m = u === 'm', sfx = m ? ' m' : '', d = function (x) { return G.shownDistance(x, u); };
-        var head = h.querySelector('.gps-hzs-layh');
-        if (!o || !r || !r.mid) { head.style.display = 'none'; if (lf) lf.style.display = 'none'; return; }
-        var B = bagApi();
-        if (!B && !S.layLoad) { S.layLoad = true; withShots(function () { if (hzOpen()) fillHazards(); }); }
-        var tq = tournament(), clubs = !tq && bagSwitch() && !!B;
-        var cs = B ? layupCarries(B, clubs) : null, maxYd = null;
-        if (cs) Object.keys(cs.bag).forEach(function (c) { var y = cs.bag[c] && cs.bag[c].yd; if (y > 0 && (maxYd == null || y > maxYd)) maxYd = y; });
-        var pl = !tq && S.pro && S.mode === 'measure' && inUS(r.mid);
-        var plan = G.layupFromYou({ from: { pt: o.pt, kind: o.from }, tee: r.tee, target: S.target, green: r.mid, hazards: hz, unitM: m ? 1 : G.M_PER_YD, maxYd: maxYd,
-            air: pl ? playsAir(effectiveWind(), r) : null, fromFt: pl ? originElev(r, o) : null, elevAt: pl ? function (p) { return ptElev(r, p); } : null });
-        head.style.display = '';
-        if (lf) {
-            lf.textContent = plan.from === 'target' ? 'From your target (' + d(plan.fromM) + sfx + ')' : plan.from === 'tee' ? 'From the tee' : 'From you';
-            lf.style.display = '';
-        }
-        lay.setAttribute('data-from', plan.from);
-        if (!plan.rows.length) {
-            var none = document.createElement('div'); none.className = 'gps-hzs-none gps-hzs-laynone';
-            none.textContent = plan.near ? 'Close enough to go at the green.' : 'Too far to lay up yet. This updates after your next shot.';
-            lay.appendChild(none);
-            return;
-        }
-        plan.rows.forEach(function (x) {
-            var hit = Math.round(x.needYd * (m ? G.M_PER_YD : 1));
-            var sg = clubs && cs ? B.suggestClub(cs.bag, x.needYd) : null;
-            row(lay, 'gps-hzs-layup' + (x.kind === 'hazard' ? ' gps-hzs-layhz' : ''), x.name + (x.kind === 'leave' ? sfx : ''),
-                '\u2192 hit ' + hit + sfx + (sg ? ' \u00b7 ' + ((B.SHORT && B.SHORT[sg.club]) || sg.club) : ''));
-        });
-    }
     // ---- DISTANCE ARCS + TEE PLAN (URGENT-052 A, 2026-10-21) -------------------------
     // "Distance arcs" (GPS tools; OFF by default, remembered per golfer on this phone): thin arcs
     // where the golfer's clubs LAND in today's wind (gps-arcs-plan.js: their carries, wind-adjusted
@@ -880,6 +754,132 @@
             list.appendChild(box);
         });
         line('gps-tplan-foot', '“In play” = the club lands from ' + n(A.IN_PLAY_SHORT_YD) + sfx + ' short of a hazard’s near edge to its far edge (a hazard with one point: ' + n(A.ONE_POINT_YD) + sfx + ' either side). Hazards: this hole’s hazard points. Worked out on this phone; nothing is sent.');
+    }
+    // HAZARD CARRIES (GolfAPI courses): each bunker / water point on this hole, with
+    // the distance to it from you (or the tee), at the point. Past the green or
+    // behind you: not shown.
+    function drawHazards() {
+        var keep = {};
+        var rec = osmRecord(S.courseKey), h = rec && rec.holes && rec.holes[String(S.hole)];
+        var hz = (h && h.osm && h.osm.hazards) || [];
+        var r = resolved(), o = r && origin(r);
+        if (S.map && ML() && S.mode === 'measure' && o && r && r.mid && hz.length) {
+            var toGreen = G.haversineMeters(o.pt, r.mid), dir = G.bearingDeg(o.pt, r.mid);
+            hz.forEach(function (z, i) {
+                var d = G.haversineMeters(o.pt, z.pt);
+                var off = Math.abs((((G.bearingDeg(o.pt, z.pt) - dir) % 360) + 540) % 360 - 180);
+                if (d > toGreen + 25 || off > 75) return;
+                var k = 'hz' + i;
+                keep[k] = 1;
+                var m = marker(k, z.pt, function () {
+                    var e = document.createElement('div');
+                    e.className = 'gps-hz ' + (z.type === 'w' ? 'gps-hz-water' : 'gps-hz-bunker');
+                    return e;
+                });
+                var t = (z.type === 'w' ? 'W ' : 'B ') + G.shownDistance(d, units());
+                var el = m && m.getElement();
+                if (el && el.textContent !== t) el.textContent = t;
+            });
+        }
+        Object.keys(S.markers || {}).forEach(function (k) { if (/^hz/.test(k) && !keep[k]) marker(k, null); });
+    }
+    // ---- HAZARDS + LAYUPS SHEET (008, switch hazards) --------------------------------
+    // "Hazards" on the map: every hazard GolfAPI marks on this hole, with REACH (its near
+    // edge) and CARRY (its far edge) from the golfer - or from the tee, off the hole - and
+    // the layups: "Lay up to 100 = 164 from you" (50 / 75 / 100 / 125 / 150, only those
+    // short of the green). The points the app already has (gps-geo.hazardRows); nothing is
+    // fetched. Redrawn on every fix while it is open. A hole with no hazard data says so.
+    function hzSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('hazards') !== false; } catch (e) { return true; } }
+    function hzSheet() { return S && S.el.querySelector('.gps-hzs'); }
+    function hzOpen() { var h = hzSheet(); return !!(h && h.style.display !== 'none'); }
+    function openHazards() { var h = hzSheet(); if (!h || !S) return; closeMenus(); h.style.display = ''; fillHazards(); }
+    function closeHazards() { var h = hzSheet(); if (h) h.style.display = 'none'; }
+    function fillHazards() {
+        var h = hzSheet();
+        if (!h || !S || !G.hazardRows) return;
+        var u = units(), sfx = u === 'm' ? ' m' : '', d = function (m) { return G.shownDistance(m, u); };
+        var rec = osmRecord(S.courseKey), hr = rec && rec.holes && rec.holes[String(S.hole)];
+        var hz = (hr && hr.osm && hr.osm.hazards) || [];
+        var r = resolved(), o = origin(r);
+        var who = o && o.from === 'tee' ? 'from the tee' : 'from you';
+        h.querySelector('.gps-hzs-title').textContent = 'Hazards \u00b7 Hole ' + S.hole;
+        h.querySelector('.gps-hzs-sub').textContent = !o ? 'Finding you\u2026' : (u === 'm' ? 'Meters ' : 'Yards ') + who;
+        var list = h.querySelector('.gps-hzs-list'), lay = h.querySelector('.gps-hzs-lay');
+        list.textContent = ''; lay.textContent = '';
+        var row = function (box, cls, name, nums) {
+            var e = document.createElement('div'); e.className = 'gps-hzs-row ' + cls;
+            var a = document.createElement('span'); a.className = 'gps-hzs-name'; a.textContent = name;
+            var b = document.createElement('span'); b.className = 'gps-hzs-nums'; b.textContent = nums;
+            e.appendChild(a); e.appendChild(b); box.appendChild(e);
+        };
+        if (!hz.length) {
+            var none = document.createElement('div'); none.className = 'gps-hzs-none';
+            none.textContent = 'No hazard data for this hole.';
+            list.appendChild(none);
+        } else if (o) {
+            G.hazardRows(o.pt, hz, r && r.mid).forEach(function (z) {
+                var cls = z.type === 'w' ? 'gps-hzs-water' : 'gps-hzs-bunker';
+                if (z.behind) row(list, cls + ' gps-hzs-behind', z.name, 'behind ' + (o.from === 'tee' ? 'the tee' : 'you'));
+                else row(list, cls, z.name, 'reach ' + d(z.reachM) + sfx + ' \u00b7 carry ' + (z.carryM == null ? '\u2014' : d(z.carryM) + sfx));
+            });
+        }
+        var lf = h.querySelector('.gps-hzs-layfrom');
+        if (layupSwitch() && G.layupFromYou) { fillLayups(h, lay, lf, r, o, hz, row); return; }
+        if (lf) lf.style.display = 'none';
+        var toGreen = o && r && r.mid ? G.haversineMeters(o.pt, r.mid) : null;
+        var lays = toGreen ? G.layupTargets(toGreen, u === 'm' ? 1 : G.M_PER_YD) : [];
+        h.querySelector('.gps-hzs-layh').style.display = lays.length ? '' : 'none';
+        lays.forEach(function (l) { row(lay, 'gps-hzs-layup', 'Lay up to ' + l.leave + sfx, '= ' + d(l.fromM) + sfx + ' ' + who); });
+    }
+    // ---- LAYUPS FROM YOU (014, switch layupFromYou) ----------------------------------
+    // Each layup row is the SHOT from the golfer's spot: "Lay up to 100 → hit 135 · 9i"
+    // (gps-geo.layupFromYou). The shot is plays-like'd the way the main number is (the same
+    // wind / temperature / altitude baseline - playsAir - and the heights already on the
+    // phone); the club is My bag's, else the bag setup's carries for the golfer's handicap.
+    // Only shots from ~40 yds to their longest carry + 5%; "Lay up short of [hazard]" rows
+    // when the hole has hazard points. On the tee box, or nothing fits from their spot: from
+    // the target ring ("From your target (223)"). Tournament mode: raw yards, no club, no
+    // plays-like. Worked out on the phone; nothing is fetched, stored or sent from here.
+    // Off: the 008 rows ("Lay up to 100 = 164 from you").
+    function layupSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('layupFromYou') !== false; } catch (e) { return true; } }
+    // { bag: { club: { yd } }, own } - My bag when it has a number, else the setup's defaults.
+    function layupCarries(B, useBag) {
+        var b = useBag ? bagNow(B) : null;
+        if (b && Object.keys(b).length) return { bag: b, own: true };
+        var dc = B.defaultCarries(bagHcp()), out = {};
+        Object.keys(dc).forEach(function (c) { out[c] = { yd: dc[c] }; });
+        return { bag: out, own: false };
+    }
+    function fillLayups(h, lay, lf, r, o, hz, row) {
+        var u = units(), m = u === 'm', sfx = m ? ' m' : '', d = function (x) { return G.shownDistance(x, u); };
+        var head = h.querySelector('.gps-hzs-layh');
+        if (!o || !r || !r.mid) { head.style.display = 'none'; if (lf) lf.style.display = 'none'; return; }
+        var B = bagApi();
+        if (!B && !S.layLoad) { S.layLoad = true; withShots(function () { if (hzOpen()) fillHazards(); }); }
+        var tq = tournament(), clubs = !tq && bagSwitch() && !!B;
+        var cs = B ? layupCarries(B, clubs) : null, maxYd = null;
+        if (cs) Object.keys(cs.bag).forEach(function (c) { var y = cs.bag[c] && cs.bag[c].yd; if (y > 0 && (maxYd == null || y > maxYd)) maxYd = y; });
+        var pl = !tq && S.pro && S.mode === 'measure' && inUS(r.mid);
+        var plan = G.layupFromYou({ from: { pt: o.pt, kind: o.from }, tee: r.tee, target: S.target, green: r.mid, hazards: hz, unitM: m ? 1 : G.M_PER_YD, maxYd: maxYd,
+            air: pl ? playsAir(effectiveWind(), r) : null, fromFt: pl ? originElev(r, o) : null, elevAt: pl ? function (p) { return ptElev(r, p); } : null });
+        head.style.display = '';
+        if (lf) {
+            lf.textContent = plan.from === 'target' ? 'From your target (' + d(plan.fromM) + sfx + ')' : plan.from === 'tee' ? 'From the tee' : 'From you';
+            lf.style.display = '';
+        }
+        lay.setAttribute('data-from', plan.from);
+        if (!plan.rows.length) {
+            var none = document.createElement('div'); none.className = 'gps-hzs-none gps-hzs-laynone';
+            none.textContent = plan.near ? 'Close enough to go at the green.' : 'Too far to lay up yet. This updates after your next shot.';
+            lay.appendChild(none);
+            return;
+        }
+        plan.rows.forEach(function (x) {
+            var hit = Math.round(x.needYd * (m ? G.M_PER_YD : 1));
+            var sg = clubs && cs ? B.suggestClub(cs.bag, x.needYd) : null;
+            row(lay, 'gps-hzs-layup' + (x.kind === 'hazard' ? ' gps-hzs-layhz' : ''), x.name + (x.kind === 'leave' ? sfx : ''),
+                '\u2192 hit ' + hit + sfx + (sg ? ' \u00b7 ' + ((B.SHORT && B.SHORT[sg.club]) || sg.club) : ''));
+        });
     }
     function drawHoleAsk() {
         var want = S.holeAsk || [];
