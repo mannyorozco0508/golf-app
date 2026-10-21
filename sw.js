@@ -4761,6 +4761,8 @@ const SHELL_FILES = [
     './simple-flow.js',
     // Settle up with Venmo / Cash App on the Results page (2.1 part D).
     './venmo-pay.js',
+    // URGENT-048: HardPanAuth - sign-in state + profile over the existing sign-in flows.
+    './hp-auth.js',
     // URGENT-045 #4: the round recap as one picture (the Receipt's Share recap).
     './round-recap.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).

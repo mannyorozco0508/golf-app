@@ -581,6 +581,9 @@
         }, function () { return null; });
     }
     function meName() {
+        // URGENT-048: the name typed in Profile (hp-auth.js; the Range's own key) comes first.
+        var typed = String(ls('hardpan_my_name') || '').replace(/\s+/g, ' ').trim();
+        if (typed) return typed.split(' ')[0];
         var a = W.authBootState || {};
         var n = a.displayName || a.name || (W.firebase && W.firebase.auth && (function () { try { var u = W.firebase.auth().currentUser; return u && u.displayName; } catch (e) { return null; } })());
         return n ? String(n).split(' ')[0] : 'Me';
@@ -605,6 +608,8 @@
                 if (!best || (o.at || 0) > best.at) best = { at: o.at || 0, h: h };
             }
         } catch (e) {}
+        // URGENT-048: the handicap typed in Profile (hp-auth.js, { h, at }) wins over an older round.
+        try { var P = JSON.parse(ls('hardpan_my_hcp') || 'null'); if (P && P.h != null && String(P.h) !== '' && (!best || (Number(P.at) || 0) >= best.at)) best = { at: Number(P.at) || 0, h: String(P.h) }; } catch (e) {}
         if (best) return best.h;
         try { var I = W.HardPanIndex && W.HardPanIndex.current ? W.HardPanIndex.current() : null; if (I && I.text) return String(I.text); } catch (e) {}
         return '';
