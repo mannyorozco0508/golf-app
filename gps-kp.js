@@ -214,16 +214,19 @@
     }
     function measure(pos, c) {
         var h = Number(c.hole), g = golfer(c);
-        if (!g) return { error: 'Pick your golfer first' };
-        if (st.ball && st.ball.pid === g.id && st.ball.hole === h) {
-            // The second tap, at the cup: the cup for this hole (this phone, memory only), then the distance.
+        if (st.ball && st.ball.hole === h) {
+            // The second tap, at the cup: the cup for this hole (this phone, memory only), then the distance
+            // - for the golfer whose ball it is, whoever the screen shows now.
             cups[keyOf(h)] = { pt: [pos.pt[0], pos.pt[1]], acc: pos.acc, at: Date.now() };
             var ball = st.ball; st.ball = null;
-            return distanceOf(ball, cups[keyOf(h)], g);
+            return distanceOf(ball, cups[keyOf(h)], ball.golfer);
         }
+        if (!g) return { error: 'Pick your golfer first' };
+        st.note = '';
         var cup = cupFor(h);
         if (!cup) {
-            st.ball = { pid: g.id, hole: h, pt: [pos.pt[0], pos.pt[1]], acc: pos.acc };
+            st.ball = { pid: g.id, golfer: g, hole: h, pt: [pos.pt[0], pos.pt[1]], acc: pos.acc };
+            st.note = g.name + '’s ball is marked - now the cup';
             return { pending: 'Ball marked. Now stand at the cup and tap “Cup is here”' };
         }
         st.ball = null;
@@ -284,7 +287,7 @@
         id: 'kp', listName: 'KP results',
         when: function (c) { return isKpHole(data(), c.hole); },
         label: function (c) { return st.ball && st.ball.hole === Number(c.hole) ? '⛳ Cup is here' : '⛳ Mark my KP'; },
-        canMark: function (c) { var g = golfer(c); if (!g) return 'Pick your golfer first'; if (!mayWriteFor(g.id)) return 'Only a golfer in your group can be marked from this phone'; return null; },
+        canMark: function (c) { if (st.ball && st.ball.hole === Number(c.hole)) return null; var g = golfer(c); if (!g) return 'Pick your golfer first'; if (!mayWriteFor(g.id)) return 'Only a golfer in your group can be marked from this phone'; return null; },
         measure: measure, onMark: onMark, sheet: sheet, onAction: onAction,
         count: function (c) { return marksOf(data(), c.hole).length || null; },
         onHole: function () { st.ball = null; st.note = ''; }

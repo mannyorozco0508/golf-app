@@ -180,6 +180,16 @@ test('closest wins: a second golfer farther away changes nothing; the cup is reu
     assert.equal(last.v['kpWinners/h2'], '2');
     assert.equal(last.v['kpLeaders/h2'].distanceInches, 39);
 });
+test('"Cup is here" finishes the ball\'s golfer\'s mark, even if the screen\'s golfer changed in between', () => {
+    const d = round();
+    const P = page(d, { group: 1 });
+    P.at(2, 1); P.stand(BALL2); P.tap();
+    P.at(2, 2); P.stand(CUP); P.tap();
+    assert.ok(d.kpGps.h2.marks['1'], 'Alpha\'s mark');
+    assert.equal(d.kpGps.h2.marks['1'].inches, 236);
+    assert.equal(d.kpGps.h2.marks['2'], undefined);
+    assert.equal(P.K.state().pendingBall, false);
+});
 test('a typed KP with no distance is not overruled by GPS; a mark from another group is refused on this phone', () => {
     const d = round({ kpLeaders: { h2: { playerId: '3', playerName: 'Test Charlie', distanceInches: null, updatedAt: 1 } }, kpWinners: { h2: '3' } });
     const P = page(d, { group: 1 });
