@@ -138,7 +138,7 @@ test('gps-view feeds the decision from the map\'s own fix: no new watcher; manua
     const v = read('gps-view.js');
     const a = v.indexOf('    function aaTick() {'), b = v.indexOf('\n    function ', a + 30);
     const tick = v.slice(a, b);
-    assert.ok(/G\.autoAdvanceDecision\(\{/.test(tick) && /me: fix \? fix\.pt : null/.test(tick), 'the tick asks gps-geo, with the existing fix');
+    assert.ok(/G\.autoAdvanceDecision\(\{/.test(tick) && /me: lf \? lf\.pt : null/.test(tick) && /if \(fix && fix\.pt\) S\.aaLast = /.test(tick), 'the tick asks gps-geo, with the existing fix (kept 30 s for a phone standing still)');
     assert.ok(!/watchPosition|getCurrentPosition|setInterval/.test(tick), 'no new GPS watcher or timer loop');
     assert.equal((v.match(/watchPosition\(/g) || []).length, 2, 'still the one watch (Capacitor / web paths), as before');
     assert.ok(/if \(!S\.aaMoving\) S\.aaManualAt = Date\.now\(\);/.test(v), 'a hole change not made by auto-advance is manual');

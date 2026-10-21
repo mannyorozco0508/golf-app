@@ -5082,7 +5082,7 @@
     // (gps-geo.onNextTee). Tools > "Auto-advance holes" turns it off on this phone
     // (hardpan_gps_autoadvance = '0'); the switch off = none of it exists.
     // PRIVACY: the position is compared, never stored - only the On / Off choice is.
-    var AA_KEY = 'hardpan_gps_autoadvance', AA_TOAST_MS = 8000;   // the wait (~10 s) and the 2-min hold: gps-geo AA_DWELL_MS / AA_HOLD_MS
+    var AA_KEY = 'hardpan_gps_autoadvance', AA_TOAST_MS = 8000, AA_FIX_OK_MS = 30000;   // the wait (~10 s) and the 2-min hold: gps-geo AA_DWELL_MS / AA_HOLD_MS
     function aaSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('autoAdvance') !== false; } catch (e) { return true; } }
     function aaOn() { if (!aaSwitch()) return false; try { return localStorage.getItem(AA_KEY) !== '0'; } catch (e) { return true; } }
     function aaHoleRec(n) {
@@ -5104,13 +5104,18 @@
     function aaSheetOpen() { try { var ss = window.HardPanGpsStats && window.HardPanGpsStats.sheet; return !!(ss && ss.isOpen && ss.isOpen()); } catch (e) { return false; } }
     function aaTick() {
         if (!S || !G || !G.autoAdvanceDecision) return;
+        // A phone standing still on the tee may stop reporting: the map drops a fix after 10 s
+        // (FIX_STALE_MS, the same as the wait), so auto-advance keeps the last one for 30 s.
+        // In memory only, for this comparison - never stored or sent.
+        if (fix && fix.pt) S.aaLast = { pt: fix.pt, acc: fix.acc, at: fix.at || Date.now() };
         dropStaleFix();
-        var cur = resolved(), nums = cur && fix ? G.holeNumbers(fix.pt, cur) : null;
+        var lf = fix || (S.aaLast && Date.now() - S.aaLast.at <= AA_FIX_OK_MS ? S.aaLast : null);
+        var cur = resolved(), nums = cur && lf ? G.holeNumbers(lf.pt, cur) : null;
         var vis = true; try { vis = document.visibilityState !== 'hidden'; } catch (e) {}
         var on = aaOn() && typeof S.holeList === 'function';
         var d = G.autoAdvanceDecision({
             on: on, visible: vis, hole: S.hole, order: on ? (S.holeList() || []) : [],
-            me: fix ? fix.pt : null, acc: fix ? fix.acc : null,
+            me: lf ? lf.pt : null, acc: lf ? lf.acc : null,
             teeOf: function (n) { var r = aaHoleRec(n); return r ? r.tee : null; },
             green: cur && cur.mid, onGreen: !!(nums && nums.onGreen),
             sheetOpen: aaSheetOpen(), busy: aaBusy(), now: Date.now(),
@@ -6792,6 +6797,8 @@
         // 012 part 4: both legs - { toTarget, toGreen: { yards, plays, unit, text: '60 · plays 63' } | null, single, par3 }.
         playsLegs: function () { try { return playsLegsOut(); } catch (e) { return null; } },
         hole: function () { return S ? Number(S.hole) : null; },
+        // URGENT-045: why auto-advance did / did not move (tests, the sim) - no position in it.
+        aaState: function () { return S ? { on: aaOn(), reason: S.aaReason || null, armed: !!S.aaArmed, dwell: S.aaDwell ? S.aaDwell.hole : null, manualAgoMs: S.aaManualAt ? Date.now() - S.aaManualAt : null, holdMs: S.aaHoldUntil ? Math.max(0, S.aaHoldUntil - Date.now()) : 0 } : null; },
         // 022: which view the map is in - 'hole' or 'green' (the approach).
         screenView: function () { return S ? S.view || null : null; },
         // 022 Sun mode: the setting, whether it is on now, and the daylight maths (pure, for tests).

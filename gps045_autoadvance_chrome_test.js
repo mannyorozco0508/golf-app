@@ -8,6 +8,7 @@
 //      HOLE 1 (no score yet) over the map - "An earlier hole - Save goes back to hole 2";
 //   3  Undo: back on hole 1, and standing on hole 2's tee does NOT switch again (2-min hold);
 //   4  a score for hole 1 already in: the switch happens, no sheet;
+//   4b standing still on the tee (one fix, then none - the map drops it after 10 s): it still switches;
 //   5  PRIVACY: no coordinate of the walk is in localStorage, sessionStorage or the database.
 // Screenshots into $SHOTS_045AA (if set).
 // ============================================================================
@@ -46,7 +47,7 @@ const CFG = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG'
 const GEO = (p) => "(function(){ var cur = { lat: " + p[0] + ", lng: " + p[1] + " }, live = {}, n = 1;"
     + " window.__moveTo = function (la, ln) { cur = { lat: la, lng: ln }; Object.keys(live).forEach(function (id) { live[id](); }); return 'moved'; };"
     + " try { Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { watchPosition: function (ok) { var id = n++; var f = function () { ok({ coords: { latitude: cur.lat, longitude: cur.lng, accuracy: 5 }, timestamp: Date.now() }); };"
-    + " live[id] = f; var t = setInterval(function () { if (live[id]) f(); else clearInterval(t); }, 1000); setTimeout(f, 50); return id; }, getCurrentPosition: function (ok) { ok({ coords: { latitude: cur.lat, longitude: cur.lng, accuracy: 5 }, timestamp: Date.now() }); }, clearWatch: function (id) { delete live[id]; } } }); } catch (e) {} })();";
+    + " live[id] = f; var t = setInterval(function () { if (window.__still) return; if (live[id]) f(); else clearInterval(t); }, 1000); setTimeout(f, 50); return id; }, getCurrentPosition: function (ok) { ok({ coords: { latitude: cur.lat, longitude: cur.lng, accuracy: 5 }, timestamp: Date.now() }); }, clearWatch: function (id) { delete live[id]; } } }); } catch (e) {} })();";
 const ERR = "window.__e=[];addEventListener('error',function(e){window.__e.push(String(e.message)+' @'+(e.filename||'').split('/').pop()+':'+e.lineno)});";
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 const ST = "JSON.stringify({ hole: HardPanGps.hole(), side: HardPanGps.side(),"
@@ -126,6 +127,14 @@ for (const view of VIEWS) {
             assert.ok(dump.indexOf(k) === -1, 'the golfer\'s coordinate ' + v + ' was stored');
         }
         assert.ok(checked >= 3 && dump.length > 50, 'the guard looked at something: ' + checked);
+    });
+
+    test(view.tag + ': standing still on the tee (the phone reports once, then goes quiet - the Simulator, a still phone): it still switches', { timeout: 90000 }, async () => {
+        await open(view, { p101_h1: 4 });
+        await ev(MOVE(G1)); await sleep(2500);
+        await ev('window.__still = true; ' + MOVE(OFF_T2));
+        assert.ok(await until('HardPanGps.hole() === 2', 16000), 'switched to hole 2: ' + await ev('JSON.stringify(HardPanGps.aaState())'));
+        assert.equal((await st()).toast, 'Hole 2 \u2192 Undo');
     });
 
     test(view.tag + ': hole 1 already scored -> the switch, no sheet', { timeout: 90000 }, async () => {
