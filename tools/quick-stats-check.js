@@ -10,8 +10,8 @@
 //      putts 2 and fairway Hit under that golfer's box (real taps): GIR is worked out
 //      ("GIR ✓"), the score box was never blurred by the taps, and the hole's stats
 //      are on the phone (hardpan_qstats_v1_<code>_p<id>) - not in the database.
-//      Then Round Menu -> My stats shows putts / round 36.0, FIR 100%, GIR 100%, the
-//      par-4 average; Last 20 switches.
+//      Then Round Menu -> My stats shows the 1-hole sample (036 #37): 2 putts, FIR 1 of 1,
+//      GIR 1 of 1, each "from 1 hole" - never putts / round 36.0 or 100%; Last 20 switches.
 //   2. The switch off (features.quickStats false): no controls, no My stats.
 //   3. No GPS Map: no controls, no My stats - and no paywall on the card.
 //   4. Home (the app): a subscriber sees My stats, and it adds up the rounds on the phone;
@@ -69,7 +69,7 @@ const CARD = `JSON.stringify((function () {
 })())`;
 const MY = `JSON.stringify((function () {
   var p = document.getElementById('hp-my-stats');
-  var t = {}; if (p) Array.prototype.forEach.call(p.querySelectorAll('[data-ms]'), function (x) { t[x.getAttribute('data-ms')] = x.querySelector('.v').textContent; });
+  var t = {}; if (p) Array.prototype.forEach.call(p.querySelectorAll('[data-ms]'), function (x) { t[x.getAttribute('data-ms')] = x.querySelector('.v').textContent; var s = x.querySelector('.s'); if (s) t[x.getAttribute('data-ms') + 'From'] = s.textContent; });
   var on = p && p.querySelector('.ms-seg .on');
   return { open: !!(p && p.style.display !== 'none' && p.getBoundingClientRect().height > 0), tiles: t, last: on ? on.textContent : null,
     note: p ? (p.querySelector('.ms-note') || {}).textContent : null,
@@ -124,9 +124,9 @@ const BLUR = EVAL("(function(){ var i = document.activeElement; if (i && i.class
     f(c2 && !c2.writes.some((w) => /stats/.test(w)), 'stats were written to the database: ' + JSON.stringify(c2 && c2.writes));
     f(m1 && m1.open, 'Round Menu -> My stats did not open: ' + JSON.stringify(m1));
     f(m1 && m1.saved === 'Saved on this phone', 'My stats does not say "Saved on this phone": ' + JSON.stringify(m1 && m1.saved));
-    f(m1 && m1.last === 'Last 5' && m1.tiles.putts === '36.0' && m1.tiles.fir === '100%' && m1.tiles.gir === '100%' && m1.tiles.par4 === (c2 && /Par 4/.test(c2.par) ? '4.00' : m1.tiles.par4), 'My stats numbers: ' + JSON.stringify(m1 && m1.tiles));
+    f(m1 && m1.last === 'Last 5' && m1.tiles.putts === '2 putts' && m1.tiles.puttsFrom === 'from 1 hole' && m1.tiles.fir === '1 of 1' && m1.tiles.firFrom === 'from 1 hole' && m1.tiles.gir === '1 of 1' && m1.tiles.girFrom === 'from 1 hole' && m1.tiles.par4 === (c2 && /Par 4/.test(c2.par) ? '4.00' : m1.tiles.par4), 'My stats numbers: ' + JSON.stringify(m1 && m1.tiles));
     f(m1 && m1.tiles.avg === '—', 'scoring average from a 1-hole round: ' + (m1 && m1.tiles.avg));
-    f(m2 && m2.last === 'Last 20' && m2.tiles.putts === '36.0', 'Last 20: ' + JSON.stringify(m2));
+    f(m2 && m2.last === 'Last 20' && m2.tiles.putts === '2 putts', 'Last 20: ' + JSON.stringify(m2));
     [c0, c1, c2, m1].forEach((s, i) => s && clean('subscriber[' + i + ']', s));
 
     // ---- 1b. WHOSE STATS LINE (URGENT-005) -----------------------------------------------
@@ -182,12 +182,14 @@ const BLUR = EVAL("(function(){ var i = document.activeElement; if (i && i.class
         PARS.forEach((p, k) => { snap[k + 1] = { s: p + (d === 1 ? 1 : (k % 2 ? 1 : 0)), par: p }; holes[k + 1] = Object.assign({ putts: 2 }, p >= 4 ? { fw: 'hit' } : {}); });
         return "localStorage.setItem('hardpan_qstats_v1_" + c + "_p101', " + JSON.stringify(JSON.stringify({ v: 1, code: c, pid: '101', course: 'X', at, me: true, holes, snap })) + ");";
     }).join('');
-    const HOME = `JSON.stringify((function () { var b = document.querySelector('[data-hp-mystats]'); var pw = document.getElementById('gps-paywall');
-      return { btn: !!b, shown: !!(b && b.getBoundingClientRect().height > 0), pw: !!(pw && pw.style.display !== 'none'), view: (document.querySelector('.hp-view.on') || {}).id || null, e: window.__e }; })())`;
-    const [h0, hm] = J(await go({ url: fileUrl('home.html'), pre: 'try{' + seed + '}catch(e){}', steps: [{ sleep: 800 }, EVAL(HOME), { tap: '.hp-view.on [data-hp-mystats]' }, { sleep: 500 }, EVAL(MY)] }));
+    // Home's My stats is the "More" line's link (data-hp-act="sstats") since the 2.0 Home; the old
+    // [data-hp-mystats] row is placed but hidden. btn = that GPS-gated row (absent without GPS Map).
+    const HOME = `JSON.stringify((function () { var b = document.querySelector('[data-hp-mystats]'), l = document.querySelector('.hp-view.on [data-hp-act="sstats"]'); var pw = document.getElementById('gps-paywall');
+      return { btn: !!b, shown: !!(b && b.getBoundingClientRect().height > 0) || !!(l && l.getBoundingClientRect().height > 0), pw: !!(pw && pw.style.display !== 'none'), view: (document.querySelector('.hp-view.on') || {}).id || null, e: window.__e }; })())`;
+    const [h0, hm] = J(await go({ url: fileUrl('home.html'), pre: 'try{' + seed + '}catch(e){}', steps: [{ sleep: 800 }, EVAL(HOME), { tap: '.hp-view.on [data-hp-act="sstats"]' }, { sleep: 500 }, EVAL(MY)] }));
     f(h0 && h0.shown && !h0.pw, 'Home: My stats not offered to a subscriber: ' + JSON.stringify(h0));
     // 2 rounds: 81 and 72 + 9 = 81? HOMEB is par + 1 on the 9 even-indexed-odd holes: 72 + 9 = 81; HOMEA 72 + 18 = 90.
-    f(hm && hm.open && hm.tiles.avg === '85.5' && hm.tiles.putts === '36.0' && hm.tiles.fir === '100%', 'Home -> My stats numbers: ' + JSON.stringify(hm && hm.tiles));
+    f(hm && hm.open && hm.tiles.avg === '85.5' && hm.tiles.putts === '36.0' && hm.tiles.fir === '100%' && !hm.tiles.puttsFrom && !hm.tiles.firFrom, 'Home -> My stats numbers: ' + JSON.stringify(hm && hm.tiles));
     report.home = hm && hm.tiles;
     if (h0) clean('home', h0);
     const [hn] = J(await go({ url: fileUrl('home.html'), iap: { active: false }, pre: 'try{' + seed + '}catch(e){}', steps: [{ sleep: 800 }, EVAL(HOME)] }));

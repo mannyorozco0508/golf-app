@@ -237,3 +237,61 @@ test('010: My stats says "Saved on this phone" - one small grey line at the top,
     assert.equal(body.children[0], line[0], 'the first line of the page body');
     assert.match(read('gps-stats.js'), /#hp-my-stats \.ms-saved\{font-size:12px;color:#6b7280;margin:4px 2px 0;\}/, 'small and grey, like the notes');
 });
+
+// 036 #37: under 9 holes of data My stats shows the sample ("2 putts", "1 of 1", "from 1 hole"),
+// never a per-round number or a percentage from a hole or two; 9+ holes show as before.
+function myStatsWith(nHoles) {
+    const { createDocument } = require('./helpers/mini-dom.js');
+    const store = {};
+    const holes = {}, snap = {};
+    PARS.slice(0, nHoles).forEach((p, k) => { snap[k + 1] = { s: p, par: p }; holes[k + 1] = Object.assign({ putts: 2 }, p >= 4 ? { fw: 'hit' } : {}); });
+    PARS.slice(nHoles).forEach((p, k) => { snap[nHoles + k + 1] = { s: 0, par: p }; });
+    store['hardpan_qstats_v1_SMP01_p101'] = JSON.stringify({ v: 1, code: 'SMP01', pid: '101', course: 'X', at: 1, me: true, holes, snap });
+    const localStorage = { get length() { return Object.keys(store).length; }, key: (i) => Object.keys(store)[i], getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+    const sb = { localStorage, JSON, Object, Math, Number, String, Date, isFinite, document: createDocument() };
+    sb.window = sb;
+    vm.createContext(sb);
+    vm.runInContext(read('gps-stats.js'), sb);
+    sb.HardPanGpsStats.openMy();
+    const t = {};
+    sb.document.getElementById('hp-my-stats').querySelectorAll('.ms-tile').forEach((x) => {
+        const key = x.getAttribute('data-ms'); if (!key) return;
+        const s = x.querySelector('.s');
+        t[key] = { k: x.querySelector('.k').textContent, v: x.querySelector('.v').textContent, from: s ? s.textContent : null };
+    });
+    return t;
+}
+// The first holes of PARS: 1-4 are par 4s (4 fairways); 9 holes = 2 par 3s, 7 fairways.
+test('036 #37: My stats from 1 hole - the sample, not "36.0 putts / 100% GIR"', { skip }, () => {
+    const t = myStatsWith(1);
+    assert.deepStrictEqual(t.putts, { k: 'Putts', v: '2 putts', from: 'from 1 hole' });
+    assert.deepStrictEqual(t.gir, { k: 'Greens (GIR)', v: '1 of 1', from: 'from 1 hole' });
+    assert.deepStrictEqual(t.fir, { k: 'Fairways (FIR)', v: '1 of 1', from: 'from 1 hole' });
+    assert.deepStrictEqual(t.pph, { k: 'Putts / hole', v: '2.00', from: 'from 1 hole' });
+    assert.deepStrictEqual(t.par4, { k: 'Par 4 average', v: '4.00', from: 'from 1 hole' });
+    assert.strictEqual(t.avg.v, '—'); assert.strictEqual(t.avg.from, null);
+    Object.keys(t).forEach((k) => { assert.ok(!/36\.0|100%/.test(t[k].v), k + ': ' + t[k].v); });
+});
+test('036 #37: My stats from 4 holes - counts and "from 4 holes"', { skip }, () => {
+    const t = myStatsWith(4);
+    assert.deepStrictEqual(t.putts, { k: 'Putts', v: '8 putts', from: 'from 4 holes' });
+    assert.deepStrictEqual(t.gir, { k: 'Greens (GIR)', v: '4 of 4', from: 'from 4 holes' });
+    assert.deepStrictEqual(t.fir, { k: 'Fairways (FIR)', v: '4 of 4', from: 'from 4 holes' });
+});
+test('036 #37: My stats from 9 holes - round-level numbers, as before', { skip }, () => {
+    const t = myStatsWith(9);
+    assert.deepStrictEqual(t.putts, { k: 'Putts / round', v: '36.0', from: null });
+    assert.deepStrictEqual(t.gir, { k: 'Greens (GIR)', v: '100%', from: null });
+    assert.deepStrictEqual(t.pph, { k: 'Putts / hole', v: '2.00', from: null });
+    // 9 holes hold only 7 fairways (2 par 3s): still a 9-hole sample, so a percentage, as today.
+    assert.deepStrictEqual(t.fir, { k: 'Fairways (FIR)', v: '100%', from: null });
+    Object.keys(t).forEach((k) => { assert.strictEqual(t[k].from, null, k); });
+});
+test('036 #37: My stats from 18 holes - exactly as today', { skip }, () => {
+    const t = myStatsWith(18);
+    assert.deepStrictEqual(t.putts, { k: 'Putts / round', v: '36.0', from: null });
+    assert.deepStrictEqual(t.gir, { k: 'Greens (GIR)', v: '100%', from: null });
+    assert.deepStrictEqual(t.fir, { k: 'Fairways (FIR)', v: '100%', from: null });
+    assert.strictEqual(t.avg.v, '72.0');
+    Object.keys(t).forEach((k) => { assert.strictEqual(t[k].from, null, k); });
+});

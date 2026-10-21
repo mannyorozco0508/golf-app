@@ -74,6 +74,8 @@
             puttsPerHole: puttHoles ? sum(function (s) { return s.putts; }) / puttHoles : null,
             fwPct: fwCh ? sum(function (s) { return s.fwHit; }) / fwCh : null,
             girPct: girH ? sum(function (s) { return s.gir; }) / girH : null,
+            // 036 #37: the sample behind each number, so a small one shows as a count.
+            putts: sum(function (s) { return s.putts; }), puttHoles: puttHoles, fwHit: sum(function (s) { return s.fwHit; }), fwChances: fwCh, gir: sum(function (s) { return s.gir; }), girHoles: girH,
             list: rounds.sort(function (a, b) { return (b.at || 0) - (a.at || 0); }),
         };
     }
@@ -111,6 +113,12 @@
     var sheet = null, cur = null;
     function pct(x) { return x == null ? '—' : Math.round(x * 100) + '%'; }
     function num(x, d) { return x == null ? '—' : (Math.round(x * Math.pow(10, d || 0)) / Math.pow(10, d || 0)).toFixed(d || 0); }
+    // 036 #37 (SMALL SAMPLES): under 9 holes of data a stat shows what the data is - a count and
+    // "from N holes" - never a per-round number or a percentage worked out from a hole or two.
+    // Display only: the numbers themselves (aggregate / season) are not changed.
+    var SAMPLE_MIN = 9;
+    function small(n) { return n > 0 && n < SAMPLE_MIN; }
+    function fromHoles(n) { return 'from ' + n + ' hole' + (n === 1 ? '' : 's'); }
     function el(tag, cls, text) { var e = W.document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
     function btn(label, on, fn) { var b = el('button', 'gps-st-btn' + (on ? ' gps-st-on' : ''), label); b.type = 'button'; b.onclick = fn; return b; }
     function close() { if (sheet) sheet.style.display = 'none'; cur = null; }
@@ -181,7 +189,9 @@
         var ss = season();
         body.appendChild(el('h4', null, 'Season · ' + ss.rounds + ' round' + (ss.rounds === 1 ? '' : 's') + ' on this phone'));
         var g2 = el('div', 'gps-st-grid');
-        [['Putts / round', num(ss.puttsPerRound, 1)], ['Putts / hole', num(ss.puttsPerHole, 2)], ['Fairways', pct(ss.fwPct)], ['Greens (GIR)', pct(ss.girPct)]]
+        [['Putts / round', num(ss.puttsPerRound, 1)], ['Putts / hole', small(ss.puttHoles) ? num(ss.puttsPerHole, 2) + ' · ' + fromHoles(ss.puttHoles) : num(ss.puttsPerHole, 2)],
+            ['Fairways', ss.fwChances > 0 && small(Math.max(ss.puttHoles, ss.girHoles, ss.fwChances)) ? ss.fwHit + ' of ' + ss.fwChances + ' · ' + fromHoles(ss.fwChances) : pct(ss.fwPct)],
+            ['Greens (GIR)', small(ss.girHoles) ? ss.gir + ' of ' + ss.girHoles + ' · ' + fromHoles(ss.girHoles) : pct(ss.girPct)]]
             .forEach(function (x) { var d = el('div'); d.appendChild(el('div', 'gps-st-note', x[0])); d.appendChild(el('b', null, String(x[1]))); g2.appendChild(d); });
         body.appendChild(g2);
     }
@@ -380,7 +390,7 @@
             });
         });
         if (o.full) o.scoringAvg = tot / o.full;
-        [3, 4, 5].forEach(function (p) { if (byPar[p][1]) o['par' + p] = byPar[p][0] / byPar[p][1]; });
+        [3, 4, 5].forEach(function (p) { o['par' + p + 'Holes'] = byPar[p][1]; if (byPar[p][1]) o['par' + p] = byPar[p][0] / byPar[p][1]; });
         if (o.puttHoles) { o.puttsPerHole = o.putts / o.puttHoles; o.puttsPerRound = o.puttsPerHole * 18; }
         if (o.firOf) o.firPct = o.fir / o.firOf;
         if (o.girOf) o.girPct = o.gir / o.girOf;
@@ -446,7 +456,7 @@
                 + '#hp-my-stats .ms-body{max-width:520px;margin:0 auto;}#hp-my-stats .ms-seg{display:flex;gap:6px;margin:14px 0 6px;background:#e2f1ea;border-radius:999px;padding:4px;}'
                 + '#hp-my-stats .ms-seg button{flex:1;min-height:40px;border:0;border-radius:999px;background:none;color:#0f4c3a;font:800 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer;}#hp-my-stats .ms-seg button.on{background:#0f4c3a;color:#fff;}'
                 + '#hp-my-stats .ms-note{font-size:13px;color:#555;margin:6px 2px;}#hp-my-stats .ms-saved{font-size:12px;color:#6b7280;margin:4px 2px 0;}#hp-my-stats .ms-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;}'
-                + '#hp-my-stats .ms-tile{background:#fff;border-radius:14px;padding:12px 14px;}#hp-my-stats .ms-tile .k{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#555;}#hp-my-stats .ms-tile .v{font-size:24px;font-weight:800;color:#0f4c3a;margin-top:2px;}'
+                + '#hp-my-stats .ms-tile{background:#fff;border-radius:14px;padding:12px 14px;}#hp-my-stats .ms-tile .k{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#555;}#hp-my-stats .ms-tile .v{font-size:24px;font-weight:800;color:#0f4c3a;margin-top:2px;}#hp-my-stats .ms-tile .s{font-size:13px;font-weight:700;color:#555;margin-top:2px;}'
                 + '#hp-my-stats .ms-miss{display:grid;gap:10px;margin-top:10px;}#hp-my-stats .ms-miss-line{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:4px;color:#555;}#hp-my-stats .ms-miss-c b{font-size:20px;color:#0f4c3a;}'
                 // 020: the rounds behind the numbers (each removable), Start fresh, and the app-drawn question.
                 + '#hp-my-stats .ms-h{font-size:12px;font-weight:800;letter-spacing:.08em;color:#555;margin:18px 2px 8px;}'
@@ -485,9 +495,22 @@
         body.appendChild(seg);
         body.appendChild(el('div', 'ms-note', a.rounds ? (a.rounds + ' round' + (a.rounds === 1 ? '' : 's') + ' on this phone · ' + a.statRounds + ' with putts or fairways') : 'No rounds on this phone yet. Tap putts and fairways under your score on the card.'));
         var g = el('div', 'ms-grid');
-        [['Putts / round', num(a.puttsPerRound, 1), 'putts'], ['Fairways (FIR)', pct(a.firPct), 'fir'], ['Greens (GIR)', pct(a.girPct), 'gir'], ['Scoring average', num(a.scoringAvg, 1), 'avg'],
-            ['Par 3 average', num(a.par3, 2), 'par3'], ['Par 4 average', num(a.par4, 2), 'par4'], ['Par 5 average', num(a.par5, 2), 'par5'], ['Putts / hole', num(a.puttsPerHole, 2), 'pph']]
-            .forEach(function (x) { var t = el('div', 'ms-tile'); t.setAttribute('data-ms', x[2]); t.appendChild(el('div', 'k', x[0])); t.appendChild(el('div', 'v', String(x[1]))); g.appendChild(t); });
+        // 036 #37: [label, value, key, holes behind it, show the sample]. Under 9 holes: the count and "from N holes"
+        // (Putts, not Putts / round - never 2 putts on one hole x 18 = "36.0").
+        // "9 holes of data" is the page's sample, not each tile's: 9 holes with stats hold only ~7
+        // fairways (par 3s have none) and 2 par 3s, and still show as a round (as today).
+        var fewP = small(a.puttHoles), fewF = a.firOf > 0 && small(Math.max(a.puttHoles, a.girOf, a.firOf)),
+            fewS = small((a.par3Holes || 0) + (a.par4Holes || 0) + (a.par5Holes || 0));
+        [[fewP ? 'Putts' : 'Putts / round', fewP ? a.putts + ' putt' + (a.putts === 1 ? '' : 's') : num(a.puttsPerRound, 1), 'putts', a.puttHoles, fewP],
+            ['Fairways (FIR)', fewF ? a.fir + ' of ' + a.firOf : pct(a.firPct), 'fir', a.firOf, fewF],
+            ['Greens (GIR)', small(a.girOf) ? a.gir + ' of ' + a.girOf : pct(a.girPct), 'gir', a.girOf, small(a.girOf)], ['Scoring average', num(a.scoringAvg, 1), 'avg', 0, false],
+            ['Par 3 average', num(a.par3, 2), 'par3', a.par3Holes, fewS && a.par3Holes > 0], ['Par 4 average', num(a.par4, 2), 'par4', a.par4Holes, fewS && a.par4Holes > 0],
+            ['Par 5 average', num(a.par5, 2), 'par5', a.par5Holes, fewS && a.par5Holes > 0], ['Putts / hole', num(a.puttsPerHole, 2), 'pph', a.puttHoles, fewP]]
+            .forEach(function (x) {
+                var t = el('div', 'ms-tile'); t.setAttribute('data-ms', x[2]); t.appendChild(el('div', 'k', x[0])); t.appendChild(el('div', 'v', String(x[1])));
+                if (x[4]) { var f = el('div', 's', fromHoles(x[3])); f.setAttribute('data-ms-from', String(x[3])); t.appendChild(f); }
+                g.appendChild(t);
+            });
         body.appendChild(g);
         // 012: WHERE THE MISSES GO - counted from the score sheet's tee shot and green in reg rows.
         var tm = a.teeMiss || {}, gm = a.greenMiss || {};
