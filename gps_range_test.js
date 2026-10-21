@@ -35,12 +35,76 @@ test('the session: average (the median, rounded) and longest carry per club, in 
     assert.deepEqual(plain(R.summarize([])), []);
     const shots = [{ c: '7i', yd: 150 }, { c: 'Dr', yd: 240 }, { c: '7i', yd: 155 }, { c: 'Dr', yd: 251 }, { c: '7i', yd: 148 }, { c: 'Dr', yd: 236 }];
     assert.deepEqual(plain(R.summarize(shots)), [
-        { club: 'Dr', name: 'Driver', n: 3, avg: 240, longest: 251 },     // median of 236, 240, 251
-        { club: '7i', name: '7-iron', n: 3, avg: 150, longest: 155 }]);   // median of 148, 150, 155
+        { club: 'Dr', name: 'Driver', n: 3, good: 3, mis: 0, avg: 240, longest: 251 },     // median of 236, 240, 251
+        { club: '7i', name: '7-iron', n: 3, good: 3, mis: 0, avg: 150, longest: 155 }]);   // median of 148, 150, 155
     assert.equal(R.summarize([{ c: 'PW', yd: 100 }, { c: 'PW', yd: 101 }])[0].avg, 101, 'median of two = 100.5, rounds up');
     // junk left out: unknown club, no yards, out of range
     assert.deepEqual(plain(R.summarize([{ c: 'XX', yd: 150 }, { c: '9i', yd: 'x' }, { c: '9i', yd: 0 }, { c: '9i', yd: 900 }, { c: '9i', yd: 130 }])),
-        [{ club: '9i', name: '9-iron', n: 1, avg: 130, longest: 130 }]);
+        [{ club: '9i', name: '9-iron', n: 1, good: 1, mis: 0, avg: 130, longest: 130 }]);
+});
+
+test('GOOD / MISHIT: the median and the longest are of good shots only; the line per club', { skip }, () => {
+    const { R } = sandbox();
+    // Driver: 5 good (236, 238, 241, 245, 250) + 2 mishits (180 chunk, 290 - a mishit that ran out further still)
+    const shots = [{ c: 'Dr', yd: 236 }, { c: 'Dr', yd: 180, mis: true }, { c: 'Dr', yd: 241 }, { c: 'Dr', yd: 250 }, { c: 'Dr', yd: 290, mis: true },
+        { c: 'Dr', yd: 238 }, { c: 'Dr', yd: 245 }, { c: '7i', yd: 120, mis: true }, { c: '7i', yd: 95, mis: true }];
+    const sum = plain(R.summarize(shots));
+    assert.deepEqual(sum, [
+        { club: 'Dr', name: 'Driver', n: 7, good: 5, mis: 2, avg: 241, longest: 250 },   // 290 was a mishit: not the longest
+        { club: '7i', name: '7-iron', n: 2, good: 0, mis: 2, avg: null, longest: null }]);
+    assert.equal(R.clubLine(sum[0]), 'Driver · 5 good / 2 mishits · 241 (median of good)');
+    assert.equal(R.clubLine(sum[1]), '7-iron · 0 good / 2 mishits · no good shots yet');
+    assert.equal(R.clubLine(plain(R.summarize([{ c: 'PW', yd: 100 }, { c: 'PW', yd: 60, mis: true }]))[0]), 'Pitching wedge · 1 good / 1 mishit · 100 (median of good)');
+    assert.equal(R.clubLine(sum[0], (y) => Math.round(y * 0.9144)), 'Driver · 5 good / 2 mishits · 220 (median of good)', 'meters');
+    // Only mis === true is a mishit: OLD records (no flag) and junk flags count as good.
+    assert.deepEqual(plain(R.summarize([{ c: '9i', yd: 130 }, { c: '9i', yd: 140, mis: false }, { c: '9i', yd: 150, mis: 'yes' }]))[0],
+        { club: '9i', name: '9-iron', n: 3, good: 3, mis: 0, avg: 140, longest: 150 });
+});
+
+test('GOOD / MISHIT: mishits never reach "Update my bag"; a club with 0 good shots is not written', { skip }, () => {
+    const { R, B, store } = sandbox();
+    B.setup('Manny', { '7i': 152 });
+    const sum = R.summarize([{ c: 'Dr', yd: 240 }, { c: 'Dr', yd: 300, mis: true }, { c: 'Dr', yd: 150, mis: true }, { c: 'Dr', yd: 250 },
+        { c: '7i', yd: 110, mis: true }]);
+    assert.deepEqual(plain(R.bagUpdate(sum)), { Dr: 245 }, 'median of the two good drives; no 7-iron');
+    assert.deepEqual(plain(R.applyToBag(B, 'Manny', sum)), { Dr: 245 });
+    const rec = JSON.parse(store[B.KEY]).golfers['n:manny'];
+    assert.deepEqual(rec.set, { Dr: 245 });
+    assert.deepEqual(rec.base, { '7i': 152 }, 'the 7-iron (all mishits) left as it was');
+    assert.deepEqual(plain(R.bagUpdate(R.summarize([{ c: 'SW', yd: 60, mis: true }]))), {}, 'nothing to write');
+});
+
+test('GOOD / MISHIT: flipping a shot (stored as mis: true, Good = no flag); old sessions still read', { skip }, () => {
+    const { R, store } = sandbox();
+    const t0 = Date.now();
+    R.addShot('Manny', 'Dr', 240, 'gps', t0);
+    R.addShot('Manny', 'Dr', 180, 'typed', t0 + 1000);
+    R.addShot('Manny', 'Dr', 250, 'typed', t0 + 2000);
+    const shots = () => plain(R.current('Manny').shots);
+    assert.ok(shots().every((x) => !('mis' in x)), 'Good by default: no flag');
+    assert.equal(R.flip('Manny', 1).mis, true);
+    assert.deepEqual(shots()[1], { c: 'Dr', yd: 180, by: 'typed', at: t0 + 1000, mis: true });
+    assert.equal(R.summarize(R.current('Manny').shots)[0].avg, 245, 'the 180 left out');
+    R.flip('Manny', 1);
+    assert.ok(!('mis' in shots()[1]), 'flipped back to Good: the flag removed');
+    assert.equal(R.summarize(R.current('Manny').shots)[0].avg, 240);
+    R.setMishit('Manny', 2, true); R.setMishit('Manny', 2, true);
+    assert.equal(shots()[2].mis, true, 'setMishit is not a toggle');
+    assert.equal(R.flip('Manny', 9), null, 'no such shot');
+    assert.equal(R.flip('Ann', 0), null, 'another golfer');
+    // A closed session can't be flipped.
+    R.newSession('Manny');
+    assert.equal(R.setMishit('Manny', 0, true), null);
+    // OLD records (saved before Good / Mishit): no mis field anywhere - all good, read as before.
+    const old = { v: 1, golfers: { 'n:cal': { sessions: [{ id: '1', at: t0, shots: [{ c: '7i', yd: 150, by: 'gps', at: t0 }, { c: '7i', yd: 155, by: 'typed', at: t0 + 1 }, { c: '7i', yd: 148, by: 'gps', at: t0 + 2 }] }] } } };
+    store[R.KEY] = JSON.stringify(old);
+    const cur = R.current('Cal', t0 + 10);
+    assert.equal(cur.shots.length, 3);
+    assert.deepEqual(plain(R.summarize(cur.shots)), [{ club: '7i', name: '7-iron', n: 3, good: 3, mis: 0, avg: 150, longest: 155 }]);
+    assert.equal(R.clubLine(R.summarize(cur.shots)[0]), '7-iron · 3 good / 0 mishits · 150 (median of good)');
+    // and a flip on an old record adds just the flag
+    R.flip('Cal', 0);
+    assert.deepEqual(plain(R.current('Cal', t0 + 10).shots[0]), { c: '7i', yd: 150, by: 'gps', at: t0, mis: true });
 });
 
 test('Update my bag: { club: average } into My bag\'s set map - the shape a typed number writes', { skip }, () => {
@@ -115,7 +179,8 @@ test('GUARD: no latitude / longitude / position is ever stored, and nothing is s
     });
     const walk = (v, where, bad) => { if (v && typeof v === 'object') Object.keys(v).forEach((k) => { if (/^(lat|lng|lon|latitude|longitude|pt|p|coords|pos|position|point|start|land|from|to)$/i.test(k)) bad.push(where + '.' + k); walk(v[k], where + '.' + k, bad); }); return bad; };
     assert.deepEqual(walk(JSON.parse(store[R.KEY]), 'range', []), []);
-    R.sessions('Manny').forEach((s) => s.shots.forEach((x) => assert.deepEqual(Object.keys(x).sort(), ['at', 'by', 'c', 'yd'])));
+    R.flip('Manny', 1);   // a Mishit adds only mis: true
+    R.sessions('Manny').forEach((s) => s.shots.forEach((x, i) => assert.deepEqual(Object.keys(x).sort(), i === 1 ? ['at', 'by', 'c', 'mis', 'yd'] : ['at', 'by', 'c', 'yd'])));
     // The source: no network, no database, and the reading is dropped after the yards are worked out.
     const src = read('gps-range.js').replace(/\/\/.*$/gm, '');
     assert.ok(!/\bfetch\s*\(|XMLHttpRequest|sendBeacon|firebase|\.ref\s*\(|WebSocket/.test(src), 'nothing is sent');

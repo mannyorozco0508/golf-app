@@ -1,7 +1,7 @@
-// URGENT-047 B - LAUNCH MONITOR QUICK ENTRY (gps-bushnell.js): type the carries the Bushnell
-// Launch Pro showed, "Update my bag" writes them into the EXISTING My bag with
-// HardPanGpsBag.set (the same { set: { <club>: yd } } as a typed My bag number and as Range,
-// 047 A). Yards only; nothing stored of its own, nothing sent, no Bushnell sign-in.
+// URGENT-047 B - TYPE MY CARRIES (gps-bushnell.js; changed 8:15 AM: typed grid only, no
+// import): My bag > "Type my carries", one row per club, "Update my bag" writes them into the
+// EXISTING My bag with HardPanGpsBag.set (the same { set: { <club>: yd } } as a typed My bag
+// number and as Range, 047 A). Yards only; nothing stored of its own, nothing sent, no sign-in.
 'use strict';
 const fs = require('fs'), path = require('path');
 const { test } = require('node:test');
@@ -52,7 +52,7 @@ test('Update my bag: written with HardPanGpsBag.set - the shape My bag (and Rang
     assert.deepEqual(B.bag('Joe Russo'), {});
 });
 
-test('privacy guard: no network, no database, no position, no Bushnell / Foresight sign-in', { skip }, () => {
+test('privacy guard: no network, no database, no position, no sign-in', { skip }, () => {
     const src = read('gps-bushnell.js');
     const code = src.replace(/\/\/[^\n]*/g, '');
     assert.doesNotMatch(code, /fetch\(|XMLHttpRequest|sendBeacon|WebSocket|\.ref\(|firebase|navigator\.geolocation|localStorage/, 'no network / db / location / own storage');
@@ -63,7 +63,7 @@ test('privacy guard: no network, no database, no position, no Bushnell / Foresig
 
 test('gps-view wiring: the door in My bag (list view), lazy loaded, same golfer + bagSaved', { skip }, () => {
     const v = read('gps-view.js');
-    assert.ok(v.indexOf('<button type="button" class="gps-bag-lm" data-feature="clubs">') !== -1, 'the door, behind the clubs switch');
+    assert.ok(v.indexOf('<button type="button" class="gps-bag-lm" data-feature="clubs">Type my carries</button>') !== -1, 'the door, "Type my carries", behind the clubs switch');
     assert.match(v, /loadScript\('gps-bushnell\.js', function \(\) \{ return !!window\.HardPanLaunchEntry; \}/);
     assert.match(v, /HardPanLaunchEntry\.open\(\{ el: S\.el, golfer: bagGolfer\(\), units: units, flash: flash, saved: bagSaved, openBag: openBag \}\)/);
     assert.match(v, /\.gps-bag\[data-bag-view="setup"\] \.gps-bag-lm\{display:none;\}/, 'not on the first-time setup');
@@ -71,4 +71,30 @@ test('gps-view wiring: the door in My bag (list view), lazy loaded, same golfer 
     assert.equal((sync.match(/'gps-bushnell\.js'/g) || []).length, 2, 'CONSUMER_SHELL GPS block + GPS_SHELL');
     assert.ok(sw.indexOf("'./gps-bushnell.js'") !== -1, 'precached (works with no signal)');
     assert.doesNotMatch(read('index.html'), /gps-bushnell\.js/, 'not loaded at boot');
+});
+
+// 8:15 AM: the Bushnell import is dropped - "Type my carries" only, no brand names on screen.
+// Every string literal in the sheet's code and in gps-view.js (comments skipped), except the
+// file name 'gps-bushnell.js' itself, must be free of Bushnell / Launch Pro / Foresight.
+const BRANDS = /bushnell|launch ?pro|foresight/i;
+function uiStrings(src) {
+    const out = [];
+    src.split('\n').forEach((line) => {
+        if (/^\s*(\/\/|\*|\/\*)/.test(line)) return;
+        (line.match(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g) || []).forEach((q) => out.push(q));
+    });
+    return out;
+}
+test('renamed "Type my carries": title, door, and no Bushnell / Launch Pro / Foresight text in the UI strings', { skip }, () => {
+    const { L } = fresh();
+    assert.equal(L.TITLE, 'Type my carries');
+    const src = read('gps-bushnell.js');
+    assert.match(src, /gps-lm-title">' \+ TITLE/, 'the sheet title is TITLE');
+    assert.match(src, /setAttribute\('aria-label', TITLE\)/);
+    const bad = (f) => uiStrings(read(f)).filter((q) => BRANDS.test(q.replace(/gps-bushnell\.js/g, '')));
+    assert.deepEqual(bad('gps-bushnell.js'), [], 'gps-bushnell.js UI strings');
+    assert.deepEqual(bad('gps-view.js'), [], 'gps-view.js UI strings');
+    assert.doesNotMatch(read('gps-view.js'), /Enter carries from my Bushnell/);
+    // no import / screenshot reading left
+    assert.doesNotMatch(src.replace(/\/\/[^\n]*/g, ''), /type="file"|FileReader|<canvas|getImageData|Tesseract|share ?sheet/i);
 });
