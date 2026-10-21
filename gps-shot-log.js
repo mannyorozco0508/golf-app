@@ -10,7 +10,9 @@
 // THE RECORD (what add(record) takes; the chips helper builds it at the closing mark):
 //   club        'Dr' '3w' '5w' 'Hy' '4i'..'9i' 'PW' 'GW' 'SW' 'LW' (HardPanGpsBag.BAG)
 //   carry       yards, mark -> next mark (1-449)
-//   windMph     WeatherKit 10 m model wind at the shot (NWS fallback); 0 = calm
+//   windMph     WeatherKit 10 m model wind at the shot (NWS fallback); 0 = calm;
+//               null = NO READING at the mark (int-049): relAngle / along / across are then
+//               null too - the shot counts for still-air carry, never as a wind or calm point
 //   relAngle    where the wind comes FROM, vs the line ball -> CENTER of the green,
 //               0-359.9 exact: 0 head, 90 from the right, 180 tail, 270 from the left
 //   along       windMph x cos(relAngle): + headwind, - tailwind (mph)
@@ -58,27 +60,32 @@
         if (CLUBS.indexOf(club) === -1) return null;
         var carry = num(o.carry);
         if (carry === null || !(carry > 0 && carry < 450)) return null;
-        var mph = num(o.windMph); mph = mph === null || mph < 0 ? 0 : r1(Math.min(mph, 80));
-        var rel = deg(o.relAngle);
-        if (rel === null && num(o.windFromDeg) !== null && num(o.bearingDeg) !== null) rel = deg(num(o.windFromDeg) - num(o.bearingDeg));
-        if (rel === null) rel = 0;
-        var along = num(o.along), across = num(o.across);
-        if (along === null) along = mph * Math.cos(toRad(rel));
-        if (across === null) across = mph * Math.sin(toRad(rel));
+        // No reading (missing / null / negative) stays null - never turned into calm (int-049).
+        var mph = num(o.windMph); mph = mph === null || mph < 0 ? null : r1(Math.min(mph, 80));
+        var rel = null, along = null, across = null;
+        if (mph !== null) {
+            rel = deg(o.relAngle);
+            if (rel === null && num(o.windFromDeg) !== null && num(o.bearingDeg) !== null) rel = deg(num(o.windFromDeg) - num(o.bearingDeg));
+            if (rel === null) rel = 0;
+            along = num(o.along); across = num(o.across);
+            if (along === null) along = mph * Math.cos(toRad(rel));
+            if (across === null) across = mph * Math.sin(toRad(rel));
+        }
         var date = num(o.date); if (date === null && o.date) { var d = Date.parse(o.date); date = isFinite(d) ? d : null; }
         var wx = o.wxHour; if (typeof wx === 'number' && isFinite(wx)) wx = new Date(wx).toISOString(); else if (typeof wx === 'string') wx = wx.slice(0, 40); else wx = null;
         var out = {
-            club: club, carry: r1(carry), windMph: mph, relAngle: rel, along: r2(along), across: r2(across),
+            club: club, carry: r1(carry), windMph: mph, relAngle: rel, along: along === null ? null : r2(along), across: across === null ? null : r2(across),
             tempF: num(o.tempF) !== null ? r1(num(o.tempF)) : null,
             elevFt: num(o.elevFt) !== null ? r1(num(o.elevFt)) : null,
             course: String(o.course || '').slice(0, 80),
             hole: num(o.hole) !== null ? Math.round(num(o.hole)) : null,
             date: date !== null ? Math.round(date) : Date.now(),
             wxHour: wx,
-            windFromDeg: deg(o.windFromDeg),
+            windFromDeg: mph === null ? null : deg(o.windFromDeg),
             bearingDeg: deg(o.bearingDeg)
         };
-        if (o.src && /^(weatherkit|nws|hourly|manual)$/.test(String(o.src))) out.src = String(o.src);
+        if (mph !== null && o.src && /^(weatherkit|nws|hourly|manual)$/.test(String(o.src))) out.src = String(o.src);
+        if (mph === null) out.src = null;
         return out;
     }
     function add(o) {
@@ -106,7 +113,8 @@
     }
     // ---- THE FILTERS (Shot history) -----------------------------------------------
     // strength: calm (< 5 mph) | '5-10' | '10-15' | '15+' (mph, lower bound in).
-    function strengthOf(mph) { mph = Number(mph) || 0; return mph < 5 ? 'calm' : mph < 10 ? '5-10' : mph < 15 ? '10-15' : '15+'; }
+    // No reading (null): no strength at all - never "calm" (int-049).
+    function strengthOf(mph) { if (mph === null || mph === undefined || mph === '' || !isFinite(Number(mph))) return null; mph = Number(mph); return mph < 5 ? 'calm' : mph < 10 ? '5-10' : mph < 15 ? '10-15' : '15+'; }
     // dir: the nearest of head (0) / from the right (90) / tail (180) / from the left (270).
     // A calm shot (under 1 mph) has no direction.
     function dirOf(rel, mph) {

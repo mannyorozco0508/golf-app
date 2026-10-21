@@ -174,7 +174,9 @@ test('qualified = >= 8 shots with wind > 5 mph (exactly 5 does not count)', () =
     f = W.fit(seven.concat([mk(5.1, 1)]));
     assert.equal(f.windyN, 8); assert.equal(f.qualified, true); assert.equal(f.model, 'learned');
     assert.equal(W.fit([]).qualified, false);
-    assert.equal(W.fit([{ carry: 150 }, null, { carry: -3, windMph: 4, relAngle: 0 }]).skipped, 3);
+    // int-049: a carry with no wind reading is not skipped - it feeds n and still air only (noWind).
+    assert.equal(W.fit([{ carry: 150 }, null, { carry: -3, windMph: 4, relAngle: 0 }]).skipped, 2);
+    assert.equal(W.fit([{ carry: 150 }, null, { carry: -3, windMph: 4, relAngle: 0 }]).noWind, 1);
 });
 
 test('not qualified: stillAir backs out the GENERIC model; opts.carry gives generic coefficients', () => {

@@ -163,7 +163,8 @@
     // opts (optional): { hand: 'R'|'L', carry } - with opts.carry, a club that is
     // not qualified reports the GENERIC coefficients at that carry (model 'generic')
     // so My bag can show a number; otherwise they are null until qualified.
-    // Shots with no carry or no wind reading are skipped (counted in `skipped`).
+    // Shots with no carry are skipped (counted in `skipped`); shots with no wind reading
+    // (counted in `noWind`) feed only n and the still-air median (int-049).
     // head / tail / left / right: SIGNED yards of carry per mph (head < 0, tail > 0).
     function shotComponents(s) {
         if (isNum(s.windMph) && s.windMph >= 0 && isNum(s.relAngle)) return { mph: s.windMph, c: components(s.windMph, s.relAngle) };
@@ -176,20 +177,23 @@
     }
     function fit(shots, opts) {
         opts = opts || {};
-        var rows = [], skipped = 0;
+        // int-049: a shot with a carry but NO wind reading (windMph null / missing) is not a wind
+        // data point and not a calm one: it counts toward n and the still-air median only.
+        var rows = [], skipped = 0, noWind = [];
         (shots || []).forEach(function (s) {
-            var w = s && isNum(s.carry) && s.carry > 0 ? shotComponents(s) : null;
-            if (!w) { skipped++; return; }
+            if (!s || !isNum(s.carry) || !(s.carry > 0)) { skipped++; return; }
+            var w = shotComponents(s);
+            if (!w) { noWind.push(s.carry); return; }
             var c = w.c;
             rows.push({ carry: s.carry, mph: w.mph, c: c, x: [c.head, c.tail, c.fromLeft, c.fromRight] });
         });
-        var n = rows.length;
+        var n = rows.length + noWind.length;
         var windyN = rows.filter(function (r) { return r.mph > WINDY_MPH; }).length;
         var qualified = windyN >= QUALIFY_WINDY_SHOTS;
         var perN = KEYS.map(function (k, j) { return rows.filter(function (r) { return r.x[j] >= COMPONENT_MIN_MPH; }).length; });
         var out = { stillAir: null, head: null, tail: null, left: null, right: null, n: n, windyN: windyN, qualified: qualified,
             model: qualified ? 'learned' : 'generic', counts: { head: perN[0], tail: perN[1], left: perN[2], right: perN[3] },
-            skipped: skipped, bandsEligible: n >= BANDS_MIN_SHOTS, hand: opts.hand === 'L' ? 'L' : 'R' };
+            skipped: skipped, noWind: noWind.length, bandsEligible: n >= BANDS_MIN_SHOTS, hand: opts.hand === 'L' ? 'L' : 'R' };
         if (!qualified && isNum(opts.carry) && opts.carry > 0) {
             var gc = genericCoeffs(opts.carry);
             KEYS.forEach(function (k) { out[k] = gc[k]; });
@@ -200,7 +204,7 @@
             var cols = [];
             KEYS.forEach(function (k, j) { if (perN[j] >= COMPONENT_MIN_SHOTS) cols.push(j); });
             var dim = cols.length + 1;
-            if (n > dim) {
+            if (rows.length > dim) {
                 var A = [], b = [], i, j, r;
                 for (i = 0; i < dim; i++) { A.push(new Array(dim).fill(0)); b.push(0); }
                 rows.forEach(function (row) {
@@ -215,7 +219,7 @@
             }
         }
         var coeffs = qualified ? out : null;
-        out.stillAir = median(rows.map(function (row) { return row.carry - effectOf(row.carry, row.c, coeffs); }));
+        out.stillAir = median(rows.map(function (row) { return row.carry - effectOf(row.carry, row.c, coeffs); }).concat(noWind));
         return out;
     }
 

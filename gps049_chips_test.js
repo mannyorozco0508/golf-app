@@ -149,7 +149,7 @@ test('no wind reading / manual dial / NWS: src and wxHour say so', { skip }, () 
     const T = track(env);
     T.mark(TEE, info(off(TEE, 200, 0), { club: '6i', wind: { none: true, tempF: 70 } }));
     const rec = T.mark(off(TEE, 170, 0), info(off(TEE, 200, 0))).closed.record;
-    assert.equal(rec.windMph, 0); assert.equal(rec.wxHour, null); assert.equal(rec.src, null); assert.equal(rec.tempF, 70);
+    assert.strictEqual(rec.windMph, null, 'int-049: no reading = null, not calm'); assert.equal(rec.wxHour, null); assert.equal(rec.src, null); assert.equal(rec.tempF, 70);
 });
 
 test('the likely club: My bag carries vs the yards to the green (shortest that gets there, else the longest)', { skip }, () => {

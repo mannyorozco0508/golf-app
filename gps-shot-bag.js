@@ -78,6 +78,8 @@
         return d === 'head' ? 'into you' : d === 'tail' ? 'behind you' : d === 'left' ? 'from the left' : d === 'right' ? 'from the right' : 'calm';
     }
     function windWords(mph, rel) {
+        // int-049: no reading at the mark - said so, never "calm".
+        if (mph === null || mph === undefined || mph === '' || !isFinite(Number(mph))) return 'no wind reading';
         mph = Number(mph) || 0;
         if (mph < 1) return 'calm';
         return Math.round(mph) + ' mph ' + dirWords(rel, mph) + ' (' + Math.round(Number(rel) || 0) % 360 + '°)';
@@ -120,7 +122,7 @@
     // One shot's still-air carry (its wind taken out with the club's numbers, else generic).
     function stillAirOf(s, golfer) {
         var f = clubFit(golfer, s.club), L = Log(), api = WL();
-        if (!api) return s.carry;
+        if (!api || !isNum(s.windMph)) return s.carry;
         var wt = api.windTerm(s.carry, Number(s.windMph) || 0, Number(s.relAngle) || 0, f && f.qualified ? f : null, L ? L.hand(golfer) : 'R');
         return wt ? s.carry + wt.yards : s.carry;
     }

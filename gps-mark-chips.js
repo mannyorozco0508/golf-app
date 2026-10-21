@@ -60,11 +60,13 @@
     // Only distances, wind and labels - never open.pt / open.green.
     function buildRecord(open, carryYd, endElevFt) {
         var w = open.wind && !open.wind.none && num(open.wind.mph) != null ? open.wind : null;
-        var L = learn(), mph = w ? w.mph : 0;
+        // int-049: no reading at the mark = windMph null (and src null) - NOT 0 / calm. The shot
+        // still counts for still-air carry; it is never a wind data point or a calm one.
+        var L = learn(), mph = w ? w.mph : null;
         var fromDeg = w && num(w.fromDeg) != null ? norm(w.fromDeg) : null;
         var brg = num(open.bearingDeg) != null ? norm(open.bearingDeg) : null;
         var rel = L && fromDeg != null && brg != null ? L.relAngle(fromDeg, brg) : null;
-        var c = rel != null ? L.components(mph, rel) : null;
+        var c = rel != null && mph != null ? L.components(mph, rel) : null;
         var rec = {
             club: open.club,
             carry: Math.round(carryYd),
@@ -80,7 +82,7 @@
             hole: open.hole,
             date: open.at,
             wxHour: wxHour(w),
-            src: srcOf(open.wind)
+            src: w ? srcOf(open.wind) : null
         };
         if (open.golfer) rec.golfer = open.golfer;
         if (rec.relAngle == null) { delete rec.relAngle; delete rec.along; delete rec.across; }
