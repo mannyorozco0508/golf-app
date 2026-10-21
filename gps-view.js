@@ -5361,8 +5361,8 @@
         +   '<div class="gps-bag-head"><div class="gps-bag-title"></div><button type="button" class="gps-bag-done">Done</button></div><div class="gps-bag-sub"></div>'
         // 010: where the numbers live, in one line (the account too only when clubsSync is live).
         +   '<div class="gps-bag-saved">Saved on this phone</div>'
-        // URGENT-047 B: type the carries a launch monitor (Bushnell Launch Pro) showed - gps-bushnell.js.
-        +   '<button type="button" class="gps-bag-lm" data-feature="clubs">Enter carries from my Bushnell</button>'
+        // URGENT-047 B (8:15 AM): "Type my carries" - one grid, a carry per club - gps-bushnell.js.
+        +   '<button type="button" class="gps-bag-lm" data-feature="clubs">Type my carries</button>'
         // 012 part 5 (switch bagAltitude): where the numbers hold - for the altitude in plays-like.
         +   '<div class="gps-bag-alt" data-feature="bagAltitude" role="group" aria-label="My distances are from">'
         +     '<div class="gps-bag-alt-h">My distances are from:</div>'
@@ -5692,7 +5692,7 @@
         + '#gps-overlay .gps-bag-done{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
         + '#gps-overlay .gps-bag-resetall{display:block;margin:10px auto 0;min-height:44px;padding:0 16px;color:#fca5a5 !important;font-weight:800;}'
         + '#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-list,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-resetall,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-setup-open,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup-foot{display:none;}'
-        // URGENT-047 B: the launch-monitor door in My bag (list view only).
+        // URGENT-047 B: the "Type my carries" door in My bag (list view only).
         + '#gps-overlay .gps-bag-lm{display:block;width:100%;margin:2px 0 8px;min-height:44px;border-radius:12px;border:1px solid rgba(217,249,157,.5) !important;background:rgba(217,249,157,.1) !important;color:#d9f99d !important;font:800 15px/1 ' + FONT + ' !important;}'
         + '#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-lm{display:none;}'
         + '#gps-overlay .gps-bag-srow{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);}'
@@ -6353,7 +6353,7 @@
             });
         });
         on(el, '.gps-bag-done', function () { closeBag(); render(); });
-        // URGENT-047 B: LAUNCH MONITOR QUICK ENTRY (gps-bushnell.js): the same golfer and bag as My
+        // URGENT-047 B: TYPE MY CARRIES (gps-bushnell.js): the same golfer and bag as My
         // bag, written with HardPanGpsBag.set (as Range does). Yards only, on this phone.
         on(el, '.gps-bag-lm', function () {
             if (!S) return;
