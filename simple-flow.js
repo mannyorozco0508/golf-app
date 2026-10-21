@@ -63,7 +63,8 @@
         games: { weekly: false, skins: false, nassau: false, match: false, hilo: false },
         stake: { weekly: 40, skins: 10, nassau: 5, match: 10, hilo: 1 },
         who: { nassau: null, match: null, hilo: null }, whoAll: {},
-        scoring: 'net', press: '2down', carry: true, moreOpen: false, dupOpen: false,
+        // URGENT-038 #27: presses start Off - one Nassau default everywhere ($5 a bet, presses off), as + Bet.
+        scoring: 'net', press: 'none', carry: true, moreOpen: false, dupOpen: false,
         web: null, webLocal: []
     };
     function hiloHere() { return typeof W.hiloShapeOk === 'function' || !!W.HardPanHiLo; }
