@@ -305,9 +305,11 @@
         var m = me();
         host.innerHTML = settleHtml(pays, m) + profileHtml(m);
     }
-    function save() {
+    // typed: what was in the boxes when Save was tapped (URGENT-048: kept across the sign-in nudge).
+    function save(typed) {
         var m = me(), d = W.document, el = d.getElementById('vm-user'), ec = d.getElementById('vm-cash');
         if (!m || !el || !ec || !S.db) return;
+        if (typed) { el.value = typed.rv; ec.value = typed.rc; }
         var rv = el.value.trim(), rc = ec.value.trim(), v = cleanUser(rv), c = cleanCash(rc);
         var st = d.getElementById('vm-status');
         if (rv && !v) { if (st) st.textContent = 'That doesn’t look like a Venmo username (letters, numbers, - and _).'; return; }
@@ -341,10 +343,33 @@
         });
     }
     function refused(e) { return /permission|denied/i.test(String((e && (e.code || e.message)) || e)); }
+    // URGENT-048: a signed-out phone gets ONE "Sign in to use Venmo" nudge per round
+    // (hp-needs-account.js) on Pay with Venmo / Request on Venmo / Cash App / Mark
+    // paid / Save. A nudge, never a wall: after Not now the link opens (the sheet's
+    // Not now is that same link) and Mark paid / Save go ahead exactly as before.
+    // No sign-in on the page, or signed in: nothing changes.
+    function nudge(ev, el) {
+        var N = W.HardPanNeedsAccount;
+        if (!N || !N.shouldPrompt || !N.shouldPrompt({ feature: 'venmo', scope: S.code })) return false;
+        var isLink = el.tagName === 'A', paid = el.getAttribute('data-vm-paid'), isSave = !isLink && !paid;
+        var d = W.document, eu = d.getElementById('vm-user'), ec = d.getElementById('vm-cash');
+        var typed = isSave && eu && ec ? { rv: eu.value, rc: ec.value } : null;
+        var was = paid ? !!paidMark(paid) : null, code = S.code;
+        ev.preventDefault();
+        N.prompt({ feature: 'venmo', label: /\bvm-cash\b/.test(el.className) ? 'Cash App' : 'Venmo', scope: code, href: isLink ? el.getAttribute('href') : null })
+            .then(function () {
+                if (S.code !== code) return;
+                // The tap goes ahead as tapped (unless the tick already changed meanwhile).
+                if (paid) { if (!!paidMark(paid) === was) markPaid(paid); }
+                else if (isSave) save(typed);
+            });
+        return true;
+    }
     function onClick(ev) {
         var t = ev.target;
         if (!t || !t.closest || !t.closest('#vm-mount')) return;
         var b;
+        if ((b = t.closest('a.vm-btn, [data-vm-paid], .vm-save')) && nudge(ev, b)) return;
         if ((b = t.closest('[data-vm-paid]'))) { markPaid(b.getAttribute('data-vm-paid')); return; }
         if ((b = t.closest('[data-vm-me]'))) { try { W.localStorage.setItem('golfapp_me_' + S.code, b.getAttribute('data-vm-me')); } catch (e) {} S.msg = ''; autoShare(); draw(); return; }
         if (t.closest('.vm-me-clear')) { try { W.localStorage.removeItem('golfapp_me_' + S.code); } catch (e) {} S.msg = ''; draw(); return; }

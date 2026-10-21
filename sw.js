@@ -4767,10 +4767,16 @@ const SHELL_FILES = [
     './simple-flow.js',
     // Settle up with Venmo / Cash App on the Results page (2.1 part D).
     './venmo-pay.js',
+    // URGENT-048: HardPanAuth - sign-in state + profile over the existing sign-in flows.
+    './hp-auth.js',
+    // URGENT-048: the needs-an-account nudge (Sign in to use Venmo; once per round).
+    './hp-needs-account.js',
     // URGENT-045 #4: the round recap as one picture (the Receipt's Share recap).
     './round-recap.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).
     './gps-entitlement.js',
+    // URGENT-048: Home's Sign in pill, the sign-in sheet and the profile sheet.
+    './hp-account-ui.js',
     // GPS:END
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
