@@ -3992,6 +3992,7 @@
         maybeAskWho();
         aaTick();
         markTick(r);
+        try { chipsTick(r, o, nums); } catch (e) {}
     }
     // URGENT-045 THE "MARK ..." BUTTON (gps-mark-distance.js; KP by GPS gps-kp.js, Long Drive): on the
     // holes a feature claims. What it is handed: the hole, a getter for the live fix (read on the
@@ -4061,13 +4062,13 @@
     function markShotHere() {
         if (!S) return;
         if (!fix) { flash('No GPS position yet'); return; }
-        if (!S.measureFrom) { S.measureFrom = fix.pt; S.measureShot = null; render(); return; }
+        if (!S.measureFrom) { S.measureFrom = fix.pt; S.measureShot = null; chipsMark(fix.pt); render(); return; }
         var m = G.haversineMeters(S.measureFrom, fix.pt);
         S.measureShot = { text: G.shownDistance(m, units()) + (units() === 'm' ? ' m' : ' yds'), at: Date.now() };
         S.measureFrom = fix.pt;
         flash('Shot: ' + S.measureShot.text);
-        // MY BAG (008): which club was that? (skippable, never in the way)
-        bagAsk(m / G.M_PER_YD);
+        // URGENT-049: this mark closes the shot before (its carry) and asks the club for the next.
+        chipsMark(fix.pt);
         render();
         setTimeout(function () { if (S) render(); }, 4100);
     }
@@ -4129,34 +4130,114 @@
         var mine = S;
         B.syncLoad(S.db, bagUid(), bagGolfer()).then(function (got) { if (got && S === mine) { render(); if (bagSheet() && bagSheet().style.display !== 'none') fillBag(); } });
     }
-    function bagAsk(yd) {
-        if (!S || !bagSwitch() || tournament() || !(yd > 0)) return;
-        var bar = S.el.querySelector('.gps-bagask');
-        if (!bar) return;
-        S.bagPending = { yd: yd, golfer: bagGolfer() };
+    // ---- URGENT-049: THE CLUB CHIPS AFTER "MARK SHOT" (gps-mark-chips.js) ----------------
+    // Every mark = where the ball is: it closes the shot before it (carry = mark -> mark) and
+    // opens the next with "Hitting 7-iron? · 149 to the green" - the likely club pre-selected
+    // from My bag (vs the plays-like yards to the green's center), one tap to change, Skip. A
+    // shot COUNTS only with a club; Skip = position only. The green (the golfer's fix on it) or
+    // the hole's end (a score, or auto-advance) closes the last one. A counted shot goes to the
+    // shot log (gps-shot-log.js, part 3) and, as before, its carry to My bag. No coordinates
+    // in any record: the marks stay in memory, on this phone. Tournament mode: none of this.
+    function chipsApi() { return window.HardPanMarkChips || null; }
+    function withChips(fn) {
         withShots(function () {
-            var B = bagApi();
-            if (!B || !S || !S.bagPending) return;
-            bar.querySelector('.gps-bagask-head').textContent = 'Shot ' + bagShown(yd) + (units() === 'm' ? ' m' : ' yds') + ' \u00b7 which club?';
-            var row = bar.querySelector('.gps-bagask-row');
-            row.textContent = '';
-            B.BAG.forEach(function (c) {
-                var b = document.createElement('button');
-                b.type = 'button'; b.textContent = c; b.setAttribute('data-bag-club', c); b.setAttribute('aria-label', B.NAMES[c]);
-                row.appendChild(b);
+            loadScript('gps-shot-log.js', function () { return !!window.HardPanShotLog; }, function () {
+                loadScript('gps-wind-learn.js', function () { return !!window.HardPanWindLearn; }, function () {
+                    loadScript('gps-mark-chips.js', function () { return !!chipsApi(); }, function () { if (S && chipsApi()) fn(chipsApi()); });
+                });
             });
-            bar.style.display = '';
-            clearTimeout(S.bagTimer);
-            S.bagTimer = setTimeout(function () { if (S) bagSkip(); }, BAG_ASK_MS);
         });
     }
-    function bagSkip() { var bar = S && S.el.querySelector('.gps-bagask'); if (bar) bar.style.display = 'none'; if (S) S.bagPending = null; }
+    function chipsOn() { return !!(S && bagSwitch() && !tournament() && !readOnlyHere()); }
+    function chipsCourse() { var rd = (S && S.round) || {}; return String(rd.courseName || (S && S.courseKey) || ''); }
+    function chipsMark(pt) {
+        if (!S || !pt || !chipsOn()) return;
+        var r = resolved(), green = r && r.mid ? r.mid : null, nums = r ? G.holeNumbers(pt, r) : null;
+        var toYd = green ? G.haversineMeters(pt, green) / G.M_PER_YD : null, pl = playsTo(null);
+        // Taken NOW (the shot's wind is the wind when it is hit; the hole may change before the scripts load).
+        var ctx = { hole: S.hole, green: green, wind: effectiveWind(), elevFt: r ? ptElev(r, pt) : null, course: chipsCourse(), golfer: bagGolfer(),
+            // On the green (a putt) or no green to aim at: this mark only closes the shot before.
+            noOpen: !green || !!(nums && nums.onGreen) };
+        var plYd = pl && isFinite(pl.exact) ? pl.exact : null, mine = S;
+        withChips(function (C) {
+            if (S !== mine) return;
+            var T = chipsTracker(C), op = T.open();
+            // A shot left open on another hole (the golfer looked ahead, then marked here).
+            if (op && op.hole !== ctx.hole) chipsEndOther(T, op);
+            ctx.club = ctx.noOpen ? null : C.likelyClub(bagApi(), ctx.golfer, plYd || toYd);
+            var res = T.mark(pt, ctx);
+            chipsClosed(res.closed);
+            if (res.open) bagAsk(toYd, plYd, ctx.club); else bagHide();
+        });
+    }
+    function chipsTracker(C) { if (!S.chips) S.chips = C.create({ dist: G.haversineMeters, bearing: G.bearingDeg }); return S.chips; }
+    function chipsClosed(c) {
+        if (!S || !c || !c.counted) return;
+        var B = bagApi();
+        if (B && B.add(bagGolfer(), c.club, c.carry)) bagSaved();
+        S.chipsLastId = c.id;
+        flash((B ? B.NAMES[c.club] : c.club) + ': ' + bagShown(c.carry) + (units() === 'm' ? ' m' : ' yds') + ' → your shots');
+    }
+    // The ball reached the green (pt = the golfer's fix there) or the hole is over (no pt: the
+    // ball finished at the green - its center). r: THIS hole (called before a hole change).
+    function chipsEnd(pt, r) {
+        var T = S && S.chips, op = T && T.open();
+        if (!op || op.hole !== S.hole) return;
+        var end = pt || T.openGreen();
+        bagHide();
+        chipsClosed(T.close(end, r && end ? (pt ? ptElev(r, end) : ptElev(r, end, 'mid')) : null));
+    }
+    function chipsEndOther(T, op) {
+        if (myScore(op.hole) != null) chipsClosed(T.close(T.openGreen(), null)); else T.discard();
+    }
+    function chipsTick(r, o, nums) {
+        var T = S && S.chips, op = T && T.open();
+        if (!op || op.hole !== S.hole) return;
+        if (fix && o && o.from === 'me' && nums && nums.onGreen) { chipsEnd(fix.pt, r); return; }
+        if (myScore(op.hole) != null) chipsEnd(null, r);
+    }
+    // "Hitting 7-iron? · 149 to the green": the bottom bar where "which club?" was (clean map).
+    function bagAsk(toYd, plYd, club) {
+        if (!S || !bagSwitch() || tournament() || readOnlyHere()) return;
+        var bar = S.el.querySelector('.gps-bagask'), B = bagApi();
+        if (!bar || !B) return;
+        var head = bar.querySelector('.gps-bagask-head'), sub = bar.querySelector('.gps-bagask-sub'), row = bar.querySelector('.gps-bagask-row');
+        var toTxt = toYd > 0 ? ' · ' + bagShown(toYd) + (units() === 'm' ? ' m' : '') + ' to the green' : '';
+        head.textContent = '';
+        if (club) { head.appendChild(document.createTextNode('Hitting ')); var b = document.createElement('b'); b.textContent = B.NAMES[club]; head.appendChild(b); head.appendChild(document.createTextNode('?' + toTxt)); }
+        else head.textContent = 'Which club?' + toTxt;
+        if (sub) {
+            var mine = club ? (B.bag(bagGolfer()) || {})[club] : null;
+            var plTxt = plYd > 0 && toYd > 0 && Math.round(plYd) !== Math.round(toYd) ? ', plays like ' + bagShown(plYd) : '';
+            sub.textContent = club ? 'Picked from My bag (' + B.NAMES[club] + (mine && mine.yd ? ' ' + bagShown(mine.yd) : '') + plTxt + '). Tap another to change.'
+                : 'Tap the club you’re hitting. Skip = not counted.';
+        }
+        row.textContent = '';
+        var on = null;
+        B.BAG.forEach(function (c) {
+            var btn = document.createElement('button');
+            btn.type = 'button'; btn.textContent = c === club ? c + ' ✓' : c; btn.setAttribute('data-bag-club', c); btn.setAttribute('aria-label', B.NAMES[c]);
+            if (c === club) { btn.className = 'on'; btn.setAttribute('aria-pressed', 'true'); on = btn; }
+            row.appendChild(btn);
+        });
+        bar.style.display = '';
+        if (on) { try { row.scrollLeft = Math.max(0, on.offsetLeft - (row.clientWidth - on.offsetWidth) / 2); } catch (e) {} }
+        clearTimeout(S.bagTimer);
+        // It goes after 20 s; the picked club stands (Skip is the only "no club").
+        S.bagTimer = setTimeout(function () { if (S) bagHide(); }, BAG_ASK_MS);
+    }
+    function bagHide() { var bar = S && S.el.querySelector('.gps-bagask'); if (bar) bar.style.display = 'none'; if (S) clearTimeout(S.bagTimer); }
+    function bagSkip() {
+        bagHide();
+        var T = S && S.chips;
+        if (T && T.open()) { T.skip(); flash('No club · this one is not counted'); }
+    }
     function bagPick(club) {
-        var B = bagApi(), p = S && S.bagPending;
-        bagSkip();
-        if (!B || !p) return;
-        if (B.add(p.golfer, club, p.yd)) { bagSaved(); flash(B.NAMES[club] + ': ' + bagShown(p.yd) + (units() === 'm' ? ' m' : ' yds') + ' \u2192 My bag'); }
-        else render();
+        var B = bagApi(), T = S && S.chips;
+        bagHide();
+        if (!B || !T || !T.open()) return;
+        T.pick(club);
+        flash(B.NAMES[club] + ' ✓');
     }
     function syncSuggest(r, o, nums) {
         var el = S.el.querySelector('.gps-suggest');
@@ -5413,7 +5494,7 @@
         + '<div class="gps-clubs gps-float" style="display:none" role="dialog" aria-label="Which club?"><div class="gps-clubs-head"></div><div class="gps-clubs-row"></div>'
         +   '<div class="gps-clubs-foot"><button type="button" class="gps-club-move">Move it on the map</button><button type="button" class="gps-club-skip">Skip</button></div></div>'
         // MY BAG (008): "Which club?" after a measured shot - a chip row, never a blocking sheet.
-        + '<div class="gps-bagask gps-float" data-feature="clubs" style="display:none" role="group" aria-label="Which club?"><div class="gps-bagask-top"><span class="gps-bagask-head"></span><button type="button" class="gps-bagask-skip">Skip</button></div><div class="gps-bagask-row"></div></div>'
+        + '<div class="gps-bagask gps-float" data-feature="clubs" style="display:none" role="group" aria-label="Which club?"><div class="gps-bagask-top"><span class="gps-bagask-head"></span><button type="button" class="gps-bagask-skip">Skip</button></div><div class="gps-bagask-sub"></div><div class="gps-bagask-row"></div></div>'
         // LEFT, ABOVE THE SCORECARD: Recenter, and you (or the tee) -> the target.
         + '<div class="gps-leftrow">'
         +   '<button type="button" class="gps-recenter gps-float" aria-label="Recenter on the hole">⌖</button>'
@@ -5756,6 +5837,10 @@
         + '#gps-overlay .gps-bagask-row{display:flex;gap:6px;overflow-x:auto;padding-top:6px;touch-action:pan-x;}'
         + '#gps-overlay .gps-bagask button{flex:0 0 auto;min-height:44px;min-width:46px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 15px/1 ' + FONT + ';padding:0 10px;}'
         + '#gps-overlay .gps-bagask .gps-bagask-skip{min-width:0;background:transparent;border:0;color:#c8d1ca;font-size:14px;}'
+        + '#gps-overlay .gps-bagask-head b{color:#d9f99d;}'
+        + '#gps-overlay .gps-bagask-sub{font:600 12px/1.3 ' + FONT + ';color:#a7b3aa;margin-top:2px;}'
+        + '#gps-overlay .gps-bagask-sub:empty{display:none;}'
+        + '#gps-overlay .gps-bagask-row button.on{background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;box-shadow:0 0 0 3px rgba(217,249,157,.28);}'
         + '#gps-overlay .gps-bag{position:absolute;z-index:48;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:80%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font-family:' + FONT + ';touch-action:pan-y;}'
         + '#gps-overlay .gps-bag-head{display:flex;align-items:center;justify-content:space-between;}#gps-overlay .gps-bag-title{font:800 17px/1.15 ' + FONT + ';}'
         + '#gps-overlay .gps-bag-sub{font:600 12px/1.3 ' + FONT + ';color:#c8d1ca;margin:4px 0 6px;}'
@@ -6879,6 +6964,9 @@
         hole = Number(hole);
         if (hole === S.hole) { if (par != null) S.par = par; return; }
         if (S.flying) endFlyover('cancelled');   // PREVIEW (008): a new hole ends a flight
+        // URGENT-049: the hole is over (its score, or auto-advance walked on): its last shot closes.
+        // Just looking at another hole leaves it open.
+        if (S.chips && (S.aaMoving || myScore(S.hole) != null)) { try { chipsEnd(null, resolved()); } catch (e) {} }
         S.hole = hole;
         S.par = par;
         S.mode = 'measure'; S.draft = null;
