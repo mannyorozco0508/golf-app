@@ -4750,6 +4750,8 @@ const SHELL_FILES = [
     './gps-live-activity.js',
     // Simpler HardPan (017): the 3-step New round on Round Setup.
     './simple-flow.js',
+    // URGENT-045 #4: the round recap as one picture (the Receipt's Share recap).
+    './round-recap.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).
     './gps-entitlement.js',
     // GPS:END
