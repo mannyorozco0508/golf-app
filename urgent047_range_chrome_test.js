@@ -3,8 +3,8 @@
 //   1  Tools > Range: the Range sheet (the tile next to My bag)
 //   2  Driver: Mark at the mat, walk 240 yds, Mark; again 251; type 236
 //   3  7-iron: Mark / walk 150 / Mark; 155; type 148
-//   4  the session: Driver avg 242, longest 251; 7-iron avg 151, longest 155
-//   5  Update my bag -> Open My bag: Driver 242, 7-iron 151 ("entered")
+//   4  the session: Driver avg 240, longest 251; 7-iron avg 150, longest 155
+//   5  Update my bag -> Open My bag: Driver 240, 7-iron 150 ("entered")
 //   6  THE GUARD: the phone's storage and every database write - no coordinate, no lat / lng
 // Screenshots into SHOTS_047 when set.
 'use strict';
@@ -116,7 +116,7 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             await typedShot('7i', 148);
             // 4. the session
             const rows = JSON.parse(await ev("JSON.stringify(Array.from(" + R + ".querySelectorAll('[data-range-row]')).map(function(r){ return Array.from(r.children).map(function(c){ return c.textContent; }); }))"));
-            assert.deepEqual(rows, [['Driver', '3', '242', '251'], ['7-iron', '3', '151', '155']]);
+            assert.deepEqual(rows, [['Driver', '3', '240', '251'], ['7-iron', '3', '150', '155']]);
             assert.match(await ev(rangeText), /THIS SESSION · 6 shots/);
             const fit = JSON.parse(await ev("(function(){ var r = " + R + ".getBoundingClientRect(); return JSON.stringify({ top: r.top, bottom: r.bottom, right: r.right, h: innerHeight, w: innerWidth, sw: document.documentElement.scrollWidth }); })()"));
             assert.ok(fit.top >= 0 && fit.bottom <= fit.h + 1 && fit.right <= fit.w + 1, 'the sheet is on screen ' + JSON.stringify(fit));
@@ -131,7 +131,7 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             assert.ok(await until("(function(){ var b = document.querySelector('#gps-overlay .gps-bag'); return !!b && b.style.display !== 'none' && b.getAttribute('data-bag-view') === 'list'; })()", 6000), 'My bag open (list)');
             assert.equal(await ev("HardPanRange.isOpen()"), false, 'Range closed');
             const bag = JSON.parse(await ev("(function(){ var o = {}; ['Dr','7i'].forEach(function(c){ var r = document.querySelector('#gps-overlay [data-bag-row=\"' + c + '\"]'); o[c] = { v: r.querySelector('[data-bag-edit]').value, src: r.querySelector('[data-bag-src]').getAttribute('data-bag-src') }; }); return JSON.stringify(o); })()"));
-            assert.deepEqual(bag, { Dr: { v: '242', src: 'entered' }, '7i': { v: '151', src: 'entered' } });
+            assert.deepEqual(bag, { Dr: { v: '240', src: 'entered' }, '7i': { v: '150', src: 'entered' } });
             await ev("(function(){ var r = document.querySelector('#gps-overlay [data-bag-row=\"Dr\"]'); if (r) r.scrollIntoView({ block: 'center' }); return 1; })()");
             await shot('5-my-bag-after-update');
             // 6. THE GUARD

@@ -86,7 +86,8 @@
     }
 
     // ---- THE NUMBERS (pure) ----------------------------------------------------------
-    // Per club, in bag order: shots, the AVERAGE carry (the plain mean, rounded) and the longest.
+    // Per club, in bag order: shots, the AVERAGE carry and the longest. The average is the MEDIAN
+    // (Manny, 2026-10-21: one chunked shot must not drag a club's number down), rounded.
     function summarize(shots) {
         var by = {};
         (shots || []).forEach(function (s) {
@@ -95,8 +96,9 @@
             (by[c] = by[c] || []).push(yd);
         });
         return clubs().filter(function (c) { return by[c]; }).map(function (c) {
-            var v = by[c], sum = v.reduce(function (a, b) { return a + b; }, 0);
-            return { club: c, name: nameOf(c), n: v.length, avg: Math.round(sum / v.length), longest: Math.max.apply(null, v) };
+            var v = by[c], o = v.slice().sort(function (a, b) { return a - b; }), m = o.length >> 1;
+            var med = o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2;
+            return { club: c, name: nameOf(c), n: v.length, avg: Math.round(med), longest: Math.max.apply(null, v) };
         });
     }
     // What "Update my bag" writes: { <club>: average } - the shape of My bag's set map.

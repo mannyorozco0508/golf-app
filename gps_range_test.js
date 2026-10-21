@@ -29,14 +29,14 @@ function sandbox() {
 }
 const plain = (x) => JSON.parse(JSON.stringify(x));
 
-test('the session: average (plain mean, rounded) and longest carry per club, in bag order', { skip }, () => {
+test('the session: average (the median, rounded) and longest carry per club, in bag order', { skip }, () => {
     const { R } = sandbox();
     assert.deepEqual(plain(R.summarize([])), []);
     const shots = [{ c: '7i', yd: 150 }, { c: 'Dr', yd: 240 }, { c: '7i', yd: 155 }, { c: 'Dr', yd: 251 }, { c: '7i', yd: 148 }, { c: 'Dr', yd: 236 }];
     assert.deepEqual(plain(R.summarize(shots)), [
-        { club: 'Dr', name: 'Driver', n: 3, avg: 242, longest: 251 },     // (240 + 251 + 236) / 3 = 242.33
-        { club: '7i', name: '7-iron', n: 3, avg: 151, longest: 155 }]);   // (150 + 155 + 148) / 3 = 151
-    assert.equal(R.summarize([{ c: 'PW', yd: 100 }, { c: 'PW', yd: 101 }])[0].avg, 101, '100.5 rounds up');
+        { club: 'Dr', name: 'Driver', n: 3, avg: 240, longest: 251 },     // median of 236, 240, 251
+        { club: '7i', name: '7-iron', n: 3, avg: 150, longest: 155 }]);   // median of 148, 150, 155
+    assert.equal(R.summarize([{ c: 'PW', yd: 100 }, { c: 'PW', yd: 101 }])[0].avg, 101, 'median of two = 100.5, rounds up');
     // junk left out: unknown club, no yards, out of range
     assert.deepEqual(plain(R.summarize([{ c: 'XX', yd: 150 }, { c: '9i', yd: 'x' }, { c: '9i', yd: 0 }, { c: '9i', yd: 900 }, { c: '9i', yd: 130 }])),
         [{ club: '9i', name: '9-iron', n: 1, avg: 130, longest: 130 }]);
@@ -45,24 +45,24 @@ test('the session: average (plain mean, rounded) and longest carry per club, in 
 test('Update my bag: { club: average } into My bag\'s set map - the shape a typed number writes', { skip }, () => {
     const { R, B, store } = sandbox();
     const sum = R.summarize([{ c: '7i', yd: 150 }, { c: '7i', yd: 155 }, { c: '7i', yd: 148 }, { c: 'Dr', yd: 240 }, { c: 'Dr', yd: 251 }, { c: 'Dr', yd: 236 }]);
-    assert.deepEqual(plain(R.bagUpdate(sum)), { Dr: 242, '7i': 151 });
+    assert.deepEqual(plain(R.bagUpdate(sum)), { Dr: 240, '7i': 150 });
     // Manny's bag already has a learned 7-iron and a setup Driver: the range averages win (a typed number wins).
     B.add('Manny Orozco', '7i', 160); B.add('Manny Orozco', '7i', 162); B.add('Manny Orozco', '7i', 161);
     B.setup('Manny Orozco', { Dr: 230, '9i': 130 });
     const done = R.applyToBag(B, 'Manny Orozco', sum);
-    assert.deepEqual(plain(done), { Dr: 242, '7i': 151 });
+    assert.deepEqual(plain(done), { Dr: 240, '7i': 150 });
     const bag = plain(B.bag('Manny Orozco'));
-    assert.equal(bag.Dr.yd, 242); assert.equal(bag.Dr.set, true);
-    assert.equal(bag['7i'].yd, 151); assert.equal(bag['7i'].set, true);
+    assert.equal(bag.Dr.yd, 240); assert.equal(bag.Dr.set, true);
+    assert.equal(bag['7i'].yd, 150); assert.equal(bag['7i'].set, true);
     assert.equal(bag['9i'].yd, 130, 'clubs not hit at the range are left alone');
     assert.equal(B.source(bag.Dr), 'entered');
-    // The record is exactly My bag's own: golfers['n:manny orozco'].set = { Dr: 242, 7i: 151 }; shots and base untouched.
+    // The record is exactly My bag's own: golfers['n:manny orozco'].set = { Dr: 240, 7i: 150 }; shots and base untouched.
     const rec = JSON.parse(store[B.KEY]).golfers['n:manny orozco'];
-    assert.deepEqual(rec.set, { Dr: 242, '7i': 151 });
+    assert.deepEqual(rec.set, { Dr: 240, '7i': 150 });
     assert.deepEqual(rec.shots, { '7i': [160, 162, 161] });
     assert.deepEqual(rec.base, { Dr: 230, '9i': 130 });
     // The account-sync shape (switched off today) carries them as it carries a typed number.
-    assert.deepEqual(plain(B.syncShape('Manny Orozco')).set, { Dr: 242, '7i': 151 });
+    assert.deepEqual(plain(B.syncShape('Manny Orozco')).set, { Dr: 240, '7i': 150 });
     // Another golfer's bag is not touched.
     assert.deepEqual(plain(B.bag('Ann Alpha')), {});
 });
