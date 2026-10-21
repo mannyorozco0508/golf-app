@@ -133,15 +133,17 @@ test('2. the last hole: Save -> this round\'s Strokes Gained -> Done -> Finish &
         assert.ok(card, 'the Strokes Gained card is up');
         assert.deepEqual(card.cats.map((x) => x.split(':')[0]), ['ott', 'app', 'arg', 'putt']);
         assert.match(card.text, /Round done/); assert.match(card.text, /ESTIMATED/i);
-        assert.equal(card.bench, '10 hcp', 'default benchmark: 10 hcp');
+        // No profile handicap on this phone: the round's (Test 052C Alpha plays off 2) -> Scratch.
+        assert.equal(card.bench, 'Scratch', 'default benchmark from the round handicap (2): Scratch');
         assert.equal(await ev("HardPanRound.sheetKind ? HardPanRound.sheetKind() : null") === 'finish', false, 'Finish waits for Done');
         await shot(j, 'c2-after-round-card');
         // The picker on the card: Scratch re-reads the round.
         const t10 = await ev("document.querySelector('#hp-sg-card [data-sg-total]').getAttribute('data-sg-total')");
-        await click('#hp-sg-card [data-sg-bench="0"]');
+        await click('#hp-sg-card [data-sg-bench="10"]');
         const t0 = await ev("document.querySelector('#hp-sg-card [data-sg-total]').getAttribute('data-sg-total')");
-        assert.notEqual(t0, t10, 'scratch reads differently: ' + t0 + ' vs ' + t10);
-        assert.equal(await ev("localStorage.getItem('hardpan_sg_bench')"), '0', 'kept on this phone');
+        assert.notEqual(t0, t10, 'a 10 reads differently: ' + t0 + ' vs ' + t10);
+        assert.equal(await ev("localStorage.getItem('hardpan_sg_bench')"), '10', 'the pick is kept on this phone');
+        assert.equal(await ev("document.querySelector('#hp-sg-card [data-sg-bench].on').textContent"), '10 hcp');
         await click('#hp-sg-card [data-sg-done]');
         await sleep(900);
         assert.equal(await ev('!!document.getElementById(\'hp-sg-card\')'), false, 'the card closed');
@@ -183,10 +185,10 @@ const MY = `JSON.stringify((function () {
     tiles: (p.querySelector('.ms-seg [data-ms-last].on') || {}).textContent, info: (document.getElementById('hp-sg-info') || {}).innerText || null,
     sw: document.documentElement.scrollWidth, iw: innerWidth, e: window.__e };
 })())`;
-async function myStats(steps) {
+async function myStats(steps, pre) {
     const all = [{ sleep: 800 }, { tap: '.hp-view.on [data-hp-act="sstats"]' }, { sleep: 700 }].concat(steps);
     const r = await arriveCold({ url: fileUrl('home.html'), settleMs: 3500, viewport: VIEW,
-        preScript: seedMy() + CFG + 'window.__hardpanDoors = true;' + ERR + iapStub({ active: true }), steps: all });
+        preScript: (pre || '') + seedMy() + CFG + 'window.__hardpanDoors = true;' + ERR + iapStub({ active: true }), steps: all });
     if (!r.ok) throw new Error(r.reason);
     return r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
 }
@@ -225,4 +227,22 @@ test('3. My stats: the section, Last round / 10 / 20, Scratch / 10 / 20, not eno
     assert.equal(e.last, 'Last 20'); assert.equal(e.bench, '20 hcp');
     assert.ok(Number(e.total) > Number(a.total), '20 hcp ' + e.total + ' > 10 hcp ' + a.total);
     v.forEach((x) => assert.deepEqual(x.e, [], 'page errors'));
+});
+
+test('4. My stats, a +3.7 golfer (the 048 profile): Tour / plus is picked by default; all four fit; his own pick wins', { timeout: 150000 }, async () => {
+    const sh = (n) => SHOTS ? [{ shot: path.join(SHOTS, n + '-' + TAG + '.png'), viewportOnly: true }] : [];
+    const PLUS = "try{localStorage.setItem('hardpan_my_hcp', JSON.stringify({ h: '+3.7', at: Date.now() }));}catch(e){}";
+    const FIT = "JSON.stringify({ fit: [].map.call(document.querySelectorAll('[data-ms-sg] [data-sg-bench]'), function (b) { var r = b.getBoundingClientRect(); return { t: b.textContent, fits: b.scrollWidth <= b.clientWidth + 1, w: Math.round(r.width), h: Math.round(r.height) }; }) })";
+    const v = await myStats([{ expression: MY }, { expression: FIT },
+        { expression: "(function(){var e=document.querySelector('[data-ms-sg]'); e.scrollIntoView({block:'start'}); var p=document.getElementById('hp-my-stats'); if(p) p.scrollTop-=8; return 1;})()" }, { sleep: 300 }].concat(sh('c6-mystats-tour-plus-default'), [
+        { tap: '[data-ms-sg] [data-sg-bench="0"]' }, { sleep: 400 }, { expression: MY }]), PLUS);
+    const [a, fit, b] = v;
+    assert.equal(a.bench, 'Tour / plus', '+3.7 -> Tour / plus by default');
+    assert.match(a.text, /PER ROUND VS TOUR \/ PLUS/i);
+    assert.match(a.text, /behind Tour \/ plus|ahead of Tour \/ plus/);
+    const f = fit.fit;
+    assert.deepEqual(f.map((x) => x.t), ['Tour / plus', 'Scratch', '10 hcp', '20 hcp']);
+    f.forEach((x) => { assert.ok(x.fits, x.t + ' not cut: ' + JSON.stringify(f)); assert.ok(x.h >= 44, x.t + ' 44pt'); });
+    assert.equal(b.bench, 'Scratch', 'his own pick wins');
+    v.filter((x) => x && x.e).forEach((x) => assert.deepEqual(x.e, []));
 });

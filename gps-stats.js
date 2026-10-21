@@ -1146,7 +1146,8 @@
     // Fit (052-c, tools in the report): tee within 0.08, fairway 0.02, rough 0.02, green 0.03 of
     // anchor + margin. 10 and 20 handicap = scratch + (hcp / 20) x an extra per shot that grows
     // with distance, sized so a typical par-72 card sums to ~82 (10) and ~92 (20). ESTIMATED -
-    // the (i) says so.
+    // the (i) says so. TOUR / PLUS (added 2:21 PM, Manny +3.7): the same curves WITHOUT the scratch margin -
+    // i.e. at the Broadie Tour anchors themselves (same source); also estimated. Card ~71.6 - 1.4 = ~70.2.
     //
     //   expected strokes to hole out (scratch), d in yards, f in feet:
     //   tee      2.81 + 0.00185 d + 0.52 / (1 + e^-((d - 263) / 16.7)) + 0.00313 max(0, d - 426)
@@ -1179,7 +1180,11 @@
     // ============================================================================
     var SGKEY = 'hardpan_sg_v1_', SG_BENCH_KEY = 'hardpan_sg_bench', SG_LAST_KEY = 'hardpan_sg_last';
     var SG_MIN = 18, SG_ARG_YD = 50;
-    var SG_BENCHES = [0, 10, 20];
+    // URGENT-052 C (2:21 PM, Manny +3.7): a 4th benchmark, TOUR / PLUS ('tour') - the same curves AT the
+    // Broadie Tour anchors, i.e. without the scratch margin (putts -0.03, fairway -0.06, rough / tee -0.08,
+    // mixed -0.07), no handicap extra. Also estimated; same source as above.
+    var SG_BENCHES = ['tour', 0, 10, 20];
+    var SG_TOUR_MARGIN = { green: 0.03, fairway: 0.06, rough: 0.08, tee: 0.08, mixed: 0.07 };
     var SG_FP = { lt3: 2, '3-6': 4.5, '6-10': 8, '10-20': 15, '20-40': 30, '40p': 50 };
     var SG_FP_CHIPS = [['lt3', '<3'], ['3-6', '3–6'], ['6-10', '6–10'], ['10-20', '10–20'], ['20-40', '20–40'], ['40p', '40+']];
     var SG_BANDS = [['u100', 'Under 100', 0, 100], ['100-125', '100–125', 100, 125], ['125-150', '125–150', 125, 150], ['150-175', '150–175', 150, 175], ['175p', '175+', 175, 1e9]];
@@ -1191,10 +1196,12 @@
     function sgFair(d) { d = sgClamp(d, 0.5, 400); return 1.665 + 1.047 * (1 - Math.exp(-d / 14.34)) + 1.364e-5 * d * d; }
     function sgRough(d) { d = sgClamp(d, 0.5, 400); return 2.201 + 0.780 * (1 - Math.exp(-d / 22.29)) + 1.289e-5 * d * d; }
     function sgGreen(f) { f = sgClamp(f, 0.5, 150); return 1 + (1 - 1 / (1 + Math.pow(f / 7.74, 2.37))) + 0.00643 * Math.max(0, f - 22.2); }
-    function sgBench(h) { h = Number(h); return SG_BENCHES.indexOf(h) === -1 ? 0 : h; }
+    function sgBench(h) { if (h === 'tour') return 'tour'; h = Number(h); return SG_BENCHES.indexOf(h) === -1 ? 0 : h; }
     // Expected strokes to hole out. pos: { lie: 'tee' | 'fairway' | 'rough' | 'mixed' | 'green' | 'holed', d (yds) | f (ft) }.
     function sgExpected(pos, hcp) {
-        var k = sgBench(hcp) / 20, d = Number(pos && pos.d), f = Number(pos && pos.f);
+        var b = sgBench(hcp), lie = pos && pos.lie;
+        if (b === 'tour') { var e0 = sgExpected(pos, 0); return lie === 'holed' || e0 == null ? e0 : e0 - (SG_TOUR_MARGIN[lie] || 0); }
+        var k = b / 20, d = Number(pos && pos.d), f = Number(pos && pos.f);
         switch (pos && pos.lie) {
             case 'holed': return 0;
             case 'green': return sgGreen(f) + k * (0.08 + 0.004 * Math.min(sgClamp(f, 0.5, 150), 60));
@@ -1352,7 +1359,41 @@
             return Object.assign({}, r, { sg: rec && rec.v === 1 ? { yd: rec.yd || {}, marks: (pid != null && rec.marks && rec.marks[String(pid)]) || {} } : {} });
         }).sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
     }
-    function sgBenchNow() { var v = null; try { v = W.localStorage.getItem(SG_BENCH_KEY); } catch (e) {} return v === '0' ? 0 : v === '20' ? 20 : 10; }
+    // THE DEFAULT BENCHMARK (Manny, 2:21 PM): the closest one at or better than the golfer's handicap -
+    // plus -> Tour / plus, 0-9.9 -> Scratch, 10-19.9 -> 10, 20+ -> 20; no handicap -> 10. The handicap: the
+    // 048 profile (HardPanAuth.profile.get().hcp, else hardpan_my_hcp; "+3.7" is plus), else the golfer's
+    // handicap in the round on screen. A pick the golfer makes (hardpan_sg_bench) always wins.
+    function sgHcpNum(v) {
+        var t = String(v == null ? '' : v).trim().replace(/\s+/g, '');
+        if (!t || !/^\+?-?\d+(\.\d+)?$/.test(t)) return null;
+        var n = Number(t.replace(/^\+/, ''));
+        if (!isFinite(n)) return null;
+        return t.charAt(0) === '+' && n > 0 ? -n : n;
+    }
+    function sgBenchFor(h) { h = sgHcpNum(h); if (h == null) return 10; return h < 0 ? 'tour' : h < 10 ? 0 : h < 20 ? 10 : 20; }
+    function sgMyHcp(roundHcp) {
+        var h = null;
+        try { var A = W.HardPanAuth; if (A && A.profile && typeof A.profile.get === 'function') { var p = A.profile.get(); if (p) h = sgHcpNum(p.hcp); } } catch (e) {}
+        if (h == null) { var hh = lsGet('hardpan_my_hcp'); if (hh && hh.h != null) h = sgHcpNum(hh.h); }
+        if (h == null && roundHcp != null) h = sgHcpNum(roundHcp);
+        return h;
+    }
+    // The phone's own golfer's handicap in the round on screen (index.html), when there is one.
+    function sgRoundHcp() {
+        try {
+            /* global currentData, qsOwnId */
+            var d = typeof currentData !== 'undefined' ? currentData : null, me = typeof qsOwnId === 'function' ? qsOwnId() : null;
+            var p = d && me != null ? (d.players || []).filter(function (x) { return String(x.id) === String(me); })[0] : null;
+            return p && p.hcp != null ? p.hcp : null;
+        } catch (e) { return null; }
+    }
+    function sgBenchNow(roundHcp) {
+        var v = null; try { v = W.localStorage.getItem(SG_BENCH_KEY); } catch (e) {}
+        if (v === 'tour') return 'tour';
+        if (v === '0' || v === '10' || v === '20') return Number(v);
+        var h = sgMyHcp(roundHcp === undefined ? sgRoundHcp() : roundHcp);
+        return h == null ? 10 : sgBenchFor(h);
+    }
     function sgSetBench(h) { h = sgBench(h); try { W.localStorage.setItem(SG_BENCH_KEY, String(h)); } catch (e) {} return h; }
     function sgLastNow() { var v = null; try { v = W.localStorage.getItem(SG_LAST_KEY); } catch (e) {} return v === '1' ? 1 : v === '20' ? 20 : 10; }
     // ---- THE VIEW (shared by My stats and the after-round card) ----
@@ -1363,6 +1404,7 @@
         + '.hp-sg .sg-i span{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;border:1.5px solid #9aa5a0;color:#0f4c3a;font:800 15px/1 Georgia,serif;}'
         + '.hp-sg .sg-seg{display:flex;gap:6px;margin:8px 0;background:#e2f1ea;border-radius:999px;padding:4px;}'
         + '.hp-sg .sg-seg button{flex:1;min-height:44px;border:0;border-radius:999px;background:none;color:#0f4c3a;font:800 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer;white-space:nowrap;}.hp-sg .sg-seg button.on{background:#0f4c3a;color:#fff;}'
+        + '.hp-sg .sg-seg4{gap:2px;}.hp-sg .sg-seg4 button{font-size:14px;padding:0 4px;letter-spacing:-.01em;}'
         + '.hp-sg .sg-lbl{font-size:14px;color:#555;margin:8px 2px 0;}'
         + '.hp-sg .sg-card{background:#fff;border-radius:14px;padding:12px 14px;margin-top:8px;}'
         + '.hp-sg .sg-vs{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#555;}'
@@ -1381,7 +1423,8 @@
     function sgFmt(x) { if (x == null || !isFinite(x)) return '—'; var v = Math.round(x * 10) / 10; if (v === 0) return '0.0'; return (v > 0 ? '+' : '−') + Math.abs(v).toFixed(1); }
     function sgCls(x) { var v = Math.round((x || 0) * 10) / 10; return v > 0 ? 'pos' : v < 0 ? 'neg' : ''; }
     function sgBar(x) { var b = el('div', 'sg-bar'), w = Math.min(50, Math.abs(x || 0) / 3 * 50); if (Math.round((x || 0) * 10)) { var i = el('i', sgCls(x)); i.style.width = Math.max(2, w) + '%'; b.appendChild(i); } return b; }
-    function sgBenchName(h) { return h === 0 ? 'scratch' : 'a ' + h + ' handicap'; }
+    function sgBenchName(h) { return h === 'tour' ? 'Tour / plus' : h === 0 ? 'scratch' : 'a ' + h + ' handicap'; }
+    function sgBenchLabel(h) { return h === 'tour' ? 'Tour / plus' : h === 0 ? 'Scratch' : h + ' hcp'; }
     function sgCountText(c, t) {
         var n = t.n;
         if (c === 'ott') return n + ' drive' + (n === 1 ? '' : 's');
@@ -1422,15 +1465,15 @@
             box.appendChild(seg);
         }
         box.appendChild(el('div', 'sg-lbl', 'Compared with'));
-        var bs = el('div', 'sg-seg'); bs.setAttribute('data-sg-benchpick', '1');
+        var bs = el('div', 'sg-seg sg-seg4'); bs.setAttribute('data-sg-benchpick', '1');
         SG_BENCHES.forEach(function (h) {
-            var b = el('button', h === o.bench ? 'on' : '', h === 0 ? 'Scratch' : h + ' hcp'); b.type = 'button'; b.setAttribute('data-sg-bench', String(h));
+            var b = el('button', h === o.bench ? 'on' : '', sgBenchLabel(h)); b.type = 'button'; b.setAttribute('data-sg-bench', String(h));
             b.onclick = function () { opts.onBench(h); };
             bs.appendChild(b);
         });
         box.appendChild(bs);
         var card = el('div', 'sg-card');
-        card.appendChild(el('div', 'sg-vs', (opts.today ? 'This round' : 'Per round') + ' vs ' + (o.bench === 0 ? 'a scratch golfer' : 'a ' + o.bench + ' handicap')));
+        card.appendChild(el('div', 'sg-vs', (opts.today ? 'This round' : 'Per round') + ' vs ' + (o.bench === 'tour' ? 'Tour / plus' : o.bench === 0 ? 'a scratch golfer' : 'a ' + o.bench + ' handicap')));
         var tot = el('div', 'sg-tot'); tot.setAttribute('data-sg-total', o.total == null ? '' : String(Math.round(o.total * 10) / 10));
         var tb = el('b', o.total == null ? '' : sgCls(o.total), o.total == null ? '—' : sgFmt(o.total));
         tot.appendChild(tb);
@@ -1487,7 +1530,7 @@
         o.appendChild(st);
         var box = el('div');
         box.appendChild(el('h3', null, 'How Strokes Gained works'));
-        box.appendChild(el('p', null, 'Every shot is compared with how many shots a scratch, 10 or 20 handicap takes to hole out from the same spot.'));
+        box.appendChild(el('p', null, 'Every shot is compared with how many shots a Tour / plus player, a scratch, 10 or 20 handicap takes to hole out from the same spot. It starts on the one nearest your handicap (at or better); your own pick stays.'));
         [['Off the tee', ' · hole length (card) → where the tee shot stopped (your Mark shot) + fairway hit / missed (score sheet). Par 4s and 5s.'],
             ['Approach', ' · shots from more than 50 yds: start yards (your mark) → on the green: first-putt length; missed: your next mark.'],
             ['Around the green', ' · shots from 50 yds in: your mark → first-putt length (or holed).'],
@@ -1496,7 +1539,7 @@
         });
         var p2 = el('p'); p2.appendChild(d.createTextNode('A category shows ')); p2.appendChild(el('b', null, 'Not enough data')); p2.appendChild(d.createTextNode(' until it has 18 holes of what it needs. Shots no mark separates are left out, never guessed.'));
         box.appendChild(p2);
-        var src = el('p', 'src', 'Benchmark: HardPan baseline (estimated) — our own curves, shaped on Mark Broadie’s published strokes-gained research. Not an official table. Kept on this phone.');
+        var src = el('p', 'src', 'Benchmark: HardPan baseline (estimated) — our own curves, shaped on Mark Broadie’s published strokes-gained research. Tour / plus sits on his published Tour values; Scratch adds a small margin; 10 and 20 add more per shot. Not an official table. Kept on this phone.');
         src.setAttribute('data-sg-source', '1');
         box.appendChild(src);
         var ok = el('button', null, 'Got it'); ok.type = 'button'; ok.onclick = function () { o.remove(); };
@@ -1590,6 +1633,6 @@
         caddie: { key: CADDIE_KEY, max: CADDIE_MAX, get: caddieGet, line: caddieLine, set: caddieSet },
         // 052 C: Strokes Gained (lite) - the engine (pure), the marks store (distances only), the views.
         sg: { expected: sgExpected, hole: sgHole, roundHoles: sgRoundHoles, summary: sgSummary, practice: sgPractice, mark: sgMark, setYards: sgSetYards, load: sgLoad, rounds: sgRounds,
-            bench: sgBenchNow, setBench: sgSetBench, last: sgLastNow, fpChips: SG_FP_CHIPS, fpFeet: SG_FP, bands: SG_BANDS, min: SG_MIN, roundCard: sgRoundCard, info: sgInfo, key: SGKEY },
+            bench: sgBenchNow, setBench: sgSetBench, benchFor: sgBenchFor, hcpNum: sgHcpNum, myHcp: sgMyHcp, benches: SG_BENCHES, last: sgLastNow, fpChips: SG_FP_CHIPS, fpFeet: SG_FP, bands: SG_BANDS, min: SG_MIN, roundCard: sgRoundCard, info: sgInfo, key: SGKEY },
         sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? (ss.ctx.home != null ? ss.ctx.home : ss.ctx.hole) : null; }, shownHole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, go: function (h) { return ssGoto(h); }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
 })();

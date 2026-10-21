@@ -269,3 +269,74 @@ test('the after-round card is only for the phone\'s own golfer with stats on, an
     store['hardpan_qstats_v1_RC1_p101'] = JSON.stringify({ v: 1, code: 'RC1', pid: '101', at: 1, me: true, holes: {}, snap: { 1: { s: 4, par: 4 } } });
     assert.strictEqual(St.sg.roundCard('RC1', () => {}), false);
 });
+
+// ---- 2:21 PM (Manny, +3.7): TOUR / PLUS, and the default from the golfer's handicap ----------------
+test('Tour / plus: the 4th benchmark - the curves without the scratch margin, at the Broadie Tour anchors', { skip }, () => {
+    const { St } = sandbox();
+    const E = St.sg.expected;
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(St.sg.benches)), ['tour', 0, 10, 20]);
+    // Hand-worked: scratch minus the margin (green 0.03, fairway 0.06, rough / tee 0.08, mixed 0.07).
+    near(E({ lie: 'green', f: 15 }, 'tour'), 1.828 - 0.03, 'green 15 ft');
+    near(E({ lie: 'fairway', d: 150 }, 'tour'), 3.019 - 0.06, 'fairway 150');
+    near(E({ lie: 'tee', d: 400 }, 'tour'), 4.070 - 0.08, 'tee 400');
+    near(E({ lie: 'mixed', d: 20 }, 'tour'), 2.563 - 0.07, 'mixed 20');
+    assert.strictEqual(E({ lie: 'holed' }, 'tour'), 0);
+    // Near the published Tour values it was shaped on (3 ft 1.04, 10 ft 1.61, 30 ft 1.98; fairway 100 2.80, 200 3.19; tee 400 3.99).
+    [[{ lie: 'green', f: 3 }, 1.04], [{ lie: 'green', f: 10 }, 1.61], [{ lie: 'green', f: 30 }, 1.98], [{ lie: 'fairway', d: 100 }, 2.80], [{ lie: 'fairway', d: 200 }, 3.19], [{ lie: 'tee', d: 400 }, 3.99]]
+        .forEach(([p, v]) => assert.ok(Math.abs(E(p, 'tour') - v) < 0.08, JSON.stringify(p) + ' ' + E(p, 'tour') + ' vs ' + v));
+    // Internally consistent: below scratch everywhere, and a par-72 card (4 x 180, 10 x 400, 4 x 520) sums below scratch's.
+    ['tee', 'fairway', 'rough', 'mixed'].forEach((lie) => [30, 100, 150, 200, 300, 450].forEach((d) => assert.ok(E({ lie, d }, 'tour') < E({ lie, d }, 0), lie + ' ' + d)));
+    [2, 5, 10, 20, 40, 60].forEach((f) => assert.ok(E({ lie: 'green', f }, 'tour') < E({ lie: 'green', f }, 0), 'green ' + f));
+    const card = (h) => 4 * E({ lie: 'tee', d: 180 }, h) + 10 * E({ lie: 'tee', d: 400 }, h) + 4 * E({ lie: 'tee', d: 520 }, h);
+    assert.ok(card('tour') < card(0), 'tour card ' + card('tour') + ' < scratch ' + card(0));
+    assert.ok(card('tour') > 69 && card('tour') < 71, 'tour card ~70: ' + card('tour'));
+    // Monotone with distance (a longer shot never expects fewer strokes).
+    for (let d = 20; d < 600; d += 10) assert.ok(E({ lie: 'tee', d: d + 10 }, 'tour') >= E({ lie: 'tee', d }, 'tour') - 1e-9, 'tee monotone at ' + d);
+    // The same round reads worse against Tour / plus than against scratch.
+    const store = {}; seedRound(store, 'TOUR1', 1, {});
+    const S2 = sandbox(store).St;
+    assert.ok(S2.sg.summary(S2.sg.rounds(), 'tour').total < S2.sg.summary(S2.sg.rounds(), 0).total);
+    assert.strictEqual(S2.sg.setBench('tour'), 'tour'); assert.strictEqual(store.hardpan_sg_bench, 'tour'); assert.strictEqual(S2.sg.bench(), 'tour');
+});
+
+test('the default benchmark: the closest at or better than the handicap - +3.7 Tour / plus; 0 / 9.9 / 10 / 19.9 / 20 edges; none = 10', { skip }, () => {
+    const { St } = sandbox();
+    const F = St.sg.benchFor;
+    assert.strictEqual(F('+3.7'), 'tour', 'Manny, +3.7');
+    assert.strictEqual(F('+0.1'), 'tour');
+    assert.strictEqual(F('0'), 0); assert.strictEqual(F('+0'), 0, '+0 is scratch');
+    assert.strictEqual(F('9.9'), 0); assert.strictEqual(F('10'), 10); assert.strictEqual(F('19.9'), 10); assert.strictEqual(F('20'), 20); assert.strictEqual(F('36'), 20);
+    assert.strictEqual(F(''), 10); assert.strictEqual(F(null), 10); assert.strictEqual(F('abc'), 10, 'no handicap = 10');
+    assert.strictEqual(St.sg.hcpNum('+3.7'), -3.7); assert.strictEqual(St.sg.hcpNum('12.4'), 12.4); assert.strictEqual(St.sg.hcpNum(' + 2 '), -2);
+});
+
+test('where the handicap comes from: the 048 profile, else hardpan_my_hcp, else the round; a manual pick wins', { skip }, () => {
+    // No handicap anywhere: 10, as before.
+    assert.strictEqual(sandbox().St.sg.bench(null), 10);
+    // The 048 profile (HardPanAuth.profile.get().hcp, "+3.7") stubbed on the sandbox's window.
+    let s;
+    const mk = (store, profileHcp) => {
+        const st = store || {};
+        const localStorage = { get length() { return Object.keys(st).length; }, key: (i) => Object.keys(st)[i], getItem: (k) => (k in st ? st[k] : null), setItem: (k, v) => { st[k] = String(v); }, removeItem: (k) => { delete st[k]; } };
+        const sb = { localStorage, JSON, Object, Math, Number, String, Date, isFinite, Array };
+        sb.window = sb;
+        if (profileHcp !== undefined) sb.HardPanAuth = { profile: { get: () => ({ name: 'Manny', hcp: profileHcp }) } };
+        vm.createContext(sb); vm.runInContext(read('gps-stats.js'), sb);
+        return { St: sb.HardPanGpsStats, store: st };
+    };
+    s = mk({}, '+3.7'); assert.strictEqual(s.St.sg.bench(null), 'tour', 'profile +3.7 -> Tour / plus');
+    s = mk({}, '9.9'); assert.strictEqual(s.St.sg.bench(null), 0);
+    s = mk({}, '14'); assert.strictEqual(s.St.sg.bench(5), 10, 'the profile wins over the round');
+    // hardpan_my_hcp when HardPanAuth is not loaded (Home without it).
+    s = mk({ hardpan_my_hcp: JSON.stringify({ h: '+3.7', at: 1 }) }); assert.strictEqual(s.St.sg.bench(null), 'tour', 'hardpan_my_hcp +3.7');
+    s = mk({ hardpan_my_hcp: JSON.stringify({ h: '22', at: 1 }) }); assert.strictEqual(s.St.sg.bench(null), 20);
+    // Profile empty: the round's handicap.
+    s = mk({}, ''); assert.strictEqual(s.St.sg.bench('15'), 10, 'round 15 -> 10'); assert.strictEqual(s.St.sg.bench('+1'), 'tour', 'round +1');
+    assert.strictEqual(s.St.sg.bench(null), 10, 'nothing -> 10');
+    // A pick he makes himself wins, and is remembered.
+    s = mk({}, '+3.7');
+    assert.strictEqual(s.St.sg.setBench(20), 20); assert.strictEqual(s.St.sg.bench(null), 20, 'manual 20 beats +3.7');
+    assert.strictEqual(s.store.hardpan_sg_bench, '20');
+    s = mk({ hardpan_sg_bench: '0' }, '25'); assert.strictEqual(s.St.sg.bench(null), 0, 'a remembered Scratch beats 25');
+    s = mk({ hardpan_sg_bench: 'tour' }, '25'); assert.strictEqual(s.St.sg.bench(null), 'tour');
+});
