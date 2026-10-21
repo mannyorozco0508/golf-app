@@ -1493,7 +1493,7 @@
         // URGENT-024: the build on this phone, at the foot of Home.
         if (!$('hs-build')) { var bd = W.document.createElement('div'); bd.id = 'hs-build'; bd.style.cssText = 'text-align:center;font-size:12px;opacity:.6;margin:14px 0 4px;'; v.appendChild(bd); }
         $('hs-build').textContent = 'Build: ' + String(W.HARDPAN_BUILD || 'dev (not a build)');
-        var hi = $('hs-hello'); if (hi) hi.textContent = 'HardPan';
+        var hi = $('hs-hello'); if (hi) hi.textContent = 'HardPan Golf';
         // GPS-1 and Games (History) get a way back to this Home.
         ['gps', 'games'].forEach(function (n) {
             var view = $('v-' + n);
