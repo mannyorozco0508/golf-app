@@ -3885,7 +3885,19 @@
             }
         }
         var dd = roundData(), who = scoreFor(), many = !!(dd && dd.players && dd.players.length > 1);
-        txt('.gps-who', many && who && who.player ? ((groupsOf(dd).length > 1 ? 'Group ' + groupOf(who.player.id) + ' \u00b7 ' : '') + shortName(dd, who.player) + ' \u25BE') : '');
+        // URGENT-034: the name is part of the bar (a tap = Enter score for them); ONLY the \u25BE is the
+        // "Whose score?" picker, its own tap area (gps-who-pick).
+        var whoName = many && who && who.player ? (groupsOf(dd).length > 1 ? 'Group ' + groupOf(who.player.id) + ' \u00b7 ' : '') + shortName(dd, who.player) : '';
+        var whoEl = S.el.querySelector('.gps-who');
+        if (whoEl && whoEl.getAttribute('data-shown') !== whoName) {
+            whoEl.setAttribute('data-shown', whoName);
+            whoEl.textContent = '';
+            if (whoName) {
+                whoEl.appendChild(document.createTextNode(whoName + ' '));
+                var pk = document.createElement('span'); pk.className = 'gps-who-pick'; pk.setAttribute('role', 'button'); pk.setAttribute('aria-label', 'Whose score - pick a golfer'); pk.textContent = '\u25BE';
+                whoEl.appendChild(pk);
+            }
+        }
         show('.gps-who', many && !setting);
         var sb = S.el.querySelector('.gps-score');
         if (sb) { sb.classList.toggle('gps-score-num', mine != null); sb.classList.toggle('gps-score-ro', ro); }
@@ -5528,6 +5540,8 @@
         + '#gps-overlay .gps-who{flex:0 0 auto;background:none;border:0;color:#0b0f0c;font-size:12px;font-weight:800;line-height:1;padding:4px 6px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.85;}'
         + '#gps-overlay .gps-score-col.gps-slide-l{animation:gpsSlideL .22s ease-out;}#gps-overlay .gps-score-col.gps-slide-r{animation:gpsSlideR .22s ease-out;}'
         + '@keyframes gpsSlideL{from{transform:translateX(40%);opacity:.2;}to{transform:none;opacity:1;}}@keyframes gpsSlideR{from{transform:translateX(-40%);opacity:.2;}to{transform:none;opacity:1;}}'
+        // URGENT-034: the \u25BE is the "Whose score?" picker's own tap area (the rest of the bar = Enter score).
+        + '#gps-overlay .gps-who-pick{display:inline-block;padding:6px 10px;margin:-6px -6px -6px -4px;}'
         + '#gps-overlay .gps-who-sheet{position:absolute;inset:0;z-index:30;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;}'
         + '#gps-overlay .gps-who-card{width:100%;max-width:520px;max-height:70%;overflow:auto;box-sizing:border-box;background:#fff;color:#1a1a1a;border-radius:18px 18px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom) + 14px);}'
         + '#gps-overlay .gps-who-title{font-weight:800;font-size:17px;margin-bottom:10px;}'
@@ -6046,7 +6060,8 @@
                 e.preventDefault();
                 var sh = S.el.querySelector('.gps-plinfo');
                 if (sh && plInfoSwitch()) { closeMenus(); sh.style.display = sh.style.display === 'none' ? '' : 'none'; }
-            } else if (hit('.gps-ld-holelbl')) { e.preventDefault(); var sb = S.el.querySelector('.gps-score'); if (sb) sb.click(); }
+            }
+            // URGENT-034: "Hole 2" (.gps-ld-holelbl) is inside the green bar - its own click opens the sheet.
         });
         on(el, '.gps-layout-pick', function () { if (S) setLayout(layoutNow() === 'd' ? 'c' : 'd'); });
         // THE TOOLS SHEET (012): its controls, the swipe, and a tap outside it closes it.
@@ -6271,21 +6286,33 @@
         on(el, '.gps-wind', function () { if (!S) return; if (windSheetOpen()) closeWindSheet(); else openWindSheet(); });
         var wsheet = el.querySelector('.gps-wind-sheet');
         if (wsheet) { wsheet.addEventListener('click', windSheetClick); bindDial(wsheet); }
-        on(el, '.gps-score', function () {
+        // URGENT-034: THE GREEN BAR IS ONE BUTTON. A tap anywhere between \u2039 and \u203a - "Hole 2", the
+        // golfer's name, "Enter score" or the space around them - opens the score sheet once, on the
+        // golfer shown. Only the \u25BE opens "Whose score?"; \u2039 / \u203a are their own buttons. (Before, the
+        // name was the picker, and a pick never opened the sheet: tap, pick, back on the map, forever.)
+        var openScoreHere = function (pid) {
             if (!S || (S.swipedAt && Date.now() - S.swipedAt < 450)) return;
             var w = scoreFor();
             // POLISH #8: the Card may be showing the 18-hole grid - a score is entered on the hole view.
             try { var R = window.HardPanRound; if (R && typeof R.holeView === 'function') R.holeView(); } catch (e) {}
-            if (typeof S.openScore === 'function' && !readOnlyHere()) S.openScore(S.hole, w ? w.id : null);
+            if (typeof S.openScore === 'function' && !readOnlyHere()) S.openScore(S.hole, pid != null ? pid : (w ? w.id : null));
+        };
+        S.openScoreHere = openScoreHere;
+        var scoreCol = el.querySelector('.gps-score-col');
+        if (scoreCol) scoreCol.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (e.target && e.target.closest && e.target.closest('.gps-who-pick')) { if (S && !(S.swipedAt && Date.now() - S.swipedAt < 450)) openWho(false); return; }
+            openScoreHere();
         });
-        on(el, '.gps-who', function () { if (S && !(S.swipedAt && Date.now() - S.swipedAt < 450)) openWho(false); });
         var whoSheet = el.querySelector('.gps-who-sheet');
         if (whoSheet) whoSheet.addEventListener('click', function (ev) {
             var t = ev.target, b;
             var sh = S && S.el.querySelector('.gps-who-sheet');
             if (!sh) return;
             if ((b = t.closest('[data-who-group]'))) { openWho(sh.getAttribute('data-who-first') === '1', Number(b.getAttribute('data-who-group'))); return; }
-            if ((b = t.closest('[data-who-id]'))) { closeWho(); setPick(b.getAttribute('data-who-id')); return; }
+            // URGENT-034: a golfer picked from \u25BE ("Whose score?") opens the score sheet for them. The
+            // first "Who are you?" ask only sets the name tag.
+            if ((b = t.closest('[data-who-id]'))) { var first = sh.getAttribute('data-who-first') === '1', id = b.getAttribute('data-who-id'); closeWho(); setPick(id); if (!first && S && S.openScoreHere) S.openScoreHere(id); return; }
             if (t.closest('.gps-who-skip')) {
                 var d = roundData(), g = Number(sh.getAttribute('data-who-g')) || lockedG() || (d ? groupsOf(d)[0] : 1), f = d ? inGroup(d, g)[0] : null;
                 closeWho(); if (f) setPick(f.id); return;
