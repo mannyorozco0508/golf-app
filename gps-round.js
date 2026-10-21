@@ -458,7 +458,7 @@
         + '#hp-rs .rs-chips button{white-space:nowrap;border:0;border-radius:999px;padding:0 13px;min-height:40px;background:#e9eee9;font-size:14px;font-weight:600;}'
         + '#hp-rs .rs-chips button.on{background:#0f4c3a;color:#fff;}'
         + '#hp-rs .rs-addg{display:flex;align-items:center;gap:12px;width:100%;border:0;border-radius:16px;background:#0f4c3a;color:#fff;padding:0 16px;min-height:58px;margin:0 0 10px;font-size:18px;font-weight:800;text-align:left;}'
-        + '#hp-rs .rs-addg .rs-plus{font-size:22px;color:#d4f27c;}#hp-rs .rs-addg .rs-dd{color:#fff;opacity:.75;font-size:13px;font-weight:600;margin:0 0 0 auto;}'
+        + '#hp-rs .rs-addg .rs-tt{display:inline;color:#fff;font-size:18px;}#hp-rs .rs-addg .rs-plus{font-size:22px;color:#d4f27c;}#hp-rs .rs-addg .rs-dd{color:#fff;opacity:.75;font-size:13px;font-weight:600;margin:0 0 0 auto;}'
         + '#hp-rs .rs-more{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1.5px dashed #b8c4bd;border-radius:16px;padding:12px 14px;min-height:60px;background:transparent;margin:0;}'
         + '#hp-rs .rs-more .rs-tt{color:#13241d;}#hp-rs .rs-more .rs-dd{white-space:normal;font-size:13px;}#hp-rs .rs-more .rs-go{font-size:16px;color:#0f4c3a;font-weight:800;}'
         + '#hp-rs.open .rs-more{border:2px solid #0f4c3a;background:#f3f8f4;min-height:48px;margin-bottom:4px;}'
@@ -505,10 +505,13 @@
         if (e.tagName === 'A' && e.closest('#app-nav-wrap')) return 'nav-' + String(e.getAttribute('href') || '').split('?')[0].split('/').pop();
         return null;
     }
+    // Shown in the sheet: laid out, and not display:none inside it. (Visibility is not asked: the
+    // sheet is still coming up when the rows are drawn, and a control with a CSS transition - the
+    // .btn-outline links - still reads "hidden" at that instant.)
     function rsShown(e, body) {
         var r = e.getBoundingClientRect();
         if (!(r.width > 0 && r.height > 0)) return false;
-        for (var x = e; x && x !== body; x = x.parentElement) { var c = getComputedStyle(x); if (c.display === 'none' || c.visibility === 'hidden') return false; }
+        for (var x = e; x && x !== body; x = x.parentElement) { if (getComputedStyle(x).display === 'none') return false; }
         return true;
     }
     // Today's controls, as today's sheet shows them (measured with the new look switched off for a
@@ -580,7 +583,7 @@
                 + (gs ? '<button type="button" data-rs="q-start" data-rs-start="shotgun"' + (now === 'shotgun' ? ' class="on" aria-pressed="true"' : '') + '>Shotgun</button>' : '')
                 + '</span></div>';
         }
-        if (take('fdm-add')) top += '<button type="button" class="rs-addg" data-rs="fdm-add"><span class="rs-plus">＋</span>Add a game<span class="rs-dd">Nassau, skins, bets</span></button>';
+        if (take('fdm-add')) top += '<button type="button" class="rs-addg" data-rs="fdm-add"><span class="rs-plus">＋</span><span class="rs-tt">Add a game</span><span class="rs-dd">Nassau, skins, bets</span></button>';
         top += row('q-course', '⛳', 'Change course', 'A new round somewhere else');
         // MORE: the rest, grouped.
         var weekly = d.moneyPool && d.moneyPool.enabled !== false ? 'On' : 'Off';
