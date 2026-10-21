@@ -64,6 +64,8 @@
 <script src="bbb-engine.js"></script>
 <script src="vegas-engine.js"></script>
 <script src="extra-games-ui.js"></script>
+<!-- Settle up with Venmo / Cash App (HardPan 2.1 part D): links only, its own mount. -->
+<script src="venmo-pay.js"></script>
 <!-- GPS:END -->
 <script src="settlement-engine.js"></script>
 <script src="side-match-lines.js"></script>
@@ -565,6 +567,7 @@ html {
      "hardpan_simple_flow", the hpSimpleFlow() rule at the foot of this page); off = the old page.
      The Consumer app has none of this (GPS block). -->
 <script src="gps-config.js"></script>
+<script src="round-recap.js"></script>   <!-- URGENT-045 #4: the round recap picture - HardPanRecap.render(roundData) draws this Receipt as one PNG -->
 <script>
     (function () {
         try {
@@ -730,6 +733,102 @@ html {
         return { on: on, chrome: chrome, share: share, gameCard: gameCard, settleUp: settleUp, scoresHtml: scoresHtml, render: render };
     })();
 </script>
+<!-- URGENT-045 #4b: SHARE RECAP. The round recap picture (round-recap.js, HardPanRecap.render) to the
+     share sheet, beside "Share receipt" in the Receipt's foot. Native: RattleExport.shareBytes (the one
+     Filesystem CACHE + Share chain the trip recap and the PDF use). Web: navigator.share with the file,
+     else a download. "Save to Photos" is the share sheet's own "Save Image" - no Photos plugin.
+     ?recap=1 (Home > History's share action) opens the share once the Receipt is drawn.
+     DISPLAY ONLY: nothing written, no network, no location. -->
+<script>
+    window.HpRecapShare = (function () {
+        'use strict';
+        var busy = false;
+        function data() { try { return (typeof currentData !== 'undefined') ? currentData : null; } catch (e) { return null; } }
+        // The Receipt is drawn and final: the two tables round-recap.js reads, and the foot on.
+        function ready() {
+            var f = document.getElementById('hp-rc-foot');
+            return !!(f && !f.hidden && document.querySelector('#receipt-scorecard table') && document.querySelector('#hp-rc-scores table'));
+        }
+        function label(btn, text) { var s = btn && btn.querySelector('.hp-rc-recap-t'); if (s) s.textContent = text; }
+        function say(msg) {
+            if (typeof uiRefuse === 'function') { try { uiRefuse(msg); return; } catch (e) {} }
+            try { window.alert(msg); } catch (e) {}
+        }
+        function web(r) {
+            var file = null;
+            try { if (r.blob && typeof File === 'function') file = new File([r.blob], r.name, { type: 'image/png' }); } catch (e) { file = null; }
+            if (file && navigator.canShare && navigator.share) {
+                var ok = false; try { ok = navigator.canShare({ files: [file] }); } catch (e) { ok = false; }
+                if (ok) return navigator.share({ files: [file], title: 'Round Recap' }).then(function () { return { path: 'web-shared' }; }, function (e) {
+                    return { path: /abort|cancel/i.test(String((e && (e.name || e.message)) || '')) ? 'web-cancelled' : 'web-failed', error: e };
+                });
+            }
+            var a = document.createElement('a');
+            a.href = r.dataUrl; a.download = r.name; a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () { a.remove(); }, 1200);
+            return Promise.resolve({ path: 'download' });
+        }
+        function share(btn) {
+            if (busy) return Promise.resolve({ path: 'busy' });
+            if (!window.HardPanRecap || typeof window.HardPanRecap.render !== 'function') { say('The recap picture is not in this build.'); return Promise.resolve({ path: 'no-recap' }); }
+            busy = true;
+            label(btn, 'Building…');
+            var end = function (out) { busy = false; label(btn, 'Share recap'); return out; };
+            return window.HardPanRecap.render(data()).then(function (r) {
+                var ex = window.RattleExport;
+                if (ex && ex.isNative && ex.isNative() && ex.shareBytes) {
+                    return ex.shareBytes(r.name, String(r.dataUrl || '').split(',')[1] || '', 'Round Recap').then(function () { return { path: 'native-shared', name: r.name }; }, function (e) {
+                        if (/cancel/i.test(String((e && (e.message || e)) || ''))) return { path: 'native-cancelled' };
+                        say('Could not open the share sheet. Please try again.');
+                        return { path: 'native-failed', error: e };
+                    });
+                }
+                return web(r);
+            }, function (e) {
+                say(e && e.message === 'not-ready' ? 'The recap is ready once the round is final.' : 'Could not draw the recap. Please try again.');
+                return { path: 'render-failed', error: e };
+            }).then(end, function (e) { end(); return { path: 'failed', error: e }; });
+        }
+        // The button, beside "Share receipt" in #hp-rc-foot (HpRcpt.chrome builds the foot).
+        function mount() {
+            var f = document.getElementById('hp-rc-foot');
+            if (!f || f.querySelector('.hp-rc-recap')) return !!f;
+            var b = document.createElement('button');
+            b.type = 'button'; b.className = 'hp-rc-recap';
+            b.setAttribute('aria-label', 'Share recap picture - text it, or Save Image to Photos');
+            b.innerHTML = '<span class="hp-rc-recap-t">Share recap</span><small>Text it · Save Image</small>';
+            b.addEventListener('click', function () { share(b); });
+            f.classList.add('hp-rc-foot2');
+            f.insertBefore(b, f.firstChild);
+            return true;
+        }
+        // From Home > History (?recap=1): once the Receipt is final, share it. Native opens the sheet;
+        // a browser wants a tap for navigator.share, so it is the button, scrolled to and pulsed.
+        function auto() {
+            var q = null; try { q = new URLSearchParams(location.search).get('recap'); } catch (e) {}
+            if (q !== '1') return;
+            var t0 = Date.now();
+            (function wait() {
+                mount();
+                if (!ready()) { if (Date.now() - t0 < 20000) setTimeout(wait, 250); return; }
+                var b = document.querySelector('#hp-rc-foot .hp-rc-recap');
+                var ex = window.RattleExport;
+                if (ex && ex.isNative && ex.isNative()) { share(b); return; }
+                if (b) { try { b.scrollIntoView({ block: 'end' }); } catch (e) {} b.classList.add('hp-rc-pulse'); }
+            })();
+        }
+        function boot() {
+            if (!(window.HpRcpt && window.HpRcpt.on())) return;
+            var t0 = Date.now();
+            (function m() { if (!mount() && Date.now() - t0 < 20000) setTimeout(m, 200); })();
+            auto();
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else setTimeout(boot, 0);
+        return { share: share, mount: mount, ready: ready };
+    })();
+</script>
 <style>
 @media screen {
     html.hp-rcpt, html.hp-rcpt.dark-mode {
@@ -829,6 +928,15 @@ html {
     .hp-rc-foot[hidden] { display: none; }
     .hp-rc-share { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 58px; border: 0; border-radius: 16px;
         background: var(--hp-lime); color: var(--hp-lime-ink); font-family: inherit; font-weight: 800; font-size: 19px; line-height: 1; cursor: pointer; }
+    /* URGENT-045 #4b: "Share recap" beside "Share receipt" - two equal buttons in the foot */
+    .hp-rc-foot2:not([hidden]) { display: flex; gap: 10px; }
+    .hp-rc-foot2 .hp-rc-share { flex: 1 1 0; min-width: 0; }
+    .hp-rc-recap { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+        min-height: 58px; border: 0; border-radius: 16px; background: var(--hp-green); color: #fff; font-family: inherit; cursor: pointer; padding: 6px 8px; }
+    .hp-rc-recap-t { font-weight: 800; font-size: 19px; line-height: 1; }
+    .hp-rc-recap small { font-size: 12px; font-weight: 600; color: #cfe3d8; line-height: 1.1; }
+    .hp-rc-recap.hp-rc-pulse { animation: hpRcPulse 1.2s ease-in-out 3; }
+    @keyframes hpRcPulse { 50% { box-shadow: 0 0 0 6px rgba(212, 242, 124, .9); } }
 }
 </style>
 <!-- GPS:END -->
@@ -1072,6 +1180,8 @@ html {
             renderReceiptScorecard();
             // GPS:BEGIN
             if (window.HpRcpt) window.HpRcpt.render(currentData);   // POLISH #31 (option A): the head, FINAL SCORES
+            // Settle up: fewest payments read from the lines above, Venmo / Cash App links (venmo-pay.js).
+            if (window.HardPanVenmo) { try { window.HardPanVenmo.onRound(db, currentMode, currentData); } catch (e) {} }
             // GPS:END
         });
     }

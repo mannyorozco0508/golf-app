@@ -4748,8 +4748,17 @@ const SHELL_FILES = [
     './gps-round-edit.js',
     // 022 (1): Lock Screen / Dynamic Island yardages (the app only).
     './gps-live-activity.js',
+    // URGENT-045: the shared "Mark ..." button and KP by GPS (distances only).
+    './gps-mark-distance.js',
+    './gps-kp.js',
+    // URGENT-045 #2b: Long Drive ("Mark my drive"; distances only).
+    './gps-longdrive.js',
     // Simpler HardPan (017): the 3-step New round on Round Setup.
     './simple-flow.js',
+    // Settle up with Venmo / Cash App on the Results page (2.1 part D).
+    './venmo-pay.js',
+    // URGENT-045 #4: the round recap as one picture (the Receipt's Share recap).
+    './round-recap.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).
     './gps-entitlement.js',
     // GPS:END

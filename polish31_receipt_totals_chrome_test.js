@@ -129,7 +129,7 @@ const EXTRACT = `(() => {
   if (btn) btn.click();
   window.RattleExport = real;
   if (captured) exportMoney = money(captured.roots.map((x) => x.innerText).join(' ')).sort();
-  return JSON.stringify({ look: A ? 'A' : 'old', shareButton: !!btn, screenMoney: money(main.innerText).sort(), settle, payout, poHead, netView, segMoney, matchNet, each, ledger,
+  return JSON.stringify({ look: A ? 'A' : 'old', shareButton: !!btn, screenMoney: (function () { var v = document.getElementById('vm-settle'), d = v ? v.style.display : ''; if (v) v.style.display = 'none'; var r = money(main.innerText).sort(); if (v) v.style.display = d; return r; })(), vmMoney: money(((document.getElementById('vm-settle') || {}).innerText) || '').sort(), settle, payout, poHead, netView, segMoney, matchNet, each, ledger,
     card, engine, finalScores, exportMoney, writes: (window.__coldWrites || []).length, title: T(document.getElementById(A ? 'hp-rc-title' : 'main-title')),
     scrollW: document.documentElement.scrollWidth, innerW: innerWidth });
 })()`;
@@ -162,6 +162,8 @@ for (const r of ROUNDS) {
         assert.equal(a.writes, 0, 'nothing written'); assert.equal(b.writes, 0, 'nothing written');
         assert.ok(b.screenMoney.length > 0, 'the round has money on its receipt');
         assert.deepEqual(a.screenMoney, b.screenMoney, 'every money figure on screen');
+        // URGENT-045 #3: the Venmo / Cash App card (#vm-settle) only repeats the Settle up payments - every amount on it is one of them.
+        (a.vmMoney || []).forEach((v) => assert.ok((a.settle || []).join(' ').indexOf(v) !== -1, 'Venmo card amount ' + v + ' is a Settle up line'));
         assert.deepEqual(a.settle.map((s) => s.replace(/\s+/g, ' ')), b.settle, 'Settle up = Who Pays Who, line for line');
         assert.deepEqual(a.payout, b.payout, 'Pay out rows');
         assert.deepEqual(a.poHead, b.poHead, 'Pay out total');

@@ -996,6 +996,7 @@
             else { setupClose(); var q = $('hp-q'); if (q) { q.value = ''; q.focus(); } search(); }
             return;
         }
+        if ((b = t.closest('[data-hp-recap]'))) { W.location.href = recapHref(b.getAttribute('data-hp-recap'), b.getAttribute('data-hp-recap-g')); return; }   // URGENT-045 #4b
         if ((b = t.closest('[data-hp-hist]'))) { historyOpen(b); return; }
         if ((b = t.closest('[data-hp-open]'))) { W.location.href = roundHref(b.getAttribute('data-hp-open')); return; }
         if ((b = t.closest('[data-hp-draft]'))) { var dr = draftRead(); if (dr) W.location.href = draftHref(dr); else draftPaint(); return; }
@@ -1339,12 +1340,25 @@
         var sub = [dayLabel(r.at), golfersText(r.golfers)].filter(Boolean).join(' · ');
         var names = r.names.slice(0, 4).join(', ') + (r.names.length > 4 ? ' +' + (r.names.length - 4) : '');
         var state = r.finished ? 'Final' + (r.result ? ' · ' + r.result : '') : (r.thru ? 'Thru ' + r.thru : 'Not started');
-        return '<button type="button" class="hp-row hp-hist-row" data-hp-hist="' + esc(r.code) + '" data-hp-hist-fin="' + (r.finished ? 1 : 0) + '"' + (r.group ? ' data-hp-hist-g="' + esc(r.group) + '"' : '') + '>'
+        var row = '<button type="button" class="hp-row hp-hist-row" data-hp-hist="' + esc(r.code) + '" data-hp-hist-fin="' + (r.finished ? 1 : 0) + '"' + (r.group ? ' data-hp-hist-g="' + esc(r.group) + '"' : '') + '>'
             + '<span style="min-width:0;"><span class="n" style="display:block;">' + esc(r.course) + '</span>'
             + '<span class="s" style="display:block;">' + esc(sub) + '</span>'
             + '<span class="s" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(names) + '</span>'
             + '<span class="s" style="display:block;font-weight:700;color:' + (r.finished ? 'var(--hp-text)' : 'var(--hp-warn)') + ';">' + esc(state) + '</span></span>'
             + '<span class="hp-badge' + (r.finished ? '' : ' setup') + '">' + (r.finished ? 'Results ›' : 'Resume ›') + '</span></button>';
+        if (!r.finished) return row;
+        // URGENT-045 #4b: a finished round's SHARE RECAP, beside its row (a button may not hold a
+        // button). It opens the Receipt with ?recap=1, which draws the recap and opens the share sheet.
+        return '<div class="hp-hist-item" style="display:flex;gap:8px;align-items:stretch;">'
+            + row.replace('class="hp-row hp-hist-row"', 'class="hp-row hp-hist-row" style="flex:1 1 auto;min-width:0;"')
+            + '<button type="button" class="hp-hist-recap" data-hp-recap="' + esc(r.code) + '"' + (r.group ? ' data-hp-recap-g="' + esc(r.group) + '"' : '')
+            + ' aria-label="Share recap of ' + esc(r.course) + '" style="flex:0 0 66px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:0;border-radius:16px;background:var(--hp-card);color:var(--hp-green);font:inherit;font-size:12px;font-weight:800;cursor:pointer;padding:8px 4px;">'
+            + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7.5 7.5 12 3l4.5 4.5"/><path d="M8 11H6a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-2"/></svg>'
+            + '<span>Recap</span></button></div>';
+    }
+    // HOME > HISTORY's share action: the finished round's Receipt, which shares its recap (?recap=1).
+    function recapHref(code, g) {
+        return 'settlement.html?game=' + encodeURIComponent(code) + (g ? '&group=' + encodeURIComponent(g) : '') + '&recap=1';
     }
     // HOME › HISTORY: the list, then each row refreshed from the server (a round finished on
     // another phone reads Final here). Reads only - nothing is written.
@@ -2541,7 +2555,7 @@
         }, function () { return false; });
     }
 
-    W.HardPanDoors = { dayLabel: dayLabel, historyList: historyList, joinGroups: joinGroups, seenRound: seenRound, roundResult: roundResult, hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
+    W.HardPanDoors = { dayLabel: dayLabel, historyList: historyList, recapHref: recapHref, joinGroups: joinGroups, seenRound: seenRound, roundResult: roundResult, hasGames: hasGames, thruOf: thruOf, joinTarget: joinTarget, joinHref: joinHref, joinProblem: joinProblem, roundHref: roundHref, stuckRound: stuckRound, forgetRound: forgetRound, spectatorMode: spectatorMode, spectating: spectating, openShare: openShare, myTrips: myTrips, rememberTrip: rememberTrip, golfapiPlace: golfapiPlace, activeRound: activeRound, stuck: stuck, LOC_MS: LOC_MS, LOAD_MS: LOAD_MS, LAUNCH_MS: LAUNCH_MS, ALL_GAMES: ALL_GAMES, openAddGame: openAddGame, closeAddGame: closeAddGame, todaysGamesAdd: todaysGamesAdd, playersFirst: agPlayersFirst, AG_NEED: AG_NEED, tripPrefill: tripPrefill, placeMenuItems: placeMenuItems, placeGpsPill: placeGpsPill, door: door, setDoor: setDoor, on: on, afterSave: afterSave, recents: recents, addRecent: addRecent, gpsRoundStrip: gpsRoundStrip, allCourses: allCourses, miles: miles, ready: ready,
         position: position, nearList: nearList, shownName: shownName, where: where, meName: meName, myHcp: myHcp, loadScriptTimed: loadScriptTimed, STATES: STATES, gamesOf: gamesOf, simpleOn: simpleOn,
         draftRead: draftRead, draftKeep: draftKeep, draftClear: draftClear, draftHref: draftHref,
         // URGENT-028: the round in progress as this phone has it (Start Round asks before replacing a scored one).
