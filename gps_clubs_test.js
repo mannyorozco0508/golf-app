@@ -87,7 +87,8 @@ test('gps-view: behind its switch; never in tournament mode; plays-like center, 
     assert.ok(/if \(bagSwitch\(\) && !tournament\(\) && S\.pro/.test(v), 'no suggestion in tournament mode');
     assert.ok(/var moved = !!\(S\.targetMoved && S\.target\), to = moved \? S\.target : aimAt\(r\);/.test(v) && /playsTo\(moved \? S\.target : null\)/.test(v), 'plays-like to the center, or to the moved target');
     assert.ok(/'Suggested: ' \+ sg\.name \+ ' \(your ' \+ bagShown\(sg\.yd\) \+ '\)'/.test(v), '"Suggested: 7-iron (your 158)"');
-    assert.ok(/bagAsk\(m \/ G\.M_PER_YD\);/.test(v), 'asked after the measured shot');
+    // URGENT-049: every mark asks the club for the shot FROM there (the chips), the carry closes at the next mark.
+    assert.ok(/S\.measureFrom = fix\.pt;\s*flash\('Shot: '[\s\S]{0,200}chipsMark\(fix\.pt\);/.test(v) && /if \(res\.open\) bagAsk\(toYd, plYd, ctx\.club\);/.test(v), 'asked at the mark');
     const sec = v.slice(v.indexOf('// ---- MY CLUB DISTANCES'), v.indexOf('// ONE TAP (gps-features): the shot, here'));
     assert.ok(sec.length > 500 && !/\.ref\(|\.set\(|\.update\(|fetch\(/.test(sec.replace(/B\.set\(/g, '')), 'nothing written to the database or sent');
     // The live rules have no per-golfer path a phone may write this to (pushPrefs/<uid> takes bets / hype only).
