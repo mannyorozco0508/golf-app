@@ -686,7 +686,7 @@
         + '#hp-score-sheet .hp-ss-n.mark-double{box-shadow:inset 0 0 0 2px currentColor,inset 0 0 0 4px var(--ss-bg),inset 0 0 0 6px currentColor;border-radius:3px;}'
         + '#hp-score-sheet .hp-ss-par .hp-ss-n{height:28px;}#hp-score-sheet .hp-ss-more{margin-top:8px;}'
         + '#hp-score-sheet .hp-ss-note{font-size:14px;color:#a7aea4;margin:14px 2px 0;}'
-        + '#hp-score-sheet textarea.hp-ss-notes{width:100%;box-sizing:border-box;min-height:84px;margin-top:8px;border-radius:12px;border:1px solid #3a423a;background:#1b211b;color:#f4f4ef;font:500 16px/1.35 inherit;padding:10px;}'
+        + '#hp-score-sheet textarea.hp-ss-notes{width:100%;box-sizing:border-box;min-height:84px;margin-top:8px;border-radius:12px;border:1px solid #3a423a;background:#1b211b;color:#f4f4ef;font-family:inherit;font-size:16px;font-weight:500;line-height:1.35;padding:10px;}'
         + '#hp-score-sheet .hp-ss-saved{font-size:12px;color:#8f978c;margin:14px 2px 0;}'
         // Notes | Save on one line; when Save's words do not fit beside Notes (large text, small phone),
         // Save moves up onto its own line above Notes - never wrapped or cut.
