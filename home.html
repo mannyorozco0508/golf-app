@@ -127,7 +127,9 @@
 <!-- SIMPLER HARDPAN HOME (mailbox 017): four doors + Resume. Shown instead of MAIN when
      features.simpleFlow is on (front-door.js simpleView); off, MAIN below exactly as before. -->
 <div class="hp-view" id="v-simple">
-  <div class="hs-hello" id="hs-hello">HardPan</div>
+  <!-- URGENT-048: the profile spot, top right of the title row (hp-account-ui.js): "Sign in" pill when
+       signed out or anonymous, the golfer's initial when signed in. Nothing on Home needs it. -->
+  <div class="hpa-hrow"><div class="hs-hello" id="hs-hello">HardPan</div><button type="button" id="hpa-spot" class="hpa-pill" data-hpa-state="out" aria-label="Sign in"><span class="pi"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0f4c3a" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>Sign in</button></div>
   <!-- URGENT-013 (setup v2): the original two doors. Both open the one Course & Tees screen
        (simple-flow.js); GPS: "Start GPS" -> the map; Games & Bets: Players -> Games -> Start. -->
   <button type="button" class="hp-door gps hs-door" data-hp-act="sgpsdoor">
@@ -243,6 +245,8 @@
     const db = firebase.database();
 </script>
 <script src="front-door.js"></script>
+<!-- URGENT-048: Home's Sign in pill, the sign-in sheet and the profile sheet (UI over window.HardPanAuth). -->
+<script src="hp-account-ui.js"></script>
 <script>
     if (window.HardPanHome) window.HardPanHome.start(db);
     if (window.HardPanGpsStats) ['hp-mystats-main', 'hp-mystats-gps'].forEach(function (id) { window.HardPanGpsStats.placeHome(document.getElementById(id)); });
