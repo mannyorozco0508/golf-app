@@ -156,15 +156,43 @@
         + '#hp-addg .ag-cta{display:block;width:100%;min-height:56px;border:0;border-radius:16px;background:#0f4c3a;color:#fff;font:800 18px inherit;margin-top:14px;cursor:pointer}'
         + '#hp-addg .ag-cta[disabled]{opacity:.5}'
         + '#hp-addg .ag-err{color:#b42318;font-weight:700;font-size:14px;margin:8px 2px 0}'
-        + '#hp-addg .ag-note{font-size:13px;color:#667;line-height:1.4}';
+        + '#hp-addg .ag-note{font-size:13px;color:#667;line-height:1.4}'
+        // URGENT-044: THE SHORT FORM (the score sheet's "+ Add") - dark, over the score sheet, as the 042 preview.
+        + '#hp-addg.ag-short{z-index:2147483000;color-scheme:dark}'
+        + '#hp-addg.ag-short .ag-scrim{background:rgba(0,0,0,.45)}'
+        + '#hp-addg.ag-short .ag-panel{background:#111611;color:#f4f4ef;border-radius:24px 24px 0 0;padding:10px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.5)}'
+        + '#hp-addg.ag-short .ag-grab{width:42px;background:#5b625a;margin:0 auto 2px}'
+        + '#hp-addg.ag-short .ag-top{padding:8px 18px 2px}#hp-addg.ag-short h2{font-size:24px;color:#fff}'
+        + '#hp-addg.ag-short .ag-cancel{border:0;background:none;color:#a7aea4;font-family:inherit;font-size:17px;font-weight:600;min-height:44px;padding:0 2px;cursor:pointer}'
+        + '#hp-addg.ag-short .ag-sub{font-size:14px;font-weight:600;color:#a7aea4;margin:0 18px 6px}'
+        + '#hp-addg.ag-short .ag-body{padding:0 18px 4px}'
+        + '#hp-addg.ag-short .ag-h{margin:14px 0 8px;font-size:14px;letter-spacing:.06em;color:#d7dcd3}'
+        + '#hp-addg.ag-short input{width:100%;background:#1b211b;color:#fff;border:0;box-shadow:inset 0 0 0 1px #3a423a;font-size:19px;font-weight:700}'
+        + '#hp-addg.ag-short input:focus{outline:0;box-shadow:inset 0 0 0 2px #c8f07a}'
+        + '#hp-addg.ag-short #ag-hcp{width:100%;text-align:left}'
+        + '#hp-addg.ag-short .ag-two{display:flex;gap:12px}#hp-addg.ag-short .ag-two>div:first-child{flex:0 0 96px}#hp-addg.ag-short .ag-two>div:last-child{flex:1;min-width:0}'
+        + '#hp-addg.ag-short .ag-tees{display:flex;flex-wrap:wrap;gap:6px}'
+        + '#hp-addg.ag-short .ag-tees button{flex:1 1 0;min-width:70px;min-height:52px;border:0;border-radius:14px;background:#262c26;color:#f4f4ef;font-family:inherit;font-size:16px;font-weight:700;padding:0 4px;cursor:pointer}'
+        + '#hp-addg.ag-short .ag-tees button.on{background:#c8f07a;color:#0b0f0c}'
+        + '#hp-addg.ag-short .ag-from{margin-top:16px;padding:12px 14px;border-radius:14px;background:#1b211b;box-shadow:inset 0 0 0 1px #3a423a;font-size:18px;font-weight:800;color:#fff}'
+        + '#hp-addg.ag-short .ag-from small{display:block;font-size:13.5px;font-weight:600;color:#a7aea4;margin-top:3px}'
+        + '#hp-addg.ag-short .ag-holes{display:flex;gap:6px;margin-top:10px}'
+        + '#hp-addg.ag-short .ag-holes span{flex:1;height:44px;border-radius:10px;background:#1b211b;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#8f978c}'
+        + '#hp-addg.ag-short .ag-holes span b{font-size:16px;color:#5b625a;font-weight:800}'
+        + '#hp-addg.ag-short .ag-holes span.now{box-shadow:inset 0 0 0 2px #c8f07a;color:#c8f07a}#hp-addg.ag-short .ag-holes span.now b{color:#c8f07a}'
+        + '#hp-addg.ag-short .ag-holes span.later b{color:#3a423a}'
+        + '#hp-addg.ag-short .ag-err{color:#ff8a80;margin:10px 18px 0}'
+        + '#hp-addg.ag-short .ag-foot{margin-top:14px;padding:12px 18px calc(env(safe-area-inset-bottom) + 16px);border-top:1px solid #262c26}'
+        + '#hp-addg.ag-short .ag-cta{margin:0;background:#c8f07a;color:#0b0f0c;font-family:inherit;font-size:20px;font-weight:800}';
     function root() {
         var e = D.getElementById('hp-addg');
-        if (e) return e;
+        if (e) { e.classList.toggle('ag-short', !!(S.short && S.mode === 'add')); return e; }
         var st = D.createElement('style'); st.id = 'hp-addg-css'; st.textContent = CSS; D.head.appendChild(st);
         e = D.createElement('div'); e.id = 'hp-addg'; e.setAttribute('role', 'dialog'); e.setAttribute('aria-modal', 'true'); e.setAttribute('aria-label', 'Add golfer');
         D.body.appendChild(e);
         e.addEventListener('click', onClick);
         e.addEventListener('input', onInput);
+        e.classList.toggle('ag-short', !!(S.short && S.mode === 'add'));
         return e;
     }
     function teeRowsHtml() {
@@ -189,6 +217,7 @@
     function render() {
         if (S.mode === 'edit') { renderEdit(); return; }
         if (S.mode === 'list') { renderList(); return; }
+        if (S.short) { renderShort(); return; }
         var e = root(), y = e.querySelector('.ag-panel') ? e.querySelector('.ag-panel').scrollTop : 0;
         var gs = bounds(), plus = /^\+/.test(S.hcp), rt = roundTeeKey(S.tees || []);
         var h = '<div class="ag-scrim" data-ag="close"></div><div class="ag-panel"><div class="ag-grab"></div>'
@@ -213,6 +242,49 @@
             + '<button type="button" class="ag-cta" data-ag="save"' + (S.saving || !n ? ' disabled' : '') + '>' + (S.saving ? 'Adding…' : n > 1 ? 'Add ' + n + ' golfers' : 'Add') + '</button></div>';
         e.innerHTML = h;
         var p = e.querySelector('.ag-panel'); if (p) p.scrollTop = y;
+    }
+    // ---- URGENT-044: THE SHORT FORM (the score sheet's "+ Add", HardPanAddGolfer.open({ short: true,
+    // fromHole: N })). Name, HCP, Tee, "Add from hole N" (the holes before it stay blank), one button,
+    // Cancel. No "+ Add another", My golfers or Paste several - those stay on the full sheet (Round
+    // settings > Add golfer). The save is the same save() below: the same draft, buildPlayersUpdate,
+    // one guarded update. A golfer added on hole N simply has no scores before it - nothing else written.
+    // "Holes 1–2" / "Hole 1" / "Holes 10–18, 1–2": the holes before N, in play order.
+    function blankHoles(list) {
+        var hs = (list || []).map(Number).filter(function (n) { return n > 0; });
+        if (!hs.length) return '';
+        var runs = [], a = hs[0], b = hs[0];
+        for (var i = 1; i <= hs.length; i++) {
+            if (i < hs.length && hs[i] === b + 1) { b = hs[i]; continue; }
+            runs.push(a === b ? String(a) : a + '\u2013' + b);
+            if (i < hs.length) { a = b = hs[i]; }
+        }
+        return (hs.length === 1 ? 'Hole ' : 'Holes ') + runs.join(', ');
+    }
+    function shortCta() { var n = S.name.trim(); return S.saving ? 'Adding\u2026' : 'Add ' + (n || 'golfer') + ' \u00b7 from hole ' + S.fromHole; }
+    function shortBlank() { var b = blankHoles(S.before), n = S.name.trim(); return b ? b + ' stay blank for ' + (n || 'them') : 'Their card starts here'; }
+    function renderShort() {
+        var e = root();
+        var order = S.order, i = order.indexOf(Number(S.fromHole)), st = Math.max(0, Math.min(i - 3, order.length - 7));
+        var strip = order.slice(st, st + 7).map(function (n, k) {
+            var at = st + k;
+            return at < i ? '<span><b>\u2013</b>' + n + '</span>' : at === i ? '<span class="now"><b>' + n + '</b>now</span>' : '<span class="later"><b>\u00b7</b>' + n + '</span>';
+        }).join('');
+        var tees = (S.tees || []).map(function (r) {
+            var dup = (S.tees || []).filter(function (x) { return nk(x.name) === nk(r.name); }).length > 1;
+            var on = S.tee === r.key;
+            return '<button type="button" class="' + (on ? 'on' : '') + '" data-ag-tee="' + esc(r.key) + '" aria-pressed="' + on + '">' + esc(r.name) + (dup && r.gender === 'female' ? ' (W)' : '') + '</button>';
+        }).join('');
+        var h = '<div class="ag-scrim" data-ag="close"></div><div class="ag-panel"><div class="ag-grab"></div>'
+            + '<div class="ag-top"><h2>Add golfer</h2><button type="button" class="ag-cancel" data-ag="close">Cancel</button></div>'
+            + '<div class="ag-sub">Joins this group' + (S.where ? ' \u00b7 ' + esc(S.where) : '') + '</div><div class="ag-body">'
+            + '<div class="ag-h">NAME</div><input id="ag-name" type="text" placeholder="Name" autocomplete="off" autocapitalize="words" value="' + esc(S.name) + '">'
+            + '<div class="ag-two"><div><div class="ag-h">HCP</div><input id="ag-hcp" type="text" inputmode="decimal" autocomplete="off" value="' + esc(S.hcp) + '"></div>'
+            + (tees ? '<div><div class="ag-h">TEE</div><div class="ag-tees">' + tees + '</div></div>' : '') + '</div>'
+            + '<div class="ag-from" id="ag-from">Add from hole ' + esc(S.fromHole) + '<small>' + esc(shortBlank()) + '</small></div>'
+            + (strip ? '<div class="ag-holes" aria-hidden="true">' + strip + '</div>' : '') + '</div>'
+            + (S.err ? '<div class="ag-err" role="alert">' + esc(S.err) + '</div>' : '')
+            + '<div class="ag-foot"><button type="button" class="ag-cta" data-ag="save"' + (S.saving || !S.name.trim() ? ' disabled' : '') + '>' + esc(shortCta()) + '</button></div></div>';
+        e.innerHTML = h;
     }
     // ---- EDIT ONE GOLFER (URGENT-018): name, HCP, tee, group, Out - in place ------------
     function playerById(id) { return ((data() || {}).players || []).filter(function (p) { return String(p.id) === String(id); })[0] || null; }
@@ -360,10 +432,16 @@
     function onInput(ev) {
         var t = ev.target;
         if (t.id === 'ag-name') S.name = t.value;
+        else if (t.id === 'ag-hcp' && S.short && S.mode === 'add') S.hcp = String(t.value || '').trim();   // the short form: "+2" typed as is
         else if (t.id === 'ag-hcp') { var v = String(t.value || '').trim(); S.hcp = /^\+/.test(v) ? v : (/^\+/.test(S.hcp) && v ? '+' + v : v); if (/^\+/.test(v)) { t.value = v.slice(1); render(); var h = D.getElementById('ag-hcp'); if (h) { h.focus(); h.setSelectionRange(h.value.length, h.value.length); } } }
         else if (t.id === 'ag-paste') S.pasteText = t.value;
         if (S.mode === 'edit') { var mo = D.getElementById('ag-money'), mt = editMoney(); if (mo) mo.textContent = mt; return; }
         var cta = D.querySelector('#hp-addg [data-ag="save"]');
+        if (S.short && S.mode === 'add') {
+            if (cta && !S.saving) { cta.disabled = !S.name.trim(); cta.textContent = shortCta(); }
+            var sm = D.querySelector('#ag-from small'); if (sm) sm.textContent = shortBlank();
+            return;
+        }
         if (cta && !S.saving) { var n = S.list.length + (S.name.trim() ? 1 : 0); cta.disabled = !n; cta.textContent = n > 1 ? 'Add ' + n + ' golfers' : 'Add'; }
     }
     function onClick(ev) {
@@ -465,8 +543,20 @@
         if (!data() || !code()) return false;
         if (teesCode !== code()) { teesCode = code(); S.tees = null; }
         S = { open: true, mode: 'add', why: o.why || '', from: null, edit: null, out: false, list: [], name: o.name || '', hcp: '', tee: '', group: o.group || myGroup(), err: '', saving: false, paste: false, pasteText: '', tees: S.tees, chips: null, onDone: o.onDone || null };
+        // URGENT-044: the short form (the score sheet's "+ Add"): from hole N, the holes before it blank.
+        var fh = Number(o.fromHole);
+        if (o.short && fh > 0) {
+            var nums = function (a) { return Array.isArray(a) ? a.map(Number).filter(function (n) { return n > 0; }) : null; };
+            var rng = function (a, b) { var r = []; for (var k = a; k <= b; k++) r.push(k); return r; };
+            S.short = true; S.fromHole = fh; S.where = String(o.where || '');
+            // The play order: the holes played so far (the score sheet's, up to N), then the rest of the card.
+            var total = Math.max(fh, ((data() || {}).courseData || []).length || 18);
+            S.order = nums(o.holes) || []; if (S.order.indexOf(fh) < 0) S.order = rng(1, total);
+            for (var nx = fh % total + 1; S.order.length < total && S.order.indexOf(nx) < 0; nx = nx % total + 1) S.order.push(nx);
+            S.before = nums(o.before) || S.order.slice(0, S.order.indexOf(fh));
+        }
         if (S.tees && S.tees.length) S.tee = roundTeeKey(S.tees);
-        loadTees(); loadChips();
+        loadTees(); if (!S.short) loadChips();
         render();
         root().classList.add('open');
         if (!organizer()) { S.err = 'Only the round’s organizer can add golfers.'; render(); }
@@ -495,7 +585,7 @@
         if (!organizer()) { S.err = 'Only the round\u2019s organizer can change golfers.'; render(); }
         return true;
     }
-    function close() { S.open = false; var e = D.getElementById('hp-addg'); if (e) { e.classList.remove('open'); e.innerHTML = ''; } }
+    function close() { S.open = false; var e = D.getElementById('hp-addg'); if (e) { e.classList.remove('open', 'ag-short'); e.innerHTML = ''; } }
     function isOpen() { return !!S.open; }
     // A NEW ROUND'S TEES ARE THE COURSE'S: forgotten when the sheet opens on another round (a new
     // code) - checked on open, not on a timer (a never-ending interval kept every harness test that
@@ -550,5 +640,5 @@
         if (W.GolfBack && typeof W.GolfBack.register === 'function') W.GolfBack.register({ name: 'hp-addgolfer', priority: 3, isOpen: isOpen, close: close });
     } catch (e) {}
 
-    W.HardPanAddGolfer = { open: open, openEdit: openEdit, openGolfers: openGolfers, close: close, isOpen: isOpen, myGroup: myGroup, _teeRowsOf: teeRowsOf };
+    W.HardPanAddGolfer = { open: open, openEdit: openEdit, openGolfers: openGolfers, close: close, isOpen: isOpen, myGroup: myGroup, blankHoles: blankHoles, _teeRowsOf: teeRowsOf };
 })();
