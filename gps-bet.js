@@ -426,6 +426,8 @@
                 }).join('') + '<button type="button" class="hb-tile' + (st.game === 'skins' ? ' on' : '') + '" data-hb="more"><b>More \u203a</b><span>Skins, Dots, 9 Points\u2026</span></button></div>';
             } else {
                 html += '<div class="hb-tiles"><button type="button" class="hb-tile' + (st.game === 'skins' ? ' on' : '') + '" data-hb-game="skins"><b>Skins</b><span>Any number \u00b7 pick who\u2019s in</span></button>'
+                    // URGENT-045 #2b: Long Drive (gps-longdrive.js) - paid by the Weekly Game's KP money, as a KP hole.
+                    + (window.HardPanGpsLd ? '<button type="button" class="hb-tile" data-hb="longdrive"><b>Long Drive</b><span>One hole \u00b7 paid like a KP</span></button>' : '')
                     + '<button type="button" class="hb-tile" data-hb="other"><b>Other games \u203a</b><span>Dots, 9 Points, Birdies\u2026</span></button>'
                     + '<button type="button" class="hb-tile" data-hb="less"><b>\u2039 Back</b><span>Match, Nassau\u2026</span></button></div>';
             }
@@ -616,6 +618,7 @@
         if (a === 'more') { st.more = true; draw(); return; }
         if (a === 'less') { st.more = false; if (st.game === 'skins') { st.game = null; st.picks = []; } draw(); return; }
         if (a === 'other') { var rt = st.returnTo; close(); moreGames(rt); return; }
+        if (a === 'longdrive') { var rtl = st.returnTo; close(); openWeekly({ turnOn: true, longDrive: true, returnTo: rtl }); return; }
         if (a === 'swap') {
             var n = st.picks.length;
             st.picks = (n >= 4 || (st.mode === '2v2' && n > 2)) ? st.picks.slice(2).concat(st.picks.slice(0, 2)) : st.picks.slice().reverse();
@@ -778,27 +781,41 @@
             skMode: (base.skins && base.skins.mode) || 'remainder', skAmt: String(base.skins && base.skins.amount ? base.skins.amount : ''),
             skScoring: (base.skins && base.skins.scoring) || 'net', skCarry: !(base.skins && base.skins.carryOver === false),
             err: '', saving: false, returnTo: o.returnTo || null, onDone: o.onDone || null };
+        // URGENT-045 #2b LONG DRIVE: its hole is one of kp.holes (the KP money pays it as-is), shown
+        // apart from the KP chips; moneyPool.longDrive = { holes, allowRough } says which one it is.
+        var ld = base.longDrive || null;
+        wk.ldHoles = ld && Array.isArray(ld.holes) ? ld.holes.map(Number) : [];
+        wk.ldRough = !!(ld && ld.allowRough === true);
+        wk.ldShow = !!(o.longDrive || wk.ldHoles.length);
+        wk.ldNew = !!(o.longDrive && !wk.ldHoles.length);
+        wk.kpHoles = wk.kpHoles.filter(function (h) { return wk.ldHoles.indexOf(h) === -1; });
         wkDraw();
         wkRoot().classList.add('open');
+        if (o.longDrive) { try { var ldEl = document.getElementById('wk-ld'); if (ldEl && ldEl.scrollIntoView) ldEl.scrollIntoView({ block: 'start' }); } catch (e) {} }
         return true;
     }
     function wkClose() { var r = document.getElementById('hp-weekly'); if (r) r.classList.remove('open'); wk = null; }
     function wkPool() {
         var num = function (v) { return parseFloat(v) || 0; };
         var pool = { enabled: true, buyIn: num(wk.buyIn) };
-        if (num(wk.kpAmt) > 0) pool.kp = { amount: num(wk.kpAmt), holes: wk.kpHoles.slice().sort(function (a, b) { return a - b; }) };
+        var ldh = (wk.ldHoles || []).slice();
+        if (num(wk.kpAmt) > 0) pool.kp = { amount: num(wk.kpAmt), holes: wk.kpHoles.concat(ldh.filter(function (h) { return wk.kpHoles.indexOf(h) === -1; })).sort(function (a, b) { return a - b; }) };
         if (wk.netCustom) { var am = wk.netAmounts.map(function (v) { var n = parseFloat(v); return isNaN(n) ? '' : n; }); if (am.some(function (v) { return v !== ''; })) pool.net = { payoutMode: 'custom', amounts: am }; }
         else if (num(wk.netAmt) > 0) pool.net = { amount: num(wk.netAmt), places: wk.netPlaces.slice() };
         pool.skins = { mode: wk.skMode, scoring: wk.skScoring, carryOver: wk.skCarry };
         if (wk.skMode === 'fixed') pool.skins.amount = num(wk.skAmt);
         // Every key Round Setup's form does not own rides along (participantIds, ...).
-        Object.keys(wk.pool || {}).forEach(function (k) { if (['enabled', 'buyIn', 'kp', 'net', 'skins'].indexOf(k) === -1 && pool[k] === undefined) pool[k] = wk.pool[k]; });
+        if (ldh.length) pool.longDrive = { holes: ldh.sort(function (a, b) { return a - b; }), allowRough: !!wk.ldRough };
+        Object.keys(wk.pool || {}).forEach(function (k) { if (['enabled', 'buyIn', 'kp', 'net', 'skins', 'longDrive'].indexOf(k) === -1 && pool[k] === undefined) pool[k] = wk.pool[k]; });
         return pool;
     }
     function wkCheck(pool) {
         if (typeof validateMoneyPool !== 'function') return { valid: false, errors: ['This page cannot check the pot - use Round settings › Full setup.'] };
         var d = data() || {};
-        return validateMoneyPool(Object.assign({}, d, { moneyPool: pool }), d.courseData || []);
+        var v = validateMoneyPool(Object.assign({}, d, { moneyPool: pool }), d.courseData || []);
+        if (wk && wk.on && wk.ldNew && !(wk.ldHoles || []).length) v = Object.assign({}, v, { valid: false, errors: ['Pick the Long Drive hole.'].concat(v.errors || []) });
+        else if (pool && pool.longDrive && !(pool.kp && Number(pool.kp.amount) > 0)) v = Object.assign({}, v, { valid: false, errors: ['Long Drive is paid from the KP money - enter the KP money.'].concat(v.errors || []) });
+        return v;
     }
     function wkDraw() {
         if (!wk) return;
@@ -812,7 +829,14 @@
                 + '<div class="hb-row"><span>Buy-in</span><span>$ <input class="hb-custom" data-wk-in="buyIn" inputmode="decimal" value="' + esc(wk.buyIn) + '" aria-label="Buy-in"></span></div>'
                 + '<div class="hb-row"><span>Pot</span><b id="wk-pot">$' + esc(String(Math.round(v.totalPool || 0))) + '</b></div></div>';
             h += '<div class="hb-h">KP (closest to the pin)</div><div class="hb-card"><div class="hb-row"><span>KP money</span><span>$ <input class="hb-custom" data-wk-in="kpAmt" inputmode="decimal" value="' + esc(wk.kpAmt) + '" aria-label="KP money"></span></div></div>';
-            if (holes.length) h += '<div class="hb-chips" style="margin-top:8px;">' + holes.map(function (x) { return '<button type="button" class="hb-chip' + (wk.kpHoles.indexOf(x.n) > -1 ? ' on' : '') + '" data-wk-kp="' + x.n + '" aria-pressed="' + (wk.kpHoles.indexOf(x.n) > -1) + '">' + x.n + (x.par === 3 ? ' · P3' : '') + '</button>'; }).join('') + '</div>';
+            if (holes.length) h += '<div class="hb-chips" style="margin-top:8px;">' + holes.filter(function (x) { return (wk.ldHoles || []).indexOf(x.n) === -1; }).map(function (x) { return '<button type="button" class="hb-chip' + (wk.kpHoles.indexOf(x.n) > -1 ? ' on' : '') + '" data-wk-kp="' + x.n + '" aria-pressed="' + (wk.kpHoles.indexOf(x.n) > -1) + '">' + x.n + (x.par === 3 ? ' · P3' : '') + '</button>'; }).join('') + '</div>';
+            if (wk.ldShow) {
+                // LONG DRIVE: one par 4 / 5; its share of the KP money is paid as a KP hole's is.
+                var nk = wk.kpHoles.length + wk.ldHoles.length, amt = parseFloat(wk.kpAmt) || 0;
+                h += '<div class="hb-h" id="wk-ld">Long Drive (one hole, in the fairway)</div><div class="hb-chips">' + holes.filter(function (x) { return x.par >= 4; }).map(function (x) { var on1 = wk.ldHoles.indexOf(x.n) > -1; return '<button type="button" class="hb-chip' + (on1 ? ' on' : '') + '" data-wk-ld="' + x.n + '" aria-pressed="' + on1 + '">' + x.n + ' · P' + x.par + '</button>'; }).join('') + '</div>'
+                    + '<div class="hb-card"><div class="hb-row"><span>Rough counts</span><span class="hb-seg">' + seg('ldRough', true, 'Yes') + seg('ldRough', false, 'No') + '</span></div></div>'
+                    + '<div class="hb-worst">Paid from the KP money like a KP hole' + (nk && amt > 0 ? ': $' + esc(String(amt)) + ' over ' + nk + ' hole' + (nk === 1 ? '' : 's') + ' (KP + Long Drive), about $' + esc(String(Math.floor(amt / nk))) + ' each' : '') + '. Golfers tap “Mark my drive” on the GPS.</div>';
+            }
             h += '<div class="hb-h">Net finish</div><div class="hb-card">';
             if (wk.netCustom) {
                 h += wk.netAmounts.map(function (a, i) { return '<div class="hb-row"><span>' + ['1st', '2nd', '3rd', '4th'][i] + '</span><span>$ <input class="hb-custom" data-wk-netc="' + i + '" inputmode="decimal" value="' + esc(a) + '"></span></div>'; }).join('');
@@ -852,6 +876,7 @@
         if (!t || !wk) return;
         if ((b = t.closest('[data-wk-set]'))) { var k = b.getAttribute('data-wk-set'), v = b.getAttribute('data-v'); wk[k] = v === 'true' ? true : v === 'false' ? false : v; wk.err = ''; wkDraw(); return; }
         if ((b = t.closest('[data-wk-kp]'))) { var n = Number(b.getAttribute('data-wk-kp')), i = wk.kpHoles.indexOf(n); if (i > -1) wk.kpHoles.splice(i, 1); else wk.kpHoles.push(n); wkDraw(); return; }
+        if ((b = t.closest('[data-wk-ld]'))) { var nl = Number(b.getAttribute('data-wk-ld')); wk.ldHoles = wk.ldHoles.indexOf(nl) > -1 ? [] : [nl]; wk.kpHoles = wk.kpHoles.filter(function (x) { return x !== nl; }); wk.err = ''; wkDraw(); return; }
         if ((b = t.closest('[data-wk-places]'))) { wk.netPlaces = b.getAttribute('data-wk-places').split(',').map(Number); wkDraw(); return; }
         b = t.closest('[data-wk]'); if (!b) return;
         var a = b.getAttribute('data-wk');
