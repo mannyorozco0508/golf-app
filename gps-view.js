@@ -674,7 +674,7 @@
     function layupSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('layupFromYou') !== false; } catch (e) { return true; } }
     // { bag: { club: { yd } }, own } - My bag when it has a number, else the setup's defaults.
     function layupCarries(B, useBag) {
-        var b = useBag ? B.bag(bagGolfer()) : null;
+        var b = useBag ? bagNow(B) : null;
         if (b && Object.keys(b).length) return { bag: b, own: true };
         var dc = B.defaultCarries(bagHcp()), out = {};
         Object.keys(dc).forEach(function (c) { out[c] = { yd: dc[c] }; });
@@ -1784,7 +1784,7 @@
         var B = bagApi();
         // My bag lives in gps-shots.js, read on first use: load it, then place the tee shot again.
         if (!B) { if (S && !S.teeLoad) { S.teeLoad = true; var mine = S; withShots(function () { if (S === mine && !S.targetMoved) { placeTarget(resolved()); render(); } }); } return null; }
-        var b = null; try { b = bagSwitch() ? B.bag(bagGolfer()) : null; } catch (e) { b = null; }
+        var b = null; try { b = bagSwitch() ? bagNow(B) : null; } catch (e) { b = null; }
         if (b && b.Dr && b.Dr.yd > 0) return { yd: b.Dr.yd, own: true };
         try { var dc = B.defaultCarries(bagHcp()); if (dc && dc.Dr > 0) return { yd: dc.Dr, own: false }; } catch (e) {}
         return null;
@@ -3141,7 +3141,26 @@
         var to = targetPt ? ptElev(r, targetPt) : ptElev(r, r.mid, 'mid');
         var q = playsAir(w, r);
         q.yards = D; q.elevFromFt = originElev(r, o); q.elevToFt = to; q.shotBearingDeg = G.bearingDeg(o.pt, aim);
-        return G.playsLike(q);
+        return playsLearned(G.playsLike(q), D, w, has, q.shotBearingDeg);
+    }
+    // 049: THE GOLFER'S OWN WIND. The club for this plays-like (My bag's suggestion); once that club
+    // qualifies (8+ logged shots in wind over 5 mph), its wind term is the golfer's own
+    // (gps-shot-bag.js adjust -> gps-wind-learn.js windTerm), the slope / temperature / altitude
+    // terms unchanged. The club is picked again for the new number (once). Else: as before.
+    function playsLearned(pl, D, w, has, brg) {
+        var SB = shotBag(), B = bagApi();
+        if (!pl || !SB || !B || !has || !bagSwitch() || tournament() || !(w.mph > 0)) return pl;
+        try {
+            var g = bagGolfer(), bag = bagNow(B), o = { yards: D, mph: w.mph, fromDeg: w.fromDeg, bearingDeg: brg, golfer: g };
+            var sg = B.suggestClub(bag, pl.exact);
+            if (!sg) return pl;
+            var p2 = SB.adjust(pl, Object.assign({ club: sg.club }, o));
+            if (p2 && p2.learned) {
+                var sg2 = B.suggestClub(bag, p2.exact);
+                if (sg2 && sg2.club !== sg.club) { var p3 = SB.adjust(pl, Object.assign({ club: sg2.club }, o)); if (p3 && p3.learned) p2 = p3; }
+            }
+            return p2 || pl;
+        } catch (e) { return pl; }
     }
     function syncPlays() {
         if (!S) return;
@@ -3198,7 +3217,7 @@
                 text = 'Plays ' + (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (parts.length ? ': ' + parts.join(', ') : '');
                 var B = bagApi();
                 if (bagSwitch() && B && o.from === 'me') {
-                    var sg = B.suggestClub(B.bag(bagGolfer()), pl.exact);
+                    var sg = B.suggestClub(bagNow(B), pl.exact);
                     if (sg) { text += ' \u2192 ' + sg.name + ' (your ' + bagShown(sg.yd) + ')'; S.plClub = true; }
                 }
                 if (has && w.mph > 0) {
@@ -3234,7 +3253,7 @@
     function playsClubNow() {
         var B = bagApi(), p = playsLineNow();
         if (!p || p.from !== 'me' || !B || !bagSwitch() || tournament()) return null;
-        var sg = B.suggestClub(B.bag(bagGolfer()), p.exact);
+        var sg = B.suggestClub(bagNow(B), p.exact);
         return sg ? { club: sg.club, short: (B.SHORT && B.SHORT[sg.club]) || sg.club, name: sg.name, yd: sg.yd, shown: bagShown(sg.yd) } : null;
     }
     // THE (i) SHEET, "THIS SHOT" (012): the breakdown the simple line leaves out - the shot,
@@ -3264,12 +3283,31 @@
         var box = sh && sh.querySelector('.gps-plinfo-now');
         if (!box) return;
         var rows = simpleSwitch() ? playsInfoNow() : [];
-        var key = rows.join('|');
+        var src = rows.length ? playsSrcNow() : null;
+        var key = rows.join('|') + '|' + (src ? src.text : '');
         if (box.getAttribute('data-rows') === key) return;
         box.setAttribute('data-rows', key);
         box.textContent = '';
         rows.forEach(function (t, i) { var d = document.createElement('div'); d.className = i ? 'gps-plinfo-row' : 'gps-plinfo-row gps-plinfo-shot'; d.textContent = t; box.appendChild(d); });
+        // 049: whose wind numbers - "From your 14 marked 7-iron shots: ..." or "Generic wind model - N more ...".
+        if (src) {
+            var sd = document.createElement('div'); sd.className = 'gps-plinfo-src' + (src.learned ? '' : ' gen'); sd.textContent = src.text; box.appendChild(sd);
+            if (!src.learned) {
+                var bar = document.createElement('div'); bar.className = 'gps-plinfo-bar'; var bi = document.createElement('i'); bi.style.width = Math.round(100 * src.have / 8) + '%'; bar.appendChild(bi); box.appendChild(bar);
+                var sb = document.createElement('div'); sb.className = 'gps-plinfo-row gps-plinfo-srcsub'; sb.textContent = src.sub; box.appendChild(sb);
+            }
+        }
         box.style.display = rows.length ? '' : 'none';
+    }
+    // 049: the (i)'s wind-source line for the plays-like club (gps-shot-bag.js infoText), or null.
+    function playsSrcNow() {
+        var SB = shotBag(), c = playsClubNow();
+        if (!SB || !c) return null;
+        try {
+            var r = resolved(), o = origin(r), tp = playsAim(r), aim = tp || aimAt(r), w = effectiveWind(), now = null;
+            if (o && aim && w && !w.none && w.mph > 0) now = { mph: w.mph, rel: ((w.fromDeg - G.bearingDeg(o.pt, aim)) % 360 + 360) % 360 };
+            return SB.infoText(bagGolfer(), c.club, now);
+        } catch (e) { return null; }
     }
     function openPlaysInfo() { var sh = plInfoSheet(); if (!sh) return; closeMenus(); sh.style.display = ''; fillPlaysInfo(); }
 
@@ -3954,6 +3992,7 @@
         maybeAskWho();
         aaTick();
         markTick(r);
+        try { chipsTick(r, o, nums); } catch (e) {}
     }
     // URGENT-045 THE "MARK ..." BUTTON (gps-mark-distance.js; KP by GPS gps-kp.js, Long Drive): on the
     // holes a feature claims. What it is handed: the hole, a getter for the live fix (read on the
@@ -3974,7 +4013,21 @@
     }
     // ---- SHOT BY SHOT (gps-features): mark, then replay - on this phone only ------
     function shotsApi() { return window.HardPanGpsShots || null; }
-    function withShots(fn) { loadScript('gps-shots.js', function () { return !!shotsApi(); }, function () { if (S && shotsApi()) fn(shotsApi()); }); }
+    // 049: the shot log (gps-shot-log.js), the wind math (gps-wind-learn.js) and what they teach My bag
+    // (gps-shot-bag.js) come with it - each optional: missing, My bag works as before.
+    function withShots(fn) {
+        loadScript('gps-shots.js', function () { return !!shotsApi(); }, function () {
+            loadScript('gps-shot-log.js', function () { return !!window.HardPanShotLog; }, function () {
+                loadScript('gps-wind-learn.js', function () { return !!window.HardPanWindLearn; }, function () {
+                    loadScript('gps-shot-bag.js', function () { return !!window.HardPanShotBag; }, function () { if (S && shotsApi()) fn(shotsApi()); });
+                });
+            });
+        });
+    }
+    // 049 MY BAG'S NUMBERS: HardPanGpsBag.bag with the shot log's learned still-air carry for a
+    // club with 3+ logged shots (a typed number still wins). Every club suggestion reads this.
+    function shotBag() { return window.HardPanShotBag || null; }
+    function bagNow(B) { var g = bagGolfer(), b = B.bag(g), SB = shotBag(); try { return SB && bagSwitch() ? SB.mergeBag(b, g) : b; } catch (e) { return b; } }
     // THE SHOT'S NUMBERS, at the moment it is marked: from the shot before (or the
     // tee) to here - yards, the slope (the hole line's heights, already on the phone),
     // the wind relative to THIS shot, and what it played like (gps-geo.playsLike: the
@@ -4009,13 +4062,13 @@
     function markShotHere() {
         if (!S) return;
         if (!fix) { flash('No GPS position yet'); return; }
-        if (!S.measureFrom) { S.measureFrom = fix.pt; S.measureShot = null; render(); return; }
+        if (!S.measureFrom) { S.measureFrom = fix.pt; S.measureShot = null; chipsMark(fix.pt); render(); return; }
         var m = G.haversineMeters(S.measureFrom, fix.pt);
         S.measureShot = { text: G.shownDistance(m, units()) + (units() === 'm' ? ' m' : ' yds'), at: Date.now() };
         S.measureFrom = fix.pt;
         flash('Shot: ' + S.measureShot.text);
-        // MY BAG (008): which club was that? (skippable, never in the way)
-        bagAsk(m / G.M_PER_YD);
+        // URGENT-049: this mark closes the shot before (its carry) and asks the club for the next.
+        chipsMark(fix.pt);
         render();
         setTimeout(function () { if (S) render(); }, 4100);
     }
@@ -4077,34 +4130,116 @@
         var mine = S;
         B.syncLoad(S.db, bagUid(), bagGolfer()).then(function (got) { if (got && S === mine) { render(); if (bagSheet() && bagSheet().style.display !== 'none') fillBag(); } });
     }
-    function bagAsk(yd) {
-        if (!S || !bagSwitch() || tournament() || !(yd > 0)) return;
-        var bar = S.el.querySelector('.gps-bagask');
-        if (!bar) return;
-        S.bagPending = { yd: yd, golfer: bagGolfer() };
+    // ---- URGENT-049: THE CLUB CHIPS AFTER "MARK SHOT" (gps-mark-chips.js) ----------------
+    // Every mark = where the ball is: it closes the shot before it (carry = mark -> mark) and
+    // opens the next with "Hitting 7-iron? · 149 to the green" - the likely club pre-selected
+    // from My bag (vs the plays-like yards to the green's center), one tap to change, Skip. A
+    // shot COUNTS only with a club; Skip = position only. The green (the golfer's fix on it) or
+    // the hole's end (a score, or auto-advance) closes the last one. A counted shot goes to the
+    // shot log (gps-shot-log.js, part 3) only; My bag reads its carry from there. No coordinates
+    // in any record: the marks stay in memory, on this phone. Tournament mode: none of this.
+    function chipsApi() { return window.HardPanMarkChips || null; }
+    function withChips(fn) {
         withShots(function () {
-            var B = bagApi();
-            if (!B || !S || !S.bagPending) return;
-            bar.querySelector('.gps-bagask-head').textContent = 'Shot ' + bagShown(yd) + (units() === 'm' ? ' m' : ' yds') + ' \u00b7 which club?';
-            var row = bar.querySelector('.gps-bagask-row');
-            row.textContent = '';
-            B.BAG.forEach(function (c) {
-                var b = document.createElement('button');
-                b.type = 'button'; b.textContent = c; b.setAttribute('data-bag-club', c); b.setAttribute('aria-label', B.NAMES[c]);
-                row.appendChild(b);
+            loadScript('gps-shot-log.js', function () { return !!window.HardPanShotLog; }, function () {
+                loadScript('gps-wind-learn.js', function () { return !!window.HardPanWindLearn; }, function () {
+                    loadScript('gps-mark-chips.js', function () { return !!chipsApi(); }, function () { if (S && chipsApi()) fn(chipsApi()); });
+                });
             });
-            bar.style.display = '';
-            clearTimeout(S.bagTimer);
-            S.bagTimer = setTimeout(function () { if (S) bagSkip(); }, BAG_ASK_MS);
         });
     }
-    function bagSkip() { var bar = S && S.el.querySelector('.gps-bagask'); if (bar) bar.style.display = 'none'; if (S) S.bagPending = null; }
+    function chipsOn() { return !!(S && bagSwitch() && !tournament() && !readOnlyHere()); }
+    function chipsCourse() { var rd = (S && S.round) || {}; return String(rd.courseName || (S && S.courseKey) || ''); }
+    function chipsMark(pt) {
+        if (!S || !pt || !chipsOn()) return;
+        var r = resolved(), green = r && r.mid ? r.mid : null, nums = r ? G.holeNumbers(pt, r) : null;
+        var toYd = green ? G.haversineMeters(pt, green) / G.M_PER_YD : null, pl = playsTo(null);
+        // Taken NOW (the shot's wind is the wind when it is hit; the hole may change before the scripts load).
+        var ctx = { hole: S.hole, green: green, wind: effectiveWind(), elevFt: r ? ptElev(r, pt) : null, course: chipsCourse(), golfer: bagGolfer(),
+            // On the green (a putt) or no green to aim at: this mark only closes the shot before.
+            noOpen: !green || !!(nums && nums.onGreen) };
+        var plYd = pl && isFinite(pl.exact) ? pl.exact : null, mine = S;
+        withChips(function (C) {
+            if (S !== mine) return;
+            var T = chipsTracker(C), op = T.open();
+            // A shot left open on another hole (the golfer looked ahead, then marked here).
+            if (op && op.hole !== ctx.hole) chipsEndOther(T, op);
+            ctx.club = ctx.noOpen ? null : C.likelyClub(bagApi(), ctx.golfer, plYd || toYd);
+            var res = T.mark(pt, ctx);
+            chipsClosed(res.closed);
+            if (res.open) bagAsk(toYd, plYd, ctx.club); else bagHide();
+        });
+    }
+    function chipsTracker(C) { if (!S.chips) S.chips = C.create({ dist: G.haversineMeters, bearing: G.bearingDeg }); return S.chips; }
+    function chipsClosed(c) {
+        if (!S || !c || !c.counted) return;
+        var B = bagApi();
+        // int-049: the shot log is the ONE source of a marked shot in My bag (mergeBag) - it is
+        // not also added to the old bag's shot list (that counted every shot twice, and Reset /
+        // swipe-to-delete in Shot history could not take the second copy out).
+        S.chipsLastId = c.id;
+        flash((B ? B.NAMES[c.club] : c.club) + ': ' + bagShown(c.carry) + (units() === 'm' ? ' m' : ' yds') + ' → your shots');
+    }
+    // The ball reached the green (pt = the golfer's fix there) or the hole is over (no pt: the
+    // ball finished at the green - its center). r: THIS hole (called before a hole change).
+    function chipsEnd(pt, r) {
+        var T = S && S.chips, op = T && T.open();
+        if (!op || op.hole !== S.hole) return;
+        var end = pt || T.openGreen();
+        bagHide();
+        chipsClosed(T.close(end, r && end ? (pt ? ptElev(r, end) : ptElev(r, end, 'mid')) : null));
+    }
+    function chipsEndOther(T, op) {
+        if (myScore(op.hole) != null) chipsClosed(T.close(T.openGreen(), null)); else T.discard();
+    }
+    function chipsTick(r, o, nums) {
+        var T = S && S.chips, op = T && T.open();
+        if (!op || op.hole !== S.hole) return;
+        if (fix && o && o.from === 'me' && nums && nums.onGreen) { chipsEnd(fix.pt, r); return; }
+        if (myScore(op.hole) != null) chipsEnd(null, r);
+    }
+    // "Hitting 7-iron? · 149 to the green": the bottom bar where "which club?" was (clean map).
+    function bagAsk(toYd, plYd, club) {
+        if (!S || !bagSwitch() || tournament() || readOnlyHere()) return;
+        var bar = S.el.querySelector('.gps-bagask'), B = bagApi();
+        if (!bar || !B) return;
+        var head = bar.querySelector('.gps-bagask-head'), sub = bar.querySelector('.gps-bagask-sub'), row = bar.querySelector('.gps-bagask-row');
+        var toTxt = toYd > 0 ? ' · ' + bagShown(toYd) + (units() === 'm' ? ' m' : '') + ' to the green' : '';
+        head.textContent = '';
+        if (club) { head.appendChild(document.createTextNode('Hitting ')); var b = document.createElement('b'); b.textContent = B.NAMES[club]; head.appendChild(b); head.appendChild(document.createTextNode('?' + toTxt)); }
+        else head.textContent = 'Which club?' + toTxt;
+        if (sub) {
+            var mine = club ? (B.bag(bagGolfer()) || {})[club] : null;
+            var plTxt = plYd > 0 && toYd > 0 && Math.round(plYd) !== Math.round(toYd) ? ', plays like ' + bagShown(plYd) : '';
+            sub.textContent = club ? 'Picked from My bag (' + B.NAMES[club] + (mine && mine.yd ? ' ' + bagShown(mine.yd) : '') + plTxt + '). Tap another to change.'
+                : 'Tap the club you’re hitting. Skip = not counted.';
+        }
+        row.textContent = '';
+        var on = null;
+        B.BAG.forEach(function (c) {
+            var btn = document.createElement('button');
+            btn.type = 'button'; btn.textContent = c === club ? c + ' ✓' : c; btn.setAttribute('data-bag-club', c); btn.setAttribute('aria-label', B.NAMES[c]);
+            if (c === club) { btn.className = 'on'; btn.setAttribute('aria-pressed', 'true'); on = btn; }
+            row.appendChild(btn);
+        });
+        bar.style.display = '';
+        if (on) { try { row.scrollLeft = Math.max(0, on.offsetLeft - (row.clientWidth - on.offsetWidth) / 2); } catch (e) {} }
+        clearTimeout(S.bagTimer);
+        // It goes after 20 s; the picked club stands (Skip is the only "no club").
+        S.bagTimer = setTimeout(function () { if (S) bagHide(); }, BAG_ASK_MS);
+    }
+    function bagHide() { var bar = S && S.el.querySelector('.gps-bagask'); if (bar) bar.style.display = 'none'; if (S) clearTimeout(S.bagTimer); }
+    function bagSkip() {
+        bagHide();
+        var T = S && S.chips;
+        if (T && T.open()) { T.skip(); flash('No club · this one is not counted'); }
+    }
     function bagPick(club) {
-        var B = bagApi(), p = S && S.bagPending;
-        bagSkip();
-        if (!B || !p) return;
-        if (B.add(p.golfer, club, p.yd)) { bagSaved(); flash(B.NAMES[club] + ': ' + bagShown(p.yd) + (units() === 'm' ? ' m' : ' yds') + ' \u2192 My bag'); }
-        else render();
+        var B = bagApi(), T = S && S.chips;
+        bagHide();
+        if (!B || !T || !T.open()) return;
+        T.pick(club);
+        flash(B.NAMES[club] + ' ✓');
     }
     function syncSuggest(r, o, nums) {
         var el = S.el.querySelector('.gps-suggest');
@@ -4121,7 +4256,7 @@
                 if (to) {
                     var pl = playsTo(moved ? to : null);
                     var yd = pl ? pl.exact : G.haversineMeters(o.pt, to) / G.M_PER_YD;
-                    var sg = yd >= 10 ? B.suggestClub(B.bag(bagGolfer()), yd) : null;
+                    var sg = yd >= 10 ? B.suggestClub(bagNow(B), yd) : null;
                     if (sg) text = 'Suggested: ' + sg.name + ' (your ' + bagShown(sg.yd) + ')';
                 }
             }
@@ -4183,15 +4318,28 @@
     function fillBag() {
         var sh = bagSheet(), B = bagApi();
         if (!sh || !B) return;
-        var who = bagGolfer(), mine = B.bag(who), m = units() === 'm';
+        var who = bagGolfer(), mine = bagNow(B), m = units() === 'm', SB = shotBag(), SL = window.HardPanShotLog || null;
+        var logBy = SL ? SL.byClub(who) : {}, fitsBy = SB ? SB.fits(who) : {};
+        if (SB) SB.ensureCss();
         sh.setAttribute('data-bag-view', 'list');
         bagSavedLine(sh, B);
         fillAlt(sh);
         sh.querySelector('.gps-bag-title').textContent = 'My bag' + (who ? ' \u00b7 ' + String(who).split(' ')[0] : '');
         sh.querySelector('.gps-bag-sub').textContent = (m ? 'Meters' : 'Yards') + ': "learned" is the middle of your last 10 marked shots per club (odd ones left out); "entered" is a number you typed'
             + (setupSwitch() ? ' or set up (marked shots take over once a club has ' + B.LEARN_MIN + ')' : '') + '. On this phone only.';
+        // 049: the shot log's numbers - still-air carry (the wind taken out), wind yd/mph per club.
+        if (SB && SL) sh.querySelector('.gps-bag-sub').textContent = (m ? 'Meters' : 'Yards') + ': "learned" is your still-air carry from your marked shots, with the wind taken out; "entered" is a number you typed'
+            + (setupSwitch() ? ' or set up' : '') + '. Wind: yards per mph, learned per club once it has ' + SB.QUALIFY + ' marked shots in wind over ' + SB.WINDY_MPH + ' mph - until then the generic model. Reset clears a club\u2019s marked shots. On this phone only.';
         var list = sh.querySelector('.gps-bag-list');
         list.textContent = '';
+        // 049: HANDEDNESS (stored with the golfer, in the shot log): wording, and the generic model.
+        var hb = sh.querySelector('.gps-bag-hand');
+        if (SL && !hb) {
+            hb = document.createElement('div'); hb.className = 'gps-bag-hand'; hb.setAttribute('role', 'group'); hb.setAttribute('aria-label', 'I play');
+            hb.innerHTML = '<span>I play</span><button type="button" data-bag-hand="R">Right-handed</button><button type="button" data-bag-hand="L">Left-handed</button>';
+            list.parentNode.insertBefore(hb, list);
+        }
+        if (hb && SL) { var hn = SL.hand(who); Array.prototype.forEach.call(hb.querySelectorAll('[data-bag-hand]'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-bag-hand') === hn ? 'true' : 'false'); }); }
         B.BAG.forEach(function (c) {
             var v = mine[c], row = document.createElement('div');
             row.className = 'gps-bag-row'; row.setAttribute('data-bag-row', c);
@@ -4206,8 +4354,19 @@
                 : 'learned \u00b7 ' + v.n + ' shot' + (v.n === 1 ? '' : 's');
             meta.setAttribute('data-bag-src', B.source(v));
             var rs = document.createElement('button'); rs.type = 'button'; rs.className = 'gps-bag-reset'; rs.setAttribute('data-bag-reset', c); rs.textContent = 'Reset';
-            rs.style.visibility = v ? '' : 'hidden';
+            var logged = (logBy[c] || []).length;
+            rs.style.visibility = v || logged ? '' : 'hidden';
             row.appendChild(nm); row.appendChild(inp); row.appendChild(meta); row.appendChild(rs);
+            // 049: the club's wind line + its Shot history.
+            if (SB && (v || logged)) {
+                var wl = SB.windLine(fitsBy[c] || null), wd = document.createElement('div');
+                wd.className = 'gps-bag-wind' + (wl.learned ? '' : ' gen'); wd.setAttribute('data-bag-wind', c);
+                var ws = document.createElement('span'); ws.textContent = wl.text; wd.appendChild(ws);
+                var hbt = document.createElement('button'); hbt.type = 'button'; hbt.className = 'gps-bag-hist'; hbt.setAttribute('data-bag-hist', c);
+                hbt.textContent = 'Shot history' + (logged ? ' (' + logged + ')' : ''); hbt.setAttribute('aria-label', B.NAMES[c] + ' shot history');
+                if (logged) wd.appendChild(hbt);
+                row.appendChild(wd);
+            }
             list.appendChild(row);
         });
     }
@@ -4680,10 +4839,10 @@
         var pl = playsTo(S.target || null);
         if (!pl) return null;
         var u = units(), m = u === 'm';
-        var out = { raw: G.shownDistance(G.haversineMeters(o.pt, aim), u), plays: (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (m ? 'm' : 'y'), club: '' };
+        var out = { raw: G.shownDistance(G.haversineMeters(o.pt, aim), u), plays: (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (m ? 'm' : 'y'), club: '', yours: !!pl.learned };
         var B = bagApi();
         if (bagSwitch() && B && o.from === 'me' && !(B.needsSetup && B.needsSetup(bagGolfer()))) {
-            var sg = B.suggestClub(B.bag(bagGolfer()), pl.exact);
+            var sg = B.suggestClub(bagNow(B), pl.exact);
             if (sg) out.club = clubShort(sg.club);
         }
         return out;
@@ -4826,7 +4985,11 @@
             if (p) {
                 txt('.gps-ld-raw', p.raw);
                 txt('.gps-ld-pltext', p.plays + (p.club ? ' · ' + p.club : ''));
-                pill.setAttribute('aria-label', 'Plays like ' + p.plays + (p.club ? ', ' + p.club : '') + ' - how it works');
+                // 049: "yours" once the plays-like uses the golfer's own wind numbers for that club.
+                var sm = pill.querySelector('.gps-ld-pl small'), yb = sm && sm.querySelector('.gps-ld-yours');
+                if (sm && p.yours && !yb) { yb = document.createElement('b'); yb.className = 'gps-ld-yours'; yb.textContent = 'yours'; sm.appendChild(yb); }
+                else if (yb && !p.yours) yb.remove();
+                pill.setAttribute('aria-label', 'Plays like ' + p.plays + (p.club ? ', ' + p.club : '') + (p.yours ? ', from your shots' : '') + ' - how it works');
             }
         }
         if (rsSwitch()) syncRoundChip();
@@ -5333,7 +5496,7 @@
         + '<div class="gps-clubs gps-float" style="display:none" role="dialog" aria-label="Which club?"><div class="gps-clubs-head"></div><div class="gps-clubs-row"></div>'
         +   '<div class="gps-clubs-foot"><button type="button" class="gps-club-move">Move it on the map</button><button type="button" class="gps-club-skip">Skip</button></div></div>'
         // MY BAG (008): "Which club?" after a measured shot - a chip row, never a blocking sheet.
-        + '<div class="gps-bagask gps-float" data-feature="clubs" style="display:none" role="group" aria-label="Which club?"><div class="gps-bagask-top"><span class="gps-bagask-head"></span><button type="button" class="gps-bagask-skip">Skip</button></div><div class="gps-bagask-row"></div></div>'
+        + '<div class="gps-bagask gps-float" data-feature="clubs" style="display:none" role="group" aria-label="Which club?"><div class="gps-bagask-top"><span class="gps-bagask-head"></span><button type="button" class="gps-bagask-skip">Skip</button></div><div class="gps-bagask-sub"></div><div class="gps-bagask-row"></div></div>'
         // LEFT, ABOVE THE SCORECARD: Recenter, and you (or the tee) -> the target.
         + '<div class="gps-leftrow">'
         +   '<button type="button" class="gps-recenter gps-float" aria-label="Recenter on the hole">⌖</button>'
@@ -5386,6 +5549,8 @@
         +   '<p>Plays-like is how long the shot will play - the yards, adjusted. It is an estimate.</p>'
         +   '<ul>'
         +     '<li><b>Uphill / downhill:</b> about 1 yard for every 3 feet the target is above or below you.</li>'
+        // 049: the golfer's own wind numbers per club (gps-shot-bag.js / gps-wind-learn.js).
+        +     '<li><b>Wind, your numbers:</b> once a club has 8 marked shots in wind over 5 mph, plays-like uses what the wind did to <i>your</i> ball with that club - headwind, tailwind, from the left and from the right, each learned on its own. Until then, the generic numbers below. Your marked shots stay on this phone.</li>'
         +     '<li><b>Into the wind:</b> about 1% longer for every mph of headwind.</li>'
         +     '<li><b>Downwind:</b> about 0.5% shorter for every mph of tailwind - half as much.</li>'
         +     '<li><b>Crosswind:</b> no change in distance - aim off into the wind instead (about 0.5% of the distance for every mph across).</li>'
@@ -5674,6 +5839,10 @@
         + '#gps-overlay .gps-bagask-row{display:flex;gap:6px;overflow-x:auto;padding-top:6px;touch-action:pan-x;}'
         + '#gps-overlay .gps-bagask button{flex:0 0 auto;min-height:44px;min-width:46px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:800 15px/1 ' + FONT + ';padding:0 10px;}'
         + '#gps-overlay .gps-bagask .gps-bagask-skip{min-width:0;background:transparent;border:0;color:#c8d1ca;font-size:14px;}'
+        + '#gps-overlay .gps-bagask-head b{color:#d9f99d;}'
+        + '#gps-overlay .gps-bagask-sub{font:600 12px/1.3 ' + FONT + ';color:#a7b3aa;margin-top:2px;}'
+        + '#gps-overlay .gps-bagask-sub:empty{display:none;}'
+        + '#gps-overlay .gps-bagask-row button.on{background:#d9f99d;color:#0b0f0c;border-color:#d9f99d;box-shadow:0 0 0 3px rgba(217,249,157,.28);}'
         + '#gps-overlay .gps-bag{position:absolute;z-index:48;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:80%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font-family:' + FONT + ';touch-action:pan-y;}'
         + '#gps-overlay .gps-bag-head{display:flex;align-items:center;justify-content:space-between;}#gps-overlay .gps-bag-title{font:800 17px/1.15 ' + FONT + ';}'
         + '#gps-overlay .gps-bag-sub{font:600 12px/1.3 ' + FONT + ';color:#c8d1ca;margin:4px 0 6px;}'
@@ -6390,7 +6559,21 @@
                 if (!B || !S || !t || !t.closest) return;
                 if (altClick(t)) { e.preventDefault(); return; }
                 var r1 = t.closest('[data-bag-reset]');
-                if (r1) { B.reset(bagGolfer(), r1.getAttribute('data-bag-reset')); bagSaved(); fillBag(); render(); return; }
+                // 049: a club with marked shots in the log - Reset clears them (back to the number it had before).
+                if (r1) {
+                    var rc = r1.getAttribute('data-bag-reset'), SLr = window.HardPanShotLog;
+                    if (SLr && SLr.list({ golfer: bagGolfer(), club: rc }).length) SLr.reset(rc, bagGolfer()); else { B.reset(bagGolfer(), rc); bagSaved(); }
+                    fillBag(); render(); return;
+                }
+                var hd = t.closest('[data-bag-hand]');
+                if (hd) { var SLh = window.HardPanShotLog; if (SLh) SLh.setHand(bagGolfer(), hd.getAttribute('data-bag-hand')); fillBag(); render(); return; }
+                var hs = t.closest('[data-bag-hist]');
+                if (hs && shotBag()) {
+                    var hc = hs.getAttribute('data-bag-hist');
+                    closeBag();
+                    shotBag().openHistory({ el: S.el, golfer: bagGolfer(), club: hc, units: units, onChange: function () { render(); }, back: function () { if (S) openBag(); } });
+                    return;
+                }
                 if (t.closest('.gps-bag-resetall')) { B.resetAll(bagGolfer()); bagSaved(); fillBag(); render(); }
             });
         }
@@ -6783,6 +6966,9 @@
         hole = Number(hole);
         if (hole === S.hole) { if (par != null) S.par = par; return; }
         if (S.flying) endFlyover('cancelled');   // PREVIEW (008): a new hole ends a flight
+        // URGENT-049: the hole is over (its score, or auto-advance walked on): its last shot closes.
+        // Just looking at another hole leaves it open.
+        if (S.chips && (S.aaMoving || myScore(S.hole) != null)) { try { chipsEnd(null, resolved()); } catch (e) {} }
         S.hole = hole;
         S.par = par;
         S.mode = 'measure'; S.draft = null;

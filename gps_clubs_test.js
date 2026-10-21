@@ -87,7 +87,8 @@ test('gps-view: behind its switch; never in tournament mode; plays-like center, 
     assert.ok(/if \(bagSwitch\(\) && !tournament\(\) && S\.pro/.test(v), 'no suggestion in tournament mode');
     assert.ok(/var moved = !!\(S\.targetMoved && S\.target\), to = moved \? S\.target : aimAt\(r\);/.test(v) && /playsTo\(moved \? S\.target : null\)/.test(v), 'plays-like to the center, or to the moved target');
     assert.ok(/'Suggested: ' \+ sg\.name \+ ' \(your ' \+ bagShown\(sg\.yd\) \+ '\)'/.test(v), '"Suggested: 7-iron (your 158)"');
-    assert.ok(/bagAsk\(m \/ G\.M_PER_YD\);/.test(v), 'asked after the measured shot');
+    // URGENT-049: every mark asks the club for the shot FROM there (the chips), the carry closes at the next mark.
+    assert.ok(/S\.measureFrom = fix\.pt;\s*flash\('Shot: '[\s\S]{0,200}chipsMark\(fix\.pt\);/.test(v) && /if \(res\.open\) bagAsk\(toYd, plYd, ctx\.club\);/.test(v), 'asked at the mark');
     const sec = v.slice(v.indexOf('// ---- MY CLUB DISTANCES'), v.indexOf('// ONE TAP (gps-features): the shot, here'));
     assert.ok(sec.length > 500 && !/\.ref\(|\.set\(|\.update\(|fetch\(/.test(sec.replace(/B\.set\(/g, '')), 'nothing written to the database or sent');
     // The live rules have no per-golfer path a phone may write this to (pushPrefs/<uid> takes bets / hype only).
@@ -221,7 +222,8 @@ test('gps-view: setup behind bagSetup; sync only for the signed-in golfer\'s own
     assert.ok(/B\.defaultCarries\(hcp\)/.test(v) && /I\.current\(\)/.test(v), 'from the round\'s handicap, else the HardPan Index');
     assert.ok(/u && !u\.isAnonymous && u\.uid/.test(v) && /String\(w\.id\) === String\(me\)/.test(v), 'own bag, real sign-in');
     assert.ok(/function bagSyncCan\(B\) \{ return !!\(B && B\.syncOn\(\)/.test(v), 'behind clubsSync');
-    assert.equal((v.match(/bagSaved\(\);/g) || []).length, 5, 'saved after a club pick, a typed number, a reset, reset all and the setup');
+    // int-049: 4 - a marked shot's club pick goes to the shot log (gps-shot-log.js), not the old bag, so there is no bag save for it.
+    assert.equal((v.match(/bagSaved\(\);/g) || []).length, 4, 'saved after a typed number, a reset, reset all and the setup');
     assert.ok(/'learned \\u00b7 '/.test(v) && /'entered'/.test(v), 'learned vs entered in My bag');
 });
 
@@ -232,7 +234,7 @@ test('gps-view: the plays-like line - behind playsBreakdown, never in tournament
     assert.ok(/if \(!plSwitch\(\)\) Array\.prototype\.forEach\.call\(el\.querySelectorAll\('\[data-feature="playsBreakdown"\]'\)/.test(v), 'switch off: removed');
     assert.ok(/if \(plSwitch\(\) && !tournament\(\) && S\.pro && S\.mode === 'measure'/.test(sec), 'never in tournament mode');
     assert.ok(/G\.playsParts\(pl, has \? w\.mph : null, units\(\)\)/.test(sec) && /'Plays ' \+/.test(sec));
-    assert.ok(/B\.suggestClub\(B\.bag\(bagGolfer\(\)\), pl\.exact\)/.test(sec), 'the club for the plays-like distance');
+    assert.ok(/B\.suggestClub\((B\.bag\(bagGolfer\(\)\)|bagNow\(B\)), pl\.exact\)/.test(sec), 'the club for the plays-like distance');
     assert.ok(/bagSwitch\(\) && B && o\.from === 'me'/.test(sec), 'the club only with the clubs switch on, from the golfer');
     assert.ok(/G\.windAim\(D, rel\.cross\)/.test(sec), 'crosswind: the aim-off');
     assert.ok(/if \(S\.plClub\) text = '';/.test(v), 'the plain Suggested line steps aside');

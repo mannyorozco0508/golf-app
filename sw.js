@@ -4720,8 +4720,14 @@ const SHELL_FILES = [
     './gps-shots.js',
     // URGENT-047 A: Range - carry by club, Update my bag (distances only, on the phone).
     './gps-range.js',
+    // URGENT-049: the shot log, the wind math, what they teach My bag (distances and wind only, on the phone).
+    './gps-shot-log.js',
+    './gps-wind-learn.js',
+    './gps-shot-bag.js',
     // URGENT-047 B: launch monitor quick entry - type carries, Update my bag (yards only, on the phone).
     './gps-bushnell.js',
+    // URGENT-049: the club chips after Mark shot - counted shots to the shot log (distances + wind only).
+    './gps-mark-chips.js',
     // Paste the whole trip / round: parser + review + drafts (gps-paste).
     './trip-setup-paste.js',
     './setup-paste-ui.js',
