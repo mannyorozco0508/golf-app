@@ -8394,8 +8394,23 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (nearestGroup) orderedGroups = [nearestGroup, ...rest];
         }
 
+        // POLISH #30 (029, Game Day > Course: "Papago Golf Club" AND "Papago Golf Club (Papago)"): ONE ROW
+        // PER COURSE, by the course resolver every other screen uses (front-door.js HardPanCourse - the GPS
+        // door's search and NEAR YOU). The directory's az_papago (no record of its own) is the twin of the
+        // shared gapi_ record the GPS uses, so the resolver answers gapi_ for it: a row whose resolver key
+        // is ANOTHER row on this list, AND that has no card of its own (no preset, no record), is not drawn
+        // again. A twin WITH its own card (Prestwick, Talking Stick, Lewis River, Grassy Hill - saved rounds
+        // use those cards) is left as it was. The directory entry itself stays (getCourseNameById still names
+        // az_papago); only the second ROW goes. No resolver: every row, as before.
+        const HCr = window.HardPanCourse;
+        const oneKey = (id) => { try { const r = HCr && HCr.resolve && HCr.hasCard && !HCr.hasCard(id) ? HCr.resolve(id) : null; return r && r.key ? r.key : id; } catch (e) { return id; } };
+        const listedIds = {};
+        courseDirectory.forEach(g => g.items.forEach(i => { if (courseNameMatches(filterText, i.name)) listedIds[i.id] = 1; }));
+        Object.keys(globalCourses).forEach(k => { if ((k.startsWith('gca_') || k.startsWith('gapi_') || (!isNativeApp() && k.startsWith('comm_'))) && globalCourses[k] && courseNameMatches(filterText, globalCourses[k].name)) listedIds[k] = 1; });
+        const twinOfListed = (id) => { const k = oneKey(id); return k !== id && !!listedIds[k]; };
+
         orderedGroups.forEach(group => {
-            const filteredItems = group.items.filter(item => courseNameMatches(filterText, item.name));
+            const filteredItems = group.items.filter(item => courseNameMatches(filterText, item.name) && !twinOfListed(item.id));
             if (filteredItems.length > 0) {
                 hasResults = true;
                 if (filterText === "") {
@@ -8437,7 +8452,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         Object.keys(globalCourses).forEach(k => { if (k.startsWith('gapi_') && globalKeys.indexOf(k) === -1) globalKeys.push(k); });
         // GPS:END
         if (globalKeys.length > 0) {
-            const filteredGlobals = globalKeys.filter(k => courseNameMatches(filterText, globalCourses[k].name));
+            const filteredGlobals = globalKeys.filter(k => courseNameMatches(filterText, globalCourses[k].name) && !twinOfListed(k));
             if (filteredGlobals.length > 0) {
                 hasResults = true;
                 if (filterText === "") {
