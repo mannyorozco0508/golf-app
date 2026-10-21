@@ -279,6 +279,8 @@ test('7 the Golfers row\'s "+ Add golfer" and More\'s Add golfer: the same quick
         await j.evaluate("document.querySelector(" + JSON.stringify(more ? '#hp-rs .rs-open .rs-li[data-rs="q-addgolfer"]' : '#hp-rs .rs-golf [data-rs="q-addgolfer"]') + ").click()");
         assert.ok(await until(j, "!!document.querySelector('#hp-addg.open #ag-name')", 5000), 'the Add golfer sheet opened (' + (more ? 'More' : 'top') + ')');
         assert.equal(await j.evaluate("document.getElementById('round-sheet').classList.contains('open')"), false, 'Round settings closed under it');
+        // URGENT-044: Round settings keeps the FULL sheet (the score sheet's "+ Add" is the short form).
+        assert.equal(await j.evaluate("!!document.querySelector('#hp-addg.open:not(.ag-short) [data-ag=\"another\"]') && !!document.querySelector('#hp-addg [data-ag=\"paste\"]') && !!document.querySelector('#hp-addg .ag-plus') && !document.querySelector('#hp-addg .ag-from')"), true, 'the full Add golfer sheet: + Add another, Paste several (' + (more ? 'More' : 'top') + ')');
         await j.evaluate('HardPanAddGolfer.close()'); await sleep(300);
     }
     assert.equal(await j.evaluate('window.__opens'), 2, 'HardPanAddGolfer.open, once each');

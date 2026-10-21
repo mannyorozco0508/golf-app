@@ -666,6 +666,9 @@
         + '#hp-score-sheet .hp-ss-chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px;}'
         + '#hp-score-sheet .hp-ss-chip{min-height:44px;padding:0 18px;border-radius:999px;background:#262c26;color:#f4f4ef;font-size:17px;font-weight:700;}'
         + '#hp-score-sheet .hp-ss-chip.on{background:#c8f07a;color:#0b0f0c;}'
+        // URGENT-042: "+ Add" at the end of the golfer chips (its own class - never counted as a golfer).
+        + '#hp-score-sheet .hp-ss-add{min-height:44px;padding:0 16px;border-radius:999px;background:transparent;color:#c8f07a;font-size:17px;font-weight:800;box-shadow:inset 0 0 0 1.5px #3f4a3f;white-space:nowrap;}'
+        + '#hp-score-sheet .hp-ss-chip.hp-ss-new{box-shadow:0 0 0 3px rgba(200,240,122,.28);}'
         + '#hp-score-sheet .hp-ss-h{margin:16px 0 8px;font-size:14px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#d7dcd3;}#hp-score-sheet .hp-ss-h small{font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:#8f978c;}'
         + '#hp-score-sheet .hp-ss-opts{display:grid;gap:8px;}#hp-score-sheet .hp-ss-c4{grid-template-columns:repeat(4,minmax(0,1fr));}#hp-score-sheet .hp-ss-c5{grid-template-columns:repeat(5,minmax(0,1fr));}'
         + '#hp-score-sheet .hp-ss-b{--ss-bg:#262c26;min-height:52px;border-radius:14px;background:var(--ss-bg);color:#f4f4ef;font-size:17px;font-weight:700;padding:0 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;}'
@@ -752,7 +755,7 @@
         if (!ss.wrap) ss.wrap = ssBuild();
         var host = ctx.host || W.document.body;
         if (ss.wrap.parentNode !== host) host.appendChild(ss.wrap);
-        ss.ctx = ctx; ss.pend = {}; ss.more = false; ss.notes = false;
+        ss.ctx = ctx; ss.pend = {}; ss.more = false; ss.notes = false; ss.added = null;
         if (ctx.home == null) ctx.home = ctx.hole;
         var pick = ctx.golfers.filter(function (g) { return String(g.id) === String(ctx.pick); })[0];
         ss.sel = String((pick || ctx.golfers[0]).id);
@@ -772,7 +775,9 @@
         bk.style.display = fw.style.display = rng.length > 1 ? '' : 'none';
         bk.disabled = at <= 0; fw.disabled = at < 0 || at >= rng.length - 1;
         var away = Number(c.hole) !== Number(c.home);
-        w.querySelector('.hp-ss-earlier').textContent = away ? 'An earlier hole \u2014 Save goes back to hole ' + c.home + '.' : '';
+        // URGENT-044: just added from the score sheet - "Tim added — from hole 4. Holes 1–3 blank."
+        var ad = !away && ss.added && ss.added.ctx === c && Number(ss.added.hole) === Number(c.hole) ? ss.added : null;
+        w.querySelector('.hp-ss-earlier').textContent = away ? 'An earlier hole \u2014 Save goes back to hole ' + c.home + '.' : ad ? ad.line : '';
         w.querySelector('.hp-ss-meta').textContent = [c.si ? 'HCP ' + c.si : '', c.yards ? c.yards + 'y' : ''].filter(Boolean).join(' · ');
         var body = w.querySelector('.hp-ss-body'), keep = ss.toTop ? 0 : body.scrollTop;
         ss.toTop = false;
@@ -781,8 +786,10 @@
         var chips = el('div', 'hp-ss-chips');
         c.golfers.forEach(function (g) {
             var s = ssStrokes(String(g.id));
-            chips.appendChild(ssEl('button', 'hp-ss-chip' + (String(g.id) === pid ? ' on' : ''), (g.name || ('Player ' + g.id)) + (s ? ' · ' + s : ''), { 'data-ss-golfer': String(g.id), 'aria-pressed': String(g.id) === pid ? 'true' : 'false' }));
+            chips.appendChild(ssEl('button', 'hp-ss-chip' + (String(g.id) === pid ? ' on' : '') + (ad && ad.id === String(g.id) ? ' hp-ss-new' : ''), (g.name || ('Player ' + g.id)) + (s ? ' · ' + s : ''), { 'data-ss-golfer': String(g.id), 'aria-pressed': String(g.id) === pid ? 'true' : 'false' }));
         });
+        // URGENT-042: "+ Add" (a solo round: "+ Add golfer") - the Round Menu's own Add golfer sheet.
+        if (ssCanAdd() && !away) chips.appendChild(ssEl('button', 'hp-ss-add', c.golfers.length === 1 ? '+ Add golfer' : '+ Add', { 'data-ss-add': '1', 'aria-label': 'Add a golfer from hole ' + c.home }));
         body.appendChild(chips);
         // SCORE
         var cur = ssStrokes(pid);
@@ -856,6 +863,7 @@
         var c = ss.ctx, pid = ss.sel;
         if ((b = t.closest('[data-ss-golfer]'))) { ss.sel = b.getAttribute('data-ss-golfer'); ss.more = false; ss.notes = false; ssRender(); return; }
         if ((b = t.closest('[data-ss-step]'))) { ssStep(Number(b.getAttribute('data-ss-step'))); return; }
+        if (t.closest('[data-ss-add]')) { ssAddGolfer(); return; }
         if ((b = t.closest('[data-ss-more]'))) { ss.more = !ss.more; ssRender(); return; }
         if ((b = t.closest('[data-ss-score]'))) {
             var n = Number(b.getAttribute('data-ss-score'));
@@ -911,6 +919,57 @@
         var nx = ssNextOpen(pid);
         if (nx == null) return false;
         ss.sel = nx; ss.more = false; ss.notes = false; ss.toTop = true;
+        return true;
+    }
+    // ---- URGENT-042: "+ ADD" ON THE SCORE SHEET ------------------------------------------
+    // The add itself is the Round Menu's Add golfer sheet in its short form (URGENT-044:
+    // gps-add-golfer.js HardPanAddGolfer.open({ short: true, fromHole: N }): Name, HCP, Tee; the Players sheet's own buildPlayersUpdate, one guarded update of the round).
+    // Nothing here writes a golfer. A golfer added on hole N has no scores at all, so the holes
+    // before N are blank on the card; their scores start with the one typed here. The organizer
+    // only (canReachSetup - the add sheet's own gate), and only on the hole the sheet opened on.
+    /* global canReachSetup */
+    function ssCanAdd() {
+        var A = W.HardPanAddGolfer;
+        if (!A || typeof A.open !== 'function') return false;
+        try { return typeof canReachSetup === 'function' && !!canReachSetup(); } catch (e) { return false; }
+    }
+    function ssAddGolfer() {
+        var c = ss && ss.ctx, A = W.HardPanAddGolfer;
+        if (!c || !A || Number(c.hole) !== Number(c.home)) return false;
+        ssKeep();   // every tap is already saved; nothing typed is lost under the add sheet
+        var had = c.golfers.map(function (g) { return String(g.id); }), added = null;
+        // URGENT-044: the SHORT form of the same sheet (Name, HCP, Tee, "Add from hole N", one button,
+        // Cancel) - over this one, which stays put behind it. The full sheet stays in Round settings.
+        var before = ssRange().slice(0, -1);
+        var ok = A.open({ short: true, fromHole: Number(c.home), holes: Array.isArray(c.holes) ? c.holes.map(Number) : null, before: before,
+            where: String(c.course || '').split(' (')[0], onDone: function (list) { added = list || []; } });
+        if (!ok) return false;
+        var box = W.document.getElementById('hp-addg');
+        var back = function () {
+            if (!ss || ss.ctx !== c) return;   // the score sheet was closed meanwhile
+            ss.wrap.style.display = '';
+            if (!added || !added.length || typeof c.at !== 'function') { ssRender(); return; }
+            // Back on the score sheet with the new golfer picked, once the card draws their box
+            // (the round's own listener). Bounded: never a never-ending timer.
+            var t0 = Date.now();
+            (function wait() {
+                if (!ss || ss.ctx !== c) return;
+                var nx = null; try { nx = c.at(c.home); } catch (e) {}
+                var fresh = nx && nx.golfers ? nx.golfers.filter(function (g) { return had.indexOf(String(g.id)) === -1; }) : [];
+                if (!fresh.length && Date.now() - t0 < 6000) { setTimeout(wait, 150); return; }
+                if (fresh.length) {
+                    ['golfers', 'score', 'save'].forEach(function (k) { if (nx[k] !== undefined) c[k] = nx[k]; });
+                    var g = fresh[fresh.length - 1], nm = g.name || added[added.length - 1].name, bl = typeof A.blankHoles === 'function' ? A.blankHoles(before) : '';
+                    ss.sel = String(g.id); ss.more = false; ss.notes = false; ss.toTop = true;
+                    ss.added = { ctx: c, id: String(g.id), hole: Number(c.home), line: nm + ' added \u2014 from hole ' + c.home + '.' + (bl ? ' ' + bl + ' blank.' : '') };
+                }
+                ssRender();
+            })();
+        };
+        if (box && typeof W.MutationObserver === 'function') {
+            var mo = new W.MutationObserver(function () { if (box.classList.contains('open')) return; mo.disconnect(); back(); });
+            mo.observe(box, { attributes: true, attributeFilter: ['class'] });
+        } else back();
         return true;
     }
     // SAVE: each score typed here, through the card's own save; then the next hole (the card's
