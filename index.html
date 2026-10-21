@@ -1696,6 +1696,17 @@
         .ps-out { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--text-muted); }
         .ps-out input { width: 20px; height: 20px; min-height: 0; padding: 0; }
         .ps-row.ps-is-out input.ps-name { text-decoration: line-through; color: var(--text-muted); }
+        /* POLISH #20: the row's controls say what they are - a label over each column
+           (the same five-column grid as .ps-row), so "A", "G1" and "Out" read as
+           Flight, Group and Out. */
+        .ps-head { display: grid; grid-template-columns: 1fr 52px 40px 58px 54px; gap: 6px; padding: 2px 0 0; font-size: 0.66rem; font-weight: bold; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+        .ps-head span { text-align: center; }
+        .ps-head span:first-child { text-align: left; }
+        /* POLISH #20: in the HardPan app, Golfers is a screen of its own - not a card
+           floating over the score sheet. Full height, solid background, above the
+           GPS overlay (#gps-overlay 10050) like the other quick edits (#hp-redit 10300). */
+        #players-sheet.ps-own { z-index: 10300; padding: 0; align-items: stretch; justify-content: stretch; background: var(--bg-page, #f4f6f3); }
+        #players-sheet.ps-own .ps-content { box-sizing: border-box; overflow-y: auto; max-width: none; width: 100%; max-height: none; height: 100%; border-radius: 0; box-shadow: none; padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 20px); }
         /* v212: the Index/Course line, on its own line across the row so the
            five controls above it keep their widths and their 40px targets. */
         .ps-hcp-note { grid-column: 1 / -1; font-size: 0.72rem; color: var(--text-muted); line-height: 1.3; padding: 0 0 2px 2px; }
@@ -8131,7 +8142,18 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         psSnapshot = rosterSignature(currentData.players);
         renderPlayersSheet(currentData);
         const el = document.getElementById('players-sheet');
+        // POLISH #20: in the HardPan app (gps-bet.js on()) Golfers opens ON ITS OWN - a full
+        // screen, named the way Round settings names it - not a sheet on the score sheet.
+        // Every door (Round settings' Golfers row, the quick edit, ?players=1) lands here.
+        const own = psOwnScreen();
+        if (el) el.classList.toggle('ps-own', own);
+        const title = document.getElementById('players-sheet-title');
+        if (title) title.textContent = own ? '\uD83D\uDC65 Golfers' : '\uD83D\uDC65 Players';
+        if (own) { try { if (typeof toggleRoundSheet === 'function' && document.getElementById('round-sheet') && document.getElementById('round-sheet').classList.contains('open')) toggleRoundSheet(false); } catch (e) {} }
         if (el) el.style.display = 'flex';
+    }
+    function psOwnScreen() {
+        try { return !!(window.HardPanBet && typeof window.HardPanBet.on === 'function' && window.HardPanBet.on()); } catch (e) { return false; }
     }
     function closePlayersSheet() {
         const el = document.getElementById('players-sheet');
@@ -8197,7 +8219,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (!body) return;
         const players = data.players || [];
         const boundaries = computeGroupBoundaries(players.length, data.groupSizeOverrides || {});
-        let html = '';
+        // POLISH #20: the column labels, once, over the rows.
+        let html = '<div class="ps-head" aria-hidden="true"><span>Golfer</span><span>' + escapeHtml(psBoxLabel()) + '</span><span>Flight</span><span>Group</span><span></span></div>';
         boundaries.forEach(b => {
             html += '<div class="ps-group"><span>Group ' + b.group + '</span><button type="button" class="ps-add" onclick="psAddRow(' + b.group + ')">+ Add golfer</button></div>';
             for (let i = b.startIdx; i < b.startIdx + b.size; i++) {
@@ -8206,7 +8229,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 html += '<div class="ps-row' + (out ? ' ps-is-out' : '') + '" data-idx="' + i + '" data-id="' + escapeAttr(p.id) + '">'
                     + '<input class="ps-name" type="text" value="' + escapeAttr(p.name) + '" placeholder="Name">'
                     + '<input class="ps-hcp" type="text" inputmode="decimal" value="' + escapeAttr(psBoxValue(p)) + '" placeholder="' + psBoxLabel() + '" oninput="psHcpBoxInput(this)">'
-                    + '<button type="button" class="ps-flight" data-flight="' + (p.flight === 'B' ? 'B' : 'A') + '" onclick="psToggleFlight(this)">' + (p.flight === 'B' ? 'B' : 'A') + '</button>'
+                    + '<button type="button" class="ps-flight" aria-label="Flight" data-flight="' + (p.flight === 'B' ? 'B' : 'A') + '" onclick="psToggleFlight(this)">' + (p.flight === 'B' ? 'B' : 'A') + '</button>'
                     + '<select class="ps-grp" data-group="' + b.group + '" aria-label="Group" onchange="psRefreshMoney()">'
                     + boundaries.map(x => '<option value="' + x.group + '"' + (x.group === b.group ? ' selected' : '') + '>G' + x.group + '</option>').join('')
                     + '</select>'
@@ -8239,7 +8262,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         row.className = 'ps-row ps-new'; row.setAttribute('data-group', String(group));
         row.innerHTML = '<input class="ps-name" type="text" value="" placeholder="New golfer">'
             + '<input class="ps-hcp" type="text" inputmode="decimal" value="" placeholder="' + psBoxLabel() + '" oninput="psHcpBoxInput(this)">'
-            + '<button type="button" class="ps-flight" data-flight="A" onclick="psToggleFlight(this)">A</button>'
+            + '<button type="button" class="ps-flight" aria-label="Flight" data-flight="A" onclick="psToggleFlight(this)">A</button>'
             + '<span class="ps-grp-new">G' + group + '</span>'
             + '<span class="ps-out">new</span>';
         host.appendChild(row);
