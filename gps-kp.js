@@ -227,7 +227,7 @@
         if (!cup) {
             st.ball = { pid: g.id, golfer: g, hole: h, pt: [pos.pt[0], pos.pt[1]], acc: pos.acc };
             st.note = g.name + '’s ball is marked - now the cup';
-            return { pending: 'Ball marked. Now stand at the cup and tap “Cup is here”' };
+            return { pending: 'Ball marked. Now walk to the cup.' };
         }
         st.ball = null;
         return distanceOf(pos, cup, g);

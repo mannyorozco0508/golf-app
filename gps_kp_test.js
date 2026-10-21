@@ -137,7 +137,7 @@ test('THE EXISTING FLOW: ball, then "Cup is here" -> index.html saveKpLeader wri
     assert.equal(P.M.active(), 'kp', 'the button on the KP hole');
     P.stand(BALL); P.tap();
     assert.equal(P.K.state().pendingBall, true, 'the ball first, then the cup');
-    assert.ok(P.flashes.some((f) => /stand at the cup/.test(f)));
+    assert.ok(P.flashes.some((f) => /walk to the cup/.test(f)));
     assert.equal(P.writes.length, 0, 'nothing written until the cup');
     P.stand(CUP); P.tap();
     const kp = P.writes.find((w) => w.kind === 'durable:update' && w.v['kpWinners/h2'] !== undefined);
