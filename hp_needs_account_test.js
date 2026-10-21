@@ -71,3 +71,16 @@ test('wiring: Results page (GPS block, before venmo-pay.js), shell lists; venmo-
     assert.match(v, /N\.shouldPrompt\(\{ feature: 'venmo', scope: S\.code \}\)/);
     assert.match(v, /if \(paid\) \{ if \(!!paidMark\(paid\) === was\) markPaid\(paid\); \}/);
 });
+
+test('a slow auth start never prompts: until HardPanAuth.ready() settles, the tap goes ahead', { skip }, async () => {
+    let release;
+    const sb = load();
+    sb.HardPanAuth.ready = () => new Promise((r) => { release = r; });
+    // A fresh load, so the file asks the new ready().
+    const sb2 = { localStorage: store(), HardPanAuth: sb.HardPanAuth, HardPanAccountUI: sb.HardPanAccountUI };
+    sb2.window = sb2; vm.createContext(sb2); vm.runInContext(read('hp-needs-account.js'), sb2);
+    assert.equal(sb2.HardPanNeedsAccount.shouldPrompt({ feature: 'venmo', scope: 'R1' }), false, 'not yet ready: no prompt');
+    release();
+    await new Promise((r) => setImmediate(r));
+    assert.equal(sb2.HardPanNeedsAccount.shouldPrompt({ feature: 'venmo', scope: 'R1' }), true, 'ready + anonymous: prompt');
+});

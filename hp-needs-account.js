@@ -20,8 +20,9 @@
 // (localStorage hardpan_needs_account; in memory if storage is blocked).
 //
 // shouldPrompt({ feature, scope }) is the synchronous check a caller makes in its
-// click handler BEFORE stopping the tap: true only when this phone is signed out
-// (anonymous), sign-in is on the page, no sheet is open, and this feature has not
+// click handler BEFORE stopping the tap: true only when HardPanAuth.ready() has
+// settled and state().signedIn is false (anonymous), sign-in is on the page, no
+// sheet is open, and this feature has not
 // been asked about in this round yet. Missing HardPanAuth or HardPanAccountUI =
 // false, so a page without sign-in behaves exactly as it does today.
 //
@@ -58,9 +59,25 @@
         ks.slice(200).forEach(function (x) { delete all[x]; });
         try { W.localStorage.setItem(KEY, JSON.stringify(all)); } catch (e) {}
     }
+    // HardPanAuth.ready(): a slow auth start must never cause a false prompt, so until
+    // it has settled the answer is "don't ask" (the tap goes ahead as today). Asked for
+    // as soon as this file loads, and again on every check until it has settled.
+    var settled = false, asked = null;
+    function authSettled() {
+        if (settled) return true;
+        var a = auth();
+        if (!a) return false;
+        if (typeof a.ready !== 'function') { settled = true; return true; }
+        if (!asked) {
+            try {
+                asked = Promise.resolve(a.ready()).then(function () { settled = true; }, function () { settled = true; });
+            } catch (e) { settled = true; }
+        }
+        return settled;
+    }
     function shouldPrompt(o) {
         o = o || {};
-        return !!(auth() && ui() && !signedIn() && !open && !seen(o));
+        return !!(auth() && ui() && authSettled() && !signedIn() && !open && !seen(o));
     }
 
     var CSS = '.hpna-scrim{position:fixed;inset:0;background:rgba(10,20,15,.42);z-index:2147483000;opacity:0;transition:opacity .18s;}'
@@ -162,6 +179,12 @@
         return promise;
     }
 
+    // HardPanAuth may load after this file: ask for ready() once the page is parsed too.
+    authSettled();
+    try {
+        if (W.document && W.document.readyState === 'loading') W.document.addEventListener('DOMContentLoaded', authSettled);
+        if (W.addEventListener) W.addEventListener('load', authSettled);
+    } catch (e) {}
     W.HardPanNeedsAccount = {
         prompt: prompt,
         shouldPrompt: shouldPrompt,

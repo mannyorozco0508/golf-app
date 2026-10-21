@@ -3,7 +3,8 @@
 //
 // A finished round (tools/extra-games-backcompat.js's, as tools/venmo-check.js
 // uses it) opened cold on settlement.html as Ann (?me=11), with stand-ins for
-// 048 part 2 (HardPanAuth) and part 1 (HardPanAccountUI) - tools/lib/hp-auth-stub.js.
+// 048 part 2's REAL hp-auth.js (HardPanAuth, 505379f) over the harness's auth stand-in,
+// and a stand-in for part 1 (HardPanAccountUI) - tools/lib/hp-auth-stub.js.
 // Real taps only. The rule under test: a NUDGE, NEVER A WALL.
 //   1. Signed out: Pay with Venmo -> the sheet ("Sign in to use Venmo", the why,
 //      Sign in, Not now, the "keeps working" note; no words for staking money)
@@ -26,7 +27,9 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
 const { round } = require('./tools/extra-games-backcompat.js');
-const { authStub } = require('./tools/lib/hp-auth-stub.js');
+const { accountUIStub, hpAuthScript } = require('./tools/lib/hp-auth-stub.js');
+const SIGNED_OUT = accountUIStub() + hpAuthScript();   // the harness default: an anonymous user
+const SIGNED_IN = { uid: 'u-ann', email: 'ann@example.com', isAnonymous: false };
 
 const SHOTS = process.env.HPNA_SHOTS || '';
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
@@ -53,14 +56,14 @@ const LOOK = `JSON.stringify({
   noHref: (document.querySelector('.hpna-root a[data-hpna-no]') || { getAttribute: function () { return null; } }).getAttribute('href'),
   venmoHref: (document.querySelector('#vm-mount a.vm-venmo') || { getAttribute: function () { return null; } }).getAttribute('href'),
   clicks: window.__clicks, opens: window.__opens, answers: window.__answers, errs: window.__hpErr,
-  opened: window.__hpAuth ? window.__hpAuth.opened : null,
+  opened: window.__hpUI ? window.__hpUI.opened : null, signedIn: window.HardPanAuth ? window.HardPanAuth.state().signedIn : null,
   ticks: (window.__coldWrites || []).filter(function (w) { return /settleUp/.test(w.path); }).map(function (w) { return w.path + '=' + JSON.stringify(w.value && w.value.by); }),
   paidRows: document.querySelectorAll('#vm-mount .vm-row.vm-done').length,
   hasNA: !!window.HardPanNeedsAccount })`;
 const look = { expression: LOOK };
 
-async function run(vp, pre, steps) {
-    const r = await arriveCold({ url: fileUrl('settlement.html', 'game=XGBACK&me=11'), db: db(), settleMs: 3500, viewport: vp,
+async function run(vp, pre, steps, auth) {
+    const r = await arriveCold({ auth, url: fileUrl('settlement.html', 'game=XGBACK&me=11'), db: db(), settleMs: 3500, viewport: vp,
         preScript: REC + (pre || ''), blockUrls: ['*venmo.com*', '*cash.app*'], steps });
     if (!r.ok) throw new Error(r.reason);
     return r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
@@ -72,13 +75,14 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
     const tag = vp.width + 'x' + vp.height;
 
     test(tag + ' signed out: Pay with Venmo -> the prompt -> Not now -> the link still opens; at most once per round', async () => {
-        const [a0, a1, a2, a3, a4] = await run(vp, authStub({ signedIn: false }), [
+        const [a0, a1, a2, a3, a4] = await run(vp, SIGNED_OUT, [
             look,
             { tap: '#vm-mount a.vm-venmo' }, { sleep: 400 }, look, ...shot('prompt-over-settle-up', vp),
             { tap: '.hpna-root [data-hpna-no]' }, { sleep: 400 }, look,
             { tap: '#vm-mount a.vm-venmo' }, { sleep: 400 }, look,
             { tap: '#vm-mount [data-vm-paid]' }, { sleep: 500 }, look]);
         assert.ok(a0.hasNA, 'hp-needs-account.js is on the page');
+        assert.equal(a0.signedIn, false, 'the real HardPanAuth: anonymous = not signed in');
         assert.ok(a0.venmoHref && /^https:\/\/venmo\.com\/u\/bob-baker-1\?txn=pay/.test(a0.venmoHref), 'fixture: Ann has Pay with Venmo: ' + a0.venmoHref);
         assert.equal(a0.sheet, false);
         // The tap was stopped (only this once) and the sheet is up, as previewed.
@@ -107,7 +111,7 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
     });
 
     test(tag + ' signed out: Mark paid -> the prompt -> Not now -> Mark paid behaves as today', async () => {
-        const [b1, b2] = await run(vp, authStub({ signedIn: false }), [
+        const [b1, b2] = await run(vp, SIGNED_OUT, [
             { tap: '#vm-mount [data-vm-paid]' }, { sleep: 400 }, look,
             { tap: '.hpna-root [data-hpna-no]' }, { sleep: 500 }, look]);
         assert.ok(b1.sheet); assert.deepEqual(b1.ticks, [], 'nothing written while the sheet is up');
@@ -120,10 +124,10 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
     });
 
     test(tag + ' signed out: Mark paid -> Sign in -> openSignIn, resolves "signin" once signed in, then the tick', async () => {
-        const [c1, c2, c3] = await run(vp, authStub({ signedIn: false }), [
+        const [c1, c2, c3] = await run(vp, SIGNED_OUT, [
             { tap: '#vm-mount [data-vm-paid]' }, { sleep: 400 }, look,
             { tap: '.hpna-root [data-hpna-in]' }, { sleep: 300 }, look,
-            { expression: 'window.__hpAuth.set(true)' }, { sleep: 400 }, look]);
+            { expression: 'window.__signInAs(' + JSON.stringify(SIGNED_IN) + ')' }, { sleep: 400 }, look]);
         assert.ok(c1.sheet);
         assert.equal(c2.sheet, false); assert.equal(c2.opened, 1, 'HardPanAccountUI.openSignIn() called');
         assert.deepEqual(c2.answers, [], 'not resolved before signed in'); assert.deepEqual(c2.ticks, []);
@@ -132,16 +136,17 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
     });
 
     test(tag + ' signed in: no prompt; the link and Mark paid as today', async () => {
-        const [d1, d2] = await run(vp, authStub({ signedIn: true }), [
+        const [d1, d2] = await run(vp, SIGNED_OUT, [
             { tap: '#vm-mount a.vm-venmo' }, { sleep: 400 }, look,
-            { tap: '#vm-mount [data-vm-paid]' }, { sleep: 500 }, look]);
+            { tap: '#vm-mount [data-vm-paid]' }, { sleep: 500 }, look], SIGNED_IN);
+        assert.equal(d1.signedIn, true, 'HardPanAuth says signed in');
         assert.equal(d1.sheet, false);
         assert.equal(d1.clicks.length, 1); assert.equal(d1.clicks[0].prevented, false);
         assert.equal(d2.sheet, false); assert.equal(d2.ticks.length, 1);
         assert.deepEqual(d2.answers, []); assert.deepEqual(d2.errs, []);
     });
 
-    test(tag + ' no sign-in on the page (no HardPanAuth): no prompt, exactly today', async () => {
+    test(tag + ' no sign-in sheet on the page (no HardPanAccountUI): no prompt, exactly today', async () => {
         const [e1, e2] = await run(vp, '', [
             { tap: '#vm-mount a.vm-venmo' }, { sleep: 400 }, look,
             { tap: '#vm-mount [data-vm-paid]' }, { sleep: 500 }, look]);

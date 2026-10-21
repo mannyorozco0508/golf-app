@@ -34,7 +34,10 @@ const SHOTS = path.resolve(process.argv[2] || path.join(os.homedir(), 'Desktop/c
 fs.mkdirSync(SHOTS, { recursive: true });
 const VPA = /^(\d+)x(\d+)$/.exec(process.argv[3] || '393x852');
 const VP = { width: Number(VPA[1]), height: Number(VPA[2]) };
-const ERR = "window.__vmErr = []; addEventListener('error', function (e) { window.__vmErr.push(String(e.message || e)); }); addEventListener('unhandledrejection', function (e) { window.__vmErr.push('rejection: ' + String(e.reason && e.reason.message || e.reason)); });";
+// URGENT-048: this check is today's Settle up flow, so the once-per-round "Sign in to use
+// Venmo" nudge is marked as already shown for XGBACK (the nudge is checked on its own in
+// urgent048_needs_account_chrome_test.js). Without sign-in on the page it changes nothing.
+const ERR = "try { localStorage.setItem('hardpan_needs_account', JSON.stringify({ 'XGBACK|venmo': 1 })); } catch (e) {} window.__vmErr = []; addEventListener('error', function (e) { window.__vmErr.push(String(e.message || e)); }); addEventListener('unhandledrejection', function (e) { window.__vmErr.push('rejection: ' + String(e.reason && e.reason.message || e.reason)); });";
 const OFF = "window.__vmOff = true; Object.defineProperty(window, 'HARDPAN_GPS_CONFIG', { configurable: true, get: function () { return window.__vmCfg; }, set: function (v) { if (v) v.venmo = false; window.__vmCfg = v; } });";
 
 function dbs() {
