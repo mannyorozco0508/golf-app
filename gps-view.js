@@ -5162,7 +5162,8 @@
                 t.classList.add('gps-aa-over');
                 var pn = document.querySelector('#hp-score-sheet .hp-ss'), top0 = S.el.getBoundingClientRect().top;
                 var y = pn ? pn.getBoundingClientRect().top - top0 - t.offsetHeight - 6 : null;
-                if (y != null && isFinite(y)) t.style.top = Math.max(4, Math.round(y)) + 'px';
+                // Never under the status bar / Dynamic Island: below the safe area, at worst over the sheet's grab handle.
+                if (y != null && isFinite(y)) t.style.top = 'max(calc(env(safe-area-inset-top, 0px) + 6px), ' + Math.max(4, Math.round(y)) + 'px)';
             }
         } catch (e) {}
     }
