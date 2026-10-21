@@ -86,7 +86,7 @@
         + 'font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;text-align:left;'
         + 'transform:translateY(100%);transition:transform .22s ease-out;box-sizing:border-box;}'
         + '.hpna-on .hpna-scrim{opacity:1;} .hpna-on .hpna-sheet{transform:none;}'
-        + '.hpna-sheet *{box-sizing:border-box;}'
+        + '.hpna-sheet *{box-sizing:border-box;} .hpna-sheet:focus{outline:none;}'
         + '.hpna-grab{width:40px;height:5px;border-radius:3px;background:#c9d1cc;margin:8px auto 6px;}'
         + '.hpna-ic{width:56px;height:56px;border-radius:16px;background:#e2f1ea;display:flex;align-items:center;justify-content:center;font-size:28px;margin:6px 2px 10px;}'
         + '.hpna-t{font-size:24px;font-weight:800;letter-spacing:-.01em;line-height:1.2;margin:0 0 6px;}'
@@ -121,7 +121,7 @@
             ? '<a class="hpna-no" data-hpna-no href="' + esc(o.href) + '" target="_blank" rel="noopener">Not now</a>'
             : '<button type="button" class="hpna-no" data-hpna-no>Not now</button>';
         root.innerHTML = '<div class="hpna-scrim" data-hpna-scrim></div>'
-            + '<div class="hpna-sheet" role="dialog" aria-modal="true" aria-labelledby="hpna-t">'
+            + '<div class="hpna-sheet" role="dialog" aria-modal="true" aria-labelledby="hpna-t" tabindex="-1">'
             + '<div class="hpna-grab"></div>'
             + '<div class="hpna-ic" aria-hidden="true">' + esc(o.icon || f.icon || '👤') + '</div>'
             + '<h2 class="hpna-t" id="hpna-t">' + esc(title) + '</h2>'
@@ -133,7 +133,9 @@
         // Next frame: slide up.
         (W.requestAnimationFrame || function (cb) { return setTimeout(cb, 16); })(function () { root.classList.add('hpna-on'); });
         var prevFocus = d.activeElement;
-        try { root.querySelector('[data-hpna-in]').focus({ preventScroll: true }); } catch (e) {}
+        // Focus goes to the sheet itself (for VoiceOver / a keyboard), not to Sign in:
+        // no ring drawn around the button before the golfer has touched anything.
+        try { root.querySelector('.hpna-sheet').focus({ preventScroll: true }); } catch (e) {}
 
         function close() {
             d.removeEventListener('keydown', onKey, true);
