@@ -34,7 +34,7 @@ const GEO = "try{ navigator.geolocation.getCurrentPosition = function (ok) { set
 // A SLOW FIRST CONNECTION on the GPS door's code-minting page (admin.html?start=quick) only: every
 // read waits until SLOW ms after the page started, and .info/connected says false until then (as the
 // real SDK does before its first connection). navigator.onLine stays true throughout.
-const slow = (ms) => "(function(){ if (!/admin\\.html$/.test(location.pathname) || !/start=quick/.test(location.search)) return;"
+const slow = (ms, page) => "(function(){ if (!/admin\\.html$/.test(location.pathname) || !/" + (page || 'start=quick') + "/.test(location.search)) return;"
     + " var T0 = Date.now(), SLOW = " + ms + ", up = function () { return Date.now() - T0 >= SLOW; }, left = function () { return Math.max(0, SLOW - (Date.now() - T0)); };"
     + " window.__issues = 0; var realDb = firebase.database;"
     + " firebase.database = function () { var d = realDb.apply(this, arguments); return { ref: function (p) { var r = d.ref(p);"
@@ -49,7 +49,7 @@ const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 const journeys = [];
 after(async () => { for (const j of journeys) { try { await j.close(); } catch (e) {} } });
 async function open(pre) {
-    const j = await openJourney({ db: { events: {}, global_courses: { az_papago: PAPAGO }, trips: {}, organizers: {}, tournaments: {} },
+    const j = await openJourney({ db: { events: {}, global_courses: { az_papago: PAPAGO }, gps_links: { az_papago: '012141520636857668694' }, trips: {}, organizers: {}, tournaments: {} },
         viewport: { width: 393, height: 852 }, webgl: true, preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + GEO + pre });
     journeys.push(j);
     try { await j.cdp('Browser.grantPermissions', { permissions: ['geolocation'] }); await j.cdp('Emulation.setGeolocationOverride', HERE); } catch (e) {}
@@ -116,4 +116,15 @@ test('genuinely offline (navigator.onLine false): the offline line at once, pick
     const b = await watch(j, READY, 30000);
     assert.ok(b.s && READY(b.s), 'back online: ' + JSON.stringify(b.seen));
     assert.equal(await ev(j, KEY), 'az_papago');
+});
+
+test('a slow first connection on the round\'s own page (9 s): the ✓ GPS links that timed out are asked again once it is up', { timeout: 90000 }, async () => {
+    const j = await open(slow(9000, 'game='));
+    await door(j);
+    const { seen, s } = await watch(j, READY, 45000);
+    assert.ok(s && READY(s), 'the round\'s Course & Tees: ' + JSON.stringify(seen));
+    assert.ok(!seen.some((x) => x.nosig), JSON.stringify(seen));
+    const t0 = Date.now(); let k = null;
+    while (Date.now() - t0 < 30000) { k = JSON.parse(await ev(j, "JSON.stringify({ partial: HardPanDoors.gpsKeysPartial(), link: HardPanDoors.gpsLinks().az_papago || null, kept: !!localStorage.getItem('hardpan_gpskeys_v1') })")); if (!k.partial && k.link) break; await sleep(300); }
+    assert.deepEqual(k, { partial: false, link: '012141520636857668694', kept: true }, 'the GPS links read again after the slow connection');
 });

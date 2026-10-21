@@ -252,7 +252,8 @@
         var fin = function () {
             S.gpsFiles = true; if (typeof H.refreshCourses === 'function') H.refreshCourses(); S.near = S.here ? nearList(S.here) : S.near; done();
             // 021: ✓ GPS on every course with live GPS - the GPS links and set greens, read once.
-            if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (S.here && S.near && S.near.length !== undefined) S.near = nearList(S.here); if (S.open && S.step === 1) render(); });
+            if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (S.here && S.near && S.near.length !== undefined) S.near = nearList(S.here); if (S.open && S.step === 1) render(); keysPartial(); });
+            sockWatch();
         };
         if (!left || typeof H.loadScriptTimed !== 'function') { fin(); return; }
         need.forEach(function (src) { H.loadScriptTimed(src, function () { if (--left === 0) fin(); }); });
@@ -1608,7 +1609,7 @@
             d.ref('.info/connected').on('value', function (s) {
                 var up = !!(s && typeof s.val === 'function' && s.val());
                 NS.sock = up;
-                if (up) { NS.ever = true; backUp(); }
+                if (up) { NS.ever = true; if (NS.keysWait) keysAgain(); backUp(); }
             });
         } catch (e) {}
     }
@@ -1620,9 +1621,21 @@
         if (!S.minting) { clearTimeout(NS.timer); NS.timer = null; retryCode(); }
         var key = courseKey();
         if (key && !cardInHand(key)) { watchTees(); cardFor(key).then(function () { if (S.step === 1 && courseKey() === key) render(); }); }
+        keysAgain();
+    }
+    // THE ✓ GPS LINKS (front-door loadGpsKeys) - a read that timed out on a slow first connection is
+    // PARTIAL (a course or more without its ✓ GPS): asked again once the database is up, on ANY Course &
+    // Tees screen (the round's own page can have a slow first connection too). A few times at most.
+    function keysPartial() {
         var H = HD();
-        if (typeof H.gpsKeysPartial === 'function' && H.gpsKeysPartial() && typeof H.loadGpsKeys === 'function')
-            H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.open && S.step === 1) render(); });
+        if (typeof H.gpsKeysPartial !== 'function' || !H.gpsKeysPartial()) { NS.keysWait = false; return; }
+        if (NS.sock === true) keysAgain(); else NS.keysWait = true;
+    }
+    function keysAgain() {
+        var H = HD();
+        NS.keysWait = false;
+        if (typeof H.gpsKeysPartial !== 'function' || !H.gpsKeysPartial() || typeof H.loadGpsKeys !== 'function' || (NS.keyTries = (NS.keyTries || 0) + 1) > 3) return;
+        H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.open && S.step === 1) render(); keysPartial(); });
     }
     function againLater() {
         if (NS.timer || !S.offline) return;
