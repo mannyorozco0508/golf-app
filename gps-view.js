@@ -4309,13 +4309,28 @@
         } else setData(MISS_SRC, fc);
         try { map.setPaintProperty('mymiss-line', 'line-dasharray', f.own ? [1, 0] : [2, 1.5]); } catch (e) {}
         S.missRing = ring;
-        // Its label (text only, no button - taps go through to the map), beside the oval on its
-        // right edge, so it never sits on top of it.
-        var edge = ring.reduce(function (a, p) { var q = S.map.project(ll(p)), w = S.map.project(ll(a)); return q.x > w.x ? p : a; }, ring[0]);
+        // Its label (text only, no button - taps go through to the map), beside the oval - on its
+        // right, or on its left when the right has no room (the rail) - never on top of it.
+        var px = ring.map(function (p) { return S.map.project(ll(p)).x; });
+        var rI = px.indexOf(Math.max.apply(null, px)), lI = px.indexOf(Math.min.apply(null, px));
         var nm = (B.NAMES && B.NAMES[club]) || club;
-        var lbl = 'My miss · ' + nm + (f.own ? '' : ' · default shape');
-        var mk = marker('mymiss', edge, function () { var e = document.createElement('div'); e.className = 'gps-miss-lbl'; e.style.pointerEvents = 'none'; return e; });
-        if (mk) { var me = mk.getElement(); if (me.textContent !== lbl) { me.textContent = ''; var sp = document.createElement('span'); sp.textContent = lbl; me.appendChild(sp); } me.setAttribute('data-miss-club', club); me.setAttribute('data-miss-own', f.own ? '1' : '0'); }
+        var lbl = 'My miss \u00b7 ' + nm + (f.own ? '' : 'default shape');
+        var mk = marker('mymiss', ring[rI], function () { var e = document.createElement('div'); e.className = 'gps-miss-lbl'; e.style.pointerEvents = 'none'; return e; });
+        if (mk) {
+            var me = mk.getElement();
+            if (me.textContent !== lbl) {
+                me.textContent = '';
+                var sp = document.createElement('span'); sp.appendChild(document.createTextNode('My miss \u00b7 ' + nm));
+                if (!f.own) { var sm = document.createElement('small'); sm.textContent = 'default shape'; sp.appendChild(sm); }
+                me.appendChild(sp);
+            }
+            var cb = ldOn() ? ldClearBox() : null, wrapW = (S.el.querySelector('.gps-map-wrap') || {}).clientWidth || 0;
+            var room = cb ? cb.right : wrapW - 8, sw0 = me.firstChild ? me.firstChild.offsetWidth : 0;
+            var flip = px[rI] + 8 + sw0 > room && px[lI] - 8 - sw0 >= 4;
+            me.classList.toggle('gps-miss-lbl-l', flip);
+            mk.setLngLat(ll(ring[flip ? lI : rI]));
+            me.setAttribute('data-miss-club', club); me.setAttribute('data-miss-own', f.own ? '1' : '0');
+        }
         missKeepClear();
     }
     // The plays-like pill (layout D, bottom right) never covers the oval: when they meet - and the
@@ -6291,6 +6306,7 @@
         + '#gps-overlay .gps-ts-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;border-bottom:1px solid rgba(255,255,255,.1);font:700 17px/1.25 ' + FONT + ';}'
         // URGENT-052 B: the My miss label (text only, never a button).
         + '#gps-overlay .gps-miss-lbl{width:0;height:0;overflow:visible;}#gps-overlay .gps-miss-lbl span{position:absolute;left:8px;top:-10px;padding:2px 7px;border-radius:8px;background:rgba(11,15,12,.82);color:#7dd3fc;font:800 11.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;}'
+        + '#gps-overlay .gps-miss-lbl small{display:block;font-weight:600;font-size:10.5px;color:#cbd5e1;}#gps-overlay .gps-miss-lbl.gps-miss-lbl-l span{left:auto;right:8px;}'
         + '#gps-overlay .gps-ts-sw{flex:0 0 auto;position:relative;width:52px;height:32px;border-radius:16px !important;background:rgba(255,255,255,.22) !important;transition:background .15s;}'
         + '#gps-overlay .gps-ts-sw i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.4);}'
         + '#gps-overlay .gps-ts-sw.on{background:#7cc242 !important;}#gps-overlay .gps-ts-sw.on i{left:23px;}'
