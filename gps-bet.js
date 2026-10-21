@@ -81,7 +81,7 @@
     // kind: 'side' = a sideMatches record (sideMatchPayloadFromTerms); 'skins' = an
     // additionalGameInstances entry (New Action's saveFieldAction shape).
     var GAMES = {
-        match:  { label: 'Match', sub: '1 v 1', sub2: 'Best ball', kind: 'side', stakeWord: '$ a side', chips: [5, 10, 20], presses: true },
+        match:  { label: 'Match', sub: 'Hole by hole', sub2: 'Best ball', kind: 'side', stakeWord: '$ a side', chips: [5, 10, 20], presses: true },
         nassau: { label: 'Nassau', sub: 'F9 / B9 / 18', kind: 'side', stakeWord: '$ each nine + 18', chips: [2, 5, 10], presses: true },
         hilo:   { label: 'Hi-Lo', sub: 'Low + high ball', kind: 'side', stakeWord: '$ per point', chips: [1, 5, 10] },
         stroke: { label: 'Stroke play', sub: 'Lowest total', kind: 'side', stakeWord: '$ overall', chips: [5, 10, 20] },
@@ -398,6 +398,12 @@
     }
     function close() { var r = document.getElementById('hp-bet'); if (r) r.classList.remove('open'); st = null; }
 
+    // URGENT-038 #26: the empty match line's hint. 1 v 1 = just the two golfers (no "sides" to
+    // order); 2 v 2 and Hi-Lo keep the tap-order hint, where the order is the sides.
+    function pickHint(game, mode) {
+        if (game !== 'skins' && game !== 'hilo' && mode !== '2v2') return 'Tap the 2 golfers';
+        return 'Tap the golfers in the order of the sides';
+    }
     function chipFor(p, idx) {
         var n = idx > -1 ? '<i>' + (idx + 1) + '</i>' : '';
         return '<button type="button" class="hb-chip' + (idx > -1 ? ' on' : '') + '" data-hb-pick="' + esc(p.id) + '">' + n + esc(first(p) || p.name) + '</button>';
@@ -414,7 +420,8 @@
                 + '<button type="button" role="tab" data-hb-mode="2v2" class="' + (st.mode === '2v2' ? 'on' : '') + '" aria-selected="' + (st.mode === '2v2') + '">2 v 2</button></div>';
             if (!st.more) {
                 html += '<div class="hb-tiles">' + tiles(st.mode).map(function (k) {
-                    var g = GAMES[k], sub = (k === 'match' && st.mode === '2v2') ? g.sub2 : (k === 'match' ? '1 v 1' : g.sub);
+                    // URGENT-038 #26: Match says how it is won ("Hole by hole"), not the 1 v 1 the toggle above already says.
+                    var g = GAMES[k], sub = (k === 'match' && st.mode === '2v2') ? g.sub2 : g.sub;
                     return '<button type="button" class="hb-tile' + (st.game === k ? ' on' : '') + '" data-hb-game="' + k + '"><b>' + esc(g.label) + '</b><span>' + esc(sub) + '</span></button>';
                 }).join('') + '<button type="button" class="hb-tile' + (st.game === 'skins' ? ' on' : '') + '" data-hb="more"><b>More \u203a</b><span>Skins, Dots, 9 Points\u2026</span></button></div>';
             } else {
@@ -440,7 +447,7 @@
                 // (gps-add-golfer.js); the chips redraw with them in it.
                 if (window.HardPanAddGolfer) html += '<button type="button" class="hb-field" data-hp-addgolfer="1">+ Add golfer</button>';
                 var sh = shapeOf(st.game, st.picks, st.mode);
-                html += '<div class="hb-vsrow"><div class="hb-vs" aria-live="polite">' + (vsLine(st.game, st.picks, st.mode) || '<span style="color:#8a958f">Tap the golfers in the order of the sides</span>') + '</div>'
+                html += '<div class="hb-vsrow"><div class="hb-vs" aria-live="polite">' + (vsLine(st.game, st.picks, st.mode) || '<span style="color:#8a958f">' + pickHint(st.game, st.mode) + '</span>') + '</div>'
                     + (st.game !== 'skins' && st.picks.length >= 2 ? '<button type="button" class="hb-swap" data-hb="swap" aria-label="Swap sides">\u21C4 Swap</button>' : '') + '</div>';
                 html += '<div class="hb-why">' + (st.picks.length && !sh.ok ? esc(sh.why) : '') + '</div>';
                 html += '<button type="button" class="hb-go" data-hb="next"' + (sh.ok ? '' : ' disabled') + '>Next: amount \u203a</button>';
