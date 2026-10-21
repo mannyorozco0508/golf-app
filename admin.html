@@ -2524,15 +2524,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 <div class="sm-nassau-stakes">
                     <div>
                         <label>Front 9</label>
-                        <input type="number" id="setup-nassau-front" value="10" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
+                        <input type="number" id="setup-nassau-front" value="5" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
                     </div>
                     <div>
                         <label>Back 9</label>
-                        <input type="number" id="setup-nassau-back" value="10" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
+                        <input type="number" id="setup-nassau-back" value="5" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
                     </div>
                     <div>
                         <label>Overall 18</label>
-                        <input type="number" id="setup-nassau-overall" value="20" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
+                        <input type="number" id="setup-nassau-overall" value="5" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
                     </div>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
@@ -2545,11 +2545,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     </div>
                     <div>
                         <label style="font-size:0.75rem;">Press Rule</label>
+                        <!-- URGENT-038 #27: ONE NASSAU DEFAULT EVERYWHERE (Manny's pick): $5 / $5 / $5,
+                             presses off - what + Bet starts at. Only where a NEW Nassau starts;
+                             a saved bet keeps its own pressRule and amounts. -->
                         <select id="setup-nassau-press">
                             <option value="2down">Auto @ 2 Down</option>
                             <option value="1down">Auto @ 1 Down</option>
                             <option value="anytime">Press Any Hole</option>
-                            <option value="none">No Press</option>
+                            <option value="none" selected>No Press</option>
                         </select>
                     </div>
                 </div>
@@ -12064,7 +12067,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             renderSetupNassauPlayers();
             // PRICE THE AUTO-PRESS OPTION AS THE PANEL APPEARS.
             //
-            // The stake boxes ship at 10/10/20, which is already what most groups
+            // The stake boxes ship at 5/5/5 (URGENT-038 #27), which is already what most groups
             // want, so most golfers never type in one - and the label was wired only
             // to oninput. That left the control showing the bare "Same as Segment"
             // fallback for exactly the people who accepted the defaults. The reveal
