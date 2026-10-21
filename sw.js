@@ -4763,6 +4763,8 @@ const SHELL_FILES = [
     './venmo-pay.js',
     // URGENT-048: HardPanAuth - sign-in state + profile over the existing sign-in flows.
     './hp-auth.js',
+    // URGENT-048: the needs-an-account nudge (Sign in to use Venmo; once per round).
+    './hp-needs-account.js',
     // URGENT-045 #4: the round recap as one picture (the Receipt's Share recap).
     './round-recap.js',
     // GPS Pro: the App Store entitlement (gps-store-iap).
