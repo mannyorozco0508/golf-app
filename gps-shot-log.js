@@ -27,6 +27,13 @@
 //   bearingDeg  the compass bearing of the reference line ball -> green center
 //   golfer      (optional) the golfer's name - the log is per golfer, like My bag
 //   src         (optional) 'weatherkit' | 'nws' | 'manual'
+//   -- URGENT-052 B (optional; a record from before 052 has none of these and stays valid) --
+//   offline     signed yards off the aim line where the ball finished: + = RIGHT of the line,
+//               - = LEFT, as the golfer looks toward the aim (handedness is kept apart: hand());
+//               null = no line / the end is not a real ball position (endKind 'hole-close')
+//   aimKind     'target-ring' (the ring he moved) | 'green-center'
+//   endKind     'marked' (the next Mark shot) | 'green' (his fix on the green) |
+//               'hole-close' (finishing the hole - ball assumed at the green; leave out of misses)
 // add() fills `id` (text) and returns it, or null when the record is not usable.
 // ============================================================================
 (function () {
@@ -36,6 +43,9 @@
     var MAX_PER_GOLFER = 6000;   // ~3 seasons of every counted shot; the oldest drop first past this
     var CLUBS = ['Dr', '3w', '5w', 'Hy', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
     var HANDS = ['R', 'L'];
+    var AIM_KINDS = ['target-ring', 'green-center'];
+    var END_KINDS = ['marked', 'green', 'hole-close'];
+    var OFFLINE_MAX = 150;       // yards either side; a bigger number is not a miss, it is a bad mark
     function lsGet(k) { try { var v = W.localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
     function lsSet(k, v) { try { W.localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
     function golferKey(name) {
@@ -86,6 +96,14 @@
         };
         if (mph !== null && o.src && /^(weatherkit|nws|hourly|manual)$/.test(String(o.src))) out.src = String(o.src);
         if (mph === null) out.src = null;
+        // 052 B: the miss. Only when the record says how the shot ended (old records: absent).
+        if (END_KINDS.indexOf(o.endKind) !== -1) {
+            var offl = num(o.offline);
+            out.offline = o.endKind === 'hole-close' || offl === null || Math.abs(offl) > OFFLINE_MAX ? null : r1(offl);
+            if (out.offline === 0) out.offline = 0;   // never -0
+            out.aimKind = AIM_KINDS.indexOf(o.aimKind) !== -1 ? o.aimKind : 'green-center';
+            out.endKind = o.endKind;
+        }
         return out;
     }
     function add(o) {
@@ -169,8 +187,11 @@
     function syncOn() { try { return !!(W.HARDPAN_GPS_CONFIG && W.HARDPAN_GPS_CONFIG.shotLogSync === true); } catch (e) { return false; } }
     function syncSaveSoon() { /* phone only (see above) */ }
 
+    // 052 B: does this record carry a usable left/right miss? (stage 2 fits only these)
+    function hasMiss(s) { return !!(s && s.endKind && s.endKind !== 'hole-close' && typeof s.offline === 'number' && isFinite(s.offline)); }
+
     W.HardPanShotLog = {
-        KEY: KEY, CLUBS: CLUBS, MAX_PER_GOLFER: MAX_PER_GOLFER,
+        KEY: KEY, CLUBS: CLUBS, MAX_PER_GOLFER: MAX_PER_GOLFER, AIM_KINDS: AIM_KINDS, END_KINDS: END_KINDS, hasMiss: hasMiss,
         add: add, remove: remove, list: list, byClub: byClub, reset: reset,
         hand: hand, setHand: setHand, strengthOf: strengthOf, dirOf: dirOf, clean: clean, bytes: bytes,
         golferKey: golferKey, syncOn: syncOn

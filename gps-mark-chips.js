@@ -18,11 +18,30 @@
 // elevation change, course, hole, date. NEVER a coordinate: the marks live in memory
 // on this phone only while a shot is open and are not in the record.
 // Pure (no DOM); gps-view.js draws the chip row.
+//
+// URGENT-052 B stage 1 - THE LEFT / RIGHT MISS (`offline`), worked out at the closing mark from
+// the in-memory marks only, then the positions are dropped like before:
+//   offline  signed yards off the AIM LINE where the ball finished: + = RIGHT of the line,
+//            - = LEFT, as the golfer looks down the line toward the aim (the same for a right-
+//            or a left-hander - handedness is kept separately, HardPanShotLog.hand).
+//   aimKind  'target-ring'  - the golfer moved the target ring for this shot (moved while he
+//                             stood within AIM_NEAR_YD of where he marked it), the line runs
+//                             ball -> the ring;
+//            'green-center' - otherwise, ball -> the CENTER of the green (as the wind angle).
+//   endKind  'marked'      - closed by the next Mark shot (the ball really is there);
+//            'green'       - closed by the golfer's own GPS fix on the green;
+//            'hole-close'  - closed by finishing the hole (a score / auto-advance): the ball is
+//                            only ASSUMED at the green's center, so offline is null and stage 2
+//                            leaves these out (the carry still counts, as in 049).
+// Old records (before 052) have none of the three and stay valid.
 // ============================================================================
 (function () {
     'use strict';
     var W = typeof window !== 'undefined' ? window : {};
     var M_PER_YD = 0.9144;
+    var AIM_NEAR_YD = 40;        // a ring moved within this of the shot's mark is that shot's aim
+    var AIM_MIN_YD = 5;          // an aim closer than this to the ball gives no line
+    var END_KINDS = ['marked', 'green', 'hole-close'];
     function num(x) { return typeof x === 'number' && isFinite(x) ? x : null; }
     function norm(d) { d = ((d % 360) + 360) % 360; d = Math.round(d * 10) / 10; return d >= 360 ? 0 : d; }
 
@@ -56,9 +75,25 @@
         } catch (e) { return null; }
     }
 
-    // THE RECORD for a closed, counted shot. open: the shot as marked; carryYd; endElevFt.
-    // Only distances, wind and labels - never open.pt / open.green.
-    function buildRecord(open, carryYd, endElevFt) {
+    // THE MISS OFF THE AIM LINE (052 B): signed yards, + = right of the line from `from`
+    // toward `aim`, for the golfer looking down it. dist(a, b) -> meters, bearing(a, b) -> deg.
+    // null when there is no line (no aim, aim on top of the ball) or no end.
+    function offlineYd(from, aim, end, dist, bearing) {
+        if (!from || !aim || !end || typeof dist !== 'function' || typeof bearing !== 'function') return null;
+        var aimYd = dist(from, aim) / M_PER_YD, endYd = dist(from, end) / M_PER_YD;
+        if (!(aimYd >= AIM_MIN_YD) || !isFinite(endYd)) return null;
+        if (endYd < 0.5) return 0;
+        var a = bearing(from, aim), b = bearing(from, end);
+        if (num(a) == null || num(b) == null) return null;
+        var v = endYd * Math.sin((b - a) * Math.PI / 180);
+        v = Math.round(v * 10) / 10;
+        return v === 0 ? 0 : v;   // never -0
+    }
+
+    // THE RECORD for a closed, counted shot. open: the shot as marked; carryYd; endElevFt;
+    // miss (052 B): { offline, aimKind, endKind } or nothing (an old caller).
+    // Only distances, wind and labels - never open.pt / open.green / open.aim.
+    function buildRecord(open, carryYd, endElevFt, miss) {
         var w = open.wind && !open.wind.none && num(open.wind.mph) != null ? open.wind : null;
         // int-049: no reading at the mark = windMph null (and src null) - NOT 0 / calm. The shot
         // still counts for still-air carry; it is never a wind data point or a calm one.
@@ -85,6 +120,11 @@
             src: w ? srcOf(open.wind) : null
         };
         if (open.golfer) rec.golfer = open.golfer;
+        if (miss && END_KINDS.indexOf(miss.endKind) !== -1) {
+            rec.offline = miss.endKind === 'hole-close' || num(miss.offline) == null ? null : miss.offline;
+            rec.aimKind = miss.aimKind === 'target-ring' ? 'target-ring' : 'green-center';
+            rec.endKind = miss.endKind;
+        }
         if (rec.relAngle == null) { delete rec.relAngle; delete rec.along; delete rec.across; }
         return rec;
     }
@@ -97,39 +137,60 @@
         var open = null, lastId = null;
         // Close the open shot with the ball at pt (a mark, the green, the hole's end). A shot
         // with a club goes to the log; one without (Skip) is dropped. Returns { counted, id,
-        // record, carry } or null (nothing open).
-        function close(pt, endElevFt) {
+        // record, carry } or null (nothing open). endKind (052 B): 'marked' (default) |
+        // 'green' | 'hole-close'.
+        function close(pt, endElevFt, endKind) {
             var o = open;
             open = null;
             if (!o) return null;
             var carry = pt && dist ? dist(o.pt, pt) / M_PER_YD : null;
             var out = { counted: false, id: null, record: null, carry: carry != null ? Math.round(carry) : null, club: o.club || null, hole: o.hole };
             if (!o.club || !(carry >= 1 && carry < 450)) return out;
-            var rec = buildRecord(o, carry, endElevFt);
+            var ek = END_KINDS.indexOf(endKind) !== -1 ? endKind : 'marked';
+            var line = o.aim || o.green;
+            var miss = { endKind: ek, aimKind: o.aim ? 'target-ring' : 'green-center',
+                offline: ek === 'hole-close' ? null : offlineYd(o.pt, line, pt, dist, bearing) };
+            var rec = buildRecord(o, carry, endElevFt, miss);
             var Lg = log(), id = Lg ? Lg.add(rec) : null;
             out.record = rec; out.id = id; out.counted = id != null; lastId = id;
             return out;
         }
         // A mark at pt. info: { hole, green (the hole's green CENTER), wind (the wind
         // source's reading now), elevFt (the height here, or null), course, golfer, club
-        // (pre-selected, or null), noOpen (on the green / tournament: close only) }.
-        // Returns { closed, open }.
+        // (pre-selected, or null), noOpen (on the green / tournament: close only),
+        // ring (052 B: { pt, from } - the moved target ring and where the golfer stood when he
+        // moved it; null = not moved) }. Returns { closed, open }.
         function mark(pt, info) {
             info = info || {};
-            var closed = close(pt, info.elevFt);
+            var closed = close(pt, info.elevFt, 'marked');
             if (!info.noOpen && pt) {
                 open = { pt: [pt[0], pt[1]], hole: info.hole, at: now(), club: info.club || null,
                     green: info.green ? [info.green[0], info.green[1]] : null,
                     bearingDeg: info.green && bearing ? bearing(pt, info.green) : null,
                     wind: info.wind ? Object.assign({}, info.wind) : null,
-                    elevFt: num(info.elevFt), course: info.course || '', golfer: info.golfer || '' };
+                    elevFt: num(info.elevFt), course: info.course || '', golfer: info.golfer || '', aim: null };
+                aim(info.ring || null, pt);
             }
             return { closed: closed, open: open ? view() : null };
         }
-        function view() { return open ? { hole: open.hole, club: open.club, bearingDeg: open.bearingDeg, at: open.at } : null; }
+        function view() { return open ? { hole: open.hole, club: open.club, bearingDeg: open.bearingDeg, at: open.at, aimKind: open.aim ? 'target-ring' : 'green-center' } : null; }
+        // THE AIM of the open shot (052 B). ring: { pt, from } (the moved target ring and where
+        // the golfer stood when he moved it) or null (not moved / put back). here: the golfer
+        // now. Only while he is still at the ball (within AIM_NEAR_YD of the mark) - once he has
+        // walked on, the ring is for his next shot. A ring moved from somewhere else (left over
+        // from the shot before) is not this shot's aim. Returns the aim kind now.
+        function near(a, b) { return !!(a && b && dist && dist(a, b) / M_PER_YD <= AIM_NEAR_YD); }
+        function aim(ring, here) {
+            if (!open) return null;
+            if (here && !near(open.pt, here)) return open.aim ? 'target-ring' : 'green-center';
+            if (!ring || !ring.pt) open.aim = null;
+            else if (near(open.pt, ring.from)) open.aim = [ring.pt[0], ring.pt[1]];
+            return open.aim ? 'target-ring' : 'green-center';
+        }
         return {
             mark: mark,
             close: close,
+            aim: aim,
             pick: function (club) { if (open) open.club = club || null; return view(); },
             skip: function () { if (open) open.club = null; return view(); },
             discard: function () { open = null; },
@@ -149,7 +210,7 @@
     function remove(id, golfer) { var L = log(); if (!L || !id || typeof L.remove !== 'function') return false; return L.remove(id, golfer) !== false; }
 
     var api = { create: create, buildRecord: buildRecord, likelyClub: likelyClub, wxHour: wxHour, srcOf: srcOf,
-        remove: remove, M_PER_YD: M_PER_YD };
+        remove: remove, offlineYd: offlineYd, M_PER_YD: M_PER_YD, AIM_NEAR_YD: AIM_NEAR_YD, END_KINDS: END_KINDS };
     W.HardPanMarkChips = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

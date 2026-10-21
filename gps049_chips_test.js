@@ -105,7 +105,9 @@ test('the record holds no coordinates (built record AND what the log stored)', {
     const r = T.mark(off(TEE, 155, 0), info(green));
     assert.ok(!COORD.test(JSON.stringify(r.closed.record)), JSON.stringify(r.closed.record));
     assert.ok(!COORD.test(env.store[env.L.KEY].replace(/Papago Golf Club/g, '')), 'nothing position-like on the phone either');
-    Object.keys(r.closed.record).forEach((k) => assert.ok(['club', 'carry', 'windMph', 'windFromDeg', 'bearingDeg', 'relAngle', 'along', 'across', 'tempF', 'elevFt', 'course', 'hole', 'date', 'wxHour', 'src', 'golfer'].includes(k), 'unexpected field ' + k));
+    Object.keys(r.closed.record).forEach((k) => assert.ok(['club', 'carry', 'windMph', 'windFromDeg', 'bearingDeg', 'relAngle', 'along', 'across', 'tempF', 'elevFt', 'course', 'hole', 'date', 'wxHour', 'src', 'golfer',
+        // URGENT-052 B stage 1: the left/right miss - yards and labels, never a position.
+        'offline', 'aimKind', 'endKind'].includes(k), 'unexpected field ' + k));
     // gps-view never hands the log a point: everything it passes goes through buildRecord.
     const v = read('gps-view.js'), sec = v.slice(v.indexOf('// ---- URGENT-049: THE CLUB CHIPS'), v.indexOf('    function syncSuggest('));
     assert.ok(sec.length > 1000 && !/HardPanShotLog\.add|\.ref\(|fetch\(|localStorage/.test(sec), 'the view writes nothing itself');
