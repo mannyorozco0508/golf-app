@@ -1124,8 +1124,9 @@
         var l = (list || []).map(Number), i = l.indexOf(Number(cur));
         return i === -1 || i + 1 >= l.length ? null : l[i + 1];
     }
-    var NEXT_TEE_M = 25, GREEN_CLEAR_M = 20, NEXT_TEE_ACC_M = 30;
-    // Is the golfer ON THE NEXT HOLE'S TEE? Within 25 m of its tee point, OFF the
+    // URGENT-045: ~30 yds (27.4 m) of the next tee - was 25 m.
+    var NEXT_TEE_M = 30 * M_PER_YD, GREEN_CLEAR_M = 20, NEXT_TEE_ACC_M = 30;
+    // Is the golfer ON THE NEXT HOLE'S TEE? Within ~30 yds of its tee point, OFF the
     // current green (not inside it, and more than 20 m from its center - a green with
     // no outline is a center only), on a fix good enough to tell (+-30 m or better).
     // o: { me, acc (m), tee (the next hole's), green (the current hole's center),
@@ -1136,6 +1137,44 @@
         if (o.onGreen) return false;
         if (pinPt(o.green) && haversineMeters(pinPt(o.me), pinPt(o.green)) <= GREEN_CLEAR_M) return false;
         return haversineMeters(pinPt(o.me), pinPt(o.tee)) <= NEXT_TEE_M;
+    }
+
+    // URGENT-045 AUTO-ADVANCE, THE WHOLE DECISION (pure: a position + the state -> switch or not).
+    // o: { on (Tools switch), visible (foreground), hole, order (play order: the picker's list -
+    //      start on 10, a shotgun hole), me, acc, teeOf(n) or tees {n: pt} (the next hole's tee
+    //      point; none = no auto-advance onto that hole), green (the current hole's center),
+    //      onGreen, sheetOpen (the score sheet), busy (anything else over the map or the card),
+    //      now, manualAt (the last MANUAL hole change), holdUntil (Undo), armed, dwell, dwellMs }
+    // -> { go, to, reason, armed, dwell }. go = true only ONE hole forward in play order (never
+    // back, never a wrap past the last hole played, never two at once), off the current green,
+    // within ~30 yds of the next tee for dwellMs. ARMED: the golfer has been seen OFF the next
+    // tee (or on the current green) since this hole began - a hole whose tee sits beside the next
+    // one's never chains 2 -> 3 -> 4 off one standing spot. A manual change wins for 2 min.
+    var AA_HOLD_MS = 120000, AA_DWELL_MS = 10000;
+    function autoAdvanceDecision(o) {
+        o = o || {};
+        var now = isFinite(o.now) ? o.now : Date.now();
+        var out = function (reason, extra) { return Object.assign({ go: false, to: null, reason: reason, armed: !!o.armed, dwell: null }, extra || {}); };
+        if (!o.on) return out('off');
+        if (o.visible === false) return out('background');
+        var next = nextInPlayOrder(o.order, o.hole);
+        if (next == null) return out('last');
+        var tee = typeof o.teeOf === 'function' ? o.teeOf(next) : (o.tees ? o.tees[String(next)] || o.tees[next] : null);
+        tee = pinPt(tee);
+        if (!tee) return out('no-tee', { to: next });
+        var me = pinPt(o.me), good = !!me && !(isFinite(o.acc) && o.acc > NEXT_TEE_ACC_M);
+        var onCurGreen = !!o.onGreen || (!!pinPt(o.green) && !!me && haversineMeters(me, pinPt(o.green)) <= GREEN_CLEAR_M);
+        var armed = !!o.armed || (good && (onCurGreen || haversineMeters(me, tee) > NEXT_TEE_M));
+        if (o.sheetOpen) return out('sheet', { to: next, armed: armed });
+        if (o.busy) return out('busy', { to: next, armed: armed });
+        if (isFinite(o.holdUntil) && now < o.holdUntil) return out('undo', { to: next, armed: armed });
+        if (isFinite(o.manualAt) && now - o.manualAt < AA_HOLD_MS) return out('manual', { to: next, armed: armed });
+        if (!armed) return out('not-armed', { to: next });
+        if (!onNextTee({ me: me, acc: o.acc, tee: tee, green: o.green, onGreen: o.onGreen })) return out('not-there', { to: next, armed: armed });
+        var wait = isFinite(o.dwellMs) ? o.dwellMs : AA_DWELL_MS, d = o.dwell;
+        if (!d || Number(d.hole) !== next || !isFinite(d.since)) return out('arming', { to: next, armed: armed, dwell: { hole: next, since: now } });
+        if (now - d.since < wait) return out('waiting', { to: next, armed: armed, dwell: d });
+        return { go: true, to: next, reason: 'go', armed: armed, dwell: null };
     }
 
     // A NUMBER THAT FITS. Four digits at most - 9999 yards is five and a half
@@ -2268,6 +2307,7 @@
         layupPlan: layupPlan, layupFromYou: layupFromYou, LAYUP_MIN_YD: LAYUP_MIN_YD, LAYUP_MAX_PAD: LAYUP_MAX_PAD, LAYUP_SHORT_YD: LAYUP_SHORT_YD, LAYUP_TEE_M: LAYUP_TEE_M,
         ARC_STEP_YD: ARC_STEP_YD, PIN_MARKS_YD: PIN_MARKS_YD, measureOrigin: measureOrigin, shownDistance: shownDistance, OFF_HOLE_YARDS: OFF_HOLE_YARDS,
         nextInPlayOrder: nextInPlayOrder, onNextTee: onNextTee, NEXT_TEE_M: NEXT_TEE_M, GREEN_CLEAR_M: GREEN_CLEAR_M,
+        autoAdvanceDecision: autoAdvanceDecision, AA_HOLD_MS: AA_HOLD_MS, AA_DWELL_MS: AA_DWELL_MS,
         tileXY: tileXY, courseBounds: courseBounds, tilesFor: tilesFor, midpoint: midpoint,
         flyoverFrame: flyoverFrame, holePath: holePath, flyoverPlan: flyoverPlan, flyoverCamera: flyoverCamera, pathTarget: pathTarget, fitCamera: fitCamera, pathBearing: pathBearing,
         FLYOVER_MS: FLYOVER_MS, FLYOVER_MS_BY_PAR: FLYOVER_MS_BY_PAR, FLY_HOLD_MS: FLY_HOLD_MS, FLY_ROUGH_M: FLY_ROUGH_M, PATH_MIN_TURN_DEG: PATH_MIN_TURN_DEG,
