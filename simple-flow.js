@@ -133,7 +133,7 @@
         // handler re-resolves the course from the TYPED NAME on every click outside its search
         // box (last record with that exact name wins, or a brand-new "comm_" course) - so a tap
         // here could quietly swap the picked course for another record. Taps stop here.
-        e.addEventListener('click', function (ev) { onClick(ev); ev.stopPropagation(); });
+        e.addEventListener('click', function (ev) { S.tap = true; try { onClick(ev); } finally { S.tap = false; } ev.stopPropagation(); });
         e.addEventListener('input', onInput);
         e.addEventListener('change', onChange);
         e.addEventListener('keydown', typeKey);
@@ -153,7 +153,7 @@
             + (n ? '<span class="sf-bar" aria-label="Step ' + n + ' of 3">' + bar + '</span>' : '') + '</div>'
             + '<h1>' + title + '</h1>' + body + '<div class="sf-foot">' + foot + '</div></div>';
     }
-    function render() {
+    function render(keep) {
         if (!S.open) return;
         if (S.step === 1) holdPick();
         var e = el(), y = e.scrollTop, html;
@@ -162,9 +162,42 @@
         else if (S.step === 3) html = step3();
         else html = share();
         if (S.ask && S.step === 1) html += askHtml();
-        e.innerHTML = html;
+        if (!(S.step === 1 && keepBox(e, html, keep))) e.innerHTML = html;
         if (S.step === 3 && S.moreOpen) placePool(true);
         e.scrollTop = y;
+    }
+    // URGENT-035 (Manny, 6:05 PM: "it's really hard to type… there's like a stutter"). THE CAUSE: every
+    // redraw of the course step rebuilt the whole screen, the search box with it - 250 ms after a letter,
+    // and again for "Searching all courses…" and its answer. The box being typed in was thrown away for a
+    // new one, focused again by code and its cursor put at the end: on the phone the keyboard lets go and
+    // takes hold again (a letter in that moment lands late, or in the old box and is lost), and a cursor
+    // placed mid-word jumps to the end. Now the SEARCH BOX IS NEVER REDRAWN: everything around it is
+    // replaced and the box itself (its letters, focus and cursor) is left alone. Only a query reset by
+    // the screen (a course picked) is written into it. A tap that redraws the screen still lets go of the
+    // keyboard, as before (render(true): the typing / online-search redraws keep it).
+    function keepBox(e, html, keep) {
+        var old = $('sf-q');
+        if (!old || !e.contains(old)) return false;
+        var tmp = D.createElement('div'); tmp.innerHTML = html;
+        var nu = tmp.querySelector('#sf-q');
+        if (!nu) return false;
+        var oc = [], nc = [], x, i;
+        for (x = old; x && x !== e; x = x.parentNode) oc.push(x);
+        for (x = nu; x && x !== tmp; x = x.parentNode) nc.push(x);
+        if (oc.length !== nc.length) return false;
+        for (i = 0; i < oc.length; i++) if (oc[i].tagName !== nc[i].tagName) return false;
+        for (i = oc.length - 1; i >= 0; i--) {   // top down: each level's other nodes are the new ones
+            var o = oc[i], n = nc[i], op = o.parentNode, np = n.parentNode, after = false;
+            Array.prototype.slice.call(op.childNodes).forEach(function (c) { if (c !== o) op.removeChild(c); });
+            Array.prototype.slice.call(np.childNodes).forEach(function (c) { if (c === n) { after = true; return; } if (after) op.appendChild(c); else op.insertBefore(c, o); });
+            if (i > 0) {
+                Array.prototype.slice.call(o.attributes).forEach(function (a) { if (!n.hasAttribute(a.name)) o.removeAttribute(a.name); });
+                Array.prototype.forEach.call(n.attributes, function (a) { if (o.getAttribute(a.name) !== a.value) o.setAttribute(a.name, a.value); });
+            }
+        }
+        if (old.value !== S.q) old.value = S.q;
+        if (!keep && S.tap && D.activeElement === old) old.blur();
+        return true;
     }
     function go(n) { if (S.step === 3 && n !== 3) placePool(false); S.step = n; var e = el(); render(); e.scrollTop = 0; }
 
@@ -355,25 +388,28 @@
         var hit = null; try { hit = JSON.parse(ls(WEB + k) || 'null'); } catch (e) {}
         if (hit && hit.at && Date.now() - hit.at < WEB_MS) { S.web = { k: k, state: 'ok', results: hit.results || [] }; render1(); return; }
         if (typeof navigator !== 'undefined' && navigator.onLine === false) { S.web = { k: k, state: 'offline' }; render1(); return; }
-        S.web = { k: k, state: 'busy' };
+        var seq = S.webSeq = (S.webSeq || 0) + 1;   // URGENT-035: only the newest search's answer is used
+        S.web = { k: k, state: 'busy', seq: seq };
         try { (W.__sfWeb = W.__sfWeb || []).push(k); } catch (e) {}   // (the tests count the online searches)
         render1();
-        var done = false, t = setTimeout(function () { if (!done) { done = true; if (S.web && S.web.k === k) { S.web = { k: k, state: 'error' }; render1(); } } }, 20000);
+        var cur = function () { return S.web && S.web.k === k && S.webSeq === seq; };
+        var done = false, t = setTimeout(function () { if (!done) { done = true; if (cur()) { S.web = { k: k, state: 'error' }; render1(); } } }, 20000);
         Promise.resolve().then(function () { return L.search(k); }).then(function (r) {
             if (done) return; done = true; clearTimeout(t);
-            if (!S.web || S.web.k !== k) return;
+            if (!cur()) return;
             var st = r && r.status;
             if (st === 'ok') { var res = (r.results || []).slice(0, 25); ls(WEB + k, JSON.stringify({ at: Date.now(), results: res })); S.web = { k: k, state: 'ok', results: res }; }
             else S.web = { k: k, state: st === 'signin' || st === 'account' ? 'signin' : st === 'offline' ? 'offline' : 'error' };
             render1();
-        }, function () { if (done) return; done = true; clearTimeout(t); if (S.web && S.web.k === k) { S.web = { k: k, state: 'error' }; render1(); } });
+        }, function () { if (done) return; done = true; clearTimeout(t); if (cur()) { S.web = { k: k, state: 'error' }; render1(); } });
     }
     // Redraw the course step, keeping the golfer's place in the search box.
     function render1() {
         if (S.step !== 1) return;
         var a = W.document.activeElement, typing = a && a.id === 'sf-q';
-        render();
-        var q = $('sf-q'); if (typing && q) { q.focus(); try { q.setSelectionRange(q.value.length, q.value.length); } catch (e) {} }
+        render(true);
+        // URGENT-035: the box is kept (keepBox), focus and cursor untouched; only a rebuilt box is focused again.
+        var q = $('sf-q'); if (typing && q && q !== a) { q.focus(); try { q.setSelectionRange(q.value.length, q.value.length); } catch (e) {} }
     }
     function webRowHtml(m) {
         var where = [m.city, m.state].filter(Boolean).join(', ');
@@ -1374,9 +1410,16 @@
     function onInput(ev) {
         var t = ev.target;
         if (t.id === 'sf-q') {
-            S.q = t.value; clearTimeout(S.qt); clearTimeout(S.wt);
-            S.qt = setTimeout(function () { render(); var q = $('sf-q'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); } }, 250);
-            S.wt = setTimeout(webSearch, 600);   // URGENT-027: online after a pause, never per letter
+            // URGENT-035: the list follows each letter (one redraw a frame, the box itself never redrawn);
+            // online only after typing pauses: ~400 ms, longer for a slow typist (twice their own gap
+            // between letters, up to 800 ms) so a pause is a pause, never a call per letter.
+            S.q = t.value; clearTimeout(S.wt);
+            var now = Date.now(), gap = S.lastKey ? now - S.lastKey : 0; S.lastKey = now;
+            if (gap > 0 && gap < 1500) S.gaps = (S.gaps || []).concat(gap).slice(-4);
+            var gs = (S.gaps || []).slice().sort(function (a, b) { return a - b; }), med = gs.length ? gs[Math.floor(gs.length / 2)] : 0;
+            // (the letter is painted first, the list the frame after: typing never waits on the list)
+            if (!S.qf) S.qf = (W.requestAnimationFrame || function (f) { return setTimeout(f, 16); })(function () { setTimeout(function () { S.qf = 0; render1(); }, 0); });
+            S.wt = setTimeout(webSearch, Math.min(800, Math.max(400, 2 * med)));   // URGENT-027: online after a pause, never per letter
             return;
         }
         if (t.id === 'sf-paste') { S.pasted = t.value; return; }   // read on paste / leaving the box / Done
