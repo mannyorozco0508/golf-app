@@ -3157,6 +3157,20 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // score entry stays the dominant thing once a round is actually underway). Dismissal is
     // remembered per round via localStorage, so it reappears for a genuinely new round but
     // doesn't nag on every score entered in this one.
+    // PURE on its arguments: has every golfer still in the group a score on at least one
+    // hole (any hole - a shotgun group's first is not hole 1)? Then hole 1 is behind them.
+    function landingPastFirstHole(players, data) {
+        const d = data || currentData || {};
+        const live = (players || []).filter(p => p && p.out !== true);
+        if (!live.length) return false;
+        const scores = d.scores || {};
+        const holes = new Set();
+        Object.keys(scores).forEach(k => { const m = /^p.+_h(\d+)$/.exec(k); if (m && Number(scores[k]) > 0) holes.add(m[1]); });
+        for (const h of holes) {
+            if (live.every(p => Number(scores['p' + p.id + '_h' + h]) > 0)) return true;
+        }
+        return false;
+    }
     function renderLandingSummary(filteredPlayers, allPlayers) {
         const box = document.getElementById('round-landing-summary');
         if (!box) return;
@@ -3165,6 +3179,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (scopeMissing()) { box.style.display = 'none'; return; }
         const dismissKey = `landingDismissed_${currentMode}`;
         if (localStorage.getItem(dismissKey) === '1') { box.style.display = 'none'; return; }
+        // POLISH #25: a coach card for the first tee. Once the group has a whole hole on
+        // the card it has gone - it was still there, "Got it ✕" and all, after 18.
+        if (landingPastFirstHole(filteredPlayers)) { box.style.display = 'none'; return; }
 
         const namesHtml = filteredPlayers.map(p => escapeHtml(golferLabel(p))).join(', ')
             + ` <button onclick="localStorage.setItem('${dismissKey}','1'); document.getElementById('round-landing-summary').style.display='none';" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; cursor:pointer; text-decoration:underline; margin-left:6px;">Got it ✕</button>`;
@@ -3952,6 +3969,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             games = (typeof getRoundGames === 'function' ? getRoundGames(currentData) : []) || [];
         } catch (e) { games = []; }
         const lines = [];
+        // POLISH #25: in the HardPan app stroke play is how the scores are KEPT, not a game -
+        // a GPS-only round listed "Stroke Play" under TODAY'S GAMES. The app drops the main
+        // game when it is plain stroke; a real main game (Nassau, skins...) still shows.
+        try {
+            if (window.HardPanBet && typeof window.HardPanBet.on === 'function' && window.HardPanBet.on())
+                games = games.filter(g => !(g && g.role === 'main' && (g.format || 'stroke') === 'stroke'));
+        } catch (e) {}
         games.forEach(g => {
             let text = '';
             try { text = (typeof describeGame === 'function') ? describeGame(g) : (g && g.label); }
