@@ -20,6 +20,16 @@
 //   applyToBag(B, golfer, summary) -> the same map, written with B.set
 //   sessions(golfer) / current(golfer) / addShot(golfer, club, yd, by) / undo(golfer) / newSession(golfer)
 //   carryYds(a, b) -> whole yards between two [lat, lng] (pure; the points are not kept)
+//   openHome({ account }) / closeHome() / homeGolfer(account)   Range from HOME, with no round
+//
+// FROM HOME (URGENT-047, added 7:20 AM): Home › Range opens this same sheet with NO round. The
+// golfer is the phone's own (homeGolfer: who this phone said it was on its newest round - the name
+// My bag keeps that golfer's numbers under - else the name typed here once ("Your name",
+// localStorage hardpan_my_name), else the account's first name). openHome loads what the GPS page
+// would have (gps-geo.js, gps-shots.js HardPanGpsBag, gps-mark-distance.js HardPanMark), watches the
+// location only while the sheet is open (the reading kept in memory, dropped on Done), and hands
+// HardPanMark a fix getter so Mark goes through HardPanMark.readFix exactly as on the GPS page.
+// No round is created, nothing is written to the database; typing the carry works with no GPS.
 // ============================================================================
 (function () {
     'use strict';
@@ -199,7 +209,7 @@
         var rows = sum.map(function (r) {
             return '<tr data-range-row="' + r.club + '"><td class="c">' + esc(r.name) + '</td><td>' + r.n + '</td><td class="a">' + shown(r.avg) + '</td><td>' + shown(r.longest) + '</td></tr>';
         }).join('');
-        var applied = st.applied ? '<div class="gps-range-done" role="status">✓ My bag updated <button type="button" class="gps-range-openbag">Open My bag</button></div>' : '';
+        var applied = st.applied ? '<div class="gps-range-done" role="status">✓ My bag updated' + (typeof ctx.openBag === 'function' ? ' <button type="button" class="gps-range-openbag">Open My bag</button>' : '') + '</div>' : '';
         sh.innerHTML = ''
             + '<div class="gps-range-head"><div class="gps-range-title">Range' + (who ? ' · ' + esc(who) : '') + '</div><button type="button" class="gps-range-x">Done</button></div>'
             + '<div class="gps-range-sub">Carry by club. Distances only, on this phone.</div>'
@@ -251,7 +261,10 @@
         paint();
         return true;
     }
-    function close() { st.start = null; st.err = ''; var sh = sheet(); if (sh) sh.style.display = 'none'; }
+    function close() {
+        st.start = null; st.err = ''; var sh = sheet(); if (sh) sh.style.display = 'none';
+        if (ctx && typeof ctx.onClose === 'function') call(ctx.onClose);
+    }
 
     var F = '-apple-system,system-ui,sans-serif';
     var CSS = ''
@@ -283,13 +296,169 @@
         + '#gps-overlay .gps-range-note{font-size:12px;color:#a7b3aa;text-align:center;margin-top:4px;}'
         + '#gps-overlay .gps-range-done{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding:6px 10px;border-radius:12px;background:rgba(217,249,157,.15);color:#d9f99d;font-weight:800;}'
         + '#gps-overlay .gps-range-new{display:block;margin:10px auto 0;min-height:44px;padding:0 14px;border:0;background:transparent;color:#c8d1ca;font:700 14px/1 ' + F + ';text-decoration:underline;}';
+    // Home (no #gps-overlay): the same rules under #hp-range, a full screen of its own.
+    var HOME_CSS = CSS.replace(/#gps-overlay /g, '#hp-range ')
+        + '#hp-range{position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147482400;background:#0b0f0c;color:#fff;}'
+        + '#hp-range .gps-range-sheet{top:0;max-height:none;border-radius:0;background:#0b0f0c;color:#fff;padding-top:calc(env(safe-area-inset-top) + 12px);}'
+        + '#hp-range .hp-range-ask{max-width:520px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 24px) 16px 16px;box-sizing:border-box;font:600 15px/1.35 ' + F + ';}'
+        + '#hp-range .hp-range-ask .t{font:800 22px/1.2 ' + F + ';margin-bottom:6px;}#hp-range .hp-range-ask .b{color:#c8d1ca;margin-bottom:14px;}'
+        + '#hp-range .hp-range-ask input{display:block;width:100%;box-sizing:border-box;min-height:50px;border-radius:12px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:700 17px/1 ' + F + ';padding:0 12px;}'
+        + '#hp-range .hp-range-ask button{display:block;width:100%;min-height:50px;margin-top:10px;border-radius:14px;border:0;font:800 16px/1 ' + F + ';}'
+        + '#hp-range .hp-range-ask .ok{background:#d9f99d;color:#0b0f0c;}#hp-range .hp-range-ask .no{background:transparent;color:#c8d1ca;border:1px solid rgba(255,255,255,.25);}'
+        + '#hp-range .hp-range-flash{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:60;max-width:488px;margin:0 auto;padding:10px 12px;border-radius:12px;background:#d9f99d;color:#0b0f0c;font:800 15px/1.25 ' + F + ';text-align:center;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.4);}';
     function ensureCss() {
         if (typeof document === 'undefined' || document.getElementById('gps-range-css')) return;
-        var s = document.createElement('style'); s.id = 'gps-range-css'; s.textContent = CSS; (document.head || document.documentElement).appendChild(s);
+        var s = document.createElement('style'); s.id = 'gps-range-css'; s.textContent = CSS + HOME_CSS; (document.head || document.documentElement).appendChild(s);
+    }
+
+    // ---- RANGE FROM HOME, WITH NO ROUND (URGENT-047, added 7:20 AM) --------------------------
+    var NAME_KEY = 'hardpan_my_name', FIX_STALE_MS = 10000, LOAD_MS = 8000;
+    var GEO_OPTS = { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 };
+    var home = { watch: null, kind: null, fix: null, gen: 0, flashT: null };
+    function lsRead(k) { try { return W.localStorage.getItem(k); } catch (e) { return null; } }
+    function cleanName(n) { return String(n == null ? '' : n).replace(/\s+/g, ' ').trim().slice(0, 40); }
+    // The phone's own golfer: who this phone said it was on its newest round here ("This is me",
+    // golfapp_me_<code>, or the GPS name tag, hardpan_gps_golfer_<code> - the golfer whose My bag the
+    // GPS screen showed), else the name typed here once, else the account's first name. '' = ask.
+    function homeGolfer(account) {
+        var best = null;
+        try {
+            for (var i = 0; i < W.localStorage.length; i++) {
+                var k = W.localStorage.key(i), mm = /^golfapp_snap_v1_(\w+)$/.exec(k || '');
+                if (!mm) continue;
+                var o = null; try { o = JSON.parse(lsRead(k)); } catch (e) { o = null; }
+                var id = lsRead('golfapp_me_' + mm[1]) || lsRead('hardpan_gps_golfer_' + mm[1]);
+                var ps = o && o.data && Array.isArray(o.data.players) ? o.data.players : [];
+                var p = id == null ? null : ps.filter(function (q) { return q && String(q.id) === String(id); })[0];
+                var nm = p ? cleanName(p.name) : '';
+                if (nm && (!best || (Number(o.at) || 0) > best.at)) best = { at: Number(o.at) || 0, name: nm };
+            }
+        } catch (e) {}
+        if (best) return best.name;
+        var typed = cleanName(lsRead(NAME_KEY));
+        if (typed) return typed;
+        var a = cleanName(account);
+        return a && a.toLowerCase() !== 'me' ? a : '';
+    }
+    // THE LOCATION, only while Range is open from Home: the newest reading in memory (never stored),
+    // dropped when it is 10 s old and when the sheet closes. The app's Geolocation plugin, else the browser's.
+    function capGeo() {
+        try { var C = W.Capacitor; return C && typeof C.isNativePlatform === 'function' && C.isNativePlatform() && C.Plugins && C.Plugins.Geolocation && typeof C.Plugins.Geolocation.watchPosition === 'function' ? C.Plugins.Geolocation : null; } catch (e) { return null; }
+    }
+    function geoStart() {
+        geoStop();
+        var gen = home.gen;
+        var onPos = function (p) { if (gen !== home.gen || !p || !p.coords) return; home.fix = { pt: [p.coords.latitude, p.coords.longitude], acc: p.coords.accuracy, at: Date.now() }; };
+        var cap = capGeo();
+        try {
+            if (cap) {
+                home.kind = 'cap'; home.watch = 'pending';
+                Promise.resolve(cap.watchPosition(GEO_OPTS, function (p, err) { if (!err) onPos(p); })).then(function (id) {
+                    if (gen !== home.gen) { try { cap.clearWatch({ id: id }); } catch (e) {} return; }
+                    home.watch = id;
+                }, function () { if (gen === home.gen) home.watch = null; });
+                return;
+            }
+            var g = typeof navigator !== 'undefined' ? navigator.geolocation : null;
+            if (g && typeof g.watchPosition === 'function') { home.kind = 'web'; home.watch = g.watchPosition(onPos, function () {}, GEO_OPTS); }
+        } catch (e) {}
+    }
+    function geoStop() {
+        home.gen++; home.fix = null;
+        var id = home.watch, kind = home.kind;
+        home.watch = null; home.kind = null;
+        if (id === null || id === undefined) return;
+        try {
+            if (kind === 'cap') { var cap = capGeo(); if (cap && id !== 'pending') cap.clearWatch({ id: id }); }
+            else if (typeof navigator !== 'undefined' && navigator.geolocation) navigator.geolocation.clearWatch(id);
+        } catch (e) {}
+    }
+    function homeFix() {
+        var f = home.fix;
+        if (!f || Date.now() - f.at > FIX_STALE_MS) return null;
+        return { pt: [f.pt[0], f.pt[1]], acc: f.acc, at: f.at };
+    }
+    function homeUnits() { return lsRead('hardpan_gps_units') === 'm' ? 'm' : 'yd'; }
+    function homeBox() {
+        var d = W.document, box = d.getElementById('hp-range');
+        if (!box) { box = d.createElement('div'); box.id = 'hp-range'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Range'); d.body.appendChild(box); }
+        return box;
+    }
+    function homeFlash(t) {
+        var box = W.document.getElementById('hp-range'); if (!box) return;
+        var f = box.querySelector('.hp-range-flash');
+        if (!f) { f = W.document.createElement('div'); f.className = 'hp-range-flash'; f.setAttribute('role', 'status'); box.appendChild(f); }
+        f.textContent = String(t || ''); f.style.display = '';
+        clearTimeout(home.flashT);
+        home.flashT = setTimeout(function () { f.style.display = 'none'; }, 2500);
+    }
+    // What the GPS page would have loaded: the yards math, My bag's store and the shared Mark reading.
+    function need(list, done) {
+        var left = list.length, d = W.document;
+        if (!left) { done(); return; }
+        var one = function () { if (--left === 0) done(); };
+        list.forEach(function (x) {
+            if (x[1]()) { one(); return; }
+            var fin = false, sc = d.createElement('script'), end = function () { if (fin) return; fin = true; clearTimeout(t); one(); };
+            var t = setTimeout(end, LOAD_MS);
+            sc.src = x[0]; sc.async = true; sc.onload = end; sc.onerror = end;
+            (d.head || d.documentElement).appendChild(sc);
+        });
+    }
+    function closeHome() {
+        geoStop();
+        var K = W.HardPanMark;
+        if (K && typeof K.context === 'function' && K.context() && K.context().rangeHome && typeof K.sync === 'function') K.sync(null);
+        var box = typeof document !== 'undefined' ? document.getElementById('hp-range') : null;
+        if (box) box.style.display = 'none';
+    }
+    function homeRange(box, name) {
+        need([['gps-geo.js', function () { return !!W.HardPanGeo; }], ['gps-shots.js', function () { return !!W.HardPanGpsBag; }],
+            ['gps-mark-distance.js', function () { return !!W.HardPanMark; }]], function () {
+            if (box.style.display === 'none') return;   // closed while loading
+            geoStart();
+            var K = W.HardPanMark;
+            // HardPanMark with no button on Home (on: false): only its best-of-5-s reading, from this fix getter.
+            if (K && typeof K.sync === 'function') K.sync({ el: box, on: false, hole: 0, fix: homeFix, flash: homeFlash, rangeHome: true });
+            open({ el: box, golfer: name, units: homeUnits, flash: homeFlash, fix: homeFix, onClose: closeHome });
+        });
+    }
+    function askName(box, go) {
+        var a = W.document.createElement('div');
+        a.className = 'hp-range-ask';
+        a.innerHTML = '<div class="t">Your name</div><div class="b">Range keeps your carries and updates My bag under this name, on this phone.</div>'
+            + '<input type="text" class="hp-range-name" maxlength="40" autocomplete="given-name" aria-label="Your name" placeholder="Your name">'
+            + '<button type="button" class="ok">Continue</button><button type="button" class="no">Cancel</button>';
+        box.appendChild(a);
+        var i = a.querySelector('input');
+        var ok = function () {
+            var n = cleanName(i.value);
+            if (!n) { i.focus(); return; }
+            try { W.localStorage.setItem(NAME_KEY, n); } catch (e) {}
+            a.parentNode.removeChild(a);
+            go(n);
+        };
+        a.querySelector('.ok').addEventListener('click', ok);
+        a.querySelector('.no').addEventListener('click', function () { a.parentNode.removeChild(a); closeHome(); });
+        i.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); ok(); } });
+        try { i.focus(); } catch (e) {}
+    }
+    function openHome(o) {
+        o = o || {};
+        if (typeof document === 'undefined' || !document.body) return false;
+        ensureCss();
+        var box = homeBox();
+        box.style.display = '';
+        Array.prototype.forEach.call(box.querySelectorAll('.hp-range-ask'), function (n) { n.parentNode.removeChild(n); });
+        var sh = box.querySelector('.gps-range-sheet'); if (sh) sh.style.display = 'none';
+        var name = homeGolfer(o.account);
+        if (name) homeRange(box, name); else askName(box, function (n) { homeRange(box, n); });
+        return true;
     }
 
     var api = { open: open, close: close, isOpen: isOpen, summarize: summarize, bagUpdate: bagUpdate, applyToBag: applyToBag,
         sessions: sessions, current: current, addShot: addShot, undo: undo, newSession: newSession, carryYds: carryYds,
+        openHome: openHome, closeHome: closeHome, homeGolfer: homeGolfer, NAME_KEY: NAME_KEY,
         KEY: KEY, MAX_YD: MAX_YD, SESSION_GAP_MS: SESSION_GAP_MS, state: function () { return { club: st.club, marking: !!st.start, busy: st.busy }; } };
     W.HardPanRange = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

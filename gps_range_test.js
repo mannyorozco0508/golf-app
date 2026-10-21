@@ -18,7 +18,8 @@ const ON = fs.existsSync(path.join(__dirname, 'gps-range.js'));
 const skip = ON ? false : 'Consumer tree: no GPS';
 function sandbox() {
     const store = {};
-    const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+    const localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; },
+        key: (i) => Object.keys(store)[i] || null, get length() { return Object.keys(store).length; } };
     const sb = { localStorage, JSON, Object, Math, Number, String, Date, isFinite, Array, setTimeout };
     sb.window = sb;
     vm.createContext(sb);
@@ -133,4 +134,25 @@ test('wiring: GPS tools > Range (menu item + Tools tile), loaded on first use, i
     assert.ok(read('sw.js').includes("'./gps-range.js'"), 'cached for offline');
     const sm = read('sync-mobile-web.js');
     assert.equal((sm.match(/'gps-range\.js'/g) || []).length, 2, 'in CONSUMER_SHELL (GPS block) and GPS_SHELL');
+});
+
+test('Range from Home (no round): the phone\'s own golfer - newest round here, else the name typed once, else the account\'s', { skip }, () => {
+    const { R, store } = sandbox();
+    const g = (acct) => R.homeGolfer(acct);
+    // nothing yet: '' (Home asks "Your name"); "Me" is not a name
+    assert.equal(g('Me'), '');
+    assert.equal(g('Manny'), 'Manny', 'the account\'s first name');
+    store.hardpan_my_name = '  Cal  ';
+    assert.equal(g('Manny'), 'Cal', 'the name typed once wins over the account');
+    store['golfapp_snap_v1_OLD001'] = JSON.stringify({ at: 1000, data: { players: [{ id: 101, name: 'Old Name' }] } });
+    store['golfapp_me_OLD001'] = '101';
+    store['golfapp_snap_v1_NEW001'] = JSON.stringify({ at: 2000, data: { players: [{ id: 101, name: 'Ann' }, { id: 102, name: 'Ann Alpha' }] } });
+    store['hardpan_gps_golfer_NEW001'] = '102';
+    store['golfapp_snap_v1_NOME01'] = JSON.stringify({ at: 9000, data: { players: [{ id: 101, name: 'Not Me' }] } });
+    assert.equal(g('Manny'), 'Ann Alpha', 'who this phone was on its newest round (the GPS name tag) - My bag\'s key');
+    // the source: no database, no round written
+    const src = read('gps-range.js').replace(/\/\/.*$/gm, '');
+    const home = src.slice(src.indexOf('function homeGolfer'), src.indexOf('var api ='));
+    assert.ok(!/events\/|lastRoomCode|hardpan_last_round|golfapp_snap_v1_[^(]*setItem|\.set\(\s*['"]/.test(home), 'Home Range writes no round');
+    assert.ok(/setItem\(NAME_KEY, n\)/.test(home) && (home.match(/setItem\(/g) || []).length === 1, 'the only thing Home Range stores itself is the typed name');
 });
