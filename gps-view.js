@@ -74,6 +74,10 @@
         // "Map data not yet available" picture, not an error, so nothing falls back.
         maxNativeZoom: 19,
         maxZoom: 21,
+        // URGENT-051 ESRI CLOSE-UP: a course set to 'esri-closeup' adds a SECOND Esri layer over the
+        // z19 one, asked for z20-z21 only. Each of its tiles is checked: Esri's "Map data not yet
+        // available" picture (or an error) is treated as missing, and the z19 layer under it shows.
+        closeZoom: 21,
         // Esri's required credit, word for word (Wave 2, 2026-10-08). Fixed text,
         // not read at runtime: the attribution Esri requires for this key is this
         // exact line, and one less request per round.
@@ -413,7 +417,7 @@
                 if (v) cacheWrite(key, v);
                 // A lookup another phone shared (build 5).
                 if (v && v.osm && v.osm.holes && S && S.courseKey === key) { S.osmShared = v.osm; lsSet(OSM_LOOKUP + key, v.osm); }
-                if (S && S.courseKey === key) { if (v) S.courseRec = v; render(); }
+                if (S && S.courseKey === key) { if (v) S.courseRec = v; applyImagery(); render(); }
             }, function () { /* no rule yet, or offline: the cache and the round carry it */ });
         } catch (e) {}
     }
@@ -925,7 +929,7 @@
     // reads the phone's cache only.
     function usgsNetworkAllowed() {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) return false;
-        return !!(S && (S.esriFailed || S.mode !== 'measure'));
+        return !!(S && (S.esriFailed || S.mode !== 'measure' || S.imgSrc === 'usgs'));
     }
     var protocolAdded = false;
     function addUsgsProtocol(ml) {
@@ -986,7 +990,7 @@
     function maxZoomNow() {
         if (!S) return 18;
         if (S.googleOn) return (!S.googleFailed && S.mode === 'measure') ? TILES.maxZoom : 18;
-        return (S.esriOn && !S.esriFailed && !tapMode()) ? TILES.maxZoom : 18;
+        return (S.esriOn && !S.esriFailed && !tapMode() && !usgsPicture()) ? TILES.maxZoom : 18;
     }
 
     // ---- ESRI STOPS ANSWERING: USGS TAKES OVER ----------------------------------
@@ -1002,6 +1006,7 @@
         S.esriFailed = true; S.esriFailWhy = why; S.esriFailAt = S.esriErrRun || 0;
         if (S.map) {
             try { if (S.map.getLayer('esri')) S.map.setLayoutProperty('esri', 'visibility', 'none'); } catch (x) {}
+            try { if (S.map.getLayer('esri-hi')) S.map.setLayoutProperty('esri-hi', 'visibility', 'none'); } catch (x) {}
             try { S.map.setMaxZoom(maxZoomNow()); } catch (x) {}
             refreshUsgs();
             reportMapState();
@@ -1013,7 +1018,9 @@
         syncImageryForMode();
         refreshUsgs();
     }
-    function onOffline() { dropEsri('offline'); dropGoogle('offline'); }
+    // 051: a course whose Esri tiles are in the browser cache (within Esri's own max-age) keeps Esri
+    // with no signal; tiles not in it fail, and four in a row hand over to USGS as always.
+    function onOffline() { if (!(S && esriWarmValid(S.courseKey))) dropEsri('offline'); dropGoogle('offline'); }
     function onOnline() {
         if (S && S.googleOn && S.googleFailed && S.googleFailWhy === 'offline' && !S.googleRetried && S.map && S.map.getSource('google')) {
             S.googleRetried = true; S.googleFailed = false; S.googleFailWhy = null; S.gErrRun = 0;
@@ -1028,6 +1035,275 @@
         syncImageryForMode();
     }
 
+    // ---- THE COURSE'S MAP PICTURE (URGENT-051, Manny 2026-10-21) ------------------
+    // Per course, one of three: 'esri' (the default), 'esri-closeup' (Esri plus its z20-21 tiles where
+    // they exist) or 'usgs' (public-domain NAIP). From, newest wins:
+    //   - the shared course record course_gps/<key>/imagery (set by us; or by the organizer once the
+    //     rule in docs/051-imagery-rules-proposal.md is published and gps-config imageryShare is true),
+    //   - the same field on the GolfAPI course's own key (course_gps/gapi_<id>/imagery), so one record
+    //     serves every course key linked to it,
+    //   - this phone's copy (hardpan_imagery_v1_<key>) - what the organizer picked in Fix the green.
+    // THE QUIET FALLBACK, never a blank map: the chosen picture -> Esri z19 -> USGS. Close-up tiles that
+    // are missing show the z19 Esri tile under them; Esri failing shows USGS (as before); USGS chosen
+    // and failing shows Esri.
+    var IMG_SOURCES = ['esri', 'esri-closeup', 'usgs'];
+    var IMG_LOCAL = 'hardpan_imagery_v1_';
+    var IMG_WORDS = {
+        'esri': { name: 'Esri satellite', note: 'The usual satellite photo. Best for most courses.' },
+        'esri-closeup': { name: 'Esri close-up', note: 'Sharper when you zoom in on a green, where Esri has it.' },
+        'usgs': { name: 'USGS aerial', note: 'Free government photo. Softer, but always kept on the phone.' }
+    };
+    // { src, at } from a saved value - a plain string or { src | source, at }. Anything else: null.
+    function normImagery(v) {
+        if (!v) return null;
+        var src = typeof v === 'string' ? v : (v.src || v.source);
+        if (IMG_SOURCES.indexOf(src) === -1) return null;
+        var at = typeof v === 'object' ? Number(v.at) : 0;
+        return { src: src, at: isFinite(at) ? at : 0 };
+    }
+    // The newest of the candidates (a tie keeps the first: the shared record over the phone).
+    function pickImagery(list) {
+        var best = null;
+        (list || []).forEach(function (v) { var n = normImagery(v); if (n && (!best || n.at > best.at)) best = n; });
+        return best ? best.src : 'esri';
+    }
+    function imageryFor(key) {
+        if (!key) return 'esri';
+        var rec = (S && S.courseKey === key) ? S.courseRec : cacheRead(key);
+        var alias = (S && S.courseKey === key) ? S.imgAlias : lsGet(IMG_LOCAL + 'alias_' + key);
+        return pickImagery([rec && rec.imagery, alias, lsGet(IMG_LOCAL + key)]);
+    }
+    // The GolfAPI course a key is linked to (gapi_<id>), whose record may carry the field.
+    function imageryAliasKey(key) {
+        if (/^gapi_\d{6,30}$/.test(String(key || ''))) return null;
+        var id = null;
+        try { id = (window.HardPanGpsLive && window.HardPanGpsLive.idFor(key)) || (window.HardPanGolfApi && window.HardPanGolfApi.links && window.HardPanGolfApi.links[key]) || null; } catch (e) {}
+        return id && /^\d{6,30}$/.test(String(id)) ? 'gapi_' + id : null;
+    }
+    function loadImageryAlias() {
+        if (!S) return;
+        var key = S.courseKey, ak = imageryAliasKey(key);
+        S.imgAlias = lsGet(IMG_LOCAL + 'alias_' + key);
+        if (!ak || !S.db || typeof S.db.ref !== 'function') return;
+        try {
+            S.db.ref('course_gps/' + ak + '/imagery').once('value').then(function (snap) {
+                var v = snap && typeof snap.val === 'function' ? snap.val() : null;
+                if (!S || S.courseKey !== key) return;
+                S.imgAlias = normImagery(v);
+                lsSet(IMG_LOCAL + 'alias_' + key, S.imgAlias);
+                applyImagery();
+            }, function () {});
+        } catch (e) {}
+    }
+    // THE ORGANIZER'S PICK (Fix the green): on this phone always; to the shared record only when the
+    // rule for it is live (gps-config imageryShare: true - docs/051-imagery-rules-proposal.md).
+    function saveImagery(src) {
+        if (!S || IMG_SOURCES.indexOf(src) === -1 || !S.canFix || readOnlyHere()) return;
+        var v = { src: src, at: Date.now() };
+        lsSet(IMG_LOCAL + S.courseKey, v);
+        S.imgSaved = 'phone';
+        if (cfg().imageryShare === true && S.db && typeof S.db.ref === 'function') {
+            var mine = S;
+            try {
+                var p = S.db.ref('course_gps/' + S.courseKey + '/imagery').set({ src: src, at: v.at, ev: S.eventCode });
+                if (p && typeof p.then === 'function') p.then(function () { if (S === mine) { S.imgSaved = 'shared'; syncImgSheet(); } }, function () {});
+            } catch (e) {}
+        }
+        applyImagery();
+    }
+
+    // ESRI'S "MAP DATA NOT YET AVAILABLE" TILE: HTTP 200, a grey JPEG with white words. Known by its
+    // bytes (2,521 bytes, measured 2026-10-21), else by its look - nearly every pixel one neutral
+    // grey - checked only on a small tile, since the real thing is small.
+    var PLACEHOLDER = { len: 2521, fnv: 0x92d9118f, maxLen: 8000 };
+    function fnv32(u8) { var h = 0x811c9dc5; for (var i = 0; i < u8.length; i++) { h ^= u8[i]; h = Math.imul(h, 0x01000193) >>> 0; } return h >>> 0; }
+    // rgba: pixel bytes (a small sample is enough). True when >= 90% sit within 8 of one neutral grey 150-235.
+    function greyCard(rgba) {
+        var n = Math.floor(rgba.length / 4), counts = {}, best = null;
+        if (!n) return false;
+        for (var i = 0; i < n; i++) {
+            var r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
+            if (Math.abs(r - g) > 6 || Math.abs(g - b) > 6) continue;
+            var k = r >> 3; counts[k] = (counts[k] || 0) + 1;
+            if (best == null || counts[k] > counts[best]) best = k;
+        }
+        if (best == null) return false;
+        var c = best * 8 + 4, near = 0;
+        if (c < 150 || c > 235) return false;
+        for (var j = 0; j < n; j++) {
+            var rr = rgba[j * 4], gg = rgba[j * 4 + 1], bb = rgba[j * 4 + 2];
+            if (Math.abs(rr - c) <= 8 && Math.abs(gg - c) <= 8 && Math.abs(bb - c) <= 8) near++;
+        }
+        return near / n >= 0.9;
+    }
+    // Resolves true for the placeholder; false for a real tile, and false whenever it cannot tell.
+    function isPlaceholderTile(buf) {
+        try {
+            var u8 = new Uint8Array(buf);
+            if (u8.length === PLACEHOLDER.len && fnv32(u8) === PLACEHOLDER.fnv) return Promise.resolve(true);
+            if (u8.length > PLACEHOLDER.maxLen || typeof createImageBitmap !== 'function' || typeof Blob === 'undefined') return Promise.resolve(false);
+            return createImageBitmap(new Blob([u8])).then(function (bmp) {
+                var W = 32, cv = (typeof OffscreenCanvas === 'function') ? new OffscreenCanvas(W, W) : document.createElement('canvas');
+                cv.width = W; cv.height = W;
+                var cx = cv.getContext('2d');
+                cx.drawImage(bmp, 0, 0, W, W);
+                try { bmp.close(); } catch (e) {}
+                return greyCard(cx.getImageData(0, 0, W, W).data);
+            }).catch(function () { return false; });
+        } catch (e) { return Promise.resolve(false); }
+    }
+    // hpesri://{z}/{y}/{x} -> the keyed Esri tile, for the close-up layer only. The key is added here,
+    // never written into the style. A placeholder or a failed request is an error: MapLibre draws
+    // nothing for that tile and the z19 Esri layer below shows through.
+    var esriHiAdded = false;
+    function addEsriHiProtocol(ml) {
+        if (esriHiAdded || !ml || typeof ml.addProtocol !== 'function') return;
+        esriHiAdded = true;
+        ml.addProtocol('hpesri', function (params) {
+            var m = /^hpesri:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
+            if (!m) return Promise.reject(new Error('bad tile url'));
+            var url = esriTileUrl().replace('{key}', encodeURIComponent(esriKey())).replace('{z}', m[1]).replace('{y}', m[2]).replace('{x}', m[3]);
+            return fetch(url, { mode: 'cors', credentials: 'omit' }).then(function (r) {
+                if (!r.ok) throw new Error('esri ' + r.status);
+                return r.arrayBuffer();
+            }).then(function (b) {
+                return isPlaceholderTile(b).then(function (ph) {
+                    if (ph) { if (S) S.hiPlaceholders = (S.hiPlaceholders || 0) + 1; throw new Error('esri placeholder'); }
+                    return { data: b };
+                });
+            });
+        });
+    }
+    function esriHiSource() {
+        return { type: 'raster', tiles: ['hpesri://{z}/{y}/{x}'], tileSize: 256, minzoom: TILES.maxNativeZoom + 1, maxzoom: TILES.closeZoom,
+                 attribution: esriAttribution() };
+    }
+    // Close-up tiles missing this many times with none loaded: the course has none - the layer is
+    // taken off for the round (no more requests), quietly.
+    var HI_MISS_TO_OFF = 8;
+    // The picture the course asks for, put on the map: the close-up layer in or out, Esri held back
+    // while USGS is the picture. Called when the map is ready, when the course record (or its GolfAPI
+    // record) arrives, and when the organizer picks. Safe to call any time.
+    function applyImagery() {
+        if (!S) return;
+        var want = imageryFor(S.courseKey);
+        if (want !== S.imgSrc) { S.usgsErrRun = 0; S.usgsFailed = false; S.hiOff = null; S.hiMissRun = 0; }
+        S.imgSrc = want;
+        if (!S.map || !S.styleReady) return;
+        var hiWant = want === 'esri-closeup' && S.esriOn && !S.googleOn;
+        try {
+            if (hiWant && !S.map.getSource('esri-hi')) {
+                S.map.addSource('esri-hi', esriHiSource());
+                S.map.addLayer({ id: 'esri-hi', type: 'raster', source: 'esri-hi', minzoom: TILES.maxNativeZoom + 0.5, layout: { visibility: 'none' } }, 'acc-fill');
+            } else if (!hiWant && S.map.getSource('esri-hi')) {
+                if (S.map.getLayer('esri-hi')) S.map.removeLayer('esri-hi');
+                S.map.removeSource('esri-hi');
+            }
+        } catch (e) {}
+        if (want === 'usgs') refreshUsgs();
+        syncImageryForMode();
+        syncImgSheet();
+    }
+    // The organizer, fixing a green on a GPS Map phone: the switch shows.
+    function imgPickOn() { return !!(S && S.pro && S.canFix && S.fixing && S.mode === 'gpsMid' && !readOnlyHere()); }
+    function syncImgSheet() {
+        if (!S || !S.el) return;
+        var sh = S.el.querySelector('.gps-img-sheet');
+        if (!sh) return;
+        var open = !!S.imgSheet && imgPickOn();
+        sh.style.display = open ? '' : 'none';
+        var cur = S.imgSrc || imageryFor(S.courseKey);
+        sh.querySelectorAll('.gps-img-list button').forEach(function (b) {
+            var on = b.getAttribute('data-img') === cur;
+            b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        var sub = sh.querySelector('.gps-img-sub');
+        if (sub) sub.textContent = S.imgSaved === 'shared' ? 'Saved for every round on this course.'
+            : (cfg().imageryShare === true ? 'Kept for every round on this course.' : 'Kept on this phone for every round on this course.');
+    }
+    // USGS is the chosen picture and is not failing: Esri stays off the map (no Esri requests).
+    function usgsPicture() { return !!(S && S.imgSrc === 'usgs' && !S.usgsFailed); }
+    function failUsgs() {
+        if (!S || S.usgsFailed || S.imgSrc !== 'usgs') return;
+        S.usgsFailed = true;
+        syncImageryForMode();
+    }
+
+    // ESRI IN THE PHONE'S BROWSER CACHE FOR THE ROUND (URGENT-051 offline): Esri allows pre-caching only
+    // "as permitted by the caching headers" (Location Platform §3.1.d.6.A). So Esri tiles are fetched
+    // into the browser's own HTTP cache - never Cache Storage, never IndexedDB - and they last only as
+    // long as Esri's Cache-Control says. A header that forbids caching (no-store, no-cache, max-age=0)
+    // stops the warm-up at the first tile. The AREA comes from the COURSE (its holes and greens, as the
+    // USGS pre-cache), never from the golfer: the same course gives the same tiles wherever the golfer is.
+    var ESRI_WARM = 'hardpan_esri_warm_v1_';
+    var ESRI_WARM_CAP = 300;                        // tiles per course per warm-up, at most
+    function esriWarmValid(key) { var w = lsGet(ESRI_WARM + key); return !!(w && w.until && Date.now() < w.until); }
+    // The tile list, pure: z16-18 over the course box (z16-17 when that is too many), z19 over each green,
+    // and with the close-up z20 over each green - in that order, cut at the cap.
+    function esriWarmTiles(b, greens, src, cap) {
+        if (!b || !G || !G.tilesFor) return [];
+        cap = cap || ESRI_WARM_CAP;
+        var out = G.tilesFor(b, 16, 18, cap) || G.tilesFor(b, 16, 17, cap) || [];
+        var seen = {};
+        out.forEach(function (t) { seen[t.z + '/' + t.x + '/' + t.y] = 1; });
+        var zs = src === 'esri-closeup' ? [19, 20] : [19];
+        zs.forEach(function (z) {
+            (greens || []).forEach(function (g) {
+                var d = 30 / 111320, dl = d / Math.cos(g[0] * Math.PI / 180);
+                (G.tilesFor({ south: g[0] - d, north: g[0] + d, west: g[1] - dl, east: g[1] + dl }, z, z, 64) || []).forEach(function (t) {
+                    var k = t.z + '/' + t.x + '/' + t.y;
+                    if (!seen[k] && out.length < cap) { seen[k] = 1; out.push(t); }
+                });
+            });
+        });
+        return out.slice(0, cap);
+    }
+    function maxAgeOf(cc) {
+        cc = String(cc || '').toLowerCase();
+        if (/no-store|no-cache|private/.test(cc)) return 0;
+        var m = /max-age=(\d+)/.exec(cc);
+        return m ? Number(m[1]) : 0;
+    }
+    function warmEsri(courseKey, osm, extraPts) {
+        var why = function (r) { return Promise.resolve({ ok: false, reason: r }); };
+        var src = imageryFor(courseKey);
+        if (src === 'usgs') return why('usgs-chosen');
+        if (!esriKey() || cfg().esriWarm === false) return why('off');
+        if (esriWarmValid(courseKey)) return why('fresh');
+        var b = G.courseBounds(osm, extraPts || [], 150);
+        if (!b) return why('no-course-data');
+        var greens = [];
+        Object.keys((osm && osm.holes) || {}).forEach(function (n) {
+            var r = G.resolveHole ? G.resolveHole(osm.holes[n], []) : null;
+            if (r && r.mid) greens.push(r.mid);
+        });
+        (extraPts || []).forEach(function (p) { if (p && isFinite(p[0]) && isFinite(p[1])) greens.push(p); });
+        var tiles = esriWarmTiles(b, greens, src);
+        if (!tiles.length) return why('no-tiles');
+        var tmpl = esriTileUrl().replace('{key}', encodeURIComponent(esriKey()));
+        var i = 0, fetched = 0, failed = 0, age = null, stop = false;
+        var one = function () {
+            if (stop || i >= tiles.length) return Promise.resolve();
+            var t = tiles[i++];
+            var url = tmpl.replace('{z}', t.z).replace('{y}', t.y).replace('{x}', t.x);
+            return fetch(url, { mode: 'cors', credentials: 'omit', cache: 'default' }).then(function (r) {
+                if (!r || !r.ok) { failed++; return null; }
+                var a = maxAgeOf(r.headers && r.headers.get('cache-control'));
+                if (age == null || a < age) age = a;
+                if (!a) stop = true;     // Esri's headers do not allow keeping it: stop asking
+                fetched++;
+                return r.arrayBuffer().then(function () {}, function () {});
+            }, function () { failed++; }).then(one);
+        };
+        return Promise.all([one(), one(), one(), one()]).then(function () {
+            var at = Date.now(), res = { ok: !stop && failed === 0 && fetched > 0, src: src, tiles: tiles.length, fetched: fetched, failed: failed, maxAge: age };
+            if (stop) res.reason = 'headers';
+            // Good for its max-age less an hour - never past what Esri allowed.
+            if (res.ok && age > 3600) lsSet(ESRI_WARM + courseKey, { at: at, until: at + (age - 3600) * 1000, n: fetched, src: src });
+            return res;
+        }).catch(function () { return { ok: false, reason: 'error' }; });
+    }
+
     // ---- THE MAP --------------------------------------------------------------
     var EMPTY = { type: 'FeatureCollection', features: [] };
     function ll(p) { return [p[1], p[0]]; }               // [lat, lng] -> [lng, lat]
@@ -1036,6 +1312,7 @@
         var el = S.el.querySelector('.gps-map');
         if (!ml || !el) { S.map = null; if (el) el.classList.add('gps-no-tiles'); return; }
         addUsgsProtocol(ml);
+        addEsriHiProtocol(ml);
         S.imagery = imageryChoice();
         S.googleOn = S.imagery === 'google';
         // Google chosen: Esri is not on the map at all (no Google with another map).
@@ -1043,8 +1320,9 @@
         S.esriOn = !!key;
         var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
         S.googleFailed = S.googleOn && offline; S.googleFailWhy = S.googleFailed ? 'offline' : null; S.gErrRun = 0;
-        S.esriFailed = !key || offline;
-        S.esriFailWhy = !key ? 'no-key' : (offline ? 'offline' : null);
+        var offEsri = offline && !esriWarmValid(S.courseKey);
+        S.esriFailed = !key || offEsri;
+        S.esriFailWhy = !key ? 'no-key' : (offEsri ? 'offline' : null);
         S.esriErrRun = 0;
         S.tileErrors = 0; S.tileLoads = 0; S.usgsGen = 0;
         var sources = {
@@ -1111,12 +1389,24 @@
                 S.esriErrRun = (S.esriErrRun || 0) + 1;
                 if (S.esriErrRun >= ESRI_ERRS_TO_FAIL) dropEsri('errors');
             }
-            if (sid === 'usgs') S.usgsErrs = (S.usgsErrs || 0) + 1;
+            if (sid === 'usgs') {
+                S.usgsErrs = (S.usgsErrs || 0) + 1;
+                // 051: USGS chosen and not answering (in a row) - Esri takes over, quietly.
+                S.usgsErrRun = (S.usgsErrRun || 0) + 1;
+                if (S.imgSrc === 'usgs' && S.usgsErrRun >= ESRI_ERRS_TO_FAIL) failUsgs();
+            }
+            // 051: a close-up tile missing (Esri's placeholder, or an error) - the z19 tile under it shows.
+            if (sid === 'esri-hi') {
+                S.hiMiss = (S.hiMiss || 0) + 1; S.hiMissRun = (S.hiMissRun || 0) + 1;
+                if (!S.hiOff && !(S.hiLoads > 0) && S.hiMissRun >= HI_MISS_TO_OFF) { S.hiOff = 'missing'; syncImageryForMode(); }
+            }
             if (sid === 'usgs' || sid === 'esri') { S.tileErrors++; syncNoTiles(); }
         });
         map.on('data', function (e) {
             if (!S || S.map !== map || !e || e.dataType !== 'source' || !e.tile) return;
             if (e.sourceId === 'esri') { S.esriLoads = (S.esriLoads || 0) + 1; S.esriErrRun = 0; }
+            if (e.sourceId === 'esri-hi') { S.hiLoads = (S.hiLoads || 0) + 1; S.hiMissRun = 0; }
+            if (e.sourceId === 'usgs') S.usgsErrRun = 0;
             if (e.sourceId === 'google') { S.googleLoads = (S.googleLoads || 0) + 1; S.gErrRun = 0; }
             if (e.sourceId === 'usgs' || e.sourceId === 'esri' || e.sourceId === 'google') { S.tileLoads++; syncNoTiles(); reportMapState(); }
         });
@@ -1151,6 +1441,7 @@
             if (!map.getStyle || !(function () { try { return !!map.getSource('usgs'); } catch (e) { return false; } })()) return;
             S.styleReady = true;
             if (S.googleOn) addGoogleLayer();
+            applyImagery();
             limitToCourse();
             frameHole(true);
             render();
@@ -1178,6 +1469,15 @@
         el.setAttribute('data-esri-fail-at', S.esriFailed && S.esriFailWhy === 'errors' ? String(S.esriFailAt) : '');
         var es = S.map.getSource('esri');
         el.setAttribute('data-esri-src-max', es ? String(es.maxzoom) : '');
+        // 051: the course's picture and its fallback state (no position in any of it).
+        el.setAttribute('data-img-src', S.imgSrc || '');
+        el.setAttribute('data-img-hi', S.map.getLayer('esri-hi') ? (S.hiOff ? 'off' : (S.map.getLayoutProperty('esri-hi', 'visibility') || 'visible')) : '');
+        el.setAttribute('data-img-hi-loads', String(S.hiLoads || 0));
+        el.setAttribute('data-img-hi-miss', String(S.hiMiss || 0));
+        el.setAttribute('data-img-hi-placeholders', String(S.hiPlaceholders || 0));
+        el.setAttribute('data-usgs-failed', S.usgsFailed ? '1' : '');
+        var hs = S.map.getSource('esri-hi');
+        el.setAttribute('data-esri-hi-max', hs ? String(hs.maxzoom) : '');
         var gs = S.map.getSource('google');
         el.setAttribute('data-google', !S.googleOn ? 'off' : (S.googleFailed ? 'failed' : (S.map.getLayer('google') ? (S.map.getLayoutProperty('google', 'visibility') || 'visible') : 'pending')));
         el.setAttribute('data-google-why', S.googleFailWhy || '');
@@ -1408,10 +1708,15 @@
             }
         }
         if (S.map.getLayer('esri')) {
-            var want = (pinning || S.esriFailed) ? 'none' : 'visible';
+            var want = (pinning || S.esriFailed || usgsPicture()) ? 'none' : 'visible';
             if (S.map.getLayoutProperty('esri', 'visibility') !== want) {
                 S.map.setLayoutProperty('esri', 'visibility', want);
                 if (want === 'none') refreshUsgs();
+            }
+            // 051: the close-up layer shows only over a showing Esri layer.
+            if (S.map.getLayer('esri-hi')) {
+                var hw = (want === 'visible' && !S.hiOff) ? 'visible' : 'none';
+                if (S.map.getLayoutProperty('esri-hi', 'visibility') !== hw) S.map.setLayoutProperty('esri-hi', 'visibility', hw);
             }
         }
         if (S.map.getMaxZoom() !== maxZoomNow()) S.map.setMaxZoom(maxZoomNow());
@@ -1425,7 +1730,16 @@
     // golfers set - never from the golfer's position; a course with no points at
     // all is skipped rather than guessed at. Once per course per PRECACHE_DAYS,
     // marked done only when every tile is in. Esri tiles are never stored here.
+    // 051: then, when the course's picture is Esri (or Esri close-up), its Esri tiles for the same
+    // course area go into the browser's HTTP cache under Esri's own headers (warmEsri) - result.esri.
     function precacheCourse(courseKey, extraPts) {
+        return precacheUsgs(courseKey, extraPts).then(function (res) {
+            if (!res || res.reason === 'no-course' || res.reason === 'no-gps-map' || res.reason === 'offline' || res.reason === 'unsupported') return res;
+            var osm = (S && S.courseKey === courseKey) ? osmRecord(courseKey) : G.osmCourse(window.HardPanGpsCourses || {}, courseKey);
+            return warmEsri(courseKey, osm, extraPts).then(function (w) { res.esri = w; return res; }, function () { return res; });
+        });
+    }
+    function precacheUsgs(courseKey, extraPts) {
         var why = function (r) { return Promise.resolve({ ok: false, reason: r }); };
         G = G || window.HardPanGeo || null;
         if (!courseKey || !G) return why('no-course');
@@ -3923,6 +4237,10 @@
         var gb = S.el.querySelector('.gps-gps-set');
         if (gb) { gb.disabled = !gpsOk; gb.classList.toggle('gps-off', !gpsOk); }
         show('.gps-tap-fallback', S.mode === 'gpsMid');
+        show('.gps-img-open', imgPickOn());
+        txt('.gps-img-open', 'Map picture: ' + IMG_WORDS[S.imgSrc || 'esri'].name + ' \u203A');
+        if (S.imgSheet && !imgPickOn()) S.imgSheet = false;
+        syncImgSheet();
         show('.gps-skip', S.mode === 'setFront' || S.mode === 'setBack' || S.mode === 'gpsFront' || S.mode === 'gpsBack');
         show('.gps-addedges', S.mode === 'confirmMid' || S.mode === 'gpsConfirmMid');
         show('.gps-save', S.mode === 'confirmMid' || S.mode === 'confirmAll' || S.mode === 'gpsConfirmMid' || S.mode === 'gpsConfirmAll');
@@ -5418,7 +5736,15 @@
         +   '<button type="button" class="gps-btn gps-primary gps-save" style="display:none">Save green</button>'
         +   '<button type="button" class="gps-btn gps-cancel" style="display:none">Cancel</button>'
         +   '<button type="button" class="gps-tap-fallback" style="display:none">Set by tapping (lower detail)</button>'
+        // URGENT-051: the organizer's map picture for this course (Fix the green only).
+        +   '<button type="button" class="gps-img-open" style="display:none">Map picture: Esri satellite \u203A</button>'
         + '</div>'
+        + '<div class="gps-img-sheet gps-scroll-ok" style="display:none" role="dialog" aria-label="Map picture for this course"><div class="gps-img-card">'
+        +   '<div class="gps-img-title">Map picture for this course</div><div class="gps-img-sub"></div>'
+        +   '<div class="gps-img-list">'
+        +     IMG_SOURCES.map(function (k) { return '<button type="button" data-img="' + k + '"><b>' + IMG_WORDS[k].name + '</b><span>' + IMG_WORDS[k].note + '</span></button>'; }).join('')
+        +   '</div><button type="button" class="gps-img-done">Done</button>'
+        + '</div></div>'
         // TOOLS: Edit Pin, the green, Units.
         + '<div class="gps-shotbar gps-float" style="display:none" role="status"><div class="gps-shotbar-text"></div><div class="gps-shotbar-btns">'
         +   '<button type="button" class="gps-sb-here">Here</button><button type="button" class="gps-sb-undo">Undo</button>'
@@ -5634,6 +5960,18 @@
         + '#gps-overlay .gps-who-title{font-weight:800;font-size:17px;margin-bottom:10px;}'
         + '#gps-overlay .gps-who-list button{display:block;width:100%;min-height:48px;margin:0 0 8px;border:1px solid #0f4c3a;border-radius:12px;background:#fff;color:#0f4c3a;font-weight:800;font-size:16px;text-align:left;padding:0 14px;}'
         + '#gps-overlay .gps-who-list button.on{background:#0f4c3a;color:#fff;}'
+        // URGENT-051: the map-picture sheet (Fix the green) - the who sheet's look.
+        + '#gps-overlay .gps-img-open{display:block;width:100%;margin-top:6px;background:none;border:0;color:#d9f99d;font-weight:700;font-size:14px;text-decoration:underline;padding:6px 0;}'
+        + '#gps-overlay .gps-img-sheet{position:absolute;inset:0;z-index:31;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;}'
+        + '#gps-overlay .gps-img-card{width:100%;max-width:520px;max-height:80%;overflow:auto;box-sizing:border-box;background:#fff;color:#1a1a1a;border-radius:18px 18px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom) + 14px);}'
+        + '#gps-overlay .gps-img-title{font-weight:800;font-size:17px;}'
+        + '#gps-overlay .gps-img-sub{font-size:13px;color:#4b5563;margin:4px 0 12px;}'
+        + '#gps-overlay .gps-img-list button{display:block;width:100%;min-height:56px;margin:0 0 8px;border:1px solid #0f4c3a;border-radius:12px;background:#fff;color:#0f4c3a;text-align:left;padding:8px 14px;}'
+        + '#gps-overlay .gps-img-list button b{display:block;font-size:16px;font-weight:800;}'
+        + '#gps-overlay .gps-img-list button span{display:block;font-size:13px;font-weight:500;color:#374151;margin-top:2px;}'
+        + '#gps-overlay .gps-img-list button.on{background:#0f4c3a;color:#fff;}'
+        + '#gps-overlay .gps-img-list button.on span{color:#d1fae5;}'
+        + '#gps-overlay .gps-img-done{display:block;width:100%;min-height:46px;border:0;border-radius:12px;background:#e5e7eb;color:#111;font-weight:800;font-size:16px;}'
         + '#gps-overlay .gps-who-skip{display:block;width:100%;min-height:44px;border:0;background:none;color:#555;font-weight:700;font-size:15px;}'
         + '#gps-overlay .gps-score-prev{flex:0 0 auto;width:46px;color:#0b0f0c;font-size:26px;font-weight:800;border-right:1px solid rgba(11,15,12,.25);}'
         + '#gps-overlay .gps-score-next{flex:0 0 auto;width:46px;color:#0b0f0c;font-size:26px;font-weight:800;border-left:1px solid rgba(11,15,12,.25);}'
@@ -6466,10 +6804,16 @@
         window.addEventListener('online', onOnline);
         document.addEventListener('touchmove', blockPull, { passive: false });
         // Set / fix the green: by GPS first; the photo-tap way is the fallback link.
-        on(el, '.gps-set-green', function () { S.mode = 'gpsMid'; S.draft = null; render(); });
+        on(el, '.gps-set-green', function () { S.mode = 'gpsMid'; S.draft = null; S.fixing = false; render(); });
         on(el, '.gps-saveline-yes', saveLine);
         on(el, '.gps-saveline-clear', clearLine);
-        on(el, '.gps-fix-green', function () { S.mode = 'gpsMid'; S.draft = null; render(); });
+        on(el, '.gps-fix-green', function () { S.mode = 'gpsMid'; S.draft = null; S.fixing = true; render(); });
+        // URGENT-051: the map picture for this course - three choices, kept for every round here.
+        on(el, '.gps-img-open', function () { if (imgPickOn()) { S.imgSheet = true; syncImgSheet(); } });
+        on(el, '.gps-img-done', function () { S.imgSheet = false; syncImgSheet(); });
+        el.querySelectorAll('.gps-img-list button').forEach(function (b) {
+            b.addEventListener('click', function () { saveImagery(b.getAttribute('data-img')); syncImgSheet(); render(); });
+        });
         on(el, '.gps-tap-fallback', function () { S.mode = 'setMid'; S.draft = null; render(); });
         // "Set": the spot the golfer is STANDING on becomes the green's center /
         // front / back - their deliberate choice, made with the button, and the
@@ -6509,6 +6853,7 @@
         document.addEventListener('visibilitychange', onVisibility);
         window.addEventListener('pagehide', onPageHide);
         loadCourseRecord();
+        loadImageryAlias();
         loadCourseLocation();
         // THE APP'S FRONT DOOR (gps-doors): Score and + Game at the bottom, Games at the top.
         if (doorsOn()) {
@@ -6945,6 +7290,13 @@
         prepareMap: function () { if (!S) return false; if (!S.pro && hasGpsPro()) becomePro(); if (!S.pro) return false; ensureMap(); if (S.map) { try { S.map.resize(); } catch (e) {} } return true; },
         // 017 part D (tests, read only): what the map shows - zoom, centre, the target ring, the hole.
         view: function () { if (!S) return null; var m = S.map, c = null, z = null; try { if (m) { z = m.getZoom(); var cc = m.getCenter(); c = [cc.lat, cc.lng]; } } catch (e) {} return { hole: S.hole, zoom: z, center: c, target: S.target ? [S.target[0], S.target[1]] : null, built: !!m }; },
+        // URGENT-051: the course's map picture. Pure helpers (gps_imagery_test.js) and what shows now.
+        imagery: {
+            sources: IMG_SOURCES, words: IMG_WORDS, norm: normImagery, pick: pickImagery, greyCard: greyCard, fnv32: fnv32,
+            isPlaceholder: isPlaceholderTile, warmTiles: esriWarmTiles, maxAge: maxAgeOf, PLACEHOLDER: PLACEHOLDER, WARM_CAP: ESRI_WARM_CAP,
+            forCourse: function (key) { return imageryFor(key); },
+            now: function () { return S ? { src: S.imgSrc || null, hi: !!(S.map && S.map.getLayer('esri-hi')), hiOff: S.hiOff || null, hiLoads: S.hiLoads || 0, hiMiss: S.hiMiss || 0, hiPlaceholders: S.hiPlaceholders || 0, usgsFailed: !!S.usgsFailed, esriFailed: !!S.esriFailed, saved: S.imgSaved || null } : null; }
+        },
         TILES: TILES, IDLE_STOP_MS: IDLE_STOP_MS
     };
     if (typeof window !== 'undefined') window.HardPanGps = api;
