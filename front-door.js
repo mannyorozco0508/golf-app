@@ -144,7 +144,7 @@
     function loadGpsKeys(done, again) {
         var fin = typeof done === 'function' ? done : function () {};
         if (again) { GPSK = { links: null, own: null, gc: null, asked: false }; try { W.localStorage.removeItem(GPSK_LS); } catch (e) {} }
-        if (GPSK.links && GPSK.gc) { fin(); return; }
+        if (GPSK.links && GPSK.gc && !GPSK.partial) { fin(); return; }
         if (!again) {
             try {
                 var kept = JSON.parse(W.localStorage.getItem(GPSK_LS) || 'null');
@@ -154,9 +154,13 @@
         var d = null; try { d = W.firebase && W.firebase.database ? W.firebase.database() : null; } catch (e) { d = null; }
         if (!d || GPSK.asked) { fin(); return; }
         GPSK.asked = true;
+        // A SLOW FIRST CONNECTION IS NOT "NO GPS" (fix-false-nosignal): a read that timed out (a fresh
+        // install's database still connecting) leaves the answer PARTIAL - used for now, never kept on
+        // the phone for 6 h, and asked again on the next call (simple-flow asks once the database is up).
+        var short = false;
         var one = function (path) {
             return new Promise(function (res) {
-                var t = setTimeout(function () { res(null); }, 6000);
+                var t = setTimeout(function () { short = true; res(null); }, 6000);
                 try { d.ref(path).once('value').then(function (snap) { clearTimeout(t); res((snap && snap.val && snap.val()) || null); }, function () { clearTimeout(t); res(null); }); }
                 catch (e) { clearTimeout(t); res(null); }
             });
@@ -179,10 +183,11 @@
                 }));
             })
             .then(function () {
-                GPSK.links = links; GPSK.gc = gc; GPSK.own = {};
-                try { W.localStorage.setItem(GPSK_LS, JSON.stringify({ at: Date.now(), links: links, gc: gc })); } catch (e) {}
+                GPSK.links = links; GPSK.gc = gc; GPSK.own = {}; GPSK.partial = short;
+                if (short) GPSK.asked = false;
+                else try { W.localStorage.setItem(GPSK_LS, JSON.stringify({ at: Date.now(), links: links, gc: gc })); } catch (e) {}
                 C.list = null; CR.rows = null; GA.t = null; fin();
-            }, function () { GPSK.links = links; GPSK.gc = gc; GPSK.own = {}; fin(); });
+            }, function () { GPSK.links = links; GPSK.gc = gc; GPSK.own = {}; GPSK.partial = true; GPSK.asked = false; fin(); });
     }
     // ✓ GPS = WHAT THE MAP WILL DRAW (URGENT-022: one answer for the list and the map). gps-geo
     // courseGps is the map's own rule; here it reads the GolfAPI courses the phone has (the app's
@@ -2562,7 +2567,7 @@
         localRound: localRound, progressOf: progressOf,
         // URGENT-019: the course list is worked out once; a page that loads the GPS course files after
         // that (simple-flow's Course & Tees) asks for it again, as the GPS-1 picker does (C.list = null).
-        refreshCourses: function () { C.list = null; CR.rows = null; }, loadGpsKeys: loadGpsKeys, gpsLinks: function () { return GPSK.links || {}; },
+        refreshCourses: function () { C.list = null; CR.rows = null; }, loadGpsKeys: loadGpsKeys, gpsKeysPartial: function () { return !!GPSK.partial; }, gpsLinks: function () { return GPSK.links || {}; },
         holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld,
         roundBackGuard: roundBackGuard };
     W.HardPanHome = { start: homeStart, show: show };
