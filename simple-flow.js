@@ -163,6 +163,7 @@
         else html = share();
         if (S.ask && S.step === 1) html += askHtml();
         if (!(S.step === 1 && keepBox(e, html, keep))) e.innerHTML = html;
+        if (S.step === 1) offlineMount();
         if (S.step === 3 && S.moreOpen) placePool(true);
         e.scrollTop = y;
     }
@@ -198,6 +199,35 @@
         if (old.value !== S.q) old.value = S.q;
         if (!keep && S.tap && D.activeElement === old) old.blur();
         return true;
+    }
+    // URGENT-036 #36 (POLISH 029 #36: "Download for offline" was only in Game Day setup). The GPS
+    // door's Course & Tees screen offers it too, for the picked course: Round Setup's own row
+    // (admin.html gpsOfflineRow - the same download, the same buttons and words), drawn into this
+    // screen's slot. Each course keeps its own row element, put back after every redraw, so a
+    // download in progress keeps its button and its count, and never paints over another course.
+    function offlineMount() {
+        var slot = $('sf-offline-slot'), row = fn('gpsOfflineRow'), key = courseKey();
+        if (!slot || !row || !key) return;
+        var o = S.off && S.off.key === key ? S.off : null;
+        if (!o) {
+            var el = D.createElement('div');
+            el.id = 'sf-offline-row';
+            el.setAttribute('role', 'status');
+            el.style.cssText = 'margin:-2px 2px 12px; font-size:0.82rem; font-weight:700; display:none; color:var(--text-muted);';
+            o = S.off = { key: key, el: el, sig: '' };
+        }
+        var ready = readyOf(key), sig = (ready ? 1 : 0) + '|' + (W.HardPanGpsOffline ? 1 : 0);
+        if (o.sig !== sig && !o.el.querySelector('button[disabled]')) {
+            o.sig = sig;
+            try { row(key, { status: ready ? 'ready' : 'none' }, courseName(), o.el); } catch (e) {}
+        }
+        if (o.el.parentNode !== slot) slot.appendChild(o.el);
+        // The download code (gps-offline.js) loads the way Round Setup loads it (gpsGolfApiLoad: in the app).
+        var load = fn('gpsGolfApiLoad');
+        if (!W.HardPanGpsOffline && load && !S.offLoad) {
+            S.offLoad = 1;
+            try { load().then(function () { if (S.open && S.step === 1) offlineMount(); }, function () {}); } catch (e) {}
+        }
     }
     function go(n) { if (S.step === 3 && n !== 3) placePool(false); S.step = n; var e = el(); render(); e.scrollTop = 0; }
 
@@ -720,7 +750,7 @@
         var pend = pendBusy() ? S.pend : null, pendOld = pend && pend.state !== 'card';
         if (pendOld) body += pendHead(pend);
         // POLISH 029 #11: the TEES (and the start) sit right under the picked course, above NEAR YOU.
-        else if (!S.changing) body += courseHead() + lookupBox(key, courseName()) + courseCard();
+        else if (!S.changing) body += courseHead() + lookupBox(key, courseName()) + courseCard() + (S.mode === 'gps' && key ? '<div id="sf-offline-slot"></div>' : '');
         // NEAR YOU, ALWAYS (URGENT-016: with a course already picked the list was gone - only the
         // course and "Change"). The picked course is the card above; the list under it is the
         // others, closest first; a tap switches the course and its tees redraw in place.

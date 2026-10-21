@@ -7858,8 +7858,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return el;
     }
     const gpsElevAsked = {};
-    function gpsOfflineRow(key, r, name) {
-        const el = gpsOfflineEl();
+    // URGENT-036 #36: the same row on the GPS door's Course & Tees screen (simple-flow.js): host is
+    // that screen's own element; without one it is Round Setup's row, as before.
+    function gpsOfflineRow(key, r, name, host) {
+        const el = host || gpsOfflineEl();
         if (!el) return;
         const O = window.HardPanGpsOffline;
         const ready = r && (r.status === 'ready' || r.status === 'partial');
@@ -7884,7 +7886,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             t.textContent = '\u2713 Downloaded for offline \u00b7 ' + pack.holes + ' holes \u00b7 ' + (pack.tiles || []).length + ' map tiles'
                 + (pack.tilesOk ? '' : ' (map needs signal)') + (pack.elevOk ? '' : ' \u00b7 some heights missing');
             el.appendChild(t);
-            el.appendChild(btn('Delete', async () => { await O.remove(key); gpsOfflineRow(key, r, name); }, true));
+            el.appendChild(btn('Delete', async () => { await O.remove(key); gpsOfflineRow(key, r, name, host); }, true));
             return;
         }
         t.textContent = 'Not downloaded';
@@ -7899,7 +7901,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 else if (p.elev) t.textContent = 'Downloading heights\u2026 ' + (p.elev.had + p.elev.fetched + p.elev.failed) + '/' + p.elev.points;
             } });
             if (!res.pack) { t.textContent = res.reason === 'offline' ? 'No signal - try again with signal' : 'Could not download (' + (res.reason || 'error') + ')'; b.disabled = false; return; }
-            gpsOfflineRow(key, r, name);
+            gpsOfflineRow(key, r, name, host);
         }));
     }
     // NO SIGNAL AT SETUP: a downloaded course's card comes from its pack (only when
