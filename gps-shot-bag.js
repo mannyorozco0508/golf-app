@@ -47,16 +47,20 @@
         return out;
     }
     function clubFit(golfer, club) { return fits(golfer)[club] || null; }
-    // My bag's numbers with the log's still-air carry for clubs with LEARN_MIN+ logged shots.
-    // A typed number (set) still wins. bag: HardPanGpsBag.bag(golfer).
+    // My bag's numbers with the shot log as the ONE source of marked shots (int-049): for a club
+    // with logged shots, n = the log's count (what Shot history lists), never the old bag's shot
+    // list as well. The number: a typed one (set) still wins; else the log's still-air carry once
+    // the club has LEARN_MIN logged shots (or from the first, when there is no other number);
+    // until then the number it had (the setup's carry, or an older one). bag: HardPanGpsBag.bag(golfer).
     function mergeBag(bag, golfer) {
         var out = {}, f = fits(golfer);
         Object.keys(bag || {}).forEach(function (c) { out[c] = bag[c]; });
         Object.keys(f).forEach(function (c) {
-            var x = f[c];
-            if (!x || x.n < LEARN_MIN || !isNum(x.stillAir)) return;
-            if (out[c] && out[c].set) return;
-            out[c] = { yd: Math.round(x.stillAir), n: x.n, set: false, log: true, qualified: !!x.qualified };
+            var x = f[c], cur = out[c];
+            if (!x || !(x.n > 0)) return;
+            if (cur && cur.set) { out[c] = { yd: cur.yd, n: x.n, set: true }; return; }
+            if (isNum(x.stillAir) && (x.n >= LEARN_MIN || !cur)) { out[c] = { yd: Math.round(x.stillAir), n: x.n, set: false, log: true, qualified: !!x.qualified }; return; }
+            if (cur) { var k = {}; Object.keys(cur).forEach(function (q) { k[q] = cur[q]; }); k.n = x.n; out[c] = k; }
         });
         return out;
     }

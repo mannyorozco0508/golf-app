@@ -4136,7 +4136,7 @@
     // from My bag (vs the plays-like yards to the green's center), one tap to change, Skip. A
     // shot COUNTS only with a club; Skip = position only. The green (the golfer's fix on it) or
     // the hole's end (a score, or auto-advance) closes the last one. A counted shot goes to the
-    // shot log (gps-shot-log.js, part 3) and, as before, its carry to My bag. No coordinates
+    // shot log (gps-shot-log.js, part 3) only; My bag reads its carry from there. No coordinates
     // in any record: the marks stay in memory, on this phone. Tournament mode: none of this.
     function chipsApi() { return window.HardPanMarkChips || null; }
     function withChips(fn) {
@@ -4174,7 +4174,9 @@
     function chipsClosed(c) {
         if (!S || !c || !c.counted) return;
         var B = bagApi();
-        if (B && B.add(bagGolfer(), c.club, c.carry)) bagSaved();
+        // int-049: the shot log is the ONE source of a marked shot in My bag (mergeBag) - it is
+        // not also added to the old bag's shot list (that counted every shot twice, and Reset /
+        // swipe-to-delete in Shot history could not take the second copy out).
         S.chipsLastId = c.id;
         flash((B ? B.NAMES[c.club] : c.club) + ': ' + bagShown(c.carry) + (units() === 'm' ? ' m' : ' yds') + ' → your shots');
     }
