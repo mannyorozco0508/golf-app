@@ -117,6 +117,12 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // MY BAG ACCOUNT SYNC (009): the signed-in golfer's own bag to player_clubs/<uid>/me. OFF:
     // that rule is phase 2 and not live (writes would be refused) - the bag stays on the phone.
     clubsSync: false,
+    // SETTLE UP WITH VENMO / CASH APP (2.1 part D, venmo-pay.js): the Results page's Settle up card -
+    // links only, no money through the app. Its paths (events/<round>/venmo, cashapp, settleUp;
+    // trips/<trip>/venmo, cashapp): under the LIVE rules only the organizer's phone can write them;
+    // the rules change for the group is a proposal (docs/045-venmo-rules-proposal.md, URGENT-045).
+    // false = nothing on the page.
+    venmo: true,
     iap: true, iapEntitlement: 'gps_map', iapProduct: 'com.rattlegolf.app.gpsmap.yearly',
     // RevenueCat PUBLIC Apple SDK key (appl_...), from RevenueCat > Project >
     // API keys. Public by design (it ships in every app binary), but it stays
