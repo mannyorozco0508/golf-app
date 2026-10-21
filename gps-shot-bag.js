@@ -177,6 +177,8 @@
             sh.innerHTML = '<div class="gps-bag-head"><div class="gps-bag-title"></div><button type="button" class="gps-bag-done gps-shist-done">Done</button></div>'
                 + '<div class="gps-bag-sub">Newest first. Swipe a shot left to delete one marked by mistake. Wind angle: where it came from vs your line to the green (0° into you, 90° from the right, 180° behind, 270° from the left).</div>'
                 + '<div class="gps-shist-sum" role="status"></div>'
+                // URGENT-052 B: MY MISS for this club - the summary line, the oval, the map switch.
+                + '<div class="gps-shist-miss" style="display:none"></div>'
                 + '<div class="gps-shist-f gps-shist-fs" role="group" aria-label="Wind strength"></div>'
                 + '<div class="gps-shist-f gps-shist-fd" role="group" aria-label="Wind direction"></div>'
                 + '<div class="gps-shist-list"></div>'
@@ -207,6 +209,7 @@
     function histClick(e) {
         var t = e.target; if (!H || !t || !t.closest) return;
         if (t.closest('.gps-shist-done')) { histClose(); return; }
+        if (t.closest('[data-shist-miss]')) { var MP = Miss(); if (MP) { MP.setOn(H.ctx.golfer, !MP.isOn(H.ctx.golfer)); if (H.ctx.onChange) H.ctx.onChange(); histFill(); } return; }
         var f = t.closest('[data-shist-s]'); if (f) { H.strength = f.getAttribute('data-shist-s'); histFill(); return; }
         f = t.closest('[data-shist-d]'); if (f) { H.dir = f.getAttribute('data-shist-d'); histFill(); return; }
         var d = t.closest('[data-shist-del]');
@@ -225,6 +228,7 @@
             box.textContent = '';
             list.forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.setAttribute(attr, x[0]); b.setAttribute('aria-pressed', x[0] === cur ? 'true' : 'false'); b.textContent = x[1]; box.appendChild(b); });
         };
+        missFill(sh.querySelector('.gps-shist-miss'), c, all, f, k, u);
         fill(sh.querySelector('.gps-shist-fs'), STRENGTHS, H.strength, 'data-shist-s');
         fill(sh.querySelector('.gps-shist-fd'), DIRS, H.dir, 'data-shist-d');
         var box = sh.querySelector('.gps-shist-list');
@@ -245,11 +249,75 @@
         });
     }
 
+    // ---- MY MISS (URGENT-052 B) on the club screen -----------------------------------
+    // The fit (gps-miss-pattern.js) of this club's marked shots with a real miss, wind out;
+    // the default shape (labelled) under 10. The picture: the aim line straight up, LONG at the
+    // top, the golfer's right on the right; the oval and his shots (dots). Distances only.
+    function Miss() { return W.HardPanMissPattern && typeof W.HardPanMissPattern.fit === 'function' ? W.HardPanMissPattern : null; }
+    function missFit(golfer, club, carry) {
+        var MP = Miss(), L = Log(); if (!MP || !L) return null;
+        var shots = L.list({ golfer: golfer, club: club });
+        return MP.fit(shots, { club: club, hand: L.hand(golfer), coeffs: clubFit(golfer, club), carry: carry });
+    }
+    function missSvg(mf, golfer, club) {
+        var MP = Miss(), L = Log(); if (!MP || !mf) return '';
+        var pts = [];
+        (L ? L.list({ golfer: golfer, club: club }) : []).forEach(function (s) { var p = MP.point(s, clubFit(golfer, club)); if (p) pts.push([p.x, p.carry - mf.carry]); });
+        var ring = MP.outline(mf, 64).map(function (q) { return [q[0], q[1] - mf.carry]; });
+        var ext = 6;
+        ring.concat(pts).forEach(function (q) { ext = Math.max(ext, Math.abs(q[0]), Math.abs(q[1])); });
+        ext *= 1.15;
+        var Wd = 300, Ht = 150, sc = Math.min(Wd / 2, Ht / 2) / ext, cx = Wd / 2, cy = Ht / 2;
+        var X = function (x) { return (cx + x * sc).toFixed(1); }, Y = function (y) { return (cy - y * sc).toFixed(1); };
+        var d = ring.map(function (q, i) { return (i ? 'L' : 'M') + X(q[0]) + ' ' + Y(q[1]); }).join(' ') + ' Z';
+        return '<svg class="gps-miss-svg" viewBox="0 0 ' + Wd + ' ' + Ht + '" role="img" aria-label="' + (mf.own ? 'Your miss pattern' : 'Default shape') + '">'
+            + '<line x1="' + cx + '" y1="4" x2="' + cx + '" y2="' + (Ht - 4) + '" stroke="rgba(255,255,255,.35)" stroke-dasharray="4 4"/>'
+            + '<line x1="8" y1="' + cy + '" x2="' + (Wd - 8) + '" y2="' + cy + '" stroke="rgba(255,255,255,.15)"/>'
+            + '<path d="' + d + '" fill="rgba(125,211,252,.22)" stroke="#7dd3fc" stroke-width="2"' + (mf.own ? '' : ' stroke-dasharray="6 4"') + '/>'
+            + pts.map(function (q) { return '<circle cx="' + X(q[0]) + '" cy="' + Y(q[1]) + '" r="3.2" fill="#f4f4ef"/>'; }).join('')
+            + '<text x="' + (cx + 4) + '" y="14" fill="#a7b3aa" font-size="11" font-weight="700">long</text>'
+            + '<text x="' + (cx + 4) + '" y="' + (Ht - 6) + '" fill="#a7b3aa" font-size="11" font-weight="700">short</text>'
+            + '<text x="8" y="' + (cy - 5) + '" fill="#a7b3aa" font-size="11" font-weight="700">left</text>'
+            + '<text x="' + (Wd - 8) + '" y="' + (cy - 5) + '" fill="#a7b3aa" font-size="11" font-weight="700" text-anchor="end">right</text></svg>';
+    }
+    function missFill(box, c, all, f, k, u) {
+        var MP = Miss(); if (!box) return;
+        if (!MP) { box.style.display = 'none'; return; }
+        var carry = c.carry != null ? c.carry : (f && isNum(f.stillAir) ? f.stillAir : null);
+        var mf = missFit(c.golfer, c.club, carry), on = MP.isOn(c.golfer);
+        box.style.display = '';
+        box.textContent = '';
+        var h = document.createElement('div'); h.className = 'gps-miss-h'; h.textContent = 'MY MISS'; box.appendChild(h);
+        var line = document.createElement('div'); line.className = 'gps-miss-line'; line.setAttribute('data-miss-line', c.club);
+        line.textContent = mf ? MP.summary(mf, nameOf(c.club), k !== 1 ? 'm' : 'yd') : nameOf(c.club) + ': no carry yet - mark a few shots first';
+        box.appendChild(line);
+        if (mf) {
+            var pic = document.createElement('div'); pic.className = 'gps-miss-pic'; pic.innerHTML = missSvg(mf, c.golfer, c.club); box.appendChild(pic);
+            var note = document.createElement('div'); note.className = 'gps-miss-note';
+            note.textContent = (mf.own ? 'From your ' + mf.n + ' marked shots with a real finish, wind taken out. The oval holds about 2 of 3.'
+                : 'Default shape until ' + mf.need + ' marked shots: ' + (mf.hand === 'L' ? 'left misses shorter, right misses longer (left-handed).' : 'right misses shorter, left misses longer.'))
+                + ' Shots closed by finishing the hole are left out.';
+            box.appendChild(note);
+        }
+        var row = document.createElement('div'); row.className = 'gps-miss-row';
+        var lb = document.createElement('span'); lb.textContent = 'Show My miss on the map'; row.appendChild(lb);
+        var sw = document.createElement('button'); sw.type = 'button'; sw.className = 'gps-ts-sw gps-miss-sw' + (on ? ' on' : ''); sw.setAttribute('data-shist-miss', '1');
+        sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', on ? 'true' : 'false'); sw.setAttribute('aria-label', 'My miss on the map');
+        sw.appendChild(document.createElement('i')); row.appendChild(sw);
+        box.appendChild(row);
+    }
+    CSS += '#gps-overlay .gps-shist-miss{margin:2px 0 8px;padding:8px 10px;border-radius:12px;background:rgba(125,211,252,.08);border:1px solid rgba(125,211,252,.25);}'
+        + '#gps-overlay .gps-miss-h{font:800 11px/1.2 -apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.06em;color:#7dd3fc;margin-bottom:3px;}'
+        + '#gps-overlay .gps-miss-line{font:800 14px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#f4f4ef;}'
+        + '#gps-overlay .gps-miss-pic svg{display:block;width:100%;height:auto;max-height:150px;margin:6px 0 2px;}'
+        + '#gps-overlay .gps-miss-note{font:600 11.5px/1.35 -apple-system,BlinkMacSystemFont,sans-serif;color:#a7b3aa;}'
+        + '#gps-overlay .gps-miss-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;font:700 13.5px/1.2 -apple-system,BlinkMacSystemFont,sans-serif;}';
+
     try { ensureCss(); } catch (e) {}
     W.HardPanShotBag = {
         LEARN_MIN: LEARN_MIN, QUALIFY: QUALIFY, WINDY_MPH: WINDY_MPH, api: WL,
         fits: fits, clubFit: clubFit, mergeBag: mergeBag, windLine: windLine, infoText: infoText, adjust: adjust,
         windWords: windWords, stillAirOf: stillAirOf, nameOf: nameOf, ensureCss: ensureCss,
-        openHistory: histOpen, closeHistory: histClose, historyOpen: function () { return !!H; }, swipe: swipe
+        openHistory: histOpen, closeHistory: histClose, historyOpen: function () { return !!H; }, swipe: swipe, missFit: missFit
     };
 })();
