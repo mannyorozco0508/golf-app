@@ -229,6 +229,55 @@ test('URGENT-034 bug 2: the phone\'s own golfer enters every stat with no jump; 
     } finally { await j.close(); }
 });
 
+test('URGENT-034 bug 3: every score tap saves at once - 3 golfers scored, the sheet closed any way, the Card and the Thru chip show them', { timeout: 180000 }, async () => {
+    const { j, ev, click } = await start('PS3403', 0, { me: '103', round: round034('PS3403') });
+    try {
+        await j.cdp('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+        const sc = (h) => ev("JSON.stringify(['101','102','103','104'].map(function(p){ var v = (currentData.scores||{})['p'+p+'_h" + h + "']; return v == null ? '' : String(v); }))");
+        // Manny's hole 1: Skeens 5, Bob 5, Manny 4 + 2 putts - each saved the moment it is tapped.
+        const enter = async (h) => {
+            assert.equal(await ev('HardPanGps.hole()'), h, 'on hole ' + h);
+            await click('#gps-overlay .gps-score');
+            await click('#hp-score-sheet [data-ss-score="4"]');
+            assert.equal(JSON.parse(await sc(h))[2], '4', 'Manny\'s 4 saved at the tap, before any Save');
+            await click('#hp-score-sheet [data-ss-k="putts"][data-ss-v="2"]');
+            await click('#hp-score-sheet [data-ss-golfer="101"]');
+            await click('#hp-score-sheet [data-ss-score="5"]');
+            await click('#hp-score-sheet [data-ss-score="5"]');   // the sheet jumped to Bob
+            assert.deepEqual(JSON.parse(await sc(h)), ['5', '5', '4', ''], 'hole ' + h + ': all three saved with the sheet still open');
+        };
+        const closed = async (how) => assert.equal(await ev("(function(){ var w=document.getElementById('hp-score-sheet'); return !w || w.style.display==='none'; })()"), true, how + ' closed the sheet');
+        // 1. The backdrop (a tap on the map above the sheet).
+        await enter(1);
+        await tapAt(j, 200, 30);
+        await closed('the backdrop');
+        // 2. A swipe down on the handle.
+        await ev('gpsStepHole(1)'); await sleep(700);
+        await enter(2);
+        const hd = JSON.parse(await ev("JSON.stringify((function(){ var b=document.querySelector('#hp-score-sheet .hp-ss-handle').getBoundingClientRect(); return [b.left+b.width/2, b.top+b.height/2]; })())"));
+        await j.cdp('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: hd[0], y: hd[1] }] });
+        for (let k = 1; k <= 6; k++) { await j.cdp('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: hd[0], y: hd[1] + k * 30 }] }); await sleep(20); }
+        await j.cdp('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await sleep(400);
+        await closed('the swipe');
+        // 3. The hole changed under the sheet (the card's own Next).
+        await ev('gpsStepHole(1)'); await sleep(700);
+        await enter(3);
+        await ev('gpsStepHole(1)'); await sleep(700);
+        await closed('the hole change');
+        for (const h of [1, 2, 3]) assert.deepEqual(JSON.parse(await sc(h)), ['5', '5', '4', ''], 'hole ' + h + ' kept');
+        // The map's chip counts them; the Card (the grid) shows them.
+        const chip = await ev("(document.querySelector('#gps-overlay .gps-lc-score')||{}).textContent||''");
+        assert.match(chip, /Thru 3/, 'the Thru chip: ' + chip);
+        await shot(j, '034-bug3-thru');
+        await click('#gps-overlay .gps-side-bets');
+        await sleep(700);
+        const boxes = JSON.parse(await ev("JSON.stringify([1,2,3].map(function(h){ return ['101','102','103','104'].map(function(p){ var i = document.querySelector('.score-input[data-hole=\"'+h+'\"][data-player-id=\"'+p+'\"]'); return i ? i.value : null; }); }))"));
+        assert.deepEqual(boxes, [['5', '5', '4', ''], ['5', '5', '4', ''], ['5', '5', '4', '']], 'the Card shows holes 1-3');
+        await shot(j, '034-bug3-card');
+    } finally { await j.close(); }
+});
+
 test('#4: no signal - the score is on the card and the Thru pill, "📴 N waiting" on the map, no stuck "Saving…"; back online it sends', { timeout: 120000 }, async () => {
     const { j, ev, click } = await start('PS0004', 2);
     try {

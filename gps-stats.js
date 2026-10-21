@@ -837,9 +837,11 @@
         if ((b = t.closest('[data-ss-score]'))) {
             var n = Number(b.getAttribute('data-ss-score'));
             ss.pend[pid] = n;
-            // The score moved: a record that already holds this hole works its GIR out again.
-            var rec = qLoad(c.code, pid);
-            if (rec && rec.holes[String(c.hole)]) qSet(c, pid, c.hole, {}, n, c.par);
+            // URGENT-034 BUG 3: EVERY SCORE TAP IS SAVED AT ONCE - the card's own save (saveScore: the
+            // offline queue, the audit line), not held until "Save · Next hole". Held, a sheet closed any
+            // other way (the backdrop, a swipe, a hole change, the bar tapped again) lost them all.
+            // ssKeepOne also works the GIR out again for a record that already holds this hole.
+            ssKeepOne(pid);
             if (ss.more && ssGrid(c.par).indexOf(n) === -1) ss.more = false;
             // POLISH #34: on to the next golfer with no score on this hole - once this golfer's own
             // stats rows (when shown) have their putts too, so a golfer's putts are never skipped.
@@ -909,6 +911,15 @@
         ss.pend = {}; ss.more = false; ss.notes = false;
         if (!nx.golfers.some(function (g) { return String(g.id) === String(ss.sel); })) ss.sel = String(nx.golfers[0].id);
         ssRender();
+    }
+    // One golfer's typed score on the hole shown, through the card's own save (once per change).
+    function ssKeepOne(pid) {
+        var c = ss.ctx, n = ss.pend[pid];
+        if (!(n > 0)) return;
+        if (n !== Number(c.score ? c.score(pid) : 0)) c.save(pid, n);
+        ssDone[c.code + '|' + pid + '|' + c.hole] = n;
+        var rec = qLoad(c.code, pid);
+        if (rec && rec.holes[String(c.hole)]) qSet(c, pid, c.hole, {}, n, c.par);
     }
     function ssKeep() {
         var c = ss.ctx, pend = ss.pend;
