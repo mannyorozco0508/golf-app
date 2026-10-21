@@ -53,7 +53,7 @@ test('the yards: the first shot from the tee, each next one from the shot before
 test('the GPS screen: Tools > Mark shots / Replay round; a tap in mark mode marks a shot (not the target); this phone only', { skip }, () => {
     const v = read('gps-view.js'), src = read('gps-shots.js').replace(/^\s*\/\/.*$/gm, '');
     assert.ok(/gps-mark-shots">Mark shots</.test(v) && /gps-replay">Replay round</.test(v));
-    assert.ok(/if \(S\.shotMode\) \{ addShot\(pt, 'tap'\); return; \}\s*\n\s*if \(S\.replay\) return;\s*\n\s*\/\/ Tap anywhere: the target jumps there\./.test(v), 'mark mode takes the tap; replay ignores it');
+    assert.ok(/if \(S\.shotMode\) \{ addShot\(pt, 'tap'\); return; \}\s*\n\s*if \(S\.replay\) return;\s*\n(?:\s*\/\/ 052 A: a tap ON THE TEE opens the tee plan[^\n]*\n[^\n]*\n[^\n]*openTeePlan\(\); return; \}\n)?\s*\/\/ Tap anywhere: the target jumps there\./.test(v), 'mark mode takes the tap; replay ignores it');
     assert.ok(/function stopReplayTimer\(\)/.test(v) && /function unmount\(\) \{[\s\S]{0,120}stopReplayTimer\(\);/.test(v), 'the replay timer stops with the screen');
     // 009: the ONE database path is My bag's account sync (player_clubs/<uid>/me), switched off
     // (clubsSync) until its rule is live - gps_clubs_test.js holds it. The rest: none.
