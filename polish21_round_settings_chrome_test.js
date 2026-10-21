@@ -12,6 +12,13 @@
 //   5  A scorekeeper's phone (group link): the Scorekeeper line in THIS PHONE.
 //   6  Non-GPS Round settings (simpleFlow off - Consumer / Game Day): exactly today's controls,
 //      no new look.
+//   7  URGENT-040 9:23 PM: the Golfers row has its own "+ Add golfer" on the right; it and More's
+//      Add golfer click the same quick edit and open the same sheet (HardPanAddGolfer.open).
+//   8  A SOLO GPS round, on hole 4 (holes 1-3 scored): Menu > Round settings > + Add golfer ->
+//      name / HCP / tee -> Add. The new golfer is on the Card and the score sheet at hole 4, holes
+//      1-3 blank; nothing but the players / groups is written (games, money, scores untouched).
+//
+// SHOTS=1 saves the screens to ~/Desktop/claude-code-reports/040/.
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -31,17 +38,19 @@ const round = (code) => {
 };
 const CFG = "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{osm:true,live:false,devPro:true});}});})();";
 const GEO = "(function(){ try { Object.defineProperty(navigator,'geolocation',{configurable:true,value:{watchPosition:function(ok){ var f=function(){ok({coords:{latitude:33.4528,longitude:-79.1547,accuracy:5},timestamp:Date.now()});}; setTimeout(f,50); return setInterval(f,1000);}, getCurrentPosition:function(ok){ok({coords:{latitude:33.4528,longitude:-79.1547,accuracy:5},timestamp:Date.now()});}, clearWatch:function(t){clearInterval(t);}}}); } catch(e){} })();";
+const SHOT_DIR = path.join(require('os').homedir(), 'Desktop', 'claude-code-reports', '040');
+async function shot(j, name) { if (!process.env.SHOTS) return; try { fs.mkdirSync(SHOT_DIR, { recursive: true }); await j.shot(path.join(SHOT_DIR, name + '.png')); } catch (e) {} }
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 const journeys = [];
 after(async () => { for (const j of journeys) { try { await j.close(); } catch (e) {} } });
 async function until(j, expr, ms) { const t0 = Date.now(); while (Date.now() - t0 < (ms || 10000)) { try { if (await j.evaluate(expr)) return true; } catch (e) {} await sleep(200); } return false; }
 const J = async (j, expr) => JSON.parse(await j.evaluate('JSON.stringify(' + expr + ')'));
 
-async function gpsRound(code, query) {
+async function gpsRound(code, query, ev, courses) {
     const pre = 'window.__hardpanDoors = true; window.__simpleFlow = true;' + iapStub({ active: true }) + CFG + GEO
         + "try{localStorage.setItem('golfapp_me_" + code + "','101');sessionStorage.setItem('groupPickDismissed:" + code + "','1');"
         + "localStorage.setItem('hardpan_round_side','gps|" + code + "');}catch(e){}";
-    const j = await openJourney({ db: { events: { [code]: round(code) }, global_courses: {}, trips: {}, organizers: {}, tournaments: {} }, viewport: { width: 393, height: 852 }, webgl: true, preScript: pre });
+    const j = await openJourney({ db: { events: { [code]: ev || round(code) }, global_courses: courses || {}, trips: {}, organizers: {}, tournaments: {} }, viewport: { width: 393, height: 852 }, webgl: true, preScript: pre });
     journeys.push(j);
     await j.goto(fileUrl('index.html', 'game=' + code + (query || '&me=101')), 300);
     assert.ok(await until(j, "!!window.HardPanGps && HardPanGps.side() === 'gps' && HardPanGps.isMounted()", 30000), 'the map is up');
@@ -109,7 +118,7 @@ test('2 More open: THIS ROUND, THIS PHONE, GO TO, then Save & exit and Delete', 
         + " go: Array.prototype.map.call(document.querySelectorAll('#hp-rs .rs-grid button'), function(e){ return e.getAttribute('data-rs'); }),"
         + " end: Array.prototype.map.call(document.querySelectorAll('#hp-rs-end [data-rs]'), function(e){ return e.getAttribute('data-rs'); }),"
         + " dark: !!document.querySelector('#hp-rs [data-rs=\"dark\"] .rs-tog'), more: document.querySelector('#hp-rs [data-rs=\"more\"]').getAttribute('aria-expanded'),"
-        + " topStill: !!document.querySelector('#hp-rs > [data-rs=\"q-players\"]'), endShown: getComputedStyle(document.getElementById('hp-rs-end')).display }");
+        + " topStill: !!document.querySelector('#hp-rs > [data-rs=\"q-players\"], #hp-rs > .rs-golf > [data-rs=\"q-players\"]'), endShown: getComputedStyle(document.getElementById('hp-rs-end')).display }");
     assert.deepEqual(s.heads.map((h) => h.toUpperCase()), ['THIS ROUND', 'THIS PHONE', 'GO TO']);
     assert.deepEqual(s.lists[0], THIS_ROUND);
     assert.deepEqual(s.lists[1], THIS_PHONE);
@@ -240,4 +249,129 @@ test('6 non-GPS Round settings (Consumer / Game Day): today\'s sheet exactly, no
     const seen = (await J(j, SEEN)).map((x) => x.text);
     if (process.env.PRINT_CONSUMER) console.log(JSON.stringify(seen));
     assert.deepEqual(seen, CONSUMER_TODAY);
+});
+
+test('7 the Golfers row\'s "+ Add golfer" and More\'s Add golfer: the same quick edit, the same sheet', { timeout: 120000 }, async () => {
+    const j = await gpsRound('PRS21F');
+    await openSettings(j);
+    const g = await J(j, "(function(){ var r = document.querySelector('#hp-rs > .rs-golf'), a = r && r.querySelector('[data-rs=\"q-addgolfer\"]'), m = r && r.querySelector('[data-rs=\"q-players\"]');"
+        + " if (!a || !m) return null; var ra = a.getBoundingClientRect(), rr = r.getBoundingClientRect(), rm = m.getBoundingClientRect();"
+        + " return { text: a.textContent.trim(), right: Math.round(rr.right - ra.right), leftOfIt: rm.right <= ra.left + 1, h: Math.round(ra.height), w: Math.round(rr.width), nested: !!a.closest('[data-rs=\"q-players\"]'), first: r === document.querySelector('#hp-rs > .rs-row') }; })()");
+    assert.ok(g, 'the Golfers row has a "+ Add golfer" button');
+    assert.equal(g.text, '＋ Add golfer');
+    assert.equal(g.first, true, 'the Golfers row is the first row, on top');
+    assert.ok(g.right <= 16 && g.leftOfIt, 'on the right of the row: ' + JSON.stringify(g));
+    assert.ok(g.h >= 44, 'a 44pt tap target: ' + g.h);
+    assert.equal(g.nested, false, 'its own button, not inside the Golfers button');
+    await shot(j, 'round-settings-top');
+    // Both buttons click the same control: the quick edit "addgolfer" (today's handler).
+    await j.evaluate("(function(){ window.__hits = []; document.addEventListener('click', function(ev){ var t = ev.target; if (!t || !t.closest || t.closest('#hp-rs, #hp-rs-end')) return; var e = t.closest('#round-sheet-body button'); if (!e) return; window.__hits.push(e.getAttribute('data-hq')); ev.preventDefault(); ev.stopImmediatePropagation(); }, true); return 1; })()");
+    const hits = await J(j, "(function(){ var out = []; document.querySelector('#hp-rs .rs-golf [data-rs=\"q-addgolfer\"]').click(); out.push(window.__hits.splice(0)); document.querySelector('#hp-rs [data-rs=\"more\"]').click(); return out; })()");
+    await sleep(300);
+    hits.push(await J(j, "(function(){ document.querySelector('#hp-rs .rs-open .rs-li[data-rs=\"q-addgolfer\"]').click(); return window.__hits.splice(0); })()"));
+    assert.deepEqual(hits, [['addgolfer'], ['addgolfer']], 'top and More click the same quick edit');
+    await J1_reload(j);
+    // ... and, let through, both open today's Add golfer sheet by HardPanAddGolfer.open.
+    await j.evaluate("(function(){ window.__opens = 0; var f = HardPanAddGolfer.open; HardPanAddGolfer.open = function(){ window.__opens++; return f.apply(this, arguments); }; return 1; })()");
+    for (const more of [false, true]) {
+        await openSettings(j);
+        if (more) { await j.evaluate("document.querySelector('#hp-rs [data-rs=\"more\"]').click()"); await sleep(300); }
+        await j.evaluate("document.querySelector(" + JSON.stringify(more ? '#hp-rs .rs-open .rs-li[data-rs="q-addgolfer"]' : '#hp-rs .rs-golf [data-rs="q-addgolfer"]') + ").click()");
+        assert.ok(await until(j, "!!document.querySelector('#hp-addg.open #ag-name')", 5000), 'the Add golfer sheet opened (' + (more ? 'More' : 'top') + ')');
+        assert.equal(await j.evaluate("document.getElementById('round-sheet').classList.contains('open')"), false, 'Round settings closed under it');
+        await j.evaluate('HardPanAddGolfer.close()'); await sleep(300);
+    }
+    assert.equal(await j.evaluate('window.__opens'), 2, 'HardPanAddGolfer.open, once each');
+});
+// The catcher of test 7 stays on the page; a fresh page for the real taps.
+async function J1_reload(j) {
+    await j.goto(fileUrl('index.html', 'game=PRS21F&me=101'), 300);
+    assert.ok(await until(j, "!!window.HardPanGps && HardPanGps.side() === 'gps' && HardPanGps.isMounted()", 30000), 'the map is up again');
+    await sleep(1200);
+}
+
+test('8 a SOLO GPS round on hole 4: Menu > Round settings > + Add golfer -> name / HCP / tee; on the Card and score sheet from hole 4, 1-3 blank; games and money untouched', { timeout: 180000 }, async () => {
+    const code = 'PRS21S';
+    const { makeCourseData } = require('./helpers/fixtures.js');
+    const CD = makeCourseData(18);
+    const TEE = (name, y, rt, sl) => ({ name, rating: rt, slope: sl, parTotal: 72, totalYards: y, holes: CD.map((h) => ({ par: h.par, yardage: Math.round(y / 18) })) });
+    const TEES = { male: [TEE('Blue', 6500, 71.0, 125), TEE('White', 6187, 69.0, 118)], female: [TEE('Red', 5645, 71.4, 120)] };
+    // Start GPS, one golfer: holes 1-3 scored; the round's skins game and pot left as the fixture
+    // has them, so "untouched" means something.
+    const ev0 = wizardSavedRound({ code, golfers: 1, ownerUid: 'anon-cold', thru: 3, flights: false, names: ['Test Solo'], courseData: CD,
+        overrides: { activeCourseKey: 'caledonia', courseName: 'Caledonia Golf & Fish Club (Caledonia)', groupSizeOverrides: { 0: 1 },
+            teeRating: { teeKey: 'male:1', teeName: 'White', slope: 118, courseRating: 69.0, par: 72 }, handicapBasis: 'as-entered' } });
+    const j = await gpsRound(code, '&me=101', ev0, { caledonia: { tees: TEES } });
+    for (let k = 0; k < 18 && Number(await j.evaluate('HardPanGps.hole()')) !== 4; k++) { await j.evaluate('gpsStepHole(' + (Number(await j.evaluate('HardPanGps.hole()')) < 4 ? 1 : -1) + ')'); await sleep(600); }
+    assert.equal(await j.evaluate('HardPanGps.hole()'), 4, 'on hole 4');
+    // What the page SHOWS for the money (read only - nothing here is computed by the test).
+    const POT = "(function(){ var t = document.body.innerText, m = t.match(/WEEKLY GAME[^\\n]*\\$\\d+/i), e = t.match(/Weekly Game · \\$\\d+ each/); return [m ? m[0] : null, e ? e[0] : null]; })()";
+    const pot0 = await J(j, POT);
+    const before = await J(j, '(function(){ var d = Object.assign({}, currentData); delete d.players; delete d.groupSizeOverrides; return d; })()');
+    // Every write the page makes from here.
+    await j.evaluate("(function(){ window.__w = []; var real = db.ref; db.ref = function (p) { var r = real.apply(db, arguments); var u = r.update, s = r.set;"
+        + " r.update = function (v) { window.__w.push(['update', String(p), Object.keys(v || {}).sort()]); return u.apply(r, arguments); };"
+        + " r.set = function (v) { window.__w.push(['set', String(p)]); return s.apply(r, arguments); }; return r; }; return 1; })()");
+    // The taps, from the GPS screen: ☰ Menu, Round settings, + Add golfer.
+    await j.evaluate("document.querySelector('#gps-overlay .gps-door-games').click()"); await sleep(600);
+    assert.ok(await until(j, "!!document.querySelector('[data-hs-tile=\"settings\"]')", 5000), '1 tap: the Round Menu');
+    await shot(j, 'solo-1-menu');
+    await j.evaluate("document.querySelector('[data-hs-tile=\"settings\"]').click()");
+    assert.ok(await until(j, "!!document.querySelector('#hp-rs .rs-golf [data-rs=\"q-addgolfer\"]')", 8000), '2 taps: Round settings, "+ Add golfer" on the Golfers row');
+    await sleep(400);
+    await shot(j, 'solo-2-round-settings');
+    await j.evaluate("document.querySelector('#hp-rs .rs-golf [data-rs=\"q-addgolfer\"]').click()");
+    assert.ok(await until(j, "!!document.querySelector('#hp-addg.open #ag-name') && document.querySelectorAll('#hp-addg [data-ag-tee]').length >= 3", 8000), '3 taps: the Add golfer sheet, with the course\'s tees');
+    const typeIn = (sel, v) => j.evaluate('(function(){var e=document.querySelector(' + JSON.stringify(sel) + '); e.value=' + JSON.stringify(v) + '; e.dispatchEvent(new Event("input",{bubbles:true})); return 1;})()');
+    await typeIn('#ag-name', 'Test Friend');
+    await typeIn('#ag-hcp', '12');
+    await j.evaluate("document.querySelector('#hp-addg [data-ag-tee=\"male:0\"]').click()"); await sleep(200);
+    await shot(j, 'solo-3-add-golfer');
+    await j.evaluate("document.querySelector('#hp-addg [data-ag=\"save\"]').click()");
+    assert.ok(await until(j, "!document.querySelector('#hp-addg.open') && currentData.players.length === 2", 8000), 'saved and closed');
+    await sleep(800);
+    const s = await J(j, "{ hole: HardPanGps.hole(), side: HardPanGps.side(), p: currentData.players.map(function(p){ return [p.id, p.name, p.hcp, p.tee ? p.tee.teeName : null, p.playingForMoney]; }), groups: currentData.groupSizeOverrides,"
+        + " mine: Object.keys(currentData.scores || {}).filter(function(k){ return /^p102_/.test(k); }), w: window.__w }");
+    assert.equal(s.hole, 4, 'still on hole 4');
+    // Round settings opens over the Card (gps-round.js openSettings -> toCard, as before #21): the
+    // add lands back on the Card, the same hole.
+    assert.equal(s.side, 'bets', 'on the Card, over the map');
+    await shot(j, 'solo-4-card-after-add');
+    const hv = await J(j, "Array.prototype.map.call(document.querySelectorAll('.hv-player-row .hv-player-name'), function(e){ return e.firstChild ? String(e.firstChild.nodeValue || e.textContent).trim() : ''; })");
+    assert.deepEqual(hv, ['Test S.', 'Test F.'], 'the Card\'s Hole 4 lists the new golfer: ' + JSON.stringify(hv));
+    // Back to the map for the score sheet.
+    await j.evaluate("HardPanGps.showSide('gps')"); await sleep(900);
+    assert.equal(await j.evaluate('HardPanGps.hole()'), 4, 'the map on hole 4');
+    assert.deepEqual(s.p.map((p) => p.slice(0, 2)), [[101, 'Test Solo'], [102, 'Test Friend']]);
+    assert.equal(s.p[1][2], '12');
+    assert.match(String(s.p[1][3]), /Blue/, 'their own tee: ' + JSON.stringify(s.p[1]));
+    assert.deepEqual(s.groups, { 0: 2 }, 'in the solo golfer\'s group');
+    assert.deepEqual(s.mine, [], 'no score is written for the new golfer - holes 1-3 stay blank');
+    assert.deepEqual(s.w.filter((x) => x[0] === 'update' || x[0] === 'set'), [['update', 'events/' + code, ['groupSizeOverrides', 'players']]], 'one write: the players and the groups, nothing else: ' + JSON.stringify(s.w));
+    const after_ = await J(j, '(function(){ var d = Object.assign({}, currentData); delete d.players; delete d.groupSizeOverrides; return d; })()');
+    const pot1 = await J(j, POT);
+    console.log('# solo add: Weekly Game pot as shown, before -> after (the pool config is not written):', JSON.stringify(pot0), '->', JSON.stringify(pot1), '| new golfer playingForMoney =', s.p[1][4]);
+    for (const k of ['scores', 'additionalGames', 'additionalGameInstances', 'moneyPool', 'sideMatches', 'holeBetStake', 'gameFormat', 'skinsBuyIn', 'kpWinners', 'teeRating', 'startingHole'])
+        assert.deepEqual(after_[k], before[k], k + ' untouched');
+    // THE SCORE SHEET on hole 4: the new golfer is there.
+    await j.evaluate("document.querySelector('#gps-overlay .gps-score').click()"); await sleep(600);
+    const sh = await J(j, "(function(){ var w=document.getElementById('hp-score-sheet'); if(!w||w.style.display==='none') return null; return { chips: Array.prototype.map.call(w.querySelectorAll('.hp-ss-chip'), function(c){ return c.getAttribute('data-ss-golfer'); }), hole: HardPanGps.hole() }; })()");
+    assert.ok(sh, 'the score sheet opened');
+    assert.deepEqual(sh, { chips: ['101', '102'], hole: 4 }, 'the score sheet on hole 4 has both golfers');
+    await j.evaluate("document.querySelector('#hp-score-sheet [data-ss-golfer=\"102\"]').click()"); await sleep(300);
+    await shot(j, 'solo-4-score-sheet');
+    await j.evaluate("document.querySelector('#hp-score-sheet [data-ss-score=\"5\"]').click()"); await sleep(500);
+    assert.equal(await j.evaluate("String((currentData.scores||{}).p102_h4)"), '5', 'a score for the new golfer saves on hole 4');
+    await j.evaluate('HardPanGpsStats.sheet.close()'); await sleep(500);
+    assert.equal(await j.evaluate("(function(){ var w=document.getElementById('hp-score-sheet'); return !w || w.style.display==='none'; })()"), true, 'the score sheet closed');
+    await sleep(500);
+    // THE CARD (the compact card over the map): holes 1-3 blank for the new golfer, 5 on hole 4.
+    await j.evaluate("document.querySelector('#gps-overlay .gps-side-bets').click()"); await sleep(800);
+    const card = await J(j, "[1,2,3,4,5].map(function(h){ return ['101','102'].map(function(p){ var i = document.querySelector('#hp-compact-card [data-cc-hole=\"'+h+'\"][data-cc-player=\"'+p+'\"]'); return i ? i.textContent : null; }); })");
+    assert.ok(card.slice(0, 3).every((r) => r[0] !== '' && r[0] !== null), 'Test Solo\'s holes 1-3 still there: ' + JSON.stringify(card));
+    assert.deepEqual(card.map((r) => r[1]), ['', '', '', '5', ''], 'the new golfer: blank 1-3, 5 on hole 4');
+    assert.equal(await j.evaluate("(function(){ var c = document.getElementById('hp-compact-card'); if (!c) return false; var r = c.getBoundingClientRect(); return r.height > 0 && getComputedStyle(c).display !== 'none'; })()"), true, 'the Card is showing');
+    await shot(j, 'solo-5-card');
+    const writes = (await J(j, 'window.__w')).filter((x) => !(x[0] === 'update' && x[1] === 'events/' + code && x[2].join() === 'groupSizeOverrides,players'));
+    assert.ok(writes.every((x) => /\/scores(\/|$)|p102_h4/.test(x[1] + ' ' + (x[2] || []).join())), 'after the add, only the hole-4 score is written: ' + JSON.stringify(writes));
 });

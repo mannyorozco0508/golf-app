@@ -454,6 +454,8 @@
         + '#hp-rs .rs-dd{display:block;font-size:13.5px;color:#5d6b64;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
         + '#hp-rs .rs-go{flex:none;font-size:24px;color:#9aa0a6;}'
         + '#hp-rs .rs-dot{width:22px;height:22px;border-radius:50%;border:2px solid #9aa0a6;background:#fff;}'
+        + '#hp-rs .rs-golf{padding:0;gap:0;}#hp-rs .rs-gmain{display:flex;align-items:center;gap:12px;flex:1;min-width:0;min-height:64px;border:0;background:none;text-align:left;padding:12px 8px 12px 14px;border-radius:16px;}'
+        + '#hp-rs .rs-addp{flex:none;margin-right:12px;border:0;border-radius:999px;padding:0 14px;min-height:44px;background:#0f4c3a;color:#fff !important;font-size:14px;font-weight:700;white-space:nowrap;}'
         + '#hp-rs .rs-start{cursor:default;}#hp-rs .rs-chips{display:flex;gap:6px;margin-left:auto;flex:none;}'
         + '#hp-rs .rs-chips button{white-space:nowrap;border:0;border-radius:999px;padding:0 13px;min-height:40px;background:#e9eee9;font-size:14px;font-weight:600;}'
         + '#hp-rs .rs-chips button.on{background:#0f4c3a;color:#fff;}'
@@ -571,8 +573,12 @@
         var dotCol = null;
         try { if (teeName && window.HardPanRoundEdit && window.HardPanRoundEdit.teeColor) dotCol = window.HardPanRoundEdit.teeColor(teeName); } catch (e) {}
         var dot = '<span class="rs-dot"' + (dotCol && dotCol !== '#fff' ? ' style="background:' + dotCol + ';border-color:' + dotCol + '"' : '') + '></span>';
-        var top = row('q-players', '👥', 'Golfers', (who ? who + ' · ' : '') + 'add, rename')
-            + row('q-tee', dot, 'Tee', teeName ? teeName + ' · handicaps set' : 'Everyone’s tee and the handicaps');
+        // URGENT-040 (9:23 PM): the Golfers row carries its own "+ Add golfer" on the right - the
+        // same proxy as More's Add golfer (today's quick edit -> HardPanAddGolfer.open).
+        var top = row('q-players', '👥', 'Golfers', (who ? who + ' · ' : '') + 'add, rename');
+        if (top && has['q-addgolfer']) top = '<div class="rs-row rs-golf">' + top.replace('class="rs-row"', 'class="rs-gmain"').replace(/<span class="rs-go"[^>]*>›<\/span>/, '')
+            + '<button type="button" class="rs-addp" data-rs="q-addgolfer">＋ Add golfer</button></div>';
+        top += row('q-tee', dot, 'Tee', teeName ? teeName + ' · handicaps set' : 'Everyone’s tee and the handicaps');
         if (take('q-start')) {
             var holes = (d.courseData || []).map(function (h) { return Number(h && h.hole); }), now = rsStartNow(d);
             var ten = holes.indexOf(10) > -1 && holes.length >= 18, gs = groups().length > 1;
