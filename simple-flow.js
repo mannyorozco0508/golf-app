@@ -252,7 +252,8 @@
         var fin = function () {
             S.gpsFiles = true; if (typeof H.refreshCourses === 'function') H.refreshCourses(); S.near = S.here ? nearList(S.here) : S.near; done();
             // 021: ✓ GPS on every course with live GPS - the GPS links and set greens, read once.
-            if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (S.here && S.near && S.near.length !== undefined) S.near = nearList(S.here); if (S.open && S.step === 1) render(); });
+            if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (S.here && S.near && S.near.length !== undefined) S.near = nearList(S.here); if (S.open && S.step === 1) render(); keysPartial(); });
+            sockWatch();
         };
         if (!left || typeof H.loadScriptTimed !== 'function') { fin(); return; }
         need.forEach(function (src) { H.loadScriptTimed(src, function () { if (--left === 0) fin(); }); });
@@ -316,7 +317,7 @@
     function partOf(n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? nk(m[1]).replace(/course$/, '') : ''; }
     function lookup(key, name) {
         var L = W.HardPanGpsLive;
-        if (S.offline) return false;   // no round code, no signal: nothing is looked up online
+        if (S.offline === 'offline') return false;   // no round code, no signal: nothing is looked up online
         if (!key || !liveOn() || !L.find || !L.course) return false;
         if (readyOf(key) && hasCard(key)) return false;
         var at = Number(ls(LOOK + key) || 0);
@@ -781,6 +782,7 @@
         var ok = courseName() && !pend ? '' : ' disabled';
         var pendLbl = pend ? (pend.state === 'busy' || pend.state === 'offline' || pend.state === 'card' ? 'Loading ' + tidy(pend.name) + '\u2026' : 'Start Round') : '';
         // NO ROUND CODE YET (polish 029 #5): Start Round waits for the signal - said on the button.
+        if (S.offline === 'wait') return shell('Where are you playing?', body, '<button type="button" class="sf-cta lime" data-sf="retrycode" disabled>Getting a round code\u2026<span class="sub">One moment</span></button>', 0);
         if (S.offline) return shell('Where are you playing?', body, '<button type="button" class="sf-cta lime" data-sf="retrycode"' + (S.minting ? ' disabled' : '') + '>'
             + (S.minting ? 'Getting a round code\u2026' : 'Start Round') + '<span class="sub">' + (S.minting ? 'One bar is enough' : 'Needs a moment of signal \u2014 one bar is enough') + '</span></button>', 0);
         var foot = S.mode === 'gps'
@@ -1530,8 +1532,11 @@
         return out.slice(0, 4);
     }
     function offlineBox() {
+        // STILL CONNECTING (fix-false-nosignal): a fresh install's first database connection can take
+        // longer than the code check's 8 s. That is not "no signal" - a calm line, and it carries on.
+        if (S.offline === 'wait') return '<div class="sf-note" id="sf-connecting" role="status" style="margin:0 2px 10px;">Connecting\u2026 your round code comes in a moment. Pick your course and tee.</div>';
         var line = S.offline === 'error'
-            ? 'Couldn\u2019t get a round code just now. Pick your course and tee \u2014 Start Round tries again.'
+            ? 'Couldn\u2019t get a round code just now. Pick your course and tee \u2014 it tries again by itself.'
             : 'No signal. A new round needs one bar to get its code \u2014 pick your course and tee now, and it carries on by itself when the signal is back.';
         var h = '<div class="sf-warn" id="sf-offline" role="status"><div style="font-weight:700;">\uD83D\uDCF4 ' + esc(line) + '</div>'
             + '<button type="button" class="sf-link" data-sf="retrycode" style="padding:6px 0 0;min-height:0;"' + (S.minting ? ' disabled' : '') + '>' + (S.minting ? 'Trying\u2026' : 'Try again') + '</button></div>';
@@ -1549,8 +1554,10 @@
     function noCode(kind) {
         var m = marker();
         if (!m || m.mode !== 'gps' || params().get('game') || !/admin\.html$/.test(String(W.location.pathname || ''))) return false;
-        S.offline = kind === 'error' ? 'error' : 'offline';
+        sockWatch();
+        S.offline = reallyOffline() ? 'offline' : NS.sock === true ? 'error' : 'wait';
         S.minting = false;
+        againLater();
         if (S.open) { render(); return true; }
         S.mode = 'gps'; S.code = ''; S.step = 1;
         show(true);
@@ -1569,10 +1576,79 @@
         if (k || n) m.pick = { key: k, name: n };
         ss(MARK, JSON.stringify(m));
         rememberTee();
-        S.minting = true; render();
+        S.minting = true; NS.tries++; render();
         try { if (fn('selectHomeWidget')) W.selectHomeWidget('quick'); } catch (e) { S.minting = false; }
         // createRoom navigates on success; a refusal comes back through noCode(). A hang gives the button back.
-        setTimeout(function () { if (S.minting) { S.minting = false; if (S.open) render(); } }, 20000);
+        setTimeout(function () { if (S.minting) { S.minting = false; if (S.open) { render(); againLater(); } } }, 20000);
+    }
+
+    // ---- A SLOW FIRST CONNECTION IS NOT "NO SIGNAL" (fix-false-nosignal) ---------------------------
+    // Measured in the Simulator on a FRESH install (internet on): Firebase's anonymous sign-in and the
+    // first database connection can take longer than the code check's 8 s timer (code-issuer.js). The
+    // check timed out, the round's socket (.info/connected) still read false - which is what the SDK
+    // says BEFORE its first connection, not only after losing one - so the door said "No signal", and
+    // nothing asked again: the only re-ask was the window 'online' EVENT, which never comes when
+    // navigator.onLine was true all along. The course card and the ✓ GPS links had given up on the
+    // same first connection too.
+    // NOW: "No signal" only when it is known - the phone says offline, the socket was up and dropped,
+    // or it never came up in GRACE_MS. Until then the screen says it is connecting. Whatever the
+    // state, the code is asked for again by itself: at once when the socket comes up, and on a backoff
+    // (2, 4, 8, 16, 30 s ...) while this screen is open - so the screen recovers on its own.
+    var NS = { t0: Date.now(), sock: null, ever: false, hooked: false, timer: null, tries: 0 }, GRACE_MS = 20000, BACKOFF = [2, 4, 8, 16, 30];
+    function reallyOffline() {
+        if (offlineNow()) return true;
+        if (NS.sock === true) return false;
+        if (NS.ever) return true;                       // it was up and dropped: a real loss of signal
+        return Date.now() - NS.t0 >= GRACE_MS;          // never up yet: only after a fair wait
+    }
+    function sockWatch() {
+        if (NS.hooked) return;
+        var d = wizDb(); if (!d) return;
+        NS.hooked = true;
+        try {
+            d.ref('.info/connected').on('value', function (s) {
+                var up = !!(s && typeof s.val === 'function' && s.val());
+                NS.sock = up;
+                if (up) { NS.ever = true; if (NS.keysWait) keysAgain(); backUp(); }
+            });
+        } catch (e) {}
+    }
+    // The database is up: the round code now (no waiting for the backoff), and whatever the first
+    // connection gave up on - the picked course's card, the ✓ GPS links.
+    function backUp() {
+        if (!S.open || !S.offline) return;
+        if (S.offline !== 'wait') { S.offline = 'wait'; render(); }
+        if (!S.minting) { clearTimeout(NS.timer); NS.timer = null; retryCode(); }
+        var key = courseKey();
+        if (key && !cardInHand(key)) { watchTees(); cardFor(key).then(function () { if (S.step === 1 && courseKey() === key) render(); }); }
+        keysAgain();
+    }
+    // THE ✓ GPS LINKS (front-door loadGpsKeys) - a read that timed out on a slow first connection is
+    // PARTIAL (a course or more without its ✓ GPS): asked again once the database is up, on ANY Course &
+    // Tees screen (the round's own page can have a slow first connection too). A few times at most.
+    function keysPartial() {
+        var H = HD();
+        if (typeof H.gpsKeysPartial !== 'function' || !H.gpsKeysPartial()) { NS.keysWait = false; return; }
+        if (NS.sock === true) keysAgain(); else NS.keysWait = true;
+    }
+    function keysAgain() {
+        var H = HD();
+        NS.keysWait = false;
+        if (typeof H.gpsKeysPartial !== 'function' || !H.gpsKeysPartial() || typeof H.loadGpsKeys !== 'function' || (NS.keyTries = (NS.keyTries || 0) + 1) > 3) return;
+        H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.open && S.step === 1) render(); keysPartial(); });
+    }
+    function againLater() {
+        if (NS.timer || !S.offline) return;
+        var ms = BACKOFF[Math.min(Math.max(NS.tries - 1, 0), BACKOFF.length - 1)] * 1000;
+        NS.timer = setTimeout(function () {
+            NS.timer = null;
+            if (!S.open || !S.offline || S.code) return;
+            // Still connecting past the grace: now it is said plainly (and it keeps asking).
+            if (S.offline === 'wait' && reallyOffline()) { S.offline = 'offline'; render(); }
+            if (offlineNow()) { againLater(); return; }   // the 'online' event asks the moment it is back
+            if (S.minting) { againLater(); return; }
+            retryCode();
+        }, ms);
     }
 
     // ---- ARRIVAL ------------------------------------------------------------------

@@ -4776,9 +4776,28 @@
         S.cl = { k: k, at: now, placed: !!p.city, v: courseLine(nm, p.city, p.state) };
         return S.cl.v;
     }
+    // URGENT-047 C: THE CADDIE NOTE - the phone's own note for this course's hole (gps-stats.js
+    // HardPanGpsStats.caddie, this phone only), one small line right under the course line, in
+    // layouts D and C. There only while this hole has a note; no note - no element at all.
+    function caddieNow() {
+        try { var C = window.HardPanGpsStats && window.HardPanGpsStats.caddie; return C && S && !tournament() ? String(C.line(S.courseKey, S.hole) || '') : ''; } catch (e) { return ''; }
+    }
+    function syncCaddieLine() {
+        var cl = S && S.el.querySelector('.gps-ld-course, .gps-lc-course');
+        var e = S && S.el.querySelector('.gps-caddie');
+        var t = cl ? caddieNow() : '';
+        if (!t) { if (e && e.parentNode) e.parentNode.removeChild(e); return; }
+        if (!e) { e = document.createElement('div'); e.className = 'gps-caddie'; e.setAttribute('role', 'note'); }
+        if (e.parentNode !== cl.parentNode || e.previousSibling !== cl) cl.parentNode.insertBefore(e, cl.nextSibling);
+        var shown = '✎ ' + t;
+        if (e.textContent !== shown) e.textContent = shown;
+        if (e.getAttribute('title') !== t) e.setAttribute('title', t);
+        if (e.getAttribute('aria-label') !== 'Your note for hole ' + S.hole + ': ' + t) e.setAttribute('aria-label', 'Your note for hole ' + S.hole + ': ' + t);
+    }
     function syncCourseLine() {
         var e = S && S.el.querySelector('.gps-ld-course, .gps-lc-course');
         if (!e) return;
+        try { syncCaddieLine(); } catch (er) {}
         var t = courseLineNow();
         if (e.textContent !== t) e.textContent = t;
         if (e.getAttribute('title') !== t) e.setAttribute('title', t);
@@ -4951,7 +4970,7 @@
     function tsOpen() { var t = tsSheet(); return !!(t && t.style.display !== 'none'); }
     // MORE: [the menu item it runs, icon, label]. Shown only when that item is.
     var TS_TILES = [['.gps-set-green', '⛳', 'Set the green'], ['.gps-fix-green', '⛳', 'Fix the green'], ['.gps-undo-green', '↶', 'Undo last fix'],
-        ['.gps-refresh-gps', '↻', 'Refresh GPS'], ['.gps-my-stats', '▦', 'My stats'], ['.gps-my-bag', '🏌️', 'My bag'],
+        ['.gps-refresh-gps', '↻', 'Refresh GPS'], ['.gps-my-stats', '▦', 'My stats'], ['.gps-my-bag', '🏌️', 'My bag'], ['.gps-range', '🎯', 'Range'],
         ['.gps-mark-shots', '📍', 'Mark shots'], ['.gps-replay', '▶', 'Replay round'], ['.gps-pick-course', '⚑', 'Other course'],
         ['.gps-rechoose', '①', 'Hole 1 again']];
     var TS_MARKUP = '<div class="gps-ts-head"><span class="gps-ts-grip" aria-hidden="true"></span><div class="gps-ts-title">Tools</div></div>'
@@ -5342,6 +5361,8 @@
         +   '<div class="gps-bag-head"><div class="gps-bag-title"></div><button type="button" class="gps-bag-done">Done</button></div><div class="gps-bag-sub"></div>'
         // 010: where the numbers live, in one line (the account too only when clubsSync is live).
         +   '<div class="gps-bag-saved">Saved on this phone</div>'
+        // URGENT-047 B: type the carries a launch monitor (Bushnell Launch Pro) showed - gps-bushnell.js.
+        +   '<button type="button" class="gps-bag-lm" data-feature="clubs">Enter carries from my Bushnell</button>'
         // 012 part 5 (switch bagAltitude): where the numbers hold - for the altitude in plays-like.
         +   '<div class="gps-bag-alt" data-feature="bagAltitude" role="group" aria-label="My distances are from">'
         +     '<div class="gps-bag-alt-h">My distances are from:</div>'
@@ -5418,6 +5439,8 @@
         +   '<button type="button" class="gps-menu-item gps-aa-toggle" data-feature="autoAdvance"></button>'
         +   '<button type="button" class="gps-menu-item gps-my-stats">My stats</button>'
         +   '<button type="button" class="gps-menu-item gps-my-bag" data-feature="clubs">My bag</button>'
+        // URGENT-047 A: Range - carry by club at the range, "Update my bag" (gps-range.js, distances only).
+        +   '<button type="button" class="gps-menu-item gps-range" data-feature="clubs">Range</button>'
         +   '<button type="button" class="gps-menu-item gps-mark-shots">Mark shots</button>'
         +   '<button type="button" class="gps-menu-item gps-replay">Replay round</button>'
         +   '<button type="button" class="gps-menu-item gps-add-game">\u2795 Add a game</button>'
@@ -5669,6 +5692,9 @@
         + '#gps-overlay .gps-bag-done{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
         + '#gps-overlay .gps-bag-resetall{display:block;margin:10px auto 0;min-height:44px;padding:0 16px;color:#fca5a5 !important;font-weight:800;}'
         + '#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-list,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-resetall,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-setup-open,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup-foot{display:none;}'
+        // URGENT-047 B: the launch-monitor door in My bag (list view only).
+        + '#gps-overlay .gps-bag-lm{display:block;width:100%;margin:2px 0 8px;min-height:44px;border-radius:12px;border:1px solid rgba(217,249,157,.5) !important;background:rgba(217,249,157,.1) !important;color:#d9f99d !important;font:800 15px/1 ' + FONT + ' !important;}'
+        + '#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-lm{display:none;}'
         + '#gps-overlay .gps-bag-srow{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);}'
         + '#gps-overlay .gps-bag-setup-foot{display:flex;gap:10px;justify-content:center;margin-top:10px;}'
         + '#gps-overlay .gps-bag-setup-save{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
@@ -5859,6 +5885,9 @@
         + '#gps-overlay .gps-ld-course{flex:0 0 calc(100% - 10px);margin:0 0 0 10px;box-sizing:border-box;min-width:0;padding:2px 4px 0;border-top:1px solid rgba(244,244,239,.16);'
         +   'font:600 11px/14px ' + FONT + ';color:#b9c4b5;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em;}'
         + '#gps-overlay .gps-ld-course:empty,#gps-overlay .gps-lc-course:empty{display:none;}'
+        // URGENT-047 C: the caddie note - one small line under the course line (only while this hole has one).
+        + '#gps-overlay .gps-caddie{box-sizing:border-box;min-width:0;padding:1px 4px 0;font:600 12px/15px ' + FONT + ';color:#f2e3a0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '#gps-overlay.gps-ld .gps-ld-top:has(> .gps-caddie){flex-wrap:wrap;row-gap:0;}#gps-overlay.gps-ld .gps-ld-top:has(> .gps-caddie) .gps-num-mid{flex-basis:0;}#gps-overlay .gps-ld-top > .gps-caddie{flex:0 0 calc(100% - 10px);margin:0 0 0 10px;}#gps-overlay .gps-panel > .gps-caddie{margin:-3px 8px -3px;}'
         + '#gps-overlay .gps-ld-row2{display:flex;align-items:center;gap:8px;min-height:0;pointer-events:none;}'
         + '#gps-overlay .gps-ld-row2 > *{pointer-events:auto;}'
         + '#gps-overlay .gps-ld-gap{flex:1 1 auto;pointer-events:none !important;}'
@@ -5938,6 +5967,7 @@
         +   '#gps-overlay.gps-sun .gps-ld-par,#gps-overlay.gps-sun .gps-lc-l1,#gps-overlay.gps-sun .gps-lc-l2,#gps-overlay.gps-sun .gps-lc-acc{color:#fff !important;opacity:1 !important;}'
         + '#gps-overlay.gps-sun .gps-ld-div,#gps-overlay.gps-sun .gps-ld-par{border-color:#fff;}#gps-overlay.gps-sun .gps-ld-div{background:#fff;}'
         + '#gps-overlay.gps-sun .gps-ld-course,#gps-overlay.gps-sun .gps-lc-course{color:#fff;border-top-color:rgba(255,255,255,.6);}'   // URGENT-030: white in Sun
+        + '#gps-overlay.gps-sun .gps-caddie{color:#ffd60a;}'   // URGENT-047 C
         + '#gps-overlay.gps-sun.gps-ld .gps-ld-top .gps-num-mid .gps-big{color:#fff;font-size:clamp(46px,15.5vw,60px);}'
         + '#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-lbl,#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-big{color:#ffe600 !important;font-weight:800;}'
         + '#gps-overlay.gps-sun.gps-ld .gps-ld-fb .gps-big{font-size:19px;}'
@@ -6308,7 +6338,33 @@
         on(el, '.gps-bag-setup-skip', function () { var B = bagApi(); if (!B || !S) return; B.skipSetup(bagGolfer()); fillBag(); });
         on(el, '.gps-bag-setup-open', function () { if (bagApi() && S) fillSetup(); });
         on(el, '.gps-my-bag', openBag);
+        // URGENT-047 A: RANGE (gps-range.js): the same golfer and bag as My bag; the GPS reading through
+        // HardPanMark.readFix, yards worked out and the reading dropped - distances only, on this phone.
+        on(el, '.gps-range', function () {
+            if (!S) return;
+            closeMenus();
+            withShots(function () {
+                loadScript('gps-range.js', function () { return !!window.HardPanRange; }, function () {
+                    if (!S || !window.HardPanRange) return;
+                    closeBag();
+                    window.HardPanRange.open({ el: S.el, golfer: bagGolfer(), units: units, flash: flash, saved: bagSaved, openBag: openBag,
+                        fix: function () { dropStaleFix(); return fix ? { pt: [fix.pt[0], fix.pt[1]], acc: fix.acc, at: fix.at } : null; } });
+                });
+            });
+        });
         on(el, '.gps-bag-done', function () { closeBag(); render(); });
+        // URGENT-047 B: LAUNCH MONITOR QUICK ENTRY (gps-bushnell.js): the same golfer and bag as My
+        // bag, written with HardPanGpsBag.set (as Range does). Yards only, on this phone.
+        on(el, '.gps-bag-lm', function () {
+            if (!S) return;
+            withShots(function () {
+                loadScript('gps-bushnell.js', function () { return !!window.HardPanLaunchEntry; }, function () {
+                    if (!S || !window.HardPanLaunchEntry) return;
+                    closeBag();
+                    window.HardPanLaunchEntry.open({ el: S.el, golfer: bagGolfer(), units: units, flash: flash, saved: bagSaved, openBag: openBag });
+                });
+            });
+        });
         on(el, '.gps-bagask-skip', bagSkip);
         var bagRow = el.querySelector('.gps-bagask-row');
         if (bagRow) bagRow.addEventListener('click', function (e) { var b = e.target && e.target.closest ? e.target.closest('[data-bag-club]') : null; if (b) { e.preventDefault(); bagPick(b.getAttribute('data-bag-club')); } });
@@ -6808,6 +6864,10 @@
         // POLISH #4: the offline queue changed (index.html renderOfflineBadge) - the pill's "📴 N waiting".
         queueChanged: function () { if (!S || !rsSwitch()) return; try { syncRoundChip(); syncLayoutVars(); } catch (e) {} },
         courseKey: function () { return S ? S.courseKey : null; },
+        // URGENT-047 C: a caddie note was saved / cleared (gps-stats.js) - the line on the bar now.
+        caddieChanged: function () { if (!S) return; try { syncCaddieLine(); syncLayoutVars(); } catch (e) {} },
+        caddieLine: function () { return S ? caddieNow() : ''; },
+        accountUid: function () { return bagUid(); },
         tournament: function () { return tournament(); },
         // 012: the plays-like number, its club and the (i) sheet - for every layout (old, C, D).
         playsLine: function () { try { return playsLineNow(); } catch (e) { return null; } },

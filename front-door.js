@@ -144,7 +144,7 @@
     function loadGpsKeys(done, again) {
         var fin = typeof done === 'function' ? done : function () {};
         if (again) { GPSK = { links: null, own: null, gc: null, asked: false }; try { W.localStorage.removeItem(GPSK_LS); } catch (e) {} }
-        if (GPSK.links && GPSK.gc) { fin(); return; }
+        if (GPSK.links && GPSK.gc && !GPSK.partial) { fin(); return; }
         if (!again) {
             try {
                 var kept = JSON.parse(W.localStorage.getItem(GPSK_LS) || 'null');
@@ -154,9 +154,13 @@
         var d = null; try { d = W.firebase && W.firebase.database ? W.firebase.database() : null; } catch (e) { d = null; }
         if (!d || GPSK.asked) { fin(); return; }
         GPSK.asked = true;
+        // A SLOW FIRST CONNECTION IS NOT "NO GPS" (fix-false-nosignal): a read that timed out (a fresh
+        // install's database still connecting) leaves the answer PARTIAL - used for now, never kept on
+        // the phone for 6 h, and asked again on the next call (simple-flow asks once the database is up).
+        var short = false;
         var one = function (path) {
             return new Promise(function (res) {
-                var t = setTimeout(function () { res(null); }, 6000);
+                var t = setTimeout(function () { short = true; res(null); }, 6000);
                 try { d.ref(path).once('value').then(function (snap) { clearTimeout(t); res((snap && snap.val && snap.val()) || null); }, function () { clearTimeout(t); res(null); }); }
                 catch (e) { clearTimeout(t); res(null); }
             });
@@ -179,10 +183,11 @@
                 }));
             })
             .then(function () {
-                GPSK.links = links; GPSK.gc = gc; GPSK.own = {};
-                try { W.localStorage.setItem(GPSK_LS, JSON.stringify({ at: Date.now(), links: links, gc: gc })); } catch (e) {}
+                GPSK.links = links; GPSK.gc = gc; GPSK.own = {}; GPSK.partial = short;
+                if (short) GPSK.asked = false;
+                else try { W.localStorage.setItem(GPSK_LS, JSON.stringify({ at: Date.now(), links: links, gc: gc })); } catch (e) {}
                 C.list = null; CR.rows = null; GA.t = null; fin();
-            }, function () { GPSK.links = links; GPSK.gc = gc; GPSK.own = {}; fin(); });
+            }, function () { GPSK.links = links; GPSK.gc = gc; GPSK.own = {}; GPSK.partial = true; GPSK.asked = false; fin(); });
     }
     // ✓ GPS = WHAT THE MAP WILL DRAW (URGENT-022: one answer for the list and the map). gps-geo
     // courseGps is the map's own rule; here it reads the GolfAPI courses the phone has (the app's
@@ -1496,7 +1501,32 @@
         if (prog && res && res.parentNode !== prog) prog.appendChild(res);
         var st = W.document.querySelector('[data-hs-stats]');
         if (st) st.style.display = W.HardPanGpsStats && typeof W.HardPanFeature === 'function' && W.HardPanFeature('quickStats') ? '' : 'none';
+        // URGENT-047: Range from Home (no round) - with My bag's own switch (clubs), as on the GPS screen.
+        var rg = W.document.querySelector('[data-hs-range]');
+        if (rg) rg.style.display = typeof W.HardPanFeature !== 'function' || W.HardPanFeature('clubs') !== false ? '' : 'none';
+        slimDots();
         simpleSame();
+    }
+    // URGENT-047: Home's slim row wraps at phone width - a dot at the end or start of a line is hidden
+    // (made transparent, so nothing moves and the row's text stays whole), on every size change of the row.
+    function slimDots() {
+        var row = W.document.querySelector('#v-simple .hs-slim');
+        if (!row) return;
+        var fix = function () {
+            var shown = function (b) { return !!(b && b.offsetParent !== null); };
+            Array.prototype.forEach.call(row.querySelectorAll('.hs-dot'), function (d) {
+                var all = Array.prototype.slice.call(row.querySelectorAll('button')).filter(shown);
+                var prev = null, next = null;
+                all.forEach(function (b) { var pos = d.compareDocumentPosition(b); if (pos & 2) prev = b; else if ((pos & 4) && !next) next = b; });
+                var brk = !prev || !next || Math.abs(prev.getBoundingClientRect().top - next.getBoundingClientRect().top) > 4;
+                d.classList.toggle('hs-dot-off', brk && shown(prev || next));
+            });
+        };
+        fix();
+        if (!row.__dots) {
+            row.__dots = true;
+            try { if (typeof W.ResizeObserver === 'function') new W.ResizeObserver(fix).observe(row); else W.addEventListener('resize', fix); } catch (e) {}
+        }
     }
     // SAME AS LAST WEEK: offered only when this phone saved a round that still has golfers (as Games').
     function simpleSame() {
@@ -1546,6 +1576,14 @@
         if (a === 'strip') { var t = myTrips(); W.location.href = t.length ? 'trip.html?trip=' + encodeURIComponent(t[0]) : 'trip.html#build'; return true; }
         if (a === 'shistory') { show('history'); return true; }   // 2.0 polish #6: this phone's past rounds
         if (a === 'show') { W.location.href = 'instructions.html'; return true; }
+        // URGENT-047: RANGE WITH NO ROUND - gps-range.js's own sheet for the phone's own golfer (its
+        // openHome loads My bag's store and the Mark reading). No round is created; nothing is written.
+        // GPS Map only, asked the same way as My stats.
+        if (a === 'srange') {
+            var go = function () { loadScriptTimed('gps-range.js', function () { if (W.HardPanRange && typeof W.HardPanRange.openHome === 'function') W.HardPanRange.openHome({ account: meName() }); }); };
+            if (W.HardPanGps && typeof W.HardPanGps.requireGps === 'function') W.HardPanGps.requireGps({}, go, function () {}); else go();
+            return true;
+        }
         if (a === 'sstats') {
             var S = W.HardPanGpsStats;
             if (S && typeof S.openMy === 'function' && W.HardPanGps && typeof W.HardPanGps.requireGps === 'function') W.HardPanGps.requireGps({}, function () { S.openMy(); }, function () {});
@@ -2562,7 +2600,7 @@
         localRound: localRound, progressOf: progressOf,
         // URGENT-019: the course list is worked out once; a page that loads the GPS course files after
         // that (simple-flow's Course & Tees) asks for it again, as the GPS-1 picker does (C.list = null).
-        refreshCourses: function () { C.list = null; CR.rows = null; }, loadGpsKeys: loadGpsKeys, gpsLinks: function () { return GPSK.links || {}; },
+        refreshCourses: function () { C.list = null; CR.rows = null; }, loadGpsKeys: loadGpsKeys, gpsKeysPartial: function () { return !!GPSK.partial; }, gpsLinks: function () { return GPSK.links || {}; },
         holdRound: holdRound, heldFor: heldFor, isHeldOp: isHeldOp, heldLanded: heldLanded, heldRefused: heldRefused, sendHeld: sendHeld, armHeld: armHeld,
         roundBackGuard: roundBackGuard };
     W.HardPanHome = { start: homeStart, show: show };
