@@ -1501,7 +1501,32 @@
         if (prog && res && res.parentNode !== prog) prog.appendChild(res);
         var st = W.document.querySelector('[data-hs-stats]');
         if (st) st.style.display = W.HardPanGpsStats && typeof W.HardPanFeature === 'function' && W.HardPanFeature('quickStats') ? '' : 'none';
+        // URGENT-047: Range from Home (no round) - with My bag's own switch (clubs), as on the GPS screen.
+        var rg = W.document.querySelector('[data-hs-range]');
+        if (rg) rg.style.display = typeof W.HardPanFeature !== 'function' || W.HardPanFeature('clubs') !== false ? '' : 'none';
+        slimDots();
         simpleSame();
+    }
+    // URGENT-047: Home's slim row wraps at phone width - a dot at the end or start of a line is hidden
+    // (made transparent, so nothing moves and the row's text stays whole), on every size change of the row.
+    function slimDots() {
+        var row = W.document.querySelector('#v-simple .hs-slim');
+        if (!row) return;
+        var fix = function () {
+            var shown = function (b) { return !!(b && b.offsetParent !== null); };
+            Array.prototype.forEach.call(row.querySelectorAll('.hs-dot'), function (d) {
+                var all = Array.prototype.slice.call(row.querySelectorAll('button')).filter(shown);
+                var prev = null, next = null;
+                all.forEach(function (b) { var pos = d.compareDocumentPosition(b); if (pos & 2) prev = b; else if ((pos & 4) && !next) next = b; });
+                var brk = !prev || !next || Math.abs(prev.getBoundingClientRect().top - next.getBoundingClientRect().top) > 4;
+                d.classList.toggle('hs-dot-off', brk && shown(prev || next));
+            });
+        };
+        fix();
+        if (!row.__dots) {
+            row.__dots = true;
+            try { if (typeof W.ResizeObserver === 'function') new W.ResizeObserver(fix).observe(row); else W.addEventListener('resize', fix); } catch (e) {}
+        }
     }
     // SAME AS LAST WEEK: offered only when this phone saved a round that still has golfers (as Games').
     function simpleSame() {
@@ -1551,6 +1576,14 @@
         if (a === 'strip') { var t = myTrips(); W.location.href = t.length ? 'trip.html?trip=' + encodeURIComponent(t[0]) : 'trip.html#build'; return true; }
         if (a === 'shistory') { show('history'); return true; }   // 2.0 polish #6: this phone's past rounds
         if (a === 'show') { W.location.href = 'instructions.html'; return true; }
+        // URGENT-047: RANGE WITH NO ROUND - gps-range.js's own sheet for the phone's own golfer (its
+        // openHome loads My bag's store and the Mark reading). No round is created; nothing is written.
+        // GPS Map only, asked the same way as My stats.
+        if (a === 'srange') {
+            var go = function () { loadScriptTimed('gps-range.js', function () { if (W.HardPanRange && typeof W.HardPanRange.openHome === 'function') W.HardPanRange.openHome({ account: meName() }); }); };
+            if (W.HardPanGps && typeof W.HardPanGps.requireGps === 'function') W.HardPanGps.requireGps({}, go, function () {}); else go();
+            return true;
+        }
         if (a === 'sstats') {
             var S = W.HardPanGpsStats;
             if (S && typeof S.openMy === 'function' && W.HardPanGps && typeof W.HardPanGps.requireGps === 'function') W.HardPanGps.requireGps({}, function () { S.openMy(); }, function () {});

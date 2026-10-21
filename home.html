@@ -112,6 +112,11 @@
   .hs-card { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; background: #fff; border: 1px solid var(--hp-line); border-radius: 16px; padding: 12px 16px; font-family: inherit; cursor: pointer; color: var(--hp-text); margin-bottom: 10px; }
   .hs-card .h { display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--hp-muted); } .hs-card .n { display: block; font-size: 17px; font-weight: 800; margin-top: 2px; } .hs-card .go { font-size: 17px; font-weight: 800; color: var(--hp-green); white-space: nowrap; text-align: center; }
   .hs-slim { text-align: center; font-size: 14px; color: var(--hp-green); margin-top: 6px; }
+  /* URGENT-047: five links (Join with a code · Trip · History · My stats · Range) on two even lines; a link
+     never breaks inside itself, and a dot where the line breaks is hidden (front-door.js slimDots). */
+  .hs-slim { text-wrap: balance; }
+  .hs-slim button { white-space: nowrap; }
+  .hs-slim .hs-dot.hs-dot-off { color: transparent; }
   .hs-slim button { border: 0; background: none; color: var(--hp-green); font-weight: 800; font-size: 14px; font-family: inherit; padding: 8px 2px; min-height: 40px; cursor: pointer; }
   #v-simple .hs-hello { font-size: 24px; margin: 18px 0 6px; }
 </style>
@@ -138,7 +143,7 @@
     <div class="hint">The code (QNXF83), the code and your group (QNXF83 2), or paste the link. A QR: point the camera at it - it opens the round.</div>
     <div id="hs-code-msg" class="hp-status" role="status"></div>
   </div>
-  <div class="hs-slim"><button type="button" data-hp-act="sjoinopen">Join with a code</button> &middot; <button type="button" data-hp-act="strip">Trip</button> &middot; <button type="button" data-hp-act="shistory">History</button><span data-hs-stats> &middot; <button type="button" data-hp-act="sstats">My stats</button></span></div>
+  <div class="hs-slim"><button type="button" data-hp-act="sjoinopen">Join with a code</button><span class="hs-dot"> &middot; </span><button type="button" data-hp-act="strip">Trip</button><span class="hs-dot"> &middot; </span><button type="button" data-hp-act="shistory">History</button><span data-hs-stats><span class="hs-dot"> &middot; </span><button type="button" data-hp-act="sstats">My stats</button></span><span data-hs-range><span class="hs-dot"> &middot; </span><button type="button" data-hp-act="srange">Range</button></span></div>
 </div>
 
 <!-- HISTORY (2.0 polish #6): this phone's past rounds, newest first - course, day, golfers, the

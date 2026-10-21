@@ -146,3 +146,151 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
         } finally { await j.close(); }
     });
 }
+
+// ============================================================================
+// URGENT-047 (added 7:20 AM) - RANGE FROM HOME, WITH NO ROUND (home.html, a stand-in GPS).
+//   7  Home's bottom row: Join with a code · Trip · History · My stats · Range - on screen, no
+//      sideways scroll, no link broken over two lines
+//   8  Home › Range: the same Range sheet; the golfer is the phone's own (393: who this phone was on its
+//      newest round - Ann Alpha, whose My bag already holds a 9-iron; 375: no name yet - "Your name"
+//      asked ONCE, and with NO GPS at all the typed carries still work)
+//   9  Mark the ball / Mark where it landed (HardPanMark.readFix) and typed carries; Update my bag
+//      writes My bag's own set map into the same bag record (hardpan_bag_v1)
+//  10  THE GUARD: no round created, no events/<code>, no database write at all; no coordinate stored;
+//      Done stops the location watch
+// ============================================================================
+const SNAP = { at: Date.now() - 2 * 86400000, data: { courseName: 'Range Test Golf Club', players: [{ id: 101, name: 'Ann Alpha' }, { id: 102, name: 'Ben Bravo' }] }, meta: { group: null } };
+const BAG0 = { v: 1, golfers: { 'n:ann alpha': { shots: {}, set: { '9i': 140 } } } };
+const NOGEO = "(function(){ window.__liveCount = function(){ return 0; }; try { Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { watchPosition: function (ok, no) { setTimeout(function(){ no({ code: 1, message: 'denied' }); }, 50); return 7; }, getCurrentPosition: function (ok, no) { no({ code: 1, message: 'denied' }); }, clearWatch: function () {} } }); } catch (e) {} })();";
+for (const c of [{ vp: { width: 393, height: 852 }, who: 'Ann Alpha', seeded: true, gps: true }, { vp: { width: 375, height: 667 }, who: 'Cal', seeded: false, gps: false }]) {
+    const vp = c.vp;
+    test('Home › Range with no round at ' + vp.width + 'x' + vp.height + (c.gps ? '' : ' (no GPS, a new name)'), { timeout: 240000 }, async () => {
+        const GEO2 = c.gps ? GEO.replace("window.__moveTo", "window.__liveCount = function () { return Object.keys(live).length; }; window.__moveTo") : NOGEO;
+        const SEED = !c.seeded ? '' : "try{if(!sessionStorage.getItem('rhseed')){sessionStorage.setItem('rhseed','1');localStorage.setItem('golfapp_snap_v1_RHOME1'," + JSON.stringify(JSON.stringify(SNAP)) + ");localStorage.setItem('golfapp_me_RHOME1','101');localStorage.setItem('hardpan_bag_v1'," + JSON.stringify(JSON.stringify(BAG0)) + ");}}catch(e){}";
+        const PRE = 'window.__hardpanDoors = true; window.__simpleFlow = true;' + iapStub({ active: true }) + CFG + GEO2 + SEED;
+        const j = await openJourney({ db: { events: {}, global_courses: {}, trips: {}, organizers: {}, tournaments: {} }, viewport: vp, webgl: true, preScript: PRE });
+        const ev = (x) => j.evaluate(x);
+        const until = async (x, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { try { if (await ev(x)) return true; } catch (e) {} await sleep(250); } return false; };
+        const shot = async (n) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await sleep(900); await j.shot(path.join(SHOTS, 'home-chrome-' + vp.width + 'x' + vp.height + '-' + n + '.png')); } };
+        const R = "document.querySelector('#hp-range .gps-range-sheet')";
+        const rangeText = "(function(){ var b = document.getElementById('hp-range'), s = " + R + "; return b && b.style.display !== 'none' && s && s.style.display !== 'none' ? s.innerText : ''; })()";
+        const tapR = (sel) => ev("(function(){ var b = " + R + ".querySelector(" + JSON.stringify(sel) + "); if (!b) return false; b.click(); return true; })()");
+        const shotsNow = () => ev("(function(){ var c = HardPanRange.current(" + JSON.stringify(c.who) + "); return c ? c.shots.length : 0; })()");
+        const gpsShot = async (club, bearing, yds) => {
+            const n0 = await shotsNow();
+            assert.equal(await tapR('[data-range-club="' + club + '"]'), true, club + ' chip');
+            await ev('__moveTo(' + MAT[0] + ',' + MAT[1] + ')'); await sleep(1100);
+            await tapR('.gps-range-mark');
+            assert.ok(await until("HardPanRange.state().marking && !HardPanRange.state().busy", 7000), 'first Mark taken: ' + await ev(rangeText));
+            assert.match(await ev(rangeText), /Mark where it landed/);
+            const land = G.destination(MAT, bearing, yds * YDM);
+            await ev('__moveTo(' + land[0] + ',' + land[1] + ')'); await sleep(1100);
+            await tapR('.gps-range-mark');
+            assert.ok(await until("(function(){ var c = HardPanRange.current(" + JSON.stringify(c.who) + "); return !!c && c.shots.length === " + (n0 + 1) + "; })()", 7000), 'the shot saved: ' + await ev(rangeText));
+            return land;
+        };
+        const typedShot = async (club, yds) => {
+            const n0 = await shotsNow();
+            await tapR('[data-range-club="' + club + '"]');
+            await ev("(function(){ var i = " + R + ".querySelector('.gps-range-typed'); i.value = '" + yds + "'; return 1; })()");
+            await tapR('.gps-range-add');
+            assert.ok(await until("(function(){ var c = HardPanRange.current(" + JSON.stringify(c.who) + "); return !!c && c.shots.length === " + (n0 + 1) + "; })()", 4000), 'typed shot saved');
+        };
+        try {
+            await j.goto(fileUrl('home.html'), 2500);
+            assert.ok(await until("(function(){ var v = document.getElementById('v-simple'); return !!v && getComputedStyle(v).display !== 'none'; })()", 15000), 'Home');
+            await sleep(800);
+            const keys0 = JSON.parse(await ev("JSON.stringify(Object.keys(localStorage).sort())"));
+            // 7. the row
+            const row = JSON.parse(await ev("(function(){ var r = document.querySelector('#v-simple .hs-slim'), rr = r.getBoundingClientRect(); var bs = Array.from(r.querySelectorAll('button')).filter(function(b){ return b.offsetParent !== null; }).map(function(b){ var x = b.getBoundingClientRect(); return { t: b.textContent, l: x.left, r: x.right, top: Math.round(x.top), h: x.height, lh: parseFloat(getComputedStyle(b).lineHeight) || 20 }; }); var dots = Array.from(r.querySelectorAll('.hs-dot')).filter(function(d){ return d.offsetParent !== null; }).map(function(d){ var x = d.getBoundingClientRect(); return { top: Math.round(x.top), on: !d.classList.contains('hs-dot-off') && getComputedStyle(d).color !== 'rgba(0, 0, 0, 0)' }; }); return JSON.stringify({ bs: bs, dots: dots, text: r.textContent.replace(/\\s+/g, ' ').trim(), w: innerWidth, sw: document.documentElement.scrollWidth, rl: rr.left, rr: rr.right }); })()"));
+            assert.deepEqual(row.bs.map((b) => b.t), ['Join with a code', 'Trip', 'History', 'My stats', 'Range'], 'the row: ' + row.text);
+            assert.equal(row.text, 'Join with a code · Trip · History · My stats · Range');
+            assert.ok(row.sw <= row.w, 'no sideways scroll ' + JSON.stringify(row));
+            row.bs.forEach((b) => { assert.ok(b.l >= 0 && b.r <= row.w + 0.5, b.t + ' on screen'); assert.ok(b.h <= 48, b.t + ' is one line (' + b.h + ')'); });
+            const lines = Array.from(new Set(row.bs.map((b) => b.top)));
+            assert.ok(lines.length <= 2, 'at most two lines: ' + JSON.stringify(row.bs));
+            // wraps nicely: a dot shows only BETWEEN two links on the same line (none dangling at a break)
+            assert.equal(row.dots.length, 4);
+            row.dots.forEach((d, i) => { const same = row.bs[i].top === row.bs[i + 1].top; assert.equal(d.on, same, 'dot ' + i + ' ' + JSON.stringify(row)); });
+            if (lines.length === 2) assert.ok(row.bs.filter((b) => b.top === lines[1]).length >= 2, 'not one link alone on the second line: ' + JSON.stringify(row.bs));
+            await ev("document.querySelector('[data-hp-act=\"srange\"]').scrollIntoView({ block: 'center' })");
+            await shot('0-home-row');
+            // 8. Home › Range
+            assert.ok(await j.tap('[data-hp-act="srange"]'), 'the Range link');
+            if (!c.seeded) {
+                assert.ok(await until("(function(){ var a = document.querySelector('#hp-range .hp-range-ask'); return !!a && a.offsetParent !== null; })()", 10000), '"Your name" asked');
+                assert.match(await ev("document.querySelector('#hp-range .hp-range-ask').innerText"), /Your name/);
+                await shot('1-your-name');
+                await ev("(function(){ var i = document.querySelector('#hp-range .hp-range-name'); i.value = '  Cal  '; return 1; })()");
+                await ev("document.querySelector('#hp-range .hp-range-ask .ok').click()");
+            }
+            assert.ok(await until("!!window.HardPanRange && HardPanRange.isOpen() && !!window.HardPanGpsBag && !!window.HardPanMark", 12000), 'the Range sheet, with My bag\'s store and the Mark reading loaded');
+            assert.match(await ev(rangeText), new RegExp('Range · ' + c.who.split(' ')[0]));
+            assert.match(await ev(rangeText), /No shots yet/);
+            assert.equal(await ev("!!document.getElementById('gps-overlay')"), false, 'no GPS screen on Home');
+            if (c.gps) assert.ok(await until("window.__liveCount() === 1", 4000), 'the location watched while Range is open');
+            const fit0 = JSON.parse(await ev("(function(){ var r = " + R + ".getBoundingClientRect(); return JSON.stringify({ top: r.top, bottom: r.bottom, left: r.left, right: r.right, h: innerHeight, w: innerWidth, sw: document.documentElement.scrollWidth }); })()"));
+            assert.ok(fit0.top >= 0 && fit0.bottom <= fit0.h + 1 && fit0.left >= 0 && fit0.right <= fit0.w + 1, 'the sheet fills the screen ' + JSON.stringify(fit0));
+            await shot('2-range-open');
+            // 9. shots
+            const lands = [];
+            if (c.gps) {
+                lands.push(await gpsShot('Dr', 5, 240));
+                assert.equal(await ev("HardPanMark.context() && HardPanMark.context().rangeHome === true"), true, 'Mark went through HardPanMark (Home context)');
+                await tapR('[data-range-club="7i"]');
+                await ev('__moveTo(' + MAT[0] + ',' + MAT[1] + ')'); await sleep(1100);
+                await tapR('.gps-range-mark');
+                assert.ok(await until("HardPanRange.state().marking && !HardPanRange.state().busy", 7000));
+                await shot('3-range-marking');
+                const l2 = G.destination(MAT, 0, 150 * YDM); lands.push(l2);
+                await ev('__moveTo(' + l2[0] + ',' + l2[1] + ')'); await sleep(1100);
+                await tapR('.gps-range-mark');
+                assert.ok(await until("HardPanRange.current('Ann Alpha').shots.length === 2", 7000));
+            } else {
+                // No GPS at all: Mark says so; typing still works.
+                await tapR('[data-range-club="Dr"]');
+                await tapR('.gps-range-mark');
+                assert.ok(await until(rangeText + ".indexOf('No GPS position yet') > -1", 9000), 'no GPS: ' + await ev(rangeText));
+                await shot('3-range-no-gps');
+                await typedShot('Dr', 240);
+                await typedShot('7i', 150);
+            }
+            await typedShot('Dr', 250);
+            await typedShot('7i', 160);
+            const rows = JSON.parse(await ev("JSON.stringify(Array.from(" + R + ".querySelectorAll('[data-range-row]')).map(function(r){ return Array.from(r.children).map(function(c){ return c.textContent; }); }))"));
+            assert.deepEqual(rows, [['Driver', '2', '245', '250'], ['7-iron', '2', '155', '160']]);
+            await ev(R + ".scrollTop = 99999");
+            await shot('4-range-session');
+            await tapR('.gps-range-bag');
+            assert.ok(await until(rangeText + ".indexOf('My bag updated') > -1", 4000), 'updated');
+            assert.equal(await ev("!!" + R + ".querySelector('.gps-range-openbag')"), false, 'no "Open My bag" on Home (My bag is on the GPS screen)');
+            await shot('5-range-bag-updated');
+            const key = 'n:' + c.who.toLowerCase();
+            const bag = JSON.parse(await ev("localStorage.getItem('hardpan_bag_v1')"));
+            assert.deepEqual(bag.golfers[key].set, Object.assign(c.seeded ? { '9i': 140 } : {}, { Dr: 245, '7i': 155 }), 'My bag\'s own set map, the same record');
+            const shown = JSON.parse(await ev("(function(){ var B = HardPanGpsBag, b = B.bag(" + JSON.stringify(c.who) + "); return JSON.stringify({ Dr: [b.Dr.yd, B.source(b.Dr)], i7: [b['7i'].yd, B.source(b['7i'])] }); })()"));
+            assert.deepEqual(shown, { Dr: [245, 'entered'], i7: [155, 'entered'] }, 'My bag shows them as entered');
+            // Done: Home again, the watch stopped
+            await tapR('.gps-range-x');
+            assert.ok(await until("document.getElementById('hp-range').style.display === 'none'", 3000), 'Done closes Range');
+            if (c.gps) assert.equal(await ev('window.__liveCount()'), 0, 'the location watch stopped');
+            assert.equal(await ev("HardPanMark.context()"), null, 'HardPanMark let go');
+            // Asked ONCE: open again - straight to the sheet.
+            await j.tap('[data-hp-act="srange"]');
+            assert.ok(await until("HardPanRange.isOpen()", 8000), 'Range again');
+            assert.equal(await ev("document.querySelectorAll('#hp-range .hp-range-ask').length"), 0, 'no second "Your name"');
+            assert.match(await ev(rangeText), new RegExp('Range · ' + c.who.split(' ')[0]));
+            await tapR('.gps-range-x');
+            // 10. THE GUARD
+            const writes = JSON.parse(await ev('JSON.stringify(window.__WRITES || [])'));
+            assert.deepEqual(writes, [], 'no database write at all');
+            assert.deepEqual(JSON.parse(await ev("JSON.stringify(Object.keys((window.__DB || {}).events || {}))")), [], 'no events/<code>');
+            const keys1 = JSON.parse(await ev("JSON.stringify(Object.keys(localStorage).sort())"));
+            const added = keys1.filter((k) => keys0.indexOf(k) === -1);
+            assert.ok(!added.some((k) => /^(golfapp_snap_v1_|golfapp_me_|hardpan_gps_golfer_|lastRoomCode|hardpan_last_round)/.test(k)), 'no round on this phone: ' + added.join(', '));
+            const ls = await ev("(function(){ var o = {}; Object.keys(localStorage).forEach(function(k){ o[k] = localStorage.getItem(k); }); return JSON.stringify(o); })()");
+            for (const x of [MAT].concat(lands).flat()) assert.ok(ls.indexOf(x.toFixed(3)) === -1, 'no coordinate ' + x + ' stored');
+            assert.doesNotMatch(await ev("localStorage.getItem('hardpan_range_v1') + localStorage.getItem('hardpan_bag_v1')"), /"(lat|lng|latitude|longitude|pt|coords|pos|start)"/);
+        } finally { await j.close(); }
+    });
+}
