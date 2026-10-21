@@ -1940,7 +1940,7 @@
             el.className = 'gps-target';
             el.innerHTML = '<span class="gps-ring"></span><span class="gps-ring-in"></span><span class="gps-ring-line"></span><span class="gps-ring-dot"></span><span class="gps-ring-lbl"></span>';
             var m = new (ML().Marker)({ element: el, draggable: true, anchor: 'center' }).setLngLat(ll(S.target)).addTo(S.map);
-            m.on('dragstart', function () { if (!S) return; S.dragging = true; S.targetMoved = true; S.lineAsked = false; });
+            m.on('dragstart', function () { if (!S) return; S.dragging = true; S.targetMoved = true; S.targetMovedFrom = fix ? fix.pt.slice() : null; S.lineAsked = false; });
             m.on('drag', function () {
                 if (!S) return;
                 var p = m.getLngLat();
@@ -3736,6 +3736,7 @@
         // Tap anywhere: the target jumps there.
         S.target = pt;
         S.targetMoved = true;
+        S.targetMovedFrom = fix ? fix.pt.slice() : null;   // 052 B: whose shot's aim (memory only)
         S.lineAsked = false;
         clampTarget();
         render();
@@ -4157,7 +4158,7 @@
         // Taken NOW (the shot's wind is the wind when it is hit; the hole may change before the scripts load).
         var ctx = { hole: S.hole, green: green, wind: effectiveWind(), elevFt: r ? ptElev(r, pt) : null, course: chipsCourse(), golfer: bagGolfer(),
             // On the green (a putt) or no green to aim at: this mark only closes the shot before.
-            noOpen: !green || !!(nums && nums.onGreen) };
+            noOpen: !green || !!(nums && nums.onGreen), ring: chipsRing() };
         var plYd = pl && isFinite(pl.exact) ? pl.exact : null, mine = S;
         withChips(function (C) {
             if (S !== mine) return;
@@ -4170,6 +4171,9 @@
             if (res.open) bagAsk(toYd, plYd, ctx.club); else bagHide();
         });
     }
+    // 052 B: THE AIM LINE for the left/right miss - the target ring if the golfer moved it (and
+    // where he stood when he did), else the tracker uses the green's CENTER. Memory only.
+    function chipsRing() { return S && S.targetMoved && S.target ? { pt: S.target.slice(), from: S.targetMovedFrom || null } : null; }
     function chipsTracker(C) { if (!S.chips) S.chips = C.create({ dist: G.haversineMeters, bearing: G.bearingDeg }); return S.chips; }
     function chipsClosed(c) {
         if (!S || !c || !c.counted) return;
@@ -4187,14 +4191,16 @@
         if (!op || op.hole !== S.hole) return;
         var end = pt || T.openGreen();
         bagHide();
-        chipsClosed(T.close(end, r && end ? (pt ? ptElev(r, end) : ptElev(r, end, 'mid')) : null));
+        chipsClosed(T.close(end, r && end ? (pt ? ptElev(r, end) : ptElev(r, end, 'mid')) : null, pt ? 'green' : 'hole-close'));
     }
     function chipsEndOther(T, op) {
-        if (myScore(op.hole) != null) chipsClosed(T.close(T.openGreen(), null)); else T.discard();
+        if (myScore(op.hole) != null) chipsClosed(T.close(T.openGreen(), null, 'hole-close')); else T.discard();
     }
     function chipsTick(r, o, nums) {
         var T = S && S.chips, op = T && T.open();
         if (!op || op.hole !== S.hole) return;
+        // 052 B: a ring moved while he is still at the ball is this shot's aim.
+        if (typeof T.aim === 'function') T.aim(chipsRing(), fix ? fix.pt : null);
         if (fix && o && o.from === 'me' && nums && nums.onGreen) { chipsEnd(fix.pt, r); return; }
         if (myScore(op.hole) != null) chipsEnd(null, r);
     }
