@@ -17,6 +17,8 @@ const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { openJourney, fileUrl } = require('./tools/lib/journey.js');
 const { iapStub } = require('./tools/lib/iap-stub.js');
+// int-048: home.html now loads hp-auth.js itself; 'no HardPanAuth at all' keeps it off the page.
+const { noAuthScript } = require('./tools/lib/hp-auth-stub.js');
 
 const SHOTS = path.join(process.env.HOME || '', 'Desktop', 'claude-code-reports', '048', 'chrome');
 try { fs.mkdirSync(SHOTS, { recursive: true }); } catch (e) { }
@@ -91,7 +93,7 @@ after(async () => { for (const j of journeys) { try { await j.close(); } catch (
 async function open(start, opts) {
     const o = opts || {};
     const j = await openJourney({ db: DB(), viewport: o.vp || { width: 393, height: 852 },
-        preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + (o.noAuth ? '' : fakeAuth(start, o.seed)) });
+        preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + (o.noAuth ? noAuthScript() : fakeAuth(start, o.seed)) });
     journeys.push(j);
     await j.goto(fileUrl('home.html'), 2200);
     if (!o.noAuth) await until(j, "!!window.HardPanAuth && document.getElementById('hpa-spot').getAttribute('data-hpa-state') === " + JSON.stringify(start === 'in' ? 'in' : 'out'));
