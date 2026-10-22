@@ -1,8 +1,8 @@
 // ============================================================================
 // int-061 - THE MY MISS LABEL NEVER SITS ON THE RAIL OR THE DISTANCE LABELS (real Chrome, 402x874 and
-// 375x667). Made-up course and golfer (the 049 / 052 B test course, "Ann Alpha", no marked shots - so
-// every club shows the labelled DEFAULT SHAPE). My miss switched on in GPS tools, as a golfer does.
-//   1  on the tee: the Driver oval - its label clear of the rail buttons, the distance bubbles, the
+// 375x667). Made-up course and golfer (the 049 / 052 B test course, "Ann Alpha", 10 marked Driver shots -
+// her own small oval - and no irons, so an iron shows the labelled DEFAULT SHAPE). My miss switched on in GPS tools, as a golfer does.
+//   1  on the tee: her own Driver oval (small, at the aim ring) - its label clear of the rail buttons, the distance bubbles, the
 //      "20 yd" ring label, the plays-like pill and the oval itself (17-f-2: it touched "20 yd").
 //   2  ~160 yds out on the middle line (the oval in the middle of the screen, no room beside it):
 //      the iron's default shape (7-iron, a 6 in the made-up wind) - the label goes under (or over) the oval, clear of all of the above.
@@ -46,7 +46,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const yd = (a, b) => G.haversineMeters(a, b) / G.M_PER_YD;
 
 
-const LOG = { v: 1, golfers: { 'n:ann alpha': { hand: 'R', shots: [] } } };
+// 10 marked Driver shots (her own, small, tilted oval - as on the iPhone 17 where it met "20 yd"); no irons.
+const DR = [247, 252, 244, 250, 256, 262, 238, 249, 260, 241], OFF = [14, 11, 16, 9, -12, -15, 18, 10, -10, 13];
+const LOG = { v: 1, golfers: { 'n:ann alpha': { hand: 'R', shots: DR.map((c, i) => ({ id: 'd' + i, club: 'Dr', carry: c, windMph: 0, relAngle: 0, along: 0, across: 0, tempF: 75, elevFt: null, course: 'Chips Test Golf Club', hole: 1 + (i % 9), date: Date.now() - (i + 1) * 3600000, wxHour: null, windFromDeg: 0, bearingDeg: 0, src: 'manual', offline: OFF[i], aimKind: 'green-center', endKind: 'marked' })) } } };
 const SEED2 = "localStorage.setItem('hardpan_shotlog_v1', " + JSON.stringify(JSON.stringify(LOG)) + ");";
 
 for (const vp of [{ width: 402, height: 874 }, { width: 375, height: 667 }]) {
@@ -81,7 +83,7 @@ for (const vp of [{ width: 402, height: 874 }, { width: 375, height: 667 }]) {
             assert.ok(await until("!!(HardPanGps.missLbl() && HardPanGps.missLbl().box)", 8000), 'the oval and its label');
             await sleep(800);
             const a = await lbl();
-            assert.match(a.text, /^My miss · Driver/, a.text);
+            assert.equal(a.text, 'My miss · Driver', 'her own shape: ' + a.text);
             clear(a, 'tee');
             console.log('# ' + vp.width + ' tee ' + JSON.stringify(a));
             await shot('1-tee-driver');

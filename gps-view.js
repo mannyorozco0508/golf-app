@@ -4861,21 +4861,23 @@
         return out;
     }
     function missLblSpots(box, sw, sh, B) {
-        var G = 8, cx = (box.l + box.r) / 2, cy = (box.t + box.b) / 2;
+        var cx = (box.l + box.r) / 2, cy = (box.t + box.b) / 2, out = [];
         var cl = function (l) { return Math.max(B.l, Math.min(B.r - sw, l)); }, ct = function (t) { return Math.max(B.t, Math.min(B.b - sh, t)); };
-        var below = box.b + 6, above = box.t - 6 - sh;
-        return [
-            { how: 'right', l: box.r + G, t: ct(cy - sh / 2) },
-            { how: 'left', l: box.l - G - sw, t: ct(cy - sh / 2) },
-            { how: 'below', l: cl(cx - sw / 2), t: below },
-            { how: 'above', l: cl(cx - sw / 2), t: above },
-            { how: 'below', l: cl(box.l), t: below }, { how: 'below', l: cl(box.r - sw), t: below },
-            { how: 'above', l: cl(box.l), t: above }, { how: 'above', l: cl(box.r - sw), t: above },
-            // No room outside the oval at all (a small phone, close in): just inside its top / bottom edge.
-            { how: 'above', l: cl(cx - sw / 2), t: ct(above) }, { how: 'below', l: cl(cx - sw / 2), t: ct(below) },
-            { how: 'left', l: cl(box.l - G - sw), t: ct(cy - sh / 2) }, { how: 'right', l: cl(box.r + G), t: ct(cy - sh / 2) },
-            { how: 'inside', l: cl(cx - sw / 2), t: ct(box.t + 4) }
-        ].map(function (c) { c.r = c.l + sw; c.b = c.t + sh; return c; });
+        // Nearest first: beside, under, over the oval; then a step further out (the aim ring and its
+        // "20 yd" label often sit right at a small oval).
+        [8, 30, 54].forEach(function (G) {
+            var below = box.b + G - 2, above = box.t - G + 2 - sh;
+            out.push({ how: 'right', l: box.r + G, t: ct(cy - sh / 2) }, { how: 'left', l: box.l - G - sw, t: ct(cy - sh / 2) },
+                { how: 'below', l: cl(cx - sw / 2), t: below }, { how: 'above', l: cl(cx - sw / 2), t: above },
+                { how: 'below', l: cl(box.l), t: below }, { how: 'below', l: cl(box.r - sw), t: below },
+                { how: 'above', l: cl(box.l), t: above }, { how: 'above', l: cl(box.r - sw), t: above });
+        });
+        // No room outside the oval at all (a small phone, close in): the sides clamped onto the screen,
+        // or just inside the oval's top / bottom edge.
+        out.push({ how: 'above', l: cl(cx - sw / 2), t: ct(box.t - 6 - sh) }, { how: 'below', l: cl(cx - sw / 2), t: ct(box.b + 6) },
+            { how: 'left', l: cl(box.l - 8 - sw), t: ct(cy - sh / 2) }, { how: 'right', l: cl(box.r + 8), t: ct(cy - sh / 2) },
+            { how: 'inside', l: cl(cx - sw / 2), t: ct(box.t + 4) });
+        return out.map(function (c) { c.r = c.l + sw; c.b = c.t + sh; return c; });
     }
     function missPlaceLbl() {
         if (!S || !S.map || !S.missRing || !S.markers || !S.markers.mymiss) return null;
