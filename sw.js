@@ -4726,6 +4726,8 @@ const SHELL_FILES = [
     './gps-shot-bag.js',
     // URGENT-052 A: distance arcs + tee plan (pure math, on the phone; nothing stored or sent).
     './gps-arcs-plan.js',
+    // URGENT-052 B: My miss - the miss pattern per club (pure math + an off-by-default switch, on the phone).
+    './gps-miss-pattern.js',
     // URGENT-047 B: launch monitor quick entry - type carries, Update my bag (yards only, on the phone).
     './gps-bushnell.js',
     // URGENT-049: the club chips after Mark shot - counted shots to the shot log (distances + wind only).
