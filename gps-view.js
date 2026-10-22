@@ -2879,7 +2879,9 @@
         return { l: b.left - wrapR.left, t: b.top - wrapR.top, r: b.right - wrapR.left, b: b.bottom - wrapR.top };
     }
     function hits(a, b) { return a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t; }
-    function placePills() {
+    // int-061: the My miss label is placed after the bubbles, so it can keep off them.
+    function placePills() { placePills0(); try { missPlaceLbl(); } catch (e) {} }
+    function placePills0() {
         if (!S) return;
         placeSaveLine();
         var pTo = S.el.querySelector('.gps-pill-to'), pOn = S.el.querySelector('.gps-pill-on');
@@ -4834,18 +4836,74 @@
                 if (!f.own) { var sm = document.createElement('small'); sm.textContent = 'default shape'; sp.appendChild(sm); }
                 me.appendChild(sp);
             }
-            var cb = ldOn() ? ldClearBox() : null, wrapW = (S.el.querySelector('.gps-map-wrap') || {}).clientWidth || 0;
-            var room = cb ? cb.right : wrapW - 8, sw0 = me.firstChild ? me.firstChild.offsetWidth : 0;
-            var flip = px[rI] + 8 + sw0 > room && px[lI] - 8 - sw0 >= 4;
-            me.classList.toggle('gps-miss-lbl-l', flip);
-            mk.setLngLat(ll(ring[flip ? lI : rI]));
             me.setAttribute('data-miss-club', club); me.setAttribute('data-miss-own', f.own ? '1' : '0');
         }
         missKeepClear();
+        missPlaceLbl();
     }
     // The plays-like pill (layout D, bottom right) never covers the oval: when they meet - and the
     // golfer has not moved the map himself - the map slides up just enough (never past the clear
     // map's top).
+    // int-061: WHERE THE MY MISS LABEL GOES. Beside the oval (right, else left), else under it, else over
+    // it - the first spot that stays inside the clear map and off everything else on it: the right-hand
+    // rail buttons, the distance bubbles, the "20 yd" ring label, the plays-like pill, the F / C / B and
+    // carry labels and the oval itself. Nothing fits: the spot that covers least. Runs after the
+    // distance bubbles are placed (placePills), so it sees where they are. Text only, never a button.
+    function missLblObstacles(wr) {
+        var out = [], add = function (e) {
+            if (!e || e.offsetParent === null) return;
+            var b = e.getBoundingClientRect(); if (!(b.width > 0 && b.height > 0)) return;
+            out.push({ l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top });
+        };
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-arc-lbl, .gps-right > *, .gps-leftrow .gps-recenter, .gps-green-dims, .gps-banner, .gps-msg, .gps-verify, .gps-target-row'), add);
+        Object.keys(S.markers || {}).forEach(function (k) { if (k !== 'mymiss') { var m = S.markers[k]; add(m && m.getElement()); } });
+        add(S.targetMarker && S.targetMarker.getElement());
+        return out;
+    }
+    function missLblSpots(box, sw, sh, B) {
+        var G = 8, cx = (box.l + box.r) / 2, cy = (box.t + box.b) / 2;
+        var cl = function (l) { return Math.max(B.l, Math.min(B.r - sw, l)); }, ct = function (t) { return Math.max(B.t, Math.min(B.b - sh, t)); };
+        var below = box.b + 6, above = box.t - 6 - sh;
+        return [
+            { how: 'right', l: box.r + G, t: ct(cy - sh / 2) },
+            { how: 'left', l: box.l - G - sw, t: ct(cy - sh / 2) },
+            { how: 'below', l: cl(cx - sw / 2), t: below },
+            { how: 'above', l: cl(cx - sw / 2), t: above },
+            { how: 'below', l: cl(box.l), t: below }, { how: 'below', l: cl(box.r - sw), t: below },
+            { how: 'above', l: cl(box.l), t: above }, { how: 'above', l: cl(box.r - sw), t: above },
+            // No room outside the oval at all (a small phone, close in): just inside its top / bottom edge.
+            { how: 'above', l: cl(cx - sw / 2), t: ct(above) }, { how: 'below', l: cl(cx - sw / 2), t: ct(below) },
+            { how: 'left', l: cl(box.l - G - sw), t: ct(cy - sh / 2) }, { how: 'right', l: cl(box.r + G), t: ct(cy - sh / 2) },
+            { how: 'inside', l: cl(cx - sw / 2), t: ct(box.t + 4) }
+        ].map(function (c) { c.r = c.l + sw; c.b = c.t + sh; return c; });
+    }
+    function missPlaceLbl() {
+        if (!S || !S.map || !S.missRing || !S.markers || !S.markers.mymiss) return null;
+        var mk = S.markers.mymiss, me = mk.getElement(), sp = me && me.firstChild, wrap = S.el.querySelector('.gps-map-wrap');
+        if (!sp || !wrap) return null;
+        var wr = wrap.getBoundingClientRect(), box = missRect(); if (!box) return null;
+        var sw = sp.offsetWidth, sh = sp.offsetHeight, cb = ldOn() ? ldClearBox() : null;
+        var B = { l: 4, t: (cb ? cb.top : 0) + 4, r: (cb ? cb.right : wr.width) - 4, b: (cb ? cb.bottom : wr.height) - 4 };
+        // Weights: off the clear map or on a button / number / label counts 10x; on the oval's own edge 1x
+        // (the oval is see-through; the rail and the numbers are not).
+        var obs = missLblObstacles(wr), ov = { l: box.l - 2, t: box.t - 2, r: box.r + 2, b: box.b + 2 };
+        var over = function (c, o, m) { var w = Math.min(c.r, o.r + m) - Math.max(c.l, o.l - m), h = Math.min(c.b, o.b + m) - Math.max(c.t, o.t - m); return w > 0 && h > 0 ? w * h : 0; };
+        var cover = function (c) {
+            var a = 0;
+            obs.forEach(function (o) { a += 10 * over(c, o, 2); });
+            var ow = Math.max(0, B.l - c.l) + Math.max(0, c.r - B.r), oh = Math.max(0, B.t - c.t) + Math.max(0, c.b - B.b);
+            return a + over(c, ov, 0) + (ow * sh + oh * sw) * 10;
+        };
+        var spots = missLblSpots(box, sw, sh, B), best = null;
+        spots.forEach(function (c) { c.cover = cover(c); if (!best || c.cover < best.cover - 0.5) best = c; });
+        var cx = (box.l + box.r) / 2, cy = (box.t + box.b) / 2;
+        try { mk.setLngLat(S.map.unproject([cx, cy])); } catch (e) { return null; }
+        sp.style.left = Math.round(best.l - cx) + 'px'; sp.style.top = Math.round(best.t - cy) + 'px'; sp.style.right = 'auto';
+        me.classList.toggle('gps-miss-lbl-l', best.how === 'left');
+        me.setAttribute('data-miss-at', best.how);
+        S.missLbl = { how: best.how, l: best.l, t: best.t, r: best.r, b: best.b, cover: Math.round(best.cover), spots: spots.map(function (c) { return c.how + '@' + Math.round(c.l) + ',' + Math.round(c.t) + ':' + Math.round(c.cover); }), B: B };
+        return S.missLbl;
+    }
     function missRect() {
         if (!S || !S.missRing || !S.map) return null;
         var l = 1e9, t = 1e9, r = -1e9, b = -1e9;
@@ -7818,6 +7876,21 @@
         target: function () { return S && S.target ? [S.target[0], S.target[1]] : null; },
         // URGENT-052 B (checks): the map's own layer / source ids, and the My miss oval's box on screen.
         mapLayers: function () { try { var st = S && S.map && S.map.getStyle(); return st ? { layers: st.layers.map(function (l) { return l.id; }), sources: Object.keys(st.sources || {}) } : null; } catch (e) { return null; } },
+        // int-061 (checks): the My miss label's box on screen and anything it touches (rail, bubbles, "20 yd", pill, labels).
+        missLbl: function () {
+            try {
+                var m = S && S.markers && S.markers.mymiss, sp = m && m.getElement().firstChild, wrap = S && S.el.querySelector('.gps-map-wrap');
+                if (!sp || !wrap) return null;
+                var wr = wrap.getBoundingClientRect(), b = sp.getBoundingClientRect(), L = { l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top };
+                var hits = [];
+                Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-carry-lbl, .gps-ld-top, .gps-ld-bottom, .gps-green-dims, .gps-banner, .gps-msg'), function (e) {
+                    if (e.offsetParent === null) return; var q = e.getBoundingClientRect(); if (!(q.width > 0 && q.height > 0)) return;
+                    if (Math.min(b.right, q.right) - Math.max(b.left, q.left) > 0.5 && Math.min(b.bottom, q.bottom) - Math.max(b.top, q.top) > 0.5) hits.push(String(e.className).split(' ').slice(0, 2).join('.'));
+                });
+                var o = missRect(), onOval = !!(o && Math.min(L.r, o.r) - Math.max(L.l, o.l) > 0.5 && Math.min(L.b, o.b) - Math.max(L.t, o.t) > 0.5);
+                return { at: m.getElement().getAttribute('data-miss-at'), box: { l: Math.round(L.l), t: Math.round(L.t), r: Math.round(L.r), b: Math.round(L.b) }, hits: hits, onOval: onOval, w: Math.round(wr.width), text: sp.textContent, placed: S.missLbl || null };
+            } catch (e) { return { err: String(e && e.message || e) }; }
+        },
         missRect: function () { try { var r = missRect(); return r ? { l: Math.round(r.l), t: Math.round(r.t), r: Math.round(r.r), b: Math.round(r.b) } : null; } catch (e) { return null; } },
         // THE TOOLS SHEET (012): on in this layout? (index.html's gpsSheetPlace skips the drop-down row then.)
         toolsSheetOn: function () { return tsOn(); },
