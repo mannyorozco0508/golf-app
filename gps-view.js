@@ -4664,6 +4664,7 @@
             // On the green (a putt) or no green to aim at: this mark only closes the shot before.
             noOpen: !green || !!(nums && nums.onGreen), ring: chipsRing() };
         var plYd = pl && isFinite(pl.exact) ? pl.exact : null, mine = S;
+        sgMarkHere(toYd, !!(nums && nums.onGreen), r);
         withChips(function (C) {
             if (S !== mine) return;
             var T = chipsTracker(C), op = T.open();
@@ -4678,6 +4679,18 @@
     // 052 B: THE AIM LINE for the left/right miss - the target ring if the golfer moved it (and
     // where he stood when he did), else the tracker uses the green's CENTER. Memory only.
     function chipsRing() { return S && S.targetMoved && S.target ? { pt: S.target.slice(), from: S.targetMovedFrom || null } : null; }
+    // URGENT-052 C: STROKES GAINED keeps each mark's YARDS TO THE GREEN'S CENTRE for the golfer this
+    // screen shows (gps-stats.js sg.mark - a number; the position itself is never passed or kept),
+    // and the hole's length: the card's yards, else tee -> green on the map. Off the green only.
+    function sgMarkHere(toYd, onGreen, r) {
+        try {
+            var St = window.HardPanGpsStats, w = scoreFor();
+            if (!St || !St.sg || !S || !S.eventCode || !w || toYd == null || onGreen) return;
+            var meta = (typeof S.holeMeta === 'function' ? S.holeMeta(S.hole) : null) || {};
+            var hy = Number(meta.yards) > 0 ? Number(meta.yards) : (r && r.tee && r.mid ? G.haversineMeters(r.tee, r.mid) / G.M_PER_YD : null);
+            St.sg.mark(S.eventCode, w.id, S.hole, Math.round(toYd), { holeYd: hy });
+        } catch (e) {}
+    }
     function chipsTracker(C) { if (!S.chips) S.chips = C.create({ dist: G.haversineMeters, bearing: G.bearingDeg }); return S.chips; }
     function chipsClosed(c) {
         if (!S || !c || !c.counted) return;

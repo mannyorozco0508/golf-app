@@ -245,7 +245,7 @@
     function dropStats(code) {
         code = String(code || '');
         if (!code) return 0;
-        var ks = lsKeys(function (k) { return k.indexOf(QKEY + code + '_p') === 0 || k === KEY + code; });
+        var ks = lsKeys(function (k) { return k.indexOf(QKEY + code + '_p') === 0 || k === KEY + code || k === 'hardpan_sg_v1_' + code; });
         ks.forEach(lsDel);
         idx().removeRound(code);
         return ks.length;
@@ -273,7 +273,7 @@
     function clearAll() {
         var codes = statCodes();
         codes.forEach(function (c) { if (!skipped(c)) { try { W.localStorage.setItem(NOSTATS + c, 'removed'); } catch (e) {} } });
-        lsKeys(function (k) { return k.indexOf(QKEY) === 0 || k.indexOf(KEY) === 0; }).forEach(lsDel);
+        lsKeys(function (k) { return k.indexOf(QKEY) === 0 || k.indexOf(KEY) === 0 || k.indexOf('hardpan_sg_v1_') === 0; }).forEach(lsDel);
         idx().clear();
         return codes.length;
     }
@@ -295,8 +295,12 @@
         var auto = girAuto(Number(strokes) || 0, putts, Number(par));
         return { putts: putts, fw: fwAsked(par) ? (h.fw || null) : null, gir: girOf(h, strokes, par),
             // 012 (the score sheet): the rest of the hole - all optional, all on this phone.
-            girAuto: auto, gd: GD[h.gd] ? h.gd : null, bunker: h.bunker == null ? null : h.bunker, pen: h.pen == null ? null : h.pen, note: h.note || '' };
+            girAuto: auto, gd: GD[h.gd] ? h.gd : null, bunker: h.bunker == null ? null : h.bunker, pen: h.pen == null ? null : h.pen, note: h.note || '',
+            // 052 C: the first putt's length (a chip id, feet: lt3 / 3-6 / 6-10 / 10-20 / 20-40 / 40p) - optional.
+            fp: FP_IDS.indexOf(h.fp) !== -1 ? h.fp : null };
     }
+    // 052 C: the first-putt length chips (gps-stats.js Strokes Gained reads them; nothing else does).
+    var FP_IDS = ['lt3', '3-6', '6-10', '10-20', '20-40', '40p'];
     function q3(v) { var n = Number(v); return v == null || v === '' || !isFinite(n) || n < 0 ? null : Math.min(3, Math.floor(n)); }
     function qHole(code, pid, n, strokes, par) { var r = qLoad(code, pid); return qCell(r && r.holes[String(n)], strokes, par); }
     // ctx: { code, course }. patch: { putts } or { fw } - null / undefined clears it.
@@ -311,6 +315,8 @@
         if ('bunker' in patch) { var b = q3(patch.bunker); if (b == null) delete h.bunker; else h.bunker = b; }
         if ('pen' in patch) { var pn = q3(patch.pen); if (pn == null) delete h.pen; else h.pen = pn; }
         if ('note' in patch) { var t = String(patch.note == null ? '' : patch.note).trim().slice(0, 500); if (t) h.note = t; else delete h.note; }
+        // 052 C: first-putt length - stored beside putts, the same way; anything not a chip clears it.
+        if ('fp' in patch) { if (FP_IDS.indexOf(patch.fp) !== -1) h.fp = patch.fp; else delete h.fp; }
         var g = girOf(h, strokes, par);
         if (g == null) delete h.gir; else h.gir = g;
         if (Number(strokes) > 0) rec.snap[n] = { s: Number(strokes), par: Number(par) };
@@ -423,6 +429,8 @@
             if (lg && me && String(lg.player) !== String(me.pid)) lg = null;
             if (!me && !lg) return;
             var r0 = { code: code, course: (me && me.course) || (lg && lg.course) || '', at: (me && me.at) || (lg && lg.at) || 0, holes: {}, snap: {} };
+            // 052 C: whose marks are this round's (Strokes Gained reads hardpan_sg_v1_<code> by golfer).
+            Object.defineProperty(r0, 'pid', { value: me ? String(me.pid) : (lg ? String(lg.player) : null), enumerable: false });
             if (lg) {
                 Object.keys(lg.holes || {}).forEach(function (n) { var h = lg.holes[n] || {}; r0.holes[n] = { putts: h.putts == null ? null : h.putts, fw: h.fw || null }; });
                 Object.keys(lg.snap || {}).forEach(function (n) { r0.snap[n] = { s: lg.snap[n].strokes || 0, par: lg.snap[n].par }; });
@@ -494,6 +502,8 @@
         });
         body.appendChild(seg);
         body.appendChild(el('div', 'ms-note', a.rounds ? (a.rounds + ' round' + (a.rounds === 1 ? '' : 's') + ' on this phone · ' + a.statRounds + ' with putts or fairways') : 'No rounds on this phone yet. Tap putts and fairways under your score on the card.'));
+        // 052 C: STROKES GAINED (lite) - its own window (Last round / 10 / 20) and benchmark; the tiles below keep Last 5 / 20.
+        if (a.rounds) { var sgBox = el('div', 'ms-sg'); sgBox.setAttribute('data-ms-sg', '1'); body.appendChild(sgBox); try { sgMySection(sgBox, renderMy); } catch (e) { sgBox.remove(); } body.appendChild(el('div', 'ms-h', 'YOUR NUMBERS')); }
         var g = el('div', 'ms-grid');
         // 036 #37: [label, value, key, holes behind it, show the sample]. Under 9 holes: the count and "from N holes"
         // (Putts, not Putts / round - never 2 putts on one hole x 18 = "36.0").
@@ -828,6 +838,8 @@
         if (nxg) sv.setAttribute('data-ss-next', nxt); else sv.removeAttribute('data-ss-next');
         sv.textContent = nxg ? 'Next: ' + (nxg.name || ('Player ' + nxg.id)) + ' \u203a' : (away ? 'Save · back to hole ' + c.home : (c.last ? 'Save' : 'Save · Next hole ›'));
         if (showStats) {
+            // 052 C: the card's length of this hole, for Off the tee (this phone; a number).
+            if (c.yards && ssIsOwn(pid)) sgSetYards(c.code, c.hole, c.yards);
             var cell = ssCell(pid);
             var row = function (title, sub, key, cols, opts, on) {
                 var h = el('div', 'hp-ss-h', title); if (sub) h.appendChild(el('small', null, ' · ' + sub));
@@ -842,6 +854,9 @@
                 body.appendChild(o);
             };
             row('Putts', null, 'putts', 5, [[0, '0'], [1, '1'], [2, '2'], [3, '3'], [4, '4+']], function (v) { return cell.putts === v; });
+            // 052 C: FIRST PUTT - one optional tap (feet), for Strokes Gained. Never asked for, never in the
+            // way of the score or the Next / Save; no first putt with 0 putts (holed from off the green).
+            if (cell.putts !== 0) row('First putt', 'ft \u00b7 optional', 'fp', 6, SG_FP_CHIPS, function (v) { return cell.fp === v; });
             if (fwAsked(par)) row('Tee shot', null, 'fw', 4, [['L', '← Left'], ['hit', 'Fairway'], ['R', 'Right →'], ['S', 'Short']], function (v) { return cell.fw === v; });
             var gv = ssGir(cell);
             row('Green in reg', 'auto from score + putts', 'gd', 5, [['hit', 'Hit', gv.auto ? 'auto' : ''], ['short', 'Short'], ['long', 'Long'], ['L', 'Left'], ['R', 'Right']], function (v) { return gv.v === v; });
@@ -895,6 +910,7 @@
             var k = b.getAttribute('data-ss-k'), v = b.getAttribute('data-ss-v'), cell = ssCell(pid), patch = {};
             if (k === 'gd') patch = ssGirTap(cell, v);
             else if (k === 'fw') patch.fw = cell.fw === v ? null : v;
+            else if (k === 'fp') patch.fp = cell.fp === v ? null : v;   // 052 C: a chip id; tap again = cleared
             else { var nv = Number(v); patch[k] = cell[k] === nv ? null : nv; }
             qSet(c, pid, c.hole, patch, ssStrokes(pid), c.par);
             // POLISH #34: score and putts in - the next golfer with no score (other stats: tap back).
@@ -1050,9 +1066,11 @@
         // POLISH #10: the last hole saved with every golfer on the sheet scored - "Finish & settle
         // up" opens (ctx.finish: display only, nothing is finished or written by it).
         var allIn = last && (c.golfers || []).every(function (g) { return ssStrokes(String(g.id)) > 0; });
+        // 052 C: the phone's own golfer keeps stats - this round's Strokes Gained first; its Done goes on to Finish.
+        var own = ('own' in c) ? c.own : c.pick, sgCard = allIn && c.stats && own != null && !practiceOn(c.code);
         ssClose();
         if (!last && typeof next === 'function') next();
-        else if (allIn && typeof finish === 'function') { try { finish(); } catch (e) {} }
+        else if (allIn && typeof finish === 'function') { var go = function () { try { finish(); } catch (e) {} }; var shown = false; try { shown = sgCard && sgRoundCard(c.code, go); } catch (e) { shown = false; } if (!shown) go(); }
     }
     // TOOLS: "Track stats for others" - this phone only, off by default.
     function ssPlaceToggle(menu) {
@@ -1113,6 +1131,480 @@
     // Notes on the sheet is a caddie note for the phone's own golfer when the course is known.
     function ssCaddieFor(pid) { return ssIsOwn(pid) && caddieOk(ssCourseKey(), ss.ctx.hole); }
 
+    // ============================================================================
+    // URGENT-052 C - STROKES GAINED (LITE). The golfer this phone IS, from what is already on
+    // this phone: the score (snap), putts, the tee shot (fw), penalties (pen), the NEW first-putt
+    // length (fp, one optional tap on the score sheet) and Mark shot's marks (each one's yards to
+    // the green's centre - a DISTANCE, never a position: hardpan_sg_v1_<code>). Read-only on the
+    // score: nothing here writes a score or a putt, and no money engine reads any of it.
+    //
+    // THE BENCHMARK: "HardPan baseline (estimated)". Our own smooth curves, SHAPED ON the
+    // expected-strokes values Mark Broadie published (Every Shot Counts, 2014; Columbia Business
+    // School working papers on PGA Tour ShotLink data). No table is copied or bundled: each lie
+    // is one formula whose few parameters were fitted to a handful of his publicly quoted Tour
+    // values plus a scratch margin (putts +0.03, fairway +0.06, rough / tee +0.08), then rounded.
+    // Fit (052-c, tools in the report): tee within 0.08, fairway 0.02, rough 0.02, green 0.03 of
+    // anchor + margin. 10 and 20 handicap = scratch + (hcp / 20) x an extra per shot that grows
+    // with distance, sized so a typical par-72 card sums to ~82 (10) and ~92 (20). ESTIMATED -
+    // the (i) says so. TOUR / PLUS (added 2:21 PM, Manny +3.7): the same curves WITHOUT the scratch margin -
+    // i.e. at the Broadie Tour anchors themselves (same source); also estimated. Card ~71.6 - 1.4 = ~70.2.
+    //
+    //   expected strokes to hole out (scratch), d in yards, f in feet:
+    //   tee      2.81 + 0.00185 d + 0.52 / (1 + e^-((d - 263) / 16.7)) + 0.00313 max(0, d - 426)
+    //   fairway  1.665 + 1.047 (1 - e^(-d / 14.34)) + 1.364e-5 d^2
+    //   rough    2.201 + 0.780 (1 - e^(-d / 22.29)) + 1.289e-5 d^2
+    //   mixed    (fairway + rough) / 2       (a mark whose lie we do not know)
+    //   green    1 + (1 - 1 / (1 + (f / 7.74)^2.37)) + 0.00643 max(0, f - 22.2)
+    //   extra per shot at handicap h (k = h / 20):
+    //   tee  k (0.40 + 0.0019 d)   fairway  k (0.20 + 0.0028 d)   rough / mixed  k (0.30 + 0.0030 d)
+    //   green  k (0.08 + 0.004 min(f, 60))
+    //
+    // THE HOLE (each stroke from where it started to where it stopped; SG = E(before) - E(after) - 1):
+    //   start = the tee at the card's yards (else the GPS tee -> green), lie tee
+    //   marks = Mark shot's marks off the green, in order, = where the ball was after strokes
+    //           1, 2, ...  (a first mark within 20 yds of the tee distance = the tee: dropped; two
+    //           marks within 2 yds = one). Mark 1 on a par 4/5 takes its lie from the tee-shot answer
+    //           (Fairway -> fairway, a miss -> rough, none -> mixed); every other mark is mixed.
+    //   green = the first-putt length (fp chip, its middle: <3 = 2, 3-6 = 4.5, 6-10 = 8, 10-20 = 15,
+    //           20-40 = 30, 40+ = 50 ft); 0 putts = holed from off the green (no fp needed).
+    //   shots = score - putts - penalties. Penalty strokes are charged to the tee shot.
+    //   Category of a stroke: the tee shot on a par 4/5 = OFF THE TEE; from more than 50 yds =
+    //   APPROACH (banded by its start: under 100 / 100-125 / 125-150 / 150-175 / 175+); from 50
+    //   yds in = AROUND THE GREEN; on the green = PUTTING (E(fp) - putts).
+    //   Strokes no mark separates (two or more from beyond 50 yds) cannot be split, so the
+    //   categories they could belong to are NOT COUNTED on that hole (never guessed).
+    // A hole COUNTS for a category when every stroke of that category on it was measured (a par 3
+    // has no tee shot to measure, so it counts for Off the tee - in a round with at least one
+    // drive marked). NOT ENOUGH DATA until a category has 18 such holes; the total leaves it out
+    // and says so. Per round = the category's strokes gained x 18 / its holes.
+    // ============================================================================
+    var SGKEY = 'hardpan_sg_v1_', SG_BENCH_KEY = 'hardpan_sg_bench', SG_LAST_KEY = 'hardpan_sg_last';
+    var SG_MIN = 18, SG_ARG_YD = 50;
+    // URGENT-052 C (2:21 PM, Manny +3.7): a 4th benchmark, TOUR / PLUS ('tour') - the same curves AT the
+    // Broadie Tour anchors, i.e. without the scratch margin (putts -0.03, fairway -0.06, rough / tee -0.08,
+    // mixed -0.07), no handicap extra. Also estimated; same source as above.
+    var SG_BENCHES = ['tour', 0, 10, 20];
+    var SG_TOUR_MARGIN = { green: 0.03, fairway: 0.06, rough: 0.08, tee: 0.08, mixed: 0.07 };
+    var SG_FP = { lt3: 2, '3-6': 4.5, '6-10': 8, '10-20': 15, '20-40': 30, '40p': 50 };
+    var SG_FP_CHIPS = [['lt3', '<3'], ['3-6', '3–6'], ['6-10', '6–10'], ['10-20', '10–20'], ['20-40', '20–40'], ['40p', '40+']];
+    var SG_BANDS = [['u100', 'Under 100', 0, 100], ['100-125', '100–125', 100, 125], ['125-150', '125–150', 125, 150], ['150-175', '150–175', 150, 175], ['175p', '175+', 175, 1e9]];
+    var SG_NAMES = { ott: 'Off the tee', app: 'Approach', arg: 'Around the green', putt: 'Putting' };
+    var SG_CATS = ['ott', 'app', 'arg', 'putt'];
+    // ---- THE BASELINE (pure) ----
+    function sgClamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+    function sgTee(d) { d = sgClamp(d, 60, 700); return 2.81 + 0.00185 * d + 0.52 / (1 + Math.exp(-(d - 263) / 16.7)) + 0.00313 * Math.max(0, d - 426); }
+    function sgFair(d) { d = sgClamp(d, 0.5, 400); return 1.665 + 1.047 * (1 - Math.exp(-d / 14.34)) + 1.364e-5 * d * d; }
+    function sgRough(d) { d = sgClamp(d, 0.5, 400); return 2.201 + 0.780 * (1 - Math.exp(-d / 22.29)) + 1.289e-5 * d * d; }
+    function sgGreen(f) { f = sgClamp(f, 0.5, 150); return 1 + (1 - 1 / (1 + Math.pow(f / 7.74, 2.37))) + 0.00643 * Math.max(0, f - 22.2); }
+    function sgBench(h) { if (h === 'tour') return 'tour'; h = Number(h); return SG_BENCHES.indexOf(h) === -1 ? 0 : h; }
+    // Expected strokes to hole out. pos: { lie: 'tee' | 'fairway' | 'rough' | 'mixed' | 'green' | 'holed', d (yds) | f (ft) }.
+    function sgExpected(pos, hcp) {
+        var b = sgBench(hcp), lie = pos && pos.lie;
+        if (b === 'tour') { var e0 = sgExpected(pos, 0); return lie === 'holed' || e0 == null ? e0 : e0 - (SG_TOUR_MARGIN[lie] || 0); }
+        var k = b / 20, d = Number(pos && pos.d), f = Number(pos && pos.f);
+        switch (pos && pos.lie) {
+            case 'holed': return 0;
+            case 'green': return sgGreen(f) + k * (0.08 + 0.004 * Math.min(sgClamp(f, 0.5, 150), 60));
+            case 'tee': return sgTee(d) + k * (0.40 + 0.0019 * sgClamp(d, 60, 700));
+            case 'fairway': return sgFair(d) + k * (0.20 + 0.0028 * sgClamp(d, 0.5, 400));
+            case 'rough': return sgRough(d) + k * (0.30 + 0.0030 * sgClamp(d, 0.5, 400));
+            case 'mixed': return (sgFair(d) + sgRough(d)) / 2 + k * (0.30 + 0.0030 * sgClamp(d, 0.5, 400));
+        }
+        return null;
+    }
+    function sgBandOf(d) { for (var i = 0; i < SG_BANDS.length; i++) if (d >= SG_BANDS[i][2] && d < SG_BANDS[i][3]) return SG_BANDS[i][0]; return SG_BANDS[0][0]; }
+    // ---- ONE HOLE (pure) ----
+    // h: { par, s (score), putts, fp (chip id), pen, fw, yd (hole length), marks: [yds to the green, in order] }
+    // -> { ott, app, arg, putt: { on (counts), sg, n (strokes) }, bands: { id: { sg, n } }, drive (a tee shot measured) }
+    function sgHole(h, hcp) {
+        var out = { bands: {}, drive: false };
+        SG_CATS.forEach(function (c) { out[c] = { on: true, sg: 0, n: 0 }; });
+        var par = Number(h && h.par) || 0, s = Number(h && h.s) || 0;
+        if (!(s > 0) || !(par >= 3)) { SG_CATS.forEach(function (c) { out[c].on = false; }); return out; }
+        var E = function (pos) { return sgExpected(pos, hcp); };
+        var off = function (cats) { cats.forEach(function (c) { out[c].on = false; }); };
+        var add = function (cat, sg, n, startD) {
+            out[cat].sg += sg; out[cat].n += n;
+            if (cat === 'app') { var b = sgBandOf(startD); out.bands[b] = out.bands[b] || { sg: 0, n: 0 }; out.bands[b].sg += sg; out.bands[b].n += n; }
+        };
+        var putts = h.putts == null || h.putts === '' ? null : Number(h.putts);
+        var pen = Math.max(0, Number(h.pen) || 0);
+        var fpFt = SG_FP[h.fp] != null ? SG_FP[h.fp] : null;
+        // PUTTING
+        var end = null;   // the position the last non-putt stroke reached
+        if (putts == null) { off(['putt']); }
+        else if (putts === 0) { end = { lie: 'holed' }; }
+        else if (fpFt != null) { end = { lie: 'green', f: fpFt }; add('putt', E(end) - putts, putts); }
+        else off(['putt']);
+        // THE SHOTS TO THE GREEN
+        var Y = Number(h.yd) > 0 ? Number(h.yd) : null;
+        var raw = (Array.isArray(h.marks) ? h.marks : []).map(Number).filter(function (x) { return x > 0 && x < 800; });
+        var marks = [];
+        raw.forEach(function (x, i) {
+            if (i === 0 && Y != null && x >= Y - 20) return;                 // marked on the tee
+            if (marks.length && Math.abs(marks[marks.length - 1] - x) <= 2) return;   // a double tap
+            marks.push(x);
+        });
+        var shots = putts == null ? null : s - putts - pen;
+        if (shots != null && shots < 1) { off(['ott', 'app', 'arg']); return out; }
+        if (shots != null) while (marks.length && marks.length >= shots) marks.pop();   // the last mark was on the fringe
+        var lie1 = par >= 4 ? (h.fw === 'hit' ? 'fairway' : (h.fw === 'L' || h.fw === 'R' || h.fw === 'S') ? 'rough' : 'mixed') : 'mixed';
+        var pos = [Y != null ? { lie: 'tee', d: Y } : null].concat(marks.map(function (d, i) { return { lie: i === 0 ? lie1 : 'mixed', d: d }; }));
+        var catOf = function (i, from) { return i === 1 && par >= 4 ? 'ott' : (from && from.d <= SG_ARG_YD ? 'arg' : 'app'); };
+        var unknownFrom = function (i, from) {   // every category a block of strokes starting at stroke i could hold
+            if (i === 1) return par >= 4 ? ['ott', 'app', 'arg'] : ['app', 'arg'];
+            return from && from.d <= SG_ARG_YD ? ['arg'] : ['app', 'arg'];
+        };
+        // Strokes 1..k: mark to mark.
+        for (var i = 1; i <= marks.length; i++) {
+            var a = pos[i - 1], b = pos[i];
+            if (!a) { off(i === 1 ? (par >= 4 ? ['ott'] : ['app']) : ['app']); continue; }
+            var sg = E(a) - E(b) - 1 - (i === 1 ? pen : 0);
+            var cat = catOf(i, a);
+            add(cat, sg, 1, a.d);
+            if (cat === 'ott') out.drive = true;
+        }
+        // The last block: from the last mark (or the tee) to the green / the hole.
+        var k = marks.length, from = pos[k], left = shots == null ? null : shots - k;
+        if (!from || end == null || left == null || left < 1) off(unknownFrom(k + 1, from));
+        else if (left === 1) { var c1 = catOf(k + 1, from); add(c1, E(from) - E(end) - 1 - (k === 0 ? pen : 0), 1, from.d); if (c1 === 'ott') out.drive = true; }
+        else if (k > 0 && from.d <= SG_ARG_YD) add('arg', E(from) - E(end) - left, left, from.d);
+        else off(unknownFrom(k + 1, from));
+        if (par >= 4 && !out.drive) out.ott.on = false;
+        return out;
+    }
+    // ---- ROUNDS (pure) ----
+    // round: myRounds()'s { code, at, holes, snap } plus sg: { yd: { n: yds }, marks: { n: [yds] } }.
+    function sgRoundHoles(r, hcp) {
+        var sg = r.sg || {}, yd = sg.yd || {}, mk = sg.marks || {}, list = [];
+        Object.keys(r.snap || {}).forEach(function (n) {
+            var x = r.snap[n], h = (r.holes || {})[n] || {};
+            if (!x || !(x.s > 0)) return;
+            var res = sgHole({ par: x.par, s: x.s, putts: h.putts, fp: h.fp, pen: h.pen, fw: h.fw, yd: yd[n], marks: mk[n] }, hcp);
+            res.hole = Number(n); res.par = Number(x.par);
+            list.push(res);
+        });
+        // A par 3 counts for Off the tee only in a round with a drive measured.
+        var drives = list.some(function (x) { return x.drive; });
+        list.forEach(function (x) { if (x.par === 3 && !drives) x.ott.on = false; });
+        return list;
+    }
+    // Sum over rounds -> per-round numbers. { rounds, holes, cats: { c: { holes, n, sg, perRound, enough } },
+    // bands: { id: { n, sg, perRound } }, total, totalOf: [cats], missing: [cats] }
+    function sgSummary(rounds, hcp) {
+        var o = { rounds: 0, holes: 0, cats: {}, bands: {}, bench: sgBench(hcp) };
+        SG_CATS.forEach(function (c) { o.cats[c] = { holes: 0, n: 0, sg: 0, perRound: null, enough: false }; });
+        (rounds || []).forEach(function (r) {
+            var hs = sgRoundHoles(r, hcp);
+            if (!hs.length) return;
+            o.rounds++; o.holes += hs.length;
+            hs.forEach(function (x) {
+                SG_CATS.forEach(function (c) { if (x[c].on) { o.cats[c].holes++; o.cats[c].n += x[c].n; o.cats[c].sg += x[c].sg; } });
+                if (x.app.on) Object.keys(x.bands).forEach(function (b) { var t = o.bands[b] = o.bands[b] || { n: 0, sg: 0, perRound: null }; t.n += x.bands[b].n; t.sg += x.bands[b].sg; });
+            });
+        });
+        var appHoles = o.cats.app.holes;
+        SG_CATS.forEach(function (c) { var t = o.cats[c]; t.enough = t.holes >= SG_MIN; if (t.holes) t.perRound = t.sg * 18 / t.holes; });
+        Object.keys(o.bands).forEach(function (b) { if (appHoles) o.bands[b].perRound = o.bands[b].sg * 18 / appHoles; });
+        o.totalOf = SG_CATS.filter(function (c) { return o.cats[c].enough; });
+        o.missing = SG_CATS.filter(function (c) { return !o.cats[c].enough; });
+        o.total = o.totalOf.length ? o.totalOf.reduce(function (a, c) { return a + o.cats[c].perRound; }, 0) : null;
+        return o;
+    }
+    // PRACTICE THIS: the biggest per-round loss among the categories with enough data (Approach by
+    // its distance band when a band holds 3+ shots). null when nothing has enough data.
+    function sgPractice(o) {
+        if (!o || !o.totalOf || !o.totalOf.length) return null;
+        var opts = [];
+        o.totalOf.forEach(function (c) {
+            if (c === 'app') {
+                var bs = SG_BANDS.filter(function (b) { var t = o.bands[b[0]]; return t && t.n >= 3 && t.perRound != null; });
+                if (bs.length) { bs.forEach(function (b) { opts.push({ cat: 'app', band: b[0], label: 'Approach from ' + (b[0] === 'u100' ? 'under 100' : b[1]), perRound: o.bands[b[0]].perRound, n: o.bands[b[0]].n }); }); return; }
+            }
+            opts.push({ cat: c, band: null, label: SG_NAMES[c], perRound: o.cats[c].perRound, n: o.cats[c].n });
+        });
+        opts.sort(function (a, b) { return a.perRound - b.perRound; });
+        var w = opts[0];
+        return w && w.perRound < -0.05 ? w : { none: true };
+    }
+    // ---- STORAGE: Mark shot's yards per hole, and the card's hole length (this phone only) ----
+    function sgLoad(code) { var r = lsGet(SGKEY + code); return r && r.v === 1 ? r : { v: 1, code: String(code), yd: {}, marks: {} }; }
+    function sgYd(x) { var n = Number(x); return typeof x !== 'object' && isFinite(n) && n > 0 && n < 1000 ? Math.round(n) : null; }
+    // One mark: the yards from the ball to the green's centre (a number - a position is refused).
+    function sgMark(code, pid, hole, toGreenYd, opts) {
+        opts = opts || {};
+        var y = sgYd(toGreenYd), n = Number(hole);
+        if (!code || pid == null || !(n >= 1 && n <= 36) || y == null || opts.onGreen || skipped(code)) return false;
+        var r = sgLoad(code), p = String(pid), k = String(n);
+        r.marks[p] = r.marks[p] || {};
+        var list = r.marks[p][k] = r.marks[p][k] || [];
+        if (list.length >= 15) return false;
+        list.push(y);
+        var cy = sgYd(opts.holeYd); if (cy != null && !r.yd[k]) r.yd[k] = cy;
+        return lsSet(SGKEY + code, r);
+    }
+    // The card's length of a hole (the score sheet knows it).
+    function sgSetYards(code, hole, yd) {
+        var y = sgYd(yd), k = String(Number(hole));
+        if (!code || y == null || !(Number(hole) >= 1) || skipped(code)) return false;
+        var r = sgLoad(code);
+        if (r.yd[k] === y) return true;
+        r.yd[k] = y;
+        return lsSet(SGKEY + code, r);
+    }
+    // My rounds with their SG record (the golfer's own marks).
+    function sgRounds() {
+        return myRounds().map(function (r) {
+            var rec = lsGet(SGKEY + r.code), pid = r.pid;
+            return Object.assign({}, r, { sg: rec && rec.v === 1 ? { yd: rec.yd || {}, marks: (pid != null && rec.marks && rec.marks[String(pid)]) || {} } : {} });
+        }).sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    }
+    // THE DEFAULT BENCHMARK (Manny, 2:21 PM): the closest one at or better than the golfer's handicap -
+    // plus -> Tour / plus, 0-9.9 -> Scratch, 10-19.9 -> 10, 20+ -> 20; no handicap -> 10. The handicap: the
+    // 048 profile (HardPanAuth.profile.get().hcp, else hardpan_my_hcp; "+3.7" is plus), else the golfer's
+    // handicap in the round on screen. A pick the golfer makes (hardpan_sg_bench) always wins.
+    function sgHcpNum(v) {
+        var t = String(v == null ? '' : v).trim().replace(/\s+/g, '');
+        if (!t || !/^\+?-?\d+(\.\d+)?$/.test(t)) return null;
+        var n = Number(t.replace(/^\+/, ''));
+        if (!isFinite(n)) return null;
+        return t.charAt(0) === '+' && n > 0 ? -n : n;
+    }
+    function sgBenchFor(h) { h = sgHcpNum(h); if (h == null) return 10; return h < 0 ? 'tour' : h < 10 ? 0 : h < 20 ? 10 : 20; }
+    function sgMyHcp(roundHcp) {
+        var h = null;
+        try { var A = W.HardPanAuth; if (A && A.profile && typeof A.profile.get === 'function') { var p = A.profile.get(); if (p) h = sgHcpNum(p.hcp); } } catch (e) {}
+        if (h == null) { var hh = lsGet('hardpan_my_hcp'); if (hh && hh.h != null) h = sgHcpNum(hh.h); }
+        if (h == null && roundHcp != null) h = sgHcpNum(roundHcp);
+        return h;
+    }
+    // The phone's own golfer's handicap in the round on screen (index.html), when there is one.
+    function sgRoundHcp() {
+        try {
+            /* global currentData, qsOwnId */
+            var d = typeof currentData !== 'undefined' ? currentData : null, me = typeof qsOwnId === 'function' ? qsOwnId() : null;
+            var p = d && me != null ? (d.players || []).filter(function (x) { return String(x.id) === String(me); })[0] : null;
+            return p && p.hcp != null ? p.hcp : null;
+        } catch (e) { return null; }
+    }
+    function sgBenchNow(roundHcp) {
+        var v = null; try { v = W.localStorage.getItem(SG_BENCH_KEY); } catch (e) {}
+        if (v === 'tour') return 'tour';
+        if (v === '0' || v === '10' || v === '20') return Number(v);
+        var h = sgMyHcp(roundHcp === undefined ? sgRoundHcp() : roundHcp);
+        return h == null ? 10 : sgBenchFor(h);
+    }
+    function sgSetBench(h) { h = sgBench(h); try { W.localStorage.setItem(SG_BENCH_KEY, String(h)); } catch (e) {} return h; }
+    function sgLastNow() { var v = null; try { v = W.localStorage.getItem(SG_LAST_KEY); } catch (e) {} return v === '1' ? 1 : v === '20' ? 20 : 10; }
+    // ---- THE VIEW (shared by My stats and the after-round card) ----
+    var SG_CSS = '.hp-sg{color:#1a1a1a;font:600 15px/1.35 -apple-system,system-ui,sans-serif;}'
+        + '.hp-sg .sg-head{display:flex;align-items:center;gap:8px;margin:18px 2px 8px;}.hp-sg .sg-k{font-size:12px;font-weight:800;letter-spacing:.08em;color:#555;}'
+        + '.hp-sg .sg-est{font-size:11px;font-weight:800;letter-spacing:.06em;background:#fde68a;color:#7c2d12;border-radius:6px;padding:2px 6px;}'
+        + '.hp-sg .sg-i{margin-left:auto;min-width:44px;min-height:44px;border-radius:999px;border:0;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}'
+        + '.hp-sg .sg-i span{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;border:1.5px solid #9aa5a0;color:#0f4c3a;font:800 15px/1 Georgia,serif;}'
+        + '.hp-sg .sg-seg{display:flex;gap:6px;margin:8px 0;background:#e2f1ea;border-radius:999px;padding:4px;}'
+        + '.hp-sg .sg-seg button{flex:1;min-height:44px;border:0;border-radius:999px;background:none;color:#0f4c3a;font:800 15px/1 -apple-system,system-ui,sans-serif;cursor:pointer;white-space:nowrap;}.hp-sg .sg-seg button.on{background:#0f4c3a;color:#fff;}'
+        + '.hp-sg .sg-seg4{gap:2px;}.hp-sg .sg-seg4 button{font-size:14px;padding:0 4px;letter-spacing:-.01em;}'
+        + '.hp-sg .sg-lbl{font-size:14px;color:#555;margin:8px 2px 0;}'
+        + '.hp-sg .sg-card{background:#fff;border-radius:14px;padding:12px 14px;margin-top:8px;}'
+        + '.hp-sg .sg-vs{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#555;}'
+        + '.hp-sg .sg-tot{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:4px 0 6px;}.hp-sg .sg-tot b{font-size:30px;font-weight:800;}.hp-sg .sg-tot span{font-size:14px;color:#444;}'
+        + '.hp-sg .pos{color:#0f4c3a;}.hp-sg .neg{color:#b91c1c;}'
+        + '.hp-sg .sg-row{display:grid;grid-template-columns:minmax(0,1fr) 84px 52px;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #eef1ee;}'
+        + '.hp-sg .sg-row .n{font-weight:800;}.hp-sg .sg-row .c{font-size:12px;color:#666;font-weight:600;}.hp-sg .sg-row .v{text-align:right;font-weight:800;}'
+        + '.hp-sg .sg-bar{position:relative;height:16px;}.hp-sg .sg-bar:before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:#c9d3cd;}'
+        + '.hp-sg .sg-bar i{position:absolute;top:2px;height:12px;border-radius:4px;}.hp-sg .sg-bar i.neg{background:#b91c1c;right:50%;}.hp-sg .sg-bar i.pos{background:#0f4c3a;left:50%;}'
+        + '.hp-sg .sg-row.sg-none{grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);}'
+        + '.hp-sg .sg-nd{font-size:13px;color:#555;border:1px dashed #c9d3cd;border-radius:10px;padding:6px 8px;background:#f6f8f6;}.hp-sg .sg-nd b{color:#1a1a1a;}'
+        + '.hp-sg .sg-sub{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#555;margin:12px 0 2px;}'
+        + '.hp-sg .sg-row.sg-band{grid-template-columns:minmax(0,1fr) 84px 52px;padding:5px 0;}'
+        + '.hp-sg .sg-practice{background:#0f4c3a;color:#fff;border-radius:14px;padding:12px 14px;margin-top:10px;}.hp-sg .sg-practice .t{font-size:12px;font-weight:800;letter-spacing:.08em;color:#d9f99d;}.hp-sg .sg-practice .b{font-size:17px;font-weight:800;margin-top:2px;}'
+        + '.hp-sg .sg-foot{font-size:12px;color:#666;margin:8px 2px 0;}';
+    function sgFmt(x) { if (x == null || !isFinite(x)) return '—'; var v = Math.round(x * 10) / 10; if (v === 0) return '0.0'; return (v > 0 ? '+' : '−') + Math.abs(v).toFixed(1); }
+    function sgCls(x) { var v = Math.round((x || 0) * 10) / 10; return v > 0 ? 'pos' : v < 0 ? 'neg' : ''; }
+    function sgBar(x) { var b = el('div', 'sg-bar'), w = Math.min(50, Math.abs(x || 0) / 3 * 50); if (Math.round((x || 0) * 10)) { var i = el('i', sgCls(x)); i.style.width = Math.max(2, w) + '%'; b.appendChild(i); } return b; }
+    function sgBenchName(h) { return h === 'tour' ? 'Tour / plus' : h === 0 ? 'scratch' : 'a ' + h + ' handicap'; }
+    function sgBenchLabel(h) { return h === 'tour' ? 'Tour / plus' : h === 0 ? 'Scratch' : h + ' hcp'; }
+    function sgCountText(c, t) {
+        var n = t.n;
+        if (c === 'ott') return n + ' drive' + (n === 1 ? '' : 's');
+        if (c === 'app') return n + ' marked';
+        if (c === 'arg') return n + ' shot' + (n === 1 ? '' : 's') + ' from 50 in';
+        return t.holes + ' hole' + (t.holes === 1 ? '' : 's');
+    }
+    var SG_NEEDS = {
+        ott: 'Mark shot where each drive stops',
+        app: 'Mark shot before each approach, plus first-putt length',
+        arg: 'every shot from 50 yds in marked, plus first-putt length',
+        putt: 'first-putt length'
+    };
+    function sgNotEnough(c, t) {
+        var d = el('div', 'sg-nd');
+        d.appendChild(el('b', null, 'Not enough data. '));
+        d.appendChild(W.document.createTextNode('Needs ' + SG_NEEDS[c] + ' on 18+ holes · you have ' + t.holes + '.' + (c === 'putt' ? ' Tap it on the score sheet.' : '')));
+        return d;
+    }
+    // Draw into box. opts: { title, bench, onBench(h), last, onLast(n) (null: no window picker), rounds, today (one round), onInfo }
+    function sgDraw(box, o, opts) {
+        box.textContent = '';
+        box.classList.add('hp-sg');
+        var head = el('div', 'sg-head');
+        head.appendChild(el('span', 'sg-k', opts.title || 'STROKES GAINED'));
+        head.appendChild(el('span', 'sg-est', 'ESTIMATED'));
+        var ib = el('button', 'sg-i'); ib.type = 'button'; ib.setAttribute('aria-label', 'How Strokes Gained works'); ib.setAttribute('data-sg-info', '1');
+        ib.appendChild(el('span', null, 'i')); ib.onclick = function () { sgInfo(); };
+        head.appendChild(ib);
+        box.appendChild(head);
+        if (opts.onLast) {
+            var seg = el('div', 'sg-seg'); seg.setAttribute('data-sg-window', '1');
+            [[1, 'Last round'], [10, 'Last 10'], [20, 'Last 20']].forEach(function (x) {
+                var b = el('button', x[0] === opts.last ? 'on' : '', x[1]); b.type = 'button'; b.setAttribute('data-sg-last', String(x[0]));
+                b.onclick = function () { opts.onLast(x[0]); };
+                seg.appendChild(b);
+            });
+            box.appendChild(seg);
+        }
+        box.appendChild(el('div', 'sg-lbl', 'Compared with'));
+        var bs = el('div', 'sg-seg sg-seg4'); bs.setAttribute('data-sg-benchpick', '1');
+        SG_BENCHES.forEach(function (h) {
+            var b = el('button', h === o.bench ? 'on' : '', sgBenchLabel(h)); b.type = 'button'; b.setAttribute('data-sg-bench', String(h));
+            b.onclick = function () { opts.onBench(h); };
+            bs.appendChild(b);
+        });
+        box.appendChild(bs);
+        var card = el('div', 'sg-card');
+        card.appendChild(el('div', 'sg-vs', (opts.today ? 'This round' : 'Per round') + ' vs ' + (o.bench === 'tour' ? 'Tour / plus' : o.bench === 0 ? 'a scratch golfer' : 'a ' + o.bench + ' handicap')));
+        var tot = el('div', 'sg-tot'); tot.setAttribute('data-sg-total', o.total == null ? '' : String(Math.round(o.total * 10) / 10));
+        var tb = el('b', o.total == null ? '' : sgCls(o.total), o.total == null ? '—' : sgFmt(o.total));
+        tot.appendChild(tb);
+        var rn = opts.today ? '' : ' · ' + o.rounds + ' round' + (o.rounds === 1 ? '' : 's');
+        tot.appendChild(el('span', null, o.total == null ? 'Not enough data yet' + rn
+            : 'shots ' + (opts.today ? '' : 'a round ') + (Math.round(o.total * 10) / 10 >= 0 ? 'ahead of ' : 'behind ') + sgBenchName(o.bench) + rn + (o.missing.length ? ' · ' + o.totalOf.length + ' categor' + (o.totalOf.length === 1 ? 'y' : 'ies') : '')));
+        card.appendChild(tot);
+        SG_CATS.forEach(function (c) {
+            var t = o.cats[c], row = el('div', 'sg-row' + (t.enough ? '' : ' sg-none')); row.setAttribute('data-sg-cat', c); row.setAttribute('data-sg-enough', t.enough ? '1' : '0');
+            var l = el('div'); l.appendChild(el('div', 'n', SG_NAMES[c]));
+            if (t.enough) l.appendChild(el('div', 'c', sgCountText(c, t)));
+            row.appendChild(l);
+            if (t.enough) { row.appendChild(sgBar(t.perRound)); var v = el('div', 'v ' + sgCls(t.perRound), sgFmt(t.perRound)); v.setAttribute('data-sg-v', String(Math.round(t.perRound * 10) / 10)); row.appendChild(v); }
+            else row.appendChild(sgNotEnough(c, t));
+            card.appendChild(row);
+        });
+        if (o.cats.app.enough) {
+            var bandsShown = SG_BANDS.filter(function (b) { return o.bands[b[0]] && o.bands[b[0]].n; });
+            if (bandsShown.length) {
+                card.appendChild(el('div', 'sg-sub', 'Approach by distance'));
+                bandsShown.forEach(function (b) {
+                    var t = o.bands[b[0]], row = el('div', 'sg-row sg-band'); row.setAttribute('data-sg-band', b[0]);
+                    var l = el('div'); l.appendChild(el('div', null, b[1])); l.appendChild(el('div', 'c', t.n + ' shot' + (t.n === 1 ? '' : 's')));
+                    row.appendChild(l); row.appendChild(sgBar(t.perRound)); row.appendChild(el('div', 'v ' + sgCls(t.perRound), sgFmt(t.perRound)));
+                    card.appendChild(row);
+                });
+            }
+        }
+        box.appendChild(card);
+        var pr = sgPractice(o);
+        if (pr) {
+            var p = el('div', 'sg-practice'); p.setAttribute('data-sg-practice', pr.none ? 'none' : (pr.band || pr.cat));
+            p.appendChild(el('div', 't', '🎯 PRACTICE THIS'));
+            p.appendChild(el('div', 'b', pr.none ? 'Nothing is losing you shots against ' + sgBenchName(o.bench) + '. Try the next benchmark down.'
+                : pr.label + (opts.today ? ' cost you ' + Math.abs(Math.round(pr.perRound * 10) / 10).toFixed(1) + ' shots today (' + pr.n + ' ' + (pr.cat === 'ott' ? 'drive' : pr.cat === 'putt' ? 'putt' : 'shot') + (pr.n === 1 ? '' : 's') + ').'
+                    : ' costs you ' + Math.abs(Math.round(pr.perRound * 10) / 10).toFixed(1) + ' shots a round.')));
+            box.appendChild(p);
+        }
+        var foot = (o.missing.length && o.totalOf.length ? 'Total leaves out ' + o.missing.map(function (c) { return SG_NAMES[c]; }).join(', ') + ' until ' + (o.missing.length === 1 ? 'it has' : 'they have') + ' enough holes. ' : '')
+            + '+ = better than the benchmark. From scores, putts, first-putt length and your marked shots. Kept on this phone.';
+        var f = el('div', 'sg-foot', foot); f.setAttribute('data-sg-foot', '1');
+        box.appendChild(f);
+    }
+    // THE (i): what each category uses, and the benchmark - "estimated".
+    function sgInfo() {
+        var d = W.document, o = d.getElementById('hp-sg-info');
+        if (o) o.remove();
+        o = el('div'); o.id = 'hp-sg-info'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-label', 'How Strokes Gained works');
+        var st = el('style');
+        st.textContent = '#hp-sg-info{position:fixed;inset:0;z-index:2147483000;background:rgba(5,20,12,.5);display:flex;align-items:flex-end;justify-content:center;font:600 15px/1.4 -apple-system,system-ui,sans-serif;color:#1a1a1a;color-scheme:light;}'
+            + '#hp-sg-info>div{background:#fff;border-radius:20px 20px 0 0;padding:18px 18px calc(env(safe-area-inset-bottom) + 16px);width:100%;max-width:520px;max-height:88%;overflow-y:auto;box-sizing:border-box;}'
+            + '#hp-sg-info h3{margin:0 0 6px;font-size:19px;font-weight:800;}#hp-sg-info p{margin:8px 0;color:#333;font-weight:600;}#hp-sg-info b{color:#0f4c3a;}#hp-sg-info .src{color:#555;font-size:14px;}'
+            + '#hp-sg-info button{display:block;width:100%;min-height:50px;margin-top:12px;border-radius:14px;border:1px solid #c9d3cd;background:#fff;font:800 16px/1 -apple-system,system-ui,sans-serif;color:#1a1a1a;cursor:pointer;}';
+        o.appendChild(st);
+        var box = el('div');
+        box.appendChild(el('h3', null, 'How Strokes Gained works'));
+        box.appendChild(el('p', null, 'Every shot is compared with how many shots a Tour / plus player, a scratch, 10 or 20 handicap takes to hole out from the same spot. It starts on the one nearest your handicap (at or better); your own pick stays.'));
+        [['Off the tee', ' · hole length (card) → where the tee shot stopped (your Mark shot) + fairway hit / missed (score sheet). Par 4s and 5s.'],
+            ['Approach', ' · shots from more than 50 yds: start yards (your mark) → on the green: first-putt length; missed: your next mark.'],
+            ['Around the green', ' · shots from 50 yds in: your mark → first-putt length (or holed).'],
+            ['Putting', ' · first-putt length (one tap on the score sheet) + putts.']].forEach(function (x) {
+            var p = el('p'); p.appendChild(el('b', null, x[0])); p.appendChild(d.createTextNode(x[1])); box.appendChild(p);
+        });
+        var p2 = el('p'); p2.appendChild(d.createTextNode('A category shows ')); p2.appendChild(el('b', null, 'Not enough data')); p2.appendChild(d.createTextNode(' until it has 18 holes of what it needs. Shots no mark separates are left out, never guessed.'));
+        box.appendChild(p2);
+        var src = el('p', 'src', 'Benchmark: HardPan baseline (estimated) — our own curves, shaped on Mark Broadie’s published strokes-gained research. Tour / plus sits on his published Tour values; Scratch adds a small margin; 10 and 20 add more per shot. Not an official table. Kept on this phone.');
+        src.setAttribute('data-sg-source', '1');
+        box.appendChild(src);
+        var ok = el('button', null, 'Got it'); ok.type = 'button'; ok.onclick = function () { o.remove(); };
+        box.appendChild(ok);
+        o.appendChild(box);
+        o.onclick = function (e) { if (e.target === o) o.remove(); };
+        d.body.appendChild(o);
+        return o;
+    }
+    function sgStyle() {
+        var d = W.document;
+        if (d.getElementById('hp-sg-style')) return;
+        var st = el('style'); st.id = 'hp-sg-style'; st.textContent = SG_CSS;
+        (d.head || d.body).appendChild(st);
+    }
+    // MY STATS: the section, with its own window (Last round / 10 / 20) and benchmark picker.
+    function sgMySection(box, rerender) {
+        sgStyle();
+        var last = sgLastNow(), bench = sgBenchNow(), rounds = sgRounds().filter(function (r) { return Object.keys(r.snap || {}).some(function (n) { return r.snap[n].s > 0; }); }).slice(0, last);
+        var o = sgSummary(rounds, bench);
+        sgDraw(box, o, { bench: bench, last: last, today: last === 1,
+            onBench: function (h) { sgSetBench(h); rerender(); },
+            onLast: function (n) { try { W.localStorage.setItem(SG_LAST_KEY, String(n)); } catch (e) {} rerender(); } });
+        return o;
+    }
+    // THE AFTER-ROUND CARD: this round's strokes gained, over whatever is on screen, at the end
+    // of the last hole (the score sheet's Save). Done goes on to what came next (Settle up).
+    function sgRoundCard(code, then) {
+        var d = W.document, r = sgRounds().filter(function (x) { return String(x.code) === String(code); })[0];
+        if (!r) return false;
+        var o0 = sgSummary([r], sgBenchNow());
+        // Nothing to say (no putts, no marks): straight on.
+        if (!SG_CATS.some(function (c) { return o0.cats[c].holes > 0 && o0.cats[c].n > 0; })) return false;
+        sgStyle();
+        var wrap = d.getElementById('hp-sg-card');
+        if (wrap) wrap.remove();
+        wrap = el('div'); wrap.id = 'hp-sg-card'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Strokes Gained, this round');
+        var st = el('style');
+        st.textContent = '#hp-sg-card{position:fixed;inset:0;z-index:2147482600;background:rgba(5,20,12,.55);display:flex;align-items:flex-end;justify-content:center;color-scheme:light;}'
+            + '#hp-sg-card>.box{background:#f0f4f2;border-radius:20px 20px 0 0;padding:16px 16px calc(env(safe-area-inset-bottom) + 16px);width:100%;max-width:520px;max-height:92%;overflow-y:auto;box-sizing:border-box;font:600 15px/1.35 -apple-system,system-ui,sans-serif;color:#1a1a1a;}'
+            + '#hp-sg-card .rt{font-size:19px;font-weight:800;color:#13241d;}#hp-sg-card .rs{font-size:14px;color:#555;margin-top:2px;}'
+            + '#hp-sg-card .btn{display:block;width:100%;min-height:52px;margin-top:10px;border-radius:14px;font:800 17px/1 -apple-system,system-ui,sans-serif;cursor:pointer;}'
+            + '#hp-sg-card .btn.go{border:0;background:#0f4c3a;color:#fff;}#hp-sg-card .btn.done{border:1px solid #c9d3cd;background:#fff;color:#1a1a1a;}';
+        wrap.appendChild(st);
+        var box = el('div', 'box');
+        var strokes = 0, par = 0, holes = 0;
+        Object.keys(r.snap || {}).forEach(function (n) { var x = r.snap[n]; if (x && x.s > 0) { strokes += x.s; par += Number(x.par) || 0; holes++; } });
+        var tp = strokes - par;
+        box.appendChild(el('div', 'rt', 'Round done · ' + (r.course || 'This round') + ' · ' + strokes + ' (' + (tp > 0 ? '+' + tp : tp === 0 ? 'E' : tp) + ')'));
+        box.appendChild(el('div', 'rs', 'Strokes Gained, this round' + (holes < 18 ? ' · ' + holes + ' holes' : '')));
+        var sec = el('div');
+        box.appendChild(sec);
+        var draw = function () { sgDraw(sec, sgSummary([r], sgBenchNow()), { bench: sgBenchNow(), today: true, onBench: function (h) { sgSetBench(h); draw(); } }); };
+        draw();
+        var more = el('button', 'btn go', 'See last 10 rounds'); more.type = 'button'; more.setAttribute('data-sg-more', '1');
+        var done = el('button', 'btn done', 'Done'); done.type = 'button'; done.setAttribute('data-sg-done', '1');
+        var finish = function () { wrap.remove(); if (typeof then === 'function') { try { then(); } catch (e) {} } };
+        more.onclick = function () { try { W.localStorage.setItem(SG_LAST_KEY, '10'); } catch (e) {} wrap.remove(); openMy(); };
+        done.onclick = finish;
+        box.appendChild(more); box.appendChild(done);
+        wrap.appendChild(box);
+        d.body.appendChild(wrap);
+        return true;
+    }
+
     function setTrackOthers(v) { setOthers(!!v); if (ssIsOpen()) ssRender(); return othersOn(); }
     function trackShown() {
         try {
@@ -1139,5 +1631,8 @@
         // The score sheet (012).
         // URGENT-047 C: caddie notes per course hole (this phone only; no location).
         caddie: { key: CADDIE_KEY, max: CADDIE_MAX, get: caddieGet, line: caddieLine, set: caddieSet },
+        // 052 C: Strokes Gained (lite) - the engine (pure), the marks store (distances only), the views.
+        sg: { expected: sgExpected, hole: sgHole, roundHoles: sgRoundHoles, summary: sgSummary, practice: sgPractice, mark: sgMark, setYards: sgSetYards, load: sgLoad, rounds: sgRounds,
+            bench: sgBenchNow, setBench: sgSetBench, benchFor: sgBenchFor, hcpNum: sgHcpNum, myHcp: sgMyHcp, benches: SG_BENCHES, last: sgLastNow, fpChips: SG_FP_CHIPS, fpFeet: SG_FP, bands: SG_BANDS, min: SG_MIN, roundCard: sgRoundCard, info: sgInfo, key: SGKEY },
         sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? (ss.ctx.home != null ? ss.ctx.home : ss.ctx.hole) : null; }, shownHole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, go: function (h) { return ssGoto(h); }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
 })();
