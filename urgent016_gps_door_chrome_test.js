@@ -6,7 +6,7 @@
 //   2  NEAR YOU with a course already picked (the closest, Dobson): the picked course on top,
 //      highlighted, and 6+ nearby courses right under it (distance, ✓ GPS); a tap on one switches
 //      the course in place.
-//   3  Location denied: YOUR COURSES (this phone's own) instead of an empty list.
+//   3  Location denied: LAST PLAYED (this phone's own; URGENT-060: 1 course, was YOUR COURSES) instead of an empty list.
 //   4  Games & Bets: Round Setup's own lobby page (admin.html?start=lobby), drawn since polish #29
 //      (option B) as Home-style door cards - "‹ Home", Game Day / Road Trip - over the same lobby
 //      functions; no 3-step screen, no session mark (features.simpleGames off). Game Day still opens
@@ -40,19 +40,19 @@ const J = (r) => r.value.filter((v) => typeof v === 'string' && v.charAt(0) === 
 const HERE = [{ cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.3759, longitude: -111.8778, accuracy: 10 } } },
     { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } }];
 const STEP1 = "JSON.stringify({ text: (document.getElementById('sf') || {}).innerText || '', key: document.getElementById('course-select').value,"
-    + " head: (document.querySelector('#sf-course') || {}).innerText || '', headSel: !!document.querySelector('#sf-course.sf-sel'),"
+    + " head: (document.querySelector('#sf-course') || {}).innerText || '', headSel: !!document.querySelector('#sf-course.sf-sel'), sel: (document.querySelector('#sf .sf-row.sf-sel') || {}).innerText || '',"
     + " near: Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function (b) { return b.innerText.replace(/\\n/g, ' | '); }),"
     + " order: (function(){ var t = (document.getElementById('sf') || {}).innerText || ''; return [t.indexOf('NEAR YOU'), t.indexOf('TEES')]; })() })";
 
 describe('URGENT-016: the GPS door', () => {
-    test('GPS: Home -> "Where are you playing?" with no frame of the old lobby; NEAR YOU (6+) under the picked course; a tap switches it', { timeout: 120000 }, async () => {
+    test('GPS: Home -> "Where are you playing?" with no frame of the old lobby; NEAR YOU (the 3 closest, the picked one first, "You\'re here") above its tees; a tap switches it', { timeout: 120000 }, async () => {
         const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE + FRAMES, steps: [
             ...HERE,
             { tap: '[data-hp-act="sgpsdoor"]' },
             { waitFor: "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-tee]') && document.querySelectorAll('#sf [data-sf-course]').length > 0", timeout: 30000 }, { sleep: 800 },
             X(STEP1),
             X("JSON.stringify({ frames: JSON.parse(sessionStorage.getItem('u16_frames') || '{}'), cover: document.documentElement.classList.contains('sf-pre') })"),
-            { tap: '#sf [data-sf-course]', nth: 0 }, { sleep: 1200 }, X(STEP1)] });
+            { tap: '#sf [data-sf-course]', nth: 1 }, { sleep: 1200 }, X(STEP1)] });
         assert.equal(r.ok, true, r.reason);
         const [s1, fr, after] = J(r);
         assert.match(s1.text, /^‹\nGPS\nWhere are you playing\?/);
@@ -61,33 +61,33 @@ describe('URGENT-016: the GPS door', () => {
         assert.equal(fr.frames.start.lobby, 0, 'the old lobby flashed on the code-minting hop: ' + JSON.stringify(fr.frames));
         assert.equal(fr.frames.game.lobby, 0, 'the old lobby flashed on the round page: ' + JSON.stringify(fr.frames));
         assert.equal(fr.cover, false, 'the cover is lifted once the screen is up');
-        // the picked course on top, highlighted; its TEES right under it, then NEAR YOU (polish 029 #11,
-        // Manny: the tees sat under 8 NEAR YOU rows, below the fold); 6+ others
+        // URGENT-060 (was polish 029 #11 / 6+ rows): NEAR YOU is the 3 closest only - the course he is at
+        // first, picked and highlighted, "You're here" - then its TEES (no longer list, so they stay up top)
         assert.equal(s1.key, 'gca_zgkynkan');
-        assert.match(s1.head, /Dobson Ranch Golf Course\n0\.0 mi · (✓ GPS · )?Change/);   // ✓ GPS = what the map draws (URGENT-022)
-        assert.equal(s1.headSel, true);
-        assert.ok(s1.order[1] > 0 && s1.order[1] < s1.order[0], 'polish #11: the TEES sit under the picked course, above NEAR YOU: ' + JSON.stringify(s1.order));
-        assert.ok(s1.near.length >= 6, 'at least 6 nearby courses: ' + JSON.stringify(s1.near));
-        assert.ok(s1.near.every((t) => !/^Dobson Ranch Golf Course \|/.test(t)), 'the picked course is not repeated in the list');
+        assert.match(s1.near[0], /^Dobson Ranch Golf Course \| You’re here · 0\.0 mi( · ✓ GPS)?$/);   // ✓ GPS = what the map draws (URGENT-022)
+        assert.match(s1.sel, /^Dobson Ranch Golf Course\n/, 'the picked course is its highlighted row');
+        assert.equal(s1.head, '', 'not repeated as a second card');
+        assert.ok(s1.order[0] > 0 && s1.order[0] < s1.order[1], 'URGENT-060: NEAR YOU, then the TEES: ' + JSON.stringify(s1.order));
+        assert.equal(s1.near.length, 3, 'the 3 closest only: ' + JSON.stringify(s1.near));
         assert.ok(s1.near.every((t) => / mi/.test(t)), 'each row shows its distance: ' + JSON.stringify(s1.near));
         // (✓ GPS badges: only what the map draws - the course check covers them on the phone's rules.)
         // a tap on a nearby course switches it in place
         assert.notEqual(after.key, 'gca_zgkynkan', 'the tap switched the course');
-        assert.equal(after.head.split('\n')[0], s1.near[0].split(' | ')[0]);
-        assert.ok(after.near.some((t) => /^Dobson Ranch Golf Course \|/.test(t)), 'Dobson is back in the list');
+        assert.equal(after.sel.split('\n')[0], s1.near[1].split(' | ')[0]);
+        assert.ok(/^Dobson Ranch Golf Course \| You’re here/.test(after.near[0]), 'Dobson stays first, "You\'re here", not picked');
     });
 
-    test('GPS, location denied: YOUR COURSES (this phone\'s own) instead of an empty list', { timeout: 90000 }, async () => {
+    test('GPS, location denied: LAST PLAYED (this phone\'s own, URGENT-060: 1 course) instead of an empty list', { timeout: 90000 }, async () => {
         const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 },
             preScript: BASE + "try{localStorage.setItem('hardpan_last_tee_gca_zgkynkan','White');}catch(e){}", steps: [
                 { cdp: { method: 'Browser.setPermission', params: { permission: { name: 'geolocation' }, setting: 'denied' } } },
                 { tap: '[data-hp-act="sgpsdoor"]' },
-                { waitFor: "/game=/.test(location.search) && /YOUR COURSES|Couldn.t get your location/.test(((document.getElementById('sf') || {}).innerText || ''))", timeout: 40000 }, { sleep: 500 },
+                { waitFor: "/game=/.test(location.search) && /LAST PLAYED|Couldn.t get your location/.test(((document.getElementById('sf') || {}).innerText || ''))", timeout: 40000 }, { sleep: 500 },
                 X(STEP1)] });
         assert.equal(r.ok, true, r.reason);
         const [s1] = J(r);
         assert.match(s1.text, /NEAR YOU\nLocation is off for this page/);
-        assert.match(s1.text, /YOUR COURSES\nDobson Ranch Golf Course/);
+        assert.match(s1.text, /LAST PLAYED\nDobson Ranch Golf Course\n/);
     });
 
     test('Games & Bets: Round Setup\'s lobby page as door cards (polish #29) - Game Day / Road Trip, no 3-step screen', { timeout: 90000 }, async () => {

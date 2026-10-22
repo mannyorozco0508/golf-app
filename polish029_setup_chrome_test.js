@@ -30,7 +30,8 @@ const PAPAGO = { name: 'Papago Golf Club', data: PAP,
     tees: { male: [TEE('Black', 7419, 75.0, 130), TEE('Black/Blue', 7125, 73.2, 127), TEE('Blue', 6884, 72.0, 125), TEE('Blue/White', 6662, 71.0, 123),
                    TEE('White', 6475, 70.1, 120), TEE('White/Green', 6074, 68.2, 117), TEE('Green', 5830, 66.9, 115), TEE('Gold', 5435, 65.0, 111)] },
     location: { city: 'Phoenix', state: 'AZ', latitude: 33.4560, longitude: -111.9480 } };
-const HERE = { latitude: 33.4560, longitude: -111.9480, accuracy: 10 };
+// URGENT-060: the golfer ON Papago (its course point) - only within ~0.5 mi is a course auto-picked.
+const HERE = { latitude: 33.4578, longitude: -111.9603, accuracy: 10 };
 const GEO = "try{ navigator.geolocation.getCurrentPosition = function (ok) { setTimeout(function(){ ok({ coords: " + JSON.stringify(HERE) + " }); }, 50); }; }catch(e){}";
 // NO SIGNAL, as the phone reports it: navigator.onLine false while localStorage u29off = 1, and the
 // code check (code-issuer.js) times out the way it does with no socket.
@@ -98,9 +99,10 @@ test('#5 #11 #35 #1: the GPS door with no signal stays on Course & Tees; the mid
     assert.deepEqual(s.resume.map((r) => r.split(' ')[0]), ['TC47A7'], 'each unfinished round once, no finished round: ' + JSON.stringify(s.resume));
     assert.match(s.resume[0], /^TC47A7 Dobson Ranch \| Thru 7 · 2 waiting/);
     assert.match(s.btn, /^Start Round/);
-    // #11: TEES right under the picked course, above NEAR YOU; the middle tee, not the tips.
+    // URGENT-060 (was #11: TEES above NEAR YOU): NEAR YOU (the 3 closest, the picked course its first row),
+    // then the picked course's TEES; the middle tee, not the tips.
     const ti = s.text.indexOf('TEES'), ni = s.text.indexOf('NEAR YOU'), ci = s.text.indexOf('Papago Golf Club');
-    assert.ok(ci >= 0 && ci < ti && ti < ni, 'course, then TEES, then NEAR YOU: ' + [ci, ti, ni]);
+    assert.ok(ni >= 0 && ni < ci && ci < ti, 'NEAR YOU, then the course, then TEES: ' + [ni, ci, ti]);
     assert.equal(await ev(j, TEE_ON), 'White');
     // #35
     assert.deepEqual(s.chips, ['Hole 1', 'Hole 10', 'Shotgun']);

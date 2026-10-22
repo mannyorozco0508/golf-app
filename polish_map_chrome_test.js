@@ -234,8 +234,9 @@ test('#13 #22 Course & Tees: a solid band under the status bar; the picked cours
     await j.evaluate("document.querySelector('[data-hp-act=\"sgpsdoor\"]').click()");
     assert.ok(await until(j, "/admin\\.html/.test(location.pathname) && !!document.getElementById('sf')", 30000), 'Course & Tees');
     if (!(await until(j, "document.getElementById('course-select') && document.getElementById('course-select').value === 'az_papago'", 6000))) await j.evaluate("(function(){var b=document.querySelector('#sf [data-sf-course=\"az_papago\"]'); if(b) b.click(); return 1;})()");
-    assert.ok(await until(j, "!!document.querySelector('#sf #sf-course') && !!document.querySelector('#sf [data-sf-tee]')", 15000), 'Papago picked, its tees');
-    const name = await j.evaluate("document.querySelector('#sf #sf-course .n').textContent");
+    // URGENT-060: the picked course is its highlighted NEAR YOU row (the card only for a course from search).
+    assert.ok(await until(j, "!!document.querySelector('#sf #sf-course, #sf .sf-row.sf-sel') && !!document.querySelector('#sf [data-sf-tee]')", 15000), 'Papago picked, its tees');
+    const name = await j.evaluate("document.querySelector('#sf #sf-course .n, #sf .sf-row.sf-sel .n').textContent");
     assert.equal(name, 'Papago Golf Club', 'no repeated "(Papago)"');
     const band = JSON.parse(await j.evaluate("JSON.stringify({ h: getComputedStyle(document.getElementById('sf'), '::before').height, bg: getComputedStyle(document.getElementById('sf'), '::before').backgroundColor, pos: getComputedStyle(document.getElementById('sf'), '::before').position })"));
     if (safe) assert.equal(band.h, TOP + 'px', JSON.stringify(band));

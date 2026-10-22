@@ -271,6 +271,54 @@
     function nameOf(c) { var H = HD(); return dropRepeat(typeof H.shownName === 'function' ? H.shownName(c.name) : c.name); }
     function readyOf(key) { var c = HC(); try { return !!(c && key && c.resolve(key).hasGps); } catch (e) { return false; } }
     function distTo(c) { var H = HD(); return S.here && c.pt && typeof H.miles === 'function' ? H.miles(S.here, c.pt) : null; }
+    // URGENT-060: THE COURSE HE IS AT - within HERE_MI of him (a GPS-ready one there first on the GPS
+    // door, URGENT-019), else none. NEAR YOU is the 3 closest, that course first. "At" a course is
+    // measured to the nearest of its listed point AND its holes' tees / greens (the resolver's GPS
+    // record, the one the map draws; the nearest first when two are close - a 27-hole club, twins): a course's point is ONE spot (often hole 1's tee), and a golfer
+    // on the far side of a big course (Papago, Thistle) is more than 0.5 mi from it while on the course.
+    // The distance shown on each row is unchanged (to the course's point).
+    var HERE_MI = 0.5, NEAR_SHOWN = 3, atMemo = {};
+    function atMi(x) {
+        var H = HD(), c = HC(), d = x.d;
+        if (d == null || d > 3 || !S.here || typeof H.miles !== 'function') return d;
+        var mk = x.c.key + '|' + S.here[0] + ',' + S.here[1];
+        if (atMemo[mk] != null) return atMemo[mk];
+        var best = d, holes = 0;
+        try {
+            var rec = c && c.gps ? c.gps(x.c.key, x.c.name, x.c.pt || null) : null, hs = (rec && rec.holes) || {};
+            Object.keys(hs).forEach(function (n) {
+                var h = hs[n] && (hs[n].osm || hs[n]);
+                if (!h) return;
+                holes++;
+                [h.tee, h.mid, h.green && h.green[0]].forEach(function (pt) {
+                    if (Array.isArray(pt) && isFinite(pt[0]) && isFinite(pt[1])) { var m = H.miles(S.here, pt); if (m < best) best = m; }
+                });
+            });
+        } catch (e) {}
+        // (a course whose GPS data is not in yet - the GolfAPI file still loading - is measured again once it is)
+        if (holes) atMemo[mk] = best;
+        return best;
+    }
+    function autoHere() {
+        if (!S.auto || !Array.isArray(S.near)) return;
+        if (courseKey() || courseName()) { S.auto = false; return; }
+        var at = hereOf(S.near);
+        if (!at) return;
+        S.auto = false;
+        pick(at.c.key, at.c.name); if (S.mode === 'gps') lookup(at.c.key, at.c.name);
+    }
+    function hereOf(near) {
+        if (!Array.isArray(near)) return null;
+        var at = near.map(function (x) { return { x: x, m: atMi(x) }; }).filter(function (y) { return y.m != null && y.m <= HERE_MI; })
+            .sort(function (a, b) { return a.m - b.m; }).map(function (y) { return y.x; });
+        if (!at.length) return null;
+        return (S.mode === 'gps' ? at.filter(function (x) { return x.c.ready; })[0] : null) || at[0];
+    }
+    function nearShown(near) {
+        if (!Array.isArray(near)) return [];
+        var at = hereOf(near);
+        return (at ? [at] : []).concat(near.filter(function (x) { return !at || x.c.key !== at.c.key; })).slice(0, NEAR_SHOWN);
+    }
     function miStr(d) { return d == null ? '' : (d < 10 ? d.toFixed(1) : Math.round(d)) + ' mi'; }
     function locate() {
         var H = HD();
@@ -285,9 +333,11 @@
                 // THE COURSE YOU ARE AT (URGENT-019): the closest one - a GPS-ready one only when it is that
                 // same spot (within a mile of the closest), never a GPS course across town over the one
                 // you are standing on (on the phone, ✓ GPS is only the app's GolfAPI courses).
-                var c0 = S.near[0], cand = c0 ? S.near.filter(function (x) { return x.c.ready && x.d - c0.d <= 1; }).concat(S.near) : S.near;
-                if (S.mode !== 'gps') cand = S.near;
-                if (!courseKey() && !courseName() && cand.length) { pick(cand[0].c.key, cand[0].c.name); if (S.mode === 'gps') lookup(cand[0].c.key, cand[0].c.name); }
+                // URGENT-060 (Manny, 5:25 PM): auto-picked ONLY when he is at it (within ~0.5 mi) - "You're here".
+                // Farther than that from every course, nothing is picked (a course picked before stays).
+                // (its holes may land after the position: autoHere() on each redraw picks it then, once)
+                S.auto = !courseKey() && !courseName();
+                autoHere();
                 if (S.step === 1) render();
             });
         });
@@ -739,6 +789,7 @@
     }
     function step1() {
         locate();
+        autoHere();
         var all = S.gpsFiles ? courses() : [], q = S.q.toLowerCase(), key = courseKey();
         var body = (S.offline ? offlineBox() : '') + '<input type="search" class="sf-search" id="sf-q" placeholder="🔍 Search courses" value="' + esc(S.q) + '" autocomplete="off" style="margin-bottom:12px;">';
         if (q.length >= 2) {
@@ -753,33 +804,37 @@
         }
         // URGENT-028: a tapped online course still loading IS the selected card (never the one before it).
         var pend = pendBusy() ? S.pend : null, pendOld = pend && pend.state !== 'card';
-        if (pendOld) body += pendHead(pend);
-        // POLISH 029 #11: the TEES (and the start) sit right under the picked course, above NEAR YOU.
-        else if (!S.changing) body += courseHead() + lookupBox(key, courseName()) + courseCard() + (S.mode === 'gps' && key ? '<div id="sf-offline-slot"></div>' : '');
-        // NEAR YOU, ALWAYS (URGENT-016: with a course already picked the list was gone - only the
-        // course and "Change"). The picked course is the card above; the list under it is the
-        // others, closest first; a tap switches the course and its tees redraw in place.
-        if (q.length < 2) {
-            var yours = function () {
-                var rec = recentCourses().filter(function (c) { return c.key !== key; });
-                return rec.length ? '<div class="sf-h">YOUR COURSES</div>' + rec.map(function (c) { return rowHtml(c, null, false); }).join('') : '';
+        // THE PICKED COURSE'S TEES (POLISH 029 #11: the tees and the start right under the course).
+        var picked = function (head) { return pendOld ? pendHead(pend) : S.changing ? '' : (head ? courseHead() : '') + lookupBox(key, courseName()) + courseCard() + (S.mode === 'gps' && key ? '<div id="sf-offline-slot"></div>' : ''); };
+        if (q.length >= 2) body += picked(true);
+        else {
+            // URGENT-060 (Manny, 5:25 PM): SHORTER. Under the search: NEAR YOU = the 3 closest only (the
+            // course he is at first, picked, "You're here"), LAST PLAYED = 1 course (none when it is one of
+            // the 3), then the picked course's tees and Start Round. The rest comes from search. The picked
+            // course is its highlighted row; only a course picked from search (in neither list) keeps its card.
+            var shown = {}, rows = '';
+            var lastRow = function () {
+                var last = recentCourses()[0];
+                if (!last || shown[last.key]) return '';
+                shown[last.key] = 1;
+                return '<div class="sf-h">LAST PLAYED</div>' + rowHtml(last, distTo(last), last.key === key);
             };
-            body += '<div class="sf-h">NEAR YOU</div>';
-            if (S.near === 'asking' || S.near === null) body += '<div class="sf-note" style="margin-bottom:10px;">Finding courses near you…</div>';
+            rows += '<div class="sf-h">NEAR YOU</div>';
+            if (S.near === 'asking' || S.near === null) rows += '<div class="sf-note" style="margin-bottom:10px;">Finding courses near you…</div>';
             else if (S.near === 'none') {
-                // NO POSITION (location denied, or it never answered): say which, offer a retry, and
-                // list this phone's own courses instead of nothing.
+                // NO POSITION (location denied, or it never answered): say which, offer a retry.
                 var nat = false; try { nat = !!(W.Capacitor && W.Capacitor.isNativePlatform && W.Capacitor.isNativePlatform()); } catch (e) {}
-                body += '<div class="sf-note" style="margin-bottom:10px;">' + (S.nearWhy === 'denied' ? (nat ? 'Location is off for HardPan. To see courses near you, turn it on in Settings \u203a HardPan \u203a Location, or search above.'
+                rows += '<div class="sf-note" style="margin-bottom:10px;">' + (S.nearWhy === 'denied' ? (nat ? 'Location is off for HardPan. To see courses near you, turn it on in Settings \u203a HardPan \u203a Location, or search above.'
                     : 'Location is off for this page. To see courses near you, allow it (Safari: aA \u203a Website Settings \u203a Location), or search above.')
                     : 'Couldn\u2019t get your location yet. Search above, or try again.') + ' <button type="button" class="sf-link" data-sf="relocate" style="padding:0 0 0 4px;min-height:0;">Try again</button></div>';
-                body += yours();
             }
             else {
-                var others = S.near.filter(function (x) { return x.c.key !== key; }).slice(0, 8);
-                if (!others.length) body += '<div class="sf-note" style="margin-bottom:10px;">No other courses we know of nearby — search above.</div>' + yours();
-                else body += others.map(function (x) { return rowHtml(x.c, x.d, false); }).join('');
+                var top = nearShown(S.near), at = hereOf(S.near);
+                if (!top.length) rows += '<div class="sf-note" style="margin-bottom:10px;">No courses we know of nearby — search above.</div>';
+                else rows += top.map(function (x) { shown[x.c.key] = 1; return rowHtml(x.c, x.d, x.c.key === key, at && x.c.key === at.c.key); }).join('');
             }
+            rows += lastRow();
+            body += rows + picked(!pendOld && key && !shown[key] || (!key && !!courseName()));
         }
         if (q.length < 2) body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Add a course ›</button>';
         var ok = courseName() && !pend ? '' : ' disabled';
@@ -806,9 +861,9 @@
         Object.keys(W.localStorage || {}).forEach(function (k) { if (k.indexOf(TEE_MEM) === 0) add(k.slice(TEE_MEM.length), ''); });
         return out.slice(0, 6);
     }
-    function rowHtml(c, d, on) {
-        return '<button type="button" class="sf-row' + (on ? ' sf-sel' : '') + '" data-sf-course="' + esc(c.key) + '" data-sf-name="' + esc(c.name) + '"><span class="n">' + esc(nameOf(c)) + '</span>'
-            + '<span class="s">' + esc(miStr(d)) + (c.ready ? (d != null ? ' · ' : '') + '✓ GPS' : (!hasCard(c.key) && liveOn() ? (d != null ? ' · ' : '') + 'Tap to load' : '')) + '</span></button>';
+    function rowHtml(c, d, on, here) {
+        return '<button type="button" class="sf-row' + (on ? ' sf-sel' : '') + '" data-sf-course="' + esc(c.key) + '" data-sf-name="' + esc(c.name) + '"' + (here ? ' data-sf-here="1"' : '') + '><span class="n">' + esc(nameOf(c)) + '</span>'
+            + '<span class="s">' + (here ? '<span class="sf-here" style="font-weight:800;color:#0f4c3a;">You\u2019re here</span> · ' : '') + esc(miStr(d)) + (c.ready ? (d != null ? ' · ' : '') + '✓ GPS' : (!hasCard(c.key) && liveOn() ? (d != null ? ' · ' : '') + 'Tap to load' : '')) + '</span></button>';
     }
 
     // ---- STEP 2: PLAYERS ----------------------------------------------------------

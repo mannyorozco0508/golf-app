@@ -83,7 +83,7 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         assert.equal(s1.h1, 'Where are you playing?');
         assert.match(s1.text, /^‹\nGames & Bets/);
         // URGENT-022: ✓ GPS only when the map would draw it (here: the web's settings, no GPS data) - one rule.
-        assert.match(s1.text, /Dobson Ranch Golf Course\n0\.0 mi · (✓ GPS · )?Change/, 'the closest course, picked');
+        assert.match(s1.text, /NEAR YOU\nDobson Ranch Golf Course\nYou’re here · 0\.0 mi( · ✓ GPS)?\n/, 'the closest course, picked (URGENT-060: first in NEAR YOU, "You\u2019re here")');
         // URGENT-013: the tee NAMES (the first look showed the gender: Men, Men, Men, Men, Women, Women),
         // Men/Women small, yards, rating / slope; the women's White and Red (same yards) not repeated.
         // (polish 029 #11: the first-time tee is a middle one - White here - not the tips.)
