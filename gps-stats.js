@@ -660,8 +660,8 @@
     // URGENT-005: the stats rows are for the golfer this phone IS (ctx.own - index.html qsOwnId), not
     // whoever's chip is picked; nobody's when the phone is nobody; everyone's with Track stats for others.
     // URGENT-034: the golfer this phone IS (the same rule as the stats rows). They never auto-advance.
-    function ssIsOwn(pid) { var c = ss.ctx; var me = ('own' in c) ? c.own : c.pick; return me != null && String(pid) === String(me); }
-    function ssStatsFor(pid) { var c = ss.ctx; var me = ('own' in c) ? c.own : c.pick; return !!(c.stats && !practiceOn(c.code) && ((me != null && String(pid) === String(me)) || othersOn())); }
+    function ssIsOwn(pid) { var c = ss && ss.ctx; if (!c) return false; var me = ('own' in c) ? c.own : c.pick; return me != null && String(pid) === String(me); }
+    function ssStatsFor(pid) { var c = ss && ss.ctx; if (!c) return false; var me = ('own' in c) ? c.own : c.pick; return !!(c.stats && !practiceOn(c.code) && ((me != null && String(pid) === String(me)) || othersOn())); }
     function ssCell(pid) { var c = ss.ctx; return qHole(c.code, pid, c.hole, ssStrokes(pid), c.par); }
     function ssIsOpen() { return !!(ss && ss.wrap && ss.wrap.style.display !== 'none'); }
     function ssClose() { if (ss && ss.wrap) { ss.wrap.style.display = 'none'; ss.wrap.querySelector('.hp-ss').style.transform = ''; } if (ss) { ss.pend = {}; ss.ctx = null; } }
@@ -898,6 +898,8 @@
             // other way (the backdrop, a swipe, a hole change, the bar tapped again) lost them all.
             // ssKeepOne also works the GIR out again for a record that already holds this hole.
             ssKeepOne(pid);
+            // int-061: the save can close the sheet under us (the round moves on to another hole): nothing more to do.
+            if (!ss || !ss.ctx) return;
             if (ss.more && ssGrid(c.par).indexOf(n) === -1) ss.more = false;
             // POLISH #34: on to the next golfer with no score on this hole - once this golfer's own
             // stats rows (when shown) have their putts too, so a golfer's putts are never skipped.
@@ -913,6 +915,7 @@
             else if (k === 'fp') patch.fp = cell.fp === v ? null : v;   // 052 C: a chip id; tap again = cleared
             else { var nv = Number(v); patch[k] = cell[k] === nv ? null : nv; }
             qSet(c, pid, c.hole, patch, ssStrokes(pid), c.par);
+            if (!ss || !ss.ctx) return;   // int-061: closed meanwhile (a fast double tap, a hole change)
             // POLISH #34: score and putts in - the next golfer with no score (other stats: tap back).
             // URGENT-034: never the phone's own golfer (Tee shot, Green in reg, Bunker, Penalties still to come).
             if (k === 'putts' && patch.putts != null && ssStrokes(pid) > 0 && !ssIsOwn(pid)) ssAdvance(pid);
