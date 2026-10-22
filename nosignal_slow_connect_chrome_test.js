@@ -29,7 +29,8 @@ const TEE = (name, y, r, sl) => ({ name, rating: r, slope: sl, parTotal: 73, tot
 const PAPAGO = { name: 'Papago Golf Club', data: PAP,
     tees: { male: [TEE('Black', 7419, 75.0, 130), TEE('Blue', 6884, 72.0, 125), TEE('White', 6475, 70.1, 120), TEE('Gold', 5435, 65.0, 111)] },
     location: { city: 'Phoenix', state: 'AZ', latitude: 33.4560, longitude: -111.9480 } };
-const HERE = { latitude: 33.4560, longitude: -111.9480, accuracy: 10 };
+// URGENT-060: the golfer ON Papago (its course point) - only within ~0.5 mi is a course auto-picked.
+const HERE = { latitude: 33.4578, longitude: -111.9603, accuracy: 10 };
 const GEO = "try{ navigator.geolocation.getCurrentPosition = function (ok) { setTimeout(function(){ ok({ coords: " + JSON.stringify(HERE) + " }); }, 50); }; }catch(e){}";
 // A SLOW FIRST CONNECTION on the GPS door's code-minting page (admin.html?start=quick) only: every
 // read waits until SLOW ms after the page started, and .info/connected says false until then (as the

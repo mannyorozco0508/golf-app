@@ -36,10 +36,11 @@ const SF = "JSON.stringify({ key: document.getElementById('course-select').value
 const open = (answer, more) => arriveCold({ url: fileUrl('admin.html', 'start=quick'), db: { events: {}, global_courses: {}, trips: {}, tournaments: {}, organizers: {} }, settleMs: 2500, viewport: { width: 393, height: 852 },
     preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + LIVE(answer) + "try{sessionStorage.setItem('hardpan_simple_flow','gps');}catch(e){}"
         + "if (/admin\\.html$/.test(location.pathname)) document.addEventListener('DOMContentLoaded', function () { var s = document.createElement('script'); s.src = 'gps-live.js'; document.head.appendChild(s); });", steps: [
-        { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.4560, longitude: -111.9480, accuracy: 10 } } },
+        // URGENT-060: the golfer ON Papago (its course point) - only within ~0.5 mi is a course auto-picked.
+        { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.4578, longitude: -111.9603, accuracy: 10 } } },
         { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
         { sleep: 2500 }, X("(function(){ var b=document.querySelector('[data-sf=relocate]'); if(b) b.click(); return 'relocate'; })()"),
-        { waitFor: "/Papago/.test((document.getElementById('sf-course')||{}).innerText||'')", timeout: 40000 }, { sleep: 300 }, X(SF)].concat(more) });
+        { waitFor: "/Papago/.test((document.querySelector('#sf-course, #sf .sf-row.sf-sel')||{}).innerText||'')", timeout: 40000 }, { sleep: 300 }, X(SF)].concat(more) });
 const J = (r) => r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
 
 test('found online: "Getting Papago\'s scorecard…", then its tees, and Start GPS starts the round - no typing', { timeout: 120000 }, async () => {

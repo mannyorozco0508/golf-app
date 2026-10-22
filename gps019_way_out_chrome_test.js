@@ -72,7 +72,11 @@ test('no scores: GPS "‹" -> Course & Tees for a new round -> Dobson -> Start G
     assert.notEqual(s1.code, 'TSNONE');
     // Dobson: picked already (the closest GPS course with a card here) or one tap in the list.
     if (!(await ev(j, "document.getElementById('course-select').value === 'gca_zgkynkan'"))) {
-        assert.ok(s1.rows.includes('gca_zgkynkan'), 'Dobson in NEAR YOU: ' + JSON.stringify(s1.rows));
+        // URGENT-060: NEAR YOU is the 3 closest only - Dobson (12 mi from Talking Stick) comes from search.
+        if (!s1.rows.includes('gca_zgkynkan')) {
+            await ev(j, "(function(){ var i=document.getElementById('sf-q'); i.value='dobson'; i.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
+            assert.ok(await until(j, "!!document.querySelector('#sf [data-sf-course=\"gca_zgkynkan\"]')", 10000), 'Dobson found by search');
+        }
         await click(j, '#sf [data-sf-course="gca_zgkynkan"]'); taps++;
     }
     assert.ok(await until(j, "document.getElementById('course-select').value === 'gca_zgkynkan' && !!document.querySelector('#sf [data-sf-tee]')", 15000), 'Dobson picked, its tees');

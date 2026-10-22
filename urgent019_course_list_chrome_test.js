@@ -47,7 +47,8 @@ test('Talking Stick: the GolfAPI course is picked (✓ GPS, Black / Gold / Jade)
     assert.equal(r.ok, true, r.reason);
     const [s] = J(r);
     assert.equal(s.key, 'gapi_' + ID);
-    assert.match(s.head, /^Talking Stick Golf Club \(South - Piipaash\)\n0\.0 mi · ✓ GPS · Change/);
+    // URGENT-060: the picked course is the first NEAR YOU row, "You're here" (no second card).
+    assert.match(s.rows[0], /^gapi_990000000000000001 \| Talking Stick Golf Club \(South - Piipaash\) \| You’re here · 0\.0 mi · ✓ GPS$/);
     assert.deepEqual(s.tees, ['Black', 'Gold', 'Jade']);
     assert.ok(!s.rows.some((x) => /^az_talking_piipaash /.test(x)), 'the directory twin is gone: ' + JSON.stringify(s.rows));
     const ood = s.rows.filter((x) => /^az_talking_oodham /.test(x))[0];

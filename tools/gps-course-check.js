@@ -1,7 +1,8 @@
 // ============================================================================
 // THE GPS COURSE CHECK (URGENT-020, Manny 2026-10-20: permanent - run before ANY "READY").
 //
-// For each course: (1) search + NEAR YOU find it once (no duplicates); (2) tees with real
+// For each course: (1) search + NEAR YOU find it once (no duplicates; URGENT-060: NEAR YOU = 3 rows, on
+// the course a picked "You're here" row, off it the course may come from search only); (2) tees with real
 // names / yards; (3) the hole card loads (pars + HCP for 18); (4) the GPS opens with a green
 // middle yardage on hole 1; (5) + Bet opens. Real Chrome, iPhone size, THE PHONE'S GPS RULES
 // (gps-config osm off, live on: GolfAPI only - the desktop default is OpenStreetMap and hides
@@ -46,7 +47,8 @@ const COURSES = (process.env.ONLY ? null : null) || [
     // A course with a card and NO greens anywhere: the map must show the COURSE AREA with "Tap the middle
     // of the green" - never the golfer's location (run with the golfer 2 km away).
     { label: 'No greens: Las Colinas', name: /^Las Colinas/i, q: 'las colinas', at: [33.2441784, -111.6180444], noGreens: true, golfer: [33.2620, -111.6180] },
-    { label: 'Thistle (MacKay/Cameron)', name: /^Thistle.*MacKay.*Cameron/i, q: 'thistle', at: [33.8890, -78.5350] }
+    // (URGENT-060: the golfer ON the course - by MacKay hole 1's tee; the old spot was 1.1 mi south of every hole)
+    { label: 'Thistle (MacKay/Cameron)', name: /^Thistle.*MacKay.*Cameron/i, q: 'thistle', at: [33.9051, -78.5447] }
 ].filter((c) => !process.env.ONLY || new RegExp(process.env.ONLY, 'i').test(c.label));
 
 // The phone's GPS rules: gps-live on (liveTest), loaded on Round Setup too (the app loads it there).
@@ -88,7 +90,7 @@ async function check(c) {
         await until("document.querySelectorAll('#sf [data-sf-course]').length > 0 || /No courses we know/.test((document.getElementById('sf')||{}).innerText||'')", 30000);
         await sleep(2500);
         const re = c.name.source, fl = c.name.flags;
-        const near = JSON.parse(await ev("(function(){ var re=new RegExp(" + JSON.stringify(re) + "," + JSON.stringify(fl) + "); var head=(document.querySelector('#sf-course .n')||{}).textContent||''; var rows=Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return [b.getAttribute('data-sf-course'), (b.querySelector('.n')||{}).textContent||'', /✓ GPS/.test(b.textContent)]; }); return JSON.stringify({ head: head, headKey: document.getElementById('course-select').value, hits: rows.filter(function(r){return re.test(r[1]);}).concat(re.test(head) ? [[document.getElementById('course-select').value, head, /✓ GPS/.test((document.getElementById('sf-course')||{}).textContent||'')]] : []) }); })()"));
+        const near = JSON.parse(await ev("(function(){ var re=new RegExp(" + JSON.stringify(re) + "," + JSON.stringify(fl) + "); var head=(document.querySelector('#sf-course .n')||{}).textContent||''; var rows=Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return [b.getAttribute('data-sf-course'), (b.querySelector('.n')||{}).textContent||'', /✓ GPS/.test(b.textContent)]; }); var hr=document.querySelector('#sf [data-sf-here]'); return JSON.stringify({ head: head, headKey: document.getElementById('course-select').value, nRows: Array.prototype.filter.call(document.querySelectorAll('#sf .sf-h, #sf [data-sf-course]'), function(){ return 1; }).reduce(function(a,n){ if(n.classList.contains('sf-h')) a.sec=n.textContent; else if(a.sec==='NEAR YOU') a.n++; return a; }, {sec:'', n:0}).n, here: hr ? [hr.getAttribute('data-sf-course'), (hr.querySelector('.n')||{}).textContent||'', /You\u2019re here/.test(hr.textContent), hr.classList.contains('sf-sel'), hr.getAttribute('data-sf-course') === document.getElementById('course-select').value] : null, hits: rows.filter(function(r){return re.test(r[1]);}).concat(re.test(head) ? [[document.getElementById('course-select').value, head, /✓ GPS/.test((document.getElementById('sf-course')||{}).textContent||'')]] : []) }); })()"));
         // Search.
         await ev("(function(){ var i=document.getElementById('sf-q'); i.value=" + JSON.stringify(c.q) + "; i.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
         await sleep(1200);
@@ -96,8 +98,16 @@ async function check(c) {
         const nearN = near.hits.length, searchN = found.length;
         out.badge = near.hits.concat(found).some((h) => h[2]);
         const badge = out.badge ? ', ✓ GPS' : ', no ✓ GPS';
-        out.once = (nearN === 1 && searchN === 1 ? 'PASS' : 'FAIL') + ` (near ${nearN}, search ${searchN}${badge})`;
-        if (nearN !== 1) out.why.push('NEAR YOU lists it ' + nearN + 'x: ' + near.hits.map((h) => h[1]).join(' / '));
+        // URGENT-060: NEAR YOU is the 3 closest only (the rest from search). ON the course it must be in NEAR
+        // YOU exactly once, with a "You're here" row first, picked; from off the course (the golfer elsewhere)
+        // it may have dropped off NEAR YOU (never twice), and search must find it exactly once.
+        const onCourse = !c.golfer && !process.env.AWAY;
+        const hereOk = !onCourse || (near.here && near.here[2] && near.here[3] && near.here[4]);
+        const nearOk = onCourse ? nearN === 1 : nearN <= 1;
+        out.once = (nearOk && searchN === 1 && near.nRows <= 3 && hereOk ? 'PASS' : 'FAIL') + ` (near ${nearN}${onCourse ? '' : ' off-course'}, search ${searchN}${badge}${near.here ? ', here: ' + near.here[1] : ''})`;
+        if (!nearOk) out.why.push('NEAR YOU lists it ' + nearN + 'x: ' + near.hits.map((h) => h[1]).join(' / '));
+        if (near.nRows > 3) out.why.push('NEAR YOU shows ' + near.nRows + ' rows (3 max)');
+        if (!hereOk) out.why.push('on the course but no picked "You\u2019re here" row: ' + JSON.stringify(near.here));
         if (searchN !== 1) out.why.push('search lists it ' + searchN + 'x: ' + found.map((h) => h[1] + ' (' + h[0] + ')').join(' / '));
         // Pick it (the GPS row when there are two).
         const pick = (found.filter((h) => h[2])[0] || found[0] || near.hits[0] || [])[0];
