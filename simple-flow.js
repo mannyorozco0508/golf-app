@@ -1608,6 +1608,9 @@
     function noCode(kind) {
         var m = marker();
         if (!m || m.mode !== 'gps' || params().get('game') || !/admin\.html$/.test(String(W.location.pathname || ''))) return false;
+        // URGENT-065: no signal - Home's one-tap start is off; the golfer has Course & Tees (the course
+        // still picked) and taps Start Round once the round's code comes.
+        if (m.go) { delete m.go; ss(MARK, JSON.stringify(m)); }
         sockWatch();
         S.offline = reallyOffline() ? 'offline' : NS.sock === true ? 'error' : 'wait';
         S.minting = false;
