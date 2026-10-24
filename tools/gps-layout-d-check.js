@@ -10,7 +10,7 @@
 // tiles, in the page) and Manny's bag set up.
 //   1  THE TOP BAR, one dark card: ‹ | HOLE 1 ▾ | MIDDLE (big, lime) | B / F | Par / HCP.
 //      Under it Games (left) and the round chip (right). The old top panel / C's panel gone.
-//   2  THE RAIL: Wind, Green, Hazards, Preview, Zoom - 52px squares at the right.
+//   2  THE RAIL: Wind, Green, Preview, Zoom - 52px squares at the right (URGENT-064 #7: no Hazards).
 //   3  THE PILL: the raw yards in a dark circle, "Plays like Ny · club" (the bag's club).
 //      THE BOTTOM: a wide Mark shot; under it Card | Hole 1 / Enter score | + Game | Tools.
 //      The credit ("Powered by Esri") just above the bottom, left.
@@ -211,8 +211,8 @@ function checkD(a, f, tag, o) {
     f(a.games && a.chip && a.games.t >= a.top.b && a.chip.t >= a.top.b && a.games.r < a.chip.l && a.chip.r <= a.vw - 4, tag + ' 1: Games left / round chip right, under the bar: ' + JSON.stringify([a.games, a.chip]));
     if (o.want) f(a.chipText === o.want, tag + ' 1: the round chip says ' + JSON.stringify(a.chipText) + ', expected ' + JSON.stringify(o.want));
     // 2 THE RAIL
-    const want = ['gps-wind', 'gps-green-view', 'gps-hz-btn', 'gps-fly-btn', 'gps-zoom'];
-    f(JSON.stringify(a.rail.map((x) => x.cls)) === JSON.stringify(want), tag + ' 2: the rail is not Wind, Green, Hazards, Preview, Zoom: ' + JSON.stringify(a.rail.map((x) => x.cls)));
+    const want = ['gps-wind', 'gps-green-view', 'gps-fly-btn', 'gps-zoom'];
+    f(JSON.stringify(a.rail.map((x) => x.cls)) === JSON.stringify(want), tag + ' 2: the rail is not Wind, Green, Preview, Zoom: ' + JSON.stringify(a.rail.map((x) => x.cls)));
     a.rail.forEach((x) => f(x.w >= 52 && x.w <= 96 && x.h >= 52 && x.r <= a.vw - 4 && x.r >= a.vw - 12, tag + ' 2: a rail square: ' + JSON.stringify(x)));
     f(a.rail.length && a.rail[0].t >= Math.max(a.games ? a.games.b : 0, a.chip ? a.chip.b : 0), tag + ' 2: the rail starts under the Games / chip row');
     // 3 THE PILL, THE BOTTOM, THE CREDIT
@@ -259,7 +259,7 @@ function checkD(a, f, tag, o) {
         const shotStep = SHOTS ? [{ shot: path.join(SHOTS, 'D-' + ph.w + 'x' + ph.h + '-' + tx.name + '.png'), viewportOnly: true }] : [];
         s = await go({ esri: 'OK-3X', seed: BAG, vw: ph.w, vh: ph.h, steps: START.concat([SCALE(tx.k), W(1500), MEASURE, CLIPS], shotStep,
             [TAP('.gps-ld-plays'), W(400), ONTOP('.gps-plinfo'), TAP('.gps-plinfo-done'), W(200), TAP('.gps-tools'), W(300), ONTOP('.gps-tsheet'), TAP('.gps-tools'), W(200),
-             TAP('.gps-hz-btn'), W(500), ONTOP('.gps-hzs'), TAP('.gps-hzs-done'), W(200), TAP('.gps-hole-btn'), W(300), ONTOP('.gps-picker-card')]) });
+             TAP('.gps-hole-btn'), W(300), ONTOP('.gps-picker-card')]) });
         const [m, cl, ...tops] = s;
         checkD(m, f, tag, { esri: true, club: true, want });
         (cl.clips || []).forEach((x) => f(false, tag + ' P2: text cut off / off screen: ' + x));

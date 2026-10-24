@@ -4476,8 +4476,8 @@
         drawTarget();
         drawHoleAsk();
         drawHazards();
-        // HAZARDS SHEET (008): its button while measuring; open, it follows the golfer.
-        show('.gps-hz-btn', S.pro && S.mode === 'measure' && !S.replay && courseHasAnyData());
+        // HAZARDS SHEET (008): open, it follows the golfer. (URGENT-064 #7: no Hazards button on the map any more -
+        // the sheet has no way in; the hazard data, the map's hazard chips, the tee plan and the arcs keep using it.)
         if (hzOpen()) { if (S.mode !== 'measure') closeHazards(); else fillHazards(); }
         // 052 A: the tee plan follows the hole / wind; tournament mode or a spectator closes it.
         if (tplanOpen()) { if (S.mode !== 'measure' || !planAllowed()) closeTeePlan(); else fillTeePlan(); }
@@ -5250,7 +5250,7 @@
     // ---- LAYOUT C (mailbox 011, Manny picked mockup C; switch gpsLayoutC) -----------
     // The map clear at the top: Back + Games at the left, the hole chip (and the round's
     // score chip) at the right. Everything else in ONE bottom panel: F / MIDDLE / B, the
-    // plays line, Green | Hazards | Mark shot | Preview, and the score row. The existing
+    // plays line, Green | Mark shot | Preview, and the score row. The existing
     // elements are MOVED into it (their handlers, selectors and render code stay the
     // same); off, nothing moves and the old layout is exactly as it was.
     var PANEL_KEY = 'hardpan_gps_panel_';
@@ -5286,7 +5286,7 @@
         put(plays, '.gps-pl-line'); put(plays, '.gps-suggest');
         plays.appendChild(mk('div', 'gps-lc-acc', { style: 'display:none' }));
         var acts = mk('div', 'gps-lc-acts');
-        put(acts, '.gps-green-view'); put(acts, '.gps-hz-btn'); put(acts, '.gps-mark-shot'); put(acts, '.gps-fly-btn');
+        put(acts, '.gps-green-view'); put(acts, '.gps-mark-shot'); put(acts, '.gps-fly-btn');
         panel.appendChild(handle); panel.appendChild(nums);
         panel.appendChild(mk('div', 'gps-lc-course'));   // URGENT-030: the course line, under the yardages
         panel.appendChild(plays); panel.appendChild(acts);
@@ -5423,7 +5423,7 @@
 
     // ---- LAYOUT D "HardPan" (mailbox 012, the new default; switch gpsLayoutD) ----------
     // One dark top bar (‹ | HOLE 4 ▾ | MIDDLE | B / F | Par / HCP), Games + the round chip
-    // under it, a right rail of small squares (Wind, Green, Hazards, Preview, Zoom), the
+    // under it, a right rail of small squares (Wind, Green, Preview, Zoom), the
     // distance bubbles on the shot line, a cream "Plays like" pill, and at the bottom a wide
     // Mark shot over Card | Hole N / Enter score | + Game | Tools. The SAME elements as the
     // other layouts, moved (their handlers, selectors and render code stay the same) - one
@@ -5443,7 +5443,7 @@
     // Every element a layout moves, and where it lives in MARKUP (a comment marks the spot),
     // so a switch puts them all back before the other layout takes them.
     var MOVED = ['.gps-back', '.gps-door-games', '.gps-wind', '.gps-hole-btn', '.gps-who', '.gps-num-f', '.gps-num-mid', '.gps-num-b', '.gps-pl-line', '.gps-suggest',
-        '.gps-green-view', '.gps-hz-btn', '.gps-mark-shot', '.gps-fly-btn', '.gps-zoom', '.gps-bottom', '.gps-actions'];
+        '.gps-green-view', '.gps-mark-shot', '.gps-fly-btn', '.gps-zoom', '.gps-bottom', '.gps-actions'];
     var LAYOUT_BOXES = ['.gps-lc-top', '.gps-panel', '.gps-ld-head', '.gps-ld-l1', '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom', '.gps-ld-holelbl'];
     function markHomes(el) {
         el._gpsHomes = MOVED.map(function (sel) {
@@ -5491,7 +5491,7 @@
         if (rsSwitch()) row2.appendChild(mk('button', 'gps-lc-score gps-ld-score gps-float', { type: 'button', 'data-feature': 'gpsRoundScore', style: 'display:none', 'aria-label': 'Round score - open the scorecard' }));
         // THE RIGHT RAIL (each still follows its own switch and render rule).
         var rail = mk('div', 'gps-ld-rail');
-        put(rail, '.gps-wind'); put(rail, '.gps-green-view'); put(rail, '.gps-hz-btn'); put(rail, '.gps-fly-btn'); put(rail, '.gps-zoom');
+        put(rail, '.gps-wind'); put(rail, '.gps-green-view'); put(rail, '.gps-fly-btn'); put(rail, '.gps-zoom');
         // THE PLAYS-LIKE PILL: the raw yards in the dark circle, "Plays like 249y · 3W". Tap = ⓘ.
         var plays = mk('button', 'gps-ld-plays', { type: 'button', style: 'display:none', 'aria-label': 'Plays like - how it works' });
         plays.innerHTML = '<span class="gps-ld-raw"></span><span class="gps-ld-pl"><small>Plays like</small><b class="gps-ld-pltext"></b></span>' + (plInfoSwitch() ? '<span class="gps-ld-i" aria-hidden="true">ⓘ</span>' : '');
@@ -6187,7 +6187,6 @@
         + '<div class="gps-right">'
         +   '<div class="gps-wind gps-float" style="display:none" role="button" tabindex="0" aria-label="Wind"><span class="gps-wind-arrow">↑</span><span class="gps-wind-mph"></span><span class="gps-wind-tag"></span></div>'
         +   '<button type="button" class="gps-green-view gps-float" style="display:none" aria-label="Zoom to the green, or back to the hole"></button>'
-        +   '<button type="button" class="gps-hz-btn gps-float" data-feature="hazards" style="display:none" aria-label="Hazards and layups on this hole">Hazards</button>'
         +   '<button type="button" class="gps-mark-shot gps-float" style="display:none" aria-label="Mark shot here">\uD83D\uDCCD Mark shot</button>'
         +   '<button type="button" class="gps-fly-btn gps-float" data-feature="flyover" style="display:none" aria-label="Preview the hole from the tee to the green">Preview</button>'
         + '</div>'
@@ -6431,7 +6430,6 @@
         + '#gps-overlay .gps-hz{font:800 11px/1 ' + FONT + ';padding:3px 6px;border-radius:999px;border:1px solid rgba(11,15,12,.55);white-space:nowrap;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.35);}'
         + '#gps-overlay .gps-hz-bunker{background:#f3e3b5;color:#3a2e12;}'
         + '#gps-overlay .gps-hz-water{background:#9fd3ff;color:#0b2540;}'
-        + '#gps-overlay .gps-hz-btn{font-size:13px;white-space:nowrap;}'
         // The stack is taller with Hazards: its own box lets a drag through to the map (only its buttons take taps).
         + '#gps-overlay .gps-right{pointer-events:none;}#gps-overlay .gps-right > *{pointer-events:auto;}'
         + '#gps-overlay .gps-hzs{position:absolute;z-index:46;left:0;right:0;bottom:0;margin:0 auto;max-width:520px;max-height:62%;overflow:auto;border-radius:18px 18px 0 0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));box-sizing:border-box;font-family:' + FONT + ';touch-action:pan-y;}'
@@ -7335,7 +7333,6 @@
         on(el, '.gps-green-view', toggleGreenView);
         // HAZARDS (008): the switch off = no button, no sheet (removed, not hidden).
         if (!hzSwitch()) Array.prototype.forEach.call(el.querySelectorAll('[data-feature="hazards"]'), function (n) { n.parentNode.removeChild(n); });
-        on(el, '.gps-hz-btn', function () { if (!S) return; if (hzOpen()) closeHazards(); else openHazards(); });
         on(el, '.gps-hzs-done', closeHazards);
         on(el, '.gps-tplan-done', closeTeePlan);
         on(el, '.gps-tee-plan', function () { if (S) openTeePlan(); });

@@ -81,7 +81,8 @@ test('layups: 50 / 75 / 100 / 125 / 150, only those shorter than the green; "lay
 test('gps-view: behind its switch (button and sheet removed when off), the app\'s own points only, says so with none', () => {
     const v = read('gps-view.js');
     assert.ok(/HardPanFeature\('hazards'\)/.test(v));
-    assert.ok(/class="gps-hz-btn gps-float" data-feature="hazards"/.test(v) && /class="gps-hzs gps-float gps-scroll-ok" data-feature="hazards"/.test(v));
+    // URGENT-064 #7: no Hazards button on the map any more; the sheet's markup stays (behind the same switch).
+    assert.ok(!/gps-hz-btn/.test(v) && /class="gps-hzs gps-float gps-scroll-ok" data-feature="hazards"/.test(v));
     assert.ok(/if \(!hzSwitch\(\)\) Array\.prototype\.forEach\.call\(el\.querySelectorAll\('\[data-feature="hazards"\]'\)/.test(v));
     assert.ok(/'No hazard data for this hole\.'/.test(v));
     assert.ok(/G\.hazardRows\(o\.pt, hz, r && r\.mid\)/.test(v) && /hr\.osm\.hazards/.test(v), 'the hole record\'s hazard points');

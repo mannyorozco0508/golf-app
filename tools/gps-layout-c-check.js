@@ -27,7 +27,7 @@
 //   L3 THE MAP: the credit just above the panel; Recenter / zoom above the credit; the tee
 //      and the green, the yardage pills and the target inside the clear map; a tap in the top
 //      row's gap: the target is pulled into the clear map; at least 120px of clear map.
-//   L4 SHEETS: Hazards, How plays-like works, the wind, Tools, the hole picker, My bag (and its
+//   L4 SHEETS: How plays-like works, the wind, Tools, the hole picker, My bag (and its
 //      "Saved on this phone"), Tools > My stats (the round sheet), Home's My stats page (its
 //      "Saved on this phone"), "Which club?" after Mark shot - each on top: hit-tested at its
 //      middle and both bottom corners; inside the screen.
@@ -228,8 +228,7 @@ const clearTopOf = (a) => Math.max(...[a.back, a.games, a.hole, a.chip].filter(B
         const steps = START(k).concat([MEASURE], shot(tag), [
             // A tap in the top row's gap: the target comes back into the clear map.
             { expression: "(function(){ var c = document.querySelector('#gps-overlay .maplibregl-canvas'); if (!c) return 'no canvas';"
-                + " ['mousedown', 'mouseup', 'click'].forEach(function (t) { c.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: " + TX + ", clientY: " + TY + ", button: 0 })); }); return 'tapped'; })()" }, W(800), MEASURE,
-            TAP('#gps-overlay .gps-hz-btn'), W(500), SCALE(k), W(300), SHEET('hazards', '#gps-overlay .gps-hzs')].concat(shot(tag + '-hazards'), [TAP('#gps-overlay .gps-hzs-done'), W(300),
+                + " ['mousedown', 'mouseup', 'click'].forEach(function (t) { c.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, clientX: " + TX + ", clientY: " + TY + ", button: 0 })); }); return 'tapped'; })()" }, W(800), MEASURE].concat([
             TAP('#gps-overlay .gps-pl-info'), W(400), SCALE(k), W(300), SHEET('plays info', '#gps-overlay .gps-plinfo'), TAP('#gps-overlay .gps-plinfo-done'), W(300),
             TAP('#gps-overlay .gps-wind'), W(500), SCALE(k), W(300), SHEET('wind', '#gps-overlay .gps-wind-sheet'), TAP('#gps-overlay .gps-ws-done'), W(300),
             TAP('#gps-overlay .gps-tools'), W(300), SCALE(k), W(300), SHEET('tools', '#gps-overlay .gps-tsheet:not([style*="none"]), #gps-overlay .gps-tools-menu:not([style*="none"])'),
@@ -274,8 +273,8 @@ const clearTopOf = (a) => Math.max(...[a.back, a.games, a.hole, a.chip].filter(B
         F(a.plays && a.plays.l >= 0 && a.plays.r <= vw && !a.plays.clip && /^Plays (like )?\d+/.test(a.playsText || ''), 'L2: the plays line (009 "Plays 168: ...", or 012e playsSimple "Plays like 168y"): ' + JSON.stringify([a.playsText, a.plays]));
         F(/251, 191, 36/.test(a.playsColor || ''), 'L2: the plays line is not amber: ' + a.playsColor);
         F(/^±\d+ yds$/.test(a.accText || '') && a.acc && a.plays && a.acc.t >= a.plays.b - 1, 'L2: the accuracy line: ' + a.accText);
-        const acts = [a.green, a.hz, a.mark, a.fly].filter(Boolean);
-        F(acts.length === 4 && acts.every((x) => x.h >= 44 && Math.abs(x.w - acts[0].w) <= 1 && Math.abs(x.t - acts[0].t) <= 1), 'L2: Green | Hazards | Mark shot | Preview: ' + JSON.stringify(acts));
+        const acts = [a.green, a.mark, a.fly].filter(Boolean);
+        F(!a.hz && acts.length === 3 && acts.every((x) => x.h >= 44 && Math.abs(x.w - acts[0].w) <= 1 && Math.abs(x.t - acts[0].t) <= 1), 'L2: Green | Mark shot | Preview (no Hazards): ' + JSON.stringify(acts));
         a.actLbl.forEach((x) => F(!x.clip, 'L2: "' + x.text + '" is cut off: ' + JSON.stringify(x.clip)));
         // L3
         F(a.credit && a.credit.b <= a.panel.t && a.credit.b >= a.panel.t - 12, 'L3: the credit is not just above the panel: ' + JSON.stringify([a.credit, a.panel && a.panel.t]));
@@ -286,7 +285,7 @@ const clearTopOf = (a) => Math.max(...[a.back, a.games, a.hole, a.chip].filter(B
         [a.pillTo, a.pillOn, a.target].filter(Boolean).forEach((p) => F(inside(p, ct, cb), 'L3: a yardage pill / the target sits under the top row / panel: ' + JSON.stringify(p)));
         F(t && t.target && t.target.t >= ct && t.target.b <= cb, 'L3: the tapped target is not in the clear map: ' + JSON.stringify(t && t.target) + ' clear ' + ct + '-' + cb);
         // L4
-        ['hazards', 'plays info', 'wind', 'tools', 'my bag', 'round stats', 'my stats', 'hole picker', 'which club'].forEach((n) => {
+        ['plays info', 'wind', 'tools', 'my bag', 'round stats', 'my stats', 'hole picker', 'which club'].forEach((n) => {
             const sh = sheets.filter((x) => x.name === n)[0];
             F(sh && sh.shown, 'L4: the ' + n + ' sheet did not open');
             if (!sh || !sh.shown) return;
