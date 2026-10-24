@@ -93,3 +93,69 @@ test('no runtime cache route for Esri, no IndexedDB, and the only Cache Storage 
     // (Wave 2: built in ONE place, esriSource(), used by buildMap.)
     assert.ok(/function esriSource\(key\) \{\s*return \{ type: 'raster', tiles: \[esriTileUrl\(\)/.test(v) && /sources\.esri = esriSource\(key\)/.test(v), 'positive: the Esri layer is a stock raster source');
 });
+
+// ============================================================================
+// URGENT-064 (Manny, Oct 21 3:56 PM): Esri allows offline use only on a custom plan through its own
+// SDKs, so the 051 warm-up is gone and NO Esri tile is written to any cache or storage - Cache
+// Storage, IndexedDB, localStorage, or the browser's HTTP cache (every Esri tile is asked with
+// cache: 'no-store'). USGS (public domain) is still saved for the course. The browser half, with a
+// real map in Chrome, is urgent064_esri_not_saved_chrome_test.js.
+// ============================================================================
+const vm = require('vm');
+function gpsSandbox(cfgExtra, ls) {
+    const store = Object.assign({}, ls || {});
+    const fetches = [], puts = [], idb = [], lsWrites = [];
+    const sb = {
+        localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { lsWrites.push(k); store[k] = String(v); }, removeItem: (k) => { delete store[k]; } },
+        JSON, Object, Math, Number, String, Date, Promise, RegExp, Array, isFinite, Uint8Array, setTimeout, clearTimeout,
+        navigator: { onLine: true, userAgent: 'test' },
+        // Any IndexedDB use at all is recorded.
+        indexedDB: new Proxy({}, { get: (t, k) => { idb.push(String(k)); return () => ({}); } }),
+        fetch: (url, init) => {
+            fetches.push({ url: String(url), init: init || {} });
+            return Promise.resolve({ ok: true, status: 200, headers: { get: (h) => (/cache-control/i.test(h) ? 'max-age=86400' : (/content-type/i.test(h) ? 'image/jpeg' : null)) }, arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) });
+        },
+        caches: { open: () => Promise.resolve({ match: () => Promise.resolve(null), put: (u) => { puts.push(String(u)); return Promise.resolve(); } }) }
+    };
+    sb.window = sb;
+    sb.HARDPAN_GPS_CONFIG = Object.assign({ esriKey: 'KEY' }, cfgExtra || {});
+    vm.createContext(sb);
+    for (const f of ['gps-geo.js', 'gps-courses.js', 'gps-view.js', 'gps-match.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), sb);
+    return { sb, store, fetches, puts, idb, lsWrites };
+}
+const isEsri = (u) => /arcgis\.com\/arcgis\/rest\/services\/World_Imagery|arcgisonline/i.test(String(u));
+
+test('064: no Esri tile is ever written to any cache or storage - and USGS still is', { skip: ON ? false : 'Consumer tree: no gps-view.js' }, async () => {
+    for (const src of ['esri', 'esri-closeup', 'usgs']) {
+        // An old 051 warm mark on the phone must not bring anything back.
+        const t = gpsSandbox({}, { hardpan_imagery_v1_caledonia: JSON.stringify({ src, at: 1 }), hardpan_esri_warm_v1_caledonia: JSON.stringify({ until: Date.now() + 86400e3 }) });
+        const r = await t.sb.HardPanGps.precacheCourse('caledonia', []);
+        // USGS: still saved (positive control - the same harness records a write).
+        assert.ok(r && r.ok && r.fetched > 0, src + ': USGS pre-cache ran: ' + JSON.stringify(r));
+        assert.ok(t.puts.length > 0 && t.puts.every((u) => /basemap\.nationalmap\.gov\/arcgis\/rest\/services\/USGSImageryOnly/.test(u)), src + ': Cache Storage got USGS tiles only');
+        // Esri: nothing asked, nothing stored, anywhere.
+        assert.deepStrictEqual(t.fetches.filter((q) => isEsri(q.url)), [], src + ': the pre-cache asked Esri for nothing');
+        assert.deepStrictEqual(t.puts.filter(isEsri), [], src + ': no Esri entry in Cache Storage');
+        assert.deepStrictEqual(t.idb, [], src + ': IndexedDB never touched');
+        assert.deepStrictEqual(t.lsWrites.filter((k) => /esri/i.test(k)), [], src + ': no Esri mark written to localStorage');
+    }
+    // The browser's HTTP cache: every Esri tile URL the app asks for - the map, the close-up, the
+    // setup picker - goes with cache: 'no-store'; USGS keeps its ordinary request.
+    const t = gpsSandbox();
+    const I = t.sb.HardPanGps.imagery, M = t.sb.HardPanGpsMatch;
+    for (const z of [16, 18, 19, 20, 21]) {
+        const u = 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/' + z + '/104876/73437?token=KEY';
+        assert.strictEqual(I.esriNoStore(u).cache, 'no-store', 'GPS map, z' + z);
+        assert.strictEqual(M.esriNoStore(u).cache, 'no-store', 'setup picker, z' + z);
+    }
+    const usgs = 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/16/1/2';
+    assert.strictEqual(I.esriNoStore(usgs).cache, undefined);
+    assert.strictEqual(M.esriNoStore(usgs).cache, undefined);
+    // And in the code: the three Esri request sites carry it.
+    const v = fs.readFileSync(path.join(ROOT, 'gps-view.js'), 'utf8');
+    assert.ok(/transformRequest: esriNoStore,/.test(v), 'the GPS map');
+    assert.ok(/ml\.addProtocol\('hpesri'[\s\S]{0,400}cache: 'no-store'/.test(v), 'the close-up protocol');
+    const admin = fs.readFileSync(path.join(ROOT, 'admin.html'), 'utf8');
+    assert.ok(/imageryStyle\(\), transformRequest: window\.HardPanGpsMatch\.esriNoStore,/.test(admin), 'the setup picker map');
+    assert.ok(!/function warmEsri\(/.test(v), 'the 051 Esri warm-up is gone');
+});
