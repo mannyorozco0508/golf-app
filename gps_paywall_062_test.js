@@ -45,10 +45,38 @@ function sk(o) {
     };
     return P;
 }
-function ent(config, plugin, ls) {
+// RevenueCat's Capacitor plugin (@revenuecat/purchases-capacitor), stubbed with its documented shapes:
+// CustomerInfo.entitlements.active.gps_map = EntitlementInfo { isActive, willRenew, periodType,
+// productIdentifier, expirationDate, expirationDateMillis }. e: that entitlement, or null.
+function rc(o) {
+    o = Object.assign({ e: null, buy: 'ok', eligible: 2, founding: true, restoreE: undefined }, o);
+    const calls = [];
+    const info = () => ({ entitlements: { active: o.e ? { gps_map: Object.assign({ identifier: 'gps_map', isActive: true }, o.e) } : {}, all: {} } });
+    const prod = (id, price) => ({ identifier: id, title: 'GPS Map', priceString: price, subscriptionPeriod: 'P1Y', introPrice: { price: 0, priceString: '$0.00', period: 'P1W', periodUnit: 'WEEK', periodNumberOfUnits: 1, cycles: 1 } });
+    const reg = { identifier: '$rc_annual', packageType: 'ANNUAL', product: prod(R, '$34.99') };
+    const fnd = { identifier: 'founding', packageType: 'CUSTOM', product: prod(F, '$24.99') };
+    const ent = (id, trial, days) => ({ productIdentifier: id, periodType: trial ? 'TRIAL' : 'NORMAL', willRenew: true, expirationDateMillis: Date.now() + days * DAY, expirationDate: new Date(Date.now() + days * DAY).toISOString() });
+    const P = {
+        calls, o,
+        configure: (a) => { calls.push(['configure', a]); return Promise.resolve(); },
+        addCustomerInfoUpdateListener: (fn) => { calls.push(['listen']); P.push = (e) => { o.e = e; fn(info()); }; return Promise.resolve('l'); },
+        getCustomerInfo: () => { calls.push(['getCustomerInfo']); return Promise.resolve({ customerInfo: info() }); },
+        getOfferings: () => { calls.push(['getOfferings']); const pk = o.founding ? [reg, fnd] : [reg]; return Promise.resolve({ current: { identifier: 'default', annual: reg, availablePackages: pk }, all: {} }); },
+        checkTrialOrIntroductoryPriceEligibility: (a) => { calls.push(['eligibility', a.productIdentifiers]); const m = {}; a.productIdentifiers.forEach((id) => { m[id] = { status: o.eligible }; }); return Promise.resolve(m); },
+        purchasePackage: (a) => { const id = a.aPackage.product.identifier; calls.push(['purchasePackage', id]);
+            if (o.buy === 'cancel') return Promise.reject({ code: '1', userCancelled: true });
+            o.e = ent(id, o.eligible === 2, o.eligible === 2 ? 7 : 365); o.eligible = 1;
+            return Promise.resolve({ productIdentifier: id, customerInfo: info() }); },
+        restorePurchases: () => { calls.push(['restorePurchases']); if (o.restoreE !== undefined) o.e = o.restoreE; return Promise.resolve({ customerInfo: info() }); }
+    };
+    P.ent = ent;
+    return P;
+}
+const RCFG = Object.assign({}, CFG, { iapStore: 'revenuecat', revenueCatKey: 'appl_TEST' });
+function ent(config, plugin, ls, purchases) {
     const sb = { localStorage: ls || mem(), JSON, Object, Math, Number, String, Date, Promise, RegExp, isFinite, setTimeout, clearTimeout };
     sb.window = sb; sb.HARDPAN_GPS_CONFIG = config;
-    if (plugin) sb.Capacitor = { Plugins: { HardPanStore: plugin } };
+    if (plugin || purchases) sb.Capacitor = { Plugins: Object.assign({}, plugin ? { HardPanStore: plugin } : {}, purchases ? { Purchases: purchases } : {}) };
     vm.createContext(sb); vm.runInContext(read('gps-entitlement.js'), sb);
     return { E: sb.HardPanEntitlement, sb };
 }
@@ -69,14 +97,18 @@ test('the repo keeps the paywall OFF: GPS on, and with the switch off no store i
     const c = {}; vm.runInNewContext(read('gps-config.js'), { window: c });
     const cfg = c.HARDPAN_GPS_CONFIG;
     assert.strictEqual(cfg.paywall, false, 'paywall must stay false in the repo (an install never locks GPS)');
-    assert.strictEqual(cfg.iapStore, 'storekit');
+    // RevenueCat for 2.0 (Manny, Oct 24); the key stays empty in the repo, never a secret key.
+    assert.strictEqual(cfg.iapStore, 'revenuecat');
+    assert.strictEqual(cfg.revenueCatKey, '');
+    assert.ok(!/sk_[A-Za-z0-9]/.test(read('gps-config.js')));
     assert.strictEqual(cfg.iapProduct, R); assert.strictEqual(cfg.iapFoundingProduct, F);
     assert.strictEqual(cfg.foundingCap, 1000, 'the founding cap: one number in gps-config.js');
     // Off: GPS on, even with the store saying "no subscription".
-    const P = sk({});
-    const { E } = ent(cfg, P);
+    const P = sk({}), RC = rc({});
+    const { E } = ent(cfg, P, null, RC);
     await tick();
     assert.deepStrictEqual(P.calls, [], 'paywall off: not one store call at launch');
+    assert.deepStrictEqual(RC.calls, [], 'paywall off: RevenueCat never configured or asked');
     assert.strictEqual(view(cfg, E).hasGpsPro(), true);
     assert.strictEqual(view(Object.assign({}, cfg, { iap: true }), null).hasGpsPro(), true, 'off: no entitlement module needed');
     assert.strictEqual(E.statusLine(), null, 'off: no Profile line');
@@ -268,12 +300,16 @@ test('the trial badge, the door tag and the Profile line: plain facts, no remind
     assert.ok(!/showManageSubscriptions|UNUserNotificationCenter|LocalNotifications|remind me/i.test(all));
 });
 
-test('StoreKit 2 in PhoneBridge: registered, no new package; the .storekit file in the test bundle only, and in the App scheme', { skip }, () => {
+test('StoreKit 2 in PhoneBridge stays (unused): registered; RevenueCat the one package added; the .storekit file in the test bundle only, and in the App scheme', { skip }, () => {
     const vc = read('gps-beta/ios/App/PhoneBridge/HardPanBridgeViewController.swift');
     assert.ok(/registerPluginInstance\(HardPanStorePlugin\(\)\)/.test(vc));
     const sw = read('gps-beta/ios/App/PhoneBridge/HardPanStorePlugin.swift');
     assert.ok(/jsName = "HardPanStore"/.test(sw) && /Transaction\.currentEntitlements/.test(sw) && /AppStore\.sync\(\)/.test(sw) && /Transaction\.updates/.test(sw));
-    assert.ok(!/purchases-capacitor|RevenueCat/.test(read('gps-beta/package.json') + read('gps-beta/ios/App/CapApp-SPM/Package.swift')), 'no purchase package added');
+    // The ONE package added (Manny's approved exception, Oct 24): RevenueCat, pinned, in the iOS build.
+    const pj = JSON.parse(read('gps-beta/package.json'));
+    assert.strictEqual(pj.dependencies['@revenuecat/purchases-capacitor'], '13.7.3', 'pinned exactly');
+    assert.ok(JSON.parse(read('gps-beta/capacitor.config.json')).ios.includePlugins.includes('@revenuecat/purchases-capacitor'));
+    assert.ok(/RevenuecatPurchasesCapacitor/.test(read('gps-beta/ios/App/CapApp-SPM/Package.swift')));
     const sk2 = JSON.parse(read('gps-beta/ios/App/App/HardPan.storekit'));
     const subs = sk2.subscriptionGroups[0].subscriptions;
     const by = Object.fromEntries(subs.map((s) => [s.productID, s]));
@@ -290,4 +326,87 @@ test('StoreKit 2 in PhoneBridge: registered, no new package; the .storekit file 
     const scheme = read('gps-beta/ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme');
     assert.ok(/<StoreKitConfigurationFileReference\s+identifier = "\.\.\/\.\.\/App\/HardPan\.storekit">/.test(scheme));
     assert.ok(/BlueprintName = "AppStoreKitTests"/.test(scheme));
+});
+
+// ---- REVENUECAT FOR 2.0 (Manny, Oct 24) -------------------------------------------------
+test('RevenueCat: no key -> no entitlement, never configured, never a throw; with the paywall off GPS stays on', { skip }, async () => {
+    const P = rc({ e: { productIdentifier: F, periodType: 'TRIAL', expirationDateMillis: Date.now() + DAY } });
+    const noKey = Object.assign({}, RCFG, { revenueCatKey: '' });
+    const { E } = ent(noKey, null, null, P);
+    assert.strictEqual(await cb(E.refresh), false); assert.strictEqual(E.isPro(), false); assert.strictEqual(E.known(), true);
+    assert.strictEqual((await cb(E.purchase, { founding: true })).outcome, 'unavailable');
+    assert.strictEqual((await cb(E.offer)).fromStore, false);
+    assert.deepStrictEqual(P.calls, [], 'no key: RevenueCat is not configured');
+    assert.strictEqual(view(Object.assign({}, noKey, { paywall: false }), E).hasGpsPro(), true, 'paywall off: GPS on');
+    assert.strictEqual(view(noKey, E).hasGpsPro(), false, 'paywall on, no key: the paywall (never GPS by accident)');
+    // Not even the plugin on the page (the web): the same.
+    assert.strictEqual(await cb(ent(RCFG, null).E.refresh), false);
+});
+
+test('RevenueCat: the same facts as StoreKit - trial, founding vs regular, renewal date, auto-renew', { skip }, async () => {
+    const exp = Date.now() + 7 * DAY;
+    const P = rc({ e: { productIdentifier: F, periodType: 'TRIAL', willRenew: true, expirationDateMillis: exp } });
+    const { E } = ent(RCFG, null, null, P);
+    await cb(E.refresh);
+    assert.deepStrictEqual(plain(P.calls[0]), ['configure', { apiKey: 'appl_TEST' }], 'configured with the public key only');
+    assert.deepStrictEqual(plain(E.subscription()), { active: true, productId: F, expires: exp, willRenew: true, trial: true, founding: true });
+    assert.strictEqual(E.statusLine().badge, 'Free trial'); assert.match(E.statusLine().line, /^Golf GPS · renews /);
+    // ISO date only (no millis), the regular product, an Android ":baseplan" suffix.
+    const iso = new Date(Date.now() + 200 * DAY).toISOString();
+    const Q = rc({ e: { productIdentifier: R + ':yearly', periodType: 'NORMAL', willRenew: false, expirationDate: iso } });
+    const q = ent(RCFG, null, null, Q).E; await cb(q.refresh);
+    assert.deepStrictEqual(plain(q.subscription()), { active: true, productId: R, expires: Date.parse(iso), willRenew: false, trial: false, founding: false });
+    assert.match(q.statusLine().line, /^Golf GPS · ends /, 'auto-renew off: "ends", a fact, not a prompt');
+    assert.strictEqual(q.statusLine().badge, '');
+});
+
+test('RevenueCat: trial start (founding), buy regular, cancel, restore none / found, expire mid-round keeps the round', { skip }, async () => {
+    // Trial on the founding product.
+    const A = rc({}); const a = ent(RCFG, null, null, A).E;
+    const r = await cb(a.purchase, { founding: true });
+    assert.strictEqual(r.pro, true); assert.deepStrictEqual(A.calls.filter((c) => c[0] === 'purchasePackage'), [['purchasePackage', F]]);
+    assert.strictEqual(a.subscription().trial, true); assert.strictEqual(a.subscription().founding, true);
+    // Regular when the founding window is closed.
+    const B = rc({}); const b = ent(RCFG, null, null, B).E;
+    await cb(b.purchase, { founding: false });
+    assert.deepStrictEqual(B.calls.filter((c) => c[0] === 'purchasePackage'), [['purchasePackage', R]]);
+    // Founding product not offered: the regular package even when asked for founding.
+    const C = rc({ founding: false }); const c = ent(RCFG, null, null, C).E;
+    await cb(c.purchase, { founding: true });
+    assert.deepStrictEqual(C.calls.filter((x) => x[0] === 'purchasePackage'), [['purchasePackage', R]]);
+    // Cancelled purchase.
+    const D = rc({ buy: 'cancel' }); const d = ent(RCFG, null, null, D).E;
+    const x = await cb(d.purchase, { founding: true });
+    assert.strictEqual(x.pro, false); assert.strictEqual(x.message, 'Purchase cancelled. Nothing was charged.');
+    // Restore: nothing, then a purchase made elsewhere.
+    const G = rc({}); const g = ent(RCFG, null, null, G).E;
+    const n = await cb(g.restore); assert.strictEqual(n.outcome, 'none');
+    G.o.restoreE = G.ent(F, false, 300);
+    const y = await cb(g.restore); assert.strictEqual(y.pro, true); assert.strictEqual(g.subscription().founding, true);
+    // Expire mid-round: RevenueCat pushes CustomerInfo without gps_map; this round keeps GPS.
+    const H = rc({ e: { productIdentifier: F, periodType: 'TRIAL', expirationDateMillis: Date.now() + DAY } });
+    const ls = mem(); const h = ent(RCFG, null, ls, H).E; await cb(h.refresh);
+    const V = view(RCFG, h, ls);
+    V.grantRoundPass('RND1');
+    H.push(null);
+    assert.strictEqual(h.isPro(), false); assert.strictEqual(h.subscription(), null); assert.strictEqual(h.statusLine(), null);
+    assert.strictEqual(V.hasGpsPro('RND1'), true, 'the round in progress keeps GPS');
+    assert.strictEqual(V.hasGpsPro('NEW1'), false, 'a new round asks');
+});
+
+test('RevenueCat: the paywall prices - $24.99 founding then $34.99, $34.99 alone, no second trial', { skip }, async () => {
+    const { E } = ent(RCFG, null, null, rc({}));
+    const o = plain(await cb(E.offer));
+    assert.deepStrictEqual(o, { fromStore: true, title: 'GPS Map', price: '$34.99', period: '1-year', trial: '7-day', founding: { price: '$24.99', trial: '7-day' } });
+    const V = view(RCFG, E);
+    const t = V.paywallText(o, { open: true, cap: 1000 });
+    assert.strictEqual(t.price, '$24.99/year founding price (locked while subscribed)');
+    assert.strictEqual(t.regular, 'After the first 1,000 subscribers: $34.99/year.');
+    assert.strictEqual(t.buy, 'Start 7-day free trial'); assert.strictEqual(t.buyFounding, true);
+    assert.strictEqual(V.paywallText(o, { open: false, cap: 1000 }).price, '$34.99/year');
+    const off = plain(await cb(ent(RCFG, null, null, rc({ founding: false })).E.offer));
+    assert.strictEqual(off.founding, null);
+    assert.strictEqual(V.paywallText(off, { open: true, cap: 1000 }).price, '$34.99/year', 'founding not offered: regular');
+    const used = plain(await cb(ent(RCFG, null, null, rc({ eligible: 1 })).E.offer));
+    assert.strictEqual(used.trial, null); assert.strictEqual(V.paywallText(used, { open: true }).buy, 'Subscribe');
 });

@@ -23,8 +23,7 @@
 // paywall (URGENT-062): THE MASTER SWITCH for the GPS paywall. false (the repo, so every
 // build and install made from it - Manny's phone included - keeps GPS exactly as today: no
 // store asked, never a paywall) | true (GPS needs the 7-day free trial or the yearly
-// subscription; the App Store decides, through StoreKit 2 in our own PhoneBridge plugin
-// HardPanStore - gps-entitlement.js). A build turns it on with GPS_PAYWALL=1 node
+// subscription; the store decides through RevenueCat - iapStore below - gps-entitlement.js). A build turns it on with GPS_PAYWALL=1 node
 // tools/build-gps-app.js (the built copy only, never this file). With paywall true and iap
 // off (a build with no store at all) GPS is off. There is no tester override: the old URL
 // tier switch is gone, and nothing in a URL can turn GPS on.
@@ -129,10 +128,12 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // false = nothing on the page.
     venmo: true,
     iap: true, iapEntitlement: 'gps_map', iapProduct: 'com.rattlegolf.app.gpsmap.yearly',
-    // URGENT-062: WHICH STORE. 'storekit' = StoreKit 2 through our own PhoneBridge plugin
-    // (gps-beta/ios/App/PhoneBridge/HardPanStorePlugin.swift; no new package) - the choice.
-    // 'revenuecat' = the dormant RevenueCat path below (needs its plugin + key; neither is in).
-    iapStore: 'storekit',
+    // URGENT-062: WHICH STORE. 'revenuecat' = @revenuecat/purchases-capacitor (pinned 13.7.3) with the
+    // key below - the choice for 2.0. 'storekit' = StoreKit 2 through our own PhoneBridge plugin
+    // (gps-beta/ios/App/PhoneBridge/HardPanStorePlugin.swift), kept and working, unused.
+    // RevenueCat for 2.0 (Manny, Oct 24 - matches Android's Play Billing on RevenueCat): 'revenuecat'.
+    // revenueCatKey (below) stays EMPTY until Manny sends the PUBLIC appl_ key; empty = no store.
+    iapStore: 'revenuecat',
     // THE TWO PRODUCTS, one subscription group "HardPan Plus", both yearly, both with the 7-day
     // free trial as their introductory offer (one trial per Apple ID per group):
     //   iapProduct         com.rattlegolf.app.gpsmap.yearly           the regular price (34.99)

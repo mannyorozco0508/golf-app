@@ -30,6 +30,10 @@
 // (founding or regular), the period's end (= the renewal date), auto-renew on or off, and
 // whether this period is the free trial. Kept in memory only, like before. The RevenueCat
 // path below stays, dormant (iapStore 'revenuecat'; its plugin and key are not in the app).
+// RevenueCat FOR 2.0 (Manny, Oct 24, to match Android's Play Billing on RevenueCat): gps-config
+// iapStore 'revenuecat' - @revenuecat/purchases-capacitor (13.7.3, pinned) with the PUBLIC appl_
+// key (empty until Manny sends it = no entitlement). The RevenueCat path gives the same facts as
+// the StoreKit one (rcFacts). HardPanStore stays in the app, unused unless iapStore is 'storekit'.
 // THE PAYWALL SWITCH: nothing here asks any store at launch unless HARDPAN_GPS_CONFIG.paywall
 // is true (gps-config.js) - an install with the paywall off never talks to the App Store.
 //
@@ -99,6 +103,27 @@
     }
     // The plugin answers { customerInfo } (purchase, restore, getCustomerInfo).
     function infoOf(r) { return r && r.customerInfo ? r.customerInfo : r; }
+    // URGENT-062 (RevenueCat for 2.0, Manny Oct 24): the SAME facts the StoreKit path gives, from
+    // CustomerInfo's "gps_map" EntitlementInfo: active, which product (founding / regular), the
+    // period's end (= the renewal date while auto-renew is on), willRenew, and periodType TRIAL.
+    // An Android product id may carry ":basePlan" - the part before ':' is compared. Pure.
+    function rcFacts(info) {
+        var act = info && info.entitlements && info.entitlements.active;
+        var e = act && act[entitlementId()];
+        if (!e || e.isActive === false) return { active: false, state: 'none' };
+        var exp = Number(e.expirationDateMillis) || (e.expirationDate ? Date.parse(e.expirationDate) : 0) || 0;
+        return { active: true, productId: String(e.productIdentifier || '').split(':')[0], expires: exp || null,
+            willRenew: e.willRenew !== false, trial: String(e.periodType || '').toUpperCase() === 'TRIAL', state: 'subscribed' };
+    }
+    // One CustomerInfo -> the one answer (activeIn, as before) and the facts for the screens.
+    function takeInfo(info) {
+        var on = activeIn(info);
+        sub = on ? subOf(rcFacts(info)) : null;
+        if (sub && !sub.active) sub = null;
+        set(on);
+        watchExpiry();
+        statusFns.slice().forEach(function (fn) { try { fn(); } catch (e) {} });
+    }
 
     // Configure the SDK once. Resolves true when it is ready to be asked.
     function start() {
@@ -127,7 +152,7 @@
         }).then(function () {
             try {
                 if (typeof P.addCustomerInfoUpdateListener === 'function') {
-                    P.addCustomerInfoUpdateListener(function (info) { set(activeIn(infoOf(info))); });
+                    P.addCustomerInfoUpdateListener(function (info) { takeInfo(infoOf(info)); });
                 }
             } catch (e) {}
             return true;
@@ -143,7 +168,7 @@
         start().then(function (ok) {
             if (!ok) { set(false); return false; }
             if (storeKit()) return skPlugin().status({ ids: ids() }).then(function (st) { take(st); return pro; });
-            return plugin().getCustomerInfo().then(function (r) { set(activeIn(infoOf(r))); return pro; });
+            return plugin().getCustomerInfo().then(function (r) { takeInfo(infoOf(r)); return pro; });
         }).then(function () { done(pro); }, function () { answered(); done(pro); });
     }
 
@@ -217,7 +242,25 @@
         (cur.availablePackages || []).forEach(function (p) {
             if (p && p.product && (!pk || (want && p.product.identifier === want))) pk = p;
         });
-        return pk && pk.product ? { pkg: pk, product: pk.product } : null;
+        if (!pk || !pk.product) return null;
+        // 062: the founding product's package, when configured and offered (any package of the current offering).
+        var fid = foundingId(), fpk = null;
+        if (fid) (cur.availablePackages || []).forEach(function (p) { if (p && p.product && String(p.product.identifier).split(':')[0] === fid) fpk = p; });
+        if (fpk === pk) fpk = null;
+        return { pkg: pk, product: pk.product, founding: fpk };
+    }
+    // RevenueCat: is this Apple ID still eligible for the free trial? (2 eligible, 1 not, 0 unknown, 3 none).
+    function rcEligible(ids) {
+        var P = plugin();
+        if (!P || typeof P.checkTrialOrIntroductoryPriceEligibility !== 'function') return Promise.resolve({});
+        return Promise.resolve().then(function () { return P.checkTrialOrIntroductoryPriceEligibility({ productIdentifiers: ids }); })
+            .then(function (m) { return m || {}; }, function () { return {}; });
+    }
+    function rcTrial(pr, elig) {
+        var intro = pr && pr.introPrice;
+        if (!intro || Number(intro.price) !== 0) return null;
+        var st = elig && elig[pr.identifier] && Number(elig[pr.identifier].status);
+        return st === 1 ? null : introPeriod(intro);
     }
     var offerCache = null;
     // StoreKit 2: both products from the store. -> the regular product's words, and
@@ -248,16 +291,21 @@
             return plugin().getOfferings().then(function (o) {
                 var sp = storeProduct(o && o.offerings ? o.offerings : o);
                 if (!sp) return none;
-                var pr = sp.product, intro = pr.introPrice || null;
+                var pr = sp.product, fp = sp.founding ? sp.founding.product : null;
                 offerCache = sp;
-                return {
-                    fromStore: true,
-                    title: String(pr.title || ''),
-                    price: String(pr.priceString || ''),
-                    period: periodText(pr.subscriptionPeriod),
-                    // A free intro offer: price 0, e.g. P1W / P7D.
-                    trial: intro && Number(intro.price) === 0 ? introPeriod(intro) : null
-                };
+                return rcEligible([pr.identifier].concat(fp ? [fp.identifier] : [])).then(function (elig) {
+                    var out = {
+                        fromStore: true,
+                        title: String(pr.title || ''),
+                        price: String(pr.priceString || ''),
+                        period: periodText(pr.subscriptionPeriod),
+                        // A free intro offer: price 0, e.g. P1W / P7D (not when this Apple ID already had it).
+                        trial: rcTrial(pr, elig)
+                    };
+                    // 062: the founding product (null = configured but not offered: the regular price only).
+                    if (foundingId()) out.founding = fp ? { price: String(fp.priceString || ''), trial: rcTrial(fp, elig) } : null;
+                    return out;
+                });
             });
         }).then(function (r) { cb(r || none); }, function () { cb(none); });
     }
@@ -300,8 +348,10 @@
             if (storeKit()) return skPurchase(opts);
             var go = function (sp) {
                 if (!sp) return result('unavailable', 'unavailable');
-                return plugin().purchasePackage({ aPackage: sp.pkg }).then(function (r) {
-                    set(activeIn(infoOf(r)));
+                // 062: the founding package while the paywall sells it (opts.founding) and the store offers it.
+                var pkg = opts && opts.founding && sp.founding ? sp.founding : sp.pkg;
+                return plugin().purchasePackage({ aPackage: pkg }).then(function (r) {
+                    takeInfo(infoOf(r));
                     return pro ? result('pro') : result('error', 'error');
                 }, function (e) {
                     if (cancelled(e)) return result('cancelled', 'cancelled');
@@ -324,9 +374,9 @@
                 return pro ? result('pro') : result('none', 'none');
             }, function () { return result('error', 'restoreError'); });
             return plugin().restorePurchases().then(function (r) {
-                set(activeIn(infoOf(r)));
+                takeInfo(infoOf(r));
                 // Read it again from the store, so the answer is the store's own.
-                return plugin().getCustomerInfo().then(function (r2) { set(activeIn(infoOf(r2))); }, function () {}).then(function () {
+                return plugin().getCustomerInfo().then(function (r2) { takeInfo(infoOf(r2)); }, function () {}).then(function () {
                     return pro ? result('pro') : result('none', 'none');
                 });
             }, function () { return result('error', 'restoreError'); });
@@ -357,7 +407,7 @@
         subscription: function () { return sub && enabled() ? JSON.parse(JSON.stringify(sub)) : null; },
         statusLine: function (now) { return enabled() && cfg().paywall === true ? lineFor(sub, now) : null; },
         onStatus: function (fn) { if (typeof fn === 'function') statusFns.push(fn); },
-        lineFor: lineFor, subOf: subOf, skOffer: skOffer, dateText: dateText,
+        lineFor: lineFor, subOf: subOf, skOffer: skOffer, rcFacts: rcFacts, dateText: dateText,
         MSG: MSG
     };
     if (typeof window !== 'undefined') {

@@ -61,8 +61,9 @@ if (process.env.GPS_DEV_PRO === '1') {
 // THE PAYWALL SWITCH (URGENT-062): GPS_PAYWALL=1 turns the GPS paywall ON in THIS build's
 // gps-config.js (the repo keeps paywall: false, so a normal build or install never locks GPS).
 // It wins over GPS_DEV_PRO (a dev build that counted as subscribed could not show the paywall):
-// with both set, the dev switch is left out. The store is StoreKit 2 (PhoneBridge HardPanStore);
-// run from Xcode with the App scheme, it answers from gps-beta/ios/App/App/HardPan.storekit.
+// with both set, the dev switch is left out. The store is gps-config iapStore (RevenueCat for 2.0;
+// HardPanStore StoreKit 2 kept). Run from Xcode with the App scheme, StoreKit answers from
+// gps-beta/ios/App/App/HardPan.storekit.
 if (process.env.GPS_PAYWALL === '1') {
     const cf = path.join(OUT, 'gps-config.js');
     fs.writeFileSync(cf, fs.readFileSync(cf, 'utf8').replace(/\nwindow\.HARDPAN_GPS_CONFIG\.devPro = true;\n/, '\n// (GPS_PAYWALL=1: the dev switch is left out.)\n')
