@@ -542,7 +542,7 @@
     // added to webLocal (drawn as its own local row) instead of a second, online row.
     function webBox(shown) {
         var w = S.web, raw = String(S.q || '').trim();
-        S.webLocal = [];
+        S.webLocal = []; S.webRows = [];
         if (!w || w.k !== webKey(raw)) return '';
         var p = w.pull;
         if (p) {
@@ -567,7 +567,44 @@
             if (rv && rv.row) { if (shown.indexOf(rv.row.key) === -1) { shown.push(rv.row.key); S.webLocal.push(rv.row); } return false; }
             return true;
         });
+        S.webRows = rows;
         return rows.length ? '<div id="sf-web">' + rows.map(webRowHtml).join('') + '</div>' : '';
+    }
+    // ---- 064: OPENSTREETMAP-ONLY COURSES IN SEARCH (Manny, Goldendale: "show OSM-only courses as 'Not set
+    // up yet · Add this course'") ---------------------------------------------------------------------
+    // The courses in the app's OpenStreetMap coverage files (gps-coverage-*.js) that have no card or key of
+    // ours (HardPanCourse.osmOnly). Matched like the others, drawn under them, at most 5: never ✓ GPS, never
+    // "Tap to load". A tap opens Round Setup's Add a course with the name filled in (the city shown under
+    // it); nothing is written until the golfer saves the course there. A course already listed, or one the
+    // online search lists, is not drawn twice.
+    var OSM_SHOWN = 5;
+    function osmHits(raw, listed) {
+        var c = HC(), all = [];
+        try { all = c && c.osmOnly ? c.osmOnly() : []; } catch (e) { all = []; }
+        if (!all.length) return [];
+        var have = {};
+        (listed || []).concat(S.webRows || []).forEach(function (x) { have[qWords(x.name || x.club).join(' ')] = 1; });
+        return localHits(all, raw).filter(function (x) { return !have[qWords(x.c.name).join(' ')]; }).slice(0, OSM_SHOWN).map(function (x) { return x.c; });
+    }
+    function osmRowHtml(c) {
+        var where = [c.city, c.state].filter(Boolean).join(', ');
+        return '<button type="button" class="sf-row sf-osm" style="display:block;" data-sf-osm="' + esc(c.osm || '') + '" data-sf-name="' + esc(c.name) + '" data-sf-city="' + esc(c.city || '') + '" data-sf-state="' + esc(c.state || '') + '">'
+            + '<span class="n" style="display:block;">' + esc(c.name) + '</span>'
+            + '<span class="s" style="display:block;white-space:normal;margin-top:2px;">' + (where ? esc(where) + ' · ' : '') + 'Not set up yet · <span style="font-weight:800;color:#0f4c3a;">Add this course</span></span></button>';
+    }
+    // The tap: Round Setup's own "Add a course" (the new-course form), the name filled in.
+    function addOsm(name, city, state) {
+        S.q = '';
+        away(step('course'), 'Course picked');
+        try { if (fn('showNewCourseForm')) W.showNewCourseForm(); } catch (e) {}
+        var box = $('new-course-name-input'), form = $('new-course-form');
+        if (box) box.value = name;
+        var where = [city, state].filter(Boolean).join(', '), note = $('sf-new-course-where');
+        if (form && box && where) {
+            if (!note) { note = D.createElement('p'); note.id = 'sf-new-course-where'; note.style.cssText = 'font-size:0.75rem;color:var(--text-muted);margin:-4px 0 8px 0;'; box.parentNode.insertBefore(note, box.nextSibling); }
+            note.textContent = where + ' · from OpenStreetMap';
+        } else if (note) note.remove();
+        try { (W.__sfAddOsm = W.__sfAddOsm || []).push(name); } catch (e) {}
     }
     // URGENT-028 (Manny, 1:03 PM: Papago open -> back -> Aguila from search -> Start Round -> Papago
     // hole 1 again). THE CAUSE: a tapped online course is only the pick once its pull (gpsCourse) and
@@ -838,8 +875,9 @@
             var shown = hits.map(function (c) { return c.key; }), web = webBox(shown);
             hits = hits.concat(S.webLocal);
             var waiting = S.web && S.web.k === webKey(S.q.trim()) && (S.web.state === 'busy' || S.web.pull);
-            body += '<div class="sf-h">RESULTS</div>' + hits.map(function (c) { return rowHtml(c, distTo(c), c.key === key); }).join('') + web
-                + (!hits.length && !web && !waiting ? '<div class="sf-note">' + (q.trim().length < 3 ? 'Keep typing — 3 letters searches all courses.' : 'No course found by that name.') + '</div>' : '')
+            var osm = S.web && S.web.pull ? [] : osmHits(S.q.trim(), hits);
+            body += '<div class="sf-h">RESULTS</div>' + hits.map(function (c) { return rowHtml(c, distTo(c), c.key === key); }).join('') + web + osm.map(osmRowHtml).join('')
+                + (!hits.length && !web && !osm.length && !waiting ? '<div class="sf-note">' + (q.trim().length < 3 ? 'Keep typing — 3 letters searches all courses.' : 'No course found by that name.') + '</div>' : '')
                 + '<button type="button" class="sf-link muted" data-sf="fullcourse" style="font-size:13px;">Not listed? Add a course ›</button>';
         }
         // URGENT-028: a tapped online course still loading IS the selected card (never the one before it).
@@ -1432,6 +1470,7 @@
     function onClick(ev) {
         var t = ev.target, b;
         if (!t || !t.closest) return;
+        if ((b = t.closest('[data-sf-osm]'))) { addOsm(b.getAttribute('data-sf-name'), b.getAttribute('data-sf-city'), b.getAttribute('data-sf-state')); return; }
         if ((b = t.closest('[data-sf-lkpick]'))) { lookPick(S.lookup && S.lookup.key, b.getAttribute('data-sf-lkpick')); return; }
         if ((b = t.closest('[data-sf-web]'))) { webPull(b.getAttribute('data-sf-web'), b.getAttribute('data-sf-name')); return; }
         if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.pend = null; S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; lookup(pk, pn); return; }
@@ -1499,7 +1538,7 @@
             return;
         }
         if (a === 'mix') { away(step('players'), 'Tees set'); return; }
-        if (a === 'fullcourse') { away(step('course'), 'Course picked'); return; }
+        if (a === 'fullcourse') { var wn = $('sf-new-course-where'); if (wn) wn.remove(); away(step('course'), 'Course picked'); return; }
         if (a === 'signin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t2 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t2); show(true); S.lookup = null; lookup(courseKey(), courseName()); render(); } }, 600); } return; }
         if (a === 'webback') { if (S.web) S.web.pull = null; S.pend = null; render1(); var q2 = $('sf-q'); if (q2) q2.focus(); return; }
         if (a === 'webretry') { S.web = null; webSearch(); return; }

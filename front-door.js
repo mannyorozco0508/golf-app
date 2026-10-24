@@ -351,6 +351,22 @@
         CR.rows = out; CR.sig = sig; CR.base = base; CR.alias = alias;
         return out;
     }
+    // 064 (Manny, Goldendale: "show OSM-only courses as 'Not set up yet · Add this course'"): the
+    // OpenStreetMap coverage courses list() leaves out (no key: no card, nothing to start) - for SEARCH
+    // only, as rows that open Add a course. A course list() already has (same name, or its twin within
+    // half a mile) is not one of them. Read from the files the app ships: no network, no writes.
+    function courseOsmOnly() {
+        var base = allCourses(), rows = courseList();
+        if (CR.osm && CR.osmRows === rows && CR.osmBase === base) return CR.osm;
+        var names = {}, clubs = {};
+        rows.forEach(function (r) { names[crNk(r.name)] = 1; var k = crClub(r.name); (clubs[k] = clubs[k] || []).push(r); });
+        var out = base.filter(function (c) {
+            if (c.key || !c.name || names[crNk(c.name)]) return false;
+            return !(clubs[crClub(c.name)] || []).some(function (r) { return !r.pt || !c.pt || miles(r.pt, c.pt) <= 0.5; });
+        });
+        CR.osm = out; CR.osmRows = rows; CR.osmBase = base;
+        return out;
+    }
     function courseNear(here, n) {
         if (!here) return [];
         var all = courseList().filter(function (c) { return c.pt; }).map(function (c) { return { c: c, d: miles(here, c.pt) }; })
@@ -395,7 +411,7 @@
         });
         return out;
     }
-    W.HardPanCourse = { list: courseList, near: courseNear, resolve: courseResolve, hasCard: courseHasCard, gps: courseGpsRec, teeRows: teeRows,
+    W.HardPanCourse = { list: courseList, osmOnly: courseOsmOnly, near: courseNear, resolve: courseResolve, hasCard: courseHasCard, gps: courseGpsRec, teeRows: teeRows,
         refresh: function () { C.list = null; CR.rows = null; } };
     function where(c, dist) {
         var bits = [];
