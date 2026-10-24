@@ -23,6 +23,8 @@ struct ContentView: View {
                     .font(.footnote)
             }
             .padding()
+            // 066: a round may already be live on the phone - ask for its hole instead of waiting.
+            .onAppear { session.askForHole() }
         }
     }
 
@@ -31,6 +33,7 @@ struct ContentView: View {
         let s = session.state
         let unit = (s?.units == "m") ? "m" : "yds"
         let spoken = (s?.units == "m") ? "meters" : "yards"
+        ScrollView {   // 066: the score row and the card line fit a 41 mm screen by scrolling
         VStack(spacing: 4) {
             HStack {
                 Button { session.step(-1) } label: { Image(systemName: "chevron.left") }
@@ -79,19 +82,47 @@ struct ContentView: View {
             }
 
             NavigationLink {
-                ScoreEntryView(hole: hole, par: s?.par ?? 4, saved: s?.hole == hole ? s?.score : nil)
+                let mine = s?.hole == hole
+                ScoreEntryView(hole: hole, par: s?.par ?? 4, saved: mine ? s?.score : nil,
+                               savedPutts: mine ? s?.putts : nil, puttsOn: s?.stats ?? false)
             } label: {
                 Text(scoreLabel(hole)).frame(maxWidth: .infinity)
             }
             .accessibilityHint("Enter your score for hole \(hole)")
+
+            // 066: the card so far, as the phone has it (phone scores show here too).
+            if let line = roundLine() {
+                Text(line).font(.caption2).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.7)
+                    .accessibilityLabel(roundSpoken() ?? line)
+            }
         }
         .padding(.horizontal, 4)
+        }
     }
 
     private func scoreLabel(_ hole: Int) -> String {
-        if let n = session.unsent[hole] { return "Score \(n) · sending" }
-        if let s = session.state, s.hole == hole, let n = s.score { return "Score \(n)" }
+        if let n = session.unsent[hole] { return "Score \(n)" + puttsText(session.unsentPutts[hole]) + " · sending" }
+        if let s = session.state, s.hole == hole, let n = s.score { return "Score \(n)" + puttsText(s.putts) }
         return "Enter score"
+    }
+    private func puttsText(_ p: Int?) -> String {
+        guard let p else { return "" }
+        return p == 1 ? " · 1 putt" : (p >= 4 ? " · 4+ putts" : " · \(p) putts")
+    }
+    private func toParText(_ v: Int) -> String { v == 0 ? "E" : (v > 0 ? "+\(v)" : "\(v)") }
+    /// "Manny · Thru 3 · 14 (+2)" - the phone's card for this golfer; nil before a first score.
+    private func roundLine() -> String? {
+        guard let s = session.state, let thru = s.thru, thru > 0, let total = s.total else { return nil }
+        var parts: [String] = []
+        if !s.name.isEmpty { parts.append(s.name) }
+        parts.append("Thru \(thru)")
+        parts.append(s.toPar.map { "\(total) (\(toParText($0)))" } ?? "\(total)")
+        return parts.joined(separator: " · ")
+    }
+    private func roundSpoken() -> String? {
+        guard let s = session.state, let thru = s.thru, thru > 0, let total = s.total else { return nil }
+        let par = s.toPar.map { $0 == 0 ? ", even par" : ($0 > 0 ? ", \($0) over par" : ", \(-$0) under par") } ?? ""
+        return "\(s.name.isEmpty ? "" : s.name + ", ")through \(thru) holes, \(total) strokes\(par)"
     }
 
     private func number(_ letter: String, _ v: Int?, label: String, spoken: String, size: Font, onGreen: Bool = false) -> some View {

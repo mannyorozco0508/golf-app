@@ -77,6 +77,9 @@ final class PhoneWatchSession: NSObject {
     }
 
     private func received(_ d: [String: Any]) {
+        // 066: the watch opened (or woke) with nothing on screen - it gets the last hole again at once,
+        // from here: the web view may be busy or suspended, and the phone already knows the answer.
+        if (d[WatchKey.kind] as? String) == WatchKind.sync { resendLast(); return }
         // A sendMessage that also fell back to transferUserInfo arrives twice: once is enough.
         if let id = d[WatchKey.id] as? String {
             if seenIds.contains(id) { return }

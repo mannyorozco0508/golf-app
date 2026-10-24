@@ -7675,8 +7675,47 @@
             var pl = null; try { pl = playsNow(); } catch (e) { pl = null; }
             if (pl && isFinite(pl.exact) && !onGreen) { var pv = Math.round(pl.exact * (u === 'm' ? G.M_PER_YD : 1)); plays = pv > 0 && pv <= 9999 ? pv : null; }
         }
+        var card = watchCard(hole, pro);
         return { hole: hole, par: par, front: front, center: center, back: back, plays: plays, units: u === 'm' ? 'm' : 'yd',
-            onGreen: onGreen, entitled: pro, tournament: tournament(), score: myScore(hole), round: String(S.eventCode || '') };
+            onGreen: onGreen, entitled: pro, tournament: tournament(), score: myScore(hole), round: String(S.eventCode || ''),
+            putts: card.putts, stats: card.stats, thru: card.thru, total: card.total, toPar: card.toPar, name: card.name };
+    }
+    // 066: THE GOLFER'S OWN CARD ON THE WATCH - read from what the phone already has: the round's
+    // scores (the card), this hole's putts from the quick stats on this phone (gps-stats.js, GPS Map
+    // + the quickStats switch, the same gate as the card's putts chips), the golfer's short name.
+    function watchStatsOn(pro) {
+        try { return !!(pro && window.HardPanGpsStats && window.HardPanGpsStats.quick && typeof window.HardPanFeature === 'function' && window.HardPanFeature('quickStats')); } catch (e) { return false; }
+    }
+    function watchPar(h) {
+        var m = typeof S.holeMeta === 'function' ? (S.holeMeta(h) || {}) : {};
+        if (Number(m.par) > 0) return Number(m.par);
+        var c = ((S.round && S.round.courseData) || []).filter(function (x) { return x && Number(x.hole) === Number(h); })[0];
+        return c && Number(c.par) > 0 ? Number(c.par) : null;
+    }
+    function watchCard(hole, pro) {
+        var out = { putts: null, stats: false, thru: null, total: null, toPar: null, name: '' };
+        var w = scoreFor();
+        if (!w || w.id == null) return out;
+        try { var d = roundData(); out.name = String((d && w.player ? shortName(d, w.player) : '') || '').slice(0, 24); } catch (e) {}
+        var thru = 0, total = 0, toPar = 0, parsKnown = true;
+        Object.keys(w.scores || {}).forEach(function (k) {
+            var m = /^p(.+)_h(\d+)$/.exec(k);
+            if (!m || String(m[1]) !== String(w.id)) return;
+            var v = Number(w.scores[k]);
+            if (!(v > 0) || Math.floor(v) !== v) return;
+            thru++; total += v;
+            var p = watchPar(Number(m[2]));
+            if (p) toPar += v - p; else parsKnown = false;
+        });
+        if (thru) { out.thru = thru; out.total = total; out.toPar = parsKnown ? toPar : null; }
+        out.stats = watchStatsOn(pro);
+        if (out.stats) {
+            try {
+                var c = window.HardPanGpsStats.quick.hole(String(S.eventCode || ''), w.id, hole, myScore(hole) || 0, watchPar(hole) || Number(S.par) || 4);
+                out.putts = c && c.putts != null && isFinite(c.putts) ? Number(c.putts) : null;
+            } catch (e) { out.putts = null; }
+        }
+        return out;
     }
     function watchSync(nums, aim, o, u) {
         var p = watchPlugin();
@@ -7715,6 +7754,19 @@
         var w = scoreFor();
         if (!w || w.id == null) return false;
         S.saveScore(w.id, h, String(n));
+        // 066: putts typed on the watch go where the card's putts chips put them (the quick stats on
+        // this phone - never Firebase, never a money engine), only with GPS Map + quick stats on.
+        var pt = ev.putts;
+        if (pt != null && Number(pt) >= 0 && Number(pt) <= n && Math.floor(Number(pt)) === Number(pt) && watchStatsOn(hasGpsPro())) {
+            try {
+                window.HardPanGpsStats.quick.set({ code: String(S.eventCode || ''), course: (S.round && S.round.courseName) || '' }, w.id, h,
+                    { putts: Number(pt) }, n, watchPar(h) || (h === Number(S.hole) ? Number(S.par) : 0) || 4);
+            } catch (e) {}
+        }
+        // The watch hears back at once (its "sending" clears): the putts never come back through the
+        // round, and the score may wait in the offline queue.
+        watchLast = null;
+        try { render(); } catch (e) {}
         return true;
     }
 
