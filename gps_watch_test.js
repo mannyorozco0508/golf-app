@@ -83,8 +83,11 @@ test('switch on + plugin: the current hole\'s F / C / B, in the golfer\'s units'
     // 022: plays (the phone's own plays-like to the center) rides along - a number, or null when the phone has none.
     assert.ok(last.plays === null || (Number.isInteger(last.plays) && last.plays > 0), 'plays: ' + last.plays);
     const { plays, ...rest } = last;
-    assert.deepStrictEqual(rest, { hole: 4, par: 5, front: 231, center: 243, back: 255, units: 'yd', onGreen: false, entitled: true, tournament: false, score: 5, round: 'ABC' });
-    assert.deepStrictEqual(Object.keys(last).sort(), ['back', 'center', 'entitled', 'front', 'hole', 'onGreen', 'par', 'plays', 'round', 'score', 'tournament', 'units']);
+    // 066 (watch scoring): + the golfer's own card - this hole's putts (null: none; stats false: no quick
+    // stats here), holes scored, strokes, to par (null: a scored hole's par unknown), whose card.
+    assert.deepStrictEqual(rest, { hole: 4, par: 5, front: 231, center: 243, back: 255, units: 'yd', onGreen: false, entitled: true, tournament: false, score: 5, round: 'ABC',
+        putts: null, stats: false, thru: 1, total: 5, toPar: null, name: 'Manny' });
+    assert.deepStrictEqual(Object.keys(last).sort(), ['back', 'center', 'entitled', 'front', 'hole', 'name', 'onGreen', 'par', 'plays', 'putts', 'round', 'score', 'stats', 'thru', 'toPar', 'total', 'tournament', 'units']);
     // NO LOCATION DATA LEAVES THE PHONE: numbers only - no lat / lng, no point, no accuracy.
     assert.ok(!/lat|lng|lon|pt|acc|33\.4|79\.1/i.test(JSON.stringify(last)), JSON.stringify(last));
     assert.deepStrictEqual(w.V.watchSent(), last);

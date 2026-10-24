@@ -25,12 +25,36 @@ final class WatchSessionManager: NSObject, ObservableObject {
     @Published private(set) var reachable = false
     /// Scores handed to WatchConnectivity that the phone has not echoed back yet (hole -> strokes).
     @Published private(set) var unsent: [Int: Int] = [:]
+    /// 066: putts sent with those scores (hole -> putts), until the phone echoes them.
+    @Published private(set) var unsentPutts: [Int: Int] = [:]
+    /// 066: when the last "send me the hole again" went (one at a time, not a stream).
+    private var syncAskedAt: Date?
 
     private override init() {
         super.init()
         guard WCSession.isSupported() else { return }
         WCSession.default.delegate = self
         WCSession.default.activate()
+        checkActivation(after: 8)
+    }
+
+    /// 066 - THE "Open a round..." BUG (053; reproduced on the paired Simulator, 2026-10-24): a watch app
+    /// opened within moments of being installed activates its session before the watch's
+    /// WatchConnectivity daemon knows the app ("Failed to get applicationInfo"). That activation never
+    /// completes, and activating again only answers "already in progress" - the phone's hole waits
+    /// until the app is closed and opened again (then it shows at once). So the watch says so.
+    @Published private(set) var stuck = false
+    private func checkActivation(after delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            self.stuck = WCSession.default.activationState != .activated
+        }
+    }
+    /// 066: the app came to the screen - a session that is still not activated is tried again now.
+    func wake() {
+        let wc = WCSession.default
+        guard WCSession.isSupported() else { return }
+        if wc.activationState != .activated { checkActivation(after: 8) } else if state == nil { askForHole() }
     }
 
     /// The hole on screen: the asked-for one while waiting, else the phone's.
@@ -47,10 +71,24 @@ final class WatchSessionManager: NSObject, ObservableObject {
               WatchKey.hole: next, WatchKey.round: state?.round ?? ""])
     }
 
-    func saveScore(hole: Int, strokes: Int) {
-        let s = WatchScore(hole: hole, strokes: strokes, round: state?.round ?? "")
+    func saveScore(hole: Int, strokes: Int, putts: Int? = nil) {
+        // Putts only where the phone keeps them (its quick stats); otherwise the score alone.
+        let p = (state?.stats ?? false) ? putts : nil
+        let s = WatchScore(hole: hole, strokes: strokes, putts: p, round: state?.round ?? "")
         unsent[hole] = strokes
+        if let sp = s.putts { unsentPutts[hole] = sp } else { unsentPutts[hole] = nil }
         send(s.dictionary)
+    }
+
+    /// 066: nothing on screen (a fresh launch, a wake, a pairing made after the phone last sent):
+    /// ask the phone for its current hole. sendMessage only - a queued "sync" from an hour ago means
+    /// nothing - and at most one every 5 seconds.
+    func askForHole() {
+        let wc = WCSession.default
+        guard wc.activationState == .activated, wc.isReachable else { return }
+        if let t = syncAskedAt, Date().timeIntervalSince(t) < 5 { return }
+        syncAskedAt = Date()
+        wc.sendMessage([WatchKey.kind: WatchKind.sync, WatchKey.v: watchProtocolVersion], replyHandler: nil, errorHandler: nil)
     }
 
     private func send(_ msg: [String: Any]) {
@@ -70,41 +108,58 @@ final class WatchSessionManager: NSObject, ObservableObject {
     /// TESTS ONLY (Debug builds): `-hpAutoScore N` on the watch app's launch arguments saves N for the
     /// first hole the phone sends - the same saveScore as the Save button (simulators cannot tap the watch).
     private var autoScoreDone = false
-    private var autoScore: Int? {
+    private var autoScore: Int? { launchInt("-hpAutoScore", 1...20) }
+    /// 066: `-hpAutoPutts P` goes with -hpAutoScore (the same Save, with putts).
+    private var autoPutts: Int? { launchInt("-hpAutoPutts", 0...9) }
+    private func launchInt(_ flag: String, _ r: ClosedRange<Int>) -> Int? {
         let a = ProcessInfo.processInfo.arguments
-        guard let i = a.firstIndex(of: "-hpAutoScore"), i + 1 < a.count, let n = Int(a[i + 1]), (1...20).contains(n) else { return nil }
+        guard let i = a.firstIndex(of: flag), i + 1 < a.count, let n = Int(a[i + 1]), r.contains(n) else { return nil }
         return n
     }
     #endif
 
     fileprivate func apply(_ d: [String: Any]) {
-        if (d[WatchKey.kind] as? String) == WatchKind.clear { state = nil; pendingHole = nil; return }
+        if (d[WatchKey.kind] as? String) == WatchKind.clear { state = nil; pendingHole = nil; unsent = [:]; unsentPutts = [:]; return }
         guard let s = HoleState(d) else { return }
         state = s
         #if DEBUG
         if !autoScoreDone, let n = autoScore, !s.round.isEmpty {
             autoScoreDone = true
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.saveScore(hole: s.hole, strokes: n) }
+            let p = autoPutts
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { self.saveScore(hole: s.hole, strokes: n, putts: p) }
         }
         #endif
         if pendingHole == s.hole { pendingHole = nil }
         // The phone's saved score is the truth: the watch stops showing its own copy as "sending".
         if let saved = s.score, unsent[s.hole] == saved { unsent[s.hole] = nil }
+        if let sp = unsentPutts[s.hole], s.putts == sp || !s.stats { unsentPutts[s.hole] = nil }
+        // A score for another round never shows as "sending" on this one.
+        if !s.round.isEmpty, s.round != lastRound { unsent = [:]; unsentPutts = [:]; lastRound = s.round }
     }
+    private var lastRound = ""
 }
 
 extension WatchSessionManager: WCSessionDelegate {
     nonisolated func session(_ session: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?) {
         let ctx = session.receivedApplicationContext
         let r = session.isReachable
+        let failed = state != .activated
         Task { @MainActor in
+            self.stuck = failed   // 066: never give up silently - the screen says what to do
+            if failed { return }
             self.reachable = r
             if !ctx.isEmpty { self.apply(ctx) }
+            // 066 ("Open a round..." while the phone was sending): the stored context can be empty or
+            // old - a pairing made after the phone's last send, a watch app installed later. Ask.
+            self.askForHole()
         }
     }
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         let r = session.isReachable
-        Task { @MainActor in self.reachable = r }
+        Task { @MainActor in
+            self.reachable = r
+            if r && self.state == nil { self.askForHole() }
+        }
     }
     nonisolated func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
         Task { @MainActor in self.apply(applicationContext) }

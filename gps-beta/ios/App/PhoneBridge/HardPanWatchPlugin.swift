@@ -6,11 +6,12 @@
 // `cap sync` are not involved.
 //
 // JS API (gps-view.js uses it only when HardPanFeature('watch') is on):
-//   sendHole({ hole, par, front, center, back, units, onGreen, entitled, tournament, score, round })
+//   sendHole({ hole, par, front, center, back, units, onGreen, entitled, tournament, score, round,
+//              putts, stats, thru, total, toPar, name })   (066: the golfer's own card)
 //   status() -> { supported, paired, installed, reachable, activated }
 //   pending() -> { items: [ { kind: 'score', hole, strokes, round, id, at }, ... ] }
 //   clear()   - no round open: the watch says "Open a round on iPhone"
-//   events: 'watchScore' { hole, strokes, round, id, at }, 'watchHole' { hole, round }
+//   events: 'watchScore' { hole, strokes, putts?, round, id, at }, 'watchHole' { hole, round }
 
 import Foundation
 import Capacitor
@@ -40,7 +41,11 @@ public class HardPanWatchPlugin: CAPPlugin, CAPBridgedPlugin {
                                 WatchKey.tournament: call.getBool("tournament") ?? false,
                                 WatchKey.round: call.getString("round") ?? ""]
         // JS null = absent here (a property list has no nil). Numbers only - never a coordinate.
-        for k in [WatchKey.par, WatchKey.front, WatchKey.center, WatchKey.back, WatchKey.plays, WatchKey.score] {
+        // 066: the golfer's own card - this hole's putts, holes scored, strokes, strokes against par.
+        d[WatchKey.stats] = call.getBool("stats") ?? false
+        d[WatchKey.name] = String((call.getString("name") ?? "").prefix(24))
+        for k in [WatchKey.par, WatchKey.front, WatchKey.center, WatchKey.back, WatchKey.plays, WatchKey.score,
+                  WatchKey.putts, WatchKey.thru, WatchKey.total, WatchKey.toPar] {
             if let n = call.getInt(k) { d[k] = n }
         }
         if d[WatchKey.entitled] as? Bool != true {   // GPS Map (007): no numbers for an unentitled phone

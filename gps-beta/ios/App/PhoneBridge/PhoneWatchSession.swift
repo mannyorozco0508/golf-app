@@ -28,6 +28,11 @@ final class PhoneWatchSession: NSObject {
     /// installed / reachable is dropped, and gps-view.js only re-sends when a number changes - so the
     /// session re-sends this one itself as soon as it can (a golfer standing on the tee still gets numbers).
     private var lastHole: [String: Any]?
+    /// 066 - THE "Open a round..." BUG (053; reproduced on the paired Simulator 2026-10-24): the phone's
+    /// WCSession said isWatchAppInstalled = false while HardPan was open on the paired watch, so every
+    /// hole was dropped here (JS saw the sends succeed). Once the watch app itself has messaged this
+    /// phone, it is installed: the golfer's own paired watch, so the hole goes to it.
+    private var heardFromWatch = false
     private let lock = NSLock()
 
     private override init() { super.init() }
@@ -60,7 +65,8 @@ final class PhoneWatchSession: NSObject {
     private func deliver(_ d: [String: Any]) {
         guard WCSession.isSupported() else { return }
         let s = WCSession.default
-        guard s.activationState == .activated, s.isPaired, s.isWatchAppInstalled else { return }
+        lock.lock(); let heard = heardFromWatch; lock.unlock()
+        guard s.activationState == .activated, s.isPaired, s.isWatchAppInstalled || heard else { return }
         try? s.updateApplicationContext(d)
         if s.isReachable { s.sendMessage(d, replyHandler: nil, errorHandler: nil) }
     }
@@ -77,6 +83,10 @@ final class PhoneWatchSession: NSObject {
     }
 
     private func received(_ d: [String: Any]) {
+        lock.lock(); heardFromWatch = true; lock.unlock()
+        // 066: the watch opened (or woke) with nothing on screen - it gets the last hole again at once,
+        // from here: the web view may be busy or suspended, and the phone already knows the answer.
+        if (d[WatchKey.kind] as? String) == WatchKind.sync { resendLast(); return }
         // A sendMessage that also fell back to transferUserInfo arrives twice: once is enough.
         if let id = d[WatchKey.id] as? String {
             if seenIds.contains(id) { return }

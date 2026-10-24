@@ -34,7 +34,9 @@ test('045: phone -> watch carries numbers only - the plugin copies a fixed list 
     const m = /for k in \[([^\]]+)\]/.exec(plugin);
     assert.ok(m, 'the plugin copies a fixed list of number keys');
     assert.deepStrictEqual(m[1].split(',').map((x) => x.trim()).sort(),
-        ['WatchKey.back', 'WatchKey.center', 'WatchKey.front', 'WatchKey.par', 'WatchKey.plays', 'WatchKey.score']);
+        // 066 (watch scoring): + this hole's putts and the card so far (holes scored, strokes, against par) - still numbers only.
+        ['WatchKey.back', 'WatchKey.center', 'WatchKey.front', 'WatchKey.par', 'WatchKey.plays', 'WatchKey.putts', 'WatchKey.score',
+            'WatchKey.thru', 'WatchKey.toPar', 'WatchKey.total']);
     assert.ok(/call\.getInt\(k\)/.test(plugin), 'as integers (a coordinate is never an Int key here)');
     assert.ok(!/getDouble|getArray|getObject/.test(plugin), 'no other value is read from JS');
     const proto = read('Watch/Shared/WatchProtocol.swift');
