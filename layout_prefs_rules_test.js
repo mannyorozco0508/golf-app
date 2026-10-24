@@ -32,7 +32,8 @@ const NOW = Date.now();
 const GOOD = { v: 1, order: ['ticker', 'leaderboard', 'stats'], on: { ticker: true }, at: NOW - 1000 };
 const ROOT = {
     events: { ZZTEST: { eventName: 'Test round', ownerUid: ME, scores: { p101_h1: 4 } } },
-    layoutPrefs: { [ME]: { v: 1, order: ['ticker'], at: 1 } }
+    layoutPrefs: { [ME]: { v: 1, order: ['ticker'], at: 1 } },
+    pushPrefs: { [ME]: { bets: false, hype: false } }
 };
 const USERS = {
     nobody: null,
@@ -58,6 +59,11 @@ const W = [
     { id: 'L14', what: 'a stamp in the future', who: 'me', next: 'refuse', live: 'refuse', path: 'layoutPrefs/' + ME, data: with_({ at: 4102444800000 }) },
     { id: 'L15', what: 'no order', who: 'me', next: 'refuse', live: 'refuse', path: 'layoutPrefs/' + ME, data: { v: 1, at: 5 } },
     { id: 'L16', what: 'a bad id as a switch key', who: 'me', next: 'refuse', live: 'refuse', path: 'layoutPrefs/' + ME, data: with_({ on: { 'x y': true } }) },
+    { id: 'N1', what: 'I turn Round results on (essentials)', who: 'me', next: 'allow', live: 'refuse', path: 'pushPrefs/' + ME + '/essentials', data: true },
+    { id: 'N2', what: 'I turn Round results off', who: 'me', next: 'allow', live: 'refuse', path: 'pushPrefs/' + ME + '/essentials', data: false },
+    { id: 'N3', what: 'somebody else turns MY Round results off', who: 'other', next: 'refuse', live: 'refuse', path: 'pushPrefs/' + ME + '/essentials', data: false },
+    { id: 'N4', what: 'a non-boolean essentials', who: 'me', next: 'refuse', live: 'refuse', path: 'pushPrefs/' + ME + '/essentials', data: 'yes' },
+    { id: 'N5', what: 'bets / hype save exactly as today', who: 'me', next: 'allow', live: 'allow', path: 'pushPrefs/' + ME + '/bets', data: true },
     { id: 'X1', what: 'a score write is unchanged by this delta', who: 'anon', next: 'allow', live: 'allow', path: 'events/ZZTEST/scores/p101_h2', data: 4 }
 ];
 const R = [
@@ -103,14 +109,18 @@ describe('layoutPrefs/<uid>: owner-only, a proposal', () => {
         assert.ok(W.filter((r) => r.next === 'refuse').length >= 8);
     });
 
-    test('THE DELTA IS EXACTLY ONE NEW TOP-LEVEL NODE; events and everything else unchanged', () => {
+    test('THE DELTA: layoutPrefs added, pushPrefs gains essentials; events and everything else unchanged', () => {
         const base = JSON.parse(fs.readFileSync(BASE, 'utf8')), next = JSON.parse(fs.readFileSync(NEXT, 'utf8'));
         const diffs = [];
         Object.keys(next.rules).forEach((k) => { if (!(k in base.rules)) diffs.push('ADDED ' + k); else if (JSON.stringify(base.rules[k]) !== JSON.stringify(next.rules[k])) diffs.push('CHANGED ' + k); });
         Object.keys(base.rules).forEach((k) => { if (!(k in next.rules)) diffs.push('REMOVED ' + k); });
-        assert.deepEqual(diffs, ['ADDED layoutPrefs']);
+        assert.deepEqual(diffs.sort(), ['ADDED layoutPrefs', 'CHANGED pushPrefs']);
         assert.equal(JSON.stringify(base.rules.events), JSON.stringify(next.rules.events), 'rounds, scores and money are untouched');
-        assert.equal(JSON.stringify(base.rules.pushPrefs), JSON.stringify(next.rules.pushPrefs), 'notification settings rule unchanged');
+        // pushPrefs: ONE key added (essentials, a boolean) - Round results is a switch now (Manny, approved 2026-10-24).
+        const bp = base.rules.pushPrefs.$uid, np = next.rules.pushPrefs.$uid;
+        assert.deepEqual(Object.keys(np).filter((k) => !(k in bp)), ['essentials']);
+        assert.deepEqual(np.essentials, { '.validate': 'newData.isBoolean()' });
+        Object.keys(bp).forEach((k) => assert.equal(JSON.stringify(np[k]), JSON.stringify(bp[k]), 'pushPrefs/' + k + ' unchanged'));
     });
 
     test('the proposal does what the table says', () => {

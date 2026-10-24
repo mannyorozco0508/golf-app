@@ -271,9 +271,19 @@ describe('3. NO APNs KEY IS THE STATE TODAY, AND IT MUST BE QUIET', () => {
         assert.equal(wrote, 0);
     });
 
-    test('essentials is NOT stored - a value nothing reads is a value that will disagree', () => {
-        assert.deepEqual(B.pushPrefsForSave({ bets: false, hype: true, essentials: false }), { bets: false, hype: true });
-        assert.deepEqual(Object.keys(B.pushPrefsForSave({})), ['bets', 'hype']);
+    // 066 #1 (Manny, approved 2026-10-24): essentials is a switch now, so it is stored like the others.
+    test('all three switches are stored, all off by default', () => {
+        assert.deepEqual(B.pushPrefsForSave({ bets: false, hype: true, essentials: true }), { essentials: true, bets: false, hype: true });
+        assert.deepEqual(B.pushPrefsForSave({}), { essentials: false, bets: false, hype: false });
+    });
+    test('NO iOS PROMPT until a switch is on: opted-in only when one of the three is', () => {
+        assert.equal(B.pushOptedIn({}), false);
+        assert.equal(B.pushOptedIn({ hype: true }), true);
+        assert.equal(B.pushOptedIn({ essentials: true }), true);
+    });
+    test('the in-round registration asks only for a golfer who opted in (index.html)', () => {
+        const idx = read('index.html');
+        assert.match(idx, /ask: \(typeof pushOptinHere === 'function'\) \? pushOptinHere\(\) : false,/);
     });
 });
 
@@ -308,7 +318,7 @@ describe('4. THE CREDENTIAL IS NOWHERE NEAR THE BROWSER', () => {
     test('THE MESSAGE CARRIES NO SENTENCE OF ITS OWN - it reads the decision', async () => {
         const M = await import('./functions/api/_push.js');
         const decided = P.pushDecide({
-            kind: 'final-results', tokens: ['t'], prefs: {},
+            kind: 'final-results', tokens: ['t'], prefs: { essentials: true },
             facts: { uid: 'u-1', roundCode: 'G', roundName: 'Sat', netCents: 4000 },
             alreadySent: {}, buzzedHoles: {}, now: 0
         });

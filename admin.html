@@ -1492,13 +1492,17 @@ body::before {
          would save a preference nothing could ever act on. -->
     <section id="notify-card" class="email-link-card" aria-labelledby="notify-title" style="display:none;">
         <h2 id="notify-title">Notifications</h2>
-        <p id="notify-lead">You're asked for permission when you open a round, not before.</p>
+        <p id="notify-lead">Nothing is sent until you turn one on. Your phone asks for permission when you do.</p>
         <!-- THE COPY NAMES WHAT IS ACTUALLY SENT (2026-10-04). It promised a tee
              time and a 30-minute reminder, both of which were removed before they
              shipped, and a press offer, which has no record to answer - a press is
              a thing you do, not a thing you ask. Five notifications exist: you're
              in, final results, a bet challenge, an Aloha offer, and hype. -->
-        <p id="notify-essentials" style="font-weight:bold;">⛳ Essentials &mdash; always on. You&rsquo;re in a round, and the final results.</p>
+        <!-- 066 #1 (Manny approved 2026-10-24): Essentials is a switch now, OFF until turned on, like the other two. -->
+        <label id="notify-essentials" style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px; font-weight:bold;">
+            <input type="checkbox" id="notify-ess" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">
+            <span>⛳ Round results &mdash; you&rsquo;re in a round, and the final results</span>
+        </label>
         <label style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px;">
             <input type="checkbox" id="notify-bets" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">
             <span>💰 Bets &mdash; somebody challenges you to a side bet, or offers you an Aloha</span>
@@ -8916,9 +8920,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
 
     function notifyPrefsApply(raw) {
-        var p = (typeof pushPrefsNormalise === 'function') ? pushPrefsNormalise(raw) : { bets: true, hype: true };
+        if (typeof pushPrefsWithLocal === 'function') raw = pushPrefsWithLocal(raw);
+        var p = (typeof pushPrefsNormalise === 'function') ? pushPrefsNormalise(raw) : { essentials: false, bets: false, hype: false };
+        var ess = document.getElementById('notify-ess');
         var bets = document.getElementById('notify-bets');
         var hype = document.getElementById('notify-hype');
+        if (ess) ess.checked = !!p.essentials;
         if (bets) bets.checked = !!p.bets;
         if (hype) hype.checked = !!p.hype;
     }
@@ -8938,11 +8945,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // makes a true claim look false. The guard is right; the name was mine to
         // change. And this comment does not spell the call out, because doing so
         // trips the same search.
+        var ess = document.getElementById('notify-ess');
         var prefsPayload = (typeof pushPrefsForSave === 'function')
-            ? pushPrefsForSave({ bets: bets && bets.checked, hype: hype && hype.checked })
-            : { bets: !!(bets && bets.checked), hype: !!(hype && hype.checked) };
+            ? pushPrefsForSave({ essentials: ess && ess.checked, bets: bets && bets.checked, hype: hype && hype.checked })
+            : { essentials: !!(ess && ess.checked), bets: !!(bets && bets.checked), hype: !!(hype && hype.checked) };
+        // 066 #1: the FIRST switch turned on is the moment iOS is asked (never before).
+        var optIn = !!(prefsPayload.essentials || prefsPayload.bets || prefsPayload.hype);
+        if (typeof pushSetOptinHere === 'function') pushSetOptinHere(optIn);
+        if (optIn && typeof registerThisPhone === 'function') { try { registerThisPhone(); } catch (e) {} }
         try {
-            await db.ref(notifyPrefsPath(uid)).update(prefsPayload);
+            if (typeof pushPrefsSave === 'function') await pushPrefsSave(db.ref(notifyPrefsPath(uid)), prefsPayload);
+            else await db.ref(notifyPrefsPath(uid)).update(prefsPayload);
             if (note) note.textContent = 'Saved.';
         } catch (e) {
             // THE RULES ARE NOT PUBLISHED YET, so this is the expected answer

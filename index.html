@@ -7172,6 +7172,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         try {
             pushRegisterToken({
                 uid: uid, playerId: playerId, roundCode: currentMode,
+                // 066 #1 (Manny approved): NO iOS PROMPT until the golfer has turned a notification
+                // on (Tools > Customize, or the account screen). Already granted: registered as before.
+                ask: (typeof pushOptinHere === 'function') ? pushOptinHere() : false,
                 // ONE DEVICE, ONE ROW. The row key is the token's own fingerprint,
                 // so re-registering the same phone updates its row instead of
                 // adding a second one - and a golfer with a phone and a watch

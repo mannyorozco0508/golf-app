@@ -519,6 +519,9 @@
         "hype": {
           ".validate": "newData.isBoolean()"
         },
+        "essentials": {
+          ".validate": "newData.isBoolean()"
+        },
         "$other": {
           ".validate": false
         }

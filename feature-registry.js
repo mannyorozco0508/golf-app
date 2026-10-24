@@ -358,35 +358,52 @@
     }
     function coreRow(ic, l, s) { return '<div class="hpf-row hpf-core-row"><span class="hpf-ic" aria-hidden="true">' + ic + '</span><div class="hpf-txt"><div class="hpf-l">' + esc(l) + '</div><div class="hpf-s">' + esc(s) + '</div></div><span class="hpf-core">Always</span></div>'; }
 
-    // NOTIFICATIONS: the SAME two switches as the account screen (admin.html, Wave 39), the same
-    // store (pushPrefs/<uid> via push-boot.js pushPrefsForSave) and the same defaults
-    // (push-notify.js pushPrefsNormalise). Only in the app, as there: a browser has no push.
+    // NOTIFICATIONS (Manny, approved 2026-10-24): three switches - Round results (essentials),
+    // Game challenges & presses (bets), Birdies & big moments (hype) - ALL OFF until the golfer
+    // turns one on, and NO iOS permission prompt until then. The same store as the account
+    // screen (pushPrefs/<uid> via push-boot.js pushPrefsForSave) and the same normaliser
+    // (push-notify.js). Only in the app, as there: a browser has no push.
     var notif = { prefs: null, saving: false };
     function notifyUid() { try { var u = W.firebase && W.firebase.auth && W.firebase.auth().currentUser; return u && u.uid ? u.uid : null; } catch (e) { return null; } }
-    function notifPrefs() { var raw = notif.prefs; return typeof W.pushPrefsNormalise === 'function' ? W.pushPrefsNormalise(raw) : { essentials: true, bets: !raw || raw.bets !== false, hype: !raw || raw.hype !== false }; }
+    function notifPrefs() { var raw = typeof W.pushPrefsWithLocal === 'function' ? W.pushPrefsWithLocal(notif.prefs) : notif.prefs; return typeof W.pushPrefsNormalise === 'function' ? W.pushPrefsNormalise(raw) : { essentials: !!(raw && raw.essentials === true), bets: !!(raw && raw.bets === true), hype: !!(raw && raw.hype === true) }; }
     function notifHtml() {
         if (!isNative()) return '<div class="hpf-note">Notifications are set in the HardPan app on your phone.</div>';
         if (!notifyUid()) return '<div class="hpf-note">Sign in to choose your notifications.</div>';
         var p = notifPrefs();
-        var sw = function (k, on) { return '<button type="button" class="hpf-sw' + (on ? ' on' : '') + '" role="switch" aria-checked="' + (on ? 'true' : 'false') + '" data-hpf-nsw="' + k + '"><i></i></button>'; };
-        return '<div class="hpf-row hpf-core-row"><span class="hpf-ic">✅</span><div class="hpf-txt"><div class="hpf-l">Round results</div><div class="hpf-s">"You\'re in" and final results</div></div><span class="hpf-core">Always</span></div>'
-            + '<div class="hpf-row hpf-core-row"><span class="hpf-ic">🤝</span><div class="hpf-txt"><div class="hpf-l">Game challenges &amp; presses</div><div class="hpf-s">Someone presses or challenges you</div></div>' + sw('bets', p.bets) + '</div>'
-            + '<div class="hpf-row hpf-core-row"><span class="hpf-ic">🐦</span><div class="hpf-txt"><div class="hpf-l">Birdies &amp; big moments</div><div class="hpf-s">At most one a hole</div></div>' + sw('hype', p.hype) + '</div>'
-            + '<div class="hpf-note hpf-nnote">No reminders and no ads, ever.</div>';
+        var row = function (k, ic, l, sub, on) { return '<div class="hpf-row hpf-core-row"><span class="hpf-ic" aria-hidden="true">' + ic + '</span><div class="hpf-txt"><div class="hpf-l">' + l + '</div><div class="hpf-s">' + sub + '</div></div><button type="button" class="hpf-sw' + (on ? ' on' : '') + '" role="switch" aria-checked="' + (on ? 'true' : 'false') + '" data-hpf-nsw="' + k + '" aria-label="' + l.replace(/&amp;/g, 'and') + '"><i></i></button></div>'; };
+        return '<div class="hpf-note">All off until you turn one on. No reminders and no ads, ever.</div>'
+            + row('essentials', '✅', 'Round results', '"You\'re in" and final results', p.essentials)
+            + row('bets', '🤝', 'Game challenges &amp; presses', 'Someone presses or challenges you', p.bets)
+            + row('hype', '🐦', 'Birdies &amp; big moments', 'At most one a hole', p.hype);
     }
     function notifLoad(redraw) {
         var uid = notifyUid();
         if (!isNative() || !uid || notif.prefs) return;
         try { W.firebase.database().ref('pushPrefs/' + uid).once('value').then(function (s) { notif.prefs = s.val() || {}; redraw(); }).catch(function () {}); } catch (e) {}
     }
+    // THE FIRST SWITCH ON is the moment iOS is asked: the same registration the round uses
+    // (push-boot.js pushRegisterToken), now allowed to prompt.
+    function notifAskNow(uid) {
+        if (typeof W.pushRegisterToken !== 'function') return;
+        try {
+            W.pushRegisterToken({
+                uid: uid, playerId: (host && host.me && host.me() ? host.me().id : ''), roundCode: host && host.code ? host.code() : '',
+                save: function (rec) { var key = typeof W.pushDeviceKey === 'function' ? W.pushDeviceKey(rec.token) : null; return key ? W.firebase.database().ref('pushTokens/' + uid + '/' + key).set(rec) : Promise.resolve(); }
+            }).catch(function () {});
+        } catch (e) {}
+    }
     function notifToggle(k, redraw) {
         var uid = notifyUid(); if (!uid || notif.saving) return;
         var p = notifPrefs(); p[k] = !p[k];
-        var payload = typeof W.pushPrefsForSave === 'function' ? W.pushPrefsForSave({ bets: p.bets, hype: p.hype }) : { bets: !!p.bets, hype: !!p.hype };
+        var payload = typeof W.pushPrefsForSave === 'function' ? W.pushPrefsForSave(p) : { essentials: !!p.essentials, bets: !!p.bets, hype: !!p.hype };
+        var on = !!(payload.essentials || payload.bets || payload.hype);
+        if (typeof W.pushSetOptinHere === 'function') W.pushSetOptinHere(on);
         notif.prefs = payload; notif.saving = true; redraw();
         try {
-            W.firebase.database().ref('pushPrefs/' + uid).update(payload).then(function () { notif.saving = false; }).catch(function () { notif.saving = false; notif.prefs = null; redraw(); });
+            var ref = W.firebase.database().ref('pushPrefs/' + uid);
+            (typeof W.pushPrefsSave === 'function' ? W.pushPrefsSave(ref, payload) : ref.update(payload)).then(function () { notif.saving = false; }).catch(function () { notif.saving = false; });
         } catch (e) { notif.saving = false; }
+        if (on && p[k]) notifAskNow(uid);
     }
 
     // state (internal): { work, dirty } when coming back from a lock's explainer.

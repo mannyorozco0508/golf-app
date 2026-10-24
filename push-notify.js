@@ -104,17 +104,18 @@ function pushChannelOf(kind) {
     return PUSH_KIND_CHANNEL[kind] || null;
 }
 
-// A GOLFER'S SETTINGS, NORMALISED. Anything unreadable becomes the default, and
-// the default is everything ON except nothing - a golfer who has never touched
-// the screen gets the full set, which is what somebody who turned the feature on
-// is asking for. essentials is forced true whatever is stored, because a stored
-// `false` could only have come from a bug or a hand edit.
+// A GOLFER'S SETTINGS, NORMALISED. Anything unreadable becomes the default.
+// 066 #1 (Manny, approved 2026-10-24): EVERY CHANNEL IS OPT-IN. The default is
+// everything OFF - nothing is sent until the golfer turns a switch on, and iOS is
+// not asked for permission until then either. Essentials (you're in, final
+// results) is a switch like the others now ("Round results"). Before 066 the
+// default was everything on and essentials could not be turned off.
 function pushPrefsNormalise(raw) {
     var p = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
     return {
-        essentials: true,
-        bets: p.bets === undefined ? true : !!p.bets,
-        hype: p.hype === undefined ? true : !!p.hype
+        essentials: p.essentials === true,
+        bets: p.bets === true,
+        hype: p.hype === true
     };
 }
 
