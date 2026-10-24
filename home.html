@@ -108,38 +108,72 @@
   .hs-more .h { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--hp-muted); text-align: center; margin-bottom: 6px; }
   .hs-more .row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
   .hs-more button { border: 1px solid var(--hp-line); background: #fff; border-radius: 999px; padding: 8px 14px; min-height: 40px; font-size: 14px; font-weight: 700; font-family: inherit; color: var(--hs-ink); cursor: pointer; }
-  .hs-door { min-height: 190px; margin-bottom: 12px; justify-content: flex-end; }
-  .hs-door .hs-ic { font-size: 40px; line-height: 1; } .hs-door .t { font-size: 32px; } .hs-door .d { font-size: 15px; }
-  .hp-door.gps.hs-door { background: linear-gradient(160deg, #2d6a4f, #0f4c3a); } .hp-door.games.hs-door { background: #1d2f4f; }
   .hs-card { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; background: #fff; border: 1px solid var(--hp-line); border-radius: 16px; padding: 12px 16px; font-family: inherit; cursor: pointer; color: var(--hp-text); margin-bottom: 10px; }
   .hs-card .h { display: block; font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--hp-muted); } .hs-card .n { display: block; font-size: 17px; font-weight: 800; margin-top: 2px; } .hs-card .go { font-size: 17px; font-weight: 800; color: var(--hp-green); white-space: nowrap; text-align: center; }
   .hs-slim { text-align: center; font-size: 14px; color: var(--hp-green); margin-top: 6px; }
-  /* URGENT-047: five links (Join with a code · Trip · History · My stats · Range) on two even lines; a link
-     never breaks inside itself, and a dot where the line breaks is hidden (front-door.js slimDots). */
+  /* URGENT-047: the slim links never break inside themselves, and a dot where the line breaks is hidden
+     (front-door.js slimDots). URGENT-065: two links (Join with a code · Trip) - History, My stats and
+     Range are tiles now. */
   .hs-slim { text-wrap: balance; }
   .hs-slim button { white-space: nowrap; }
   .hs-slim .hs-dot.hs-dot-off { color: transparent; }
   .hs-slim button { border: 0; background: none; color: var(--hp-green); font-weight: 800; font-size: 14px; font-family: inherit; padding: 8px 2px; min-height: 40px; cursor: pointer; }
   #v-simple .hs-hello { font-size: 24px; margin: 18px 0 6px; }
+  /* URGENT-065: the green GPS card (look C) and look B's tiles under it. */
+  .hs-gps { display: flex; flex-direction: column; align-items: flex-start; border-radius: 22px; padding: 20px 18px 18px; color: #fff; background: linear-gradient(160deg, #2d6a4f, #0f4c3a); }
+  .hs-gps .hs-ic { font-size: 30px; line-height: 1; }
+  .hs-gps .t { font-size: 32px; font-weight: 800; line-height: 1.1; margin-top: 6px; }
+  .hs-gps .d { font-size: 15px; line-height: 1.35; opacity: .9; margin-top: 2px; }
+  .hs-gps .w { font-size: 15px; line-height: 1.35; margin-top: 10px; min-height: 20px; overflow-wrap: anywhere; }
+  .hs-gps .w b { font-weight: 800; }
+  .hs-gps .h { font-size: 12px; font-weight: 800; letter-spacing: .06em; opacity: .8; margin-top: 12px; }
+  .hs-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .hs-chips button { border: 0; border-radius: 999px; background: rgba(255,255,255,.16); color: #fff; font-size: 15px; font-weight: 700; font-family: inherit; padding: 0 14px; min-height: 40px; cursor: pointer; }
+  .hs-go { width: 100%; min-height: 56px; margin-top: 16px; border: 0; border-radius: 16px; background: var(--hs-lime); color: var(--hs-lime-ink); font-size: 20px; font-weight: 800; font-family: inherit; cursor: pointer; }
+  .hs-tiles { display: flex; gap: 12px; }
+  .hs-tile { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 2px; text-align: left; min-height: 120px; border-radius: 18px; padding: 14px; border: 0; font-family: inherit; cursor: pointer; }
+  .hs-tile .hs-ic { font-size: 28px; line-height: 1; margin-bottom: 6px; }
+  .hs-tile .n { font-size: 20px; font-weight: 800; line-height: 1.15; }
+  .hs-tile .s { font-size: 14px; line-height: 1.3; opacity: .85; }
+  .hs-tile.games { background: #1d2f4f; color: #fff; }
+  .hs-tile.range { background: linear-gradient(160deg, #2d6a4f, #0f4c3a); color: #fff; }
+  .hs-tile.plain { background: #fff; color: var(--hp-text); border: 1px solid var(--hp-line); min-height: 96px; }
+  .hs-tile.plain .s { color: var(--hp-muted); opacity: 1; }
+  #hs-progress .hs-card { margin-bottom: 0; }
+  #v-simple .hs-slim { margin-top: auto; padding-top: 4px; }
 </style>
 </head>
 <body>
-<!-- SIMPLER HARDPAN HOME (mailbox 017): four doors + Resume. Shown instead of MAIN when
+<!-- SIMPLER HARDPAN HOME (mailbox 017; URGENT-065: the green GPS card + tiles). Shown instead of MAIN when
      features.simpleFlow is on (front-door.js simpleView); off, MAIN below exactly as before. -->
 <div class="hp-view" id="v-simple">
   <!-- URGENT-048: the profile spot, top right of the title row (hp-account-ui.js): "Sign in" pill when
        signed out or anonymous, the golfer's initial when signed in. Nothing on Home needs it. -->
   <div class="hpa-hrow"><div class="hs-hello" id="hs-hello">HardPan Golf</div><button type="button" id="hpa-spot" class="hpa-pill" data-hpa-state="out" aria-label="Sign in"><span class="pi"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0f4c3a" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>Sign in</button></div>
-  <!-- URGENT-013 (setup v2): the original two doors. Both open the one Course & Tees screen
-       (simple-flow.js); GPS: "Start GPS" -> the map; Games & Bets: Players -> Games -> Start. -->
-  <button type="button" class="hp-door gps hs-door" data-hp-act="sgpsdoor">
+  <!-- URGENT-065 (Manny, 10:46 AM: look B with look C's green GPS card). THE GPS CARD: where you are
+       (front-door.js homeCard - URGENT-060's "You're here" rule: within 0.5 mi of the course point or
+       any tee / green), the games you can add, and Start round (still the GPS door, data-hp-act
+       "sgpsdoor", behind the same entitlement gate): at a course, one tap starts the round there on
+       your default tees; else Course & Tees with the nearest course picked; no location / no signal,
+       Course & Tees as before. A chip starts the round the same way with that game's setup open. -->
+  <div class="hs-gps" id="hs-gps">
     <span class="hs-ic" aria-hidden="true">&#x1F4CD;</span>
-    <span><span class="t">Golf GPS</span><br><span class="d">Yardages for your round &middot; add games anytime</span></span>
-  </button>
-  <button type="button" class="hp-door games hs-door" data-hp-act="snew">
-    <span class="hs-ic" aria-hidden="true">&#x1F3B2;</span>
-    <span><span class="t">Games &amp; Bets</span><br><span class="d">Set up the group, games and money</span></span>
-  </button>
+    <div class="t">Golf GPS</div>
+    <div class="d">Yardages, plays-like and your clubs</div>
+    <div class="w" id="hs-where" role="status">Finding the course you&rsquo;re at&hellip;</div>
+    <div class="h">PLAYING FOR SOMETHING? ADD IT ANYTIME</div>
+    <div class="hs-chips"><button type="button" data-hp-act="sgame" data-hs-game="nassau">Nassau</button><button type="button" data-hp-act="sgame" data-hs-game="skins">Skins</button><button type="button" data-hp-act="sgame" data-hs-game="kp">KP by GPS</button><button type="button" data-hp-act="sgame" data-hs-game="longdrive">Long Drive</button><button type="button" data-hp-act="sgame" data-hs-game="more">+ more</button></div>
+    <button type="button" class="hs-go" data-hp-act="sgpsdoor">Start round &rsaquo;</button>
+  </div>
+  <!-- Look B's tiles: Games & Bets (the original setup door, as before) and Range; My stats and History. -->
+  <div class="hs-tiles">
+    <button type="button" class="hs-tile games" data-hp-act="snew"><span class="hs-ic" aria-hidden="true">&#x1F3B2;</span><span class="n">Games &amp; Bets</span><span class="s">group, games, money</span></button>
+    <button type="button" class="hs-tile range" data-hp-act="srange" data-hs-range><span class="hs-ic" aria-hidden="true">&#x1F3AF;</span><span class="n">Range</span><span class="s">dial in your clubs</span></button>
+  </div>
+  <div class="hs-tiles">
+    <button type="button" class="hs-tile plain" data-hp-act="sstats" data-hs-stats><span class="hs-ic" aria-hidden="true">&#x1F4CA;</span><span class="n">My stats</span><span class="s">Strokes Gained</span></button>
+    <button type="button" class="hs-tile plain" data-hp-act="shistory"><span class="hs-ic" aria-hidden="true">&#x1F55D;</span><span class="n">History</span><span class="s">past rounds</span></button>
+  </div>
   <div id="hs-same" style="display:none;"></div>
   <div id="hs-progress"></div>
   <div class="hs-join" id="hs-join" style="display:none;">
@@ -147,7 +181,7 @@
     <div class="hint">The code (QNXF83), the code and your group (QNXF83 2), or paste the link. A QR: point the camera at it - it opens the round.</div>
     <div id="hs-code-msg" class="hp-status" role="status"></div>
   </div>
-  <div class="hs-slim"><button type="button" data-hp-act="sjoinopen">Join with a code</button><span class="hs-dot"> &middot; </span><button type="button" data-hp-act="strip">Trip</button><span class="hs-dot"> &middot; </span><button type="button" data-hp-act="shistory">History</button><span data-hs-stats><span class="hs-dot"> &middot; </span><button type="button" data-hp-act="sstats">My stats</button></span><span data-hs-range><span class="hs-dot"> &middot; </span><button type="button" data-hp-act="srange">Range</button></span></div>
+  <div class="hs-slim"><button type="button" data-hp-act="sjoinopen">Join with a code</button><span class="hs-dot"> &middot; </span><button type="button" data-hp-act="strip">Trip</button></div>
 </div>
 
 <!-- HISTORY (2.0 polish #6): this phone's past rounds, newest first - course, day, golfers, the

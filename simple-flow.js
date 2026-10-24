@@ -277,28 +277,9 @@
     // record, the one the map draws; the nearest first when two are close - a 27-hole club, twins): a course's point is ONE spot (often hole 1's tee), and a golfer
     // on the far side of a big course (Papago, Thistle) is more than 0.5 mi from it while on the course.
     // The distance shown on each row is unchanged (to the course's point).
-    var HERE_MI = 0.5, NEAR_SHOWN = 3, atMemo = {};
-    function atMi(x) {
-        var H = HD(), c = HC(), d = x.d;
-        if (d == null || d > 3 || !S.here || typeof H.miles !== 'function') return d;
-        var mk = x.c.key + '|' + S.here[0] + ',' + S.here[1];
-        if (atMemo[mk] != null) return atMemo[mk];
-        var best = d, holes = 0;
-        try {
-            var rec = c && c.gps ? c.gps(x.c.key, x.c.name, x.c.pt || null) : null, hs = (rec && rec.holes) || {};
-            Object.keys(hs).forEach(function (n) {
-                var h = hs[n] && (hs[n].osm || hs[n]);
-                if (!h) return;
-                holes++;
-                [h.tee, h.mid, h.green && h.green[0]].forEach(function (pt) {
-                    if (Array.isArray(pt) && isFinite(pt[0]) && isFinite(pt[1])) { var m = H.miles(S.here, pt); if (m < best) best = m; }
-                });
-            });
-        } catch (e) {}
-        // (a course whose GPS data is not in yet - the GolfAPI file still loading - is measured again once it is)
-        if (holes) atMemo[mk] = best;
-        return best;
-    }
+    // URGENT-065: the rule itself lives in front-door.js (HardPanCourse.atMi / hereOf), so Home's GPS
+    // card says "You're at <course>" by the very same measure.
+    var NEAR_SHOWN = 3;
     function autoHere() {
         if (!S.auto || !Array.isArray(S.near)) return;
         if (courseKey() || courseName()) { S.auto = false; return; }
@@ -308,11 +289,8 @@
         pick(at.c.key, at.c.name); if (S.mode === 'gps') lookup(at.c.key, at.c.name);
     }
     function hereOf(near) {
-        if (!Array.isArray(near)) return null;
-        var at = near.map(function (x) { return { x: x, m: atMi(x) }; }).filter(function (y) { return y.m != null && y.m <= HERE_MI; })
-            .sort(function (a, b) { return a.m - b.m; }).map(function (y) { return y.x; });
-        if (!at.length) return null;
-        return (S.mode === 'gps' ? at.filter(function (x) { return x.c.ready; })[0] : null) || at[0];
+        var c = HC();
+        return c && typeof c.hereOf === 'function' && S.here ? c.hereOf(S.here, near, S.mode === 'gps') : null;
     }
     function nearShown(near) {
         if (!Array.isArray(near)) return [];
@@ -1233,6 +1211,24 @@
             S.saving = false; S.ask = o; render();
         });
     }
+    // URGENT-065 ONE TAP FROM HOME: once the picked course's tees are in the round's tee list (or it has
+    // none and its card is in hand), its tee is set as this screen sets it, then Start GPS as if tapped.
+    // Gives up quietly after 20 s - the golfer is on Course & Tees with the course picked, as when not at one.
+    function oneTap(key) {
+        var n = 0, t = setInterval(function () {
+            if (!S.open || S.step !== 1 || S.saving || S.saved || S.ask || ++n > 80) { clearInterval(t); return; }
+            if (pendBusy() || (S.lookup && S.lookup.key === courseKey() && S.lookup.state === 'busy')) return;
+            var k = courseKey(), rows = teeRows(k), sel = $('tee-rating-select');
+            if (!k || !courseName()) return;
+            var teesIn = rows.length ? !!(sel && Array.prototype.some.call(sel.options, function (o) { return rows.some(function (r) { return r.key === o.value; }); }))
+                : (n > 12 && cardInHand(k));
+            if (!teesIn) return;
+            clearInterval(t);
+            if (rows.length) preferTee(k);
+            render();
+            needCard('err1', startGps);
+        }, 250);
+    }
     var CHANGE_FROM = 'hardpan_change_from';   // gps-round.js Change course: "New round" already said yes
     function tidy(n) { return clubName(n).replace(/\s+(golf\s+(club|course|links|resort|center)|country\s+club|gc|cc)$/i, '').trim() || clubName(n); }
     function forgetOld(code) { var H = HD(); try { if (typeof H.forgetRound === 'function') H.forgetRound(code, false); } catch (e) {} }
@@ -1764,6 +1760,11 @@
             if (S.mode === 'gps' && m.pick && (m.pick.key || m.pick.name) && !courseKey()) pick(m.pick.key, m.pick.name);
             render();
             if (S.step === 1) watchTees();
+            // URGENT-065: Home's Start round AT a course - one tap: the course picked above, its tees as this
+            // screen would pick them (preferTee: this course's last tee, else Profile's default tees, else a
+            // middle tee), then this screen's own Start GPS. Anything in the way (no card, a lookup, a round
+            // in progress elsewhere) leaves the golfer right here, on the screen, with it.
+            if (S.mode === 'gps' && m.go && m.pick && m.pick.key) oneTap(m.pick.key);
         });
         // An existing round (whenReady saw it): hide again.
         var guard = setInterval(function () { if (!ss(MARK) && S.open && !S.saved) { show(false); clearInterval(guard); } }, 300);

@@ -395,7 +395,43 @@
         });
         return out;
     }
+    // URGENT-060 "YOU'RE HERE" - one rule for Course & Tees (simple-flow.js) and Home's GPS card (URGENT-065).
+    // "At" a course is measured to the nearest of its listed point AND its holes' tees / greens (the
+    // resolver's GPS record, the one the map draws): a course's point is ONE spot (often hole 1's tee), and
+    // a golfer on the far side of a big course (Papago, Thistle) is more than 0.5 mi from it while on it.
+    // x = a courseNear row { c, d }. (A course whose GPS data is not in yet is measured again once it is.)
+    var HERE_MI = 0.5, AT_MEMO = {};
+    function courseAtMi(here, x) {
+        var d = x && x.d;
+        if (d == null || d > 3 || !here) return d;
+        var mk = x.c.key + '|' + here[0] + ',' + here[1];
+        if (AT_MEMO[mk] != null) return AT_MEMO[mk];
+        var best = d, holes = 0;
+        try {
+            var rec = courseGpsRec(x.c.key, x.c.name, x.c.pt || null), hs = (rec && rec.holes) || {};
+            Object.keys(hs).forEach(function (n) {
+                var h = hs[n] && (hs[n].osm || hs[n]);
+                if (!h) return;
+                holes++;
+                [h.tee, h.mid, h.green && h.green[0]].forEach(function (pt) {
+                    if (Array.isArray(pt) && isFinite(pt[0]) && isFinite(pt[1])) { var m = miles(here, pt); if (m < best) best = m; }
+                });
+            });
+        } catch (e) {}
+        if (holes) AT_MEMO[mk] = best;
+        return best;
+    }
+    // The course he is at: within HERE_MI, the nearest first; on the GPS door a GPS-ready one there first
+    // (URGENT-019). null when he is farther than that from every course.
+    function courseHereOf(here, near, gpsFirst) {
+        if (!Array.isArray(near)) return null;
+        var at = near.map(function (x) { return { x: x, m: courseAtMi(here, x) }; }).filter(function (y) { return y.m != null && y.m <= HERE_MI; })
+            .sort(function (a, b) { return a.m - b.m; }).map(function (y) { return y.x; });
+        if (!at.length) return null;
+        return (gpsFirst ? at.filter(function (x) { return x.c.ready; })[0] : null) || at[0];
+    }
     W.HardPanCourse = { list: courseList, near: courseNear, resolve: courseResolve, hasCard: courseHasCard, gps: courseGpsRec, teeRows: teeRows,
+        atMi: courseAtMi, hereOf: courseHereOf, HERE_MI: HERE_MI,
         refresh: function () { C.list = null; CR.rows = null; } };
     function where(c, dist) {
         var bits = [];
@@ -1173,6 +1209,8 @@
         // EVERY LAUNCH OPENS MAIN (Manny, 2026-10-12): the last door is highlighted and a
         // round in progress offers Resume; #gps / #games are the in-app links' own.
         var h = (W.location.hash || '').replace('#', '');
+        // URGENT-065: a chip's game left over from a start that never reached its round is not carried on.
+        ss(HOME_GAME, null);
         // "Pick another course" (gps-trapfix): the picker, ALWAYS, and the round it came from is
         // no longer the one Resume / the GPS door goes back to (Games › your round still has it).
         if (h === 'pick') {
@@ -1511,6 +1549,120 @@
         if (rg) rg.style.display = typeof W.HardPanFeature !== 'function' || W.HardPanFeature('clubs') !== false ? '' : 'none';
         slimDots();
         simpleSame();
+        homeCard();
+    }
+    // ---- URGENT-065: HOME'S GREEN GPS CARD ---------------------------------------------------------
+    // "You're at <course> · 0.1 mi" when he is at one (URGENT-060's rule, HardPanCourse.hereOf - the GPS-ready
+    // one there first, as on the GPS door), else "Nearest: <course> · 3.2 mi"; no location: a plain line.
+    // Worked out from the same course files and ✓ GPS links GPS-1 / Course & Tees read; the position
+    // stays on this phone (nothing is sent anywhere). HS.state is what Start round and the chips act on.
+    var HS = { asked: false, here: null, why: null, state: null, files: false };
+    function miText(d) { return d == null ? '' : (d < 10 ? d.toFixed(1) : String(Math.round(d))) + ' mi'; }
+    function homeCourseName(c) {
+        var s = shownName(c.name), m = /^(.*\S)\s*\(([^()]+)\)\s*$/.exec(String(s).trim());
+        if (!m) return s;   // "Papago Golf Club (Papago Golf Club)" -> "Papago Golf Club", as Course & Tees' rows
+        var w = function (t) { return String(t).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(Boolean); }, h = w(m[1]), t = w(m[2]);
+        return t.length && t.every(function (x) { return h.indexOf(x) >= 0; }) ? m[1] : s;
+    }
+    function homeCardPaint() {
+        var el = $('hs-where');
+        if (!el) return;
+        var st = HS.state;
+        if (st && st.kind === 'at') el.innerHTML = 'You’re at <b>' + esc(homeCourseName(st.c)) + '</b> <span style="white-space:nowrap">· ' + esc(miText(st.d)) + '</span>';
+        else if (st && st.kind === 'near') el.innerHTML = 'Nearest: <b>' + esc(homeCourseName(st.c)) + '</b> <span style="white-space:nowrap">· ' + esc(miText(st.d)) + '</span>';
+        else if (st) el.textContent = 'Pick your course when you start';
+        else el.textContent = 'Finding the course you’re at…';
+        el.setAttribute('data-hs-state', st ? st.kind : 'finding');
+    }
+    function homeCardWork() {
+        if (!HS.files || HS.here === undefined) return;
+        if (!HS.here) { HS.state = { kind: 'none', why: HS.why || 'none' }; homeCardPaint(); return; }
+        C.list = null; CR.rows = null;
+        var near = courseNear(HS.here, 9), at = courseHereOf(HS.here, near, true);
+        HS.state = at ? { kind: 'at', c: at.c, d: courseAtMi(HS.here, at) } : near[0] ? { kind: 'near', c: near[0].c, d: near[0].d } : { kind: 'none', why: 'far' };
+        homeCardPaint();
+    }
+    function homeCard() {
+        if (!$('hs-where')) return;
+        homeCardPaint();
+        if (HS.asked) return;
+        HS.asked = true; HS.here = undefined;
+        var needs = [];
+        if (!W.HardPanGeo) needs.push('gps-geo.js');
+        if (!W.HardPanGpsCourses) needs.push('gps-courses.js');
+        if (!W.HardPanGolfApi && !W.__fdGolfApiTried) { W.__fdGolfApiTried = 1; needs.push('gps-golfapi.js'); }
+        STATES.forEach(function (s) { if (!(W.HardPanGpsCoverage && W.HardPanGpsCoverage[s])) needs.push('gps-coverage-' + s.toLowerCase() + '.js'); });
+        // The shared course list's names (course-index.js, as Round Setup reads it: the names cached on this
+        // phone, a 1 KB shallow check, the whole list only when nothing is cached) - so the card sees the
+        // same courses Course & Tees lists (a gca_ / gapi_ card record next to its coverage row).
+        if (typeof W.courseIndexLoader !== 'function') needs.push('course-index.js');
+        var left = needs.length;
+        var filesIn = function () {
+            var fin = function () { if (HS.files) return; HS.files = true; C.list = null; CR.rows = null; homeCardWork(); };
+            if (typeof globalCourses !== 'undefined' || typeof W.courseIndexLoader !== 'function' || !H.db) { fin(); return; }   /* global globalCourses */
+            try {
+                W.globalCourses = {};
+                var url = ''; try { url = W.firebase.app().options.databaseURL; } catch (e) {}
+                var L = W.courseIndexLoader({ into: W.globalCourses, databaseURL: url,
+                    readRecord: function (key) { return H.db.ref('global_courses/' + key).once('value').then(function (s) { return s.val(); }); },
+                    readAll: function () { return H.db.ref('global_courses').once('value').then(function (s) { return s.val(); }); },
+                    fetchJson: function (u) { if (typeof W.fetch !== 'function') return Promise.resolve(null); return Promise.race([W.fetch(u, { cache: 'no-store' }).then(function (r) { return r && r.ok ? r.json() : null; }).catch(function () { return null; }), new Promise(function (res) { setTimeout(function () { res(null); }, 4000); })]); },
+                    getItem: function (k) { return ls(k); }, setItem: function (k, v) { ls(k, v); },
+                    onApply: function () { if (HS.files) { C.list = null; CR.rows = null; homeCardWork(); } } });
+                setTimeout(fin, LOAD_MS);
+                Promise.resolve(L.load()).then(fin, fin);
+            } catch (e) { fin(); }
+        };
+        if (!left) filesIn();
+        needs.forEach(function (src) { loadScriptTimed(src, function () { if (--left === 0) filesIn(); }); });
+        if (H.db) loadGpsKeys(function () { homeCardWork(); });   // ✓ GPS for linked / set-green courses (021)
+        position(function (p, why) { if (!p && HS.here) return; HS.here = p || null; HS.why = why || null; homeCardWork(); });
+    }
+    // START ROUND (and a chip): the GPS door's own gate first (gps-entitlement, exactly as the door had it),
+    // then Course & Tees through the lobby's code hop (admin.html?start=quick), its mark saying what to do:
+    //   at a course      { pick, go }  - picked and started there, one tap (simple-flow.js oneTap)
+    //   not at a course  { pick }      - Course & Tees with the nearest course picked
+    //   no location / no signal         - Course & Tees as before ('gps')
+    // A chip also leaves its game for the round page (HOME_GAME): its setup opens once the round is up.
+    var HOME_GAME = 'hardpan_home_game';
+    function homeStartRound(game) {
+        gpsGate(homeCourse(), function () {
+            setDoor('gps'); ss(QUICK, null);
+            ss(HOME_GAME, game ? JSON.stringify({ id: game, at: Date.now() }) : null);
+            var st = HS.state, offline = false;
+            try { offline = W.navigator.onLine === false; } catch (e) {}
+            var m = null;
+            if (!offline && st && st.c && st.c.key && (st.kind === 'at' || st.kind === 'near')) {
+                m = { mode: 'gps', pick: { key: st.c.key, name: st.c.name } };
+                if (st.kind === 'at') m.go = 1;
+            }
+            ss(SIMPLE, m ? JSON.stringify(m) : 'gps');
+            W.location.href = 'admin.html?start=quick';
+        });
+    }
+    // ON THE ROUND PAGE: the game a Home chip asked for, set up over the round once it is up (and the GPS
+    // map is drawn, when it is a GPS round) - the + Bet sheet with that game picked (Nassau, Skins), the
+    // Weekly Game sheet (KP by GPS; Long Drive, as + Bet's Long Drive tile), or Add a game's full list (+ more).
+    function homeGame(code) {
+        var g = null; try { g = JSON.parse(ss(HOME_GAME) || 'null'); } catch (e) { g = null; }
+        if (!g || !g.id) return;
+        if (!(Date.now() - (Number(g.at) || 0) < 30 * 60 * 1000)) { ss(HOME_GAME, null); return; }
+        var n = 0, t = setInterval(function () {
+            if (++n > 160) { clearInterval(t); ss(HOME_GAME, null); return; }
+            var d = cd(), B = W.HardPanBet;
+            if (!(d && d.players && d.players.length) || !agCode()) return;
+            var side = String(ls('hardpan_round_side') || '');
+            var V = W.HardPanGps;
+            if (side.indexOf('gps|') === 0 && V && typeof V.isMounted === 'function' && !V.isMounted() && n < 40) return;   // (10 s at most)
+            var ok = false;
+            if (g.id === 'more') ok = openAddGame();
+            else if (B && typeof B.on === 'function' && B.on()) {
+                if (g.id === 'nassau' || g.id === 'skins') ok = B.open(g.id);
+                else if (g.id === 'kp') ok = B.openWeekly({ turnOn: true });
+                else if (g.id === 'longdrive') ok = B.openWeekly({ turnOn: true, longDrive: true });
+            } else if (n > 40) ok = openAddGame();   // no in-place sheets (simpleFlow off): Add a game's list
+            if (ok) { clearInterval(t); ss(HOME_GAME, null); }
+        }, 250);
     }
     // URGENT-047: Home's slim row wraps at phone width - a dot at the end or start of a line is hidden
     // (made transparent, so nothing moves and the row's text stays whole), on every size change of the row.
@@ -1574,6 +1726,10 @@
         if (a === 'ssame') { ss(QUICK, null); ss(SIMPLE, simpleGames() ? 'same' : null); W.location.href = 'admin.html?start=same'; return true; }
         if (a === 'sjoinopen') { var jb = $('hs-join'); if (jb) { jb.style.display = jb.style.display === 'none' ? '' : 'none'; var ji = $('hs-code'); if (ji && jb.style.display === '') ji.focus(); } return true; }
         // THE GPS DOOR (URGENT-013): the one Course & Tees screen, then "Start GPS" -> the map.
+        // URGENT-065: Home's Start round (the GPS card's button, `b`) and its game chips - homeStartRound.
+        // With no button (home.html#gpsdoor, the round's Change course) it is the plain door below.
+        if (a === 'sgpsdoor' && b && b.closest && b.closest('#hs-gps')) { homeStartRound(null); return true; }
+        if (a === 'sgame') { homeStartRound((b && b.getAttribute('data-hs-game')) || 'more'); return true; }
         if (a === 'sgpsdoor') { gpsGate(homeCourse(), function () { setDoor('gps'); ss(QUICK, null); ss(SIMPLE, 'gps'); W.location.href = 'admin.html?start=quick'; }); return true; }
         if (a === 'sjoin') { join('hs-code', 'hs-code-msg'); return true; }
         if (a === 'sgps') { gpsGate(homeCourse(), function () { setDoor('gps'); show('gps'); }); return true; }
@@ -1832,6 +1988,8 @@
         // Back at the round after a game's own Save: done.
         var nx = agNext();
         if (nx && nx.stage === 'game' && nx.code === String(code).toUpperCase()) agNext(null);
+        // URGENT-065: a game chip on Home's GPS card - its setup, once the round is up.
+        homeGame(code);
     }
     function placeGpsPill() {
         if (!on() || !params().get('game')) return;
