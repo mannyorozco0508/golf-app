@@ -138,6 +138,107 @@ describe('the privacy policy matches the shipped Consumer app', () => {
     });
 });
 
+// ============================================================================
+// THE NEW TRUTH (URGENT-066 feature 2, scorecard-scan-ai, Manny approved Oct 24).
+// The HardPan GPS app (gps-beta, GPS_ENABLED=1) may open the camera - for ONE
+// thing: the paper scorecard scan. Everything above still holds for Consumer 1.0
+// (no camera markup on any page, no Tesseract, no OCR at runtime). What this adds:
+//   - the camera is reachable from the scan files only, and they are GPS-only;
+//   - the GPS app asks with an honest NSCameraUsageDescription, the Consumer app
+//     asks for nothing;
+//   - the one native camera is the VisionKit document scanner plugin;
+//   - while privacy.html still says "no camera", NOTHING mounts the scan: when the
+//     Scan button lands (customize-screen's registry), this fails until the policy
+//     says what the scan does. Same order of operations as POLICY_MATCHES_MARKUP.
+// ============================================================================
+describe('HardPan GPS app: the camera opens only for the scorecard scan', () => {
+    const SCAN_FILES = ['gps-scan-client.js', 'gps-scan-grid.js', 'scorecard-validate.js'];
+    const CAMERA_CODE = [
+        /capture\s*=\s*["']?(environment|user)/i,
+        /setAttribute\(\s*['"]capture['"]/,
+        /getUserMedia/,
+        /HardPanDocScan/,
+        /accept\s*=\s*["']image\/\*/i,
+        /['"]accept['"]\s*,\s*['"]image\/\*/,
+    ];
+    const allShell = () => {
+        const src = read('sync-mobile-web.js');
+        const grab = (name) => {
+            const at = src.indexOf('const ' + name + ' = [');
+            const body = src.slice(at, src.indexOf('];', at));
+            return (body.match(/'([^']+)'/g) || []).map(x => x.replace(/'/g, ''));
+        };
+        return [...new Set(grab('SHARED_SHELL').concat(grab('CONSUMER_SHELL'), grab('GPS_SHELL')))]
+            .filter(f => /\.(js|html)$/.test(f) && fs.existsSync(path.join(REPO_ROOT, f)));
+    };
+    const haveScan = fs.existsSync(path.join(REPO_ROOT, 'gps-scan-client.js'));
+
+    test('only the scan client opens a camera or photo picker; every other shell file opens none', { skip: !haveScan && 'Consumer tree' }, () => {
+        const offenders = [];
+        allShell().forEach(f => {
+            if (f === 'gps-scan-client.js') return;
+            const code = read(f).split('\n').filter(l => !/^\s*(\/\/|\*|<!--)/.test(l)).join('\n');
+            CAMERA_CODE.forEach(rx => { if (rx.test(code)) offenders.push(f + ' ' + rx); });
+        });
+        assert.deepEqual(offenders, [], 'camera / photo code outside the scorecard scan');
+        const client = read('gps-scan-client.js');
+        assert.match(client, /HardPanDocScan/, 'the scan client is the one camera entry: the VisionKit plugin');
+        assert.match(client, /setAttribute\('capture', 'environment'\)/, 'and the web fallback file input');
+    });
+
+    test('the scan files are GPS only: inside the GPS block, so Consumer 1.0 ships none of them', { skip: !haveScan && 'Consumer tree' }, () => {
+        const sync = read('sync-mobile-web.js');
+        const at = sync.indexOf('const CONSUMER_SHELL = [');
+        const consumer = sync.slice(at, sync.indexOf('];', at));
+        const g0 = consumer.indexOf('// GPS:BEGIN'), g1 = consumer.indexOf('// GPS:END');
+        SCAN_FILES.forEach(f => {
+            const i = consumer.indexOf("'" + f + "'");
+            assert.ok(i > g0 && i < g1 && g0 > -1, f + ' must sit inside the CONSUMER_SHELL GPS block');
+        });
+        const html = read('index.html');
+        SCAN_FILES.forEach(f => {
+            const i = html.indexOf('<script src="' + f + '"></script>');
+            assert.ok(i > -1, 'index.html loads ' + f);
+            assert.ok(html.lastIndexOf('<!-- GPS:BEGIN -->', i) > html.lastIndexOf('<!-- GPS:END -->', i), f + ' loads inside a GPS block');
+        });
+    });
+
+    test('permission strings: the GPS app asks for the camera, honestly; the Consumer app asks for nothing', () => {
+        const consumer = read('ios/App/App/Info.plist');
+        assert.ok(!/NSCameraUsageDescription|NSPhotoLibraryUsageDescription/.test(consumer), 'the Consumer app takes no camera or photo library');
+        if (!haveScan) return;
+        const gps = read('gps-beta/ios/App/App/Info.plist');
+        const m = /<key>NSCameraUsageDescription<\/key>\s*<string>([^<]+)<\/string>/.exec(gps);
+        assert.ok(m, 'gps-beta Info.plist must carry NSCameraUsageDescription or iOS kills the app on the first scan');
+        assert.match(m[1], /only when you tap Scan scorecard/i, 'the reason names the one use');
+        assert.match(m[1], /scorecard/i);
+        assert.ok(!/NSPhotoLibraryUsageDescription/.test(gps), 'no read access to Photos (the web picker is PHPicker, which needs none)');
+    });
+
+    test('the one native camera is the VisionKit document scanner, registered like the Live Activity plugin', { skip: !haveScan && 'Consumer tree' }, () => {
+        const sw = read('gps-beta/ios/App/PhoneBridge/HardPanDocScanPlugin.swift');
+        assert.match(sw, /VNDocumentCameraViewController/);
+        assert.match(sw, /jsName = "HardPanDocScan"/);
+        assert.ok(!/URLSession|URLRequest|PHPhotoLibrary|UIImageWriteToSavedPhotosAlbum|FileManager/.test(sw), 'the plugin sends nothing and stores nothing');
+        assert.match(read('gps-beta/ios/App/PhoneBridge/HardPanBridgeViewController.swift'), /registerPluginInstance\(HardPanDocScanPlugin\(\)\)/);
+        const pbx = read('gps-beta/ios/App/App.xcodeproj/project.pbxproj');
+        assert.match(pbx, /HardPanDocScanPlugin\.swift in Sources/, 'compiled into the App target');
+        // No new package: the iOS plugin allowlist is untouched.
+        const cap = JSON.parse(read('gps-beta/capacitor.config.json'));
+        assert.ok(!cap.ios.includePlugins.some(p => /camera|scan|document/i.test(p)), 'no camera npm plugin linked');
+    });
+
+    test('POLICY_MATCHES_MARKUP (GPS): while privacy.html says "no camera", nothing mounts the scan', { skip: !haveScan && 'Consumer tree' }, () => {
+        const policy = read('privacy.html');
+        if (!/No contacts, photos, camera or microphone access/i.test(policy)) return;   // the policy now describes the scan
+        const callers = allShell().filter(f => !SCAN_FILES.includes(f))
+            .filter(f => /HardPanScan\.(open|scan)\s*\(/.test(read(f).split('\n').filter(l => !/^\s*(\/\/|\*|<!--)/.test(l)).join('\n')));
+        assert.deepEqual(callers, [],
+            'privacy.html still says the app takes no camera access, but these files mount the scorecard scan: ' + callers.join(', ')
+            + '. Update privacy.html (camera used only to scan a scorecard; photo + names/course/par sent to Google Gemini, not stored) first.');
+    });
+});
+
 // The native Consumer bundle excludes tournament.html by design, while
 // tournamentUrl() returns a relative path whenever both products share an origin.
 // Inside Capacitor that combination is a link to a file that is not there.
