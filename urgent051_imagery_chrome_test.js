@@ -130,14 +130,19 @@ async function open(code, o) {
 }
 // Zoom in with the wheel over the map until z >= target (the golfer's pinch).
 async function zoomTo(j, target) {
-    for (let i = 0; i < 30; i++) {
+    // 064: up to 60 wheel steps (a loaded machine drops some), then wait for the close-up layer to have
+    // answered at least once - its tiles now stream live (no 051 warm-up has them in the HTTP cache).
+    for (let i = 0; i < 60; i++) {
         const z = Number(await attr(j, 'data-zoom'));
         if (z >= target) break;
         await j.cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 196, y: 330, deltaX: 0, deltaY: -240 });
         await sleep(450);
     }
     await sleep(2500);
-    return Number(await attr(j, 'data-zoom'));
+    const z = Number(await attr(j, 'data-zoom'));
+    if (z >= 20) await until(j, "(function(){var s=HardPanGps.imagery.now();return !!s&&(s.hiLoads+s.hiMiss+s.hiPlaceholders>0||!!s.hiOff);})()", 20000);
+    await sleep(1000);
+    return z;
 }
 const credit = (j) => j.evaluate("(document.querySelector('#gps-overlay .gps-credit-txt')||{}).textContent||''");
 const attrib = (j) => j.evaluate("(document.querySelector('#gps-overlay .maplibregl-ctrl-attrib')||{}).textContent||''");
