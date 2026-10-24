@@ -4954,10 +4954,13 @@
     function openBag() {
         var sh = bagSheet(); if (!sh || !S) return; closeMenus();
         withShots(function () {
-            var B = bagApi(); if (!S || !B) return;
-            bagSyncLoad(B);
-            sh.style.display = '';
-            if (setupSwitch() && B.needsSetup(bagGolfer())) fillSetup(); else fillBag();
+            // 064-6a: Range's numbers (gps-range.js) for "Reset range data" - optional: missing, My bag works as before.
+            loadScript('gps-range.js', function () { return !!window.HardPanRange; }, function () {
+                var B = bagApi(); if (!S || !B) return;
+                bagSyncLoad(B);
+                sh.style.display = '';
+                if (setupSwitch() && B.needsSetup(bagGolfer())) fillSetup(); else fillBag();
+            });
         });
     }
     // "Enter your carry for each club": the starting carries for the golfer's handicap, editable.
@@ -4998,7 +5001,7 @@
         fillBag(); render();
     }
     function bagSavedLine(sh, B) { var e = sh.querySelector('.gps-bag-saved'); if (e) e.textContent = bagSyncCan(B) ? 'Saved on this phone and your account' : 'Saved on this phone'; }
-    function closeBag() { var sh = bagSheet(); if (sh) sh.style.display = 'none'; }
+    function closeBag() { bagConfirmClose(); var sh = bagSheet(); if (sh) sh.style.display = 'none'; }
     function fillBag() {
         var sh = bagSheet(), B = bagApi();
         if (!sh || !B) return;
@@ -5024,6 +5027,11 @@
             list.parentNode.insertBefore(hb, list);
         }
         if (hb && SL) { var hn = SL.hand(who); Array.prototype.forEach.call(hb.querySelectorAll('[data-bag-hand]'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-bag-hand') === hn ? 'true' : 'false'); }); }
+        // 064-6a: the clubs with Range data (gps-range.js): a line + "Reset range data" each, and "Reset all range data".
+        var RG = window.HardPanRange || null, rangeBy = {};
+        if (RG && RG.rangeData) { try { RG.rangeData(B, who).forEach(function (r) { rangeBy[r.club] = r; }); } catch (e) { rangeBy = {}; } }
+        var rall = sh.querySelector('.gps-bag-rangeall');
+        if (rall) rall.style.display = Object.keys(rangeBy).length ? '' : 'none';
         B.BAG.forEach(function (c) {
             var v = mine[c], row = document.createElement('div');
             row.className = 'gps-bag-row'; row.setAttribute('data-bag-row', c);
@@ -5041,6 +5049,13 @@
             var logged = (logBy[c] || []).length;
             rs.style.visibility = v || logged ? '' : 'hidden';
             row.appendChild(nm); row.appendChild(inp); row.appendChild(meta); row.appendChild(rs);
+            if (rangeBy[c]) {
+                var rg = document.createElement('div'); rg.className = 'gps-bag-range'; rg.setAttribute('data-bag-range', c);
+                var rt = document.createElement('span'); rt.textContent = RG.rangeLine(rangeBy[c], bagShown); rg.appendChild(rt);
+                var rb = document.createElement('button'); rb.type = 'button'; rb.className = 'gps-bag-range-reset'; rb.setAttribute('data-bag-range-reset', c);
+                rb.textContent = 'Reset range data'; rb.setAttribute('aria-label', 'Reset ' + B.NAMES[c] + ' range data');
+                rg.appendChild(rb); row.appendChild(rg);
+            }
             // 049: the club's wind line + its Shot history.
             if (SB && (v || logged)) {
                 var wl = SB.windLine(fitsBy[c] || null), wd = document.createElement('div');
@@ -5055,6 +5070,55 @@
             }
             list.appendChild(row);
         });
+    }
+    // 064-6a: RESET RANGE DATA - ASK FIRST. club: one club; null: all. Lists what each club's My bag
+    // number goes back to (the number before Range wrote it, else what My bag shows without it).
+    // Cancel (or a tap outside) changes nothing. Only Range data goes (gps-range.js resetRange).
+    function bagConfirmClose() { var c = S && S.el.querySelector('.gps-bag-confirm'); if (c && c.parentNode) c.parentNode.removeChild(c); }
+    function bagRangeAsk(club) {
+        var B = bagApi(), RG = window.HardPanRange, SB = shotBag();
+        if (!S || !B || !RG || !RG.resetPlan) return;
+        bagConfirmClose();
+        var who = bagGolfer(), plan = RG.resetPlan(B, who, club);
+        if (!plan.length) { fillBag(); return; }
+        var sfx = units() === 'm' ? ' m' : '';
+        var gone = plan.filter(function (p) { return p.bagChanges; }).map(function (p) { return p.club; });
+        var b2 = B.bag(who, { unset: gone }), after = b2;
+        try { if (SB && bagSwitch()) after = SB.mergeBag(b2, who); } catch (e) { after = b2; }
+        var n = plan.reduce(function (t, p) { return t + p.shots; }, 0), nm = club ? B.NAMES[club] : '';
+        var c = document.createElement('div'); c.className = 'gps-bag-confirm'; c.setAttribute('role', 'alertdialog'); c.setAttribute('aria-modal', 'true');
+        c.setAttribute('data-bag-confirm', club || 'all');
+        var bx = document.createElement('div'); bx.className = 'gps-bag-confirm-box'; c.appendChild(bx);
+        var t = document.createElement('div'); t.className = 'gps-bag-confirm-t'; t.textContent = club ? 'Reset ' + nm + ' range data?' : 'Reset all range data?';
+        var d = document.createElement('div'); d.className = 'gps-bag-confirm-b';
+        d.textContent = club ? (n ? 'Clears the ' + n + ' ' + nm + ' shot' + (n === 1 ? '' : 's') + ' from your Range sessions.' : 'Clears what Range wrote for ' + nm + '.')
+            : 'Clears every Range session on this phone' + (who ? ' for ' + String(who).split(' ')[0] : '') + ' (' + n + ' shot' + (n === 1 ? '' : 's') + ').';
+        var ul = document.createElement('ul'); ul.className = 'gps-bag-confirm-l';
+        plan.forEach(function (p) {
+            var li = document.createElement('li'); li.setAttribute('data-bag-confirm-club', p.club);
+            var a = p.setAfter ? { yd: p.setAfter, set: true } : after[p.club];
+            li.textContent = B.NAMES[p.club] + ': ' + (p.bagChanges ? bagShown(p.bagNow) + sfx + ' \u2192 ' + (a ? bagShown(a.yd) + sfx + ' ' + B.source(a) : 'no number')
+                : (p.bagNow ? bagShown(p.bagNow) + sfx + ' stays (typed)' : 'no My bag number to change'));
+            ul.appendChild(li);
+        });
+        var k = document.createElement('div'); k.className = 'gps-bag-confirm-k'; k.textContent = 'Numbers you typed, your marked shots on the course and Strokes Gained stay.';
+        var go = document.createElement('button'); go.type = 'button'; go.className = 'gps-bag-confirm-go'; go.textContent = club ? 'Reset range data' : 'Reset all range data';
+        var no = document.createElement('button'); no.type = 'button'; no.className = 'gps-bag-confirm-no'; no.textContent = 'Cancel';
+        [t, d, ul, k, go, no].forEach(function (x) { bx.appendChild(x); });
+        c.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (e.target === go) {
+                e.preventDefault();
+                var Bn = bagApi(), RGn = window.HardPanRange;
+                if (S && Bn && RGn) { RGn.resetRange(Bn, bagGolfer(), club || null); bagSaved(); }
+                bagConfirmClose(); fillBag(); render();
+                flash(club ? nm + ' range data reset' : 'All range data reset');
+                return;
+            }
+            if (e.target === no || e.target === c) { e.preventDefault(); bagConfirmClose(); }
+        });
+        S.el.appendChild(c);
+        try { no.focus(); } catch (e) {}
     }
     // "MY DISTANCES ARE FROM" (012 part 5): Sea level | A course I pick | Don't adjust (the
     // default - plays-like as before), and the typical temperature when the numbers were set
@@ -6233,7 +6297,10 @@
         +     '<div class="gps-bag-alt-now" role="status"></div>'
         +     '<label class="gps-bag-alt-tl">Typical temperature when I set these <input type="number" inputmode="numeric" class="gps-bag-alt-temp" data-bag-alt-temp="1" min="-20" max="130" placeholder="70" aria-label="Typical temperature when I set these, degrees F"> \u00b0F</label>'
         +   '</div>'
-        +   '<div class="gps-bag-list"></div><button type="button" class="gps-bag-resetall">Reset all</button>'
+        +   '<div class="gps-bag-list"></div>'
+        // 064-6a: only Range data (gps-range.js), after a confirm; shown when the golfer has some.
+        +   '<button type="button" class="gps-bag-rangeall" style="display:none">Reset all range data</button>'
+        +   '<button type="button" class="gps-bag-resetall">Reset all</button>'
         // FIRST-TIME SETUP (009): "Enter your carry for each club" - in place of the list.
         +   '<div class="gps-bag-setup" data-feature="bagSetup"></div>'
         +   '<div class="gps-bag-setup-foot" data-feature="bagSetup"><button type="button" class="gps-bag-setup-save">Save my bag</button><button type="button" class="gps-bag-setup-skip">Not now</button></div>'
@@ -6602,7 +6669,19 @@
         + '#gps-overlay .gps-bag-reset{min-height:40px;padding:0 8px;color:#fca5a5 !important;font-weight:700;}'
         + '#gps-overlay .gps-bag-done{min-height:44px;border-radius:12px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;padding:0 16px !important;}'
         + '#gps-overlay .gps-bag-resetall{display:block;margin:10px auto 0;min-height:44px;padding:0 16px;color:#fca5a5 !important;font-weight:800;}'
-        + '#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-list,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-resetall,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-setup-open,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup-foot{display:none;}'
+        // 064-6a: Range data per club + "Reset range data", "Reset all range data", and the ask-first prompt.
+        + '#gps-overlay .gps-bag-range{flex:1 0 100%;display:flex;align-items:center;justify-content:space-between;gap:8px;font:700 12px/1.3 ' + FONT + ';color:#ffd54a;padding-bottom:3px;}'
+        + '#gps-overlay .gps-bag-range > span{flex:1 1 auto;min-width:0;}'
+        + '#gps-overlay .gps-bag-range-reset,#gps-overlay .gps-bag-rangeall{flex:0 0 auto;min-height:40px;padding:0 10px;border-radius:10px;border:1px solid rgba(252,165,165,.5) !important;background:transparent !important;color:#fca5a5 !important;font:800 12px/1.1 ' + FONT + ' !important;}'
+        + '#gps-overlay .gps-bag-rangeall{display:block;margin:10px auto 0;min-height:44px;padding:0 16px;font-size:14px !important;}'
+        + '#gps-overlay .gps-bag-confirm{position:absolute;z-index:60;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;}'
+        + '#gps-overlay .gps-bag-confirm-box{width:100%;max-width:520px;box-sizing:border-box;background:#1b231d;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));color:#fff;font:600 14px/1.35 ' + FONT + ';}'
+        + '#gps-overlay .gps-bag-confirm-t{font:800 18px/1.2 ' + FONT + ';margin-bottom:8px;}'
+        + '#gps-overlay .gps-bag-confirm-l{margin:6px 0 8px 18px;padding:0;color:#c8d1ca;}#gps-overlay .gps-bag-confirm-k{color:#a7b3aa;font-size:12.5px;}'
+        + '#gps-overlay .gps-bag-confirm-go,#gps-overlay .gps-bag-confirm-no{display:block;width:100%;min-height:50px;margin-top:10px;border-radius:14px;font:800 16px/1 ' + FONT + ' !important;}'
+        + '#gps-overlay .gps-bag-confirm-go{border:0;background:#b91c1c !important;color:#fff !important;}'
+        + '#gps-overlay .gps-bag-confirm-no{border:1px solid rgba(255,255,255,.25) !important;background:transparent !important;color:#fff !important;}'
+        + '#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-list,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-resetall,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-rangeall,#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-setup-open,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup,#gps-overlay .gps-bag:not([data-bag-view="setup"]) .gps-bag-setup-foot{display:none;}'
         // URGENT-047 B: the "Type my carries" door in My bag (list view only).
         + '#gps-overlay .gps-bag-lm{display:block;width:100%;margin:2px 0 8px;min-height:44px;border-radius:12px;border:1px solid rgba(217,249,157,.5) !important;background:rgba(217,249,157,.1) !important;color:#d9f99d !important;font:800 15px/1 ' + FONT + ' !important;}'
         + '#gps-overlay .gps-bag[data-bag-view="setup"] .gps-bag-lm{display:none;}'
@@ -7311,6 +7390,10 @@
                     if (SLr && SLr.list({ golfer: bagGolfer(), club: rc }).length) SLr.reset(rc, bagGolfer()); else { B.reset(bagGolfer(), rc); bagSaved(); }
                     fillBag(); render(); return;
                 }
+                // 064-6a: Range data - ask first.
+                var rr = t.closest('[data-bag-range-reset]');
+                if (rr) { e.preventDefault(); bagRangeAsk(rr.getAttribute('data-bag-range-reset')); return; }
+                if (t.closest('.gps-bag-rangeall')) { e.preventDefault(); bagRangeAsk(null); return; }
                 var hd = t.closest('[data-bag-hand]');
                 if (hd) { var SLh = window.HardPanShotLog; if (SLh) SLh.setHand(bagGolfer(), hd.getAttribute('data-bag-hand')); fillBag(); render(); return; }
                 var hs = t.closest('[data-bag-hist]');
