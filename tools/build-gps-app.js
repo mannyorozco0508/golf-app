@@ -58,6 +58,17 @@ if (process.env.GPS_DEV_PRO === '1') {
     fs.appendFileSync(path.join(OUT, 'gps-config.js'), '\n// DEV BUILD (GPS_DEV_PRO=1): counts as subscribed. NEVER ARCHIVE THIS BUILD.\nwindow.HARDPAN_GPS_CONFIG.devPro = true;\n');
     console.warn('DEV BUILD: GPS_DEV_PRO=1 - this build counts as subscribed. Do NOT archive or upload it.');
 }
+// THE PAYWALL SWITCH (URGENT-062): GPS_PAYWALL=1 turns the GPS paywall ON in THIS build's
+// gps-config.js (the repo keeps paywall: false, so a normal build or install never locks GPS).
+// It wins over GPS_DEV_PRO (a dev build that counted as subscribed could not show the paywall):
+// with both set, the dev switch is left out. The store is StoreKit 2 (PhoneBridge HardPanStore);
+// run from Xcode with the App scheme, it answers from gps-beta/ios/App/App/HardPan.storekit.
+if (process.env.GPS_PAYWALL === '1') {
+    const cf = path.join(OUT, 'gps-config.js');
+    fs.writeFileSync(cf, fs.readFileSync(cf, 'utf8').replace(/\nwindow\.HARDPAN_GPS_CONFIG\.devPro = true;\n/, '\n// (GPS_PAYWALL=1: the dev switch is left out.)\n')
+        + '\n// PAYWALL BUILD (GPS_PAYWALL=1): GPS needs the trial or the subscription.\nwindow.HARDPAN_GPS_CONFIG.paywall = true;\n');
+    console.warn('PAYWALL BUILD: GPS_PAYWALL=1 - GPS needs the 7-day trial or the subscription (StoreKit).');
+}
 const lost = GPS.filter((f) => !fs.existsSync(path.join(OUT, f)));
 if (lost.length) { console.error('GPS files not in the app: ' + lost.join(', ')); process.exit(1); }
 

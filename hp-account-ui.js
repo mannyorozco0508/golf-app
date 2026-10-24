@@ -92,6 +92,9 @@
         + '.hpa-list{background:#fff;border:1px solid #dfe5df;border-radius:16px;overflow:hidden;margin-bottom:12px}'
         + '.hpa-li{display:flex;align-items:center;gap:10px;width:100%;padding:0 14px;min-height:52px;border:0;border-top:1px solid #dfe5df;background:#fff;font-size:16px;font-weight:600;color:#13241d;font-family:inherit;text-align:left;cursor:pointer}'
         + '.hpa-li:first-child{border-top:0}'
+        // 062: the plain "Golf GPS · renews <date>" line (not a button) and its "Free trial" badge.
+        + '.hpa-li.hpa-sub{cursor:default;font-weight:600}'
+        + '.hpa-badge{margin-left:auto;padding:3px 9px;border-radius:999px;background:#e7f3ec;color:#0f4c3a;font-size:12px;font-weight:800;letter-spacing:.02em;white-space:nowrap}'
         + '.hpa-li .r{margin-left:auto;font-size:16px;color:#13241d;font-weight:500;display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}'
         + '.hpa-li .r.ph{color:#9aa0a6}'
         + '.hpa-li .r b{font-size:22px;color:#9aa0a6;font-weight:400}'
@@ -333,7 +336,8 @@
                 + row('name', 'Name', name, 'Add your name')
                 + row('hcp', 'Handicap', p.hcp, 'Add')
                 + row('tees', 'Default tees', p.tees, 'Pick', p.tees ? dot(p.tees) : '')
-                + '</div><div class="hpa-h">Get paid</div><div class="hpa-list">'
+                + '</div>' + subLine()
+                + '<div class="hpa-h">Get paid</div><div class="hpa-list">'
                 + row('venmo', 'Venmo', handle(p.venmo, '@'), 'Add @username')
                 + row('cashapp', 'Cash App', handle(p.cashapp, '$'), 'Add $cashtag')
                 + '</div><div class="hpa-msg" role="status" aria-live="polite"></div>'
@@ -341,6 +345,18 @@
                 + '<button type="button" class="hpa-signout" data-hpa="signout">' + esc(WORDS.signOut) + '</button>'
                 + '<div class="hpa-fine">' + esc(WORDS.signOutFine) + '</div>';
         });
+    }
+    // URGENT-062: ONE plain line about Golf GPS (Manny, 052 CHANGED 11:41 AM): "Golf GPS · renews
+    // Oct 21, 2027" (auto-renew off: "· ends <date>"), with a "Free trial" badge during the trial.
+    // No reminder, no cancel prompt, nothing to tap. Only with the paywall on and an active trial
+    // or subscription (window.HardPanEntitlement.statusLine - the App Store's own dates); else
+    // nothing at all.
+    function subLine() {
+        var E = W.HardPanEntitlement, st = null;
+        try { st = E && typeof E.statusLine === 'function' ? E.statusLine() : null; } catch (e) { st = null; }
+        if (!st || !st.line) return '';
+        return '<div class="hpa-list" data-hpa-sub="1"><div class="hpa-li hpa-sub">' + esc(st.line)
+            + (st.badge ? '<span class="hpa-badge">' + esc(st.badge) + '</span>' : '') + '</div></div>';
     }
     function movedCount() {
         try { var a = api(); var l = a && typeof a.movedRounds === 'function' ? a.movedRounds() : []; return Array.isArray(l) ? l.length : 0; } catch (e) { return 0; }

@@ -20,9 +20,14 @@
 // is no unpaid GPS tier. iap: true (below) = the App Store entitlement alone decides
 // (gps-view.js hasGpsPro() - the one check - and gps-entitlement.js); no
 // entitlement = the paywall, never a GPS map or yardage.
-// paywall: read ONLY while iap is off (a build with no store at all): false = GPS
-// on, true = GPS off. There is no tester override: the old URL tier switch is
-// gone, and nothing in a URL can turn GPS on.
+// paywall (URGENT-062): THE MASTER SWITCH for the GPS paywall. false (the repo, so every
+// build and install made from it - Manny's phone included - keeps GPS exactly as today: no
+// store asked, never a paywall) | true (GPS needs the 7-day free trial or the yearly
+// subscription; the App Store decides, through StoreKit 2 in our own PhoneBridge plugin
+// HardPanStore - gps-entitlement.js). A build turns it on with GPS_PAYWALL=1 node
+// tools/build-gps-app.js (the built copy only, never this file). With paywall true and iap
+// off (a build with no store at all) GPS is off. There is no tester override: the old URL
+// tier switch is gone, and nothing in a URL can turn GPS on.
 // ============================================================================
 window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626sm39ujgfU89O2WgTbHOzScHuYC-jqnuh5PVjH4bTxis1jT2WYkunGwob17JGYuZzmp1nsVMZ4tqOzl3AfGe-nTOrsadF8AW1UJcfeMJe1ERbpXz0O0wX8mKr_4URw8uNLdWdsySPhs8J-yoZbizzwiCU-7J5HLnEPamSYe2Xt9IcoBw_OUDiQwKSZBEh1R-OQGiGncsJvl57ehuv0mfk_aLMUZ6fHKlCeqfgk4V2wE-uNv-Pk.AT1_49lmfRNb', paywall: false,
     // GOOGLE SATELLITE: KEEP IT OFF (Manny, 2026-10-08) - googleKey stays ''.
@@ -124,6 +129,19 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // false = nothing on the page.
     venmo: true,
     iap: true, iapEntitlement: 'gps_map', iapProduct: 'com.rattlegolf.app.gpsmap.yearly',
+    // URGENT-062: WHICH STORE. 'storekit' = StoreKit 2 through our own PhoneBridge plugin
+    // (gps-beta/ios/App/PhoneBridge/HardPanStorePlugin.swift; no new package) - the choice.
+    // 'revenuecat' = the dormant RevenueCat path below (needs its plugin + key; neither is in).
+    iapStore: 'storekit',
+    // THE TWO PRODUCTS, one subscription group "HardPan Plus", both yearly, both with the 7-day
+    // free trial as their introductory offer (one trial per Apple ID per group):
+    //   iapProduct         com.rattlegolf.app.gpsmap.yearly           the regular price (34.99)
+    //   iapFoundingProduct com.rattlegolf.app.gpsmap.founding.yearly  the founding price (24.99)
+    // The founding product is sold only while the founding window is open (foundingCap below,
+    // gps_meta/config) AND the store still offers it; a founding subscriber keeps it (and its
+    // price) for as long as they stay subscribed. Prices live in App Store Connect / the
+    // .storekit file, never here. The local StoreKit file: gps-beta/ios/App/App/HardPan.storekit.
+    iapFoundingProduct: 'com.rattlegolf.app.gpsmap.founding.yearly',
     // RevenueCat PUBLIC Apple SDK key (appl_...), from RevenueCat > Project >
     // API keys. Public by design (it ships in every app binary), but it stays
     // EMPTY in the repo until Manny sets it for a build; empty = no purchases.
@@ -135,6 +153,11 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // while they stay subscribed (the price itself is set in App Store Connect).
     // The server's gps_meta/config { foundingOpen, foundingCap } wins when the
     // phone can read it; unreadable or absent = the founding window is open.
+    // THE CAP IS NOT ENFORCED ON THE PHONE (a phone cannot count other people's purchases):
+    // this number is what the paywall SAYS. The count is kept and the window closed on the
+    // server (App Store Server Notifications -> gps_meta/config.foundingOpen = false at the
+    // cap), and the hard stop is removing the founding product from sale in App Store Connect
+    // (StoreKit then stops offering it and the paywall shows the regular price by itself).
     foundingCap: 1000,
     // The paywall's Terms of Use (EULA) and Privacy Policy links. Absolute: the
     // two pages are web pages, not in the app bundle (app_store_pages_test.js).
