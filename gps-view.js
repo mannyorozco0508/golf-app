@@ -2911,6 +2911,8 @@
         try { var mr = missRect(); if (mr) add(mr, M); } catch (e) {}
         ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit', '.gps-lc-left', '.gps-lc-right', '.gps-lc-score', '.gps-panel', '.gps-zoom',
             '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
+        // 066 #1: the golfer's extras (only when they turned some on) - the numbers keep off them too.
+        Array.prototype.forEach.call(S.el.querySelectorAll('.hpf-slot'), function (el) { add(rectOf(el, wrapR), M); });
         // F / C / B and their number pills (Green view) are placed FIRST, so the two
         // distances can stay clear of them.
         placeGreenLabels();
@@ -5339,6 +5341,60 @@
         if (typeof getStrokes === 'function' && typeof parseHcp === 'function') return function (idx, hcp) { return getStrokes(idx, parseHcp(hcp)); };   /* global getStrokes, parseHcp */
         return null;
     }
+    // ---- 066 #1: THE CUSTOMIZABLE SCREEN (feature-registry.js) ----------------------------------
+    // The golfer's extras (games ticker, leaderboard, stats strip; later voice and scan) mount
+    // into slots ON TOP OF this screen: 'strip' and 'side' at the top of .gps-under, 'dock' as
+    // squares at the end of layout D's rail (layouts C / old: the right column). Nothing here
+    // hides or moves what the screen already has; with no extra on, nothing is drawn.
+    // The registry gets this screen's own answers (round, golfer, round score, yardages) and the
+    // card's own save - it adds no score or money arithmetic of its own.
+    function extrasHost() {
+        if (!S) return null;
+        if (S.xHost) return S.xHost;
+        var standings = function () {
+            var d = roundData(); if (!d) return [];
+            var st = cardStrokes();
+            return (d.players || []).filter(function (p) { return p && p.out !== true; }).map(function (p) {
+                return { id: p.id, name: shortName(d, p), rs: roundScore({ courseData: d.courseData || [], scores: d.scores || {}, id: p.id, hcp: p.hcp, strokes: st }) };
+            });
+        };
+        var yardage = function () {
+            var r = resolved(), o = r && origin(r);
+            if (!r || !o) return null;
+            var n = G.holeNumbers(o.pt, r); if (!n) return null;
+            var m = units() === 'm', f = function (x) { return x == null ? null : Math.round(m ? x : x / G.M_PER_YD); };
+            var pl = playsLineNow();
+            return { front: f(n.frontM), middle: f(n.middleM), back: f(n.backM), playsLike: pl ? pl.shown : null, units: m ? 'm' : 'yd' };
+        };
+        var role = function () {
+            var w = scoreFor();
+            try { if (w && typeof canWritePlayer === 'function' && canWritePlayer(w.id)) return 'scorekeeper'; } catch (e) {}   /* global canWritePlayer */
+            try { if (localStorage.getItem('golfapp_role_' + String(S.eventCode || '')) === 'playing') return 'playing'; } catch (e) {}
+            return 'watching';
+        };
+        S.xHost = {
+            el: S.el,
+            under: function () { return S && S.el.querySelector('.gps-under'); },
+            dock: function () { return S && (S.el.querySelector('.gps-ld-rail') || S.el.querySelector('.gps-right')); },
+            code: function () { return S ? String(S.eventCode || '') : ''; },
+            round: roundData,
+            me: function () { var w = scoreFor(); return w && w.player ? { id: w.id, name: w.player.name } : null; },
+            hole: function () { return S ? Number(S.hole) : null; },
+            role: role,
+            ent: function () { return { gps: hasGpsPro() }; },
+            standings: standings,
+            yardage: function () { try { return yardage(); } catch (e) { return null; } },
+            // THE CARD'S OWN SAVE (index.html gpsSheetHole -> saveScore -> the offline queue).
+            saveScore: function (pid, hole, v) { if (typeof gpsSheetHole !== 'function') throw new Error('no card save'); gpsSheetHole(Number(hole)).save(pid, v); },   /* global gpsSheetHole */
+            relayout: function () { if (!S) return; try { syncLayoutVars(); if (S.view === 'green' && !S.userMoved && !S.zoomStep && !S.flying) frameGreen(); else maybeRefit(); placePills(); } catch (e) {} }
+        };
+        return S.xHost;
+    }
+    function syncExtras() {
+        var F = window.HardPanFeatures;
+        if (!S || !F || typeof F.sync !== 'function') return false;
+        try { return !!F.sync(extrasHost()); } catch (e) { return false; }
+    }
     function syncRoundChip() {
         var b = S && S.el.querySelector('.gps-lc-score');
         if (!b) return;
@@ -5394,6 +5450,7 @@
         if (a) { var t = (acc && fix && !S.geoError) ? acc.text : ''; if (a.textContent !== t) a.textContent = t; a.style.display = t ? '' : 'none'; }
         syncPanel();
         if (rsSwitch()) syncRoundChip();
+        syncExtras();   // 066 #1
         // The credit, Recenter and the zoom ride on the panel's top edge, whatever its height now.
         try { syncLayoutVars(); maybeRefit(); } catch (e) {}
     }
@@ -5679,6 +5736,7 @@
             }
         }
         if (rsSwitch()) syncRoundChip();
+        syncExtras();   // 066 #1
         try { syncLayoutVars(); } catch (e) {}
     }
     // ---- 017 SIMPLE FLOW (features.simpleFlow): + Bet and the money chip, layouts D and C ----
@@ -5800,6 +5858,8 @@
         var rc = function (sel) { var e = S.el.querySelector(sel); if (!e || e.offsetParent === null || getComputedStyle(e).display === 'none') return null; var b = e.getBoundingClientRect(); return b.height ? b : null; };
         var top = W.top, bot = W.bottom, right = W.right;
         ['.gps-ld-top', '.gps-ld-row2'].forEach(function (s) { var b = rc(s); if (b) top = Math.max(top, b.bottom); });
+        // 066 #1: the golfer's extras at the top (only when some are on): the hole is framed below them.
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-under > .hpf-host'), function (h) { if (h.offsetParent === null) return; var b = h.getBoundingClientRect(); if (b.height) top = Math.max(top, b.bottom); });
         ['.gps-ld-bottom', '.gps-ld-plays', '.gps-credit', '.gps-leftrow .gps-recenter'].forEach(function (s) { var b = rc(s); if (b) bot = Math.min(bot, b.top); });
         var rl = rc('.gps-ld-rail'); if (rl) right = Math.min(right, rl.left);
         return { top: top - W.top, bottom: bot - W.top, left: 0, right: right - W.left, W: W };
@@ -5823,6 +5883,8 @@
         ['.gps-mark-shots', '📍', 'Mark shots'], ['.gps-tee-plan', '⛳', 'Tee plan'], ['.gps-replay', '▶', 'Replay round'], ['.gps-pick-course', '⚑', 'Other course'],
         ['.gps-rechoose', '①', 'Hole 1 again']];
     var TS_MARKUP = '<div class="gps-ts-head"><span class="gps-ts-grip" aria-hidden="true"></span><div class="gps-ts-title">Tools</div></div>'
+        // 066 #1: Customize your screen (feature-registry.js) - first, always here when the registry is loaded.
+        + '<button type="button" class="gps-ts-cust" data-ts-cust="1" style="display:none"><span>\u270E Customize your screen<span style="display:block;font-size:12px;font-weight:600;opacity:.75;">Pick what shows during a round</span></span><span aria-hidden="true" style="font-size:22px;">\u203A</span></button>'
         + '<div class="gps-ts-h" data-ts-sec="layout">SCREEN LAYOUT</div><div class="gps-ts-seg" data-ts-seg="layout" role="radiogroup" aria-label="Screen layout"><button type="button" data-v="d" role="radio">HardPan</button><button type="button" data-v="c" role="radio">Bottom panel</button></div>'
         + '<div class="gps-ts-h" data-ts-sec="display">DISPLAY</div><div class="gps-ts-seg" data-ts-seg="display" role="radiogroup" aria-label="Display"><button type="button" data-v="standard" role="radio">Standard</button><button type="button" data-v="sun" role="radio">Sun</button><button type="button" data-v="auto" role="radio">Auto</button></div>'
         + '<div class="gps-ts-note" data-ts-note="display" style="font-size:12px;opacity:.75;margin:4px 2px 0;">Auto: Sun during daylight at the course</div>'
@@ -5852,6 +5914,7 @@
     function tsSync() {
         var t = tsSheet(); if (!t || !S) return;
         var lay = layoutNow(), u = units();
+        var cu = t.querySelector('[data-ts-cust]'); if (cu) cu.style.display = window.HardPanFeatures ? '' : 'none';   // 066 #1
         var seg = function (k, v, on) { Array.prototype.forEach.call(t.querySelectorAll('[data-ts-seg="' + k + '"] button'), function (b) { var lit = b.getAttribute('data-v') === v; b.classList.toggle('on', lit); b.setAttribute('aria-checked', lit ? 'true' : 'false'); }); var sg = t.querySelector('[data-ts-seg="' + k + '"]'); if (sg) sg.style.display = on ? '' : 'none'; };
         seg('layout', lay === 'd' ? 'd' : 'c', ldSwitch());
         var lh = t.querySelector('[data-ts-sec="layout"]'); if (lh) lh.style.display = ldSwitch() ? '' : 'none';
@@ -5900,6 +5963,7 @@
         var t = e.target && e.target.closest ? e.target : null;
         if (!t || !S) return;
         var b;
+        if (t.closest('[data-ts-cust]')) { closeToolsSheet(); if (window.HardPanFeatures) { syncExtras(); window.HardPanFeatures.openPanel(); } return; }   // 066 #1
         if ((b = t.closest('[data-ts-seg] button'))) {
             var k = b.parentNode.getAttribute('data-ts-seg'), v = b.getAttribute('data-v');
             if (k === 'layout' && v !== layoutNow()) { S.tsKeep = true; try { setLayout(v); } finally { S.tsKeep = false; } tsSync(); }
@@ -6929,6 +6993,7 @@
         + '#gps-overlay .gps-ts-sw.on{background:#7cc242 !important;}#gps-overlay .gps-ts-sw.on i{left:23px;}'
         + '#gps-overlay .gps-ts-sw[aria-disabled="true"]{opacity:.55;}'
         + '#gps-overlay .gps-ts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}'
+        + '#gps-overlay .gps-ts-cust{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;box-sizing:border-box;margin:6px 0 4px;padding:12px 14px;min-height:56px;border:0;border-radius:14px;background:#cdee7c !important;color:#0d1a10;text-align:left;font:800 17px/1.25 ' + FONT + ';}'   // 066 #1
         + '#gps-overlay .gps-ts-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:76px;padding:8px 4px;border-radius:14px;background:rgba(255,255,255,.07) !important;font:700 14px/1.2 ' + FONT + ';color:#f4f4ef;text-align:center;}'
         + '#gps-overlay .gps-ts-ico{font-size:20px;line-height:1;}'
         // NO GPS MAP (paid launch): a round mounted without the entitlement never shows
@@ -7776,6 +7841,7 @@
         window.removeEventListener('offline', onOffline);
         window.removeEventListener('online', onOnline);
         if (!S) return false;
+        try { if (window.HardPanFeatures) window.HardPanFeatures.detach(); } catch (e) {}   // 066 #1
         var s = S;
         S = null;
         try { if (s.map) s.map.remove(); } catch (e) {}
@@ -7805,7 +7871,7 @@
         ipadNoGps: ipadNoGps,
         isMounted: function () { return !!S; },
         // POLISH #4: the offline queue changed (index.html renderOfflineBadge) - the pill's "📴 N waiting".
-        queueChanged: function () { if (!S || !rsSwitch()) return; try { syncRoundChip(); syncLayoutVars(); } catch (e) {} },
+        queueChanged: function () { if (!S) return; syncExtras(); if (!rsSwitch()) return; try { syncRoundChip(); syncLayoutVars(); } catch (e) {} },
         courseKey: function () { return S ? S.courseKey : null; },
         // URGENT-047 C: a caddie note was saved / cleared (gps-stats.js) - the line on the bar now.
         caddieChanged: function () { if (!S) return; try { syncCaddieLine(); syncLayoutVars(); } catch (e) {} },
