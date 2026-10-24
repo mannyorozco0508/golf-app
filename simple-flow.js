@@ -365,14 +365,18 @@
     function hasCard(key) { var c = HC(); try { return !!(c && key && c.hasCard(key)); } catch (e) { return false; } }
     function liveOn() { var L = W.HardPanGpsLive; try { return !!(L && L.on && L.on()); } catch (e) { return false; } }
     function partOf(n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? nk(m[1]).replace(/course$/, '') : ''; }
+    // 064: the 30-day mark is "2:<ms>". A mark from before (a bare number) is not trusted: it may be a
+    // Starfire-style "ambiguous" that was wrongly kept as a miss, so that course is asked once more
+    // (the function's own 30-day cache answers it: 0 GolfAPI calls).
+    function lookMark(key) { var v = String(ls(LOOK + key) || ''); return /^2:\d+$/.test(v) ? Number(v.slice(2)) : 0; }
     function lookup(key, name) {
         var L = W.HardPanGpsLive;
         if (S.offline === 'offline') return false;   // no round code, no signal: nothing is looked up online
         if (!key || !liveOn() || !L.find || !L.course) return false;
         if (readyOf(key) && hasCard(key)) return false;
-        var at = Number(ls(LOOK + key) || 0);
+        var at = lookMark(key);
         if (at && Date.now() - at < LOOK_MS) { if (!hasCard(key)) S.lookup = { key: key, state: 'none' }; return false; }
-        ls(LOOK + key, String(Date.now()));
+        ls(LOOK + key, '2:' + Date.now());
         try { (W.__sfLook = W.__sfLook || []).push(key); } catch (e) {}   // (the tests count the lookups made)
         var c = courses().filter(function (x) { return x.key === key; })[0] || {};
         S.lookup = { key: key, state: 'busy' };
@@ -385,35 +389,71 @@
                 var pt = partOf(name);
                 if (!hit && pt) { var ms = (f.matches || []).filter(function (m) { return nk(String(m.club || '') + String(m.course || '')).indexOf(pt) !== -1; }); if (ms.length === 1) hit = ms[0]; }
             }
+            // 064: MORE THAN ONE (Starfire: King 18 + Mulligan at one club; or two clubs by that name):
+            // the golfer picks - never "not in our course data", never kept as a 30-day miss.
+            if (!hit && f && f.status === 'ok' && (f.matches || []).length > 1) return { status: 'choose', oneClub: !!f.oneClub, matches: chooseOrder(f.matches) };
             if (!hit) return { status: f && f.status === 'ok' ? 'ambiguous' : ((f && f.status) || 'none') };
             return L.course(hit.id, key);
         }).then(function (r) {
+            if (r && (r.status === 'choose' || r.status === 'ambiguous')) ls(LOOK + key, null);
             if (!S.lookup || S.lookup.key !== key) return;
-            // Setting up a NEW course needs a signed-in golfer (the function's rule): say that, and ask
-            // again after sign-in (the 30-day mark is cleared).
-            if (r && (r.status === 'account' || r.status === 'signin')) { ls(LOOK + key, null); S.lookup = { key: key, state: 'signin' }; if (S.step === 1) render(); return; }
-            if (!(r && r.status === 'ready')) { S.lookup = { key: key, state: 'none', why: r && r.status }; if (S.step === 1) render(); return; }
-            var H = HD(), fin = function () {
-                S.lookup = null;
-                if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.step === 1) render(); }, true);
-                else if (S.step === 1) render();
-            };
-            // Its card is a new shared record (no card of ours): read it, and that record is the pick.
-            if (r.cardKey && !hasCard(key) && wizDb()) {
-                wizDb().ref('global_courses/' + r.cardKey).once('value').then(function (snap) {
-                    var rec = snap && snap.val ? snap.val() : null;
-                    if (rec && rec.name && typeof globalCourses !== 'undefined' && globalCourses) globalCourses[r.cardKey] = rec;
-                    if (rec && rec.name && courseKey() === key) pick(r.cardKey, rec.name);
-                    fin();
-                }, fin);
-            } else fin();
+            if (r && r.status === 'choose') { S.lookup = { key: key, state: 'choose', oneClub: r.oneClub, matches: r.matches }; if (S.step === 1) render(); return; }
+            landed(key, r);
         }, function () { if (S.lookup && S.lookup.key === key) { S.lookup = { key: key, state: 'none' }; if (S.step === 1) render(); } });
         return true;
+    }
+    // The 18-hole course first (King 18 before Mulligan 9), then GPS ones, then by name.
+    function chooseOrder(ms) {
+        return ms.slice(0, 6).sort(function (a, b) { return ((Number(b.holes) >= 18) - (Number(a.holes) >= 18)) || ((b.gps ? 1 : 0) - (a.gps ? 1 : 0)) || (Number(b.holes) || 0) - (Number(a.holes) || 0) || String(a.name || a.course || '').localeCompare(String(b.name || b.course || '')); });
+    }
+    // A course picked in the choice box: pulled the app's normal way (gpsCourse, once for everyone). No
+    // ourKey: one of several courses at the club is not linked to our club row (no gps_links write).
+    function lookPick(key, id) {
+        var L = W.HardPanGpsLive, lk = S.lookup;
+        if (!L || !L.course || !lk || lk.key !== key || lk.state !== 'choose') return;
+        var m = (lk.matches || []).filter(function (x) { return String(x.id) === String(id); })[0];
+        if (!m) return;
+        S.lookup = { key: key, state: 'busy', name: m.name || m.club };
+        try { (W.__sfLookPick = W.__sfLookPick || []).push(String(id)); } catch (e) {}
+        if (S.step === 1) render();
+        L.course(String(id)).then(function (r) { if (S.lookup && S.lookup.key === key) landed(key, r); },
+            function () { if (S.lookup && S.lookup.key === key) { S.lookup = { key: key, state: 'none', why: 'error' }; if (S.step === 1) render(); } });
+    }
+    // The pull's answer (lookup or a pick from the choice box).
+    function landed(key, r) {
+        // Setting up a NEW course needs a signed-in golfer (the function's rule): say that, and ask
+        // again after sign-in (the 30-day mark is cleared).
+        if (r && (r.status === 'account' || r.status === 'signin')) { ls(LOOK + key, null); S.lookup = { key: key, state: 'signin' }; if (S.step === 1) render(); return; }
+        if (!(r && r.status === 'ready')) { S.lookup = { key: key, state: 'none', why: r && r.status }; if (S.step === 1) render(); return; }
+        var H = HD(), fin = function () {
+            S.lookup = null;
+            if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.step === 1) render(); }, true);
+            else if (S.step === 1) render();
+        };
+        // Its card is a new shared record (no card of ours): read it, and that record is the pick.
+        if (r.cardKey && !hasCard(key) && wizDb()) {
+            wizDb().ref('global_courses/' + r.cardKey).once('value').then(function (snap) {
+                var rec = snap && snap.val ? snap.val() : null;
+                if (rec && rec.name && typeof globalCourses !== 'undefined' && globalCourses) globalCourses[r.cardKey] = rec;
+                if (rec && rec.name && courseKey() === key) pick(r.cardKey, rec.name);
+                fin();
+            }, fin);
+        } else fin();
     }
     function lookupBox(key, name) {
         var lk = S.lookup && S.lookup.key === key ? S.lookup : null;
         var nm = esc(String(name || '').split(' (')[0]);
-        if (lk && lk.state === 'busy') return '<div class="sf-card" id="sf-lookup" style="display:flex;align-items:center;gap:10px;"><span class="sf-spin" aria-hidden="true">⏳</span><span class="sf-note" style="font-size:15px;">Getting ' + nm + '\u2019s scorecard\u2026</span></div>';
+        if (lk && lk.state === 'busy') return '<div class="sf-card" id="sf-lookup" style="display:flex;align-items:center;gap:10px;"><span class="sf-spin" aria-hidden="true">⏳</span><span class="sf-note" style="font-size:15px;">Getting ' + (lk.name ? esc(lk.name) : nm) + '\u2019s scorecard\u2026</span></div>';
+        // 064: MORE THAN ONE COURSE - the golfer picks (King 18 first, then Mulligan 9).
+        if (lk && lk.state === 'choose') return '<div class="sf-card" id="sf-lookup"><div style="font-weight:800;font-size:16px;margin-bottom:10px;">'
+            + (lk.oneClub ? nm + ' has ' + lk.matches.length + ' courses. Which one?' : 'More than one course is called ' + nm + '. Which one?') + '</div>'
+            + lk.matches.map(function (m) {
+                var part = String(m.course || '').trim(), holes = Number(m.holes) || 0, where = [m.city, m.state].filter(Boolean).join(', ');
+                var label = lk.oneClub && part && part.toLowerCase() !== String(m.club || '').toLowerCase() ? part + (holes && !new RegExp('\\b' + holes + '\\b').test(part) ? ' ' + holes : '') : (m.name || m.club || part);
+                var sub = [lk.oneClub ? '' : where, holes ? holes + ' holes' : '', m.gps ? '\u2713 GPS' : ''].filter(Boolean).join(' \u00b7 ');
+                return '<button type="button" class="sf-row" data-sf-lkpick="' + esc(m.id) + '"><span class="n">' + esc(label) + '</span><span class="s">' + esc(sub) + '</span></button>';
+            }).join('')
+            + '<button type="button" class="sf-btn" data-sf="change" style="width:100%;min-height:46px;">Pick another course</button></div>';
         if (lk && lk.state === 'signin') return '<div class="sf-card" id="sf-lookup"><div style="font-weight:800;font-size:16px;margin-bottom:6px;">Sign in to load ' + nm + '.</div><div class="sf-note" style="margin-bottom:10px;">Its scorecard and GPS are online - setting up a new course needs a signed-in golfer (Apple, Google or email). Once, for everyone.</div>'
             + '<button type="button" class="sf-cta" data-sf="signin" style="margin-bottom:8px;">Sign in</button><button type="button" class="sf-btn" data-sf="change" style="width:100%;min-height:46px;">Pick another course</button></div>';
         if (lk && lk.state === 'none' && hasCard(key) && S.noCard !== key) return '<div class="sf-note" id="sf-lookup" style="margin:-4px 2px 10px;">No GPS for ' + nm + ' in our data yet \u2014 its card and scores work; on the map, \u201cTap the middle of the green\u201d sets each green.</div>';
@@ -1392,6 +1432,7 @@
     function onClick(ev) {
         var t = ev.target, b;
         if (!t || !t.closest) return;
+        if ((b = t.closest('[data-sf-lkpick]'))) { lookPick(S.lookup && S.lookup.key, b.getAttribute('data-sf-lkpick')); return; }
         if ((b = t.closest('[data-sf-web]'))) { webPull(b.getAttribute('data-sf-web'), b.getAttribute('data-sf-name')); return; }
         if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.pend = null; S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; lookup(pk, pn); return; }
         if ((b = t.closest('[data-sf-tee]'))) {
