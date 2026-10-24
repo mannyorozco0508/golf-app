@@ -33,6 +33,8 @@
 		D022A000000000000000006C /* HardPanWatchPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000007 /* HardPanWatchPlugin.swift */; };
 		D022A000000000000000006D /* PhoneWatchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000008 /* PhoneWatchSession.swift */; };
 		D022A000000000000000006E /* HardPanWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = D022A0000000000000000009 /* HardPanWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E066A0000000000000000001 /* HardPanVoicePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = E066A0000000000000000011 /* HardPanVoicePlugin.swift */; };
+		E066A0000000000000000002 /* HardPanVoiceIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = E066A0000000000000000012 /* HardPanVoiceIntents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -113,6 +115,8 @@
 		D022A0000000000000000007 /* HardPanWatchPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanWatchPlugin.swift; sourceTree = "<group>"; };
 		D022A0000000000000000008 /* PhoneWatchSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneWatchSession.swift; sourceTree = "<group>"; };
 		D022A0000000000000000009 /* HardPanWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HardPanWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E066A0000000000000000011 /* HardPanVoicePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanVoicePlugin.swift; sourceTree = "<group>"; };
+		E066A0000000000000000012 /* HardPanVoiceIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanVoiceIntents.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -190,6 +194,8 @@
 				AA0220000000000000000004 /* HardPanLiveActivityPlugin.swift */,
 				D022A0000000000000000007 /* HardPanWatchPlugin.swift */,
 				D022A0000000000000000008 /* PhoneWatchSession.swift */,
+				E066A0000000000000000011 /* HardPanVoicePlugin.swift */,
+				E066A0000000000000000012 /* HardPanVoiceIntents.swift */,
 			);
 			path = PhoneBridge;
 			sourceTree = "<group>";
@@ -403,6 +409,8 @@
 				D022A000000000000000006A /* WatchProtocol.swift in Sources */,
 				D022A000000000000000006C /* HardPanWatchPlugin.swift in Sources */,
 				D022A000000000000000006D /* PhoneWatchSession.swift in Sources */,
+				E066A0000000000000000001 /* HardPanVoicePlugin.swift in Sources */,
+				E066A0000000000000000002 /* HardPanVoiceIntents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

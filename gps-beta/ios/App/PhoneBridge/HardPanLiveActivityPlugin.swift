@@ -28,6 +28,12 @@ public class HardPanLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationM
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise)
     ]
 
+    /// 066 voice: the numbers the Lock Screen shows (hole, mid, front, back, unit, round) for the Siri
+    /// yardage / held score when the web page is asleep. Numbers only - never a position. Main thread.
+    static var snapshot: [String: Any] = [:]
+    private var roundCode = ""
+    private func publish() { var s = state; s["round"] = roundCode; HardPanLiveActivityPlugin.snapshot = activityRef == nil ? [:] : s }
+
     private var activityRef: Any?                 // Activity<HardPanRoundAttributes> on iOS 16.1+
     private var state: [String: Any] = [:]
     private var green: [String: [Double]] = [:]
@@ -59,6 +65,7 @@ public class HardPanLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationM
         if #available(iOS 16.2, *) {
             take(call)
             let round = call.getString("round") ?? ""
+            roundCode = round
             DispatchQueue.main.async {
                 // One per round: an activity for this round already running (a reload) is kept.
                 if let a = Activity<HardPanRoundAttributes>.activities.first(where: { $0.attributes.round == round }) {
@@ -75,6 +82,7 @@ public class HardPanLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationM
                 }
                 self.lastPush = Date(); self.lastMid = self.state["mid"] as? Int; self.lastHole = self.state["hole"] as? Int
                 self.startLocation()
+                self.publish()
                 call.resolve(["started": true])
             }
             return
@@ -86,6 +94,7 @@ public class HardPanLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationM
     @objc func update(_ call: CAPPluginCall) {
         take(call)
         push(force: false)
+        DispatchQueue.main.async { self.publish() }
         call.resolve()
     }
 
@@ -98,7 +107,8 @@ public class HardPanLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationM
                 Task { for a in all { await a.end(nil, dismissalPolicy: .immediate) } }
             }
             #endif
-            self.activityRef = nil; self.state = [:]; self.green = [:]
+            self.activityRef = nil; self.state = [:]; self.green = [:]; self.roundCode = ""
+            HardPanLiveActivityPlugin.snapshot = [:]
             call.resolve()
         }
     }
@@ -134,6 +144,7 @@ public class HardPanLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationM
         state["mid"] = toUnit(d(c))
         if let f = green["f"] { state["front"] = toUnit(d(f)) }
         if let b = green["b"] { state["back"] = toUnit(d(b)) }
+        publish()
         push(force: false)
     }
 

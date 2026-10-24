@@ -31,6 +31,12 @@
 	<string>HardPan GPS only uses your location while the app is open, to show your yardages to the green. It never tracks you in the background.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>HardPan GPS uses your location only while the app is open, to show your yardages to the green. It is not sent anywhere unless you choose to set a green where you are standing.</string>
+	<!-- 066 voice scoring: the microphone and Apple's speech recognizer, only while the golfer
+	     holds or taps the voice button. On the phone where the phone supports it; nothing is kept. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>HardPan GPS listens only while you hold or tap the voice button, so you can say your score (like "a 5, two putts"). Nothing is recorded or kept.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>HardPan GPS turns what you say into a score for you to check and save. It's done on your iPhone when your iPhone supports it; otherwise Apple's speech recognition handles it. Nothing is kept.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
