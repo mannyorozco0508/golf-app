@@ -1598,7 +1598,12 @@
         if (typeof W.courseIndexLoader !== 'function') needs.push('course-index.js');
         var left = needs.length;
         var filesIn = function () {
-            var fin = function () { if (HS.files) return; HS.files = true; C.list = null; CR.rows = null; homeCardWork(); };
+            // ✓ GPS links / records only once the course list is complete: loadGpsKeys asks for every course
+            // key it sees and keeps the answer on this phone for hours (Course & Tees reads that same copy).
+            var fin = function () { if (HS.files) return; HS.files = true; C.list = null; CR.rows = null; homeCardWork();
+                // ...and once signed in (auth-boot): the rules read gps_links / gps_courses only then, and an answer
+                // read before that (nothing) would be kept as "no GPS".
+                if (H.db) Promise.resolve(W.authReady).then(function () { loadGpsKeys(function () { homeCardWork(); }); }, function () {}); };
             if (typeof globalCourses !== 'undefined' || typeof W.courseIndexLoader !== 'function' || !H.db) { fin(); return; }   /* global globalCourses */
             try {
                 W.globalCourses = {};
@@ -1615,7 +1620,6 @@
         };
         if (!left) filesIn();
         needs.forEach(function (src) { loadScriptTimed(src, function () { if (--left === 0) filesIn(); }); });
-        if (H.db) loadGpsKeys(function () { homeCardWork(); });   // ✓ GPS for linked / set-green courses (021)
         position(function (p, why) { if (!p && HS.here) return; HS.here = p || null; HS.why = why || null; homeCardWork(); });
     }
     // START ROUND (and a chip): the GPS door's own gate first (gps-entitlement, exactly as the door had it),
