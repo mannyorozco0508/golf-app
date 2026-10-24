@@ -3769,6 +3769,8 @@
     }
     function fillPlaysInfo() {
         var sh = plInfoSheet(), pos = sh && sh.querySelector('.gps-plinfo-pos');
+        var mi = sh && sh.querySelector('.gps-plinfo-miss'), MPi = missApi();
+        if (mi) { var mt = MPi && missShown() ? MPi.infoText() : ''; mi.querySelector('.gps-plinfo-miss-t').textContent = mt; mi.style.display = mt ? '' : 'none'; if (!MPi && missShown() && !S.missLoad) { S.missLoad = true; withShots(function () { if (S && plInfoOpen()) fillPlaysInfo(); }); } }
         if (pos) pos.textContent = perLegSwitch() && myCellSwitch() ? 'never your exact position; more than 30 yards off the hole\u2019s line, the height of the roughly 10-meter square you are in - its center, not your spot' : 'never your position';
         var box = sh && sh.querySelector('.gps-plinfo-now');
         if (!box) return;
@@ -4766,14 +4768,19 @@
         T.pick(club);
         flash(B.NAMES[club] + ' ✓');
     }
-    // ---- URGENT-052 B: "MY MISS" - THE MISS OVAL ON THE MAP (gps-miss-pattern.js) -------------
+    // ---- URGENT-052 B / URGENT-063: "MY MISS" - THE MISS OVAL ON THE MAP (gps-miss-pattern.js) ---
     // OFF by default, remembered per golfer (HardPanMissPattern.isOn / setOn). Switched in GPS
     // tools and on My bag's club screen - NO new button on the map. When off, nothing is added to
-    // the map at all (no source, no layer, no label): the map is exactly as before. When on: the
-    // club in hand (the open marked shot's club, else the club My bag suggests for the yards to
-    // the aim) - its oval (his own once 10 marked shots, else the labelled default shape), drawn
-    // along the line ball -> aim (the target ring, else the green center), centred on the club's
-    // average carry. Worked out on the phone; the positions it is drawn at live in memory only.
+    // the map at all (no source, no layer, no label): the map is exactly as before.
+    // 063: the oval comes ONLY from the club's average carry as My bag shows it (bagNow - typed,
+    // Range, good marked shots), sized by the numbers in gps-miss-pattern.js TUNE. Irons and
+    // wedges only, and only on an APPROACH into the green (missPlan): never from the tee, never
+    // a layup (the target off the green, or the green out of the club's range). The club: the
+    // one picked at Mark shot while that shot is open and the golfer still at its ball, else the
+    // one My bag suggests for the plays-like yards to the green. Drawn along the line ball ->
+    // aim (the target ring on the green, else the green center), centred on the club's carry.
+    // Worked out on the phone each render (so a new My bag number shows at once); the positions
+    // it is drawn at live in memory only.
     function missApi() { return window.HardPanMissPattern || null; }
     function missShown() { return !!(S && bagSwitch() && !tournament() && !readOnlyHere()); }
     function missPref() { var M = missApi(); return !!(M && missShown() && M.isOn(bagGolfer())); }
@@ -4782,12 +4789,28 @@
         var go = function () { var M = missApi(); if (!M || !S) return; M.setOn(bagGolfer(), !M.isOn(bagGolfer())); render(); tsSync(); };
         if (missApi()) go(); else withShots(go);
     }
-    function missClub(o, aim) {
-        var T = S.chips, op = T && T.open && T.open();
-        if (op && op.hole === S.hole && op.club) return op.club;
-        var B = bagApi(); if (!B || !o || !aim) return null;
-        var yd = G.haversineMeters(o.pt, aim) / G.M_PER_YD, sg = yd >= 10 ? B.suggestClub(bagNow(B), yd) : null;
-        return sg ? sg.club : null;
+    // THE PLAN for this spot: { club, carry, aim, hand } or null; S.missWhy says why not (checks).
+    function missPlan(r, o) {
+        var M = missApi(), B = bagApi(), SL = window.HardPanShotLog;
+        if (!M || !B || !r || !o || !o.pt || !r.mid) { S.missWhy = 'no-data'; return null; }
+        var T = S.chips, op = T && T.open && T.open(), opPt = op && T.openPt ? T.openPt() : null;
+        var C = window.HardPanMarkChips, nearYd = (C && C.AIM_NEAR_YD) || 40;
+        // The open marked shot is THIS shot only while the golfer is still at its ball.
+        var mine = !!(op && op.hole === S.hole && opPt && G.haversineMeters(opPt, o.pt) <= nearYd * G.M_PER_YD);
+        var teeYd = M.TUNE.TEE_YD * G.M_PER_YD, atTee = function (p) { return !!(r.tee && p && G.haversineMeters(p, r.tee) <= teeYd); };
+        var fromTee = o.from === 'tee' || atTee(o.pt) || (mine && atTee(opPt));
+        var pl = null; try { pl = playsTo(null); } catch (e) { pl = null; }
+        var greenYd = pl && pl.exact > 0 ? pl.exact : G.haversineMeters(o.pt, r.mid) / G.M_PER_YD;
+        var bag = bagNow(B), club = null;
+        if (mine && op.club) club = op.club;
+        else { var sg = greenYd >= 10 ? B.suggestClub(bag, greenYd) : null; club = sg ? sg.club : null; }
+        var v = club ? bag[club] : null, carry = v && v.yd > 0 ? v.yd : null;
+        var tg = S.target || null, layup = !!(tg && G.haversineMeters(tg, r.mid) > M.TUNE.GREEN_AIM_YD * G.M_PER_YD);
+        var ok = M.shows({ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup });
+        S.missWhy = ok.ok ? null : ok.why;
+        if (!ok.ok) return null;
+        var rawYd = G.haversineMeters(o.pt, r.mid) / G.M_PER_YD;
+        return { club: club, carry: carry, along: M.centreAt(carry, rawYd, pl && pl.exact > 0 ? pl.exact : null), aim: tg && !layup ? tg : r.mid, hand: SL && SL.hand ? SL.hand(bagGolfer()) : 'R' };
     }
     var MISS_SRC = 'mymiss', MISS_LAYERS = ['mymiss-fill', 'mymiss-line'];
     function missClear() {
@@ -4795,7 +4818,7 @@
             try { MISS_LAYERS.forEach(function (id) { if (S.map.getLayer(id)) S.map.removeLayer(id); }); if (S.map.getSource(MISS_SRC)) S.map.removeSource(MISS_SRC); } catch (e) {}
         }
         if (S && S.markers && S.markers.mymiss) marker('mymiss', null);
-        if (S) { S.missRing = null; S.missKey = null; }
+        if (S) { S.missRing = null; S.missKey = null; S.missOval = null; }
     }
     function missSync(r, o) {
         if (!S) return;
@@ -4803,11 +4826,11 @@
         var M = missApi();
         if (!M) { if (!S.missLoad) { S.missLoad = true; withShots(function () { if (S && missApi() && missApi().isOn(bagGolfer())) render(); }); } return; }
         if (!M.isOn(bagGolfer()) || !S.map || !S.styleReady) { missClear(); return; }
-        var aim = S.target || aimAt(r), club = o && aim ? missClub(o, aim) : null, SL = window.HardPanShotLog, B = bagApi(), SB = shotBag();
-        if (!club || !SL || !B) { missClear(); return; }
-        var who = bagGolfer(), v = bagNow(B)[club];
-        var f = SB && SB.missFit ? SB.missFit(who, club, v && v.yd ? v.yd : null) : null;
+        var plan = missPlan(r, o), B = bagApi();
+        var f = plan ? M.oval(plan.club, plan.carry, plan.hand, plan.along) : null;
         if (!f) { missClear(); return; }
+        var aim = plan.aim, club = plan.club;
+        S.missOval = { club: f.club, carry: f.avg, along: f.carry, a: f.a, b: f.b, tilt: f.tilt, hand: f.hand };
         var brg = G.bearingDeg(o.pt, aim), at = function (side, along) { return G.destination(G.destination(o.pt, brg, along * G.M_PER_YD), (brg + 90) % 360, side * G.M_PER_YD); };
         var ring = M.outline(f, 64).map(function (q) { return at(q[0], q[1]); });
         var coords = ring.map(function (p) { return [p[1], p[0]]; });
@@ -4819,27 +4842,54 @@
             map.addLayer({ id: 'mymiss-fill', type: 'fill', source: MISS_SRC, paint: { 'fill-color': '#7dd3fc', 'fill-opacity': 0.22 } }, before);
             map.addLayer({ id: 'mymiss-line', type: 'line', source: MISS_SRC, paint: { 'line-color': '#7dd3fc', 'line-width': 2, 'line-opacity': 0.95 } }, before);
         } else setData(MISS_SRC, fc);
-        try { map.setPaintProperty('mymiss-line', 'line-dasharray', f.own ? [1, 0] : [2, 1.5]); } catch (e) {}
         S.missRing = ring;
         // Its label (text only, no button - taps go through to the map), beside the oval - on its
         // right, or on its left when the right has no room (the rail) - never on top of it.
         var px = ring.map(function (p) { return S.map.project(ll(p)).x; });
         var rI = px.indexOf(Math.max.apply(null, px)), lI = px.indexOf(Math.min.apply(null, px));
         var nm = (B.NAMES && B.NAMES[club]) || club;
-        var lbl = 'My miss \u00b7 ' + nm + (f.own ? '' : 'default shape');
+        var lbl = 'My miss \u00b7 ' + nm;
         var mk = marker('mymiss', ring[rI], function () { var e = document.createElement('div'); e.className = 'gps-miss-lbl'; e.style.pointerEvents = 'none'; return e; });
         if (mk) {
             var me = mk.getElement();
             if (me.textContent !== lbl) {
                 me.textContent = '';
-                var sp = document.createElement('span'); sp.appendChild(document.createTextNode('My miss \u00b7 ' + nm));
-                if (!f.own) { var sm = document.createElement('small'); sm.textContent = 'default shape'; sp.appendChild(sm); }
+                var sp = document.createElement('span'); sp.appendChild(document.createTextNode(lbl));
                 me.appendChild(sp);
             }
-            me.setAttribute('data-miss-club', club); me.setAttribute('data-miss-own', f.own ? '1' : '0');
+            me.setAttribute('data-miss-club', club); me.setAttribute('data-miss-carry', String(Math.round(f.avg)));
         }
         missKeepClear();
         missPlaceLbl();
+        missMakeRoom();
+    }
+    // 063: NO CLEAR SPOT for the label, and only a few pixels short beside the oval (a small phone, a
+    // wide iron oval): the map slides sideways just enough (up to 40 px; the golfer has not moved it
+    // himself, the oval stays inside the clear map) for the label to sit beside it - kept only when
+    // that spot is then clear of everything; else the map goes back.
+    function missMakeRoom() {
+        var L = S && S.missLbl;
+        if (!L || !(L.cover >= 1) || S.userMoved || S.dragging || !S.map || S.missRoomBusy) return;
+        S.missRoomBusy = true;
+        try { missMakeRoom0(L); } finally { if (S) S.missRoomBusy = false; }
+    }
+    function missMakeRoom0(L) {
+        var box = missRect(), B = L.B; if (!box || !B) return;
+        var sw = L.r - L.l, tries = [];
+        var needR = B.l - (box.l - 8 - sw);                 // slide the map right: room on the oval's left
+        if (needR > 0 && needR <= 40 && box.r + needR + 1 <= B.r) tries.push(needR + 1);
+        var needL = (box.r + 8 + sw) - B.r;                 // slide it left: room on the right
+        if (needL > 0 && needL <= 40 && box.l - needL - 1 >= B.l) tries.push(-(needL + 1));
+        // The best spot itself just off the clear map's side: slide it on.
+        var offL = B.l - L.l, offR = L.r - B.r;
+        if (offL > 0 && offL <= 40 && box.r + offL + 1 <= B.r) tries.push(offL + 1);
+        if (offR > 0 && offR <= 40 && box.l - offR - 1 >= B.l) tries.push(-(offR + 1));
+        var slide = function (dx) { S.framing = true; try { S.map.panBy([-dx, 0], { animate: false }); } finally { S.framing = false; } sizeTarget(); placePills(); };
+        for (var i = 0; i < tries.length; i++) {
+            slide(tries[i]);
+            if (S.missLbl && S.missLbl.cover < 1) return;
+            slide(-tries[i]);
+        }
     }
     // The plays-like pill (layout D, bottom right) never covers the oval: when they meet - and the
     // golfer has not moved the map himself - the map slides up just enough (never past the clear
@@ -5048,10 +5098,19 @@
                 var ws = document.createElement('span'); ws.textContent = wl.text; wd.appendChild(ws);
                 var hbt = document.createElement('button'); hbt.type = 'button'; hbt.className = 'gps-bag-hist'; hbt.setAttribute('data-bag-hist', c);
                 hbt.textContent = 'Shot history' + (logged ? ' (' + logged + ')' : ''); hbt.setAttribute('aria-label', B.NAMES[c] + ' shot history');
-                // URGENT-052 B: the club screen also holds My miss (its default shape needs only a carry).
-                if (!logged && window.HardPanMissPattern) { hbt.textContent = 'My miss'; hbt.setAttribute('aria-label', B.NAMES[c] + ' my miss'); }
-                if (logged || window.HardPanMissPattern) wd.appendChild(hbt);
+                // URGENT-052 B / 063: the club screen also holds My miss (irons and wedges; it needs only My bag's carry).
+                var MPb = window.HardPanMissPattern, ironish = !!(MPb && MPb.isClub && MPb.isClub(c));
+                if (!logged && ironish) { hbt.textContent = 'My miss'; hbt.setAttribute('aria-label', B.NAMES[c] + ' my miss'); }
+                if (logged || ironish) wd.appendChild(hbt);
                 row.appendChild(wd);
+            }
+            // 063: THE MY BAG LINE per iron / wedge - "7-iron · 178 · miss right ≈ 5 short, miss left ≈ 5 long",
+            // from My bag's number now and the same formula as the map's oval (gps-miss-pattern.js TUNE).
+            var MPl = window.HardPanMissPattern;
+            if (MPl && MPl.isClub && MPl.isClub(c) && v && v.yd > 0) {
+                var ml = document.createElement('div'); ml.className = 'gps-bag-miss'; ml.setAttribute('data-bag-miss', c);
+                ml.textContent = MPl.bagLine(B.NAMES[c], v.yd, SL && SL.hand ? SL.hand(who) : 'R', m ? 'm' : 'yd', c);
+                row.appendChild(ml);
             }
             list.appendChild(row);
         });
@@ -6256,6 +6315,8 @@
         // 012 part 5: the altitude, vs My bag's "My distances are from" (gps-geo ALT_PCT_PER_1000FT = 2).
         +     '<li><b>Altitude:</b> with My bag\u2019s \u201cMy distances are from\u201d set, about 2% for every 1,000 feet above it (shorter) or below it (longer) - worked out first.</li>'
         +   '</ul>'
+        // 063: MY MISS - the formula in plain words (gps-miss-pattern.js infoText; its TUNE numbers), when My miss is allowed here.
+        +   '<p class="gps-plinfo-miss" style="display:none"><b>My miss:</b> <span class="gps-plinfo-miss-t"></span></p>'
         // 012: the words about the golfer's own grid cell appear ONLY when that fetch is on (elevMyCell + elevPerLeg; fillPlaysInfo).
         +   '<p>Heights come from the U.S. Geological Survey for the course\u2019s own points (<span class="gps-plinfo-pos">never your position</span>), so only on US courses. Wind and temperature come from the National Weather Service near the course. Anything we do not have is left out. Tournament mode turns all of it off.</p>'
         + '</div>'
@@ -7318,7 +7379,8 @@
                     var hc = hs.getAttribute('data-bag-hist');
                     closeBag();
                     var hv = bagNow(B)[hc];
-                    shotBag().openHistory({ el: S.el, golfer: bagGolfer(), club: hc, units: units, carry: hv && hv.yd ? hv.yd : null, onChange: function () { render(); tsSync(); }, back: function () { if (S) openBag(); } });
+                    shotBag().openHistory({ el: S.el, golfer: bagGolfer(), club: hc, units: units, carry: hv && hv.yd ? hv.yd : null,
+                        carryNow: function () { var Bn = bagApi(), vn = Bn && S ? bagNow(Bn)[hc] : null; return vn && vn.yd > 0 ? vn.yd : null; }, onChange: function () { render(); tsSync(); }, back: function () { if (S) openBag(); } });
                     return;
                 }
                 if (t.closest('.gps-bag-resetall')) { B.resetAll(bagGolfer()); bagSaved(); fillBag(); render(); }
@@ -7878,6 +7940,8 @@
         target: function () { return S && S.target ? [S.target[0], S.target[1]] : null; },
         // URGENT-052 B (checks): the map's own layer / source ids, and the My miss oval's box on screen.
         mapLayers: function () { try { var st = S && S.map && S.map.getStyle(); return st ? { layers: st.layers.map(function (l) { return l.id; }), sources: Object.keys(st.sources || {}) } : null; } catch (e) { return null; } },
+        // 063 (checks): the oval drawn now (club, carry, half width a, half depth b, tilt, hand) and why not.
+        missNow: function () { return S ? { oval: S.missOval || null, why: S.missWhy || null } : null; },
         // int-061 (checks): the My miss label's box on screen and anything it touches (rail, bubbles, "20 yd", pill, labels).
         missLbl: function () {
             try {
