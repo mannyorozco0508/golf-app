@@ -49,6 +49,7 @@
         emailFinish: 'Finish signing in',
         emailAgain: 'Send it again',
         otherWays: 'Other ways to sign in',
+        switched: 'This {via} sign-in already had an account, so this phone is now signed in to that account.',
         moved: 'Rounds this phone played before you signed in still show in History and keep scoring. Editing their setup needs the phone\u2019s earlier sign-in.'
     };
     var LEGAL = { privacy: 'https://golf-app-5a5.pages.dev/privacy.html', terms: 'https://golf-app-5a5.pages.dev/terms.html' };
@@ -337,10 +338,16 @@
                 + row('venmo', 'Venmo', handle(p.venmo, '@'), 'Add @username')
                 + row('cashapp', 'Cash App', handle(p.cashapp, '$'), 'Add $cashtag')
                 + '</div><div class="hpa-msg" role="status" aria-live="polite"></div>'
+                + (switchedVia(via) ? '<div class="hpa-fine" data-hpa-switched="1" style="text-align:left;margin:0 2px 12px">' + esc(WORDS.switched.replace('{via}', switchedVia(via))) + '</div>' : '')
                 + (movedCount() ? '<div class="hpa-fine" data-hpa-moved="' + movedCount() + '" style="text-align:left;margin:0 2px 12px">' + esc(WORDS.moved) + '</div>' : '')
                 + '<button type="button" class="hpa-signout" data-hpa="signout">' + esc(WORDS.signOut) + '</button>'
                 + '<div class="hpa-fine">' + esc(WORDS.signOutFine) + '</div>';
         });
+    }
+    // 064-6b: the "signed in as that account" note oauth-signin.js writes for a switch
+    // never showed (the sign-in sheet closes on success), so Profile says it.
+    function switchedVia(via) {
+        try { var a = api(); var l = a && typeof a.lastSignIn === 'function' ? a.lastSignIn() : null; return l && l.switched && via ? via : ''; } catch (e) { return ''; }
     }
     function movedCount() {
         try { var a = api(); var l = a && typeof a.movedRounds === 'function' ? a.movedRounds() : []; return Array.isArray(l) ? l.length : 0; } catch (e) { return 0; }
