@@ -254,9 +254,39 @@
             // 021: ✓ GPS on every course with live GPS - the GPS links and set greens, read once.
             if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (S.here && S.near && S.near.length !== undefined) S.near = nearList(S.here); if (S.open && S.step === 1) render(); keysPartial(); });
             sockWatch();
+            listWatch();
         };
         if (!left || typeof H.loadScriptTimed !== 'function') { fin(); return; }
         need.forEach(function (src) { H.loadScriptTimed(src, function () { if (--left === 0) fin(); }); });
+    }
+    // 064 (the 064-misc Simulator run: NEAR YOU showed "az_papago 0.7 mi", the directory row, not Papago's
+    // shared gapi_ record): on a fresh install Round Setup's shared course list (globalCourses) can land
+    // AFTER NEAR YOU was worked out, and nothing worked it out again - the directory row stayed (no ✓,
+    // no "You're here"), and the GPS keys read before the list was in missed Papago's GPS. For the first
+    // minute: when the list grows, NEAR YOU is worked out again (redrawn only if its rows changed) and the
+    // GPS keys are read again once if that first read was partial.
+    var LW = { t: null, n: 0, gc: -1, sig: '' };
+    function gcCount() { try { return typeof globalCourses !== 'undefined' && globalCourses ? Object.keys(globalCourses).length : 0; } catch (e) { return 0; } }   /* global globalCourses */
+    function listWatch() {
+        if (LW.t) return;
+        LW.gc = gcCount();
+        LW.t = setInterval(function () {
+            var H = HD(), n = gcCount();
+            if (++LW.n > 60) { clearInterval(LW.t); return; }
+            if (n === LW.gc) return;
+            var grew = n > LW.gc; LW.gc = n;
+            if (grew && typeof H.gpsKeysPartial === 'function' && H.gpsKeysPartial() && typeof H.loadGpsKeys === 'function')
+                H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.open && S.step === 1) render1(); keysPartial(); });
+            if (!S.here || !Array.isArray(S.near)) return;
+            var nx = nearList(S.here), sig = function (a) { return a.map(function (x) { return x.c.key + ':' + (x.c.ready ? 1 : 0); }).join(','); };
+            if (sig(nx) === sig(S.near)) return;
+            S.near = nx;
+            // The course picked by itself ("You're here") was the directory row: now its own record.
+            var hc = HC(), rv = null;
+            if (S.autoKey && courseKey() === S.autoKey && hc) { try { rv = hc.resolve({ key: S.autoKey }); } catch (e) { rv = null; } }
+            if (rv && rv.key && rv.key !== S.autoKey && rv.row) { S.autoKey = rv.key; if (S.lookup && S.lookup.state !== 'busy') S.lookup = null; S.noCard = null; pick(rv.key, rv.name); }
+            if (S.open && S.step === 1) render1();
+        }, 1000);
     }
     // Every course Round Setup can start: the app's list (front-door allCourses) plus the shared
     // courses Round Setup itself lists (globalCourses: gca_ / gapi_ / comm_), each with its point.
@@ -314,6 +344,7 @@
         if (!at) return;
         S.auto = false;
         pick(at.c.key, at.c.name); if (S.mode === 'gps') lookup(at.c.key, at.c.name);
+        S.autoKey = courseKey();   // (064 listWatch: the course's own record once the shared list lands)
     }
     function hereOf(near) {
         if (!Array.isArray(near)) return null;

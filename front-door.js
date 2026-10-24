@@ -158,6 +158,10 @@
         // install's database still connecting) leaves the answer PARTIAL - used for now, never kept on
         // the phone for 6 h, and asked again on the next call (simple-flow asks once the database is up).
         var short = false;
+        // 064 (Papago, a fresh install): the shared course list (Round Setup's globalCourses - Papago's gapi_
+        // record) can land AFTER this first ask; its courses are then not asked about. Not kept 6 h then:
+        // PARTIAL, asked again once the list is in (simple-flow listWatch).
+        if (!Object.keys(crShared()).length) short = true;
         var one = function (path) {
             return new Promise(function (res) {
                 var t = setTimeout(function () { short = true; res(null); }, 6000);
