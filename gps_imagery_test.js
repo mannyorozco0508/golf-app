@@ -4,10 +4,9 @@
 //   - the saved value: a string or { src, at }; newest wins; anything else is ignored; default esri.
 //   - Esri's "Map data not yet available" tile is recognised (its bytes when the measured file is on
 //     this Mac, and always by its look: one neutral grey) - real imagery is not.
-//   - the pre-cache follows the course's picture: USGS into Cache Storage as before; Esri (and the
-//     close-up's z20) into the browser HTTP cache only, under Esri's own Cache-Control, from the
-//     COURSE area - the same tiles whatever happens elsewhere; a header that forbids caching stops it;
-//     USGS chosen = no Esri request at all.
+//   - the pre-cache: USGS into Cache Storage as before, whatever the course's picture; Esri is NEVER
+//     saved (URGENT-064, Manny Oct 21: Esri allows offline only on a custom plan via its own SDKs) -
+//     no warm-up, no Esri request from the pre-cache at all, every Esri tile asked with no-store.
 // ============================================================================
 'use strict';
 const test0 = require('node:test');
@@ -101,70 +100,57 @@ test('the measured Esri placeholder file (z20 at Papago, 2026-10-21) matches the
     assert.equal(await t.gps.imagery.isPlaceholder(c.buffer.slice(c.byteOffset, c.byteOffset + c.length)), false);
 });
 
-test('Cache-Control: only a positive max-age allows keeping a tile', () => {
-    const I = sandbox().gps.imagery;
-    assert.equal(I.maxAge('max-age=86400'), 86400);
-    assert.equal(I.maxAge('public, max-age=3600'), 3600);
-    assert.equal(I.maxAge('no-store'), 0);
-    assert.equal(I.maxAge('no-cache, max-age=86400'), 0);
-    assert.equal(I.maxAge('private, max-age=600'), 0);
-    assert.equal(I.maxAge(''), 0);
-    assert.equal(I.maxAge(null), 0);
-});
-
 const caledonia = (sb) => sb.HardPanGeo.osmCourse(sb.HardPanGpsCourses, 'caledonia');
-test('the Esri tile list comes from the course alone, capped; the close-up adds z20 over the greens', () => {
-    const t = sandbox(), G = t.sb.HardPanGeo, osm = caledonia(t.sb);
-    const b = G.courseBounds(osm, [], 150);
-    const greens = Object.keys(osm.holes).map((n) => G.resolveHole(osm.holes[n], []).mid).filter(Boolean);
-    const e = t.gps.imagery.warmTiles(b, greens, 'esri'), c = t.gps.imagery.warmTiles(b, greens, 'esri-closeup');
-    assert.ok(e.length > 20 && e.length <= t.gps.imagery.WARM_CAP, 'esri: ' + e.length);
-    assert.ok(c.length >= e.length && c.length <= t.gps.imagery.WARM_CAP, 'close-up: ' + c.length);
-    assert.ok(e.every((x) => x.z >= 16 && x.z <= 19), 'esri: z16-19 only');
-    assert.ok(c.every((x) => x.z >= 16 && x.z <= 20), 'close-up: z16-20 only (z21 is asked live, never pre-fetched)');
-    assert.deepEqual(JSON.stringify(t.gps.imagery.warmTiles(b, greens, 'esri')), JSON.stringify(e), 'the same course gives the same tiles');
-    assert.equal(new Set(c.map((x) => x.z + '/' + x.x + '/' + x.y)).size, c.length, 'no tile twice');
-    assert.ok(t.gps.imagery.warmTiles(b, greens, 'esri-closeup', 40).length <= 40, 'the cap holds');
+test('064: no Esri warm-up any more - the 051 helpers are gone from the API', () => {
+    const I = sandbox().gps.imagery;
+    assert.equal(I.warmTiles, undefined, 'no Esri tile list for a warm-up');
+    assert.equal(I.maxAge, undefined, 'no Cache-Control reading for keeping Esri');
+    assert.equal(I.WARM_CAP, undefined);
+    assert.equal(typeof I.esriNoStore, 'function');
 });
 
-test('pre-cache, Esri course: USGS to Cache Storage as before, Esri to the HTTP cache only, by the course area, once per max-age', async () => {
+for (const src of ['esri', 'esri-closeup', 'usgs']) {
+    test('pre-cache, ' + src + ' course: USGS to Cache Storage as before; Esri is asked for nothing and nothing is marked', async () => {
+        const t = sandbox(src === 'esri' ? {} : { ls: { 'hardpan_imagery_v1_caledonia': JSON.stringify({ src, at: 1 }) } });
+        const r = await t.gps.precacheCourse('caledonia', [[33.45, -79.15]]);
+        const esri = t.reqs.filter((q) => /esri\.test/.test(q.url)), usgs = t.reqs.filter((q) => /nationalmap/.test(q.url));
+        assert.ok(usgs.length > 0 && r && r.ok && r.fetched > 0, 'positive: USGS fetched and stored: ' + JSON.stringify(r));
+        assert.ok(t.puts.length > 0 && t.puts.every((u) => /nationalmap/.test(u)), 'Cache Storage holds USGS only');
+        assert.equal(esri.length, 0, 'the pre-cache asked Esri for nothing');
+        assert.equal(r.esri, undefined, 'no Esri step in the result');
+        assert.ok(!Object.keys(t.store).some((k) => /esri/i.test(k)), 'no Esri mark kept: ' + Object.keys(t.store).join(','));
+    });
+}
+
+test('pre-cache: esriWarm in gps-config changes nothing now (off is the only way)', async () => {
+    const on = sandbox({ cfg: { esriWarm: true } });
+    await on.gps.precacheCourse('caledonia', []);
+    assert.equal(on.reqs.filter((q) => /esri\.test/.test(q.url)).length, 0, 'esriWarm: true does not bring the warm-up back');
+    assert.ok(on.puts.length > 0, 'positive: USGS stored');
+});
+
+test('every Esri tile request is no-store; USGS and anything else untouched', () => {
+    const I = sandbox().gps.imagery;
+    assert.deepEqual(JSON.parse(JSON.stringify(I.esriNoStore('https://esri.test/tile/18/104876/73437?token=KEY'))), { url: 'https://esri.test/tile/18/104876/73437?token=KEY', cache: 'no-store' });
+    assert.ok(I.isEsriTile('https://esri.test/tile/20/1/2?token=KEY'));
+    const u = 'https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/16/1/2';
+    assert.deepEqual(JSON.parse(JSON.stringify(I.esriNoStore(u))), { url: u }, 'USGS keeps its normal request');
+    assert.equal(I.esriNoStore('hpusgs://16/1/2').cache, undefined);
+    assert.equal(I.esriNoStore('https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer?f=json').cache, undefined, 'only tiles are matched (the stand-in template here)');
+    // The real template, with no stand-in: the real Esri tile host.
+    const real = sandbox({ cfg: { esriTileUrl: '' } }).gps.imagery;
+    assert.equal(real.esriNoStore('https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/18/1/2?token=K').cache, 'no-store');
+});
+
+test('the 051 warm marks are cleared once; nothing else in storage is touched', () => {
     const t = sandbox();
-    const r = await t.gps.precacheCourse('caledonia', []);
-    const esri = t.reqs.filter((q) => /esri\.test/.test(q.url)), usgs = t.reqs.filter((q) => /nationalmap/.test(q.url));
-    assert.ok(usgs.length > 0, 'positive: USGS fetched');
-    assert.ok(esri.length > 0 && r.esri && r.esri.ok, 'Esri warmed: ' + JSON.stringify(r.esri));
-    assert.ok(esri.every((q) => q.init.cache === 'default' && q.init.credentials === 'omit'), 'Esri requests leave caching to the browser and Esri\'s headers');
-    assert.ok(esri.every((q) => /token=KEY$/.test(q.url) && /\/tile\/(1[6-9])\//.test(q.url)), 'Esri z16-19 tiles');
-    assert.ok(t.puts.length > 0 && t.puts.every((u) => /nationalmap/.test(u)), 'Cache Storage holds USGS only');
-    const mark = JSON.parse(t.store.hardpan_esri_warm_v1_caledonia);
-    assert.ok(mark.until > Date.now() + 22 * 3600e3 && mark.until <= Date.now() + 86400e3, 'kept no longer than Esri\'s max-age');
-    const n = esri.length;
-    const again = await t.gps.precacheCourse('caledonia', []);
-    assert.equal(again.esri.reason, 'fresh');
-    assert.equal(t.reqs.filter((q) => /esri\.test/.test(q.url)).length, n, 'no second warm-up inside the max-age');
-});
-
-test('pre-cache, close-up course: the z20 tiles over the greens too; pins in the round add their greens', async () => {
-    const t = sandbox({ ls: { 'hardpan_imagery_v1_caledonia': JSON.stringify({ src: 'esri-closeup', at: 1 }) } });
-    const r = await t.gps.precacheCourse('caledonia', []);
-    assert.equal(r.esri.src, 'esri-closeup');
-    assert.ok(t.reqs.some((q) => /esri\.test\/tile\/20\//.test(q.url)), 'z20 asked');
-    assert.ok(!t.reqs.some((q) => /esri\.test\/tile\/(2[1-9])\//.test(q.url)), 'never past z20 ahead of time');
-});
-
-test('pre-cache: Esri headers that forbid caching stop the warm-up; USGS chosen asks Esri for nothing', async () => {
-    const t = sandbox({ esriCacheControl: 'no-store' });
-    const r = await t.gps.precacheCourse('caledonia', []);
-    assert.equal(r.esri.reason, 'headers');
-    assert.ok(t.reqs.filter((q) => /esri\.test/.test(q.url)).length <= 4, 'stopped at the first answers (4 in flight)');
-    assert.equal(t.store.hardpan_esri_warm_v1_caledonia, undefined, 'nothing marked as kept');
-    const u = sandbox({ ls: { 'hardpan_imagery_v1_caledonia': JSON.stringify({ src: 'usgs', at: 1 }) } });
-    const ru = await u.gps.precacheCourse('caledonia', []);
-    assert.equal(ru.esri.reason, 'usgs-chosen');
-    assert.equal(u.reqs.filter((q) => /esri\.test/.test(q.url)).length, 0);
-    assert.ok(u.reqs.some((q) => /nationalmap/.test(q.url)), 'positive: USGS still stored');
-    const off = sandbox({ cfg: { esriWarm: false } });
-    assert.equal((await off.gps.precacheCourse('caledonia', [])).esri.reason, 'off', 'gps-config esriWarm: false turns it off');
+    const keys = ['hardpan_esri_warm_v1_caledonia', 'hardpan_esri_warm_v1_gca_x', 'hardpan_usgs_done_v1_caledonia', 'hardpan_imagery_v1_caledonia'];
+    keys.forEach((k) => { t.store[k] = '{"until":99999999999999}'; });
+    const ls = t.sb.localStorage;
+    ls.key = (i) => Object.keys(t.store)[i];
+    Object.defineProperty(ls, 'length', { get: () => Object.keys(t.store).length, configurable: true });
+    assert.equal(t.gps.imagery.clearOldEsriWarm(), 2);
+    assert.deepEqual(Object.keys(t.store).sort(), ['hardpan_imagery_v1_caledonia', 'hardpan_usgs_done_v1_caledonia']);
 });
 
 test('wiring: the close-up layer, its own protocol, the fallback chain, the switch, and nothing stored but USGS', () => {
@@ -176,9 +162,13 @@ test('wiring: the close-up layer, its own protocol, the fallback chain, the swit
     assert.ok(/var want = \(pinning \|\| S\.esriFailed \|\| usgsPicture\(\)\) \? 'none' : 'visible';/.test(v), 'Esri held back while USGS is the picture');
     assert.ok(/S\.imgSrc === 'usgs' && S\.usgsErrRun >= ESRI_ERRS_TO_FAIL\) failUsgs\(\)/.test(v), 'USGS failing hands over to Esri');
     assert.ok(/data\.indexOf|\.put\(/.test(v) && v.split('\n').filter((l) => /\.put\(/.test(l) && !/^\s*\/\//.test(l)).length === 1, 'still exactly one Cache Storage write (USGS)');
-    const warm = v.slice(v.indexOf('function warmEsri('), v.indexOf('// ---- THE MAP'));
-    assert.ok(!/caches\.|\.put\(|indexedDB/.test(warm), 'the Esri warm-up never touches Cache Storage or IndexedDB');
-    assert.ok(!/\bfix\b|S\.dot|watchPosition/.test(warm), 'the Esri warm-up never reads the golfer\'s position');
+    assert.ok(!/function warmEsri\(|esriWarmValid|hardpan_esri_warm_v1_' \+/.test(v), '064: no Esri warm-up, and nothing reads its old marks');
+    assert.ok(/function onOffline\(\) \{ dropEsri\('offline'\);/.test(v), '064: no signal -> Esri off at once (nothing of it is kept)');
+    assert.ok(/var offEsri = offline;/.test(v), '064: a map built with no signal starts on USGS');
+    assert.ok(/fetch\(url, \{ mode: 'cors', credentials: 'omit', cache: 'no-store' \}\)/.test(v.slice(v.indexOf("ml.addProtocol('hpesri'"), v.indexOf('function esriHiSource('))), '064: the close-up asks with no-store');
+    assert.ok(/transformRequest: esriNoStore,/.test(v), '064: the map asks every Esri tile with no-store');
+    const pre = v.slice(v.indexOf('function precacheCourse('), v.indexOf('function precacheUsgs('));
+    assert.ok(/return precacheUsgs\(courseKey, extraPts\);/.test(pre) && !/esri/i.test(pre.replace(/\/\/.*$/gm, '')), '064: the pre-cache is USGS only');
     assert.ok(/cfg\(\)\.imageryShare === true/.test(v), 'the shared write waits for the rule (imageryShare)');
     const cfg = fs.readFileSync(path.join(ROOT, 'gps-config.js'), 'utf8');
     assert.ok(!/imageryShare:\s*true/.test(cfg), 'imageryShare is not on in the shipped config');
@@ -188,4 +178,7 @@ test('acknowledgements name Esri (incl. the close-up) and USGS', () => {
     const a = fs.readFileSync(path.join(ROOT, 'acknowledgements.html'), 'utf8');
     assert.ok(/Powered by <a href="https:\/\/www\.esri\.com">Esri<\/a>\. Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community/.test(a));
     assert.ok(/close-up imagery/.test(a) && /USDA, USGS The National Map: Orthoimagery/.test(a) && /set to USGS/.test(a));
+    assert.ok(/Esri imagery is shown live and is never saved on the phone\./.test(a), '064: the Esri line says it is never saved');
+    assert.ok(!/cache rules allow/.test(a), '064: the old "kept as long as Esri\'s cache rules allow" wording is gone');
+    assert.ok(/back-up picture stored on the phone for no signal/.test(a), 'USGS is still the saved back-up');
 });

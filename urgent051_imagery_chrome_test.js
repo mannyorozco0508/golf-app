@@ -17,8 +17,9 @@
 //   7. Fix the green (the organizer): "Map picture" -> three choices with a note each -> USGS: the map
 //      changes at once, it is kept on the phone (no database write - the rule is not live), and the
 //      NEXT round on the course opens on USGS.
-//   8. PRIVACY: the pre-cache's Esri tiles are the same with the golfer at two places on the course,
-//      and no request URL the page made carries the golfer's position.
+//   8. PRIVACY: the pre-cache's USGS tiles are the same with the golfer at two places on the course,
+//      it asks Esri for nothing (URGENT-064: Esri is never saved), and no request URL the page made
+//      carries the golfer's position.
 // Shots (when ~/Desktop/claude-code-reports/051 exists): 051/chrome/<n>-<what>.png.
 // ============================================================================
 'use strict';
@@ -129,14 +130,19 @@ async function open(code, o) {
 }
 // Zoom in with the wheel over the map until z >= target (the golfer's pinch).
 async function zoomTo(j, target) {
-    for (let i = 0; i < 30; i++) {
+    // 064: up to 60 wheel steps (a loaded machine drops some), then wait for the close-up layer to have
+    // answered at least once - its tiles now stream live (no 051 warm-up has them in the HTTP cache).
+    for (let i = 0; i < 60; i++) {
         const z = Number(await attr(j, 'data-zoom'));
         if (z >= target) break;
         await j.cdp('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 196, y: 330, deltaX: 0, deltaY: -240 });
         await sleep(450);
     }
     await sleep(2500);
-    return Number(await attr(j, 'data-zoom'));
+    const z = Number(await attr(j, 'data-zoom'));
+    if (z >= 20) await until(j, "(function(){var s=HardPanGps.imagery.now();return !!s&&(s.hiLoads+s.hiMiss+s.hiPlaceholders>0||!!s.hiOff);})()", 20000);
+    await sleep(1000);
+    return z;
 }
 const credit = (j) => j.evaluate("(document.querySelector('#gps-overlay .gps-credit-txt')||{}).textContent||''");
 const attrib = (j) => j.evaluate("(document.querySelector('#gps-overlay .maplibregl-ctrl-attrib')||{}).textContent||''");
@@ -241,25 +247,28 @@ test('7: Fix the green - the organizer picks USGS: three choices with notes, the
     assert.ok(!(db.course_gps && db.course_gps.caledonia && db.course_gps.caledonia.imagery), 'no database write while the rule is not live');
 });
 
-test('8: PRIVACY - the pre-cache asks Esri for the course area only: the same tiles from two places, and no URL carries the golfer\'s position', { timeout: 180000 }, async () => {
+test('8: PRIVACY - the pre-cache saves USGS for the course area only (the same tiles from two places), asks Esri for nothing, and no URL carries the golfer\'s position', { timeout: 180000 }, async () => {
     state.esri = 'ok'; state.usgs = 'ok'; state.hi = 'real';
     const runs = [];
     for (const [i, at] of [[0, ME], [1, [33.4561, -79.1513]]]) {
         const j = await open('T051H' + i, { at, imagery: 'esri-closeup' });
         // The round's own pre-cache (index.html, 4 s after it opens) first; then once more, asked here, fresh.
-        assert.ok(await until(j, "!!localStorage.getItem('hardpan_esri_warm_v1_caledonia')", 30000), 'the round opened -> its pre-cache warmed Esri');
-        await j.evaluate("localStorage.removeItem('hardpan_esri_warm_v1_caledonia'), 1");
+        assert.ok(await until(j, "!!localStorage.getItem('hardpan_usgs_done_v1_caledonia')", 30000), 'the round opened -> its pre-cache saved USGS');
+        await j.evaluate("localStorage.removeItem('hardpan_usgs_done_v1_caledonia'), caches.delete('hardpan-usgs-v1').then(function(){return 1;})");
         const mark = Number(await j.evaluate('window.__fetched.length'));
         const res = JSON.parse(await j.evaluate("HardPanGps.precacheCourse('caledonia', []).then(function(r){return JSON.stringify(r);})"));
-        assert.ok(res.esri && res.esri.ok && res.esri.fetched > 0, 'positive: the Esri warm-up ran: ' + JSON.stringify(res.esri));
-        // Every URL the page's fetch was handed for the warm-up (the browser may answer them from its own cache).
-        const warm = JSON.parse(await j.evaluate('JSON.stringify(window.__fetched.slice(' + mark + '))')).filter((u) => /\/esri\//.test(u)).map((u) => u.replace(/\?.*$/, '')).sort();
+        assert.ok(res.ok && res.fetched > 0, 'positive: the USGS pre-cache ran: ' + JSON.stringify(res));
+        assert.equal(res.esri, undefined, '064: no Esri step');
+        const asked = JSON.parse(await j.evaluate('JSON.stringify(window.__fetched.slice(' + mark + '))'));
+        assert.deepEqual(asked.filter((u) => /\/esri\//.test(u)), [], '064: the pre-cache asked Esri for nothing');
+        const pre = asked.filter((u) => /nationalmap/.test(u)).map((u) => u.replace(/\?.*$/, '')).sort();
+        assert.ok(!Object.keys(JSON.parse(await j.evaluate('JSON.stringify(localStorage)'))).some((k) => /esri_warm/.test(k)), '064: no Esri warm mark');
         const urls = JSON.parse(await j.evaluate("JSON.stringify(performance.getEntriesByType('resource').map(function(e){return e.name;}).concat(window.__fetched))")).concat(state.log);
-        runs.push({ at, warm, urls });
+        runs.push({ at, pre, urls });
         await j.close();
     }
-    assert.ok(runs[0].warm.length > 20, 'positive: tiles were asked for: ' + runs[0].warm.length);
-    assert.deepEqual(runs[1].warm, runs[0].warm, 'the same course area, wherever the golfer stands');
+    assert.ok(runs[0].pre.length > 10, 'positive: USGS tiles were asked for: ' + runs[0].pre.length);
+    assert.deepEqual(runs[1].pre, runs[0].pre, 'the same course area, wherever the golfer stands');
     for (const r of runs) {
         const needles = [];
         for (const d of [3, 4, 5, 6]) needles.push(r.at[0].toFixed(d), r.at[1].toFixed(d));

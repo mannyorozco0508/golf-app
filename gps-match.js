@@ -221,7 +221,15 @@
                  layers: [{ id: 'img', type: 'raster', source: 'img' }] };
     }
 
-    var api = { match: match, choose: choose, forget: forget, asking: asking, known: known, ninesFromName: ninesFromName, imageryStyle: imageryStyle, bundleCenter: bundleCenter };
+    // URGENT-064: Esri is never saved on the phone - the picker map's transformRequest sends each Esri
+    // tile request with cache: 'no-store' (the browser's HTTP cache neither keeps nor answers it).
+    function esriNoStore(url) {
+        var c = cfg(), t = String(c.esriTileUrl || 'https://ibasemaps-api.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}?token={key}');
+        var i = t.indexOf('{z}'), p = i > 0 ? t.slice(0, i) : t;
+        return (c.esriKey && p && String(url || '').indexOf(p) === 0) ? { url: url, cache: 'no-store' } : { url: url };
+    }
+
+    var api = { match: match, choose: choose, forget: forget, asking: asking, known: known, ninesFromName: ninesFromName, imageryStyle: imageryStyle, esriNoStore: esriNoStore, bundleCenter: bundleCenter };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     W.HardPanGpsMatch = api;
 })();

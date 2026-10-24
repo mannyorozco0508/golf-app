@@ -1188,9 +1188,8 @@
         syncImageryForMode();
         refreshUsgs();
     }
-    // 051: a course whose Esri tiles are in the browser cache (within Esri's own max-age) keeps Esri
-    // with no signal; tiles not in it fail, and four in a row hand over to USGS as always.
-    function onOffline() { if (!(S && esriWarmValid(S.courseKey))) dropEsri('offline'); dropGoogle('offline'); }
+    // 064: no signal -> Esri off at once (nothing of Esri's is kept on the phone): the saved USGS shows.
+    function onOffline() { dropEsri('offline'); dropGoogle('offline'); }
     function onOnline() {
         if (S && S.googleOn && S.googleFailed && S.googleFailWhy === 'offline' && !S.googleRetried && S.map && S.map.getSource('google')) {
             S.googleRetried = true; S.googleFailed = false; S.googleFailWhy = null; S.gErrRun = 0;
@@ -1333,7 +1332,7 @@
             var m = /^hpesri:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
             if (!m) return Promise.reject(new Error('bad tile url'));
             var url = esriTileUrl().replace('{key}', encodeURIComponent(esriKey())).replace('{z}', m[1]).replace('{y}', m[2]).replace('{x}', m[3]);
-            return fetch(url, { mode: 'cors', credentials: 'omit' }).then(function (r) {
+            return fetch(url, { mode: 'cors', credentials: 'omit', cache: 'no-store' }).then(function (r) {
                 if (!r.ok) throw new Error('esri ' + r.status);
                 return r.arrayBuffer();
             }).then(function (b) {
@@ -1399,80 +1398,28 @@
         syncImageryForMode();
     }
 
-    // ESRI IN THE PHONE'S BROWSER CACHE FOR THE ROUND (URGENT-051 offline): Esri allows pre-caching only
-    // "as permitted by the caching headers" (Location Platform §3.1.d.6.A). So Esri tiles are fetched
-    // into the browser's own HTTP cache - never Cache Storage, never IndexedDB - and they last only as
-    // long as Esri's Cache-Control says. A header that forbids caching (no-store, no-cache, max-age=0)
-    // stops the warm-up at the first tile. The AREA comes from the COURSE (its holes and greens, as the
-    // USGS pre-cache), never from the golfer: the same course gives the same tiles wherever the golfer is.
-    var ESRI_WARM = 'hardpan_esri_warm_v1_';
-    var ESRI_WARM_CAP = 300;                        // tiles per course per warm-up, at most
-    function esriWarmValid(key) { var w = lsGet(ESRI_WARM + key); return !!(w && w.until && Date.now() < w.until); }
-    // The tile list, pure: z16-18 over the course box (z16-17 when that is too many), z19 over each green,
-    // and with the close-up z20 over each green - in that order, cut at the cap.
-    function esriWarmTiles(b, greens, src, cap) {
-        if (!b || !G || !G.tilesFor) return [];
-        cap = cap || ESRI_WARM_CAP;
-        var out = G.tilesFor(b, 16, 18, cap) || G.tilesFor(b, 16, 17, cap) || [];
-        var seen = {};
-        out.forEach(function (t) { seen[t.z + '/' + t.x + '/' + t.y] = 1; });
-        var zs = src === 'esri-closeup' ? [19, 20] : [19];
-        zs.forEach(function (z) {
-            (greens || []).forEach(function (g) {
-                var d = 30 / 111320, dl = d / Math.cos(g[0] * Math.PI / 180);
-                (G.tilesFor({ south: g[0] - d, north: g[0] + d, west: g[1] - dl, east: g[1] + dl }, z, z, 64) || []).forEach(function (t) {
-                    var k = t.z + '/' + t.x + '/' + t.y;
-                    if (!seen[k] && out.length < cap) { seen[k] = 1; out.push(t); }
-                });
-            });
-        });
-        return out.slice(0, cap);
+    // ESRI IS NEVER SAVED ON THE PHONE (URGENT-064, Manny 3:56 PM Oct 21): Esri allows offline use of its
+    // imagery only on a custom plan and only through its own SDKs, so nothing of Esri's is kept - no
+    // warm-up ahead of the round, no Cache Storage, no IndexedDB, and every Esri tile request (the z19
+    // layer, the close-up, the setup picker) goes out with cache: 'no-store', so the browser's own HTTP
+    // cache neither keeps nor answers one. Esri streams live, with its credit; with no signal the map
+    // falls to the USGS tiles saved for the course (public domain), as before - never blank.
+    // The 051 warm-up's marks (hardpan_esri_warm_v1_<course>) are cleared once; nothing reads them now.
+    var OLD_ESRI_WARM = 'hardpan_esri_warm_v1_';
+    function clearOldEsriWarm() {
+        try {
+            if (typeof localStorage === 'undefined' || typeof localStorage.key !== 'function') return 0;
+            var gone = [];
+            for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(OLD_ESRI_WARM) === 0) gone.push(k); }
+            gone.forEach(function (k) { localStorage.removeItem(k); });
+            return gone.length;
+        } catch (e) { return 0; }
     }
-    function maxAgeOf(cc) {
-        cc = String(cc || '').toLowerCase();
-        if (/no-store|no-cache|private/.test(cc)) return 0;
-        var m = /max-age=(\d+)/.exec(cc);
-        return m ? Number(m[1]) : 0;
-    }
-    function warmEsri(courseKey, osm, extraPts) {
-        var why = function (r) { return Promise.resolve({ ok: false, reason: r }); };
-        var src = imageryFor(courseKey);
-        if (src === 'usgs') return why('usgs-chosen');
-        if (!esriKey() || cfg().esriWarm === false) return why('off');
-        if (esriWarmValid(courseKey)) return why('fresh');
-        var b = G.courseBounds(osm, extraPts || [], 150);
-        if (!b) return why('no-course-data');
-        var greens = [];
-        Object.keys((osm && osm.holes) || {}).forEach(function (n) {
-            var r = G.resolveHole ? G.resolveHole(osm.holes[n], []) : null;
-            if (r && r.mid) greens.push(r.mid);
-        });
-        (extraPts || []).forEach(function (p) { if (p && isFinite(p[0]) && isFinite(p[1])) greens.push(p); });
-        var tiles = esriWarmTiles(b, greens, src);
-        if (!tiles.length) return why('no-tiles');
-        var tmpl = esriTileUrl().replace('{key}', encodeURIComponent(esriKey()));
-        var i = 0, fetched = 0, failed = 0, age = null, stop = false;
-        var one = function () {
-            if (stop || i >= tiles.length) return Promise.resolve();
-            var t = tiles[i++];
-            var url = tmpl.replace('{z}', t.z).replace('{y}', t.y).replace('{x}', t.x);
-            return fetch(url, { mode: 'cors', credentials: 'omit', cache: 'default' }).then(function (r) {
-                if (!r || !r.ok) { failed++; return null; }
-                var a = maxAgeOf(r.headers && r.headers.get('cache-control'));
-                if (age == null || a < age) age = a;
-                if (!a) stop = true;     // Esri's headers do not allow keeping it: stop asking
-                fetched++;
-                return r.arrayBuffer().then(function () {}, function () {});
-            }, function () { failed++; }).then(one);
-        };
-        return Promise.all([one(), one(), one(), one()]).then(function () {
-            var at = Date.now(), res = { ok: !stop && failed === 0 && fetched > 0, src: src, tiles: tiles.length, fetched: fetched, failed: failed, maxAge: age };
-            if (stop) res.reason = 'headers';
-            // Good for its max-age less an hour - never past what Esri allowed.
-            if (res.ok && age > 3600) lsSet(ESRI_WARM + courseKey, { at: at, until: at + (age - 3600) * 1000, n: fetched, src: src });
-            return res;
-        }).catch(function () { return { ok: false, reason: 'error' }; });
-    }
+    // The tile template's fixed start (everything before {z}): an Esri tile URL starts with it.
+    function esriTilePrefix() { var t = esriTileUrl(); var i = t.indexOf('{z}'); return i > 0 ? t.slice(0, i) : t; }
+    function isEsriTileUrl(url) { var p = esriTilePrefix(); return !!p && String(url || '').indexOf(p) === 0; }
+    // MapLibre's transformRequest: an Esri tile is fetched with cache: 'no-store'; anything else as it was.
+    function esriNoStore(url) { return isEsriTileUrl(url) ? { url: url, cache: 'no-store' } : { url: url }; }
 
     // ---- THE MAP --------------------------------------------------------------
     var EMPTY = { type: 'FeatureCollection', features: [] };
@@ -1483,6 +1430,7 @@
         if (!ml || !el) { S.map = null; if (el) el.classList.add('gps-no-tiles'); return; }
         addUsgsProtocol(ml);
         addEsriHiProtocol(ml);
+        clearOldEsriWarm();
         S.imagery = imageryChoice();
         S.googleOn = S.imagery === 'google';
         // Google chosen: Esri is not on the map at all (no Google with another map).
@@ -1490,7 +1438,7 @@
         S.esriOn = !!key;
         var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
         S.googleFailed = S.googleOn && offline; S.googleFailWhy = S.googleFailed ? 'offline' : null; S.gErrRun = 0;
-        var offEsri = offline && !esriWarmValid(S.courseKey);
+        var offEsri = offline;
         S.esriFailed = !key || offEsri;
         S.esriFailWhy = !key ? 'no-key' : (offEsri ? 'offline' : null);
         S.esriErrRun = 0;
@@ -1531,6 +1479,8 @@
                 style: { version: 8, sources: sources, layers: layers },
                 center: [0, 20], zoom: 2, bearing: 0, pitch: 0, maxPitch: 0,
                 maxZoom: maxZoomNow(),
+                // 064: Esri tiles are fetched with cache: 'no-store' - never kept by the browser either.
+                transformRequest: esriNoStore,
                 dragRotate: false, pitchWithRotate: false, keyboard: false,
                 attributionControl: false,
                 // One finger pans, two fingers pinch-zoom; neither rotates - the hole
@@ -1900,15 +1850,10 @@
     // bars. The area comes from the COURSE - the bundled OSM holes plus any greens
     // golfers set - never from the golfer's position; a course with no points at
     // all is skipped rather than guessed at. Once per course per PRECACHE_DAYS,
-    // marked done only when every tile is in. Esri tiles are never stored here.
-    // 051: then, when the course's picture is Esri (or Esri close-up), its Esri tiles for the same
-    // course area go into the browser's HTTP cache under Esri's own headers (warmEsri) - result.esri.
+    // marked done only when every tile is in. Esri tiles are never stored, here or
+    // anywhere (URGENT-064: the 051 Esri warm-up is gone).
     function precacheCourse(courseKey, extraPts) {
-        return precacheUsgs(courseKey, extraPts).then(function (res) {
-            if (!res || res.reason === 'no-course' || res.reason === 'no-gps-map' || res.reason === 'offline' || res.reason === 'unsupported') return res;
-            var osm = (S && S.courseKey === courseKey) ? osmRecord(courseKey) : G.osmCourse(window.HardPanGpsCourses || {}, courseKey);
-            return warmEsri(courseKey, osm, extraPts).then(function (w) { res.esri = w; return res; }, function () { return res; });
-        });
+        return precacheUsgs(courseKey, extraPts);
     }
     function precacheUsgs(courseKey, extraPts) {
         var why = function (r) { return Promise.resolve({ ok: false, reason: r }); };
@@ -7909,7 +7854,9 @@
         // URGENT-051: the course's map picture. Pure helpers (gps_imagery_test.js) and what shows now.
         imagery: {
             sources: IMG_SOURCES, words: IMG_WORDS, norm: normImagery, pick: pickImagery, greyCard: greyCard, fnv32: fnv32,
-            isPlaceholder: isPlaceholderTile, warmTiles: esriWarmTiles, maxAge: maxAgeOf, PLACEHOLDER: PLACEHOLDER, WARM_CAP: ESRI_WARM_CAP,
+            isPlaceholder: isPlaceholderTile, PLACEHOLDER: PLACEHOLDER,
+            // 064: Esri is never saved - the request rule, and the one-time clean-up of the 051 marks.
+            esriNoStore: esriNoStore, isEsriTile: isEsriTileUrl, clearOldEsriWarm: clearOldEsriWarm,
             forCourse: function (key) { return imageryFor(key); },
             now: function () { return S ? { src: S.imgSrc || null, hi: !!(S.map && S.map.getLayer('esri-hi')), hiOff: S.hiOff || null, hiLoads: S.hiLoads || 0, hiMiss: S.hiMiss || 0, hiPlaceholders: S.hiPlaceholders || 0, usgsFailed: !!S.usgsFailed, esriFailed: !!S.esriFailed, saved: S.imgSaved || null } : null; }
         },
