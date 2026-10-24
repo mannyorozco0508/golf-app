@@ -33,6 +33,8 @@
 //   setMishit(golfer, i, mis) / flip(golfer, i)   shot i of the session in play -> Good / Mishit
 //   carryYds(a, b) -> whole yards between two [lat, lng] (pure; the points are not kept)
 //   openHome({ account }) / closeHome() / homeGolfer(account)   Range from HOME, with no round
+//   rangeData(B, golfer) / rangeLine(row, show?) / resetPlan(B, golfer, club?) / resetRange(B, golfer, club?)
+//                        064-6a: My bag's "Reset range data" (one club) and "Reset all range data" (club omitted)
 //
 // FROM HOME (URGENT-047, added 7:20 AM): Home › Range opens this same sheet with NO round. The
 // golfer is the phone's own (homeGolfer: who this phone said it was on its newest round - the name
@@ -158,8 +160,100 @@
     function applyToBag(B, golfer, summary) {
         var map = bagUpdate(summary), done = {};
         if (!B || typeof B.set !== 'function') return done;
-        Object.keys(map).forEach(function (c) { if (B.set(golfer, c, map[c])) done[c] = map[c]; });
+        Object.keys(map).forEach(function (c) {
+            var before = bagSetNow(B, golfer, c), w = wroteFor(golfer, c);
+            // 064-6a: what My bag had before Range wrote (a number Range wrote earlier is not "before").
+            var prev = w && before === w.yd ? w.prev : before;
+            if (B.set(golfer, c, map[c])) { done[c] = map[c]; noteWrote(golfer, c, map[c], prev); }
+        });
         return done;
+    }
+
+    // ---- RESET RANGE DATA (064-6a, My bag) ---------------------------------------------
+    // Manny (Oct 22): "we should be able to reset the stats from the range in club yardages".
+    // Range data = the club's shots in this golfer's Range sessions (this file's storage) and the
+    // My bag number Range's "Update my bag" wrote. A reset clears ONLY those: a number typed in My
+    // bag, the on-course marked shots (gps-shots.js shots, the 049 shot log), Strokes Gained and the
+    // setup carries are never touched. The number then falls back to what My bag shows without
+    // Range: the number My bag had before Range wrote over it (kept here as wrote[club].prev),
+    // else the learned / setup number, else none.
+    // WHAT RANGE WROTE: golfers[g].wrote = { <club>: { yd, prev } } (yards only; prev null = none).
+    // Older phones (Range used before this) have only the session's bag map: the newest one that
+    // wrote the club stands in, with no number before it.
+    function bagSetNow(B, golfer, c) {
+        try { var v = B && typeof B.bag === 'function' ? B.bag(golfer)[c] : null; return v && v.set ? v.yd : null; } catch (e) { return null; }
+    }
+    function wroteFor(golfer, c) {
+        var g = lsGet().golfers[gKey(golfer)];
+        if (!g) return null;
+        var w = g.wrote && g.wrote[c];
+        if (w && okYd(w.yd)) return { yd: okYd(w.yd), prev: okYd(w.prev) };
+        var ss = Array.isArray(g.sessions) ? g.sessions : [];
+        for (var i = ss.length - 1; i >= 0; i--) { var y = ss[i] && ss[i].bag ? okYd(ss[i].bag[c]) : null; if (y) return { yd: y, prev: null, old: true }; }
+        return null;
+    }
+    function noteWrote(golfer, c, yd, prev) {
+        var r = lsGet(), g = golferRec(r, gKey(golfer));
+        g.wrote = g.wrote || {};
+        g.wrote[c] = { yd: yd, prev: okYd(prev) };
+        lsSet(r);
+    }
+    // Every Range shot of this golfer, all sessions.
+    function allShots(golfer) { var out = []; sessions(golfer).forEach(function (s) { (s.shots || []).forEach(function (x) { out.push(x); }); }); return out; }
+    // Per club with Range data: { club, name, n, good, mis, avg, longest, wrote: yd|null, inBag: bool }
+    // in bag order. inBag: My bag's number for the club is still the one Range wrote (not typed over).
+    function rangeData(B, golfer) {
+        var sum = summarize(allShots(golfer)), by = {};
+        sum.forEach(function (r) { by[r.club] = r; });
+        return clubs().map(function (c) {
+            var w = wroteFor(golfer, c), now = bagSetNow(B, golfer, c), r = by[c];
+            if (!r && !w) return null;
+            var o = r ? r : { club: c, name: nameOf(c), n: 0, good: 0, mis: 0, avg: null, longest: null };
+            o.wrote = w ? w.yd : null;
+            o.inBag = !!(w && now !== null && now === w.yd);
+            return o;
+        }).filter(Boolean);
+    }
+    // "Range · 3 good / 1 mishit · 240 (median of good)" (all sessions); no shots left: "Range · wrote 240".
+    function rangeLine(r, show) {
+        if (!r) return '';
+        var f = typeof show === 'function' ? show : function (y) { return y; };
+        if (!r.n) return 'Range' + (r.wrote ? ' · wrote ' + f(r.wrote) : '');
+        return clubLine(r, f).replace(r.name, 'Range');
+    }
+    // What a reset of these clubs would do, read-only: [{ club, name, shots, bagNow, setAfter, bagChanges }].
+    // setAfter: the number My bag keeps typed in for the club after (the one before Range), or null.
+    function resetPlan(B, golfer, list) {
+        var want = list === undefined || list === null ? null : [].concat(list);
+        return rangeData(B, golfer).filter(function (r) { return !want || want.indexOf(r.club) !== -1; }).map(function (r) {
+            var w = wroteFor(golfer, r.club), now = bagSetNow(B, golfer, r.club);
+            return { club: r.club, name: r.name, shots: r.n, bagNow: now, bagChanges: r.inBag, setAfter: r.inBag ? (w.prev || null) : now };
+        });
+    }
+    // THE RESET: club (one) or null / undefined (all). Returns the plan it carried out.
+    function resetRange(B, golfer, club) {
+        var all = club === undefined || club === null;
+        if (!all && clubs().indexOf(club) === -1) return [];
+        var plan = resetPlan(B, golfer, all ? null : club);
+        if (!plan.length) return plan;
+        // My bag first: only a number Range wrote (still there) goes back to the one before it.
+        plan.forEach(function (p) { if (p.bagChanges && B && typeof B.set === 'function') B.set(golfer, p.club, p.setAfter); });
+        var r = lsGet(), k = gKey(golfer), g = r.golfers[k];
+        if (g) {
+            if (all) delete r.golfers[k];
+            else {
+                (g.sessions || []).forEach(function (s) {
+                    s.shots = (s.shots || []).filter(function (x) { return x && x.c !== club; });
+                    if (s.bag) { delete s.bag[club]; if (!Object.keys(s.bag).length) { delete s.bag; delete s.bagAt; } }
+                });
+                g.sessions = (g.sessions || []).filter(function (s) { return s.shots && s.shots.length; });
+                if (g.wrote) { delete g.wrote[club]; if (!Object.keys(g.wrote).length) delete g.wrote; }
+                if (!g.sessions.length && !g.wrote) delete r.golfers[k];
+            }
+            lsSet(r);
+        }
+        if (ctx && ctx.golfer === golfer) { st.applied = null; st.start = null; }
+        return plan;
     }
     function carryYds(a, b) {
         var G = W.HardPanGeo;
@@ -559,6 +653,7 @@
     var api = { open: open, close: close, isOpen: isOpen, summarize: summarize, bagUpdate: bagUpdate, applyToBag: applyToBag,
         sessions: sessions, current: current, addShot: addShot, undo: undo, newSession: newSession, carryYds: carryYds,
         setMishit: setMishit, flip: flip, isMis: isMis, clubLine: clubLine,
+        rangeData: rangeData, rangeLine: rangeLine, resetPlan: resetPlan, resetRange: resetRange, wroteFor: wroteFor,
         openHome: openHome, closeHome: closeHome, homeGolfer: homeGolfer, NAME_KEY: NAME_KEY,
         KEY: KEY, MAX_YD: MAX_YD, SESSION_GAP_MS: SESSION_GAP_MS, state: function () { return { club: st.club, marking: !!st.start, busy: st.busy }; } };
     W.HardPanRange = api;

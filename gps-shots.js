@@ -169,10 +169,13 @@
     }
     // { club: { yd, n, set, base? } } for every club with a number. set: typed in My bag;
     // base: the setup's carry (fewer than LEARN_MIN shots of its own yet); neither: learned.
-    function bag(golfer) {
+    // 064-6a: opts.unset = [club, ...] - those clubs as if no number were typed (what Range's
+    // "Reset range data" would leave behind). Read-only; nothing is written.
+    function bag(golfer, opts) {
         var b = bagRec().golfers[golferKey(golfer)] || { shots: {}, set: {} }, out = {};
+        var unset = opts && Array.isArray(opts.unset) ? opts.unset : [];
         BAG.forEach(function (c) {
-            var a = clubAverage((b.shots || {})[c]), set = (b.set || {})[c], base = (b.base || {})[c];
+            var a = clubAverage((b.shots || {})[c]), set = unset.indexOf(c) === -1 ? (b.set || {})[c] : null, base = (b.base || {})[c];
             if (set) out[c] = { yd: set, n: a ? a.of : 0, set: true };
             else if (a && (!base || a.of >= LEARN_MIN)) out[c] = { yd: a.yd, n: a.of, set: false };
             else if (base) out[c] = { yd: base, n: a ? a.of : 0, set: false, base: true };
