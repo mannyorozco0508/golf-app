@@ -7838,7 +7838,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         wrap.appendChild(head); wrap.appendChild(mapEl);
         document.body.appendChild(wrap);
         const la = candidates.map((c) => c.tee[0]), lo = candidates.map((c) => c.tee[1]);
-        const map = new window.maplibregl.Map({ container: mapEl, style: window.HardPanGpsMatch.imageryStyle(),
+        const map = new window.maplibregl.Map({ container: mapEl, style: window.HardPanGpsMatch.imageryStyle(), transformRequest: window.HardPanGpsMatch.esriNoStore,
             bounds: [[Math.min(...lo), Math.min(...la)], [Math.max(...lo), Math.max(...la)]], fitBoundsOptions: { padding: 90, maxZoom: 17 }, attributionControl: { compact: true } });
         candidates.forEach((c) => {
             const b = document.createElement('button');
