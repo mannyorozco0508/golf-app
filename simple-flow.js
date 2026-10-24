@@ -271,6 +271,14 @@
     function nameOf(c) { var H = HD(); return dropRepeat(typeof H.shownName === 'function' ? H.shownName(c.name) : c.name); }
     function readyOf(key) { var c = HC(); try { return !!(c && key && c.resolve(key).hasGps); } catch (e) { return false; } }
     function distTo(c) { var H = HD(); return S.here && c.pt && typeof H.miles === 'function' ? H.miles(S.here, c.pt) : null; }
+    // 067: search only - a row with no point of its own (an online result, a directory row with none) is
+    // measured to the course the app ships under that name (HardPanCourse.spot); NEAR YOU is unchanged.
+    function distSearch(c) {
+        var d = distTo(c), H = HD(), hc = HC();
+        if (d != null || !S.here || typeof H.miles !== 'function' || !hc || !hc.spot) return d;
+        var pt = null; try { pt = hc.spot({ name: c.name, club: c.club, city: c.city }); } catch (e) { pt = null; }
+        return pt ? H.miles(S.here, pt) : null;
+    }
     // URGENT-060: THE COURSE HE IS AT - within HERE_MI of him (a GPS-ready one there first on the GPS
     // door, URGENT-019), else none. NEAR YOU is the 3 closest, that course first. "At" a course is
     // measured to the nearest of its listed point AND its holes' tees / greens (the resolver's GPS
@@ -533,8 +541,8 @@
         // URGENT-035: the box is kept (keepBox), focus and cursor untouched; only a rebuilt box is focused again.
         var q = $('sf-q'); if (typing && q && q !== a) { q.focus(); try { q.setSelectionRange(q.value.length, q.value.length); } catch (e) {} }
     }
-    function webRowHtml(m) {
-        var where = [m.city, m.state].filter(Boolean).join(', ');
+    function webRowHtml(m, d) {
+        var where = [d != null ? miStr(d) : '', [m.city, m.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
         return '<button type="button" class="sf-row" data-sf-web="' + esc(m.id) + '" data-sf-name="' + esc(m.name || m.club) + '"><span class="n">' + esc(m.name || m.club) + '</span>'
             + '<span class="s">' + esc(where) + (m.gps ? (where ? ' · ' : '') + '✓ GPS' : '') + '</span></button>';
     }
@@ -567,8 +575,10 @@
             if (rv && rv.row) { if (shown.indexOf(rv.row.key) === -1) { shown.push(rv.row.key); S.webLocal.push(rv.row); } return false; }
             return true;
         });
+        // 067: the rows themselves are drawn by step1, in ONE list with the courses on the phone (best name
+        // match, then closest); this box keeps only the online search's own line (searching / no signal / ...).
         S.webRows = rows;
-        return rows.length ? '<div id="sf-web">' + rows.map(webRowHtml).join('') + '</div>' : '';
+        return '';
     }
     // ---- 064: OPENSTREETMAP-ONLY COURSES IN SEARCH (Manny, Goldendale: "show OSM-only courses as 'Not set
     // up yet · Add this course'") ---------------------------------------------------------------------
@@ -583,11 +593,31 @@
         try { all = c && c.osmOnly ? c.osmOnly() : []; } catch (e) { all = []; }
         if (!all.length) return [];
         var have = {};
-        (listed || []).concat(S.webRows || []).forEach(function (x) { have[qWords(x.name || x.club).join(' ')] = 1; });
-        return localHits(all, raw).filter(function (x) { return !have[qWords(x.c.name).join(' ')]; }).slice(0, OSM_SHOWN).map(function (x) { return x.c; });
+        (listed || []).concat(S.webRows || []).forEach(function (x) { have[qWords(x.name || x.club).join(' ')] = 1; if (x.club) have[qWords(x.club).join(' ')] = 1; });
+        return searchOrder(localHits(all, raw).filter(function (x) { return !have[qWords(x.c.name).join(' ')]; }).map(function (x) { return { kind: 'osm', c: x.c, name: x.c.name, s: x.s, d: distTo(x.c) }; }), raw).slice(0, OSM_SHOWN);
     }
-    function osmRowHtml(c) {
-        var where = [c.city, c.state].filter(Boolean).join(', ');
+    // ---- 067: SEARCH = BEST NAME MATCH FIRST, THEN CLOSEST (Manny: "we still need to see the closest
+    // courses first ... We should only add.") -------------------------------------------------------
+    // Every result - a course on the phone, an online GolfAPI course, an OpenStreetMap "Not set up yet"
+    // course - is one list: the name exactly as typed ("The" and "(...)" aside, or the same words without
+    // golf / club / country), then names that START with it, then the other good matches, then the
+    // typo-close ones; inside each, the closest to the golfer first (no point known: after those with one),
+    // then by name. Every row with a known point shows its distance.
+    function normName(t) { return String(t || '').toLowerCase().split('(')[0].replace(/['’`.]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().replace(/^the /, ''); }
+    function nameTier(name, raw, sc) {
+        var n = normName(name), q = normName(raw), core = function (t) { return t.replace(/\b(golf|club|course|gc|cc)\b/g, ' ').replace(/\s+/g, ' ').trim(); };
+        if (q && (n === q || (core(q) && core(n) === core(q)))) return 0;   // "Papago GC" = "Papago Golf Course"; "country" / "resort" still count
+        if (q && n.indexOf(q) === 0) return 1;
+        return sc >= 2 ? 2 : 3;
+    }
+    function searchOrder(items, raw) {
+        items.forEach(function (x) { x.t = nameTier(x.name, raw, x.s); });
+        return items.sort(function (a, b) {
+            return (a.t - b.t) || ((a.d == null) - (b.d == null)) || ((a.d || 0) - (b.d || 0)) || String(a.name).localeCompare(String(b.name));
+        });
+    }
+    function osmRowHtml(c, d) {
+        var where = [d != null ? miStr(d) : '', [c.city, c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
         return '<button type="button" class="sf-row sf-osm" style="display:block;" data-sf-osm="' + esc(c.osm || '') + '" data-sf-name="' + esc(c.name) + '" data-sf-city="' + esc(c.city || '') + '" data-sf-state="' + esc(c.state || '') + '">'
             + '<span class="n" style="display:block;">' + esc(c.name) + '</span>'
             + '<span class="s" style="display:block;white-space:normal;margin-top:2px;">' + (where ? esc(where) + ' · ' : '') + 'Not set up yet · <span style="font-weight:800;color:#0f4c3a;">Add this course</span></span></button>';
@@ -871,13 +901,20 @@
         var body = (S.offline ? offlineBox() : '') + '<input type="search" class="sf-search" id="sf-q" placeholder="🔍 Search courses" value="' + esc(S.q) + '" autocomplete="off" style="margin-bottom:12px;">';
         if (q.length >= 2) {
             // URGENT-027: forgiving local matches first, then every US course online (webBox).
-            var hits = localHits(all, S.q.trim()).slice(0, 10).map(function (x) { return x.c; });
+            // 067: the best name matches, then the closest (searchOrder) - one list with the online and the
+            // "Not set up yet" courses.
+            var rawQ = S.q.trim();
+            var hits = searchOrder(localHits(all, rawQ).map(function (x) { return { kind: 'local', c: x.c, name: x.c.name, s: x.s, d: distSearch(x.c) }; }), rawQ).slice(0, 10).map(function (x) { return x.c; });
             var shown = hits.map(function (c) { return c.key; }), web = webBox(shown);
             hits = hits.concat(S.webLocal);
-            var waiting = S.web && S.web.k === webKey(S.q.trim()) && (S.web.state === 'busy' || S.web.pull);
-            var osm = S.web && S.web.pull ? [] : osmHits(S.q.trim(), hits);
-            body += '<div class="sf-h">RESULTS</div>' + hits.map(function (c) { return rowHtml(c, distTo(c), c.key === key); }).join('') + web + osm.map(osmRowHtml).join('')
-                + (!hits.length && !web && !osm.length && !waiting ? '<div class="sf-note">' + (q.trim().length < 3 ? 'Keep typing — 3 letters searches all courses.' : 'No course found by that name.') + '</div>' : '')
+            var waiting = S.web && S.web.k === webKey(rawQ) && (S.web.state === 'busy' || S.web.pull);
+            var osm = S.web && S.web.pull ? [] : osmHits(rawQ, hits);
+            var items = hits.map(function (c) { return { kind: 'local', c: c, name: c.name, s: matchScore(c, rawQ), d: distSearch(c) }; })
+                .concat((S.webRows || []).map(function (m) { return { kind: 'web', m: m, name: m.name || m.club, s: Math.max(matchScore({ name: m.name || m.club }, rawQ), matchScore({ name: m.club }, rawQ)), d: distSearch({ name: m.name || m.club, club: m.club, city: m.city }) }; }))
+                .concat(osm);
+            var rowsHtml = searchOrder(items, rawQ).map(function (x) { return x.kind === 'local' ? rowHtml(x.c, x.d, x.c.key === key) : x.kind === 'web' ? webRowHtml(x.m, x.d) : osmRowHtml(x.c, x.d); }).join('');
+            body += '<div class="sf-h">RESULTS</div>' + rowsHtml + web
+                + (!hits.length && !web && !osm.length && !(S.webRows || []).length && !waiting ? '<div class="sf-note">' + (q.trim().length < 3 ? 'Keep typing — 3 letters searches all courses.' : 'No course found by that name.') + '</div>' : '')
                 + '<button type="button" class="sf-link muted" data-sf="fullcourse" style="font-size:13px;">Not listed? Add a course ›</button>';
         }
         // URGENT-028: a tapped online course still loading IS the selected card (never the one before it).

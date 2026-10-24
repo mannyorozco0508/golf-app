@@ -360,12 +360,45 @@
         if (CR.osm && CR.osmRows === rows && CR.osmBase === base) return CR.osm;
         var names = {}, clubs = {};
         rows.forEach(function (r) { names[crNk(r.name)] = 1; var k = crClub(r.name); (clubs[k] = clubs[k] || []).push(r); });
+        // (067: a listed course with no point of its own - "Arizona Biltmore (Links)" - is the same club as
+        // OSM's "Arizona Biltmore Links Course": a long club name that starts the same is not drawn twice)
+        var noPt = rows.filter(function (r) { return !r.pt && crClub(r.name).length >= 8; }).map(function (r) { return crClub(r.name); });
         var out = base.filter(function (c) {
             if (c.key || !c.name || names[crNk(c.name)]) return false;
-            return !(clubs[crClub(c.name)] || []).some(function (r) { return !r.pt || !c.pt || miles(r.pt, c.pt) <= 0.5; });
+            var cc = crClub(c.name);
+            if (noPt.some(function (k) { return cc.indexOf(k) === 0; })) return false;
+            return !(clubs[cc] || []).some(function (r) { return !r.pt || !c.pt || miles(r.pt, c.pt) <= 0.5; });
         });
         CR.osm = out; CR.osmRows = rows; CR.osmBase = base;
         return out;
+    }
+    // 067 (Manny: "we still need to see the closest courses first"): WHERE A COURSE IS when its row has
+    // no point of its own - a directory row with none ("Arizona Biltmore (Adobe)") or an online GolfAPI
+    // result (GolfAPI's search gives no point): the point of the course the app already ships under that
+    // name (its OSM coverage row, its directory row). Used for SEARCH's distance and order only - NEAR
+    // YOU is unchanged. In order: the same name ("The" dropped); the club + its part ("(Links)"); the
+    // club, in that city when one is given, and only when every such course is within 2 miles of the
+    // first. Otherwise null (no distance shown, as before).
+    var SPOT = {};
+    function spotNk(n) { return crNk(String(n || '').split('(')[0]).replace(/^the/, ''); }
+    function courseSpot(o) {
+        o = o || {};
+        var nm = String(o.club || o.name || ''), ck = '|' + nm + '|' + (o.name || '') + '|' + (o.city || '');
+        var base = allCourses();
+        if (SPOT.base !== base) SPOT = { base: base };
+        if (Object.prototype.hasOwnProperty.call(SPOT, ck)) return SPOT[ck];
+        var pts = base.filter(function (c) { return c.pt && c.name; }), k = spotNk(nm), club = crClub(nm), part = crPart(o.name || nm), hit = null;
+        if (k) hit = pts.filter(function (c) { return spotNk(c.name) === k; })[0] || null;
+        if (!hit && club && part) hit = pts.filter(function (c) { return crClub(c.name) === club + part; })[0] || null;
+        if (!hit && club.length >= 4) {
+            var cands = pts.filter(function (c) { var x = crClub(c.name); return x === club || (club.length >= 8 && x.indexOf(club) === 0); });
+            var city = String(o.city || '').toLowerCase().replace(/[^a-z]/g, '');
+            var inCity = city ? cands.filter(function (c) { return String(c.city || '').toLowerCase().replace(/[^a-z]/g, '') === city; }) : [];
+            if (inCity.length) cands = inCity;
+            if (cands.length && cands.every(function (c) { return miles(c.pt, cands[0].pt) <= 2; })) hit = cands[0];
+        }
+        SPOT[ck] = hit ? hit.pt : null;
+        return SPOT[ck];
     }
     function courseNear(here, n) {
         if (!here) return [];
@@ -411,7 +444,7 @@
         });
         return out;
     }
-    W.HardPanCourse = { list: courseList, osmOnly: courseOsmOnly, near: courseNear, resolve: courseResolve, hasCard: courseHasCard, gps: courseGpsRec, teeRows: teeRows,
+    W.HardPanCourse = { list: courseList, osmOnly: courseOsmOnly, spot: courseSpot, near: courseNear, resolve: courseResolve, hasCard: courseHasCard, gps: courseGpsRec, teeRows: teeRows,
         refresh: function () { C.list = null; CR.rows = null; } };
     function where(c, dist) {
         var bits = [];

@@ -82,10 +82,11 @@ test('Goldendale: "Goldendale Golf Club · Not set up yet · Add this course", n
         X("(function(){ var b=document.querySelector('#sf [data-sf-osm][data-sf-name=\"Goldendale Golf Club\"]'); if(b) b.click(); return b ? 'tapped' : 'NO ROW'; })()"), { sleep: 1200 }, X(SF)]);
     assert.equal(r.ok, true, r.reason);
     const [before, s, add] = J(r);
-    assert.equal(s.osm[0], 'Goldendale Golf Club | Goldendale, WA · Not set up yet · Add this course', 'first: ' + JSON.stringify(s.osm));
+    // (067: the distance from the golfer comes first on every row)
+    assert.match(s.osm[0], /^Goldendale Golf Club \| [\d,.]+ mi · Goldendale, WA · Not set up yet · Add this course$/, 'first: ' + JSON.stringify(s.osm));
     assert.equal(s.osm.filter((t) => /Goldendale Golf Club/.test(t)).length, 1, 'once');
     const [nm, sub] = s.osm[0].split(' | ');
-    assert.equal(nm + ' · ' + sub.replace(/^Goldendale, WA · /, ''), 'Goldendale Golf Club · Not set up yet · Add this course');
+    assert.equal(nm + ' · ' + sub.replace(/^[\d,.]+ mi · Goldendale, WA · /, ''), 'Goldendale Golf Club · Not set up yet · Add this course');
     assert.doesNotMatch(s.osm[0], /✓ GPS|Tap to load/, 'no GPS badge');
     assert.doesNotMatch(s.text, /No course found by that name/, 'found: not "No course found"');
     assert.deepEqual(s.fn.map((c) => c[0] + ':' + c[1].name), ['gpsSearch:goldendale'], 'the online search still asks (GolfAPI may have it) - the name only');
@@ -110,7 +111,7 @@ test('any OpenStreetMap-only course (one from the OR list, picked from the app\'
     assert.ok(c && c.name && !c.key, 'a keyless OSM course: ' + JSON.stringify(c));
     const row = s.osm.filter((t) => t.indexOf(c.name + ' | ') === 0)[0];
     assert.ok(row, 'its row: ' + JSON.stringify(s.osm));
-    assert.equal(row, c.name + ' | ' + c.city + ', OR · Not set up yet · Add this course');
+    assert.ok(row.endsWith(' · ' + c.city + ', OR · Not set up yet · Add this course') || row === c.name + ' | ' + c.city + ', OR · Not set up yet · Add this course', row);
     assert.ok(s.osm.length <= 5, 'at most 5 such rows');
     assert.equal(add.form, 'block');
     assert.equal(add.name, c.name);
