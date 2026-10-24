@@ -12,7 +12,8 @@
       "@capacitor-firebase/authentication",
       "@capacitor/push-notifications",
       "@capacitor-firebase/messaging",
-      "@capacitor/geolocation"
+      "@capacitor/geolocation",
+      "@revenuecat/purchases-capacitor"
     ]
   },
   "experimental": {
