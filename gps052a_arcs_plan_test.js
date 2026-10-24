@@ -197,5 +197,5 @@ test('gps-view.js wiring: off by default, per golfer, tournament / spectator gat
     const markupAt = v.indexOf("'<div class=\"gps-tplan ");
     assert.ok(markupAt > 0, 'positive: the plan sheet markup');
     const right = v.slice(v.indexOf("+ '<div class=\"gps-right\""), v.indexOf("+ '<div class=\"gps-clubs gps-float\""));
-    assert.ok(right.length > 100 && /gps-hz-btn/.test(right) && !/arcs|tplan|tee-plan/.test(right), 'the map\'s right-hand buttons: unchanged');
+    assert.ok(right.length > 100 && /gps-mark-shot/.test(right) && !/gps-hz-btn/.test(right) && !/arcs|tplan|tee-plan/.test(right), 'the map\'s right-hand buttons: unchanged');
 });
