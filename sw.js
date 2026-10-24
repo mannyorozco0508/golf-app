@@ -4771,6 +4771,8 @@ const SHELL_FILES = [
     './simple-flow.js',
     // Settle up with Venmo / Cash App on the Results page (2.1 part D).
     './venmo-pay.js',
+    // URGENT-066 #3: Post to GHIN on the Results page (a link only; nothing sent).
+    './ghin-post.js',
     // URGENT-048: HardPanAuth - sign-in state + profile over the existing sign-in flows.
     './hp-auth.js',
     // URGENT-048: the needs-an-account nudge (Sign in to use Venmo; once per round).

@@ -592,7 +592,8 @@ describe('PAGE WIRING AND MOBILE', () => {
         // offers scratch-or-handicap with scratch first.
         assert.ok(/one ball per side/i.test(SM));
         assert.ok(/Individual side games are unavailable/i.test(SM));
-        assert.ok(/WHS Foursomes allowance/.test(SM));
+        assert.ok(/Handicap \\u2014 foursomes allowance/.test(SM));   // URGENT-066 #3: was "WHS Foursomes allowance" (no WHS on our own number)
+        assert.ok(!SM.includes('WHS Foursomes allowance</option>'), 'the shown option has no WHS');
         const sel = SM.slice(SM.indexOf('rcSetSessionScoring'));
         assert.ok(sel.indexOf('value="scratch"') < sel.indexOf('value="handicap"'),
             'scratch must be the first and default option');

@@ -89,7 +89,7 @@
                 step: st.course,
                 label: 'Tee and rating',
                 cta: 'Pick a tee',
-                why: 'GHIN indexes become course handicaps from the tee, so without one the strokes are guesses.'
+                why: 'Each index becomes a playing handicap from the tee, so without one the strokes are guesses.'
             },
             {
                 key: 'format',

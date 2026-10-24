@@ -106,14 +106,14 @@ describe('1. THE BUILDER (handicap-labels.js), and no math moved', () => {
         const HL = loadJsFile('handicap.js');
         assert.equal(L.handicapFullLabel(p), HL.handicapFacingLabel(p), 'the full form is not re-implemented');
     });
-    test('THE BASIS SENTENCE names the tee, its numbers, and GHIN', () => {
+    test('THE BASIS SENTENCE names the tee, its numbers, and the playing handicap (est.) - not GHIN (URGENT-066 #3)', () => {
         const s = L.handicapBasisSentence(round());
         assert.match(s, /White/, 'the tee');
         assert.match(s, /Slope 113/);
         assert.match(s, /Course Rating 71\.2/);
         assert.match(s, /Par 72/);
-        assert.match(s, /GHIN/, 'and that the Index is a GHIN Handicap Index');
-        assert.match(s, /Course Handicap/);
+        assert.match(s, /Playing handicaps \(est\.\) are worked out from each golfer/, 'what we work out, in our own words');
+        assert.ok(!/GHIN|Course Handicap|Handicap Index|WHS|USGA/.test(s), 'no GHIN / USGA words on our own number: ' + s);
     });
     test('THE BASIS SENTENCE on a round with no tee rating says the entered number is used as it stands', () => {
         const s = L.handicapBasisSentence(round({ teeRating: null }));
@@ -263,18 +263,22 @@ describe('4. THE GAME TAB states the basis ONCE', () => {
         return String(run(sb, "document.getElementById('game-content').innerHTML"));
     }
     const html = gamePage(round());
-    test('there is a Handicaps card, and it names the tee, Slope, Rating, Par and GHIN', () => {
+    // URGENT-066 #3 (label audit): the card no longer says GHIN or Course Handicap about the number we work
+    // out - it says "Playing handicaps (est.)". The tee's own Slope / Course Rating / Par are still named.
+    test('there is a Handicaps card, and it names the tee, Slope, Rating, Par and the playing handicap (est.)', () => {
         assert.match(html, /Handicaps/, 'the card head');
         const t = text(html);
         assert.match(t, /White/);
         assert.match(t, /Slope 113/);
         assert.match(t, /Course Rating 71\.2/);
         assert.match(t, /Par 72/);
-        assert.match(t, /GHIN/);
+        assert.match(t, /Playing handicaps \(est\.\)/);
+        assert.ok(!/GHIN|Course Handicap|Handicap Index|WHS|USGA/.test(t), 'no GHIN / USGA words on our own number: ' + t.slice(0, 300));
     });
     test('ONCE: the basis sentence appears exactly one time on the page', () => {
         const t = text(html);
-        assert.equal((t.match(/GHIN/g) || []).length, 1, 'GHIN is said once: ' + t.slice(0, 400));
+        // URGENT-066 #3: the sentence no longer says GHIN; its own words are counted instead.
+        assert.equal((t.match(/Playing handicaps \(est\.\)/g) || []).length, 1, 'the basis sentence is said once: ' + t.slice(0, 400));
         assert.equal((t.match(/Slope 113/g) || []).length, 1, 'and the Slope once');
     });
     test('the card does NOT list every golfer - that is the Board\'s and the sheet\'s job', () => {
