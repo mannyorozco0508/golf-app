@@ -155,7 +155,8 @@ test('gps-config.js: an Esri key is set, the paywall is off, and nothing else ri
     assert.strictEqual(cfg.paywall, false, 'paywall (iap off only) stays false');
     // gps-store-iap (2026-10-17): the in-app purchase settings - an EMPTY RevenueCat key; the
     // founding cap; no price (the store's own price only).
-    assert.deepStrictEqual(Object.keys(cfg).sort(), ['clubsSync', 'elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapPrivacyUrl', 'iapProduct', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'venmo', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
+    // URGENT-062: + iapFoundingProduct (the founding product id) and iapStore ('storekit').
+    assert.deepStrictEqual(Object.keys(cfg).sort(), ['clubsSync', 'elevOnTee', 'esriKey', 'features', 'foundingCap', 'golfapi', 'googleKey', 'iap', 'iapEntitlement', 'iapFoundingProduct', 'iapPrivacyUrl', 'iapProduct', 'iapStore', 'iapTermsUrl', 'imagery', 'imageryPro', 'live', 'liveBase', 'osm', 'paywall', 'revenueCatKey', 'venmo', 'weatherkit'], 'no stand-in (esriTileUrl / nwsBase / epqsUrl / googleBase / golfapiFile / liveTest) in the shipped config');
     // 008 (2026-10-18): the per-feature switches ride along; every one on, none a stand-in URL.
     assert.deepStrictEqual(Object.keys(cfg.features).sort(), ['autoAdvance', 'bagAltitude', 'bagSetup', 'clubs', 'courseElev', 'elevMyCell', 'elevPerLeg', 'flyover', 'gpsLayoutC', 'gpsLayoutD', 'gpsRoundScore', 'hazards', 'hpIndex', 'layupFromYou', 'lineSave', 'osmPath', 'pathTarget', 'playsBreakdown', 'playsInfo', 'playsSimple', 'quickStats', 'scoreSheet', 'simpleFlow', 'simpleGames', 'toolsSheet', 'watch']);
     // Feature 10 (the Apple Watch): ON from 022 (the HardPanWatch target + plugin are in the app); every 008 switch stays on.
