@@ -254,9 +254,39 @@
             // 021: ✓ GPS on every course with live GPS - the GPS links and set greens, read once.
             if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (S.here && S.near && S.near.length !== undefined) S.near = nearList(S.here); if (S.open && S.step === 1) render(); keysPartial(); });
             sockWatch();
+            listWatch();
         };
         if (!left || typeof H.loadScriptTimed !== 'function') { fin(); return; }
         need.forEach(function (src) { H.loadScriptTimed(src, function () { if (--left === 0) fin(); }); });
+    }
+    // 064 (the 064-misc Simulator run: NEAR YOU showed "az_papago 0.7 mi", the directory row, not Papago's
+    // shared gapi_ record): on a fresh install Round Setup's shared course list (globalCourses) can land
+    // AFTER NEAR YOU was worked out, and nothing worked it out again - the directory row stayed (no ✓,
+    // no "You're here"), and the GPS keys read before the list was in missed Papago's GPS. For the first
+    // minute: when the list grows, NEAR YOU is worked out again (redrawn only if its rows changed) and the
+    // GPS keys are read again once if that first read was partial.
+    var LW = { t: null, n: 0, gc: -1, sig: '' };
+    function gcCount() { try { return typeof globalCourses !== 'undefined' && globalCourses ? Object.keys(globalCourses).length : 0; } catch (e) { return 0; } }   /* global globalCourses */
+    function listWatch() {
+        if (LW.t) return;
+        LW.gc = gcCount();
+        LW.t = setInterval(function () {
+            var H = HD(), n = gcCount();
+            if (++LW.n > 60) { clearInterval(LW.t); return; }
+            if (n === LW.gc) return;
+            var grew = n > LW.gc; LW.gc = n;
+            if (grew && typeof H.gpsKeysPartial === 'function' && H.gpsKeysPartial() && typeof H.loadGpsKeys === 'function')
+                H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.open && S.step === 1) render1(); keysPartial(); });
+            if (!S.here || !Array.isArray(S.near)) return;
+            var nx = nearList(S.here), sig = function (a) { return a.map(function (x) { return x.c.key + ':' + (x.c.ready ? 1 : 0); }).join(','); };
+            if (sig(nx) === sig(S.near)) return;
+            S.near = nx;
+            // The course picked by itself ("You're here") was the directory row: now its own record.
+            var hc = HC(), rv = null;
+            if (S.autoKey && courseKey() === S.autoKey && hc) { try { rv = hc.resolve({ key: S.autoKey }); } catch (e) { rv = null; } }
+            if (rv && rv.key && rv.key !== S.autoKey && rv.row) { S.autoKey = rv.key; if (S.lookup && S.lookup.state !== 'busy') S.lookup = null; S.noCard = null; pick(rv.key, rv.name); }
+            if (S.open && S.step === 1) render1();
+        }, 1000);
     }
     // Every course Round Setup can start: the app's list (front-door allCourses) plus the shared
     // courses Round Setup itself lists (globalCourses: gca_ / gapi_ / comm_), each with its point.
@@ -271,6 +301,14 @@
     function nameOf(c) { var H = HD(); return dropRepeat(typeof H.shownName === 'function' ? H.shownName(c.name) : c.name); }
     function readyOf(key) { var c = HC(); try { return !!(c && key && c.resolve(key).hasGps); } catch (e) { return false; } }
     function distTo(c) { var H = HD(); return S.here && c.pt && typeof H.miles === 'function' ? H.miles(S.here, c.pt) : null; }
+    // 067: search only - a row with no point of its own (an online result, a directory row with none) is
+    // measured to the course the app ships under that name (HardPanCourse.spot); NEAR YOU is unchanged.
+    function distSearch(c) {
+        var d = distTo(c), H = HD(), hc = HC();
+        if (d != null || !S.here || typeof H.miles !== 'function' || !hc || !hc.spot) return d;
+        var pt = null; try { pt = hc.spot({ name: c.name, club: c.club, city: c.city }); } catch (e) { pt = null; }
+        return pt ? H.miles(S.here, pt) : null;
+    }
     // URGENT-060: THE COURSE HE IS AT - within HERE_MI of him (a GPS-ready one there first on the GPS
     // door, URGENT-019), else none. NEAR YOU is the 3 closest, that course first. "At" a course is
     // measured to the nearest of its listed point AND its holes' tees / greens (the resolver's GPS
@@ -287,6 +325,7 @@
         if (!at) return;
         S.auto = false;
         pick(at.c.key, at.c.name); if (S.mode === 'gps') lookup(at.c.key, at.c.name);
+        S.autoKey = courseKey();   // (064 listWatch: the course's own record once the shared list lands)
     }
     function hereOf(near) {
         var c = HC();
@@ -343,14 +382,18 @@
     function hasCard(key) { var c = HC(); try { return !!(c && key && c.hasCard(key)); } catch (e) { return false; } }
     function liveOn() { var L = W.HardPanGpsLive; try { return !!(L && L.on && L.on()); } catch (e) { return false; } }
     function partOf(n) { var m = /\(([^)]*)\)/.exec(String(n)); return m ? nk(m[1]).replace(/course$/, '') : ''; }
+    // 064: the 30-day mark is "2:<ms>". A mark from before (a bare number) is not trusted: it may be a
+    // Starfire-style "ambiguous" that was wrongly kept as a miss, so that course is asked once more
+    // (the function's own 30-day cache answers it: 0 GolfAPI calls).
+    function lookMark(key) { var v = String(ls(LOOK + key) || ''); return /^2:\d+$/.test(v) ? Number(v.slice(2)) : 0; }
     function lookup(key, name) {
         var L = W.HardPanGpsLive;
         if (S.offline === 'offline') return false;   // no round code, no signal: nothing is looked up online
         if (!key || !liveOn() || !L.find || !L.course) return false;
         if (readyOf(key) && hasCard(key)) return false;
-        var at = Number(ls(LOOK + key) || 0);
+        var at = lookMark(key);
         if (at && Date.now() - at < LOOK_MS) { if (!hasCard(key)) S.lookup = { key: key, state: 'none' }; return false; }
-        ls(LOOK + key, String(Date.now()));
+        ls(LOOK + key, '2:' + Date.now());
         try { (W.__sfLook = W.__sfLook || []).push(key); } catch (e) {}   // (the tests count the lookups made)
         var c = courses().filter(function (x) { return x.key === key; })[0] || {};
         S.lookup = { key: key, state: 'busy' };
@@ -363,35 +406,71 @@
                 var pt = partOf(name);
                 if (!hit && pt) { var ms = (f.matches || []).filter(function (m) { return nk(String(m.club || '') + String(m.course || '')).indexOf(pt) !== -1; }); if (ms.length === 1) hit = ms[0]; }
             }
+            // 064: MORE THAN ONE (Starfire: King 18 + Mulligan at one club; or two clubs by that name):
+            // the golfer picks - never "not in our course data", never kept as a 30-day miss.
+            if (!hit && f && f.status === 'ok' && (f.matches || []).length > 1) return { status: 'choose', oneClub: !!f.oneClub, matches: chooseOrder(f.matches) };
             if (!hit) return { status: f && f.status === 'ok' ? 'ambiguous' : ((f && f.status) || 'none') };
             return L.course(hit.id, key);
         }).then(function (r) {
+            if (r && (r.status === 'choose' || r.status === 'ambiguous')) ls(LOOK + key, null);
             if (!S.lookup || S.lookup.key !== key) return;
-            // Setting up a NEW course needs a signed-in golfer (the function's rule): say that, and ask
-            // again after sign-in (the 30-day mark is cleared).
-            if (r && (r.status === 'account' || r.status === 'signin')) { ls(LOOK + key, null); S.lookup = { key: key, state: 'signin' }; if (S.step === 1) render(); return; }
-            if (!(r && r.status === 'ready')) { S.lookup = { key: key, state: 'none', why: r && r.status }; if (S.step === 1) render(); return; }
-            var H = HD(), fin = function () {
-                S.lookup = null;
-                if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.step === 1) render(); }, true);
-                else if (S.step === 1) render();
-            };
-            // Its card is a new shared record (no card of ours): read it, and that record is the pick.
-            if (r.cardKey && !hasCard(key) && wizDb()) {
-                wizDb().ref('global_courses/' + r.cardKey).once('value').then(function (snap) {
-                    var rec = snap && snap.val ? snap.val() : null;
-                    if (rec && rec.name && typeof globalCourses !== 'undefined' && globalCourses) globalCourses[r.cardKey] = rec;
-                    if (rec && rec.name && courseKey() === key) pick(r.cardKey, rec.name);
-                    fin();
-                }, fin);
-            } else fin();
+            if (r && r.status === 'choose') { S.lookup = { key: key, state: 'choose', oneClub: r.oneClub, matches: r.matches }; if (S.step === 1) render(); return; }
+            landed(key, r);
         }, function () { if (S.lookup && S.lookup.key === key) { S.lookup = { key: key, state: 'none' }; if (S.step === 1) render(); } });
         return true;
+    }
+    // The 18-hole course first (King 18 before Mulligan 9), then GPS ones, then by name.
+    function chooseOrder(ms) {
+        return ms.slice(0, 6).sort(function (a, b) { return ((Number(b.holes) >= 18) - (Number(a.holes) >= 18)) || ((b.gps ? 1 : 0) - (a.gps ? 1 : 0)) || (Number(b.holes) || 0) - (Number(a.holes) || 0) || String(a.name || a.course || '').localeCompare(String(b.name || b.course || '')); });
+    }
+    // A course picked in the choice box: pulled the app's normal way (gpsCourse, once for everyone). No
+    // ourKey: one of several courses at the club is not linked to our club row (no gps_links write).
+    function lookPick(key, id) {
+        var L = W.HardPanGpsLive, lk = S.lookup;
+        if (!L || !L.course || !lk || lk.key !== key || lk.state !== 'choose') return;
+        var m = (lk.matches || []).filter(function (x) { return String(x.id) === String(id); })[0];
+        if (!m) return;
+        S.lookup = { key: key, state: 'busy', name: m.name || m.club };
+        try { (W.__sfLookPick = W.__sfLookPick || []).push(String(id)); } catch (e) {}
+        if (S.step === 1) render();
+        L.course(String(id)).then(function (r) { if (S.lookup && S.lookup.key === key) landed(key, r); },
+            function () { if (S.lookup && S.lookup.key === key) { S.lookup = { key: key, state: 'none', why: 'error' }; if (S.step === 1) render(); } });
+    }
+    // The pull's answer (lookup or a pick from the choice box).
+    function landed(key, r) {
+        // Setting up a NEW course needs a signed-in golfer (the function's rule): say that, and ask
+        // again after sign-in (the 30-day mark is cleared).
+        if (r && (r.status === 'account' || r.status === 'signin')) { ls(LOOK + key, null); S.lookup = { key: key, state: 'signin' }; if (S.step === 1) render(); return; }
+        if (!(r && r.status === 'ready')) { S.lookup = { key: key, state: 'none', why: r && r.status }; if (S.step === 1) render(); return; }
+        var H = HD(), fin = function () {
+            S.lookup = null;
+            if (typeof H.loadGpsKeys === 'function') H.loadGpsKeys(function () { if (typeof H.refreshCourses === 'function') H.refreshCourses(); if (S.here) S.near = nearList(S.here); if (S.step === 1) render(); }, true);
+            else if (S.step === 1) render();
+        };
+        // Its card is a new shared record (no card of ours): read it, and that record is the pick.
+        if (r.cardKey && !hasCard(key) && wizDb()) {
+            wizDb().ref('global_courses/' + r.cardKey).once('value').then(function (snap) {
+                var rec = snap && snap.val ? snap.val() : null;
+                if (rec && rec.name && typeof globalCourses !== 'undefined' && globalCourses) globalCourses[r.cardKey] = rec;
+                if (rec && rec.name && courseKey() === key) pick(r.cardKey, rec.name);
+                fin();
+            }, fin);
+        } else fin();
     }
     function lookupBox(key, name) {
         var lk = S.lookup && S.lookup.key === key ? S.lookup : null;
         var nm = esc(String(name || '').split(' (')[0]);
-        if (lk && lk.state === 'busy') return '<div class="sf-card" id="sf-lookup" style="display:flex;align-items:center;gap:10px;"><span class="sf-spin" aria-hidden="true">⏳</span><span class="sf-note" style="font-size:15px;">Getting ' + nm + '\u2019s scorecard\u2026</span></div>';
+        if (lk && lk.state === 'busy') return '<div class="sf-card" id="sf-lookup" style="display:flex;align-items:center;gap:10px;"><span class="sf-spin" aria-hidden="true">⏳</span><span class="sf-note" style="font-size:15px;">Getting ' + (lk.name ? esc(lk.name) : nm) + '\u2019s scorecard\u2026</span></div>';
+        // 064: MORE THAN ONE COURSE - the golfer picks (King 18 first, then Mulligan 9).
+        if (lk && lk.state === 'choose') return '<div class="sf-card" id="sf-lookup"><div style="font-weight:800;font-size:16px;margin-bottom:10px;">'
+            + (lk.oneClub ? nm + ' has ' + lk.matches.length + ' courses. Which one?' : 'More than one course is called ' + nm + '. Which one?') + '</div>'
+            + lk.matches.map(function (m) {
+                var part = String(m.course || '').trim(), holes = Number(m.holes) || 0, where = [m.city, m.state].filter(Boolean).join(', ');
+                var label = lk.oneClub && part && part.toLowerCase() !== String(m.club || '').toLowerCase() ? part + (holes && !new RegExp('\\b' + holes + '\\b').test(part) ? ' ' + holes : '') : (m.name || m.club || part);
+                var sub = [lk.oneClub ? '' : where, holes ? holes + ' holes' : '', m.gps ? '\u2713 GPS' : ''].filter(Boolean).join(' \u00b7 ');
+                return '<button type="button" class="sf-row" data-sf-lkpick="' + esc(m.id) + '"><span class="n">' + esc(label) + '</span><span class="s">' + esc(sub) + '</span></button>';
+            }).join('')
+            + '<button type="button" class="sf-btn" data-sf="change" style="width:100%;min-height:46px;">Pick another course</button></div>';
         if (lk && lk.state === 'signin') return '<div class="sf-card" id="sf-lookup"><div style="font-weight:800;font-size:16px;margin-bottom:6px;">Sign in to load ' + nm + '.</div><div class="sf-note" style="margin-bottom:10px;">Its scorecard and GPS are online - setting up a new course needs a signed-in golfer (Apple, Google or email). Once, for everyone.</div>'
             + '<button type="button" class="sf-cta" data-sf="signin" style="margin-bottom:8px;">Sign in</button><button type="button" class="sf-btn" data-sf="change" style="width:100%;min-height:46px;">Pick another course</button></div>';
         if (lk && lk.state === 'none' && hasCard(key) && S.noCard !== key) return '<div class="sf-note" id="sf-lookup" style="margin:-4px 2px 10px;">No GPS for ' + nm + ' in our data yet \u2014 its card and scores work; on the map, \u201cTap the middle of the green\u201d sets each green.</div>';
@@ -471,8 +550,8 @@
         // URGENT-035: the box is kept (keepBox), focus and cursor untouched; only a rebuilt box is focused again.
         var q = $('sf-q'); if (typing && q && q !== a) { q.focus(); try { q.setSelectionRange(q.value.length, q.value.length); } catch (e) {} }
     }
-    function webRowHtml(m) {
-        var where = [m.city, m.state].filter(Boolean).join(', ');
+    function webRowHtml(m, d) {
+        var where = [d != null ? miStr(d) : '', [m.city, m.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
         return '<button type="button" class="sf-row" data-sf-web="' + esc(m.id) + '" data-sf-name="' + esc(m.name || m.club) + '"><span class="n">' + esc(m.name || m.club) + '</span>'
             + '<span class="s">' + esc(where) + (m.gps ? (where ? ' · ' : '') + '✓ GPS' : '') + '</span></button>';
     }
@@ -480,7 +559,7 @@
     // added to webLocal (drawn as its own local row) instead of a second, online row.
     function webBox(shown) {
         var w = S.web, raw = String(S.q || '').trim();
-        S.webLocal = [];
+        S.webLocal = []; S.webRows = [];
         if (!w || w.k !== webKey(raw)) return '';
         var p = w.pull;
         if (p) {
@@ -505,7 +584,66 @@
             if (rv && rv.row) { if (shown.indexOf(rv.row.key) === -1) { shown.push(rv.row.key); S.webLocal.push(rv.row); } return false; }
             return true;
         });
-        return rows.length ? '<div id="sf-web">' + rows.map(webRowHtml).join('') + '</div>' : '';
+        // 067: the rows themselves are drawn by step1, in ONE list with the courses on the phone (best name
+        // match, then closest); this box keeps only the online search's own line (searching / no signal / ...).
+        S.webRows = rows;
+        return '';
+    }
+    // ---- 064: OPENSTREETMAP-ONLY COURSES IN SEARCH (Manny, Goldendale: "show OSM-only courses as 'Not set
+    // up yet · Add this course'") ---------------------------------------------------------------------
+    // The courses in the app's OpenStreetMap coverage files (gps-coverage-*.js) that have no card or key of
+    // ours (HardPanCourse.osmOnly). Matched like the others, drawn under them, at most 5: never ✓ GPS, never
+    // "Tap to load". A tap opens Round Setup's Add a course with the name filled in (the city shown under
+    // it); nothing is written until the golfer saves the course there. A course already listed, or one the
+    // online search lists, is not drawn twice.
+    var OSM_SHOWN = 5;
+    function osmHits(raw, listed) {
+        var c = HC(), all = [];
+        try { all = c && c.osmOnly ? c.osmOnly() : []; } catch (e) { all = []; }
+        if (!all.length) return [];
+        var have = {};
+        (listed || []).concat(S.webRows || []).forEach(function (x) { have[qWords(x.name || x.club).join(' ')] = 1; if (x.club) have[qWords(x.club).join(' ')] = 1; });
+        return searchOrder(localHits(all, raw).filter(function (x) { return !have[qWords(x.c.name).join(' ')]; }).map(function (x) { return { kind: 'osm', c: x.c, name: x.c.name, s: x.s, d: distTo(x.c) }; }), raw).slice(0, OSM_SHOWN);
+    }
+    // ---- 067: SEARCH = BEST NAME MATCH FIRST, THEN CLOSEST (Manny: "we still need to see the closest
+    // courses first ... We should only add.") -------------------------------------------------------
+    // Every result - a course on the phone, an online GolfAPI course, an OpenStreetMap "Not set up yet"
+    // course - is one list: the name exactly as typed ("The" and "(...)" aside, or the same words without
+    // golf / club / country), then names that START with it, then the other good matches, then the
+    // typo-close ones; inside each, the closest to the golfer first (no point known: after those with one),
+    // then by name. Every row with a known point shows its distance.
+    function normName(t) { return String(t || '').toLowerCase().split('(')[0].replace(/['’`.]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().replace(/^the /, ''); }
+    function nameTier(name, raw, sc) {
+        var n = normName(name), q = normName(raw), core = function (t) { return t.replace(/\b(golf|club|course|gc|cc)\b/g, ' ').replace(/\s+/g, ' ').trim(); };
+        if (q && (n === q || (core(q) && core(n) === core(q)))) return 0;   // "Papago GC" = "Papago Golf Course"; "country" / "resort" still count
+        if (q && n.indexOf(q) === 0) return 1;
+        return sc >= 2 ? 2 : 3;
+    }
+    function searchOrder(items, raw) {
+        items.forEach(function (x) { x.t = nameTier(x.name, raw, x.s); });
+        return items.sort(function (a, b) {
+            return (a.t - b.t) || ((a.d == null) - (b.d == null)) || ((a.d || 0) - (b.d || 0)) || String(a.name).localeCompare(String(b.name));
+        });
+    }
+    function osmRowHtml(c, d) {
+        var where = [d != null ? miStr(d) : '', [c.city, c.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+        return '<button type="button" class="sf-row sf-osm" style="display:block;" data-sf-osm="' + esc(c.osm || '') + '" data-sf-name="' + esc(c.name) + '" data-sf-city="' + esc(c.city || '') + '" data-sf-state="' + esc(c.state || '') + '">'
+            + '<span class="n" style="display:block;">' + esc(c.name) + '</span>'
+            + '<span class="s" style="display:block;white-space:normal;margin-top:2px;">' + (where ? esc(where) + ' · ' : '') + 'Not set up yet · <span style="font-weight:800;color:#0f4c3a;">Add this course</span></span></button>';
+    }
+    // The tap: Round Setup's own "Add a course" (the new-course form), the name filled in.
+    function addOsm(name, city, state) {
+        S.q = '';
+        away(step('course'), 'Course picked');
+        try { if (fn('showNewCourseForm')) W.showNewCourseForm(); } catch (e) {}
+        var box = $('new-course-name-input'), form = $('new-course-form');
+        if (box) box.value = name;
+        var where = [city, state].filter(Boolean).join(', '), note = $('sf-new-course-where');
+        if (form && box && where) {
+            if (!note) { note = D.createElement('p'); note.id = 'sf-new-course-where'; note.style.cssText = 'font-size:0.75rem;color:var(--text-muted);margin:-4px 0 8px 0;'; box.parentNode.insertBefore(note, box.nextSibling); }
+            note.textContent = where + ' · from OpenStreetMap';
+        } else if (note) note.remove();
+        try { (W.__sfAddOsm = W.__sfAddOsm || []).push(name); } catch (e) {}
     }
     // URGENT-028 (Manny, 1:03 PM: Papago open -> back -> Aguila from search -> Start Round -> Papago
     // hole 1 again). THE CAUSE: a tapped online course is only the pick once its pull (gpsCourse) and
@@ -772,12 +910,20 @@
         var body = (S.offline ? offlineBox() : '') + '<input type="search" class="sf-search" id="sf-q" placeholder="🔍 Search courses" value="' + esc(S.q) + '" autocomplete="off" style="margin-bottom:12px;">';
         if (q.length >= 2) {
             // URGENT-027: forgiving local matches first, then every US course online (webBox).
-            var hits = localHits(all, S.q.trim()).slice(0, 10).map(function (x) { return x.c; });
+            // 067: the best name matches, then the closest (searchOrder) - one list with the online and the
+            // "Not set up yet" courses.
+            var rawQ = S.q.trim();
+            var hits = searchOrder(localHits(all, rawQ).map(function (x) { return { kind: 'local', c: x.c, name: x.c.name, s: x.s, d: distSearch(x.c) }; }), rawQ).slice(0, 10).map(function (x) { return x.c; });
             var shown = hits.map(function (c) { return c.key; }), web = webBox(shown);
             hits = hits.concat(S.webLocal);
-            var waiting = S.web && S.web.k === webKey(S.q.trim()) && (S.web.state === 'busy' || S.web.pull);
-            body += '<div class="sf-h">RESULTS</div>' + hits.map(function (c) { return rowHtml(c, distTo(c), c.key === key); }).join('') + web
-                + (!hits.length && !web && !waiting ? '<div class="sf-note">' + (q.trim().length < 3 ? 'Keep typing — 3 letters searches all courses.' : 'No course found by that name.') + '</div>' : '')
+            var waiting = S.web && S.web.k === webKey(rawQ) && (S.web.state === 'busy' || S.web.pull);
+            var osm = S.web && S.web.pull ? [] : osmHits(rawQ, hits);
+            var items = hits.map(function (c) { return { kind: 'local', c: c, name: c.name, s: matchScore(c, rawQ), d: distSearch(c) }; })
+                .concat((S.webRows || []).map(function (m) { return { kind: 'web', m: m, name: m.name || m.club, s: Math.max(matchScore({ name: m.name || m.club }, rawQ), matchScore({ name: m.club }, rawQ)), d: distSearch({ name: m.name || m.club, club: m.club, city: m.city }) }; }))
+                .concat(osm);
+            var rowsHtml = searchOrder(items, rawQ).map(function (x) { return x.kind === 'local' ? rowHtml(x.c, x.d, x.c.key === key) : x.kind === 'web' ? webRowHtml(x.m, x.d) : osmRowHtml(x.c, x.d); }).join('');
+            body += '<div class="sf-h">RESULTS</div>' + rowsHtml + web
+                + (!hits.length && !web && !osm.length && !(S.webRows || []).length && !waiting ? '<div class="sf-note">' + (q.trim().length < 3 ? 'Keep typing — 3 letters searches all courses.' : 'No course found by that name.') + '</div>' : '')
                 + '<button type="button" class="sf-link muted" data-sf="fullcourse" style="font-size:13px;">Not listed? Add a course ›</button>';
         }
         // URGENT-028: a tapped online course still loading IS the selected card (never the one before it).
@@ -1388,6 +1534,8 @@
     function onClick(ev) {
         var t = ev.target, b;
         if (!t || !t.closest) return;
+        if ((b = t.closest('[data-sf-osm]'))) { addOsm(b.getAttribute('data-sf-name'), b.getAttribute('data-sf-city'), b.getAttribute('data-sf-state')); return; }
+        if ((b = t.closest('[data-sf-lkpick]'))) { lookPick(S.lookup && S.lookup.key, b.getAttribute('data-sf-lkpick')); return; }
         if ((b = t.closest('[data-sf-web]'))) { webPull(b.getAttribute('data-sf-web'), b.getAttribute('data-sf-name')); return; }
         if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.pend = null; S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; lookup(pk, pn); return; }
         if ((b = t.closest('[data-sf-tee]'))) {
@@ -1454,7 +1602,7 @@
             return;
         }
         if (a === 'mix') { away(step('players'), 'Tees set'); return; }
-        if (a === 'fullcourse') { away(step('course'), 'Course picked'); return; }
+        if (a === 'fullcourse') { var wn = $('sf-new-course-where'); if (wn) wn.remove(); away(step('course'), 'Course picked'); return; }
         if (a === 'signin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t2 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t2); show(true); S.lookup = null; lookup(courseKey(), courseName()); render(); } }, 600); } return; }
         if (a === 'webback') { if (S.web) S.web.pull = null; S.pend = null; render1(); var q2 = $('sf-q'); if (q2) q2.focus(); return; }
         if (a === 'webretry') { S.web = null; webSearch(); return; }

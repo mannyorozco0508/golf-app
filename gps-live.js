@@ -169,6 +169,8 @@
         add(longest);
         return out.slice(0, 3);
     }
+    // A club's own words: no "(King 18)" part, no "golf / club / country / cc ...".
+    function clubKey(n) { return words(String(n || '').split('(')[0]).filter(function (x) { return !GENERIC[x]; }).join(' '); }
     // where: { city, state } from the saved card (either may be missing).
     function rank(results, where, name) {
         var st = stateCode(where && where.state), ct = cityKey(where && where.city);
@@ -203,7 +205,12 @@
                 var inCity = pool.filter(function (x) { return x.sameCity; });
                 var clear = inCity.length === 1 ? inCity[0].r : (!cityKey(where && where.city) && pool.length === 1 && st ? pool[0].r : null);
                 if (!clear && ties.length === 1 && top.sameCity) clear = top.r;
-                return { status: 'ok', matches: pool.map(function (x) { return x.r; }), clear: clear, query: variants[i], tried: tried };
+                // 064 (Starfire: King 18 + Mulligan, GolfAPI says Scottsdale, our row says Paradise Valley):
+                // EVERY match is our club, in our state - the city guess does not matter, it is one club with
+                // more than one course (the golfer picks; never "not in our course data").
+                var club = clubKey(name);
+                var oneClub = !!club && pool.every(function (x) { return clubKey(x.r.club || x.r.name) === club && (!st || x.sameState); });
+                return { status: 'ok', matches: pool.map(function (x) { return x.r; }), clear: clear, oneClub: oneClub, query: variants[i], tried: tried };
             });
         };
         return next(0).catch(function () { return { status: 'error' }; });
@@ -232,5 +239,5 @@
     };
     function message(status) { return Object.prototype.hasOwnProperty.call(MESSAGES, status) ? MESSAGES[status] : MESSAGES.error; }
 
-    W.HardPanGpsLive = { find: find, nameVariants: nameVariants, stateCode: stateCode, normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, wind: wind, message: message, _store: store };
+    W.HardPanGpsLive = { find: find, clubKey: clubKey, nameVariants: nameVariants, stateCode: stateCode, normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, wind: wind, message: message, _store: store };
 })();
