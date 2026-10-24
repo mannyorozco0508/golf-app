@@ -123,6 +123,10 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // the rules change for the group is a proposal (docs/045-venmo-rules-proposal.md, URGENT-045).
     // false = nothing on the page.
     venmo: true,
+    // POST TO GHIN (URGENT-066 #3, ghin-post.js): the Results page's "Post to GHIN" card once the round is
+    // final - a link that opens the GHIN app (else the App Store) or ghin.com. No GHIN API, nothing sent.
+    // false = nothing on the page.
+    ghinButton: true,
     iap: true, iapEntitlement: 'gps_map', iapProduct: 'com.rattlegolf.app.gpsmap.yearly',
     // RevenueCat PUBLIC Apple SDK key (appl_...), from RevenueCat > Project >
     // API keys. Public by design (it ships in every app binary), but it stays

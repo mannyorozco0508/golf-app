@@ -112,7 +112,7 @@
         var head = teeName ? (teeName + ' tee') : 'The selected tee';
         return head + DOT + 'Slope ' + status.slope + DOT + 'Course Rating ' + status.courseRating
             + DOT + 'Par ' + status.par + '. '
-            + 'Course Handicaps are converted from GHIN Handicap Indexes: '
+            + 'Playing handicaps (est.) are worked out from each golfer’s index: '
             + 'Index × (Slope / 113) + (Course Rating − Par)'
             + (status.allowance === 100 ? '' : ', then ' + status.allowance + '% allowance')
             + ', rounded (.5 up).';

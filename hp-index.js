@@ -225,7 +225,7 @@
     var HOW = 'Each finished 18-hole round you score as yourself on this phone gives a score differential: '
         + '(113 ÷ slope) × (adjusted score − course rating). The adjusted score caps every hole at net double bogey '
         + '(par + 2 + the strokes you get on that hole), or par + 5 until you have an index. Your index is the average of your '
-        + 'best 8 of your last 20 differentials (with fewer rounds, fewer count, the World Handicap System way), to one decimal, '
+        + 'best 8 of your last 20 differentials (with fewer rounds, fewer count), to one decimal, '
         + 'never above 54.0. A round with no course rating or slope for its tee is not counted. It is worked out on this phone, '
         + 'is not an official handicap and is not posted anywhere.';
     var WORDS = { label: LABEL, need: NEED, how: 'How it’s worked out', howText: HOW,

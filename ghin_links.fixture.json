@@ -1,0 +1,61 @@
+{
+  "_source": "Fetched 2026-10-24 for URGENT-066 #3 (ghin-button). aasa = https://www.ghin.com/.well-known/apple-app-site-association as served. redirect = the exact rule from ghin.com/assets/index-DDCCG9k2.js (2026-10-24): on a mobile browser landing on a claimed path, iPhone goes to the App Store, Android to Google Play. Routes = the /post-score paths in that same script.",
+  "aasa": {
+    "applinks": {
+      "apps": [],
+      "details": [
+        {
+          "appID": "2Y3A4HK9TT.org.usga.ghinmobile",
+          "paths": [
+            "/challenges/*",
+            "/upgrade-to-enhanced-gps/*",
+            "/overview/*",
+            "/myGPS/*"
+          ],
+          "components": [
+            {
+              "/": "/challenges/*",
+              "comment": "Matches any URL with a path that starts with /challenges/."
+            },
+            {
+              "/": "/upgrade-to-enhanced-gps/*",
+              "comment": "Matches any URL with a path that starts with /upgrade-to-enhanced-gps/."
+            },
+            {
+              "/": "/overview/*",
+              "comment": "Matches any URL with a path that starts with /overview/."
+            },
+            {
+              "/": "/myGPS/*",
+              "comment": "Matches any URL with a path that starts with /myGPS/."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "redirect": {
+    "pathTest": "(challenges|upgrade-to-enhanced-gps|overview|myGPS)",
+    "iphoneUA": "iPhone|iPad|iPod",
+    "ios": "https://itunes.apple.com/us/app/ghin-mobile/id491796218?mt=8",
+    "android": "https://play.google.com/store/apps/details?id=com.advancedmobile.android.ghin&amp;hl=en_US",
+    "desktopFor": [
+      "upgrade-to-enhanced-gps",
+      "overview",
+      "myGPS"
+    ],
+    "desktop": "https://www.usga.org/content/usga/home-page/Handicap-ghin/GHIN-Sentry.html"
+  },
+  "webRoutes": [
+    "/post-score",
+    "/post-score/total",
+    "/post-score/hole-by-hole",
+    "/login"
+  ],
+  "appStore": {
+    "id": "491796218",
+    "url": "https://apps.apple.com/us/app/ghin/id491796218",
+    "bundle": "org.usga.ghinmobile",
+    "team": "2Y3A4HK9TT"
+  }
+}
