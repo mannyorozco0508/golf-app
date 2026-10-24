@@ -7753,9 +7753,9 @@
         if (ev.round != null && String(ev.round) !== String(S.eventCode || '')) return false;
         var w = scoreFor();
         if (!w || w.id == null) return false;
-        S.saveScore(w.id, h, String(n));
         // 066: putts typed on the watch go where the card's putts chips put them (the quick stats on
         // this phone - never Firebase, never a money engine), only with GPS Map + quick stats on.
+        // Stored BEFORE the score: the score's save redraws the card, and its putts chips then show them.
         var pt = ev.putts;
         if (pt != null && Number(pt) >= 0 && Number(pt) <= n && Math.floor(Number(pt)) === Number(pt) && watchStatsOn(hasGpsPro())) {
             try {
@@ -7763,6 +7763,7 @@
                     { putts: Number(pt) }, n, watchPar(h) || (h === Number(S.hole) ? Number(S.par) : 0) || 4);
             } catch (e) {}
         }
+        S.saveScore(w.id, h, String(n));
         // The watch hears back at once (its "sending" clears): the putts never come back through the
         // round, and the score may wait in the offline queue.
         watchLast = null;

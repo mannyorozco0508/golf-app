@@ -10,6 +10,7 @@ import SwiftUI
 struct HardPanWatchApp: App {
     // One session for the app's life: WCSession must be activated early, before any view needs it.
     @StateObject private var session = WatchSessionManager.shared
+    @Environment(\.scenePhase) private var phase
 
     var body: some Scene {
         WindowGroup {
@@ -17,6 +18,8 @@ struct HardPanWatchApp: App {
                 ContentView()
             }
             .environmentObject(session)
+            // 066: back on the wrist - a session that never activated is tried again, an empty screen asks.
+            .onChange(of: phase) { _, p in if p == .active { session.wake() } }
         }
     }
 }

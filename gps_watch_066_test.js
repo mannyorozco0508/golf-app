@@ -64,11 +64,12 @@ function world(o) {
     const pars = { 1: 4, 2: 3, 3: 4, 4: 5, 5: 4 };
     const opts = { courseKey: 'test_course', hole: 3, par: 4, eventCode: 'ABC', round: { gpsPins: { h4: pin }, courseName: 'Test Links' },
         holeMeta: (h) => ({ par: pars[h] || 4 }) };
-    opts.saveScore = (pid, h, v) => { saved.push([pid, h, v]); sb.currentData.scores['p' + pid + '_h' + h] = v; };
+    const puttsAtSave = [];
+    opts.saveScore = (pid, h, v) => { puttsAtSave.push(putts.length); saved.push([pid, h, v]); sb.currentData.scores['p' + pid + '_h' + h] = v; };
     assert.strictEqual(V.mount(opts), true);
     V.showSide('gps');
     V.setHole(4, 5);
-    return { V, sent, listeners, saved, putts, sb, last: () => sent[sent.length - 1] };
+    return { V, sent, listeners, saved, putts, puttsAtSave, sb, last: () => sent[sent.length - 1] };
 }
 
 test('066 phone -> watch: the golfer\'s own card rides with the hole (score, putts, thru, strokes, to par, name)', () => {
@@ -102,6 +103,7 @@ test('066 watch -> phone: score AND putts - the score through the card\'s saveSc
     assert.strictEqual(w.listeners.watchScore[0]({ kind: 'score', hole: 4, strokes: 4, putts: 2, round: 'ABC', id: 'w1', at: 1 }), undefined);
     assert.deepStrictEqual(w.saved, [[1, 4, '4']], 'the card\'s own write, for this phone\'s golfer');
     assert.deepStrictEqual(w.putts, [['ABC', 1, 4, 2, 4, 5]], 'putts where the putts chips put them: round, golfer, hole, putts, strokes, par');
+    assert.deepStrictEqual(w.puttsAtSave, [1], 'putts stored BEFORE the score: the save redraws the card with its putts chip lit (seen on the Simulator)');
     assert.ok(w.sent.length > before, 'an answer goes back without waiting for a GPS fix');
     assert.strictEqual(w.last().score, 4);
     assert.strictEqual(w.last().putts, 2, 'the watch\'s "sending" clears on this echo');
@@ -155,8 +157,24 @@ test('066 round state: the phone answers "sync" natively from its last hole; the
     assert.ok(/func askForHole\(\)/.test(mgr) && /wc\.isReachable/.test(mgr) && /WatchKind\.sync/.test(mgr), 'the watch asks (sendMessage only, when reachable)');
     assert.ok(/activationDidCompleteWith[\s\S]*?self\.askForHole\(\)/.test(mgr), 'on activation');
     assert.ok(/sessionReachabilityDidChange[\s\S]*?if r && self\.state == nil \{ self\.askForHole\(\) \}/.test(mgr), 'on reconnect with nothing shown');
-    assert.ok(/\.onAppear \{ session\.askForHole\(\) \}/.test(read(IOS + 'Watch/HardPanWatch/ContentView.swift')), 'when "Open a round" is on screen');
+    assert.ok(/\.onAppear \{ session\.wake\(\) \}/.test(read(IOS + 'Watch/HardPanWatch/ContentView.swift')), 'when "Open a round" is on screen');
     assert.ok(/WatchKind\.clear \{ state = nil; pendingHole = nil; unsent = \[:\]; unsentPutts = \[:\]/.test(mgr), 'no round: nothing left "sending"');
+});
+
+test('066 root cause on the paired Simulator: the phone said "watch app not installed" while it was open - once the watch has spoken, it gets the hole', () => {
+    const sess = read(IOS + 'App/PhoneBridge/PhoneWatchSession.swift');
+    assert.ok(/s\.isPaired, s\.isWatchAppInstalled \|\| heard else \{ return \}/.test(sess), 'still paired-only; installed, or heard from');
+    assert.ok(/private func received\(_ d: \[String: Any\]\) \{\s*lock\.lock\(\); heardFromWatch = true; lock\.unlock\(\)/.test(sess), 'any message from the watch app marks it there');
+});
+test('066 the root cause seen on the paired Simulator: a session that never activated (opened right after install) is told on screen', () => {
+    const mgr = read(IOS + 'Watch/HardPanWatch/WatchSessionManager.swift');
+    assert.ok(/WCSession\.default\.activate\(\)\s*checkActivation\(after: 8\)/.test(mgr), 'checked 8 s after launch');
+    assert.ok(/self\.stuck = WCSession\.default\.activationState != \.activated/.test(mgr), 'not activated by then = stuck');
+    assert.ok(/self\.stuck = failed/.test(mgr), 'a failed activation says so too');
+    const cv = read(IOS + 'Watch/HardPanWatch/ContentView.swift');
+    assert.ok(/if session\.stuck \{[\s\S]*?Close HardPan on your watch and open it again/.test(cv), 'what to do, on the watch');
+    assert.ok(/Text\("Open a round in HardPan GPS on your iPhone"\)/.test(cv), 'the old line stays (only add)');
+    assert.ok(/\.onChange\(of: phase\) \{ _, p in if p == \.active \{ session\.wake\(\) \} \}/.test(read(IOS + 'Watch/HardPanWatch/HardPanWatchApp.swift')), 'back on the wrist: wake');
 });
 
 test('066 the watch screens: putts on the score screen (only where the phone keeps them), the card line under Score', () => {

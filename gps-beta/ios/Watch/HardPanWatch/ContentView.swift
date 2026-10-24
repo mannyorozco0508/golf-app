@@ -21,10 +21,16 @@ struct ContentView: View {
                 Text("Open a round in HardPan GPS on your iPhone")
                     .multilineTextAlignment(.center)
                     .font(.footnote)
+                if session.stuck {
+                    // 066: the session never connected (opened right after install) - a reopen fixes it.
+                    Text("Not connected yet. Close HardPan on your watch and open it again.")
+                        .multilineTextAlignment(.center)
+                        .font(.caption2).foregroundStyle(.orange)
+                }
             }
             .padding()
             // 066: a round may already be live on the phone - ask for its hole instead of waiting.
-            .onAppear { session.askForHole() }
+            .onAppear { session.wake() }
         }
     }
 

@@ -35,6 +35,26 @@ final class WatchSessionManager: NSObject, ObservableObject {
         guard WCSession.isSupported() else { return }
         WCSession.default.delegate = self
         WCSession.default.activate()
+        checkActivation(after: 8)
+    }
+
+    /// 066 - THE "Open a round..." BUG (053; reproduced on the paired Simulator, 2026-10-24): a watch app
+    /// opened within moments of being installed activates its session before the watch's
+    /// WatchConnectivity daemon knows the app ("Failed to get applicationInfo"). That activation never
+    /// completes, and activating again only answers "already in progress" - the phone's hole waits
+    /// until the app is closed and opened again (then it shows at once). So the watch says so.
+    @Published private(set) var stuck = false
+    private func checkActivation(after delay: TimeInterval) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            self.stuck = WCSession.default.activationState != .activated
+        }
+    }
+    /// 066: the app came to the screen - a session that is still not activated is tried again now.
+    func wake() {
+        let wc = WCSession.default
+        guard WCSession.isSupported() else { return }
+        if wc.activationState != .activated { checkActivation(after: 8) } else if state == nil { askForHole() }
     }
 
     /// The hole on screen: the asked-for one while waiting, else the phone's.
@@ -123,7 +143,10 @@ extension WatchSessionManager: WCSessionDelegate {
     nonisolated func session(_ session: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?) {
         let ctx = session.receivedApplicationContext
         let r = session.isReachable
+        let failed = state != .activated
         Task { @MainActor in
+            self.stuck = failed   // 066: never give up silently - the screen says what to do
+            if failed { return }
             self.reachable = r
             if !ctx.isEmpty { self.apply(ctx) }
             // 066 ("Open a round..." while the phone was sending): the stored context can be empty or
