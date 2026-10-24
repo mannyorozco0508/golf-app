@@ -4421,11 +4421,8 @@
         drawTarget();
         drawHoleAsk();
         drawHazards();
-        // HAZARDS SHEET (008): open, it follows the golfer. (URGENT-064 #7: no Hazards button on the map any more;
-        // the hazard data, the map's hazard chips, the tee plan and the arcs keep using it.)
-        // URGENT-067 (only add): the sheet stays reachable from Tools > "Hazards & layups" - shown exactly
-        // when the old map button was (pro, measuring, not a replay, the course has data).
-        show('.gps-hazards-open', S.pro && S.mode === 'measure' && !S.replay && courseHasAnyData());
+        // HAZARDS SHEET (008): open, it follows the golfer. (URGENT-064 #7: no Hazards button on the map any more -
+        // the sheet has no way in; the hazard data, the map's hazard chips, the tee plan and the arcs keep using it.)
         if (hzOpen()) { if (S.mode !== 'measure') closeHazards(); else fillHazards(); }
         // 052 A: the tee plan follows the hole / wind; tournament mode or a spectator closes it.
         if (tplanOpen()) { if (S.mode !== 'measure' || !planAllowed()) closeTeePlan(); else fillTeePlan(); }
@@ -5832,7 +5829,7 @@
     // MORE: [the menu item it runs, icon, label]. Shown only when that item is.
     var TS_TILES = [['.gps-set-green', '⛳', 'Set the green'], ['.gps-fix-green', '⛳', 'Fix the green'], ['.gps-undo-green', '↶', 'Undo last fix'],
         ['.gps-refresh-gps', '↻', 'Refresh GPS'], ['.gps-my-stats', '▦', 'My stats'], ['.gps-my-bag', '🏌️', 'My bag'], ['.gps-range', '🎯', 'Range'],
-        ['.gps-mark-shots', '📍', 'Mark shots'], ['.gps-tee-plan', '⛳', 'Tee plan'], ['.gps-hazards-open', '⚠️', 'Hazards & layups'], ['.gps-replay', '▶', 'Replay round'], ['.gps-pick-course', '⚑', 'Other course'],
+        ['.gps-mark-shots', '📍', 'Mark shots'], ['.gps-tee-plan', '⛳', 'Tee plan'], ['.gps-replay', '▶', 'Replay round'], ['.gps-pick-course', '⚑', 'Other course'],
         ['.gps-rechoose', '①', 'Hole 1 again']];
     var TS_MARKUP = '<div class="gps-ts-head"><span class="gps-ts-grip" aria-hidden="true"></span><div class="gps-ts-title">Tools</div></div>'
         + '<div class="gps-ts-h" data-ts-sec="layout">SCREEN LAYOUT</div><div class="gps-ts-seg" data-ts-seg="layout" role="radiogroup" aria-label="Screen layout"><button type="button" data-v="d" role="radio">HardPan</button><button type="button" data-v="c" role="radio">Bottom panel</button></div>'
@@ -6333,8 +6330,6 @@
         +   '<button type="button" class="gps-menu-item gps-mark-shots">Mark shots</button>'
         // 052 A: the tee plan (Distance arcs sits with My miss above).
         +   '<button type="button" class="gps-menu-item gps-tee-plan" style="display:none">Tee plan</button>'
-        // URGENT-067: the existing Hazards sheet (008), unchanged - its way in now that the map button is gone (064 #7).
-        +   '<button type="button" class="gps-menu-item gps-hazards-open" data-feature="hazards" style="display:none">Hazards &amp; layups</button>'
         +   '<button type="button" class="gps-menu-item gps-replay">Replay round</button>'
         +   '<button type="button" class="gps-menu-item gps-add-game">\u2795 Add a game</button>'
         +   '<button type="button" class="gps-menu-item gps-pick-course" style="display:none">\u26F3 Pick another course</button>'
@@ -7369,7 +7364,6 @@
         on(el, '.gps-hzs-done', closeHazards);
         on(el, '.gps-tplan-done', closeTeePlan);
         on(el, '.gps-tee-plan', function () { if (S) openTeePlan(); });
-        on(el, '.gps-hazards-open', function () { if (S) openHazards(); });
         on(el, '.gps-arcs-toggle', function () { if (S && planAllowed()) toggleArcs(); });
         on(el, '.gps-wind', function () { if (!S) return; if (windSheetOpen()) closeWindSheet(); else openWindSheet(); });
         var wsheet = el.querySelector('.gps-wind-sheet');

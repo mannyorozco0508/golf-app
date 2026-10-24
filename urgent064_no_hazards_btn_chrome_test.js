@@ -9,8 +9,7 @@
 //   1  Tools > Distance arcs ON: the arcs at the yards worked out HERE from gps-arcs-plan.js.
 //   2  tap the TEE: the Tee plan lists each club's hazards in play ("... in play · reach N ·
 //      carry N"), exactly as gps-arcs-plan.js works them out in node.
-//   3  Tools has ONE Hazards entry, "Hazards & layups" (URGENT-067 only-add: the sheet stays reachable;
-//      urgent067_hazards_tools_chrome_test.js opens it).
+//   3  Tools has no Hazards entry (default: none - Manny to say if he wants one).
 // A made-up course (synthetic - no licensed data), as urgent052a_arcs_chrome_test.js: hole 1 a
 // straight 400-yd par 4 north, a fairway bunker right (250 / 274) and water left (221 / 245).
 // Golfers "Test 064 Ann" / "Test 064 Ben". Nothing is written to any database (the journey's
@@ -112,7 +111,7 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }, { wi
             // 1. ARCS: Tools > Distance arcs ON, at the yards worked out here
             await openTools();
             const hzEntry = JSON.parse(await ev("JSON.stringify(Array.from(" + TS + ".querySelectorAll('*')).filter(function(e){ return !e.children.length && /hazard/i.test(e.textContent || ''); }).map(function(e){ return e.textContent.trim(); }))"));
-            assert.deepEqual(hzEntry, ['Hazards & layups'], '3: Tools has the one Hazards entry (URGENT-067)');
+            assert.deepEqual(hzEntry, [], '3: Tools has no Hazards entry');
             await ev(TS + ".querySelector('[data-ts-sw=\"arcs\"]').click()");
             await closeTools();
             assert.ok(await until("!!document.querySelector('#gps-overlay .gps-map').getAttribute('data-carry-arcs')", 8000), 'the arcs');
