@@ -312,7 +312,7 @@
         // name the parser could not place is taken out ("for Mikey", "Bob got").
         var only = (base.golfers || []).filter(function (x) { return String(x.id) === String(ch.id); });
         if (!only.length) return null;
-        var nc = Object.assign({}, base, { golfers: only, me: only[0].id });
+        var nc = Object.assign({}, base, { golfers: only });   // me stays: the one golfer listed is the answer either way
         var words = Parser().norm(st.text).replace(/\b(for|give)\s+[a-z']+/g, ' ').replace(/^[a-z']+\s+(?=(got|made|had|shot|scored|carded|gets|has)\b)/, '');
         return finish(parseNow(words, nc), nc);
     }
