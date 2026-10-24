@@ -37,7 +37,7 @@ const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, (msg || '') +
 //   - "the summary line: 70% right..."                     -> the 063 My bag line
 test('063: no marked-shot fit is left - the oval is My bag\'s carry only, right short / left long', { skip }, () => {
     const { M } = sandbox();
-    ['fit', 'point', 'axes', 'defaultShape', 'summary', 'MIN_SHOTS', 'K'].forEach((k) => assert.equal(M[k], undefined, k + ' is gone'));
+    ['fit', 'axes', 'defaultShape', 'summary', 'MIN_SHOTS', 'K'].forEach((k) => assert.equal(M[k], undefined, k + ' is gone'));
     const f = M.oval('7i', 150, 'R');
     assert.equal(f.tilt, -M.TUNE.TILT_DEG);
     assert.equal(f.cx, 0, 'on the aim line');
@@ -64,6 +64,34 @@ test('063: the left-hander is the mirror (left short, right long)', { skip }, ()
 test('063: the My bag line replaces the 052 B summary', { skip }, () => {
     const { M } = sandbox();
     assert.equal(M.bagLine('7-iron', 178, 'R', 'yd', '7i'), '7-iron \u00b7 178 \u00b7 miss right \u2248 5 short, miss left \u2248 5 long');
+});
+
+// URGENT-067 ("only add"): his marked shots still show - as dots on the club screen and the 052 B line -
+// with the wind taken out first and hole-closed shots left out. They never shape the oval.
+test('kept: the wind is taken out first; hole-closed shots and old records are left out', { skip }, () => {
+    const { M } = sandbox();
+    const cross = M.point(shot(-7.5, 150, { windMph: 10, relAngle: 90, across: 10, along: 0 }));
+    near(cross.x, 0, 0.01, 'the push from the right is added back');
+    near(cross.carry, 150, 0.01);
+    const head = M.point(shot(0, 135, { windMph: 10, relAngle: 0, across: 0, along: 10 }));
+    near(head.carry, 135 + 0.01 * 135 * 10, 0.01, 'headwind backed out');
+    assert.equal(M.point(shot(40, 120, { endKind: 'hole-close' })), null);
+    assert.equal(M.point({ club: '7i', carry: 120, windMph: 0, relAngle: 0 }), null);
+    const st = M.shotStats([shot(5, 150), shot(40, 120, { endKind: 'hole-close' })]);
+    assert.equal(st.n, 1);
+});
+test('kept: the line "7-iron: 70% right, 9 yds avg · right misses 6 yds short"', { skip }, () => {
+    const { M } = sandbox();
+    const shots = [11, 11, 11, 11, 11, 11, 11].map((x) => shot(x, 144)).concat([-4, -4, -5].map((x) => shot(x, 164)));
+    const st = M.shotStats(shots);
+    assert.equal(st.carry, 150);
+    assert.equal(st.pts.length, 10);
+    assert.equal(M.statsLine(st, '7-iron'), '7-iron: 70% right, 9 yds avg · right misses 6 yds short');
+    assert.equal(M.statsLine(st, '7-iron', 'm'), '7-iron: 70% right, 8 m avg · right misses 5 m short');
+    // ...and the oval does not move with them.
+    assert.deepEqual(M.oval('7i', 178, 'R'), M.oval('7i', 178, 'R'));
+    const v = read('gps-view.js'), plan = v.slice(v.indexOf('    function missPlan(r, o) {'), v.indexOf('    var MISS_SRC'));
+    assert.ok(!/shotStats|point\(/.test(plan), 'the map oval never reads his shots');
 });
 
 test('My miss switch: OFF by default, remembered per golfer, on this phone only', { skip }, () => {

@@ -137,7 +137,7 @@ test('the (i): the formula in plain words, from the one tuning block', { skip },
     const v = read('gps-view.js');
     assert.ok(/class="gps-plinfo-miss"/.test(v) && /MPi\.infoText\(\)/.test(v));
     assert.ok(/note\.textContent = MP\.infoText\(\)/.test(read('gps-shot-bag.js')));
-    assert.ok(!/default shape/.test(v + read('gps-shot-bag.js') + src.replace(/^\/\/.*$/mg, '')), 'no "default shape" label anywhere');
+    assert.ok(!/default shape/.test(v + read('gps-shot-bag.js') + src.replace(/^\s*\/\/.*$/mg, '')), 'no "default shape" label anywhere');
 });
 
 test('the My miss toggle defaults OFF (GPS tools > MAP), per golfer', { skip }, () => {

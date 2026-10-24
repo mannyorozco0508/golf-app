@@ -260,11 +260,17 @@
         var MP = Miss(), L = Log(); if (!MP) return null;
         return MP.oval(club, carry, L && L.hand ? L.hand(golfer) : 'R');
     }
-    function missSvg(mf) {
+    // His marked shots (052 B, kept): dots, side + right, y = long / short of their own average.
+    function missStats(golfer, club) {
+        var MP = Miss(), L = Log(); if (!MP || !L || !MP.shotStats) return null;
+        return MP.shotStats(L.list({ golfer: golfer, club: club }), clubFit(golfer, club));
+    }
+    function missSvg(mf, st) {
         var MP = Miss(); if (!MP || !mf) return '';
         var ring = MP.outline(mf, 64).map(function (q) { return [q[0], q[1] - mf.carry]; });
+        var pts = st ? st.pts : [];
         var ext = 6;
-        ring.forEach(function (q) { ext = Math.max(ext, Math.abs(q[0]), Math.abs(q[1])); });
+        ring.concat(pts).forEach(function (q) { ext = Math.max(ext, Math.abs(q[0]), Math.abs(q[1])); });
         ext *= 1.15;
         var Wd = 300, Ht = 150, sc = Math.min(Wd / 2, Ht / 2) / ext, cx = Wd / 2, cy = Ht / 2;
         var X = function (x) { return (cx + x * sc).toFixed(1); }, Y = function (y) { return (cy - y * sc).toFixed(1); };
@@ -273,6 +279,7 @@
             + '<line x1="' + cx + '" y1="4" x2="' + cx + '" y2="' + (Ht - 4) + '" stroke="rgba(255,255,255,.35)" stroke-dasharray="4 4"/>'
             + '<line x1="8" y1="' + cy + '" x2="' + (Wd - 8) + '" y2="' + cy + '" stroke="rgba(255,255,255,.15)"/>'
             + '<path d="' + d + '" fill="rgba(125,211,252,.22)" stroke="#7dd3fc" stroke-width="2"/>'
+            + pts.map(function (q) { return '<circle cx="' + X(q[0]) + '" cy="' + Y(q[1]) + '" r="3.2" fill="#f4f4ef"/>'; }).join('')
             + '<text x="' + (cx + 4) + '" y="14" fill="#a7b3aa" font-size="11" font-weight="700">long</text>'
             + '<text x="' + (cx + 4) + '" y="' + (Ht - 6) + '" fill="#a7b3aa" font-size="11" font-weight="700">short</text>'
             + '<text x="8" y="' + (cy - 5) + '" fill="#a7b3aa" font-size="11" font-weight="700">left</text>'
@@ -291,8 +298,11 @@
             : !MP.isClub(c.club) ? nameOf(c.club) + ': My miss is for irons and wedges only'
             : nameOf(c.club) + ': no carry yet - type one in My bag, or use Range';
         box.appendChild(line);
+        // 052 B's line from his marked shots (kept): "7-iron: 70% right, 9 yds avg · right misses 6 yds short".
+        var st = missStats(c.golfer, c.club);
+        if (st) { var sl = document.createElement('div'); sl.className = 'gps-miss-stats'; sl.setAttribute('data-miss-stats', c.club); sl.textContent = MP.statsLine(st, nameOf(c.club), k !== 1 ? 'm' : 'yd') + ' · from ' + st.n + ' marked shot' + (st.n === 1 ? '' : 's'); box.appendChild(sl); }
         if (mf) {
-            var pic = document.createElement('div'); pic.className = 'gps-miss-pic'; pic.innerHTML = missSvg(mf); box.appendChild(pic);
+            var pic = document.createElement('div'); pic.className = 'gps-miss-pic'; pic.innerHTML = missSvg(mf, st); box.appendChild(pic);
         }
         var note = document.createElement('div'); note.className = 'gps-miss-note'; note.setAttribute('data-miss-info', '1');
         note.textContent = MP.infoText();
@@ -307,6 +317,7 @@
     CSS += '#gps-overlay .gps-shist-miss{margin:2px 0 8px;padding:8px 10px;border-radius:12px;background:rgba(125,211,252,.08);border:1px solid rgba(125,211,252,.25);}'
         + '#gps-overlay .gps-miss-h{font:800 11px/1.2 -apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.06em;color:#7dd3fc;margin-bottom:3px;}'
         + '#gps-overlay .gps-miss-line{font:800 14px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#f4f4ef;}'
+        + '#gps-overlay .gps-miss-stats{font:700 12.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#d9e1db;margin-top:2px;}'
         + '#gps-overlay .gps-miss-pic svg{display:block;width:100%;height:auto;max-height:150px;margin:6px 0 2px;}'
         + '#gps-overlay .gps-miss-note{font:600 11.5px/1.35 -apple-system,BlinkMacSystemFont,sans-serif;color:#a7b3aa;}'
         + '#gps-overlay .gps-miss-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;font:700 13.5px/1.2 -apple-system,BlinkMacSystemFont,sans-serif;}';
@@ -316,6 +327,6 @@
         LEARN_MIN: LEARN_MIN, QUALIFY: QUALIFY, WINDY_MPH: WINDY_MPH, api: WL,
         fits: fits, clubFit: clubFit, mergeBag: mergeBag, windLine: windLine, infoText: infoText, adjust: adjust,
         windWords: windWords, stillAirOf: stillAirOf, nameOf: nameOf, ensureCss: ensureCss,
-        openHistory: histOpen, closeHistory: histClose, historyOpen: function () { return !!H; }, swipe: swipe, missOval: missOval
+        openHistory: histOpen, closeHistory: histClose, historyOpen: function () { return !!H; }, swipe: swipe, missOval: missOval, missStats: missStats
     };
 })();

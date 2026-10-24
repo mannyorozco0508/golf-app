@@ -9,8 +9,9 @@
 //
 // THE SOURCE: ONLY the club's average carry as My bag shows it today (a typed number, a Range
 // "Update my bag", or the good marked shots My bag has learned - whatever My bag's number is).
-// The left/right `offline` field on marked shots (gps-mark-chips.js) is still recorded; it is
-// not used here.
+// The left/right `offline` field on marked shots (gps-mark-chips.js) is still recorded; it never
+// shapes the oval. It still feeds the 052 B extras, kept (URGENT-067 "only add"): his shots as dots on
+// the club screen's picture and the "70% right, 9 yds avg" line (shotStats / statsLine).
 // THE CLUBS: irons and wedges only - 4i-9i, PW, GW, SW, LW. Never Driver, woods or hybrids.
 // WHEN IT SHOWS (shows()): an APPROACH into the green - never off the tee (the first shot), and
 // only when the green is in range of the club: the plays-like yards to the green's center
@@ -90,6 +91,49 @@
         return { ok: true, why: null };
     }
 
+    // ---- HIS MARKED SHOTS (052 B, KEPT - URGENT-067 "only add"): the dots on the club screen and the
+    // "70% right, 9 yds avg" line. Stats only - the oval above never uses them.
+    // One shot -> { x (side, wind out), carry (still air) } or null (no real miss, or closed by
+    // finishing the hole). The crosswind's push is added back (gps-geo windAim's generic drift);
+    // the carry is the 049 still-air carry (the club's own wind numbers once it qualifies).
+    var AIM_PER_MPH = 0.005;
+    function mean(a) { if (!a.length) return null; var t = 0; a.forEach(function (v) { t += v; }); return t / a.length; }
+    function WL() { return W.HardPanWindLearn && typeof W.HardPanWindLearn.windTerm === 'function' ? W.HardPanWindLearn : null; }
+    function hasMiss(s) { return !!(s && s.endKind && s.endKind !== 'hole-close' && isNum(s.offline)); }
+    function point(s, coeffs, wl) {
+        if (!hasMiss(s) || !isNum(s.carry) || !(s.carry > 0)) return null;
+        var api = wl || WL(), carry = s.carry, x = s.offline;
+        if (isNum(s.windMph) && s.windMph > 0 && isNum(s.relAngle)) {
+            if (api) { var wt = api.windTerm(s.carry, s.windMph, s.relAngle, coeffs && coeffs.qualified ? coeffs : null); if (wt && isNum(wt.yards)) carry = s.carry + wt.yards; }
+            var across = isNum(s.across) ? s.across : s.windMph * Math.sin(toRad(s.relAngle));
+            x = s.offline + s.carry * AIM_PER_MPH * across;
+        }
+        return { x: x, carry: carry };
+    }
+    // His marked shots' pattern: { n, carry (their average still-air carry), side, pct, avgSide,
+    // sideLong, pts: [[x, y]] (y = long + / short - of that average) } or null with none.
+    function shotStats(shots, coeffs, wl) {
+        var pts = [];
+        (shots || []).forEach(function (s) { var q = point(s, coeffs, wl); if (q) pts.push(q); });
+        var n = pts.length; if (!n) return null;
+        var avg = mean(pts.map(function (q) { return q.carry; }));
+        var xs = pts.map(function (q) { return q.x; }), ys = pts.map(function (q) { return q.carry - avg; });
+        var right = xs.filter(function (x) { return x > 0; }).length, left = xs.filter(function (x) { return x < 0; }).length;
+        var side = right >= left ? 'right' : 'left', sideYs = ys.filter(function (y, j) { return side === 'right' ? xs[j] > 0 : xs[j] < 0; });
+        return { n: n, carry: avg, side: side, pct: (side === 'right' ? right : left) / n,
+            avgSide: mean(xs.map(function (x) { return Math.abs(x); })), sideLong: sideYs.length ? mean(sideYs) : 0,
+            pts: xs.map(function (x, j) { return [x, ys[j]]; }) };
+    }
+    // "7-iron: 70% right, 9 yds avg · right misses 6 yds short" (the 052 B line, kept).
+    function statsLine(st, name, unit) {
+        if (!st) return '';
+        var m = unit === 'm', k = m ? 0.9144 : 1, u = m ? ' m' : ' yds';
+        var pct = Math.round(st.pct * 100), avg = Math.round(st.avgSide * k), lg = Math.round(st.sideLong * k);
+        var tail = lg <= -1 ? ' · ' + st.side + ' misses ' + Math.abs(lg) + u + ' short'
+            : lg >= 1 ? ' · ' + st.side + ' misses ' + lg + u + ' long' : ' · ' + st.side + ' misses pin-high';
+        return String(name) + ': ' + pct + '% ' + st.side + ', ' + avg + u + ' avg' + tail;
+    }
+
     // The long / short at the oval's right and left tips: { right, left } in yards, + = long.
     function tips(f) {
         if (!f) return null;
@@ -152,7 +196,8 @@
 
     var api = { TUNE: TUNE, CLUBS: CLUBS, KEY: KEY,
         isClub: isClub, oval: oval, centreAt: centreAt, margin: margin, inRange: inRange, shows: shows, tips: tips, bagLine: bagLine, infoText: infoText,
-        outline: outline, inside: inside, isOn: isOn, setOn: setOn };
+        outline: outline, inside: inside, isOn: isOn, setOn: setOn,
+        AIM_PER_MPH: AIM_PER_MPH, hasMiss: hasMiss, point: point, shotStats: shotStats, statsLine: statsLine };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof window !== 'undefined') window.HardPanMissPattern = api;
 })();

@@ -154,6 +154,9 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             const line = await ev("document.querySelector('#gps-overlay .gps-shist .gps-miss-line').textContent");
             assert.equal(line, '7-iron · 163 · miss right ≈ 4 short, miss left ≈ 4 long', '063: the My bag line from her 163');
             assert.equal(await ev("!!document.querySelector('#gps-overlay .gps-shist .gps-miss-pic svg path')"), true, 'the oval picture');
+            // URGENT-067 (only add): her marked shots are still there - the 052 B line and the dots.
+            assert.equal(await ev("document.querySelector('#gps-overlay .gps-shist [data-miss-stats]').textContent"), '7-iron: 75% right, 9 yds avg · right misses 4 yds short · from 12 marked shots');
+            assert.equal(await ev("document.querySelectorAll('#gps-overlay .gps-shist .gps-miss-pic svg circle').length"), 12, 'her 12 shots as dots');
             assert.equal(await ev("document.querySelector('#gps-overlay .gps-shist [data-shist-miss]').getAttribute('aria-checked')"), 'false');
             await shot('5-mybag-7i');
             await ev("document.querySelector('#gps-overlay .gps-shist [data-shist-miss]').click()");

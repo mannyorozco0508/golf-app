@@ -5098,10 +5098,10 @@
                 var ws = document.createElement('span'); ws.textContent = wl.text; wd.appendChild(ws);
                 var hbt = document.createElement('button'); hbt.type = 'button'; hbt.className = 'gps-bag-hist'; hbt.setAttribute('data-bag-hist', c);
                 hbt.textContent = 'Shot history' + (logged ? ' (' + logged + ')' : ''); hbt.setAttribute('aria-label', B.NAMES[c] + ' shot history');
-                // URGENT-052 B / 063: the club screen also holds My miss (irons and wedges; it needs only My bag's carry).
-                var MPb = window.HardPanMissPattern, ironish = !!(MPb && MPb.isClub && MPb.isClub(c));
-                if (!logged && ironish) { hbt.textContent = 'My miss'; hbt.setAttribute('aria-label', B.NAMES[c] + ' my miss'); }
-                if (logged || ironish) wd.appendChild(hbt);
+                // URGENT-052 B: the club screen also holds My miss (kept for every club - URGENT-067; a wood's
+                // screen says My miss is for irons and wedges only).
+                if (!logged && window.HardPanMissPattern) { hbt.textContent = 'My miss'; hbt.setAttribute('aria-label', B.NAMES[c] + ' my miss'); }
+                if (logged || window.HardPanMissPattern) wd.appendChild(hbt);
                 row.appendChild(wd);
             }
             // 063: THE MY BAG LINE per iron / wedge - "7-iron · 178 · miss right ≈ 5 short, miss left ≈ 5 long",
