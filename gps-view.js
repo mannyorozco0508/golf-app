@@ -7941,7 +7941,19 @@
         // URGENT-052 B (checks): the map's own layer / source ids, and the My miss oval's box on screen.
         mapLayers: function () { try { var st = S && S.map && S.map.getStyle(); return st ? { layers: st.layers.map(function (l) { return l.id; }), sources: Object.keys(st.sources || {}) } : null; } catch (e) { return null; } },
         // 063 (checks): the oval drawn now (club, carry, half width a, half depth b, tilt, hand) and why not.
-        missNow: function () { return S ? { oval: S.missOval || null, why: S.missWhy || null } : null; },
+        missNow: function () {
+            if (!S) return null;
+            var scr = null;
+            try {
+                if (S.missRing && S.map) {
+                    var px = S.missRing.map(function (p) { var q = S.map.project(ll(p)); return [q.x, q.y]; });
+                    var rt = px.reduce(function (a, q) { return q[0] > a[0] ? q : a; }), lf = px.reduce(function (a, q) { return q[0] < a[0] ? q : a; });
+                    var cy = px.reduce(function (a, q) { return a + q[1]; }, 0) / px.length;
+                    scr = { rightY: Math.round(rt[1] - cy), leftY: Math.round(lf[1] - cy) };   // screen px from the centre, + = lower (short)
+                }
+            } catch (e) {}
+            return { oval: S.missOval || null, why: S.missWhy || null, screen: scr };
+        },
         // int-061 (checks): the My miss label's box on screen and anything it touches (rail, bubbles, "20 yd", pill, labels).
         missLbl: function () {
             try {
