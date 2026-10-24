@@ -277,7 +277,8 @@ describe('4. THE GAME TAB states the basis ONCE', () => {
     });
     test('ONCE: the basis sentence appears exactly one time on the page', () => {
         const t = text(html);
-        assert.equal((t.match(/GHIN/g) || []).length, 1, 'GHIN is said once: ' + t.slice(0, 400));
+        // URGENT-066 #3: the sentence no longer says GHIN; its own words are counted instead.
+        assert.equal((t.match(/Playing handicaps \(est\.\)/g) || []).length, 1, 'the basis sentence is said once: ' + t.slice(0, 400));
         assert.equal((t.match(/Slope 113/g) || []).length, 1, 'and the Slope once');
     });
     test('the card does NOT list every golfer - that is the Board\'s and the sheet\'s job', () => {
