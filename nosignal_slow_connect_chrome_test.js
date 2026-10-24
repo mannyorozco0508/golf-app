@@ -74,9 +74,12 @@ async function watch(j, done, ms) {
 }
 const READY = (s) => /game=/.test(s.at) && s.tees > 0 && /^Start Round$/.test(s.start);
 async function door(j, first) {
+    // URGENT-065: these golfers stand ON Papago, where Home's Start round now starts the round in one tap
+    // (no Course & Tees). Course & Tees - what this file is about - is reached by the plain GPS door
+    // (home.html#gpsdoor, the round's Change course entry: simpleAct('sgpsdoor') with no Home button).
     await j.goto(fileUrl('home.html', ''), 2500);
     if (first) await ev(j, first);
-    assert.ok(await ev(j, "(function(){ var b = document.querySelector('[data-hp-act=\"sgpsdoor\"]'); if (!b) return false; b.click(); return true; })()"), 'the GPS door');
+    assert.ok(await ev(j, "(function(){ if (!document.querySelector('#hs-gps [data-hp-act=\"sgpsdoor\"]')) return false; location.hash = 'gpsdoor'; location.reload(); return true; })()"), 'the GPS door');
 }
 
 test('a slow first connection (12 s): never "No signal" - it ends on Course & Tees with tees and Start Round', { timeout: 90000 }, async () => {

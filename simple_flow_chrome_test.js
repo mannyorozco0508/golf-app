@@ -79,7 +79,8 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
             X("JSON.stringify({ done: location.href.split('/').pop() })")] });
         assert.equal(r.ok, true, r.reason);
         const [home, s1, tees, s2, refused, fixed, s3, sheet, w, done] = J(r);
-        assert.match(home.home, /GPS\nYardages for your round[\s\S]*Games & Bets\nSet up the group, games and money[\s\S]*Join with a code · Trip · History/, 'the two doors, then the slim row');
+        // URGENT-065 (was: the two doors, then Join · Trip · History · ...): the green GPS card, look B's tiles, then the slim row.
+        assert.match(home.home, /Golf GPS\nYardages, plays-like and your clubs[\s\S]*Start round ›[\s\S]*Games & Bets\ngroup, games, money[\s\S]*History\npast rounds[\s\S]*Join with a code · Trip/, 'the GPS card, the tiles, then the slim row');
         assert.equal(s1.h1, 'Where are you playing?');
         assert.match(s1.text, /^‹\nGames & Bets/);
         // URGENT-022: ✓ GPS only when the map would draw it (here: the web's settings, no GPS data) - one rule.

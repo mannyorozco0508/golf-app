@@ -255,14 +255,15 @@ for (const c of [{ vp: { width: 393, height: 852 }, who: 'Ann Alpha', seeded: tr
             const keys0 = JSON.parse(await ev("JSON.stringify(Object.keys(localStorage).sort())"));
             // 7. the row
             const row = JSON.parse(await ev("(function(){ var r = document.querySelector('#v-simple .hs-slim'), rr = r.getBoundingClientRect(); var bs = Array.from(r.querySelectorAll('button')).filter(function(b){ return b.offsetParent !== null; }).map(function(b){ var x = b.getBoundingClientRect(); return { t: b.textContent, l: x.left, r: x.right, top: Math.round(x.top), h: x.height, lh: parseFloat(getComputedStyle(b).lineHeight) || 20 }; }); var dots = Array.from(r.querySelectorAll('.hs-dot')).filter(function(d){ return d.offsetParent !== null; }).map(function(d){ var x = d.getBoundingClientRect(); return { top: Math.round(x.top), on: !d.classList.contains('hs-dot-off') && getComputedStyle(d).color !== 'rgba(0, 0, 0, 0)' }; }); return JSON.stringify({ bs: bs, dots: dots, text: r.textContent.replace(/\\s+/g, ' ').trim(), w: innerWidth, sw: document.documentElement.scrollWidth, rl: rr.left, rr: rr.right }); })()"));
-            assert.deepEqual(row.bs.map((b) => b.t), ['Join with a code', 'Trip', 'History', 'My stats', 'Range'], 'the row: ' + row.text);
-            assert.equal(row.text, 'Join with a code · Trip · History · My stats · Range');
+            // URGENT-065: History, My stats and Range are Home's tiles now; the slim row is Join with a code · Trip.
+            assert.deepEqual(row.bs.map((b) => b.t), ['Join with a code', 'Trip'], 'the row: ' + row.text);
+            assert.equal(row.text, 'Join with a code · Trip');
             assert.ok(row.sw <= row.w, 'no sideways scroll ' + JSON.stringify(row));
             row.bs.forEach((b) => { assert.ok(b.l >= 0 && b.r <= row.w + 0.5, b.t + ' on screen'); assert.ok(b.h <= 48, b.t + ' is one line (' + b.h + ')'); });
             const lines = Array.from(new Set(row.bs.map((b) => b.top)));
             assert.ok(lines.length <= 2, 'at most two lines: ' + JSON.stringify(row.bs));
             // wraps nicely: a dot shows only BETWEEN two links on the same line (none dangling at a break)
-            assert.equal(row.dots.length, 4);
+            assert.equal(row.dots.length, 1);
             row.dots.forEach((d, i) => { const same = row.bs[i].top === row.bs[i + 1].top; assert.equal(d.on, same, 'dot ' + i + ' ' + JSON.stringify(row)); });
             if (lines.length === 2) assert.ok(row.bs.filter((b) => b.top === lines[1]).length >= 2, 'not one link alone on the second line: ' + JSON.stringify(row.bs));
             await ev("document.querySelector('[data-hp-act=\"srange\"]').scrollIntoView({ block: 'center' })");

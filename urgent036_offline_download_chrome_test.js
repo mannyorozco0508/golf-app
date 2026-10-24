@@ -57,7 +57,9 @@ async function open() {
     journeys.push(j);
     try { await j.cdp('Browser.grantPermissions', { permissions: ['geolocation'] }); await j.cdp('Emulation.setGeolocationOverride', HERE); } catch (e) {}
     await j.goto(fileUrl('home.html', ''), 2500);
-    await click(j, '[data-hp-act="sgpsdoor"]');
+    // URGENT-065: the golfer stands on the course, where Home's Start round now starts the round in one
+    // tap; Course & Tees (this file's screen) is reached by the plain GPS door - home.html#gpsdoor.
+    assert.ok(await ev(j, "(function(){ if (!document.querySelector('#hs-gps [data-hp-act=\"sgpsdoor\"]')) return false; location.hash = 'gpsdoor'; location.reload(); return true; })()"), 'the GPS door');
     assert.ok(await until(j, "/admin\\.html/.test(location.pathname) && !!document.getElementById('sf-q')", 30000), 'Course & Tees');
     if (!(await until(j, KEY + " === '" + CK + "'", 8000))) await click(j, '#sf [data-sf-course="' + CK + '"]');
     assert.ok(await until(j, KEY + " === '" + CK + "' && !!document.querySelector('#sf [data-sf-tee]')", 15000), 'the course picked, its tees');
