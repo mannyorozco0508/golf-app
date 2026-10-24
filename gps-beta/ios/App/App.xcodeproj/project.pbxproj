@@ -148,6 +148,7 @@
 				504EC3061FED79650016851F /* App */,
 				AA022000000000000000000E /* PhoneBridge */,
 				AA022000000000000000000D /* HardPanLiveActivity */,
+				AA0620000000000000000008 /* AppStoreKitTests */,
 				D022A0000000000000000191 /* Watch */,
 				504EC3051FED79650016851F /* Products */,
 			);
@@ -158,6 +159,7 @@
 			children = (
 				504EC3041FED79650016851F /* App.app */,
 				AA0220000000000000000006 /* HardPanLiveActivity.appex */,
+				AA0620000000000000000007 /* AppStoreKitTests.xctest */,
 				D022A0000000000000000009 /* HardPanWatch.app */,
 			);
 			name = Products;
@@ -179,6 +181,7 @@
 				C4B10A042F00000000000004 /* AppRelease.entitlements */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				AA0620000000000000000003 /* HardPan.storekit */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -188,6 +191,7 @@
 			children = (
 				AA0220000000000000000005 /* HardPanBridgeViewController.swift */,
 				AA0220000000000000000004 /* HardPanLiveActivityPlugin.swift */,
+				AA0620000000000000000001 /* HardPanStorePlugin.swift */,
 				D022A0000000000000000007 /* HardPanWatchPlugin.swift */,
 				D022A0000000000000000008 /* PhoneWatchSession.swift */,
 			);
@@ -315,6 +319,10 @@
 					D022A000000000000000012C = {
 						CreatedOnToolsVersion = 26.0;
 					};
+					AA0620000000000000000009 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = 504EC3031FED79650016851F;
+					};
 				};
 			};
 			buildConfigurationList = 504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */;
@@ -335,6 +343,7 @@
 			targets = (
 				504EC3031FED79650016851F /* App */,
 				AA022000000000000000000F /* HardPanLiveActivity */,
+				AA0620000000000000000009 /* AppStoreKitTests */,
 				D022A000000000000000012C /* HardPanWatch */,
 			);
 		};
@@ -400,6 +409,7 @@
 				AA0220000000000000000007 /* HardPanRoundAttributes.swift in Sources */,
 				AA0220000000000000000008 /* HardPanLiveActivityPlugin.swift in Sources */,
 				AA0220000000000000000009 /* HardPanBridgeViewController.swift in Sources */,
+				AA0620000000000000000002 /* HardPanStorePlugin.swift in Sources */,
 				D022A000000000000000006A /* WatchProtocol.swift in Sources */,
 				D022A000000000000000006C /* HardPanWatchPlugin.swift in Sources */,
 				D022A000000000000000006D /* PhoneWatchSession.swift in Sources */,
@@ -444,6 +454,126 @@
 			targetProxy = D022A00000000000000000D2 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin URGENT-062 objects (StoreKit 2 plugin, HardPan.storekit, AppStoreKitTests) */
+		AA0620000000000000000001 /* HardPanStorePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanStorePlugin.swift; sourceTree = "<group>"; };
+		AA0620000000000000000002 /* HardPanStorePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0620000000000000000001 /* HardPanStorePlugin.swift */; };
+		AA0620000000000000000003 /* HardPan.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = HardPan.storekit; sourceTree = "<group>"; };
+		AA0620000000000000000004 /* HardPan.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AA0620000000000000000003 /* HardPan.storekit */; };
+		AA0620000000000000000005 /* AppStoreKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreKitTests.swift; sourceTree = "<group>"; };
+		AA0620000000000000000006 /* AppStoreKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0620000000000000000005 /* AppStoreKitTests.swift */; };
+		AA0620000000000000000007 /* AppStoreKitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AppStoreKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0620000000000000000008 /* AppStoreKitTests */ = {
+			isa = PBXGroup;
+			children = (
+				AA0620000000000000000005 /* AppStoreKitTests.swift */,
+			);
+			path = AppStoreKitTests;
+			sourceTree = "<group>";
+		};
+		AA062000000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0620000000000000000006 /* AppStoreKitTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA062000000000000000000B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA062000000000000000000C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0620000000000000000004 /* HardPan.storekit in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA062000000000000000000D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 504EC3031FED79650016851F;
+			remoteInfo = App;
+		};
+		AA062000000000000000000E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 504EC3031FED79650016851F /* App */;
+			targetProxy = AA062000000000000000000D /* PBXContainerItemProxy */;
+		};
+		AA0620000000000000000009 /* AppStoreKitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA062000000000000000000F /* Build configuration list for PBXNativeTarget "AppStoreKitTests" */;
+			buildPhases = (
+				AA062000000000000000000A /* Sources */,
+				AA062000000000000000000B /* Frameworks */,
+				AA062000000000000000000C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AA062000000000000000000E /* PBXTargetDependency */,
+			);
+			name = AppStoreKitTests;
+			productName = AppStoreKitTests;
+			productReference = AA0620000000000000000007 /* AppStoreKitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		AA0620000000000000000010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A2Z95T64UU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rattlegolf.gpsbeta.StoreKitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/App";
+			};
+			name = Debug;
+		};
+		AA0620000000000000000011 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = A2Z95T64UU;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rattlegolf.gpsbeta.StoreKitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/App";
+			};
+			name = Release;
+		};
+		AA062000000000000000000F /* Build configuration list for PBXNativeTarget "AppStoreKitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0620000000000000000010 /* Debug */,
+				AA0620000000000000000011 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End URGENT-062 objects */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
