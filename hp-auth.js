@@ -38,6 +38,10 @@
     var NAME_KEY = 'hardpan_my_name', HCP_KEY = 'hardpan_my_hcp', TEES_KEY = 'hardpan_default_tees';
     var PAY_KEY = 'hardpan_pay_profile', LAST_TEE = 'hardpan_last_tee_', MOVES_KEY = 'hardpan_auth_moves';
     var PROVIDER_NAMES = { 'apple.com': 'apple', 'google.com': 'google', 'password': 'email', 'emailLink': 'email' };
+    // 064-6b: HOW THIS PHONE LAST SIGNED IN ({ uid, method, switched, at }), on the
+    // phone only. One account can carry Apple + Google + email; Profile names the
+    // method the golfer actually used, not whichever Firebase lists first.
+    var METHOD_KEY = 'hardpan_signin_method';
 
     var here = '';
     try { here = (W.document && W.document.currentScript && W.document.currentScript.src) || ''; } catch (e) { here = ''; }
@@ -90,9 +94,35 @@
     function coded(code, message) { var e = new Error(message || code); e.code = code; return e; }
 
     // ---- STATE ----------------------------------------------------------------
+    // The method this phone recorded at its last successful sign-in, when it is still
+    // the same account and that method is still on it. Null otherwise (old installs,
+    // an account changed somewhere else, a method since removed).
+    function lastSignIn(u) {
+        u = u === undefined ? user() : u;
+        if (!u || u.isAnonymous || !u.uid) return null;
+        var r = lsJson(METHOD_KEY);
+        if (!r || typeof r !== 'object' || String(r.uid) !== String(u.uid)) return null;
+        var m = r.method;
+        if (m !== 'apple' && m !== 'google' && m !== 'email') return null;
+        var list = u.providerData || [], on = !list.length;
+        for (var i = 0; i < list.length; i++) {
+            var id = list[i] && list[i].providerId;
+            if (id && PROVIDER_NAMES[id] === m) on = true;
+        }
+        return on ? { method: m, switched: !!r.switched } : null;
+    }
+    function noteMethod(method, beforeUid, r) {
+        var uid = r && r.uid ? String(r.uid) : '';
+        if (!uid) return;
+        var switched = !!(beforeUid && String(beforeUid) !== uid);
+        try { W.localStorage.setItem(METHOD_KEY, JSON.stringify({ uid: uid, method: method, switched: switched, at: Date.now() })); } catch (e) { }
+    }
+    function forgetMethod() { try { W.localStorage.removeItem(METHOD_KEY); } catch (e) { } }
     function providerOf(u) {
         if (!u) return null;
         if (u.isAnonymous) return 'anonymous';
+        var last = lastSignIn(u);
+        if (last) return last.method;
         var list = u.providerData || [];
         for (var i = 0; i < list.length; i++) {
             var id = list[i] && list[i].providerId;
@@ -204,7 +234,9 @@
         return ready().then(needOauth).then(function (ok) {
             if (!ok) throw coded('sdk-absent', 'Sign-in is not ready yet. Wait a moment and try again.');
             var O = W.oauthSignin;
+            var beforeUid = (user() || {}).uid || null;
             return O.signIn(which).then(function (r) {
+                noteMethod(which === 'google' ? 'google' : 'apple', beforeUid, r);
                 return { uid: r && r.uid, email: (r && r.email) || null, preserved: !!(r && r.preserved), note: (r && r.note) || '', state: state() };
             }, function (err) {
                 var e = err || coded('unknown');
@@ -241,10 +273,12 @@
             else if (E.isEmailLink(typed)) href = typed;
             else { var code = E.codeFromPaste(typed); if (code) href = E.linkForCode(code); }
             if (!href) throw coded('bad-paste', 'Paste the whole link from the email, or type the code at the end of it.');
+            var beforeUid = (user() || {}).uid || null;
             return E.completeLink(href, email).then(function (r) {
                 if (!r || r.status !== 'signed-in') {
                     throw coded(r && r.status === 'need-email' ? 'need-email' : 'not-link', (r && r.note) || 'That is not a sign-in link.');
                 }
+                noteMethod('email', beforeUid, { uid: (r.after && r.after.uid) || (user() || {}).uid });
                 return { uid: r.after && r.after.uid, preserved: !!r.preserved, note: r.note || '', state: state() };
             }, function (err) {
                 var e = err || coded('unknown');
@@ -261,8 +295,8 @@
             var a = auth();
             if (!ok || !a) throw coded('sdk-absent', 'Sign-in is not ready yet. Wait a moment and try again.');
             var deps = { auth: a };
-            if (!opts || opts.reload !== false) deps.reload = function () { try { W.location.reload(); } catch (e) { } };
-            return W.accountExit.signOut(deps).then(function (r) { emit(); return r; }, function (err) {
+            if (!opts || opts.reload !== false) deps.reload = function () { forgetMethod(); try { W.location.reload(); } catch (e) { } };
+            return W.accountExit.signOut(deps).then(function (r) { forgetMethod(); emit(); return r; }, function (err) {
                 var e = err || coded('unknown');
                 try { e.message = W.accountExit.messageFor(e); } catch (x) { }
                 throw e;
@@ -372,7 +406,8 @@
         profile: { get: profileGet, set: profileSet },
         moves: moves,
         movedRounds: movedRounds,
-        KEYS: { name: NAME_KEY, hcp: HCP_KEY, tees: TEES_KEY, moves: MOVES_KEY },
+        lastSignIn: function () { return lastSignIn(); },
+        KEYS: { name: NAME_KEY, hcp: HCP_KEY, tees: TEES_KEY, moves: MOVES_KEY, method: METHOD_KEY },
         _test: { providerOf: providerOf, nameFor: nameFor, initialOf: initialOf, hcpText: hcpText, noteMove: noteMove, onAuth: onAuth, reset: function () { hooked = false; lastUser = null; listeners = []; loading = {}; } }
     };
     // Hook as soon as the auth SDK is there, so a switch made on this page is noted.

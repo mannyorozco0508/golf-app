@@ -36,7 +36,7 @@ function makeWorld(opts) {
     let tokenN = 0;
     const listeners = [];
     const taken = new Set(o.taken || []);
-    const other = { uid: 'acct9', isAnonymous: false, email: 'golfer@example.com', displayName: 'Manny Golfer', providerData: [{ providerId: 'apple.com' }] };
+    const other = { uid: 'acct9', isAnonymous: false, email: 'golfer@example.com', displayName: 'Manny Golfer', providerData: (o.otherProviders || ['apple.com']).map((providerId) => ({ providerId })) };
     const fire = () => listeners.forEach((fn) => fn(auth.currentUser));
     function mkAnon() {
         const u = {
@@ -66,7 +66,7 @@ function makeWorld(opts) {
         return u;
     }
     const auth = {
-        currentUser: o.noUser ? null : mkAnon(),
+        currentUser: o.noUser ? null : o.startOther ? other : mkAnon(),
         onAuthStateChanged(fn) { listeners.push(fn); setTimeout(() => fn(auth.currentUser), 0); return () => {}; },
         signInWithCredential(c) {
             calls.push(['signInWithCredential', c.providerId, c.idToken || c.pendingToken || null]);
@@ -265,4 +265,82 @@ test('wiring: Home, the round page and Results load hp-auth.js after auth-boot; 
     const sw = read('sw.js'), s = sw.indexOf("'./hp-auth.js'");
     assert.ok(s > -1 && sw.lastIndexOf('GPS:BEGIN', s) > sw.lastIndexOf('GPS:END', s), 'sw.js: in the GPS block');
     assert.equal((read('sync-mobile-web.js').match(/'hp-auth\.js'/g) || []).length, 2, 'CONSUMER_SHELL GPS block + GPS_SHELL');
+});
+
+// ---- 064-6b: Profile names the sign-in method USED, not the first one linked ----------
+// Manny's one account carries Apple + Google + email. He tapped Google; Profile said
+// Apple because providerOf() took the first entry of providerData.
+const ALL3 = ['apple.com', 'google.com', 'password'];
+const AUTH_CALLS = /^(link|signIn|signOut|sendSignIn|native)/;
+
+test('064-6b: Google sign-in on an account with Apple + Google + email shows Google (the switch path); only the existing auth calls', async () => {
+    const w = makeWorld({ native: true, taken: ['google.com'], errCredential: true, otherProviders: ALL3 });
+    await w.A.ready();
+    const r = await w.A.signInGoogle();
+    await tick();
+    assert.equal(r.uid, 'acct9'); assert.equal(r.preserved, false);
+    assert.equal(w.A.state().provider, 'google', 'the method he tapped, not providerData[0] (apple.com)');
+    assert.equal(w.A._test.providerOf({ uid: 'x', providerData: ALL3.map((providerId) => ({ providerId })) }), 'apple', 'control: no record falls back to the old order');
+    const l = w.A.lastSignIn(); assert.equal(l.method, 'google'); assert.equal(l.switched, true);
+    const rec = JSON.parse(w.ls.getItem('hardpan_signin_method'));
+    assert.deepEqual(Object.keys(rec).sort(), ['at', 'method', 'switched', 'uid'], 'no token, no email stored');
+    assert.deepEqual(names(w.calls).filter((n) => AUTH_CALLS.test(n)), ['nativeGoogle', 'linkWithCredential', 'signInWithCredential'], 'exactly the existing sign-in calls');
+    assert.deepEqual(w.dbCalls, []);
+});
+
+test('064-6b: Apple sign-in on that same account shows Apple', async () => {
+    const w = makeWorld({ native: true, taken: ['apple.com'], otherProviders: ALL3 });
+    await w.A.ready();
+    await w.A.signInApple(); await tick();
+    assert.equal(w.A.state().uid, 'acct9');
+    assert.equal(w.A.state().provider, 'apple');
+    assert.equal(w.A.lastSignIn().switched, true);
+});
+
+test('064-6b: a plain link (no switch) records the method with switched = false; email shows email', async () => {
+    const g = makeWorld();
+    await g.A.signInGoogle(); await tick();
+    assert.equal(g.A.state().provider, 'google'); assert.equal(g.A.lastSignIn().switched, false);
+    const e = makeWorld();
+    await e.A.signInEmail('me@example.com');
+    await e.A.finishEmail('ABCdef123456789XYZ'); await tick();
+    assert.equal(e.A.state().provider, 'email');
+    assert.deepEqual({ ...e.A.lastSignIn() }, { method: 'email', switched: false });
+});
+
+test('064-6b: after a reload the stored method holds; a record for another uid or a removed method is ignored', async () => {
+    const w = makeWorld({ native: true, taken: ['google.com'], errCredential: true, otherProviders: ALL3 });
+    await w.A.signInGoogle(); await tick();
+    const saved = Object.fromEntries(w.ls._m);
+    const again = makeWorld({ startOther: true, otherProviders: ALL3, ls: saved });
+    await again.A.ready();
+    assert.equal(again.A.state().provider, 'google', 'the reloaded page still says Google');
+    assert.deepEqual(names(again.calls).filter((n) => AUTH_CALLS.test(n)), [], 'reading it makes no auth call');
+    const stale = makeWorld({ startOther: true, otherProviders: ALL3, ls: { hardpan_signin_method: JSON.stringify({ uid: 'someone-else', method: 'google' }) } });
+    assert.equal(stale.A.state().provider, 'apple', 'not this account: old order');
+    const gone = makeWorld({ startOther: true, otherProviders: ['apple.com'], ls: { hardpan_signin_method: JSON.stringify({ uid: 'acct9', method: 'google' }) } });
+    assert.equal(gone.A.state().provider, 'apple', 'Google no longer on the account: old order');
+    const old = makeWorld({ startOther: true, otherProviders: ALL3 });
+    assert.equal(old.A.state().provider, 'apple', 'old install, nothing recorded: old order');
+    assert.equal(old.A.lastSignIn(), null);
+});
+
+test('064-6b: sign out clears the stored method', async () => {
+    const w = makeWorld({ native: true });
+    await w.A.signInGoogle(); await tick();
+    assert.ok(w.ls.getItem('hardpan_signin_method'));
+    await w.A.signOut();
+    assert.equal(w.ls.getItem('hardpan_signin_method'), null);
+    const w2 = makeWorld({ native: true });
+    await w2.A.signInApple(); await tick();
+    await w2.A.signOut({ reload: false });
+    assert.equal(w2.ls.getItem('hardpan_signin_method'), null);
+});
+
+test('064-6b: Profile shows "Signed in with <method>" and the switch note only after a switch', () => {
+    const src = read('hp-account-ui.js');
+    assert.match(src, /var via = providerLabel\(s\.provider\);/);
+    assert.ok(src.includes("Signed in with ' + esc(via)"));
+    assert.match(src, /switchedVia\(via\) \? '<div class="hpa-fine" data-hpa-switched="1"/);
+    assert.match(src, /l && l\.switched && via \? via : ''/);
 });
