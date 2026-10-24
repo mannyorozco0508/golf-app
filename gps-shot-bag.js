@@ -152,6 +152,7 @@
         + '#gps-overlay .gps-shist-foot{margin-top:8px;font:600 11.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#9ca3af;}'
         + '#gps-overlay .gps-bag-wind{flex:1 0 100%;font:700 12px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#d9f99d;padding-bottom:3px;display:flex;align-items:center;justify-content:space-between;gap:8px;}'
         + '#gps-overlay .gps-bag-wind.gen{color:#a7b3aa;font-weight:600;}'
+        + '#gps-overlay .gps-bag-miss{flex:1 0 100%;font:700 12px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#7dd3fc;padding-bottom:3px;}'
         + '#gps-overlay .gps-bag-hist{flex:0 0 auto;min-height:32px;padding:0 8px !important;border-radius:8px;font:700 12px/1 -apple-system,BlinkMacSystemFont,sans-serif !important;color:#d9f99d !important;background:rgba(217,249,157,.10) !important;border:0 !important;}'
         + '#gps-overlay .gps-bag-row{flex-wrap:wrap;row-gap:2px;}'
         + '#gps-overlay .gps-bag-hand{display:flex;align-items:center;gap:6px;margin:0 0 8px;font:700 13px/1.2 -apple-system,BlinkMacSystemFont,sans-serif;}'
@@ -249,31 +250,35 @@
         });
     }
 
-    // ---- MY MISS (URGENT-052 B) on the club screen -----------------------------------
-    // The fit (gps-miss-pattern.js) of this club's marked shots with a real miss, wind out;
-    // the default shape (labelled) under 10. The picture: the aim line straight up, LONG at the
-    // top, the golfer's right on the right; the oval and his shots (dots). Distances only.
-    function Miss() { return W.HardPanMissPattern && typeof W.HardPanMissPattern.fit === 'function' ? W.HardPanMissPattern : null; }
-    function missFit(golfer, club, carry) {
-        var MP = Miss(), L = Log(); if (!MP || !L) return null;
-        var shots = L.list({ golfer: golfer, club: club });
-        return MP.fit(shots, { club: club, hand: L.hand(golfer), coeffs: clubFit(golfer, club), carry: carry });
+    // ---- MY MISS (URGENT-052 B; URGENT-063) on the club screen ---------------------------
+    // 063: the oval from My bag's average carry for the club (gps-miss-pattern.js oval - its TUNE
+    // numbers), irons and wedges only; the My bag line, the picture (the aim line straight up,
+    // LONG at the top, the golfer's right on the right) and the formula in plain words.
+    // ctx.carryNow() is My bag's number NOW (so a change shows at once); ctx.carry the one at open.
+    function Miss() { return W.HardPanMissPattern && typeof W.HardPanMissPattern.oval === 'function' ? W.HardPanMissPattern : null; }
+    function missOval(golfer, club, carry) {
+        var MP = Miss(), L = Log(); if (!MP) return null;
+        return MP.oval(club, carry, L && L.hand ? L.hand(golfer) : 'R');
     }
-    function missSvg(mf, golfer, club) {
-        var MP = Miss(), L = Log(); if (!MP || !mf) return '';
-        var pts = [];
-        (L ? L.list({ golfer: golfer, club: club }) : []).forEach(function (s) { var p = MP.point(s, clubFit(golfer, club)); if (p) pts.push([p.x, p.carry - mf.carry]); });
+    // His marked shots (052 B, kept): dots, side + right, y = long / short of their own average.
+    function missStats(golfer, club) {
+        var MP = Miss(), L = Log(); if (!MP || !L || !MP.shotStats) return null;
+        return MP.shotStats(L.list({ golfer: golfer, club: club }), clubFit(golfer, club));
+    }
+    function missSvg(mf, st) {
+        var MP = Miss(); if (!MP || !mf) return '';
         var ring = MP.outline(mf, 64).map(function (q) { return [q[0], q[1] - mf.carry]; });
+        var pts = st ? st.pts : [];
         var ext = 6;
         ring.concat(pts).forEach(function (q) { ext = Math.max(ext, Math.abs(q[0]), Math.abs(q[1])); });
         ext *= 1.15;
         var Wd = 300, Ht = 150, sc = Math.min(Wd / 2, Ht / 2) / ext, cx = Wd / 2, cy = Ht / 2;
         var X = function (x) { return (cx + x * sc).toFixed(1); }, Y = function (y) { return (cy - y * sc).toFixed(1); };
         var d = ring.map(function (q, i) { return (i ? 'L' : 'M') + X(q[0]) + ' ' + Y(q[1]); }).join(' ') + ' Z';
-        return '<svg class="gps-miss-svg" viewBox="0 0 ' + Wd + ' ' + Ht + '" role="img" aria-label="' + (mf.own ? 'Your miss pattern' : 'Default shape') + '">'
+        return '<svg class="gps-miss-svg" viewBox="0 0 ' + Wd + ' ' + Ht + '" role="img" aria-label="Your miss oval">'
             + '<line x1="' + cx + '" y1="4" x2="' + cx + '" y2="' + (Ht - 4) + '" stroke="rgba(255,255,255,.35)" stroke-dasharray="4 4"/>'
             + '<line x1="8" y1="' + cy + '" x2="' + (Wd - 8) + '" y2="' + cy + '" stroke="rgba(255,255,255,.15)"/>'
-            + '<path d="' + d + '" fill="rgba(125,211,252,.22)" stroke="#7dd3fc" stroke-width="2"' + (mf.own ? '' : ' stroke-dasharray="6 4"') + '/>'
+            + '<path d="' + d + '" fill="rgba(125,211,252,.22)" stroke="#7dd3fc" stroke-width="2"/>'
             + pts.map(function (q) { return '<circle cx="' + X(q[0]) + '" cy="' + Y(q[1]) + '" r="3.2" fill="#f4f4ef"/>'; }).join('')
             + '<text x="' + (cx + 4) + '" y="14" fill="#a7b3aa" font-size="11" font-weight="700">long</text>'
             + '<text x="' + (cx + 4) + '" y="' + (Ht - 6) + '" fill="#a7b3aa" font-size="11" font-weight="700">short</text>'
@@ -283,22 +288,25 @@
     function missFill(box, c, all, f, k, u) {
         var MP = Miss(); if (!box) return;
         if (!MP) { box.style.display = 'none'; return; }
-        var carry = c.carry != null ? c.carry : (f && isNum(f.stillAir) ? f.stillAir : null);
-        var mf = missFit(c.golfer, c.club, carry), on = MP.isOn(c.golfer);
+        var carry = typeof c.carryNow === 'function' ? c.carryNow() : c.carry;
+        var mf = missOval(c.golfer, c.club, carry), on = MP.isOn(c.golfer);
         box.style.display = '';
         box.textContent = '';
         var h = document.createElement('div'); h.className = 'gps-miss-h'; h.textContent = 'MY MISS'; box.appendChild(h);
         var line = document.createElement('div'); line.className = 'gps-miss-line'; line.setAttribute('data-miss-line', c.club);
-        line.textContent = mf ? MP.summary(mf, nameOf(c.club), k !== 1 ? 'm' : 'yd') : nameOf(c.club) + ': no carry yet - mark a few shots first';
+        line.textContent = mf ? MP.bagLine(nameOf(c.club), carry, mf.hand, k !== 1 ? 'm' : 'yd', c.club)
+            : !MP.isClub(c.club) ? nameOf(c.club) + ': My miss is for irons and wedges only'
+            : nameOf(c.club) + ': no carry yet - type one in My bag, or use Range';
         box.appendChild(line);
+        // 052 B's line from his marked shots (kept): "7-iron: 70% right, 9 yds avg · right misses 6 yds short".
+        var st = missStats(c.golfer, c.club);
+        if (st) { var sl = document.createElement('div'); sl.className = 'gps-miss-stats'; sl.setAttribute('data-miss-stats', c.club); sl.textContent = MP.statsLine(st, nameOf(c.club), k !== 1 ? 'm' : 'yd') + ' · from ' + st.n + ' marked shot' + (st.n === 1 ? '' : 's'); box.appendChild(sl); }
         if (mf) {
-            var pic = document.createElement('div'); pic.className = 'gps-miss-pic'; pic.innerHTML = missSvg(mf, c.golfer, c.club); box.appendChild(pic);
-            var note = document.createElement('div'); note.className = 'gps-miss-note';
-            note.textContent = (mf.own ? 'From your ' + mf.n + ' marked shots with a real finish, wind taken out. The oval holds about 2 of 3.'
-                : 'Default shape until ' + mf.need + ' marked shots: ' + (mf.hand === 'L' ? 'left misses shorter, right misses longer (left-handed).' : 'right misses shorter, left misses longer.'))
-                + ' Shots closed by finishing the hole are left out.';
-            box.appendChild(note);
+            var pic = document.createElement('div'); pic.className = 'gps-miss-pic'; pic.innerHTML = missSvg(mf, st); box.appendChild(pic);
         }
+        var note = document.createElement('div'); note.className = 'gps-miss-note'; note.setAttribute('data-miss-info', '1');
+        note.textContent = MP.infoText();
+        box.appendChild(note);
         var row = document.createElement('div'); row.className = 'gps-miss-row';
         var lb = document.createElement('span'); lb.textContent = 'Show My miss on the map'; row.appendChild(lb);
         var sw = document.createElement('button'); sw.type = 'button'; sw.className = 'gps-ts-sw gps-miss-sw' + (on ? ' on' : ''); sw.setAttribute('data-shist-miss', '1');
@@ -309,6 +317,7 @@
     CSS += '#gps-overlay .gps-shist-miss{margin:2px 0 8px;padding:8px 10px;border-radius:12px;background:rgba(125,211,252,.08);border:1px solid rgba(125,211,252,.25);}'
         + '#gps-overlay .gps-miss-h{font:800 11px/1.2 -apple-system,BlinkMacSystemFont,sans-serif;letter-spacing:.06em;color:#7dd3fc;margin-bottom:3px;}'
         + '#gps-overlay .gps-miss-line{font:800 14px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#f4f4ef;}'
+        + '#gps-overlay .gps-miss-stats{font:700 12.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#d9e1db;margin-top:2px;}'
         + '#gps-overlay .gps-miss-pic svg{display:block;width:100%;height:auto;max-height:150px;margin:6px 0 2px;}'
         + '#gps-overlay .gps-miss-note{font:600 11.5px/1.35 -apple-system,BlinkMacSystemFont,sans-serif;color:#a7b3aa;}'
         + '#gps-overlay .gps-miss-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px;font:700 13.5px/1.2 -apple-system,BlinkMacSystemFont,sans-serif;}';
@@ -318,6 +327,6 @@
         LEARN_MIN: LEARN_MIN, QUALIFY: QUALIFY, WINDY_MPH: WINDY_MPH, api: WL,
         fits: fits, clubFit: clubFit, mergeBag: mergeBag, windLine: windLine, infoText: infoText, adjust: adjust,
         windWords: windWords, stillAirOf: stillAirOf, nameOf: nameOf, ensureCss: ensureCss,
-        openHistory: histOpen, closeHistory: histClose, historyOpen: function () { return !!H; }, swipe: swipe, missFit: missFit
+        openHistory: histOpen, closeHistory: histClose, historyOpen: function () { return !!H; }, swipe: swipe, missOval: missOval, missStats: missStats
     };
 })();

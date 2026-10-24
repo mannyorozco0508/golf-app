@@ -95,9 +95,9 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             assert.ok(await until("(function(){ var s = " + BAG + "; return !!s && s.style.display !== 'none' && !!s.querySelector('[data-bag-wind=\"7i\"]'); })()", 6000), 'My bag with the wind lines');
             const row = (c) => ev("(function(){ var r = " + BAG + ".querySelector('[data-bag-row=\"" + c + "\"]'); return r ? r.querySelector('.gps-bag-yd').value + ' | ' + r.innerText.replace(/\\s+/g, ' ') : ''; })()");
             const r7 = await row('7i');
-            assert.match(r7, /^170 \| 7-iron learned · 24 shots Reset wind: head −2\.\d · tail \+0\.\d · from left −0\.\d · from right −0\.\d yd\/mph Shot history \(24\)$/, r7);
+            assert.match(r7, /^170 \| 7-iron learned · 24 shots Reset wind: head −2\.\d · tail \+0\.\d · from left −0\.\d · from right −0\.\d yd\/mph Shot history \(24\) 7-iron · 170 · miss right ≈ 5 short, miss left ≈ 5 long$/, r7);  // URGENT-063: + the My miss line per iron
             assert.match(await row('6i'), /wind: generic · 3 of 8 windy shots/);
-            assert.match(await row('8i'), /^150 \|.*wind: generic · 1 of 8 windy shots Shot history \(1\)$/, 'one 8-iron shot: the typed / set-up number stays');
+            assert.match(await row('8i'), /^150 \|.*wind: generic · 1 of 8 windy shots Shot history \(1\) 8-iron · 150 · miss right ≈ 4 short, miss left ≈ 4 long$/, 'one 8-iron shot: the typed / set-up number stays');
             assert.match(await text(BAG), /Wind: yards per mph, learned per club once it has 8 marked shots in wind over 5 mph/);
             const hand = () => ev("Array.from(" + BAG + ".querySelectorAll('[data-bag-hand]')).map(function(b){ return b.textContent + '=' + b.getAttribute('aria-pressed'); }).join(',')");
             assert.equal(await hand(), 'Right-handed=true,Left-handed=false');

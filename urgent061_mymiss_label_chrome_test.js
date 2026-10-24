@@ -2,6 +2,8 @@
 // int-061 - THE MY MISS LABEL NEVER SITS ON THE RAIL OR THE DISTANCE LABELS (real Chrome, 402x874 and
 // 375x667). Made-up course and golfer (the 049 / 052 B test course, "Ann Alpha", 10 marked Driver shots -
 // her own small oval - and no irons, so an iron shows the labelled DEFAULT SHAPE). My miss switched on in GPS tools, as a golfer does.
+// URGENT-063: the oval is My bag's carry only (no default-shape label), never off the tee and never for Driver -
+// step 1 now checks the tee shows nothing; step 2 the iron label (club only); step 3 a short iron / wedge ~125 out.
 //   1  on the tee: her own Driver oval (small, at the aim ring) - its label clear of the rail buttons, the distance bubbles, the
 //      "20 yd" ring label, the plays-like pill and the oval itself (17-f-2: it touched "20 yd").
 //   2  ~160 yds out on the middle line (the oval in the middle of the screen, no room beside it):
@@ -79,14 +81,12 @@ for (const vp of [{ width: 402, height: 874 }, { width: 375, height: 667 }]) {
             assert.ok(await until("(function(){ var t = document.querySelector('#gps-overlay .gps-tsheet'); return !!t && t.style.display !== 'none'; })()", 5000), 'Tools');
             await ev("document.querySelector('#gps-overlay [data-ts-sw=mymiss]').click()");
             await ev("document.querySelector('#gps-overlay .gps-tools').click()"); await sleep(800);
-            // 1 - the tee: Driver.
-            assert.ok(await until("!!(HardPanGps.missLbl() && HardPanGps.missLbl().box)", 8000), 'the oval and its label');
-            await sleep(800);
-            const a = await lbl();
-            assert.equal(a.text, 'My miss · Driver', 'her own shape: ' + a.text);
-            clear(a, 'tee');
-            console.log('# ' + vp.width + ' tee ' + JSON.stringify(a));
-            await shot('1-tee-driver');
+            // 1 - the tee (URGENT-063: never an oval off the tee - and never for Driver): nothing on the map, no label.
+            await sleep(1500);
+            assert.equal(await ev("HardPanGps.missLbl()"), null, '063: no label on the tee');
+            assert.equal(await ev("HardPanGps.missNow().why"), 'tee', '063: the tee shot');
+            assert.equal(await ev("HardPanGps.mapLayers().layers.indexOf('mymiss-fill')"), -1, '063: no oval on the tee');
+            await shot('1-tee-none');
             // 2 - 150 yds out on the middle line: 7-iron, the oval in the middle of the screen.
             const at = G.destination(MID, 180, 163 * G.M_PER_YD);   // Ann's 7-iron is 163 (her bag)
             await ev('__moveTo(' + at[0] + ',' + at[1] + ')');
@@ -94,11 +94,20 @@ for (const vp of [{ width: 402, height: 874 }, { width: 375, height: 667 }]) {
             assert.ok(okIron, 'an iron about 150 out (7-iron, or 6 in the made-up wind): ' + JSON.stringify(await lbl()) + ' plays ' + await ev("(document.querySelector('#gps-overlay .gps-ld-plays')||{}).innerText"));
             await sleep(1200);
             const b = await lbl();
-            assert.match(b.text, /^My miss · [5-9]-irondefault shape$/, b.text);
+            assert.match(b.text, /^My miss · [5-9]-iron$/, '063: no "default shape" - ' + b.text);
+            await shot('2-150-iron');
             clear(b, '150 out');
             const o = JSON.parse(await ev('JSON.stringify(HardPanGps.missRect())'));
             console.log('# ' + vp.width + ' 150 ' + JSON.stringify(b) + ' oval ' + JSON.stringify(o));
-            await shot('2-150-7i-default');
+            // 3 - a short approach (her 9-iron / wedge, ~125 out): a smaller oval near the aim ring and its "20 yd" label.
+            const at3 = G.destination(MID, 180, 125 * G.M_PER_YD);
+            await ev('__moveTo(' + at3[0] + ',' + at3[1] + ')');
+            assert.ok(await until("(function(){ var l = HardPanGps.missLbl(); return !!l && /(9-iron|wedge|8-iron)/i.test(l.text); })()", 8000), 'a short iron / wedge: ' + JSON.stringify(await lbl()));
+            await sleep(1200);
+            const c3 = await lbl();
+            clear(c3, '125 out');
+            console.log('# ' + vp.width + ' 125 ' + JSON.stringify(c3));
+            await shot('3-125-short-iron');
         } finally { await j.close(); }
     });
 }

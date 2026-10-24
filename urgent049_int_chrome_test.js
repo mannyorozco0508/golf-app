@@ -111,7 +111,7 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             // My bag: the 7-iron says exactly 1 shot.
             await openBag();
             const r7 = await bagRow('7i');
-            assert.match(r7, /^163 \| 7-iron entered · 1 shot Reset wind: generic · 0 of 8 windy shots Shot history \(1\)$/, r7);
+            assert.match(r7, /^163 \| 7-iron entered · 1 shot Reset wind: generic · 0 of 8 windy shots Shot history \(1\) 7-iron · 163 · miss right ≈ 4 short, miss left ≈ 4 long$/, r7);  // URGENT-063: + the My miss line per iron
             assert.doesNotMatch(r7, /2 shots/);
             await ev(BAGS + ".querySelector('[data-bag-row=\"7i\"]').scrollIntoView({ block: 'center' })");
             await shot('2-my-bag-1-shot');

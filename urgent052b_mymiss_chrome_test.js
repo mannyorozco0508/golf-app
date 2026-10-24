@@ -4,6 +4,8 @@
 // GPS tools > My miss turns the oval on (two layers + a text label, nothing else); the plays-like
 // pill does not cover it; it is remembered (page reloaded); off again = the map as before; My bag >
 // 7-iron shows the summary line, the picture and the same switch.
+// URGENT-063: the oval is from My bag's carry only and never off the tee - switched on at the tee there
+// is no oval; it shows once she walks to an approach ~150 out; the club screen line is the 063 My bag line.
 // ORIGINAL HEADER (049):
 // A made-up course (synthetic - no licensed data), hole 1 a par 4; Ann's bag typed in; a fresh
 // WeatherKit-style wind reading on the phone (10 mph from 47).
@@ -50,6 +52,8 @@ const SEED = "(function(){ var now = Date.now(), w = JSON.stringify({ at: now, s
 const SHOTS = process.env.SHOTS_052B || '';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const yd = (a, b) => G.haversineMeters(a, b) / G.M_PER_YD;
+// 063: an approach - 150 yds short of the green on the hole's line (her irons reach; never the tee).
+const APPROACH = G.destination(MID, 180, 150 * G.M_PER_YD);
 
 
 // 12 marked 7-iron shots (052 stage 1 fields): mostly right and short.
@@ -95,6 +99,13 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             await ev("document.querySelector('#gps-overlay .gps-bagask [data-bag-club=\"7i\"]').click()");
             await sleep(800);
             assert.deepEqual(await layers(), base, 'still exactly as before (off)');
+            // 063: the map at the approach spot with My miss OFF (its own rail / buttons) - then back to the tee.
+            await ev('__moveTo(' + APPROACH[0] + ',' + APPROACH[1] + ')');
+            await sleep(2500);
+            const baseApp = await layers(), baseAppBtns = await mapButtons();
+            assert.ok(!baseApp.layers.some((l) => /mymiss/.test(l)), 'off at the approach: no My miss layer');
+            await ev('__moveTo(' + TEE[0] + ',' + TEE[1] + ')');
+            await sleep(2500);
             // 2 - GPS tools > My miss: off -> on.
             await tools();
             assert.equal(await sw(), 'false', 'the switch shows off');
@@ -103,13 +114,18 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             assert.equal(await sw(), 'true');
             await shot('3-tools-on');
             await closeTools();
-            assert.ok(await until("(function(){ var l = HardPanGps.mapLayers(); return !!l && l.layers.indexOf('mymiss-fill') !== -1; })()", 6000), 'the oval layer');
+            // 063: never off the tee (even with a 7-iron picked at Mark shot) - walk to an approach, ~150 out.
+            await sleep(1000);
+            assert.deepEqual(await layers(), base, '063: on, but the tee shot - no oval');
+            assert.equal(await ev("HardPanGps.missNow().why"), 'tee');
+            await ev('__moveTo(' + APPROACH[0] + ',' + APPROACH[1] + ')');
+            assert.ok(await until("(function(){ var l = HardPanGps.mapLayers(); return !!l && l.layers.indexOf('mymiss-fill') !== -1; })()", 8000), 'the oval layer');
             const onL = await layers();
-            assert.deepEqual(onL.layers.filter((l) => !/^mymiss-/.test(l)), base.layers, 'only the two My miss layers added');
+            assert.deepEqual(onL.layers.filter((l) => !/^mymiss-/.test(l)), baseApp.layers, 'only the two My miss layers added');
             assert.deepEqual(onL.layers.filter((l) => /^mymiss-/.test(l)), ['mymiss-fill', 'mymiss-line']);
-            assert.deepEqual(onL.sources.filter((s) => s !== 'mymiss').sort(), base.sources.slice().sort());
-            assert.equal(await label(), 'My miss · 7-iron', 'own shape (12 shots), labelled with the club');
-            assert.equal(await mapButtons(), baseBtns, 'no new button on the map');
+            assert.deepEqual(onL.sources.filter((s) => s !== 'mymiss').sort(), baseApp.sources.slice().sort());
+            assert.match(await label(), /^My miss · [5-9]-iron$/, '063: labelled with the club only (no "default shape")');
+            assert.equal(await mapButtons(), baseAppBtns, 'no new button on the map');
             // 3 - the plays-like pill never covers the oval.
             const geo = JSON.parse(await ev("JSON.stringify({ o: HardPanGps.missRect(), p: (function(){ var p = document.querySelector('#gps-overlay .gps-ld-plays'), w = document.querySelector('#gps-overlay .gps-map-wrap'); if (!p || p.offsetParent === null) return null; var a = p.getBoundingClientRect(), b = w.getBoundingClientRect(); return { l: a.left - b.left, t: a.top - b.top, r: a.right - b.left, b: a.bottom - b.top }; })(), h: innerHeight })"));
             assert.ok(geo.o, 'the oval is on the map');
@@ -119,6 +135,7 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             // 4 - remembered (the app opened again), per golfer.
             await open();
             assert.equal(await ev("HardPanMissPattern.isOn('Ann Alpha') && !HardPanMissPattern.isOn('Ben Bravo')"), true, 'remembered, per golfer');
+            await ev('__moveTo(' + APPROACH[0] + ',' + APPROACH[1] + ')');
             assert.ok(await until("(function(){ var l = HardPanGps.mapLayers(); return !!l && l.layers.indexOf('mymiss-fill') !== -1; })()", 8000), 'still on after a reload');
             // 5 - off again: the map exactly as before.
             await tools();
@@ -126,8 +143,8 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             await closeTools();
             await sleep(800);
             const offL = await layers();
-            assert.deepEqual(offL.layers, base.layers, 'layers as before');
-            assert.deepEqual(offL.sources.slice().sort(), base.sources.slice().sort(), 'sources as before');
+            assert.deepEqual(offL.layers, baseApp.layers, 'layers as before');
+            assert.deepEqual(offL.sources.slice().sort(), baseApp.sources.slice().sort(), 'sources as before');
             assert.equal(await label(), null);
             // 6 - My bag > 7-iron: the summary, the picture, the same switch.
             await ev("document.querySelector('#gps-overlay .gps-tools-menu .gps-my-bag').click()");
@@ -135,8 +152,11 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             await ev("document.querySelector('#gps-overlay [data-bag-hist=\"7i\"]').click()");
             assert.ok(await until("!!document.querySelector('#gps-overlay .gps-shist .gps-miss-line')", 6000), 'the club screen');
             const line = await ev("document.querySelector('#gps-overlay .gps-shist .gps-miss-line').textContent");
-            assert.equal(line, '7-iron: 75% right, 9 yds avg · right misses 4 yds short');
+            assert.equal(line, '7-iron · 163 · miss right ≈ 4 short, miss left ≈ 4 long', '063: the My bag line from her 163');
             assert.equal(await ev("!!document.querySelector('#gps-overlay .gps-shist .gps-miss-pic svg path')"), true, 'the oval picture');
+            // URGENT-067 (only add): her marked shots are still there - the 052 B line and the dots.
+            assert.equal(await ev("document.querySelector('#gps-overlay .gps-shist [data-miss-stats]').textContent"), '7-iron: 75% right, 9 yds avg · right misses 4 yds short · from 12 marked shots');
+            assert.equal(await ev("document.querySelectorAll('#gps-overlay .gps-shist .gps-miss-pic svg circle').length"), 12, 'her 12 shots as dots');
             assert.equal(await ev("document.querySelector('#gps-overlay .gps-shist [data-shist-miss]').getAttribute('aria-checked')"), 'false');
             await shot('5-mybag-7i');
             await ev("document.querySelector('#gps-overlay .gps-shist [data-shist-miss]').click()");
