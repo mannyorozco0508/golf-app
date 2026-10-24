@@ -7896,7 +7896,7 @@
         // gps_paywall_test.js), the founding default, and the course line.
         paywallText: function (o, f, cov) { return sheetText(o, f, cov); },
         // 062: the Home door's tag (pure), and the round pass (never lock a round in progress).
-        doorTag: doorTag, roundPass: roundPass, ROUND_PASS_MS: ROUND_PASS_MS,
+        doorTag: doorTag, roundPass: roundPass, grantRoundPass: grantPass, ROUND_PASS_MS: ROUND_PASS_MS,
         foundingFrom: foundingFrom, courseLine: courseLine,
         // The Wi-Fi iPad sentence (gps_ipad_test.js).
         ipadNoGps: ipadNoGps,

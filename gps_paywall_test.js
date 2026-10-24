@@ -151,21 +151,25 @@ test('the course line: "Caledonia: 18/18 ✓", partial and none said plainly', {
 
 test('the one gate: entitled -> go; not -> the paywall (quiet: no); the store pending -> it waits', { skip }, async () => {
     const ent = (o) => Object.assign({ enabled: () => true, isPro: () => o.pro, known: () => o.known, onChange() {}, whenKnown(cb) { o.waiters.push(cb); } }, {}), st = (pro, known) => ({ pro, known, waiters: [] });
-    let s = st(true, true), V = view({ iap: true }, ent(s)).HardPanGps, got = [];
+    // URGENT-062: paywall is the master switch (gps-config.js, false in the repo); the gate below runs with it on.
+    let s = st(true, true), V = view({ iap: true, paywall: true }, ent(s)).HardPanGps, got = [];
     assert.strictEqual(V.requireGps({}, () => got.push('go'), () => got.push('no')), true);
     assert.deepStrictEqual(got, ['go']);
-    s = st(false, true); V = view({ iap: true }, ent(s)).HardPanGps; got = [];
+    s = st(false, true); V = view({ iap: true, paywall: true }, ent(s)).HardPanGps; got = [];
     V.requireGps({ quiet: true }, () => got.push('go'), () => got.push('no'));
     assert.deepStrictEqual(got, ['no'], 'quiet and not entitled: no, and no paywall');
     // Pending: nothing yet; the answer decides.
-    s = st(false, false); V = view({ iap: true }, ent(s)).HardPanGps; got = [];
+    s = st(false, false); V = view({ iap: true, paywall: true }, ent(s)).HardPanGps; got = [];
     V.requireGps({ quiet: true }, () => got.push('go'), () => got.push('no'));
     assert.deepStrictEqual(got, [], 'decided before the store answered');
     assert.strictEqual(s.waiters.length, 1);
     s.pro = true; s.known = true; s.waiters[0](true);
     assert.deepStrictEqual(got, ['go']);
-    // The flag on but no entitlement module on the page: no GPS (fail closed).
-    assert.strictEqual(view({ iap: true }).HardPanGps.hasGpsPro(), false);
+    // The paywall on, the flag on but no entitlement module on the page: no GPS (fail closed).
+    assert.strictEqual(view({ iap: true, paywall: true }).HardPanGps.hasGpsPro(), false);
+    // 062: the paywall off (the repo): GPS on, whatever the store says.
+    assert.strictEqual(view({ iap: true }).HardPanGps.hasGpsPro(), true);
+    assert.strictEqual(view({ iap: true, paywall: false }, ent(st(false, true))).HardPanGps.hasGpsPro(), true);
     // The flag off (a build with no store): the build's own switch, as before.
     assert.strictEqual(view({ iap: false, paywall: false }).HardPanGps.hasGpsPro(), true);
     assert.strictEqual(view({ iap: false, paywall: true }).HardPanGps.hasGpsPro(), false);
