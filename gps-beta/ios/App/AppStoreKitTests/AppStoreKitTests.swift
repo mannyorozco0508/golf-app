@@ -146,7 +146,7 @@ final class InAppFlowTests: StoreBase {
     // JS in the page (an async function body: `return ...`, `await` allowed). nil on a page change.
     @MainActor func js(_ body: String) async -> Any? {
         guard let w = webView() else { return nil }
-        do { return try await w.callAsyncJavaScript(body, arguments: [:], in: nil, contentWorld: .page) } catch { return nil }
+        do { let v = try await w.callAsyncJavaScript(body, arguments: [:], in: nil, contentWorld: .page); return v is NSNull ? nil : v } catch { return nil }
     }
     func until(_ what: String, _ body: String, _ secs: Double = 40) async -> Bool {
         let end = Date().addingTimeInterval(secs)
@@ -213,16 +213,17 @@ final class InAppFlowTests: StoreBase {
 
         // 3. Start the trial (StoreKit test: confirmed, no charge) -> on to the course screen.
         _ = await js("document.querySelector('#gps-paywall .gps-sheet-buy').click(); return true;")
-        _ = await until("trial active", "return HardPanEntitlement.isPro() === true;")
-        var sub = await js("return HardPanEntitlement.subscription();") as? [String: Any] ?? [:]
-        note("after trial: \(sub)")
-        XCTAssertEqual(sub["trial"] as? Bool, true); XCTAssertEqual(sub["founding"] as? Bool, true)
+        // The paywall closes and the door goes on to the course screen (admin.html - no entitlement module there).
         _ = await until("on to the course screen", "return /admin\\.html/.test(location.pathname) || !!document.getElementById('sf');")
         try? await Task.sleep(nanoseconds: 3_000_000_000)
         await shot("04-trial-started-course")
 
         // 4. The trial badge on the door, and the Profile line.
         await home()
+        _ = await until("trial active", "return HardPanEntitlement.isPro() === true;")
+        var sub = await js("return HardPanEntitlement.subscription();") as? [String: Any] ?? [:]
+        note("after trial: \(sub)")
+        XCTAssertEqual(sub["trial"] as? Bool, true); XCTAssertEqual(sub["founding"] as? Bool, true)
         _ = await until("door trial tag", "var t = document.querySelector('.hs-gps-tag'); return !!t && t.getAttribute('data-tag') === 'trial';")
         let tag = await text("return document.querySelector('.hs-gps-tag').textContent;")
         XCTAssertTrue(tag.hasPrefix("Free trial \u{00b7} "), tag)
@@ -284,11 +285,12 @@ final class InAppFlowTests: StoreBase {
 
         // 7. Buy (the founding price, paid at once - no trial left).
         _ = await js("document.querySelector('#gps-paywall .gps-sheet-buy').click(); return true;")
+        _ = await until("paywall closed after buy", "var p = document.getElementById('gps-paywall'); return !p || p.style.display === 'none' || /admin\\.html/.test(location.pathname);")
+        await home()
         _ = await until("paid", "return HardPanEntitlement.isPro() === true;")
         sub = await js("return HardPanEntitlement.subscription();") as? [String: Any] ?? [:]
         note("after buy: \(sub)")
         XCTAssertEqual(sub["trial"] as? Bool, false); XCTAssertEqual(sub["founding"] as? Bool, true)
-        await home()
         _ = await js("HardPanAccountUI.openProfile(); return true;")
         _ = await until("profile paid", "var e = document.querySelector('[data-hpa-sub]'); return !!e && !/Free trial/.test(e.innerText);")
         note("profile paid: " + (await text("return document.querySelector('[data-hpa-sub]').innerText;")))
