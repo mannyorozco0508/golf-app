@@ -18,7 +18,12 @@
     'use strict';
     var W = typeof window !== 'undefined' ? window : {};
     var OSM_LOOKUP = 'hardpan_osm_v1_', CHOICE = 'hardpan_holechoice_v1_';
-    var OVERPASS_URLS = ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter'];
+    // 074 (Manny: "If Overpass fails on a first load: try 1-2 other public Overpass mirrors, then retry once, then show
+    // 'Map data server busy, try again.'"): the two servers 071 asked, then Private.coffee's public instance (stated policy:
+    // no rate limit; notice asked only for >10 requests/s or >10 at once - we send one at a time). All failed: one more
+    // try of the first server after a short pause; then the lookup fails as 'could not be reached' (the busy line).
+    var OVERPASS_URLS = ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter'];
+    var OVERPASS_RETRY_MS = 3000;
     var RETRY_NONE_MS = 7 * 24 * 3600 * 1000, RETRY_ERR_MS = 3600 * 1000;
     // A FRESH PULL AT PICK TIME (2026-10-10, Manny's final plan). Whenever a course
     // is picked in setup (the saved list or Search online) it is pulled from
@@ -36,17 +41,24 @@
     function cfg() { try { return W.HARDPAN_GPS_CONFIG || {}; } catch (e) { return {}; } }
     function lsGet(k) { try { var v = W.localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
     function lsSet(k, v) { try { W.localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+    // 071: an overloaded Overpass server answers 200 with NO elements and a "remark" naming the error
+    // ("runtime error: Query timed out", "out of memory"...): that is the server failing, not an empty map -
+    // thrown, so it is "could not be reached". A clean empty answer is a real "nothing there".
+    // (074: checked per server, so an overloaded server's remark moves on to the next mirror too.)
+    function overpassBusy(j) { if (j && typeof j.remark === 'string' && /error|timed? ?out|memory|rate|limit/i.test(j.remark)) throw new Error('overpass remark'); return j; }
     function overpass(q) {
         var urls = cfg().overpassUrl ? [String(cfg().overpassUrl)] : OVERPASS_URLS;
-        var one = function (i) {
+        var one = function (u) {
             // (071: a public server that never answers is given up after 60 s - the next one is asked, and the
             // lookup ends instead of hanging; measured Oct 25: answers in 25-140 s, some never)
             var ctl = typeof AbortController === 'function' ? new AbortController() : null, t = ctl ? setTimeout(function () { ctl.abort(); }, 60000) : null;
-            return fetch(urls[i], { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q), signal: ctl ? ctl.signal : undefined })
+            return fetch(u, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q), signal: ctl ? ctl.signal : undefined })
                 .then(function (r) { if (t) clearTimeout(t); if (!r.ok) throw new Error('overpass ' + r.status); return r.json(); }, function (e) { if (t) clearTimeout(t); throw e; })
-                .catch(function (e) { if (i + 1 < urls.length) return one(i + 1); throw e; });
+                .then(overpassBusy);
         };
-        return one(0);
+        var chain = function (i) { return one(urls[i]).catch(function (e) { if (i + 1 < urls.length) return chain(i + 1); throw e; }); };
+        var wait = cfg().overpassRetryMs != null ? Number(cfg().overpassRetryMs) || 0 : OVERPASS_RETRY_MS;
+        return chain(0).catch(function () { return new Promise(function (ok) { setTimeout(ok, wait); }).then(function () { return one(urls[0]); }); });
     }
     // "Thistle (MacKay / Cameron)", "Streamsong (Red/Blue)": a 27-hole pairing's nines.
     function ninesFromName(name) {
@@ -177,10 +189,7 @@
         var key = opts.key;
         var want = { name: opts.name || '', holes: of, pars: opts.pars || [], yards: opts.yards || [], nines: opts.nines || ninesFromName(opts.name),
                      choice: lsGet(CHOICE + key) || opts.choice || null };
-        // 071: an overloaded Overpass server answers 200 with NO elements and a "remark" naming the error
-        // ("runtime error: Query timed out", "out of memory"...): that is the server failing, not an empty map -
-        // thrown, so it is "could not be reached". A clean empty answer is a real "nothing there".
-        var busy = function (j) { if (j && typeof j.remark === 'string' && /error|timed? ?out|memory|rate|limit/i.test(j.remark)) throw new Error('overpass remark'); return j; };
+        var busy = overpassBusy;   // (071's remark rule - also checked per server inside overpass(), 074)
         return overpass(G().golfCoursesQuery(opts.loc)).then(busy).then(function (j) {
             var course = G().pickGolfCourse(j && j.elements, opts.name || '');
             if (!course) return null;

@@ -239,14 +239,15 @@ test('a saved match (Papago, a course the app has) shows with 0 gpsSearch calls;
     assert.deepEqual(more.fn.filter((c) => c[0] === 'gpsSearch').map((c) => c[1].name), ['papago'], '"Search more courses": one call');
 });
 
-test('OpenStreetMap failing (HTTP 504 from both servers): "Couldn\'t reach OpenStreetMap", GPS still opens, and "Try OpenStreetMap again" gets the holes', { timeout: 200000 }, async () => {
-    const r = await open(AT_BANDON, 'error', [TYPE('Bandon'), PAUSE, SETTLED, { sleep: 400 }, X('window.__fail504 = 2; 1'), TAP_OSM('Shortys'),
+test('OpenStreetMap failing (HTTP 504 from every server: 071 asked 2; 074 asks 3 mirrors + 1 retry): "Map data server busy, try again." + "Couldn\'t reach OpenStreetMap", GPS still opens, and "Try OpenStreetMap again" gets the holes', { timeout: 200000 }, async () => {
+    const r = await open(AT_BANDON, 'error', [TYPE('Bandon'), PAUSE, SETTLED, { sleep: 400 }, X('window.__fail504 = 4; 1'), TAP_OSM('Shortys'),
         { waitFor: "/^osm_/.test(document.getElementById('course-select').value) && !!document.getElementById('sf-osmnote')", timeout: 40000 }, { sleep: 500 }, X(SF),
         X("(function(){ var b=document.querySelector('[data-sf=osmretry]'); if(b) b.click(); return b ? 'retry' : 'NO RETRY'; })()"),
         { waitFor: "/GPS from OpenStreetMap/.test((document.getElementById('sf-osmnote')||{}).innerText||'')", timeout: 60000 }, { sleep: 300 }, X(SF)]);
     assert.equal(r.ok, true, r.reason);
     const [a, b] = J(r);
     notWizard(a, 'Shortys, OSM 504');
+    assert.match(a.note, /Map data server busy, try again\./, '074: the busy line');
     assert.match(a.note, /Couldn’t reach OpenStreetMap/);
     assert.match(a.note, /Try OpenStreetMap again/);
     assert.equal(a.start && a.start.disabled, false, 'Start Round is live (tap the green until then)');
