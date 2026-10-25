@@ -14,6 +14,10 @@
      Loads the auth SDK itself, asynchronously, so no page waits for it. -->
 <script src="auth-boot.js"></script>
     <script src="./firebase-database-compat.js"></script>
+    <!-- GPS:BEGIN -->
+    <!-- 069 C: an offline Game Day round (local L- code) never reaches the database under that code. -->
+    <script src="offline-round.js"></script>
+    <!-- GPS:END -->
     <!-- Live Skins consumes computeSkinsHoleLedger() from settlement-engine.js - the
          same canonical resolver the scorecard uses. money-engine.js and action-model.js
          are its dependencies. This page previously carried its own byte-identical

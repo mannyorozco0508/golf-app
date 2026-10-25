@@ -168,6 +168,17 @@ function statefulStub(dbJson, auth) {
           update: function (v) { writeAt(pathStr, v, true); return Promise.resolve(); },
           remove: function () { writeAt(pathStr, null, false); return Promise.resolve(); },
           child: function (c) { return refFor(pathStr + '/' + c); },
+          // A CREATE-ONLY TRANSACTION as the SDK answers it (069 C): fn(current); undefined aborts
+          // ({ committed: false, snapshot: what is there }), a value is written ({ committed: true }).
+          // window.__TX_HANG = true: it never answers, like a transaction with no signal.
+          transaction: function (fn) {
+            (window.__TX = window.__TX || []).push(pathStr);
+            var cur = readAt(pathStr), v = fn(cur == null ? null : JSON.parse(JSON.stringify(cur)));
+            if (window.__TX_HANG) return new Promise(function () {});
+            if (v === undefined) return Promise.resolve({ committed: false, snapshot: snapshotFor(pathStr) });
+            writeAt(pathStr, v, false);
+            return Promise.resolve({ committed: true, snapshot: snapshotFor(pathStr) });
+          },
           push: function (v) {
             pushN++;
             var key = 'K' + String(pushN).padStart(4, '0');

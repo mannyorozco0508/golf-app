@@ -2533,6 +2533,8 @@
     function openShare() {
         var code = agCode();
         if (!code) return;
+        // 069 C: an offline round has no code to share yet - say so (offline-round.js).
+        if (W.HardPanOfflineRound && W.HardPanOfflineRound.isLocal(code)) { W.HardPanOfflineRound.inviteLocked(code); return; }
         var el = shareSheet(), d = cd() || {}, org = isOrganizer();
         var groups = typeof computeGroupBoundaries === 'function' ? computeGroupBoundaries((d.players || []).length, d.groupSizeOverrides || {}) : [{ group: 1, startIdx: 0, size: (d.players || []).length }];   /* global computeGroupBoundaries */
         var btn = 'min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid #0f4c3a;background:#fff;color:#0f4c3a;font-weight:800;font-size:.95rem;';
@@ -2728,6 +2730,13 @@
         if (!heldOps().length) return Promise.resolve(null);
         // An offline write never settles (offline-queue.js): not while the phone says it has nothing.
         if (W.navigator && W.navigator.onLine === false) return Promise.resolve(null);
+        // 069 C: AN OFFLINE ROUND (local "L-" code) is never sent under that code. offline-round.js
+        // gives it its real code with a create-only transaction (round + scores in one record), then
+        // moves it on this phone; the plain send below skips it.
+        var OR = W.HardPanOfflineRound;
+        if (OR && typeof OR.hasLocal === 'function' && OR.hasLocal()) { try { OR.sync(db); } catch (e) {} }
+        var notLocal = function (op) { return isHeldOp(op) && !(OR && typeof OR.isLocalPath === 'function' && OR.isLocalPath(op.path)); };
+        if (!heldOps().filter(notLocal).length) return Promise.resolve(null);
         sendingHeld = true;
         return q.drain(s, function (op) {
             var code = String(op.path).replace(/^events\//, '');
@@ -2738,7 +2747,7 @@
                 return db.ref(op.path).update(v);
             };
             return (G && typeof G.ensureOrganizer === 'function') ? G.ensureOrganizer(db).then(go) : go(null);
-        }, { timeoutMs: 15000, only: isHeldOp }).then(function (r) {
+        }, { timeoutMs: 15000, only: notLocal }).then(function (r) {
             sendingHeld = false; tidyHeld();
             // The scorecard's own queue (scores typed on the held round) can follow it now.
             if (r && r.sent) { try { W.dispatchEvent(new W.CustomEvent('hardpan:held-sent', { detail: r })); } catch (e) {} }

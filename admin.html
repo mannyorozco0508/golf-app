@@ -45,6 +45,10 @@
     <script src="hp-index.js"></script>
     <!-- GPS:END -->
     <script src="./firebase-database-compat.js"></script>
+    <!-- GPS:BEGIN -->
+    <!-- 069 C: an offline Game Day round (local L- code) never reaches the database under that code. -->
+    <script src="offline-round.js"></script>
+    <!-- GPS:END -->
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
          decision a match makes, comes from these seven functions. They used to be
          duplicated here and in four other places; this page now consumes the one
@@ -1249,7 +1253,9 @@ body::before {
     function paintResume() {
         var c = code(), b = $('gl-resume');
         if (!b || !c) return;
-        var put = function (course, thru) { b.innerHTML = '▶︎ <b></b> · ' + (thru ? 'thru ' + thru : 'not started'); b.querySelector('b').textContent = 'Resume ' + (short(course) || c); b.style.display = ''; };
+        var put = function (course, thru) { b.innerHTML = '▶︎ <b></b> · ' + (thru ? 'thru ' + thru : 'not started'); b.querySelector('b').textContent = 'Resume ' + (short(course) || c); b.style.display = '';
+            // 069 C: an offline round (local L- code) says so, with what this phone kept (offline-round.js).
+            if (W.HardPanOfflineRound && W.HardPanOfflineRound.isLocal(c)) W.HardPanOfflineRound.resumeLabel(b, course, thru); };
         var hide = function () { b.style.display = 'none'; b.textContent = ''; };
         var local = null; try { local = typeof HP.localRound === 'function' ? HP.localRound(c) : null; } catch (e) { local = null; }
         if (local && !local.finished) put(local.data.courseName || local.data.eventName, local.thru);
@@ -6804,9 +6810,36 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             window.location.href = dest;
         } catch (err) {
             restore();
+            // GPS:BEGIN
+            // 069 C: NO SIGNAL ON GAME DAY - "Start an offline round?" (offline-round.js). Not now: the
+            // old words below, unchanged.
+            if (await hpOfferOfflineStart(err)) return;
+            // GPS:END
             reportCodeIssueFailure(err, 'round');
         }
     }
+    // GPS:BEGIN
+    // 069 C (Manny, 2026-10-25: build it as the preview shows). Only for Game Day from the Games & Bets
+    // cards, only when the code check timed out with no signal (the case that used to end in "No signal
+    // ... nothing was saved"). Start offline opens Round Setup on a LOCAL code (L- + 10 characters); it
+    // gets its real code when the signal is back.
+    async function hpOfferOfflineStart(err) {
+        const OR = window.HardPanOfflineRound;
+        if (!OR || typeof uiConfirm !== 'function' || !(err && err.code === 'timeout') || !hpNoSignal()) return false;
+        if (!document.documentElement.classList.contains('gl-on') || selectedEventType !== 'quick') return false;
+        if (coachRequested || tripLinkCode || seasonLinkCode || copyFromCode) return false;
+        let go = false;
+        try {
+            go = await uiConfirm({ title: '\uD83D\uDCF4 No signal right now',
+                body: 'Start an offline round?\nSet it up, score it and use the GPS on this phone. It gets its round code, and other golfers can join, when you have signal.',
+                confirmText: 'Start offline', cancelText: 'Not now', danger: false });
+        } catch (e) { go = false; }
+        // Not now: the old words go under the Game Day card, as before.
+        if (!go) { try { const gd = document.getElementById('gl-gameday'); if (gd && typeof window.__uiRememberTap === 'function') window.__uiRememberTap({ target: gd }); } catch (e) {} return false; }
+        window.location.href = `admin.html?game=${OR.newCode()}&eventType=${selectedEventType}`;
+        return true;
+    }
+    // GPS:END
 
     // START FROM A PREVIOUS ROUND - the lobby field for the copyFrom prefill.
     //
@@ -7042,7 +7075,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             return;
         }
         restore();
-        if (!round) { sayJoinRefusal(JOIN_REFUSAL.missing(code)); return; }
+        if (!round) {
+            sayJoinRefusal(JOIN_REFUSAL.missing(code));
+            // GPS:BEGIN
+            // 069 C: it may be an offline round that has not synced yet - said under the card.
+            try { if (window.HardPanOfflineRound) window.HardPanOfflineRound.notYet(code, document.getElementById('open-round-card')); } catch (e) {}
+            // GPS:END
+            return;
+        }
         // A group the round does not have: the picker on the scorecard shows the
         // groups that do exist, which is more use than a fail-closed card.
         if (group) {
@@ -14180,6 +14220,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const hpSlow = hpHeld ? setTimeout(() => {
                 if (saveBtn && saveBtn.disabled && hpHeldWaiting(hpHeld)) saveBtn.innerText = hpHeldLabel();
             }, SAVE_SLOW_MS + 1) : null;
+            // 069 C: AN OFFLINE ROUND (local L- code) IS SAVED ON THIS PHONE ONLY - never written under that
+            // code. Held above (the queue + the stored copy + Resume); on to the scorecard. It gets its real
+            // code, round and scores in one create-only write, when the signal is back (offline-round.js).
+            if (window.HardPanOfflineRound && window.HardPanOfflineRound.isLocal(currentMode)) {
+                clearTimeout(slowTimer); if (hpSlow) clearTimeout(hpSlow);
+                saveBtn.innerText = originalText; saveBtn.disabled = false;
+                if (!hpHeld) { uiFail('\u26A0\uFE0F Could not save this offline round on this phone (storage full?). Nothing was saved.'); return; }
+                try { recordSavedRound(currentMode); } catch (e) {}
+                window.location.href = `index.html?game=${currentMode}`;
+                return;
+            }
             // GPS:END
             // THE ORGANIZER GATE (Wave 3, organizer-gate.js), in the order the rules
             // dictate: the token is awaited, organizers/<uid>/firstSeenAt is written
