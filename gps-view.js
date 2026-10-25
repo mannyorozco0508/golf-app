@@ -4730,6 +4730,7 @@
         aaTick();
         markTick(r);
         try { chipsTick(r, o, nums); } catch (e) {}
+        try { elevNoteTick(r); } catch (e) {}
     }
     // URGENT-045 THE "MARK ..." BUTTON (gps-mark-distance.js; KP by GPS gps-kp.js, Long Drive): on the
     // holes a feature claims. What it is handed: the hole, a getter for the live fix (read on the
@@ -5491,7 +5492,7 @@
         var B = bagApi();
         if (!B || !S) return;
         var cur = B.baseline(bagGolfer());
-        B.setBaseline(bagGolfer(), Object.assign({ tempF: cur.tempF }, a));
+        B.setBaseline(bagGolfer(), Object.assign({ tempF: cur.tempF }, a, { picked: true }));   // 070: a tap = an explicit pick
         var sh = bagSheet(); if (sh) fillAlt(sh);
         render();
     }
@@ -5526,6 +5527,42 @@
         var p = t.closest('[data-bag-alt-pick]');
         if (p) { var c = (S.altFound || [])[Number(p.getAttribute('data-bag-alt-pick'))]; if (c) altPickCourse(c.name, c.pt, null); return true; }
         return false;
+    }
+    // 070 ONE-TIME NOTE (Manny): a golfer moved onto the Sea level default (never picked, has a bag
+    // here - HardPanGpsBag.elevNoteDue) sees, once per golfer on this phone, the first time the
+    // altitude really is in their plays-like: "Plays-like now adjusts for elevation (Sea level
+    // baseline). Change in Settings." It sits in the clear map under the top bar, left of the rail
+    // (never over the rail or the pill); OK or 12 s closes it. Never in tournament mode.
+    var ELEV_NOTE_MS = 12000;
+    function elevNoteEl() { return S && S.el.querySelector('.gps-elevnote'); }
+    function elevNoteHide() { var n = elevNoteEl(); if (n) n.style.display = 'none'; if (S) { S.elevNoteOn = false; clearTimeout(S.elevNoteTimer); } }
+    function elevNotePlace() {
+        var n = elevNoteEl(); if (!n || n.style.display === 'none') return;
+        var er = S.el.getBoundingClientRect(), top = null, right = null;
+        var box = ldOn() ? ldClearBox() : null;
+        if (box) { top = box.top + box.W.top - er.top + 6; right = er.right - (box.right + box.W.left) + 8; }
+        else {
+            var gr = S.el.querySelector('.gps-right'), b = gr && gr.offsetParent !== null ? gr.getBoundingClientRect() : null;
+            if (b && b.width) right = er.right - b.left + 8;
+        }
+        n.style.top = top != null && isFinite(top) ? Math.round(top) + 'px' : '';
+        n.style.right = right != null && isFinite(right) ? Math.max(8, Math.round(right)) + 'px' : '';
+    }
+    function elevNoteTick(r) {
+        if (!S) return;
+        if (S.elevNoteOn) { if (tournament()) elevNoteHide(); else elevNotePlace(); return; }
+        if (S.elevNoteDone || tournament() || !S.pro || S.mode !== 'measure' || !altSwitch()) return;
+        var B = bagApi(), g = bagGolfer();
+        if (!B || typeof B.elevNoteDue !== 'function' || !B.elevNoteDue(g)) return;
+        var al = altNow(r);
+        if (!al || typeof al.altFt !== 'number' || typeof al.altBaseFt !== 'number') return;   // only once the altitude is really in the number
+        var n = elevNoteEl(); if (!n) return;
+        B.elevNoteSeen(g);
+        S.elevNoteDone = true; S.elevNoteOn = true;
+        n.style.display = '';
+        elevNotePlace();
+        clearTimeout(S.elevNoteTimer);
+        S.elevNoteTimer = setTimeout(function () { if (S) elevNoteHide(); }, ELEV_NOTE_MS);
     }
     // ONE TAP (gps-features): the shot, here (the GPS position), then the club. Kept for later.
     function markShotWithClub() {
@@ -6655,6 +6692,7 @@
         + '</div>'
         + '<div class="gps-banner gps-float" style="display:none"></div>'
         // AUTO-ADVANCE (008): "Hole 5 >" with Undo, for a few seconds after a jump.
+        + '<div class="gps-elevnote gps-float" data-feature="bagAltitude" style="display:none" role="status"><span class="gps-elevnote-t">Plays-like now adjusts for elevation (Sea level baseline). Change in Settings.</span><button type="button" class="gps-elevnote-ok">OK</button></div>'
         + '<div class="gps-aa-toast gps-float" data-feature="autoAdvance" style="display:none" role="status"><span class="gps-aa-text"></span><button type="button" class="gps-aa-undo">Undo</button></div>'
         // BOTTOM: the scorecard (left), Enter Score + next hole (center), Tools (right).
         + '<div class="gps-bottom">'
@@ -7011,6 +7049,8 @@
         + '#gps-overlay .gps-score-next{flex:0 0 auto;width:46px;color:#0b0f0c;font-size:26px;font-weight:800;border-left:1px solid rgba(11,15,12,.25);}'
         + '#gps-overlay .gps-banner{position:absolute;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(var(--gps-attrib-h) + 74px);padding:10px 14px;border-radius:999px;font-weight:800;font-size:14px;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;}'
         + '#gps-overlay.gps-banner-up .gps-banner{bottom:calc(var(--gps-attrib-h) + 128px);}'
+        + '#gps-overlay .gps-elevnote{position:absolute;z-index:8;left:8px;right:84px;top:calc(var(--gps-top-b) + 6px);display:flex;align-items:center;gap:10px;padding:10px 10px 10px 14px;border-radius:14px;background:rgba(11,15,12,.92);color:#fff;border:1px solid rgba(217,249,157,.55);box-shadow:0 4px 14px rgba(0,0,0,.35);font:700 14px/1.3 ' + FONT + ';}'
+        + '#gps-overlay .gps-elevnote-t{flex:1;min-width:0;}#gps-overlay .gps-elevnote-ok{flex:none;min-height:40px;min-width:52px;border-radius:10px;background:#d9f99d !important;color:#0b0f0c !important;font:800 15px/1 ' + FONT + ' !important;}'
         + '#gps-overlay .gps-aa-toast{position:absolute;z-index:8;left:50%;transform:translateX(-50%);top:calc(var(--gps-top-b) + 6px);display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;border-radius:999px;font:800 16px/1 ' + FONT + ';white-space:nowrap;}'
         // URGENT-045: with the finished hole's score sheet up, the toast sits just above the sheet (over the top bar), on top of it.
         + '#gps-overlay .gps-aa-toast.gps-aa-over{z-index:2147482001;box-shadow:0 4px 18px rgba(0,0,0,.55);}'
@@ -7758,6 +7798,7 @@
             });
         });
         on(el, '.gps-bag-done', function () { closeBag(); render(); });
+        on(el, '.gps-elevnote-ok', function () { elevNoteHide(); });
         // URGENT-047 B: TYPE MY CARRIES (gps-bushnell.js): the same golfer and bag as My
         // bag, written with HardPanGpsBag.set (as Range does). Yards only, on this phone.
         on(el, '.gps-bag-lm', function () {
@@ -7793,7 +7834,9 @@
                 if (e.target && e.target.getAttribute && e.target.getAttribute('data-bag-alt-temp')) {
                     var Bt = bagApi(); if (!Bt || !S) return;
                     var cur = Bt.baseline(bagGolfer()), tv = e.target.value;
-                    Bt.setBaseline(bagGolfer(), Object.assign({}, cur, { tempF: tv === '' ? null : Number(tv) }));
+                    // 070: the temperature only - never a choice (012 wrote "Don't adjust" here as a side effect).
+                    if (typeof Bt.setBaselineTemp === 'function') Bt.setBaselineTemp(bagGolfer(), tv === '' ? null : Number(tv));
+                    else Bt.setBaseline(bagGolfer(), Object.assign({}, cur, { tempF: tv === '' ? null : Number(tv) }));
                     fillAlt(bagEl); render(); return;
                 }
                 var c = e.target && e.target.getAttribute && e.target.getAttribute('data-bag-edit'), B = bagApi();
