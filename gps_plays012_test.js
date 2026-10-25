@@ -212,17 +212,20 @@ function bagBox() {
     sb.window = sb; vm.createContext(sb); vm.runInContext(read('gps-shots.js'), sb);
     return { B: sb.HardPanGpsBag, store };
 }
-test('012-5 My bag keeps the baseline per golfer, ON THIS PHONE ONLY (never in the account sync); default "Don\'t adjust"', () => {
+test('012-5 My bag keeps the baseline per golfer, ON THIS PHONE ONLY (never in the account sync); 070: default Sea level for a golfer who never chose', () => {
     if (!fs.existsSync(path.join(__dirname, 'gps-shots.js'))) return;
     const { B, store } = bagBox();
     const j = (x) => JSON.parse(JSON.stringify(x));
-    assert.deepStrictEqual(j(B.baseline('Manny Orozco')), { mode: 'none', name: '', ft: null, tempF: null }, 'default: Don\'t adjust');
+    // 070 part 3 (Manny): never chosen = Sea level (was Don't adjust); Don't adjust is still a choice.
+    assert.deepStrictEqual(j(B.baseline('Manny Orozco')), { mode: 'sea', name: '', ft: 0, tempF: null, chosen: false }, 'default (never chosen): Sea level');
+    assert.strictEqual(B.baselineFt(B.baseline('Manny Orozco')), 0, 'Sea level default: altitude vs 0 ft');
+    B.setBaseline('Manny Orozco', { mode: 'none' });
     assert.strictEqual(B.baselineFt(B.baseline('Manny Orozco')), undefined, 'Don\'t adjust: no altitude at all');
     B.setBaseline('Manny Orozco', { mode: 'sea', tempF: 65 });
-    assert.deepStrictEqual(j(B.baseline('manny  orozco')), { mode: 'sea', name: '', ft: 0, tempF: 65 });
+    assert.deepStrictEqual(j(B.baseline('manny  orozco')), { mode: 'sea', name: '', ft: 0, tempF: 65, chosen: true });
     assert.strictEqual(B.baselineFt(B.baseline('Manny Orozco')), 0);
     B.setBaseline('Manny Orozco', { mode: 'course', name: 'Grayhawk Golf Club', ft: 1530.4, tempF: '' });
-    assert.deepStrictEqual(j(B.baseline('Manny Orozco')), { mode: 'course', name: 'Grayhawk Golf Club', ft: 1530, tempF: null }, 'blank temperature = keep 70');
+    assert.deepStrictEqual(j(B.baseline('Manny Orozco')), { mode: 'custom', name: 'Grayhawk Golf Club', ft: 1530, tempF: null, chosen: true }, 'blank temperature = keep 70; 070: a picked course is Custom with its feet');
     B.setBaseline('Joe Russo', { mode: 'course', name: 'Somewhere abroad', ft: null });
     assert.strictEqual(B.baselineFt(B.baseline('Joe Russo')), null, 'a course with no US height: altitude not available');
     B.setBaseline('X', { mode: 'moon', ft: 9 });
@@ -232,7 +235,9 @@ test('012-5 My bag keeps the baseline per golfer, ON THIS PHONE ONLY (never in t
     assert.deepStrictEqual(Object.keys(j(B.syncShape('Manny Orozco'))), ['base']);
     assert.ok(!/lat|lng|"p"/.test(store.hardpan_bag_v1));
     B.resetAll('Manny Orozco');
-    assert.strictEqual(B.baseline('Manny Orozco').mode, 'none', 'Reset all clears it too');
+    // 070 part 3: Reset all clears the clubs but keeps the elevation choice (a "Don't adjust" golfer keeps it).
+    assert.strictEqual(B.baseline('Manny Orozco').mode, 'custom', 'Reset all keeps "measured at"');
+    assert.deepStrictEqual(Object.keys(j(B.bag('Manny Orozco'))), [], 'Reset all still clears the clubs');
 });
 test('012-5 gps-view: behind bagAltitude, never in tournament mode; the club for the ADJUSTED plays-like; the lookup a course point only', () => {
     if (!fs.existsSync(path.join(__dirname, 'gps-view.js'))) return;
@@ -246,7 +251,9 @@ test('012-5 gps-view: behind bagAltitude, never in tournament mode; the club for
     const fc = fnSrc(v, 'fetchCourseFt');
     assert.ok(/!inUS\(p\)/.test(fc) && /onLine === false/.test(fc) && /lsGet\(k\)/.test(fc) && !/\bfix\b|origin\(|o\.pt/.test(fc), 'US only, online, once; never the golfer');
     assert.ok(/altPickCourse\(\(S\.round && S\.round\.courseName\) \|\| 'This course', r && \(r\.mid \|\| r\.tee\), ft\)/.test(v), 'this course: its own green / tee point');
-    ['My distances are from:', 'Sea level', 'A course I pick', "Don't adjust", 'Typical temperature when I set these'].forEach((w) => assert.ok(v.indexOf(w) !== -1, w));
+    // 070 part 3: "My distances are from: ... A course I pick" is now "My club yardages are measured at: Sea level (default) /
+    // Custom elevation (Use this course / Find a course) / Don't adjust".
+    ['My club yardages are measured at:', 'Sea level', '(default)', 'Custom elevation', 'Use this course', 'Find a course', "Don't adjust", 'Typical temperature when I set these'].forEach((w) => assert.ok(v.indexOf(w) !== -1, w));
     assert.ok(/about 1\.5% for every 1,000 feet above it/.test(v) && /var ALT_PCT_PER_1000FT = 0\.015;/.test(read('gps-geo.js')), 'the (i) sheet says the very number the formula uses');
     assert.ok(/data-feature="bagAltitude"/.test(v) && /if \(!altSwitch\(\)\) Array\.prototype\.forEach\.call\(el\.querySelectorAll\('\[data-feature="bagAltitude"\]'\)/.test(v), 'switch off: removed');
 });

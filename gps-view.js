@@ -3539,7 +3539,7 @@
         // 070: the course's height from every source in order (course record, USGS, terrain tile,
         // the phone's own altitude) - courseElevNow; src says which.
         var ce = courseElevNow(r), ft = ce.ft;
-        out.info = { ft: ft, baseFt: base, baseName: a.mode === 'course' ? a.name : '', na: ft == null || base == null, src: ce.src };
+        out.info = { ft: ft, baseFt: base, baseName: a.mode === 'custom' || a.mode === 'course' ? a.name : '', na: ft == null || base == null, src: ce.src };
         if (!out.info.na) { out.altFt = ft; out.altBaseFt = base; }
         return out;
     }
@@ -3734,7 +3734,9 @@
     function playsNow() { return playsTo(null); }
     // To the aim (CENTER / PIN: target null), or to any point on the hole (the
     // target): its height from the tee -> green line, like the golfer's.
-    function playsTo(targetPt) {
+    // 070 PART 3: noAlt - the same number WITHOUT the altitude term (the club when "Suggest
+    // clubs using elevation" is OFF); only the altitude is left out, never shown on its own.
+    function playsTo(targetPt, noAlt) {
         if (tournament()) return null;
         if (!S || !S.pro || S.mode !== 'measure') return null;
         var r = resolved(), o = origin(r), aim = targetPt || aimAt(r);
@@ -3748,6 +3750,7 @@
         if (!inUS(aim)) {
             var alo = altNow(r);
             if (!alo || typeof alo.altFt !== 'number' || typeof alo.altBaseFt !== 'number') return null;
+            if (noAlt) return { yards: Math.round(D), exact: D, terms: {} };   // 070 part 3: the club's yards without the altitude
             return G.playsLike({ yards: D, altFt: alo.altFt, altBaseFt: alo.altBaseFt });
         }
         // Today's manual wind (build 3) beats the live reading.
@@ -3755,6 +3758,7 @@
         var to = targetPt ? ptElev(r, targetPt) : ptElev(r, r.mid, 'mid');
         var q = playsAir(w, r);
         q.yards = D; q.elevFromFt = originElev(r, o); q.elevToFt = to; q.shotBearingDeg = G.bearingDeg(o.pt, aim);
+        if (noAlt) { delete q.altFt; delete q.altBaseFt; var pn = G.playsLike(q); return playsLearned(pn || { yards: Math.round(D), exact: D, terms: {} }, D, w, has, q.shotBearingDeg); }
         return playsLearned(G.playsLike(q), D, w, has, q.shotBearingDeg);
     }
     // 049: THE GOLFER'S OWN WIND. The club for this plays-like (My bag's suggestion); once that club
@@ -3833,7 +3837,7 @@
                 text = 'Plays ' + (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (parts.length ? ': ' + parts.join(', ') : '');
                 var B = bagApi();
                 if (bagSwitch() && B && o.from === 'me') {
-                    var sg = B.suggestClub(bagNow(B), pl.exact);
+                    var sg = B.suggestClub(bagNow(B), clubYd(pl, moved ? S.target : null));
                     if (sg) { text += ' \u2192 ' + sg.name + ' (your ' + bagShown(sg.yd) + ')'; S.plClub = true; }
                 }
                 if (has && w.mph > 0) {
@@ -3870,8 +3874,23 @@
         if (!pl) return null;
         var m = units() === 'm', aimP = tp || aimAt(r);
         return { text: G.playsText(pl, units()), yards: pl.yards, exact: pl.exact, shown: m ? Math.round(pl.exact * G.M_PER_YD) : Math.round(pl.exact),
-            unit: m ? 'm' : 'y', to: tp ? 'target' : 'green', from: o.from,
+            unit: m ? 'm' : 'y', to: tp ? 'target' : 'green', from: o.from, terms: pl.terms, aimPt: tp || null,
             elev: elevLineNow(r, pl, aimP ? G.haversineMeters(o.pt, aimP) / G.M_PER_YD : null) };   // 070 part 2
+    }
+    // 070 PART 3: "SUGGEST CLUBS USING ELEVATION" (My bag, per golfer, default ON). ON: the club
+    // is picked from the plays-like number with the altitude in it (as before). OFF: from the
+    // plays-like number WITHOUT the altitude term (playsTo(.., true)); the number on screen
+    // still has it. It only matters when a baseline is set and the altitude term is there.
+    function suggestUsesElevation() {
+        var B = bagApi();
+        try { return !B || typeof B.suggestUsesElevation !== 'function' || B.suggestUsesElevation(bagGolfer()) !== false; } catch (e) { return true; }
+    }
+    // The yards the club is picked from, for a plays-like pl (to targetPt, or the aim when null).
+    function clubYd(pl, targetPt) {
+        if (!pl) return null;
+        if (suggestUsesElevation() || !pl.terms || typeof pl.terms.alt !== 'number') return pl.exact;
+        var p0 = playsTo(targetPt || null, true);
+        return p0 ? p0.exact : pl.exact;
     }
     // THE CLUB FOR IT (layout D's "· 3W"): the bag's club for the PLAYS-LIKE distance, from the
     // golfer's own spot only - { club: '3w', short: '3W', name: '3-wood', yd (the bag's), shown }
@@ -3879,7 +3898,7 @@
     function playsClubNow() {
         var B = bagApi(), p = playsLineNow();
         if (!p || p.from !== 'me' || !B || !bagSwitch() || tournament()) return null;
-        var sg = B.suggestClub(bagNow(B), p.exact);
+        var sg = B.suggestClub(bagNow(B), clubYd(p, p.aimPt));
         return sg ? { club: sg.club, short: (B.SHORT && B.SHORT[sg.club]) || sg.club, name: sg.name, yd: sg.yd, shown: bagShown(sg.yd) } : null;
     }
     // THE (i) SHEET, "THIS SHOT" (012): the breakdown the simple line leaves out - the shot,
@@ -5192,6 +5211,7 @@
                 if (to) {
                     var pl = playsTo(moved ? to : null);
                     var yd = pl ? pl.exact : G.haversineMeters(o.pt, to) / G.M_PER_YD;
+                    if (pl) yd = clubYd(pl, moved ? to : null);   // 070 part 3: Suggest clubs using elevation OFF - no altitude in the club's yards
                     var sg = yd >= 10 ? B.suggestClub(bagNow(B), yd) : null;
                     if (sg) text = 'Suggested: ' + sg.name + ' (your ' + bagShown(sg.yd) + ')';
                 }
@@ -5387,22 +5407,51 @@
     // found in the course list on the phone (HardPanGolfApi - its own point's height, once).
     // On this phone only (never in the account sync).
     function ftShown(x) { return String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    // 070 part 3: the source of "This course: 1,200 ft (source)", in plain words.
+    function elevSrcShown(src) {
+        var k = String(src || '').toLowerCase();
+        if (!k) return '';
+        if (/usgs|epqs|geological/.test(k)) return 'U.S. Geological Survey';
+        if (/tile|terrain|tilezen|aws/.test(k)) return 'open terrain map';
+        if (/phone|device|gps/.test(k)) return 'your phone';
+        if (/course/.test(k)) return 'this course\u2019s own heights';
+        return String(src);
+    }
     function fillAlt(sh) {
         var box = sh && sh.querySelector('.gps-bag-alt'), B = bagApi();
         if (!box || !B || !B.baseline) return;
-        var a = B.baseline(bagGolfer()), here = courseMeanFt(S.courseKey);
-        if (here == null) here = courseFtNow(resolved());
-        Array.prototype.forEach.call(box.querySelectorAll('[data-bag-alt]'), function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-bag-alt') === a.mode || (S.altPicking && b.getAttribute('data-bag-alt') === 'course') ? 'true' : 'false'); });
+        var a = B.baseline(bagGolfer()), ce = courseElevNow() || {}, here = typeof ce.ft === 'number' && isFinite(ce.ft) ? ce.ft : null;
+        var custom = a.mode === 'custom' || a.mode === 'course';
+        Array.prototype.forEach.call(box.querySelectorAll('[data-bag-alt]'), function (b) {
+            var m = b.getAttribute('data-bag-alt');
+            b.setAttribute('aria-pressed', (S.altPicking ? m === 'custom' : (m === a.mode || (custom && m === 'custom'))) ? 'true' : 'false');
+        });
         var pick = box.querySelector('.gps-bag-alt-pick');
-        pick.style.display = S.altPicking ? '' : 'none';
+        pick.style.display = S.altPicking || custom ? '' : 'none';
+        var ftIn = box.querySelector('.gps-bag-alt-ft');
+        if (ftIn && document.activeElement !== ftIn) ftIn.value = custom && a.ft != null ? String(a.ft) : '';
         var hereName = (S.round && S.round.courseName) || 'This course';
-        pick.querySelector('.gps-bag-alt-here').textContent = 'This course: ' + hereName;
-        var thisLine = here != null ? 'This course: ' + ftShown(here) + ' ft.' : 'This course: no height yet (US courses only).';
+        pick.querySelector('.gps-bag-alt-here').setAttribute('aria-label', 'Use this course: ' + hereName);
+        var th = box.querySelector('.gps-bag-alt-this');
+        if (th) {
+            th.textContent = '';
+            var tb = document.createElement('b'); tb.textContent = 'This course: ' + (here != null ? ftShown(here) + ' ft' : 'no height yet'); th.appendChild(tb);
+            var srcT = here != null ? elevSrcShown(ce.src) : '';
+            if (srcT) th.appendChild(document.createTextNode(' (' + srcT + ')'));
+        }
         var now = S.altLooking ? 'Looking up ' + S.altLooking + '\u2019s height\u2026'
             : a.mode === 'none' ? 'Plays-like uses your numbers as they are.'
-            : a.mode === 'sea' ? 'Your numbers are from sea level. ' + thisLine
-            : (a.ft != null ? 'Your numbers are from ' + a.name + ' (' + ftShown(a.ft) + ' ft). ' + thisLine : a.name + ': no US height, so altitude is not available.');
+            : a.mode === 'sea' ? (a.chosen ? 'Your numbers are from sea level.' : 'Default: your numbers are from sea level.')
+            : (S.altPicking && !custom) ? 'Type the height where you measured them (your range, your home course), or use a course.'
+            : (a.ft != null ? 'Your numbers are from ' + ftShown(a.ft) + ' ft' + (a.name ? ' (' + a.name + ')' : '') + '.'
+                : (a.name ? a.name + ': no height found, so altitude is not available. Type the height.' : 'Type the height where you measured them, or use a course.'));
         box.querySelector('.gps-bag-alt-now').textContent = now + ' On this phone only.';
+        var sw = box.querySelector('.gps-bag-alt-sug'), on = suggestUsesElevation(), off = a.mode === 'none';
+        if (sw) { sw.checked = on; sw.disabled = off; sw.setAttribute('aria-checked', on ? 'true' : 'false'); }
+        var ss = box.querySelector('.gps-bag-alt-sugs');
+        if (ss) ss.textContent = off ? 'Only with Sea level or Custom elevation.'
+            : on ? 'The club is picked from your carries as they fly here.'
+            : 'The club is picked without elevation. The yardage still shows it.';
         var t = box.querySelector('.gps-bag-alt-temp');
         if (t && document.activeElement !== t) t.value = a.tempF != null ? String(a.tempF) : '';
     }
@@ -5439,10 +5488,10 @@
     function altPickCourse(name, pt, ftKnown) {
         if (!S) return;
         S.altPicking = false;
-        if (ftKnown != null) { altSet({ mode: 'course', name: name, ft: ftKnown }); return; }
+        if (ftKnown != null) { altSet({ mode: 'custom', name: name, ft: ftKnown }); return; }
         var mine = S;
         S.altLooking = name; var sh = bagSheet(); if (sh) fillAlt(sh);
-        fetchCourseFt(pt, function (ft) { if (S !== mine) return; S.altLooking = null; altSet({ mode: 'course', name: name, ft: ft }); });
+        fetchCourseFt(pt, function (ft) { if (S !== mine) return; S.altLooking = null; altSet({ mode: 'custom', name: name, ft: ft }); });
     }
     function altClick(t) {
         var B = bagApi(), sh = bagSheet();
@@ -5450,7 +5499,9 @@
         var m = t.closest('[data-bag-alt]');
         if (m) {
             var mode = m.getAttribute('data-bag-alt');
-            if (mode === 'course') { S.altPicking = !S.altPicking; fillAlt(sh); altList(sh); }
+            // 070: Custom elevation opens the height box + "Use this course" / "Find a course"; the
+            // choice is kept once a height is typed or a course picked (012's "A course I pick").
+            if (mode === 'custom' || mode === 'course') { var cm = B.baseline(bagGolfer()).mode; S.altPicking = cm === 'custom' ? false : !S.altPicking; fillAlt(sh); altList(sh); if (S.altPicking) { var fi = sh.querySelector('.gps-bag-alt-ft'); try { if (fi) fi.focus(); } catch (e) {} } }
             else { S.altPicking = false; altSet({ mode: mode }); }
             return true;
         }
@@ -5909,7 +5960,7 @@
             elev: elevLineNow(r, pl, G.haversineMeters(o.pt, aim) / G.M_PER_YD) };   // 070 part 2: the pill's small second line
         var B = bagApi();
         if (bagSwitch() && B && o.from === 'me' && !(B.needsSetup && B.needsSetup(bagGolfer()))) {
-            var sg = B.suggestClub(bagNow(B), pl.exact);
+            var sg = B.suggestClub(bagNow(B), clubYd(pl, S.target || null));
             if (sg) out.club = clubShort(sg.club);
         }
         return out;
@@ -6615,12 +6666,20 @@
         // URGENT-047 B (8:15 AM): "Type my carries" - one grid, a carry per club - gps-bushnell.js.
         +   '<button type="button" class="gps-bag-lm" data-feature="clubs">Type my carries</button>'
         // 012 part 5 (switch bagAltitude): where the numbers hold - for the altitude in plays-like.
-        +   '<div class="gps-bag-alt" data-feature="bagAltitude" role="group" aria-label="My distances are from">'
-        +     '<div class="gps-bag-alt-h">My distances are from:</div>'
-        +     '<div class="gps-bag-alt-row"><button type="button" data-bag-alt="sea">Sea level</button><button type="button" data-bag-alt="course">A course I pick</button><button type="button" data-bag-alt="none">' + "Don't adjust" + '</button></div>'
-        +     '<div class="gps-bag-alt-pick" style="display:none"><button type="button" class="gps-bag-alt-here">This course</button>'
+        // 070 part 3: "My club yardages are measured at: Sea level (default) / Custom elevation [__ ft] /
+        // Don't adjust" (012's "A course I pick" lives on inside Custom: "Use this course" / "Find a course"),
+        // "This course: 1,200 ft (source)", and the "Suggest clubs using elevation" switch (default ON).
+        +   '<div class="gps-bag-alt" data-feature="bagAltitude" role="group" aria-label="My club yardages are measured at">'
+        +     '<div class="gps-bag-alt-h">My club yardages are measured at:</div>'
+        +     '<div class="gps-bag-alt-row"><button type="button" data-bag-alt="sea">Sea level <span class="gps-bag-alt-def">(default)</span></button><button type="button" data-bag-alt="custom">Custom elevation</button><button type="button" data-bag-alt="none">' + "Don't adjust" + '</button></div>'
+        +     '<div class="gps-bag-alt-pick" style="display:none">'
+        +       '<label class="gps-bag-alt-ftl"><input type="number" inputmode="numeric" class="gps-bag-alt-ft" data-bag-alt-ft="1" min="-1400" max="14999" step="1" placeholder="____" aria-label="Custom elevation, feet"> ft</label>'
+        +       '<button type="button" class="gps-bag-alt-here">Use this course</button>'
         +       '<input type="search" class="gps-bag-alt-find" placeholder="Find a course" aria-label="Find a course" autocomplete="off"><div class="gps-bag-alt-list"></div></div>'
+        +     '<div class="gps-bag-alt-this"></div>'
         +     '<div class="gps-bag-alt-now" role="status"></div>'
+        +     '<label class="gps-bag-alt-sugl"><span class="gps-bag-alt-sugt"><b>Suggest clubs using elevation</b><span class="gps-bag-alt-sugs"></span></span>'
+        +       '<input type="checkbox" role="switch" class="gps-bag-alt-sug" data-bag-alt-sug="1" checked aria-label="Suggest clubs using elevation"></label>'
         +     '<label class="gps-bag-alt-tl">Typical temperature when I set these <input type="number" inputmode="numeric" class="gps-bag-alt-temp" data-bag-alt-temp="1" min="-20" max="130" placeholder="70" aria-label="Typical temperature when I set these, degrees F"> \u00b0F</label>'
         +   '</div>'
         +   '<div class="gps-bag-list"></div>'
@@ -6988,6 +7047,14 @@
         + '#gps-overlay .gps-bag-alt-row button[aria-pressed="true"]{background:#d9f99d !important;color:#0b0f0c !important;}'
         + '#gps-overlay .gps-bag-alt-pick{margin-top:6px;display:flex;flex-direction:column;gap:6px;}#gps-overlay .gps-bag-alt-find{min-height:40px;border-radius:10px;padding:0 10px;font:600 15px/1 ' + FONT + ';}'
         + '#gps-overlay .gps-bag-alt-list{display:flex;flex-direction:column;gap:4px;}#gps-overlay .gps-bag-alt-list button{text-align:left;}'
+        + '#gps-overlay .gps-bag-alt-row button,#gps-overlay .gps-bag-alt-pick .gps-bag-alt-here{border:1px solid rgba(255,255,255,.28) !important;}'
+        + '#gps-overlay .gps-bag-alt-row button[aria-pressed="true"]{border-color:#d9f99d !important;}'
+        + '#gps-overlay .gps-bag-alt-def{font-weight:600;opacity:.8;}#gps-overlay .gps-bag-alt-ftl{display:flex;align-items:center;gap:8px;color:#c8d1ca;}#gps-overlay .gps-bag-alt-ft{flex:1;min-width:0;min-height:40px;border-radius:10px;padding:0 10px;font:700 16px/1 ' + FONT + ';}'
+        + '#gps-overlay .gps-bag-alt-this{margin-top:6px;color:#c8d1ca;}#gps-overlay .gps-bag-alt-this b{color:#fff;}'
+        + '#gps-overlay .gps-bag-alt-sugl{display:flex;align-items:center;gap:10px;margin:8px 0 6px;}#gps-overlay .gps-bag-alt-sugt{flex:1;display:flex;flex-direction:column;gap:2px;}#gps-overlay .gps-bag-alt-sugt b{font-weight:800;}#gps-overlay .gps-bag-alt-sugs{color:#c8d1ca;font-weight:600;}'
+        + '#gps-overlay .gps-bag-alt-sug{appearance:none;-webkit-appearance:none;flex:none;width:50px;height:30px;border-radius:15px;background:#5b6660;position:relative;margin:0;cursor:pointer;transition:background .15s;}'
+        + '#gps-overlay .gps-bag-alt-sug::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .15s;}'
+        + '#gps-overlay .gps-bag-alt-sug:checked{background:#16a34a;}#gps-overlay .gps-bag-alt-sug:checked::after{left:23px;}#gps-overlay .gps-bag-alt-sug:disabled{opacity:.45;}'
         + '#gps-overlay .gps-bag-alt-now{margin:6px 0;color:#c8d1ca;}#gps-overlay .gps-bag-alt-tl{display:block;color:#c8d1ca;}#gps-overlay .gps-bag-alt-temp{width:64px;min-height:36px;font:700 15px/1 ' + FONT + ';text-align:center;}'
         + '#gps-overlay .gps-bag-saved{font:600 11.5px/1.3 ' + FONT + ';color:#9ca3af;margin:0 0 6px;}'
         + '#gps-overlay .gps-bag-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.08);}'
@@ -7698,6 +7765,19 @@
         if (bagEl) {
             bagEl.addEventListener('input', function (e) { if (S && e.target && e.target.classList && e.target.classList.contains('gps-bag-alt-find')) altList(bagEl); });
             bagEl.addEventListener('change', function (e) {
+                // 070 part 3: the Custom elevation height (feet), and "Suggest clubs using elevation".
+                if (e.target && e.target.getAttribute && e.target.getAttribute('data-bag-alt-ft')) {
+                    if (!S) return;
+                    var fv = e.target.value;
+                    S.altPicking = false;
+                    altSet({ mode: 'custom', name: '', ft: fv === '' ? null : Number(fv) });
+                    return;
+                }
+                if (e.target && e.target.getAttribute && e.target.getAttribute('data-bag-alt-sug')) {
+                    var Bs = bagApi(); if (!Bs || !S || typeof Bs.setSuggestUsesElevation !== 'function') return;
+                    Bs.setSuggestUsesElevation(bagGolfer(), !!e.target.checked);
+                    fillAlt(bagEl); render(); return;
+                }
                 if (e.target && e.target.getAttribute && e.target.getAttribute('data-bag-alt-temp')) {
                     var Bt = bagApi(); if (!Bt || !S) return;
                     var cur = Bt.baseline(bagGolfer()), tv = e.target.value;
@@ -8287,6 +8367,7 @@
         playsLine: function () { try { return playsLineNow(); } catch (e) { return null; } },
         courseElev: function () { try { return courseElevNow(); } catch (e) { return { ft: null, src: null }; } },
         playsClub: function () { try { return playsClubNow(); } catch (e) { return null; } },
+        suggestUsesElevation: function () { try { return suggestUsesElevation(); } catch (e) { return true; } },
         openPlaysInfo: function () { try { openPlaysInfo(); } catch (e) {} },
         // 012 part 4: both legs - { toTarget, toGreen: { yards, plays, unit, text: '60 · plays 63' } | null, single, par3 }.
         playsLegs: function () { try { return playsLegsOut(); } catch (e) { return null; } },
