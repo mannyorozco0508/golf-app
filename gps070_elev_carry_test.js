@@ -80,13 +80,23 @@ test('old shots with no course height are unchanged (sea-level baseline); Shot h
 
 test('"Don\'t adjust" (no baseline): every shot as marked, exactly as before', { skip }, () => {
     const { L, SB, B } = sandbox();
+    // 070 integration: a golfer who never chose is on Sea level now (part 3) - "Don't adjust" is picked here.
+    B.setBaseline(GOLFER, { mode: 'none' });
     addShots(L, 3, { cft: 1200, cftSrc: 'usgs' });
     assert.equal(B.baseline(GOLFER).mode, 'none');
     assert.equal(SB.fits(GOLFER)['7i'].stillAir, 155);
 });
 
+test('070 integration: a golfer who NEVER chose is on Sea level (part 3), so their 1,200 ft shots learn at sea level', { skip }, () => {
+    const { L, SB, B } = sandbox();
+    addShots(L, 3, { cft: 1200, cftSrc: 'usgs' });
+    assert.equal(B.baseline(GOLFER).mode, 'sea');
+    assert.equal(SB.fits(GOLFER)['7i'].stillAir.toFixed(1), '152.3');
+});
+
 test('a new baseline re-learns at once (the cache knows the baseline)', { skip }, () => {
     const { L, SB, B } = sandbox();
+    B.setBaseline(GOLFER, { mode: 'none' });
     addShots(L, 3, { cft: 1200, cftSrc: 'usgs' });
     assert.equal(SB.fits(GOLFER)['7i'].stillAir, 155);
     B.setBaseline(GOLFER, { mode: 'sea' });
