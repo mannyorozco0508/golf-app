@@ -69,7 +69,7 @@ describe('Polish #29 (option B): Games & Bets as door cards', () => {
 
     test('Same as last week: Round Setup\'s own copier - a NEW code, copyFrom, Players', { timeout: 120000 }, async () => {
         const r = await arriveCold({ url: URL, db: DB({ DBR5TH: ROUND('DBR5TH', 5) }), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: PRE('DBR5TH'), steps: [
-            SETTLE, { tap: '#gl-same' },
+            SETTLE, { tap: '#gl-same' }, { tap: '#ui-sheet-yes' },   // 069: "Start a new round?" - Start
             { waitFor: "/copyFrom=DBR5TH/.test(location.search) && document.querySelectorAll('#player-list .player-row').length >= 2", timeout: 25000 }, { sleep: 1000 },
             { expression: "JSON.stringify({ url: document.URL, step: typeof currentWizardStep !== 'undefined' ? currentWizardStep : null })" }] });
         assert.equal(r.ok, true, r.reason);

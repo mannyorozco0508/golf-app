@@ -95,7 +95,7 @@ describe('URGENT-016: the GPS door', () => {
             { tap: '[data-hp-act="snew"]' },
             { waitFor: "/admin\\.html/.test(location.pathname) && !!document.getElementById('gl-view') && document.getElementById('gl-view').getBoundingClientRect().height > 0", timeout: 20000 }, { sleep: 1500 },
             X("JSON.stringify({ at: location.href.split('/').pop(), lobby: document.getElementById('gl-view').innerText, old: getComputedStyle(document.getElementById('lobby-screen')).display, sf: !!document.getElementById('sf'), mark: sessionStorage.getItem('hardpan_simple_flow'), cover: document.documentElement.classList.contains('sf-pre') })"),
-            { tap: '#gl-gameday' },
+            { tap: '#gl-gameday' }, { tap: '#ui-sheet-yes' },   // 069: "Start a new round?" - Start
             { waitFor: "/game=/.test(location.search) && document.querySelectorAll('.wizard-step').length > 0", timeout: 20000 }, { sleep: 2000 },
             X("JSON.stringify({ sf: !!document.getElementById('sf') && getComputedStyle(document.getElementById('sf')).display !== 'none', admin: getComputedStyle(document.getElementById('admin-screen')).display })")] });
         assert.equal(r.ok, true, r.reason);

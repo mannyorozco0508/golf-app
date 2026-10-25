@@ -1309,13 +1309,32 @@ body::before {
         // code under events/). It waits for the connection like every read; when it answers, go.
         try { if (typeof db !== 'undefined' && db) db.ref('events/' + (code() || 'ZZZZZZ')).once('value').then(function () { NET.up = true; fire(); }, function () {}); } catch (e) {}   /* global db */
     }
-    W.HardPanGamesLobby = { whenConnected: whenConnected, net: function () { return NET.up; }, GRACE_MS: GRACE_MS };
+    // 069: "START A NEW ROUND?" FIRST (Manny, Oct 25: "yes, ask 'Start a new round?' before starting from
+    // the card"). The big Game Day card is about a fifth of the screen, and a touch that starts a scroll
+    // could start a round. Game Day and Same as last week both start a NEW round (a new code), so both ask
+    // first, with the app's own sheet (ui-dialogs.js uiConfirm). Not now: nothing happens, nothing is
+    // saved, no Connecting… and no read. Start: the card's own flow exactly as before (068's Connecting…
+    // gate, then Starting…/Checking…). The card is marked again as the control last touched, so a
+    // refusal ("No signal …") still sits under the card, not floating where the sheet's button was.
+    function remark(card) { try { if (typeof W.__uiRememberTap === 'function') W.__uiRememberTap({ target: card }); } catch (e) {} }
+    async function askThenStart(card, go) {
+        if (!card || card.getAttribute('aria-disabled') === 'true') return;
+        if (typeof W.uiConfirm !== 'function') { whenConnected(card, go); return; }
+        let ok = false;
+        try {
+            ok = await W.uiConfirm({ title: 'Start a new round?', body: card.id === 'gl-same' && code() ? 'A new round, copied from round ' + code() + '.' : '', confirmText: 'Start', cancelText: 'Not now', danger: false });
+        } catch (e) { ok = false; }
+        if (!ok) return;
+        remark(card);
+        whenConnected(card, go);
+    }
+    W.HardPanGamesLobby = { whenConnected: whenConnected, askThenStart: askThenStart, net: function () { return NET.up; }, GRACE_MS: GRACE_MS };
     function wire() {
         netWatch();
         $('gl-back').addEventListener('click', function () { W.location.href = 'home.html'; });
-        $('gl-gameday').addEventListener('click', function () { whenConnected($('gl-gameday'), function () { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); }); });
+        $('gl-gameday').addEventListener('click', function () { askThenStart($('gl-gameday'), function () { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); }); });
         $('gl-trip').addEventListener('click', function () { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('trip'); });
-        $('gl-same').addEventListener('click', function () { whenConnected($('gl-same'), function () { if (typeof W.sameAsLastWeek === 'function') W.sameAsLastWeek($('same-as-last-week')); }); });
+        $('gl-same').addEventListener('click', function () { askThenStart($('gl-same'), function () { if (typeof W.sameAsLastWeek === 'function') W.sameAsLastWeek($('same-as-last-week')); }); });
         $('gl-code').addEventListener('click', openJoin);
         $('gl-resume').addEventListener('click', function () { if (typeof W.resumeGame === 'function') W.resumeGame(); });
         mirror($('hw-quick'), $('gl-gameday'), '⏳ Starting…');
@@ -2494,6 +2513,22 @@ body::before {
             <div id="sp-round-review" style="margin-top:10px;"></div>
         </div>
     </div>
+    <!-- 069: "PASTE A LIST" AT THE TOP OF PLAYERS (Manny, Oct 25: "Paste a list box: move it to the top of
+         Players"). The existing "📋 Paste Player List" control - the same button, the same box it opens,
+         the same commit - moves from below every golfer row to the top of this step, under the step's
+         one-line subtitle. Nothing else moves; nothing is removed. The Consumer build keeps it where it was. -->
+    <script>
+    (function () {
+        var step = document.getElementById('wizard-step-5');
+        var btn = step && step.querySelector('button[onclick="openPastePlayersModal()"]');
+        var sub = step && step.querySelector('.wizard-step-sub');
+        if (!btn || !sub || !sub.parentNode) return;
+        btn.id = btn.id || 'paste-players-btn';
+        btn.setAttribute('data-hp-paste-top', '1');
+        btn.style.margin = '0 0 12px 0';
+        sub.parentNode.insertBefore(btn, sub.nextSibling);
+    })();
+    </script>
     <!-- GPS:END -->
     <!-- MY GROUPS IS FOR EVERYBODY NOW (2026-10-04). It shipped behind a
          per-device beta switch in the Account panel; the switch is gone and so is

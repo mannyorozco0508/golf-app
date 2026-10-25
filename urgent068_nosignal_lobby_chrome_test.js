@@ -79,6 +79,7 @@ test('looking at Games & Bets on a dead bar: no note, no round started, no code 
 test('Game Day on a slow first connection: "⏳ Connecting…", never "No signal", and the round starts by itself', { timeout: 90000 }, async () => {
     const j = await lobby(slow(12000));
     assert.ok(await j.tap('#gl-gameday'));
+    assert.ok(await j.tap('#ui-sheet-yes'), '069: "Start a new round?" - Start');
     const { seen, s } = await watch(j, 40000, (x) => /game=/.test(x.at));
     assert.ok(seen.some((x) => x.gd === '⏳ Connecting…'), 'Connecting… first: ' + JSON.stringify(seen));
     assert.ok(seen.every((x) => !/No signal/.test(x.note)), 'never "No signal": ' + JSON.stringify(seen));
@@ -89,6 +90,7 @@ test('Same as last week on a slow first connection: "⏳ Connecting…", then th
     const j = await lobby(slow(12000));
     for (let i = 0; i < 20 && !(await j.evaluate("getComputedStyle(document.getElementById('gl-same')).display !== 'none'")); i++) await sleep(250);
     assert.ok(await j.tap('#gl-same'));
+    assert.ok(await j.tap('#ui-sheet-yes'), '069: "Start a new round?" - Start');
     const { seen, s } = await watch(j, 40000, (x) => /step=players/.test(x.at));
     assert.ok(seen.some((x) => x.same === '⏳ Connecting…'), JSON.stringify(seen));
     assert.ok(seen.every((x) => !/No signal/.test(x.note)), JSON.stringify(seen));
@@ -98,6 +100,7 @@ test('Same as last week on a slow first connection: "⏳ Connecting…", then th
 test('the phone offline, Game Day tapped: the "No signal" words under Game Day, with no Connecting… wait', { timeout: 90000 }, async () => {
     const j = await lobby(OFFLINE);
     assert.ok(await j.tap('#gl-gameday'));
+    assert.ok(await j.tap('#ui-sheet-yes'), '069: "Start a new round?" - Start');
     const { seen, s } = await watch(j, 15000, (x) => !!x.note);
     assert.ok(seen.every((x) => x.gd !== '⏳ Connecting…'), JSON.stringify(seen));
     assert.equal(s.note, '📴 No signal — try again when you have a connection.\nThe new round was not started; nothing was saved.');
@@ -110,6 +113,7 @@ test('a good connection: Game Day starts at once, as before', { timeout: 60000 }
     const j = await lobby('');
     const t0 = Date.now();
     assert.ok(await j.tap('#gl-gameday'));
+    assert.ok(await j.tap('#ui-sheet-yes'), '069: "Start a new round?" - Start');
     const { s } = await watch(j, 15000, (x) => /game=/.test(x.at));
     assert.match(s.at, /game=[A-Z0-9]{6}&eventType=quick/);
     assert.ok(Date.now() - t0 < 6000, 'no wait added: ' + (Date.now() - t0) + ' ms');

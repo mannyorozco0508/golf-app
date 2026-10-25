@@ -45,6 +45,7 @@ async function players(pre) {
     journeys.push(j);
     await j.goto(fileUrl('admin.html', 'start=lobby'), 2500);
     await j.tap('#gl-same');
+    await j.tap('#ui-sheet-yes');   // 069: "Start a new round?" - Start
     for (let i = 0; i < 40; i++) { if (await j.evaluate("/step=players/.test(location.search) && document.querySelectorAll('#player-list .player-row').length === 4")) break; await sleep(250); }
     assert.deepEqual(JSON.parse(await j.evaluate(ROWS)).map((r) => r[0]), HAVE, 'Same as last week landed on Players with the 4 golfers');
     try { await j.cdp('Browser.grantPermissions', { permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'], origin: 'file://' }); } catch (e) {}
