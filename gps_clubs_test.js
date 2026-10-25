@@ -236,7 +236,8 @@ test('gps-view: the plays-like line - behind playsBreakdown, never in tournament
     assert.ok(/if \(!plSwitch\(\)\) Array\.prototype\.forEach\.call\(el\.querySelectorAll\('\[data-feature="playsBreakdown"\]'\)/.test(v), 'switch off: removed');
     assert.ok(/if \(plSwitch\(\) && !tournament\(\) && S\.pro && S\.mode === 'measure'/.test(sec), 'never in tournament mode');
     assert.ok(/G\.playsParts\(pl, has \? w\.mph : null, units\(\)\)/.test(sec) && /'Plays ' \+/.test(sec));
-    assert.ok(/B\.suggestClub\((B\.bag\(bagGolfer\(\)\)|bagNow\(B\)), pl\.exact\)/.test(sec), 'the club for the plays-like distance');
+    // 070 part 3: the club's yards through clubYd (pl.exact, or without the altitude when "Suggest clubs using elevation" is OFF).
+    assert.ok(/B\.suggestClub\((B\.bag\(bagGolfer\(\)\)|bagNow\(B\)), (pl\.exact|clubYd\(pl, [^)]*\))\)/.test(sec), 'the club for the plays-like distance');
     assert.ok(/bagSwitch\(\) && B && o\.from === 'me'/.test(sec), 'the club only with the clubs switch on, from the golfer');
     assert.ok(/G\.windAim\(D, rel\.cross\)/.test(sec), 'crosswind: the aim-off');
     assert.ok(/if \(S\.plClub\) text = '';/.test(v), 'the plain Suggested line steps aside');
@@ -248,7 +249,7 @@ test('009 TOURNAMENT MODE (Rules of Golf 4.3): no plays-like, no club suggestion
     const v = read('gps-view.js');
     const fn = (name) => { const i = v.indexOf('function ' + name + '('); assert.ok(i > 0, name); return v.slice(i, v.indexOf('\n    }\n', i)); };
     // 1. No plays-like: the one function every plays-like number comes from says null first.
-    assert.ok(/function playsTo\(targetPt\) \{\s*if \(tournament\(\)\) return null;/.test(v), 'playsTo: null in tournament mode');
+    assert.ok(/function playsTo\(targetPt(, noAlt)?\) \{\s*if \(tournament\(\)\) return null;/.test(v), 'playsTo: null in tournament mode');   // 070 part 3: + noAlt
     assert.ok(/if \(plSwitch\(\) && !tournament\(\)/.test(fn('syncBreakdown')), 'the plays-like line');
     assert.ok(/if \(tournament\(\)\) return \{ yd: yd \};/.test(fn('shotDetails')), 'a marked shot keeps its yards only');
     // 2. No club suggestion, no "Which club?".
