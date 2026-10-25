@@ -166,6 +166,10 @@
     // Shots with no carry are skipped (counted in `skipped`); shots with no wind reading
     // (counted in `noWind`) feed only n and the still-air median (int-049).
     // head / tail / left / right: SIGNED yards of carry per mph (head < 0, tail > 0).
+    // 070 part 4: opts.altDiv (optional): function(shot) -> the shot's altitude factor
+    // (gps-geo altFactor(course ft, baseline ft)); each shot's still-air carry is divided by it
+    // AFTER its wind is taken out (wind first, at the course's air; then to the baseline). The
+    // wind numbers are fitted on the carries as marked. Not given / not a number: 1 (as before).
     function shotComponents(s) {
         if (isNum(s.windMph) && s.windMph >= 0 && isNum(s.relAngle)) return { mph: s.windMph, c: components(s.windMph, s.relAngle) };
         if (isNum(s.along) && isNum(s.across)) {
@@ -180,12 +184,13 @@
         // int-049: a shot with a carry but NO wind reading (windMph null / missing) is not a wind
         // data point and not a calm one: it counts toward n and the still-air median only.
         var rows = [], skipped = 0, noWind = [];
+        var divOf = function (s) { var d = typeof opts.altDiv === 'function' ? opts.altDiv(s) : null; return isNum(d) && d > 0 ? d : 1; };
         (shots || []).forEach(function (s) {
             if (!s || !isNum(s.carry) || !(s.carry > 0)) { skipped++; return; }
             var w = shotComponents(s);
-            if (!w) { noWind.push(s.carry); return; }
+            if (!w) { noWind.push(s.carry / divOf(s)); return; }
             var c = w.c;
-            rows.push({ carry: s.carry, mph: w.mph, c: c, x: [c.head, c.tail, c.fromLeft, c.fromRight] });
+            rows.push({ carry: s.carry, mph: w.mph, c: c, x: [c.head, c.tail, c.fromLeft, c.fromRight], div: divOf(s) });
         });
         var n = rows.length + noWind.length;
         var windyN = rows.filter(function (r) { return r.mph > WINDY_MPH; }).length;
@@ -219,7 +224,7 @@
             }
         }
         var coeffs = qualified ? out : null;
-        out.stillAir = median(rows.map(function (row) { return row.carry - effectOf(row.carry, row.c, coeffs); }).concat(noWind));
+        out.stillAir = median(rows.map(function (row) { return (row.carry - effectOf(row.carry, row.c, coeffs)) / row.div; }).concat(noWind));
         return out;
     }
 

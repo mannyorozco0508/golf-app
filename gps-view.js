@@ -3528,6 +3528,16 @@
         if (a != null && b != null) return (a + b) / 2;
         return a != null ? a : b;
     }
+    // 070 part 4: the COURSE's height for the shot log (gps-shot-log cft) - only from a course
+    // source (our course data, USGS, terrain tiles). The 'phone' fallback is NOT logged (it is
+    // built from the phone's own altitude readings; see 070-part4-REPORT). Null = not logged.
+    var LOG_FT_SRCS = ['course', 'usgs', 'tile'];
+    function courseFtForLog() {
+        try {
+            var c = courseElevNow();
+            return c && LOG_FT_SRCS.indexOf(c.src) !== -1 && typeof c.ft === 'number' && isFinite(c.ft) ? { ft: Math.round(c.ft), src: c.src } : null;
+        } catch (e) { return null; }
+    }
     // { altFt, altBaseFt, tempBaseF, info: { ft, baseFt, baseName, na } } or null (switch off,
     // tournament mode, no bag yet). "Don't adjust": no altitude (the temperature baseline only).
     function altNow(r) {
@@ -4857,6 +4867,8 @@
         var ctx = { hole: S.hole, green: green, wind: effectiveWind(), elevFt: r ? ptElev(r, pt) : null, course: chipsCourse(), golfer: bagGolfer(),
             // On the green (a putt) or no green to aim at: this mark only closes the shot before.
             noOpen: !green || !!(nums && nums.onGreen), ring: chipsRing() };
+        var cft = courseFtForLog();   // 070 part 4: the course's height (a course number), for My bag's baseline
+        if (cft) { ctx.courseFt = cft.ft; ctx.courseFtSrc = cft.src; }
         var plYd = pl && isFinite(pl.exact) ? pl.exact : null, mine = S;
         sgMarkHere(toYd, !!(nums && nums.onGreen), r);
         withChips(function (C) {
