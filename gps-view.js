@@ -3528,7 +3528,7 @@
         if (a != null && b != null) return (a + b) / 2;
         return a != null ? a : b;
     }
-    // { altFt, altBaseFt, tempBaseF, info: { ft, baseFt, baseName, na } } or null (switch off,
+    // { altFt, altBaseFt, tempBaseF, info: { ft, baseFt, baseName, na, src } } or null (switch off,
     // tournament mode, no bag yet). "Don't adjust": no altitude (the temperature baseline only).
     function altNow(r) {
         if (!altSwitch() || tournament() || !S) return null;
@@ -3823,8 +3823,10 @@
             var moved = !!(S.targetMoved && S.target), aim = moved ? S.target : aimAt(r);
             var pl = aim ? playsTo(moved ? S.target : null) : null;
             if (pl && simpleSwitch()) {
-                pl = aim ? playsTo(playsAim(r)) : null;
-                text = pl ? G.playsText(pl, units()) : '';
+                var tp2 = playsAim(r), aim2 = tp2 || aimAt(r);
+                pl = aim ? playsTo(tp2) : null;
+                // 070 part 2: "Plays like 147y · elev +1,200 ft" - one line (layouts C and old).
+                text = pl ? G.playsTextElev(pl, units(), elevLineNow(r, pl, aim2 ? G.haversineMeters(o.pt, aim2) / G.M_PER_YD : null)) : '';
             } else if (pl) {
                 var w = effectiveWind(), has = !!(w && !w.none), m = units() === 'm';
                 var parts = G.playsParts(pl, has ? w.mph : null, units());
@@ -3845,6 +3847,15 @@
         el.style.display = text ? '' : 'none';
         if (plInfoOpen()) fillPlaysInfo();
     }
+    // 070 PART 2: THE ELEVATION LINE - "elev +1,200 ft" / "elev ~+1,180 ft (phone)" / "elev \u2212800 ft"
+    // (gps-geo.elevLine): only with a baseline set and an altitude term of 1 yd or more; never in
+    // tournament mode (altNow is null there). pl: the plays-like shown; D: its raw yards. '' = none.
+    function elevLineNow(r, pl, D) {
+        if (tournament() || !pl) return '';
+        var al = altNow(r), i = al && al.info;
+        if (!i || i.na) return '';
+        return G.elevLine({ ft: i.ft, baseFt: i.baseFt, src: i.src, altYd: G.elevAltYd(pl, D, i.ft, i.baseFt) });
+    }
     // THE PLAYS-LIKE NUMBER FOR ANY LAYOUT (012): the old line, layout C's panel and layout D's
     // pill all read this - { text: 'Plays like 249y', yards, exact, shown, unit: 'y' | 'm',
     // to: 'target' | 'green', from: 'me' | 'tee' } or null (tournament mode, no GPS Map, not
@@ -3857,9 +3868,10 @@
         if (nums && nums.onGreen) return null;
         var tp = playsAim(r), pl = playsTo(tp);
         if (!pl) return null;
-        var m = units() === 'm';
+        var m = units() === 'm', aimP = tp || aimAt(r);
         return { text: G.playsText(pl, units()), yards: pl.yards, exact: pl.exact, shown: m ? Math.round(pl.exact * G.M_PER_YD) : Math.round(pl.exact),
-            unit: m ? 'm' : 'y', to: tp ? 'target' : 'green', from: o.from };
+            unit: m ? 'm' : 'y', to: tp ? 'target' : 'green', from: o.from,
+            elev: elevLineNow(r, pl, aimP ? G.haversineMeters(o.pt, aimP) / G.M_PER_YD : null) };   // 070 part 2
     }
     // THE CLUB FOR IT (layout D's "· 3W"): the bag's club for the PLAYS-LIKE distance, from the
     // golfer's own spot only - { club: '3w', short: '3W', name: '3-wood', yd (the bag's), shown }
@@ -5862,7 +5874,7 @@
         put(rail, '.gps-wind'); put(rail, '.gps-green-view'); put(rail, '.gps-fly-btn'); put(rail, '.gps-zoom');
         // THE PLAYS-LIKE PILL: the raw yards in the dark circle, "Plays like 249y · 3W". Tap = ⓘ.
         var plays = mk('button', 'gps-ld-plays', { type: 'button', style: 'display:none', 'aria-label': 'Plays like - how it works' });
-        plays.innerHTML = '<span class="gps-ld-raw"></span><span class="gps-ld-pl"><small>Plays like</small><b class="gps-ld-pltext"></b></span>' + (plInfoSwitch() ? '<span class="gps-ld-i" aria-hidden="true">ⓘ</span>' : '');
+        plays.innerHTML = '<span class="gps-ld-raw"></span><span class="gps-ld-pl"><small>Plays like</small><b class="gps-ld-pltext"></b><small class="gps-ld-elev" style="display:none"></small></span>' + (plInfoSwitch() ? '<span class="gps-ld-i" aria-hidden="true">ⓘ</span>' : '');
         // THE BOTTOM: Mark shot, wide; under it Card | ‹ Hole 4 / Enter score › | + Game | Tools.
         var bot = mk('div', 'gps-ld-bottom', { role: 'group', 'aria-label': 'Actions' });
         put(bot, '.gps-mark-shot'); put(bot, '.gps-bottom'); put(bot, '.gps-actions');
@@ -5893,7 +5905,8 @@
         var pl = playsTo(S.target || null);
         if (!pl) return null;
         var u = units(), m = u === 'm';
-        var out = { raw: G.shownDistance(G.haversineMeters(o.pt, aim), u), plays: (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (m ? 'm' : 'y'), club: '', yours: !!pl.learned };
+        var out = { raw: G.shownDistance(G.haversineMeters(o.pt, aim), u), plays: (m ? Math.round(pl.exact * G.M_PER_YD) : pl.yards) + (m ? 'm' : 'y'), club: '', yours: !!pl.learned,
+            elev: elevLineNow(r, pl, G.haversineMeters(o.pt, aim) / G.M_PER_YD) };   // 070 part 2: the pill's small second line
         var B = bagApi();
         if (bagSwitch() && B && o.from === 'me' && !(B.needsSetup && B.needsSetup(bagGolfer()))) {
             var sg = B.suggestClub(bagNow(B), pl.exact);
@@ -6039,11 +6052,14 @@
             if (p) {
                 txt('.gps-ld-raw', p.raw);
                 txt('.gps-ld-pltext', p.plays + (p.club ? ' · ' + p.club : ''));
+                // 070 part 2: "elev +1,200 ft" under it - only with a baseline and 1 yd or more.
+                var ev = pill.querySelector('.gps-ld-elev');
+                if (ev) { if (ev.textContent !== (p.elev || '')) ev.textContent = p.elev || ''; ev.style.display = p.elev ? '' : 'none'; }
                 // 049: "yours" once the plays-like uses the golfer's own wind numbers for that club.
                 var sm = pill.querySelector('.gps-ld-pl small'), yb = sm && sm.querySelector('.gps-ld-yours');
                 if (sm && p.yours && !yb) { yb = document.createElement('b'); yb.className = 'gps-ld-yours'; yb.textContent = 'yours'; sm.appendChild(yb); }
                 else if (yb && !p.yours) yb.remove();
-                pill.setAttribute('aria-label', 'Plays like ' + p.plays + (p.club ? ', ' + p.club : '') + (p.yours ? ', from your shots' : '') + ' - how it works');
+                pill.setAttribute('aria-label', 'Plays like ' + p.plays + (p.club ? ', ' + p.club : '') + (p.yours ? ', from your shots' : '') + (p.elev ? ', ' + p.elev.replace(/^elev /, 'elevation ') : '') + ' - how it works');
             }
         }
         if (rsSwitch()) syncRoundChip();
@@ -7214,6 +7230,8 @@
         + '#gps-overlay .gps-ld-pl{display:flex;flex-direction:column;min-width:0;}'
         + '#gps-overlay .gps-ld-pl small{font:600 12px/1.2 ' + FONT + ';color:#4b5563;}'
         + '#gps-overlay .gps-ld-pl b{font:800 22px/1.1 ' + FONT + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        // 070 part 2: the elevation line, small, one line.
+        + '#gps-overlay .gps-ld-pl small.gps-ld-elev{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
         + '#gps-overlay .gps-ld-i{flex:0 0 auto;font-size:18px;color:#6b7280;}'
         // THE BOTTOM: Mark shot, then Card | Hole N / Enter score | + Game | Tools.
         + '#gps-overlay .gps-ld-bottom{position:absolute;z-index:7;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-direction:column;gap:8px;}'
