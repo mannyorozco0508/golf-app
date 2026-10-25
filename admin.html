@@ -14226,7 +14226,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (window.HardPanOfflineRound && window.HardPanOfflineRound.isLocal(currentMode)) {
                 clearTimeout(slowTimer); if (hpSlow) clearTimeout(hpSlow);
                 saveBtn.innerText = originalText; saveBtn.disabled = false;
-                if (!hpHeld) { uiFail('\u26A0\uFE0F Could not save this offline round on this phone (storage full?). Nothing was saved.'); return; }
+                if (!hpHeld) { uiFail('\u26A0\uFE0F Could not keep this offline round on this phone (storage full?) - try Save again.'); return; }
                 try { recordSavedRound(currentMode); } catch (e) {}
                 window.location.href = `index.html?game=${currentMode}`;
                 return;

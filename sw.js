@@ -4782,6 +4782,8 @@ const SHELL_FILES = [
     './venmo-pay.js',
     // URGENT-066 #3: Post to GHIN on the Results page (a link only; nothing sent).
     './ghin-post.js',
+    // 069 C: an offline Game Day round (local L- code) - never written under that code.
+    './offline-round.js',
     // URGENT-048: HardPanAuth - sign-in state + profile over the existing sign-in flows.
     './hp-auth.js',
     // URGENT-048: the needs-an-account nudge (Sign in to use Venmo; once per round).

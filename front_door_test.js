@@ -29,7 +29,9 @@ test('routes to existing screens; the ONE write is a new GPS round, through the 
     const writes = s.match(/ref\([^)]*\)\.(set|update|push|remove|transaction)\(/g) || [];
     assert.deepEqual(writes, ["ref('events/' + code).set(", "ref('events/' + code + '/scoreKeys/' + g).set(", "ref(op.path).update("], 'three writes: the new round, a round Round Setup saved with no signal (URGENT-009: its own queued op, sent once there is signal), and (Share, organizer) a group\u2019s scorekeeper code - its SHA-256 only');
     assert.match(s, /return \(G && typeof G\.ensureOrganizer === 'function'\) \? G\.ensureOrganizer\(db\)\.then\(go\) : go\(null\);/, 'the held round goes through the organizer gate too');
-    assert.match(s, /\{ timeoutMs: 15000, only: isHeldOp \}/, 'and only the held round ops - never another round\u2019s scores');
+    // 069 C: only the held round ops, and never an offline round's (local L- code - offline-round.js sends those).
+    assert.match(s, /\{ timeoutMs: 15000, only: notLocal \}/, 'and only the held round ops - never another round\u2019s scores');
+    assert.match(s, /var notLocal = function \(op\) \{ return isHeldOp\(op\) && !\(OR && typeof OR\.isLocalPath === 'function' && OR\.isLocalPath\(op\.path\)\); \};/, 'notLocal is the held round ops minus offline rounds');
     assert.match(s, /sha256\(key\)\.then\(function \(hash\) \{ made = hash; return d0\.ref\('events\/' \+ code \+ '\/scoreKeys\/' \+ g\)\.set\(hash\); \}\)/, 'the hash, never the code');
     assert.match(s, /else if \(a === 'newkey' && SH\.group != null && isOrganizer\(\)\) makeKey\(SH\.group\);/, 'the organizer only');
     assert.match(s, /G\.ensureOrganizer\(H\.db\)/); assert.match(s, /G\.stamp\(roundPayload\(key, name, card, opts\), uid\)/);

@@ -125,6 +125,9 @@ test('the phone offline, Start: the old "No signal" words, under the Game Day ca
     assert.ok(await j.tap('#gl-gameday'));
     await sleep(300);
     assert.ok(await j.tap('#ui-sheet-yes'));
+    // 069 C: with no signal Game Day now offers an offline round first; Not now gives the old words.
+    await until(j, 15000, (x) => /No signal right now/.test(x.sheet || ''));
+    assert.ok(await j.tap('#ui-sheet-no'), '069 C: "Start an offline round?" - Not now');
     const s = await until(j, 15000, (x) => !!x.note);
     assert.equal(s.note, '📴 No signal — try again when you have a connection.\nThe new round was not started; nothing was saved.');
     assert.equal(s.noteAfterGameDay, true, 'said under the card that was tapped, not where the sheet was');

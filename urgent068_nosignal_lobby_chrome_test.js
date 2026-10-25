@@ -101,6 +101,9 @@ test('the phone offline, Game Day tapped: the "No signal" words under Game Day, 
     const j = await lobby(OFFLINE);
     assert.ok(await j.tap('#gl-gameday'));
     assert.ok(await j.tap('#ui-sheet-yes'), '069: "Start a new round?" - Start');
+    // 069 C: with no signal Game Day now offers an offline round first; Not now gives the old words.
+    for (let i = 0; i < 60 && !(await j.evaluate("!!(document.getElementById('ui-sheet') && document.getElementById('ui-sheet').classList.contains('open') && /No signal right now/.test(document.getElementById('ui-sheet').innerText))")); i++) await sleep(250);
+    assert.ok(await j.tap('#ui-sheet-no'), '069 C: "Start an offline round?" - Not now');
     const { seen, s } = await watch(j, 15000, (x) => !!x.note);
     assert.ok(seen.every((x) => x.gd !== '⏳ Connecting…'), JSON.stringify(seen));
     assert.equal(s.note, '📴 No signal — try again when you have a connection.\nThe new round was not started; nothing was saved.');
