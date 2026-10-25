@@ -122,3 +122,75 @@ test('070 B: the tile fails -> the phone\'s own altitude, only while ON the cour
         assert.ok(elev.length >= 1 && elev.every((u) => u === G.terrainTile(MID).url), 'only the course\'s tile was asked for (and failed)');
     } finally { await j.close(); }
 });
+
+// ---- THE US: USGS FIRST (course points only), and the tile only once USGS has failed ----------------
+const US = { KEY: 'elev070_us', ID: '990000000000000071', CODE: 'ELU070', TEE: [33.4600, -111.9600] };
+US.MID = G.destination(US.TEE, 0, 350);
+const hu = { 1: { g: { f: P(G.destination(US.MID, 180, 12)), c: P(US.MID), b: P(G.destination(US.MID, 0, 12)) }, t: { b: P(US.TEE) } } };
+for (let n = 2; n <= 18; n++) { const t = G.destination(US.TEE, 90, 300 * (n - 1)); hu[n] = { g: { c: P(G.destination(t, 0, 350)) }, t: { b: P(t) } }; }
+const GAPI_US = { v: 1, built: 'test', links: { [US.KEY]: US.ID }, courses: { [US.ID]: { id: US.ID, club: 'Desert Mesa Golf Club', course: '', city: 'Phoenix', state: 'AZ', lat: US.TEE[0], lng: US.TEE[1], holes: 18, h: hu } } };
+// The spy answers USGS with 1,200 ft (or 503 when 'usgs070' = 'fail'); the tile with 365.5 m.
+const SPY_US = SPY.replace("if (/^(https?:)?\\/\\//.test(u))", "if (/epqs\\.nationalmap\\.gov/.test(u)) return Promise.resolve(sessionStorage.getItem('usgs070') === 'fail' ? new Response('', { status: 503 }) : new Response(JSON.stringify({ value: 1200 }), { status: 200, headers: { 'Content-Type': 'application/json' } })); if (/^(https?:)?\\/\\//.test(u))");
+assert.ok(SPY_US !== SPY, 'the US spy is wired');
+async function openUS(usgs) {
+    const r0 = wizardSavedRound({ code: US.CODE, golfers: 2, ownerUid: 'anon-cold', thru: 0, flights: false, names: ['Ann Alpha', 'Ben Bravo'], courseData: CD,
+        overrides: { activeCourseKey: US.KEY, courseName: 'Desert Mesa Golf Club', eventName: 'Elevation sources US', groupSizeOverrides: { 0: 2 } } });
+    r0.additionalGames = {}; r0.additionalGameInstances = {};
+    const pid = (r0.players[0] || {}).id;
+    const seed = "(function(){ var now = Date.now(), w = JSON.stringify({ at: now, src: 'weatherkit', obsAt: now - 20 * 60000, mph: 0, gustMph: null, toDeg: 180, fromDeg: 0, tempF: 70 });"
+        + " ['" + US.KEY + "', 'gapi_" + US.ID + "'].forEach(function (k) { localStorage.setItem('hardpan_wind_v1_' + k, w); });"
+        + " sessionStorage.setItem('usgs070', '" + usgs + "'); sessionStorage.setItem('tile070', 'ok');"
+        + " localStorage.setItem('hardpan_bag_v1', " + JSON.stringify(JSON.stringify(BAG)) + "); })();";
+    const PRE = 'window.__hardpanDoors = true; window.__simpleFlow = true;' + iapStub({ active: true }) + CFG + SPY_US + GEO + 'window.HardPanGolfApi = ' + JSON.stringify(GAPI_US) + ';' + 'window.__altM = 400;'
+        + "try{localStorage.setItem('golfapp_me_" + US.CODE + "','" + pid + "');localStorage.setItem('hardpan_round_side','gps|" + US.CODE + "');sessionStorage.setItem('groupPickDismissed:" + US.CODE + "','1');}catch(e){}"
+        + "if (!sessionStorage.getItem('seeded070u')) { sessionStorage.setItem('seeded070u', '1'); " + seed + " }";
+    const j = await openJourney({ db: { events: { [US.CODE]: r0 }, global_courses: { [US.KEY]: { name: 'Desert Mesa Golf Club', data: CD, location: { latitude: US.TEE[0], longitude: US.TEE[1], city: 'Phoenix', state: 'AZ' } } }, trips: {}, organizers: {}, tournaments: {} },
+        viewport: { width: 393, height: 852 }, webgl: true, preScript: PRE });
+    const ev = (x) => j.evaluate(x);
+    const until = async (x, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await ev(x)) return true; await sleep(250); } return false; };
+    await j.goto(fileUrl('index.html', 'game=' + US.CODE + '&group=1'), 5000);
+    await ev("(function(){ if (HardPanGps.side() !== 'gps') { var b = document.querySelector('#hp-card-bet [data-hp-bar=gps]'); if (b) b.click(); } return 1; })()");
+    assert.ok(await until("HardPanGps.isMounted() && HardPanGps.side() === 'gps' && !!document.querySelector('#gps-overlay .gps-map[data-ready]')", 30000), 'the map opens');
+    // The golfer 40 yds RIGHT of the hole's line, 151 yds out (off the line: the case where a position could leak).
+    const at = G.destination(G.destination(US.MID, 180, 151 * G.M_PER_YD), 90, 40 * G.M_PER_YD);
+    await ev('__moveTo(' + at[0] + ',' + at[1] + ')');
+    return { j, ev, until, at };
+}
+function usPrivacy(urls, at) {
+    const epqs = urls.filter((u) => /epqs\.nationalmap\.gov/.test(u));
+    epqs.forEach((u) => {
+        const m = /x=(-?[\d.]+)&y=(-?[\d.]+)/.exec(u); assert.ok(m, u);
+        const p = [Number(m[2]), Number(m[1])];
+        assert.ok(G.haversineMeters(p, at) > 25, 'a USGS request is a course point, never the golfer (' + Math.round(G.haversineMeters(p, at)) + ' m from them): ' + u);
+        assert.ok((m[1].split('.')[1] || '').length <= 5 && (m[2].split('.')[1] || '').length <= 5, 'to 5 decimals: ' + u);
+    });
+    urls.forEach((u) => { assert.ok(!/altitude|[?&]alt=/i.test(u) && u.indexOf('1312') === -1, 'the phone\'s altitude (400 m = 1,312 ft) is never sent: ' + u); });
+    urls.filter((u) => /terrarium/.test(u)).forEach((u) => assert.strictEqual(u, G.terrainTile(US.MID).url, 'the tile is the course point\'s'));
+    return epqs;
+}
+
+test('070 C (US): USGS answers -> the course\'s height is USGS / the course record, no tile asked; the phone\'s altitude not used; privacy', { timeout: 300000 }, async () => {
+    const { j, ev, until, at } = await openUS('ok');
+    try {
+        assert.ok(await until("(function(){ var c = HardPanGps.courseElev(); return c && (c.src === 'usgs' || c.src === 'course'); })()", 30000), 'USGS heights');
+        const ce = JSON.parse(await ev('JSON.stringify(HardPanGps.courseElev())'));
+        assert.equal(Math.round(ce.ft), 1200);
+        await sleep(1500);
+        const urls = JSON.parse(await ev('JSON.stringify(__urls())'));
+        const epqs = usPrivacy(urls, at);
+        assert.ok(epqs.length > 0, 'USGS was asked (course points)');
+        assert.equal(urls.filter((u) => /terrarium/.test(u)).length, 0, 'no tile while USGS answers');
+    } finally { await j.close(); }
+});
+
+test('070 D (US): USGS down -> the terrain tile (the course point\'s), never the golfer; privacy', { timeout: 300000 }, async () => {
+    const { j, ev, until, at } = await openUS('fail');
+    try {
+        assert.ok(await until("(function(){ var c = HardPanGps.courseElev(); return c && c.src === 'tile'; })()", 40000), 'the tile after USGS failed');
+        const ce = JSON.parse(await ev('JSON.stringify(HardPanGps.courseElev())'));
+        assert.ok(Math.abs(ce.ft - 1199) <= 1);
+        const urls = JSON.parse(await ev('JSON.stringify(__urls())'));
+        usPrivacy(urls, at);
+        assert.equal(urls.filter((u) => /terrarium/.test(u)).length, 1, 'one tile');
+    } finally { await j.close(); }
+});
