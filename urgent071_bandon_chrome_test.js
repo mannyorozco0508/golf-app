@@ -143,8 +143,12 @@ test('the merge / dedupe with the live "bandon" answer: every GolfAPI row shows,
     ['Bandon Dunes Golf Resort', 'Bandon Trails', 'Bandon Preserve'].forEach((n) => assert.equal(osm.indexOf(n), -1, n + ' not twice: ' + JSON.stringify(osm)));
     ['Shortys', 'Bandon Sheep Ranch'].forEach((n) => assert.ok(osm.indexOf(n) !== -1, n + ' kept: ' + JSON.stringify(osm)));
     // closest first inside a name group (067): the distances never go down among the "Bandon…" rows that have one
-    const ds = s.list.filter((t) => /^(WEB|OSM) Bandon/.test(t)).map((t) => { const m = / \| ([\d.,]+) mi/.exec(t); return m ? Number(m[1].replace(/,/g, '')) : null; }).filter((d) => d != null);
-    assert.deepEqual(ds, ds.slice().sort((a, b) => a - b), 'closest first: ' + JSON.stringify(ds));
+    // closest first inside each group (067), and (071) the GolfAPI rows above the OSM rows of the same town
+    const dist = (kind) => s.list.filter((t) => new RegExp('^' + kind + ' Bandon').test(t)).map((t) => { const m = / \| ([\d.,]+) mi/.exec(t); return m ? Number(m[1].replace(/,/g, '')) : null; }).filter((d) => d != null);
+    ['WEB', 'OSM'].forEach((k) => { const ds = dist(k); assert.deepEqual(ds, ds.slice().sort((a, b) => a - b), k + ' closest first: ' + JSON.stringify(ds)); });
+    const bandon = s.list.filter((t) => /^(WEB|OSM) Bandon/.test(t));
+    assert.ok(bandon.findIndex((t) => /^OSM/.test(t)) > bandon.map((t) => /^WEB Bandon Dunes Golf Resort/.test(t)).lastIndexOf(true), 'OSM rows after the GolfAPI ones: ' + JSON.stringify(bandon));
+    assert.ok(/^WEB/.test(s.list[0]), 'a GolfAPI row first: ' + s.list[0]);
     assert.ok(pd.list.some((t) => /^WEB Bandon Dunes Golf Resort \(Pacific Dunes\) \|.*✓ GPS/.test(t)), 'Pacific Dunes: ' + JSON.stringify(pd.list));
 });
 
@@ -183,4 +187,52 @@ test('OpenStreetMap slow (a minute or more on its public servers): picked after 
     assert.equal(early.start && early.start.disabled, false, 'Start Round is live while the holes come');
     assert.match(late.note, /GPS from OpenStreetMap \(3 of 18 holes mapped\)/);
     assert.equal(late.gps, 3);
+});
+
+// ---- THE PHONE'S CASE (found on the Simulator, bb3a20a1): Round Setup loads gps-live.js only when a course gets
+// picked. Not at a course -> nothing picked -> no gps-live -> the search never asked, the OSM rows were all.
+// These open the page WITHOUT the tests' usual gps-live injection, as the app does.
+const openPhone = (at, mode, steps, pre) => arriveCold({ url: fileUrl('admin.html', 'start=quick'), db: { events: {}, global_courses: {}, trips: {}, tournaments: {}, organizers: {} }, settleMs: 2500, viewport: { width: 393, height: 852 },
+    preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + FUNCS(mode) + (pre || '') + "try{sessionStorage.setItem('hardpan_simple_flow','gps');}catch(e){}", steps: [
+        { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: at[0], longitude: at[1], accuracy: 10 } } },
+        { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
+        { sleep: 2500 }, X("(function(){ var b=document.querySelector('[data-sf=relocate]'); if(b) b.click(); return 'relocate'; })()"),
+        { waitFor: "!!document.getElementById('sf-q') && document.querySelectorAll('#sf [data-sf-course]').length > 0", timeout: 40000 }, { sleep: 800 }].concat(steps) });
+const LIVE_STATE = X("JSON.stringify({ live: !!window.HardPanGpsLive, picked: document.getElementById('course-select').value })");
+const PAPAGO = [33.4560, -111.9480], AWAY_AZ = [33.4300, -112.5800];   // AWAY_AZ: no course within 0.5 mi - nothing picked
+
+test('REQUIRED (the phone\'s case): not at a course, gps-live not loaded by the page - typing "Bandon" loads it, asks once, and the first rows are GolfAPI ✓ GPS (not "Not set up yet")', { timeout: 150000 }, async () => {
+    const r = await openPhone(AWAY_AZ, 'live', [LIVE_STATE, TYPE('Bandon'), { sleep: 4000 }, { waitFor: "document.querySelectorAll('#sf [data-sf-web]').length >= 8", timeout: 15000 }, { sleep: 600 }, X(SF)]);
+    assert.equal(r.ok, true, r.reason);
+    const [st, s] = J(r);
+    assert.equal(st.live, false, 'the page had not loaded gps-live (the phone\'s case)');
+    assert.equal(st.picked, '', 'nothing picked');
+    assert.deepEqual(s.fn.filter((c) => c[0] === 'gpsSearch').map((c) => c[1].name), ['bandon'], 'asked once');
+    const first = s.list.slice(0, 5);
+    assert.ok(first.every((t) => /^WEB .*✓ GPS/.test(t)), 'the first 5 rows are GolfAPI ✓ GPS: ' + JSON.stringify(s.list));
+    const iOsm = s.list.findIndex((t) => /^OSM /.test(t)), lastGps = s.list.map((t) => /^WEB .*✓ GPS/.test(t)).lastIndexOf(true);
+    assert.ok(iOsm === -1 || iOsm > s.list.findIndex((t) => /Pacific Dunes/.test(t)), 'OSM rows after the resort\'s GolfAPI rows: ' + JSON.stringify(s.list) + ' ' + lastGps);
+});
+
+test('typing fires at most one call per finished word (a hesitation mid-word is not a search); "bandon dunes" then comes from this phone\'s "bandon" answer - 0 calls', { timeout: 150000 }, async () => {
+    const T1 = (v) => X("(function(){ var i=document.getElementById('sf-q'); i.focus(); i.value=" + JSON.stringify(v) + "; i.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
+    const r = await openPhone(AWAY_AZ, 'live', [T1('B'), { sleep: 160 }, T1('Ba'), { sleep: 160 }, T1('Ban'), { sleep: 160 }, T1('Band'), { sleep: 560 }, T1('Bando'), { sleep: 160 }, T1('Bandon'),
+        { sleep: 3500 }, X(SF), T1('Bandon '), { sleep: 160 }, T1('Bandon D'), { sleep: 160 }, T1('Bandon Du'), { sleep: 160 }, T1('Bandon Dun'), { sleep: 160 }, T1('Bandon Dune'), { sleep: 160 }, T1('Bandon Dunes'), { sleep: 3000 }, X(SF)]);
+    assert.equal(r.ok, true, r.reason);
+    const [a, b] = J(r);
+    assert.deepEqual(a.fn.filter((c) => c[0] === 'gpsSearch').map((c) => c[1].name), ['bandon'], 'one call for "Bandon" (none for "band")');
+    assert.deepEqual(b.fn.filter((c) => c[0] === 'gpsSearch').map((c) => c[1].name), ['bandon'], '"Bandon Dunes": 0 more calls');
+    assert.ok(b.list.filter((t) => /^WEB Bandon Dunes Golf Resort/.test(t)).length >= 5, 'the resort\'s courses shown from the saved answer: ' + JSON.stringify(b.list));
+    assert.match(b.text, /Search more courses/, '"Search more courses" offered');
+});
+
+test('a saved match (Papago, a course the app has) shows with 0 gpsSearch calls; "Search more courses" calls once', { timeout: 150000 }, async () => {
+    const r = await openPhone(AWAY_AZ, 'live', [TYPE('Papago'), { sleep: 3500 }, X(SF),
+        X("(function(){ var b=document.getElementById('sf-more'); if(b) b.click(); return b ? 'more' : 'NO BUTTON'; })()"), { sleep: 2500 }, X(SF)]);
+    assert.equal(r.ok, true, r.reason);
+    const [s, more] = J(r);
+    assert.ok(s.list.some((t) => /^LOCAL Papago/.test(t)), 'Papago shown: ' + JSON.stringify(s.list));
+    assert.equal(s.fn.filter((c) => c[0] === 'gpsSearch').length, 0, '0 gpsSearch calls');
+    assert.match(s.text, /Search more courses/);
+    assert.deepEqual(more.fn.filter((c) => c[0] === 'gpsSearch').map((c) => c[1].name), ['papago'], '"Search more courses": one call');
 });

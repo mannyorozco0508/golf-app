@@ -531,14 +531,56 @@
             .sort(function (a, b) { return (b.s - a.s) || (b.c.ready - a.c.ready) || a.c.name.localeCompare(b.c.name); });
     }
     function webKey(raw) { var w = qWords(raw).join(' '); return w.length >= 3 ? w : String(raw || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
-    function webSearch() {
+    // URGENT-071 (Manny's phone, 10:45 AM: "Bandon" -> 5 "Not set up yet" rows, no online rows). THE CAUSE:
+    // Round Setup loads gps-live.js only inside gpsGolfApiLoad(), which runs when a course gets PICKED (its
+    // GPS badge / link). A golfer who isn't at a course has nothing picked, so HardPanGpsLive never existed
+    // and this search returned at once - no call, no cached answer, no line - every time. Now gps-live is
+    // loaded on demand (the same loader), and the search runs when it is in.
+    var liveWait = null;
+    function needLive(cb) {
+        if (W.HardPanGpsLive) { cb(); return; }
+        if (!liveWait) {
+            var go = fn('gpsGolfApiLoad') ? function () { return W.gpsGolfApiLoad(); } : fn('gpsLoadScript') ? function () { return W.gpsLoadScript('gps-live.js', function () { return !!W.HardPanGpsLive; }); } : null;
+            if (!go) { cb(); return; }
+            try { (W.__sfLiveLoad = W.__sfLiveLoad || []).push(Date.now()); } catch (e) {}
+            liveWait = Promise.resolve().then(go).then(function () { liveWait = null; }, function () { liveWait = null; });
+        }
+        liveWait.then(cb);
+    }
+    // 071 (Manny: "saved courses first"): a course already on the phone or saved in Firebase (the course list:
+    // our cards + every course pulled for anyone, global_courses) whose name is what was typed (exactly,
+    // starts with it, or holds it) - or this phone's answer for a SHORTER search ("bandon" for "bandon
+    // dunes") - is shown at once, with no gpsSearch call; "Search more courses" under the results asks.
+    function savedHits(raw) { return localHits(courses(), raw).filter(function (x) { return x.s >= 3 || nameTier(x.c.name, raw, x.s) <= 1; }); }
+    function prefixCache(k, raw) {
+        var best = null;
+        try { Object.keys(W.localStorage || {}).forEach(function (key) {
+            if (key.indexOf(WEB) !== 0) return;
+            var p = key.slice(WEB.length);
+            if (p.length < 3 || p === k || k.indexOf(p) !== 0 || (best && best.p.length >= p.length)) return;
+            var v = null; try { v = JSON.parse(ls(key) || 'null'); } catch (e) {}
+            if (v && v.at && Date.now() - v.at < WEB_MS) best = { p: p, v: v };
+        }); } catch (e) {}
+        if (!best) return null;
+        var rows = (best.v.results || []).filter(function (m) { return Math.max(matchScore({ name: m.name || m.club }, raw), matchScore({ name: (m.club || '') + ' ' + (m.course || '') }, raw)) >= 2; });
+        return rows.length ? rows : null;
+    }
+    function webSearch(force) {
         var raw = String(S.q || '').trim(), L = W.HardPanGpsLive;
-        if (S.step !== 1 || raw.length < 3 || !liveOn() || !L || !L.search) return;
+        if (S.step !== 1 || raw.length < 3) return;
+        if (!L) { needLive(function () { if (W.HardPanGpsLive) webSearch(force); }); return; }   // 071
+        if (!liveOn() || !L.search) return;
         var k = webKey(raw);
-        if (k.length < 3 || (S.web && S.web.k === k && S.web.state !== 'error')) return;
-        if (localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3) return;
+        if (k.length < 3 || (!force && S.web && S.web.k === k && S.web.state !== 'error')) return;
+        if (force && S.web && S.web.k === k && S.web.state === 'busy') return;
         var hit = null; try { hit = JSON.parse(ls(WEB + k) || 'null'); } catch (e) {}
         if (hit && hit.at && Date.now() - hit.at < WEB_MS) { S.web = { k: k, state: 'ok', results: hit.results || [] }; render1(); return; }
+        if (!force) {
+            // (the old rule - 3 good matches on the phone, no online search - is kept, now with "Search more")
+            if (localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3 || savedHits(raw).length) { S.web = { k: k, state: 'saved', more: true }; render1(); return; }
+            var pre = prefixCache(k, raw);
+            if (pre) { S.web = { k: k, state: 'ok', results: pre, more: true }; render1(); return; }
+        }
         if (typeof navigator !== 'undefined' && navigator.onLine === false) { S.web = { k: k, state: 'offline' }; render1(); return; }
         var seq = S.webSeq = (S.webSeq || 0) + 1;   // URGENT-035: only the newest search's answer is used
         S.web = { k: k, state: 'busy', seq: seq };
@@ -593,6 +635,8 @@
                 + '<button type="button" class="sf-cta" data-sf="webback" style="margin-bottom:8px;">Pick another course</button>'
                 + '<button type="button" class="sf-btn" data-sf="webrequest" style="width:100%;min-height:46px;">Request this course</button></div>';
         }
+        var MORE = '<button type="button" class="sf-link" id="sf-more" data-sf="websearchmore" style="display:block;font-size:14px;margin:2px 2px 10px;padding:0;min-height:0;">\ud83d\udd0d Search more courses \u203a</button>';
+        if (w.state === 'saved') return MORE;
         if (w.state === 'busy') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;display:flex;align-items:center;gap:8px;"><span class="sf-spin" aria-hidden="true">⏳</span>Searching all courses…</div>';
         if (w.state === 'offline') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">No signal — searching all courses needs a connection.</div>';
         if (w.state === 'signin') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">Sign in to search all courses. <button type="button" class="sf-link" data-sf="websignin" style="padding:0 0 0 4px;min-height:0;">Sign in</button></div>';
@@ -611,7 +655,7 @@
         // 067: the rows themselves are drawn by step1, in ONE list with the courses on the phone (best name
         // match, then closest); this box keeps only the online search's own line (searching / no signal / ...).
         S.webRows = rows;
-        return '';
+        return w.more ? MORE : '';
     }
     // ---- 064: OPENSTREETMAP-ONLY COURSES IN SEARCH (Manny, Goldendale: "show OSM-only courses as 'Not set
     // up yet · Add this course'") ---------------------------------------------------------------------
@@ -649,7 +693,11 @@
     function searchOrder(items, raw) {
         items.forEach(function (x) { x.t = nameTier(x.name, raw, x.s); });
         return items.sort(function (a, b) {
-            return (a.t - b.t) || ((a.d == null) - (b.d == null)) || ((a.d || 0) - (b.d || 0)) || String(a.name).localeCompare(String(b.name));
+            // 071: a "Not set up yet" OpenStreetMap row sorts as 3 mi farther - GolfAPI / our ✓ GPS rows in the
+            // same town come first (Bandon: the OSM points were 1 mi closer than the resort's, so the
+            // first two rows a golfer saw over the keyboard were "Add this course").
+            var da = a.d == null ? null : a.d + (a.kind === 'osm' ? 3 : 0), db = b.d == null ? null : b.d + (b.kind === 'osm' ? 3 : 0);
+            return (a.t - b.t) || ((da == null) - (db == null)) || ((da || 0) - (db || 0)) || String(a.name).localeCompare(String(b.name));
         });
     }
     function osmRowHtml(c, d) {
@@ -713,8 +761,9 @@
         try { (W.HardPanGpsCoverage ? Object.keys(W.HardPanGpsCoverage) : []).some(function (st) { return ((W.HardPanGpsCoverage[st] || {}).rows || []).some(function (r) { if (String(r[0]) === String(id)) { c = { key: null, osm: r[0], name: r[1], city: r[2] || '', state: st, pt: r[7] != null ? [r[7], r[8]] : null, greens: Number(r[3]) || 0, holes: Number(r[5]) || 0 }; return true; } return false; }); }); } catch (e) {}
         return c || null;
     }
-    function tapOsm(id, name, city, state) {
+    function tapOsm(id, name, city, state, again) {
         var row = osmRowFor(id, name) || { osm: id, name: name, city: city, state: state, pt: null, greens: 0, holes: 18 };
+        if (!W.HardPanGpsLive && !again) { S.osmPick = { row: row, state: 'busy' }; render1(); var mine = S.osmPick; needLive(function () { if (S.osmPick === mine) tapOsm(id, name, city, state, true); }); return; }   // 071: GolfAPI first needs gps-live
         try { (W.__sfOsmTap = W.__sfOsmTap || []).push(name); } catch (e) {}
         var twins = ((S.web && S.web.results) || []).filter(function (m) { return m.gps && osmTwinOf(row, m); });
         if (twins.length === 1) { webPull(twins[0].id, twins[0].name || twins[0].club); return; }
@@ -1087,7 +1136,7 @@
             var rowsHtml = searchOrder(items, rawQ).map(function (x) { return x.kind === 'local' ? rowHtml(x.c, x.d, x.c.key === key) : x.kind === 'web' ? webRowHtml(x.m, x.d) : osmRowHtml(x.c, x.d); }).join('');
             // 071: the online search's line (searching / couldn't search · Try again) sits OVER the rows while the
             // "Not set up yet" rows are on screen, so they never look like the whole answer.
-            var webTop = web && osm.length && S.web && !S.web.pull;
+            var webTop = web && osm.length && S.web && !S.web.pull && !/sf-more/.test(web);
             body += osmPickBox() + '<div class="sf-h">RESULTS</div>' + (webTop ? web : '') + rowsHtml + (webTop ? '' : web)
                 + (!hits.length && !web && !osm.length && !(S.webRows || []).length && !waiting ? '<div class="sf-note">' + (q.trim().length < 3 ? 'Keep typing — 3 letters searches all courses.' : 'No course found by that name.') + '</div>' : '')
                 + '<button type="button" class="sf-link muted" data-sf="fullcourse" style="font-size:13px;">Not listed? Add a course ›</button>';
@@ -1782,6 +1831,7 @@
         if (a === 'osmmap') { var op = S.osmPick; if (op && op.row) osmGps(op.row); return; }
         if (a === 'webback') { if (S.web) S.web.pull = null; S.pend = null; render1(); var q2 = $('sf-q'); if (q2) q2.focus(); return; }
         if (a === 'webretry') { S.web = null; webSearch(); return; }
+        if (a === 'websearchmore') { webSearch(true); return; }   // 071: the golfer asks for the online search
         if (a === 'websignin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t3 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t3); show(true); S.web = null; webSearch(); render1(); } }, 600); } return; }
         if (a === 'webrequest') {
             var wp = (S.web && S.web.pull) || {};
@@ -1825,6 +1875,7 @@
             // online only after typing pauses: ~400 ms, longer for a slow typist (twice their own gap
             // between letters, up to 800 ms) so a pause is a pause, never a call per letter.
             S.q = t.value; clearTimeout(S.wt); S.osmPick = null;
+            if (!W.HardPanGpsLive && String(S.q).trim().length >= 2) needLive(function () {});   // 071: in by the time typing stops
             var now = Date.now(), gap = S.lastKey ? now - S.lastKey : 0; S.lastKey = now;
             if (gap > 0 && gap < 1500) S.gaps = (S.gaps || []).concat(gap).slice(-4);
             var gs = (S.gaps || []).slice().sort(function (a, b) { return a - b; }), med = gs.length ? gs[Math.floor(gs.length / 2)] : 0;
