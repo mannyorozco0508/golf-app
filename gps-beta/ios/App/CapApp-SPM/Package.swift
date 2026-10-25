@@ -12,13 +12,13 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.5.1"),
-        .package(name: "CapacitorFilesystem", path: "../../../node_modules/@capacitor/filesystem"),
-        .package(name: "CapacitorShare", path: "../../../node_modules/@capacitor/share"),
-        .package(name: "CapacitorFirebaseAuthentication", path: "../../../node_modules/@capacitor-firebase/authentication", traits: ["Google"]),
-        .package(name: "CapacitorPushNotifications", path: "../../../node_modules/@capacitor/push-notifications"),
-        .package(name: "CapacitorFirebaseMessaging", path: "../../../node_modules/@capacitor-firebase/messaging"),
-        .package(name: "CapacitorGeolocation", path: "../../../node_modules/@capacitor/geolocation"),
-        .package(name: "RevenuecatPurchasesCapacitor", path: "../../../node_modules/@revenuecat/purchases-capacitor")
+        .package(name: "CapacitorFilesystem", path: "../../../../../golf-app-069-offline/gps-beta/node_modules/@capacitor/filesystem"),
+        .package(name: "CapacitorShare", path: "../../../../../golf-app-069-offline/gps-beta/node_modules/@capacitor/share"),
+        .package(name: "CapacitorFirebaseAuthentication", path: "../../../../../golf-app-069-offline/gps-beta/node_modules/@capacitor-firebase/authentication", traits: ["Google"]),
+        .package(name: "CapacitorPushNotifications", path: "../../../../../golf-app-069-offline/gps-beta/node_modules/@capacitor/push-notifications"),
+        .package(name: "CapacitorFirebaseMessaging", path: "../../../../../golf-app-069-offline/gps-beta/node_modules/@capacitor-firebase/messaging"),
+        .package(name: "CapacitorGeolocation", path: "../../../../../golf-app-069-offline/gps-beta/node_modules/@capacitor/geolocation"),
+        .package(name: "RevenuecatPurchasesCapacitor", path: "../../../../../golf-app-069-offline/gps-beta/node_modules/@revenuecat/purchases-capacitor")
     ],
     targets: [
         .target(

@@ -388,7 +388,7 @@
             ga: golfapiFor(key) || null, osmOn: osmOn(key), osmTable: (typeof window !== 'undefined' && window.HardPanGpsCourses) || {}, lookedUp: lookedUp(key) });
         var ga = golfapiFor(key);
         if (ga) return ga;
-        if (!osmOn(key)) return null;   // GPS LIVE: GolfAPI or nothing - Tools > Set the green
+        if (!osmOn()) return null;   // GPS LIVE: GolfAPI or nothing - Tools > Set the green
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
         // Bundled first; else what an OpenStreetMap lookup found for this course
         // (this phone's, or the shared one) - see ANY COURSE below.
@@ -543,7 +543,7 @@
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
         // No pull on the tee: a course the phone has is used as the pick left it.
         if (osmRecord(key)) { fin(true); return; }
-        if (!osmOn(key)) {
+        if (!osmOn()) {
             var L = window.HardPanGpsLive;
             if (!liveOn() || !L) { fin(false); return; }
             L.ensure(key).then(function (got) {
