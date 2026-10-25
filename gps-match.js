@@ -81,6 +81,9 @@
     // Its lookup is kept on this phone only (never offered to course_gps).
     var OSM_ONLY_RE = /^osm_[wr]\d+$/;
     function osmOnly(key) { return cfg().osmOnlyCourses !== false && OSM_ONLY_RE.test(String(key || '')); }
+    // 071: the "don't ask again" marks for an OSM-only course: a real empty answer 1 day (else 7), a failure
+    // 10 minutes (else 1 hour) - written as an earlier time so the usual RETRY_* windows give those lengths.
+    function osmOnlyMark(key, none) { var t = Date.now(); if (!OSM_ONLY_RE.test(String(key || ''))) return t; return none ? t - (RETRY_NONE_MS - 24 * 3600 * 1000) : t - (RETRY_ERR_MS - 10 * 60 * 1000); }
     function osmOn(key) { return cfg().osm !== false || osmOnly(key); }
     function known(key, of, name, loc) {
         var ga = golfapiKnown(key, of, name, loc);
@@ -156,7 +159,7 @@
         if (pending[key]) return Promise.resolve({ status: 'ask', n: 0, of: of, candidates: pending[key].candidates, how: pending[key].how });
         if (!G() || typeof fetch !== 'function' || !opts.loc) return Promise.resolve(verdict({}, of, { source: 'none', how: opts.loc ? 'offline' : 'no course location' }));
         var tried = lsGet(OSM_LOOKUP + 'tried_' + key);
-        if (!opts.force && !opts.recheck && tried && Date.now() - tried.at < (tried.none ? RETRY_NONE_MS : RETRY_ERR_MS)) return Promise.resolve(verdict({}, of, { source: 'none', how: 'looked up recently, nothing found' }));
+        if (!opts.force && !opts.recheck && tried && Date.now() - tried.at < (tried.none ? RETRY_NONE_MS : RETRY_ERR_MS)) return Promise.resolve(tried.none ? verdict({}, of, { source: 'none', how: 'looked up recently, nothing found' }) : verdict({}, of, { source: 'none', how: 'OpenStreetMap could not be reached', kept: false }));   // (071: a recent failure is said as one)
         lsSet(CHECKED + key, { at: Date.now() });
         // 071: ONE lookup per course at a time on this page (the search's OSM pick and Round Setup's own link
         // on the pick asked together; the public server then refused both).
@@ -174,15 +177,17 @@
         var key = opts.key;
         var want = { name: opts.name || '', holes: of, pars: opts.pars || [], yards: opts.yards || [], nines: opts.nines || ninesFromName(opts.name),
                      choice: lsGet(CHOICE + key) || opts.choice || null };
-        return overpass(G().golfCoursesQuery(opts.loc)).then(function (j) {
+        // 071: an overloaded Overpass server answers 200 with NO elements and a "remark" naming the error
+        // ("runtime error: Query timed out", "out of memory"...): that is the server failing, not an empty map -
+        // thrown, so it is "could not be reached". A clean empty answer is a real "nothing there".
+        var busy = function (j) { if (j && typeof j.remark === 'string' && /error|timed? ?out|memory|rate|limit/i.test(j.remark)) throw new Error('overpass remark'); return j; };
+        return overpass(G().golfCoursesQuery(opts.loc)).then(busy).then(function (j) {
             var course = G().pickGolfCourse(j && j.elements, opts.name || '');
             if (!course) return null;
-            return overpass(G().courseHolesQuery(course)).then(function (raw) { return { course: course, raw: raw }; });
+            return overpass(G().courseHolesQuery(course)).then(busy).then(function (raw) { return { course: course, raw: raw }; });
         }).then(function (got) {
-            // (071: an OSM-only course IS in OpenStreetMap - the app's list came from it - so "not found" there is the
-            // public server failing (an overloaded server answers 200 with no elements): unreachable, asked again)
-            if (!got && OSM_ONLY_RE.test(String(key || ''))) return verdict({}, of, { source: 'none', how: 'OpenStreetMap could not be reached', kept: false });
-            if (!got) { if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: true }); return verdict({}, of, { source: 'none', how: 'not in OpenStreetMap near the course' }); }
+            // (071: for an OSM-only course a REAL empty answer is kept 1 day, not 7 - the app's own list says it is mapped)
+            if (!got) { if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: osmOnlyMark(key, true), none: true }); return verdict({}, of, { source: 'none', how: 'not in OpenStreetMap near the course' }); }
             var ph = G().pickHoleSet(got.raw.elements, want);
             var p = { raw: got.raw, course: got.course, want: want, candidates: ph.candidates.length, how: ph.how };
             if (!ph.set && ph.step === 5) {
@@ -190,11 +195,11 @@
                 pending[key] = { raw: got.raw, course: got.course, want: want, candidates: ph.candidates, how: ph.how };
                 return { status: 'ask', n: 0, of: of, candidates: ph.candidates, how: ph.how, step: 5 };
             }
-            if (!ph.set) { if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: true }); return verdict({}, of, { source: 'none', step: 0, how: ph.how }); }
+            if (!ph.set) { if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: osmOnlyMark(key, true), none: true }); return verdict({}, of, { source: 'none', step: 0, how: ph.how }); }
             return finish(key, opts, p, ph, guard);
         }).catch(function () {
-            // (071: an OSM-only course has no other source - the map asks again rather than wait an hour)
-            if (!minN && !OSM_ONLY_RE.test(String(key || ''))) lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: false });
+            // (071: an OSM-only course has no other source - asked again after 10 minutes, not an hour)
+            if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: osmOnlyMark(key, false), none: false });
             return verdict({}, of, { source: 'none', how: 'OpenStreetMap could not be reached', kept: false });
         });
     }

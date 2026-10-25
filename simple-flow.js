@@ -787,7 +787,7 @@
     }
     // Not in GolfAPI: the course's own key, a par-4 card on this phone, its OpenStreetMap holes when mapped.
     var OSM_CARD = {};
-    function osmGps(row) {
+    function osmGps(row, force) {
         var key = osmKey(row);
         if (!key) { S.osmPick = null; addOsm(row.name, row.city, row.state); return; }
         var n = Number(row.holes) === 9 ? 9 : 18, data = [];
@@ -826,7 +826,7 @@
         // (Round Setup loads the map helpers when a course is picked: loaded here first, the same way.)
         var need = function (src, ok) { return ok() || !fn('gpsLoadScript') ? Promise.resolve(ok()) : W.gpsLoadScript(src, ok); };
         need('gps-geo.js', function () { return !!W.HardPanGeo; }).then(function () { return need('gps-match.js', function () { return !!W.HardPanGpsMatch; }); })
-            .then(function () { M = W.HardPanGpsMatch; return M && M.match ? M.match({ key: key, name: row.name, loc: row.pt, holes: n }) : null; })
+            .then(function () { M = W.HardPanGpsMatch; return M && M.match ? M.match({ key: key, name: row.name, loc: row.pt, holes: n, force: !!force }) : null; })
             .then(function (r) { clearTimeout(t); done(r); }, function () { clearTimeout(t); done(null); });
     }
     // While it looks: "Looking up …"; more than one GolfAPI course in that outline: "Which one?".
@@ -1832,7 +1832,7 @@
         if (a === 'fullcourse') { var wn = $('sf-new-course-where'); if (wn) wn.remove(); away(step('course'), 'Course picked'); return; }
         if (a === 'signin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t2 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t2); show(true); S.lookup = null; lookup(courseKey(), courseName()); render(); } }, 600); } return; }
         if (a === 'osmpars') { var on = OSM_CARD[courseKey()] || {}; addOsm(on.name || courseName(), on.city || '', on.state || ''); return; }
-        if (a === 'osmretry') { var orc = OSM_CARD[courseKey()]; if (orc && orc.row) { S.q = orc.row.name; osmGps(orc.row); } return; }   // 071
+        if (a === 'osmretry') { var orc = OSM_CARD[courseKey()]; if (orc && orc.row) { S.q = orc.row.name; osmGps(orc.row, true); } return; }   // 071 (the golfer asked: no wait)
         if (a === 'osmskip') { var os = S.osmPick; if (os && os.skip) os.skip(); return; }
         if (a === 'osmmap') { var op = S.osmPick; if (op && op.row) osmGps(op.row); return; }
         if (a === 'webback') { if (S.web) S.web.pull = null; S.pend = null; render1(); var q2 = $('sf-q'); if (q2) q2.focus(); return; }

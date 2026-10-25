@@ -43,7 +43,8 @@ const FUNCS = (mode) => "(function(){ window.__fn = []; var of = window.fetch; v
     // OPENSTREETMAP (Overpass), stood in: Shortys' outline, then 3 holes whose lines end in their greens.
     + "  if (/interpreter/.test(s)) { window.__over++; var q = decodeURIComponent(String(init && init.body || '').replace(/^data=/, '')); var j;"
     + "   if (window.__fail504 > 0) { window.__fail504--; return Promise.resolve({ ok: false, status: 504, json: function () { return Promise.reject(new Error('html')); } }); }"
-    + "   if (window.__overNone) j = { elements: [] };"
+    + "   if (window.__overBusy) j = { elements: [], remark: 'runtime error: Query timed out in query at line 1 after 26 seconds.' };"
+    + "   else if (window.__overNone) j = { elements: [] };"
     + "   else if (/leisure/.test(q)) j = { elements: [{ type: 'way', id: 1540940976, tags: { leisure: 'golf_course', name: 'Shortys' }, center: { lat: 43.1789, lon: -124.394 } }] };"
     + "   else { var el = []; for (var n = 1; n <= 3; n++) { var la = 43.1789 + n * 0.0015, lo = -124.394; el.push({ type: 'way', id: 900 + n, tags: { golf: 'hole', ref: String(n), par: '3' }, geometry: [{ lat: la, lon: lo }, { lat: la + 0.0008, lon: lo }] });"
     + "     var g = la + 0.0008, d = 0.00012; el.push({ type: 'way', id: 950 + n, tags: { golf: 'green' }, geometry: [{ lat: g - d, lon: lo - d }, { lat: g - d, lon: lo + d }, { lat: g + d, lon: lo + d }, { lat: g + d, lon: lo - d }, { lat: g - d, lon: lo - d }] }); }"
@@ -251,4 +252,19 @@ test('OpenStreetMap failing (HTTP 504 from both servers): "Couldn\'t reach OpenS
     assert.equal(a.start && a.start.disabled, false, 'Start Round is live (tap the green until then)');
     assert.match(b.note, /GPS from OpenStreetMap \(3 of 18 holes mapped\)/);
     assert.equal(b.gps, 3);
+});
+
+test('an overloaded OpenStreetMap server (200, no elements, a runtime-error remark) is "Couldn\'t reach", not "no data"; a clean empty answer is "Tap the middle of the green", kept 1 day (not asked on every open)', { timeout: 200000 }, async () => {
+    const r = await open(AT_BANDON, 'error', [TYPE('Bandon'), PAUSE, SETTLED, { sleep: 400 }, X('window.__overBusy = true; 1'), TAP_OSM('Shortys'),
+        { waitFor: "/^osm_/.test(document.getElementById('course-select').value) && !!document.getElementById('sf-osmnote')", timeout: 40000 }, { sleep: 500 }, X(SF),
+        X("window.__overBusy = false; window.__overNone = true; (function(){ var b=document.querySelector('[data-sf=osmretry]'); if(b) b.click(); return 1; })()"),
+        { waitFor: "/No GPS map data/.test((document.getElementById('sf-osmnote')||{}).innerText||'')", timeout: 40000 }, { sleep: 300 }, X(SF),
+        X("JSON.stringify((function(){ var t = JSON.parse(localStorage.getItem('hardpan_osm_v1_tried_osm_w1540940976') || 'null'); return t ? { none: t.none, daysLeft: Math.round((7 * 24 * 3600 * 1000 - (Date.now() - t.at)) / 3600000) / 24 } : null; })())")]);
+    assert.equal(r.ok, true, r.reason);
+    const [busy, empty, mark] = J(r);
+    assert.match(busy.note, /Couldn’t reach OpenStreetMap/, 'overloaded = unreachable');
+    assert.match(empty.note, /No GPS map data for Shortys yet — on the map, “Tap the middle of the green”/, 'really empty = tap the green');
+    assert.doesNotMatch(empty.note, /Couldn’t reach/);
+    assert.equal(mark.none, true);
+    assert.ok(mark.daysLeft > 0.9 && mark.daysLeft <= 1.01, 'not asked again for 1 day: ' + JSON.stringify(mark));
 });
