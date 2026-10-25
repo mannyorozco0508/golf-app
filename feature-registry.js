@@ -507,24 +507,45 @@
         });
     }
 
-    // proposeScores: a quick confirm, then the card's own save (host.saveScore -> index.html
-    // gpsSheetHole(n).save -> saveScore -> the offline queue). A feature never writes a score.
+    // proposeScores: ONE confirm step for any number of scores - one hole (voice) or a whole
+    // scanned card (every golfer x 18 holes) - then each one through the card's own save
+    // (host.saveScore -> index.html gpsSheetHole(n).save -> saveScore -> the offline queue).
+    // A feature never writes a score. The same golfer + hole twice: the later one is used.
+    // Resolves true when every score saved, false when cancelled or any save failed.
     function proposeScores(listIn, opts) {
-        var list = (Array.isArray(listIn) ? listIn : []).filter(function (s) { return s && s.pid != null && Number(s.hole) > 0 && Number(s.strokes) > 0 && Number(s.strokes) < 20; });
+        var seen = {}, list = [];
+        (Array.isArray(listIn) ? listIn : []).forEach(function (s) {
+            if (!(s && s.pid != null && Number(s.hole) > 0 && Number(s.hole) <= 36 && Number(s.strokes) > 0 && Number(s.strokes) < 20)) return;
+            var k = String(s.pid) + '_' + Number(s.hole);
+            if (seen[k] != null) list[seen[k]] = s; else { seen[k] = list.length; list.push(s); }
+        });
         if (!list.length || !host || typeof host.saveScore !== 'function') return Promise.resolve(false);
         var d = (host.round && host.round()) || {};
         var nameOf = function (pid) { var p = (d.players || []).filter(function (x) { return String(x.id) === String(pid); })[0]; return p ? p.name : 'Golfer'; };
+        // Shown as a card: one line per golfer, their holes in order ("1:4 2:5 ..."), so a whole
+        // scanned card is one screen to check and one tap to save.
+        var byP = {}, order = [];
+        list.forEach(function (s) { var k = String(s.pid); if (!byP[k]) { byP[k] = []; order.push(k); } byP[k].push(s); });
+        var holes = {}; list.forEach(function (s) { holes[Number(s.hole)] = 1; });
+        var nH = Object.keys(holes).length;
         return new Promise(function (resolve) {
             var src = opts && opts.source ? String(opts.source) : '';
-            var sh = openSheet('<div class="hpf-expl"><h3>Save ' + (list.length === 1 ? 'this score' : 'these scores') + '?</h3>'
-                + (src ? '<p class="hpf-dim">From ' + esc(src) + '. Check before saving.</p>' : '')
-                + list.map(function (s) { return '<div class="hpf-lb-r"><span>' + esc(nameOf(s.pid)) + ' · Hole ' + Number(s.hole) + '</span><b>' + Number(s.strokes) + (s.putts != null ? ' <small>(' + Number(s.putts) + ' putts)</small>' : '') + '</b></div>'; }).join('')
-                + '<button type="button" class="hpf-b1" data-hpf-save>Save</button><button type="button" class="hpf-b2" data-hpf-cancel>Cancel</button></div>');
+            var body = order.map(function (k) {
+                var hs = byP[k].slice().sort(function (a, b) { return a.hole - b.hole; });
+                var tot = hs.reduce(function (t, s) { return t + Number(s.strokes); }, 0);
+                return '<div class="hpf-ps-p"><div class="hpf-lb-r"><b>' + esc(nameOf(k)) + '</b><span>' + (hs.length > 1 ? hs.length + ' holes · ' + tot : '') + '</span></div>'
+                    + '<div class="hpf-ps-h">' + hs.map(function (s) { return '<span><small>' + Number(s.hole) + '</small>' + Number(s.strokes) + (s.putts != null ? '<i>' + Number(s.putts) + 'p</i>' : '') + '</span>'; }).join('') + '</div></div>';
+            }).join('');
+            var sh = openSheet('<div class="hpf-expl"><h3>Save ' + (list.length === 1 ? 'this score' : list.length + ' scores') + '?</h3>'
+                + '<p class="hpf-dim">' + (src ? 'From ' + esc(src) + '. ' : '') + (nH > 1 ? nH + ' holes, ' : '') + order.length + ' golfer' + (order.length === 1 ? '' : 's') + '. Check before saving.</p>'
+                + body
+                + '<button type="button" class="hpf-b1" data-hpf-save>Save ' + (list.length === 1 ? '' : 'all ' + list.length) + '</button><button type="button" class="hpf-b2" data-hpf-cancel>Cancel</button></div>');
+            sh.setAttribute('data-hpf-propose', String(list.length));
             sh.addEventListener('click', function (e) {
                 if (e.target.closest('[data-hpf-save]')) {
-                    var ok = true;
-                    list.forEach(function (s) { try { host.saveScore(s.pid, Number(s.hole), Number(s.strokes)); } catch (x) { ok = false; } });
-                    closePanel(); resolve(ok);
+                    var bad = 0;
+                    list.forEach(function (s) { try { host.saveScore(s.pid, Number(s.hole), Number(s.strokes)); } catch (x) { bad++; } });
+                    closePanel(); resolve(bad === 0);
                 } else if (e.target.closest('[data-hpf-cancel]')) { closePanel(); resolve(false); }
             });
         });
@@ -592,6 +613,8 @@
             + '.hpf-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;font-size:13px;}'
             + '.hpf-reset{all:unset;cursor:pointer;color:#cdee7c;font-weight:700;padding:10px 0;}'
             + '.hpf-expl h3{margin:0 0 6px;font-size:19px;}.hpf-expl p{margin:0 0 10px;font-size:14px;opacity:.85;line-height:1.4;}'
+            + '.hpf-ps-p{background:#1c221f;border-radius:12px;padding:8px 10px;margin:0 0 6px;}.hpf-ps-h{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}'
+            + '.hpf-ps-h span{min-width:30px;text-align:center;background:#2a302d;border-radius:8px;padding:3px 4px;font:800 14px/1.1 ' + F + ';}.hpf-ps-h small{display:block;font-size:10px;opacity:.6;font-weight:700;}.hpf-ps-h i{display:block;font-size:10px;font-style:normal;opacity:.7;}'
             + '.hpf-b1,.hpf-b2{display:block;width:100%;text-align:center;border:0;border-radius:14px;padding:13px;font:800 16px/1 ' + F + ';margin-top:8px;}'
             + '.hpf-b1{background:#cdee7c;color:#0d1a10;}.hpf-b2{background:#2a302d;color:#f2f5ef;}';
         // INSIDE #gps-overlay its own `#gps-overlay button` rule (background: transparent) outranks a

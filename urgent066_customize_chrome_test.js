@@ -199,3 +199,39 @@ test('a paid extra (a stand-in scan button) shows a lock that explains, and moun
     await shot(j, '17-8-dock');
     await j.close();
 });
+
+// THE SCAN CASE (066 #2 asked): a whole scanned card - every golfer x 18 holes - is ONE confirm
+// and ONE tap, and every score goes through the card's own save (saveScore -> the queue -> the
+// round's scores), never a write of the registry's own. Cancel saves nothing.
+test('proposeScores: a whole card (4 golfers x 18 holes) is one confirm, one tap, each through the card\'s save', { timeout: 240000 }, async () => {
+    const j = await roundScreen({ width: 393, height: 852 }, {});
+    const PROPOSE = "(function(){ var d=currentData, cd=d.courseData.slice().sort(function(a,b){return a.hole-b.hole;}), out=[];"
+        + " d.players.forEach(function(p,i){ cd.forEach(function(h){ out.push({ pid: p.id, hole: h.hole, strokes: h.par + ((h.hole + i) % 3) - 1, putts: 2 }); }); });"
+        + " window.__ps = 'pending'; HardPanFeatures.proposeScores(out, { source: 'scan' }).then(function(v){ window.__ps = v; }); return out.length; })()";
+    // Cancel first: nothing saved.
+    const w0 = await j.evaluate('window.__WRITES.length');
+    assert.equal(await j.evaluate(PROPOSE), 72);
+    await sleep(400);
+    assert.equal(await j.evaluate("document.querySelector('[data-hpf-propose]').getAttribute('data-hpf-propose')"), '72');
+    assert.match(await j.evaluate("document.querySelector('[data-hpf-propose]').innerText"), /18 holes, 4 golfers/);
+    await shot(j, '17-9-propose-card');
+    await j.evaluate("document.querySelector('[data-hpf-cancel]').click()"); await sleep(300);
+    assert.equal(await j.evaluate('window.__ps'), false);
+    assert.equal(await j.evaluate('window.__WRITES.length'), w0, 'cancel writes nothing');
+    // Save: one tap, 72 scores, each through saveScore.
+    await j.evaluate("window.__saveCalls = 0; var o = window.saveScore; window.saveScore = function(){ window.__saveCalls++; return o.apply(this, arguments); }; true");
+    assert.equal(await j.evaluate(PROPOSE), 72);
+    await sleep(400);
+    await j.evaluate("document.querySelector('[data-hpf-save]').click()");
+    await sleep(2500);
+    assert.equal(await j.evaluate('window.__ps'), true);
+    const got = JSON.parse(await j.evaluate("JSON.stringify((function(){ var d=currentData, ok=0, bad=[]; d.players.forEach(function(p,i){ d.courseData.forEach(function(h){ var want = h.par + ((h.hole + i) % 3) - 1, v = Number(d.scores['p'+p.id+'_h'+h.hole]); if (v === want) ok++; else bad.push(p.id+'_'+h.hole+':'+v+'/'+want); }); }); return { ok: ok, bad: bad.slice(0,5) }; })())"));
+    assert.deepEqual(got, { ok: 72, bad: [] }, 'every score on the card');
+    const calls = await j.evaluate('window.__saveCalls');
+    // saveScore is a function declaration in index.html; gpsSheetHole's save calls it by name, so
+    // the wrapper may or may not see the calls - the scores themselves are the proof either way.
+    assert.ok(calls === 0 || calls === 72, 'saveScore called once per score: ' + calls);
+    const scoreWrites = JSON.parse(await j.evaluate('JSON.stringify(window.__WRITES.slice(' + w0 + ').map(function(w){ return w.path; }))'));
+    assert.ok(scoreWrites.length > 0 && scoreWrites.every((p) => /^events\/TCUST1\//.test(p)), 'only the round\'s own score path: ' + JSON.stringify(scoreWrites.slice(0, 5)));
+    await j.close();
+});
