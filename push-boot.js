@@ -303,19 +303,46 @@ function pushBindNotifications(deps) {
 }
 
 // ---------------------------------------------------------------------------
-// THE SETTINGS. Three switches, and only two of them are switches:
-// Essentials cannot be turned off - push-notify.js forces it true whatever is
-// stored - so the stored shape has two keys and the screen says why.
+// THE SETTINGS. Three switches (066 #1, Manny approved 2026-10-24): Round results
+// (essentials), Game challenges & presses (bets), Birdies & big moments (hype) -
+// all OFF until the golfer turns one on, so all three are stored.
 function pushPrefsForSave(prefs) {
     var p = (typeof pushPrefsNormalise === 'function') ? pushPrefsNormalise(prefs) : (prefs || {});
-    // essentials is NOT stored. A value nothing reads is a value that will one
-    // day disagree with the code, and a stored `false` could then only mean a bug.
-    return { bets: !!p.bets, hype: !!p.hype };
+    return { essentials: !!p.essentials, bets: !!p.bets, hype: !!p.hype };
 }
+
+// ANY SWITCH ON? Until one is, iOS is never asked (066 #1). The answer is kept on
+// the phone too (hardpan_push_optin), because the in-round registration runs before
+// the settings are read and must not raise the prompt for a golfer who said nothing.
+var PUSH_OPTIN_KEY = 'hardpan_push_optin';
+function pushOptedIn(prefs) {
+    var p = (typeof pushPrefsNormalise === 'function') ? pushPrefsNormalise(prefs) : (prefs || {});
+    return !!(p.essentials || p.bets || p.hype);
+}
+function pushOptinHere() { try { return typeof localStorage !== 'undefined' && localStorage.getItem(PUSH_OPTIN_KEY) === '1'; } catch (e) { return false; } }
+// SAVING THEM. bets / hype in one update, as before (the live rules take exactly those two);
+// essentials as its own write, which the LIVE rules refuse until the proposal that adds the
+// key is published (database.rules.layout.json, Manny's typed OK) - so it is also kept on the
+// phone (hardpan_push_ess) and read back from there while the database has none.
+var PUSH_ESS_KEY = 'hardpan_push_ess';
+function pushPrefsSave(ref, prefs) {
+    var p = pushPrefsForSave(prefs);
+    try { if (typeof localStorage !== 'undefined') localStorage.setItem(PUSH_ESS_KEY, p.essentials ? '1' : '0'); } catch (e) {}
+    return Promise.resolve(ref.update({ bets: p.bets, hype: p.hype })).then(function () {
+        try { return Promise.resolve(ref.child('essentials').set(p.essentials)).catch(function () {}); } catch (e) { return null; }
+    });
+}
+function pushPrefsWithLocal(raw) {
+    var r = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? Object.assign({}, raw) : {};
+    if (r.essentials === undefined) { try { if (typeof localStorage !== 'undefined' && localStorage.getItem(PUSH_ESS_KEY) === '1') r.essentials = true; } catch (e) {} }
+    return r;
+}
+function pushSetOptinHere(on) { try { if (typeof localStorage === 'undefined') return; if (on) localStorage.setItem(PUSH_OPTIN_KEY, '1'); else localStorage.removeItem(PUSH_OPTIN_KEY); } catch (e) {} }
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         pushPlugins, pushRegisterToken, pushRegisterIfGranted, pushDeviceKey,
-        pushPrefsForSave, pushActionHref, pushTapHref, pushBindNotifications
+        pushPrefsForSave, pushActionHref, pushTapHref, pushBindNotifications,
+        pushOptedIn, pushOptinHere, pushSetOptinHere, PUSH_OPTIN_KEY, pushPrefsSave, pushPrefsWithLocal
     };
 }

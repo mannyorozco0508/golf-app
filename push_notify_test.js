@@ -60,7 +60,7 @@ const KINDS = ['youre-in', 'final-results', 'bet-challenge', 'press-offered', 'h
 const base = (over) => Object.assign({
     kind: 'final-results',
     tokens: ['tok-1'],
-    prefs: {},
+    prefs: { essentials: true, bets: true, hype: true },   // 066 #1: every channel is opt-in now; these rows are a golfer who opted in
     facts: { uid: 'u-1', roundCode: 'GFLBAM', roundName: 'Saturday at Legacy', netCents: 4000 },
     alreadySent: {}, buzzedHoles: {}, now: 0
 }, over || {});
@@ -85,21 +85,26 @@ describe('1. FIVE NOTIFICATIONS, THREE CHANNELS, AND ESSENTIALS CANNOT BE SILENC
         assert.equal(P.pushChannelOf('made-up'), null);
     });
 
-    test('ESSENTIALS STAY ON however the settings are stored, including a stored false', () => {
-        // A stored `false` here could only come from a bug or a hand edit, and
-        // the cost of honouring it is a golfer who never finds out what they owe.
-        [undefined, null, {}, { essentials: false }, { essentials: 0 }, 'nonsense', []].forEach((raw) => {
-            assert.equal(P.pushPrefsNormalise(raw).essentials, true, JSON.stringify(raw));
-            assert.equal(P.pushAllowed('final-results', raw), true, JSON.stringify(raw));
+    // 066 #1 (Manny, approved 2026-10-24): NOTIFICATIONS ARE MINIMAL AND OPT-IN. Every channel -
+    // essentials included ("Round results") - is OFF until the golfer turns it on. This replaces
+    // "essentials stay on / bets and hype opt-out", deliberately.
+    test('EVERY CHANNEL IS OPT-IN: off for a golfer who never chose, on only when turned on', () => {
+        [undefined, null, {}, { essentials: 0 }, { essentials: 'yes' }, 'nonsense', []].forEach((raw) => {
+            assert.deepEqual(P.pushPrefsNormalise(raw), { essentials: false, bets: false, hype: false }, JSON.stringify(raw));
+            assert.equal(P.pushAllowed('final-results', raw), false, JSON.stringify(raw));
+            assert.equal(P.pushAllowed('bet-challenge', raw), false, JSON.stringify(raw));
+            assert.equal(P.pushAllowed('hype', raw), false, JSON.stringify(raw));
         });
+        assert.equal(P.pushAllowed('final-results', { essentials: true }), true);
+        assert.equal(P.pushAllowed('youre-in', { essentials: true }), true);
     });
 
-    test('bets and hype are opt-OUT: on by default, off when turned off', () => {
-        assert.deepEqual(P.pushPrefsNormalise({}), { essentials: true, bets: true, hype: true });
-        assert.equal(P.pushAllowed('bet-challenge', { bets: false }), false);
-        assert.equal(P.pushAllowed('press-offered', { bets: false }), false);
-        assert.equal(P.pushAllowed('hype', { hype: false }), false);
-        assert.equal(P.pushAllowed('hype', { bets: false }), true, 'the two switches are independent');
+    test('the three switches are independent', () => {
+        assert.equal(P.pushAllowed('bet-challenge', { bets: true }), true);
+        assert.equal(P.pushAllowed('press-offered', { bets: true }), true);
+        assert.equal(P.pushAllowed('hype', { hype: true }), true);
+        assert.equal(P.pushAllowed('hype', { bets: true }), false, 'bets on does not turn hype on');
+        assert.equal(P.pushAllowed('final-results', { bets: true, hype: true }), false, 'nor essentials');
     });
 });
 

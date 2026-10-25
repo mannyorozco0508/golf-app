@@ -230,7 +230,7 @@ describe('5. A TAP NEEDS SOMETHING TO ROUTE ON', () => {
 
     test('the decision carries its kind and round, and the message carries them as data', async () => {
         const decided = P.pushDecide({
-            kind: 'final-results', tokens: ['t'], prefs: { bets: true, hype: true },
+            kind: 'final-results', tokens: ['t'], prefs: { essentials: true, bets: true, hype: true },   // 066 #1: opt-in - this golfer turned Round results on
             facts: { uid: 'u1', roundCode: 'ABCD', moneyText: '+$20' }
         });
         assert.equal(decided.send, true, 'refused: ' + decided.reason);

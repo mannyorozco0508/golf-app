@@ -4728,6 +4728,8 @@ const SHELL_FILES = [
     './gps-arcs-plan.js',
     // URGENT-052 B: My miss - the miss pattern per club (pure math + an off-by-default switch, on the phone).
     './gps-miss-pattern.js',
+    // 066 #1: the customizable round screen - extras registry, layout store, Customize panel (all extras off by default).
+    './feature-registry.js',
     // URGENT-047 B: launch monitor quick entry - type carries, Update my bag (yards only, on the phone).
     './gps-bushnell.js',
     // URGENT-049: the club chips after Mark shot - counted shots to the shot log (distances + wind only).
