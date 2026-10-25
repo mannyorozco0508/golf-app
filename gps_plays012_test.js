@@ -216,15 +216,15 @@ test('012-5 My bag keeps the baseline per golfer, ON THIS PHONE ONLY (never in t
     const { B, store } = bagBox();
     const j = (x) => JSON.parse(JSON.stringify(x));
     // 070 part 3 (Manny): never chosen = Sea level (was Don't adjust); Don't adjust is still a choice.
-    assert.deepStrictEqual(j(B.baseline('Manny Orozco')), { mode: 'sea', name: '', ft: 0, tempF: null, chosen: false }, 'default (never chosen): Sea level');
+    assert.deepStrictEqual(j(B.baseline('Manny Orozco')), { mode: 'sea', name: '', ft: 0, tempF: null, chosen: false, picked: false }, 'default (never chosen): Sea level');
     assert.strictEqual(B.baselineFt(B.baseline('Manny Orozco')), 0, 'Sea level default: altitude vs 0 ft');
     B.setBaseline('Manny Orozco', { mode: 'none' });
     assert.strictEqual(B.baselineFt(B.baseline('Manny Orozco')), undefined, 'Don\'t adjust: no altitude at all');
     B.setBaseline('Manny Orozco', { mode: 'sea', tempF: 65 });
-    assert.deepStrictEqual(j(B.baseline('manny  orozco')), { mode: 'sea', name: '', ft: 0, tempF: 65, chosen: true });
+    assert.deepStrictEqual(j(B.baseline('manny  orozco')), { mode: 'sea', name: '', ft: 0, tempF: 65, chosen: true, picked: false });
     assert.strictEqual(B.baselineFt(B.baseline('Manny Orozco')), 0);
     B.setBaseline('Manny Orozco', { mode: 'course', name: 'Grayhawk Golf Club', ft: 1530.4, tempF: '' });
-    assert.deepStrictEqual(j(B.baseline('Manny Orozco')), { mode: 'custom', name: 'Grayhawk Golf Club', ft: 1530, tempF: null, chosen: true }, 'blank temperature = keep 70; 070: a picked course is Custom with its feet');
+    assert.deepStrictEqual(j(B.baseline('Manny Orozco')), { mode: 'custom', name: 'Grayhawk Golf Club', ft: 1530, tempF: null, chosen: true, picked: false }, 'blank temperature = keep 70; 070: a picked course is Custom with its feet');
     B.setBaseline('Joe Russo', { mode: 'course', name: 'Somewhere abroad', ft: null });
     assert.strictEqual(B.baselineFt(B.baseline('Joe Russo')), null, 'a course with no US height: altitude not available');
     B.setBaseline('X', { mode: 'moon', ft: 9 });

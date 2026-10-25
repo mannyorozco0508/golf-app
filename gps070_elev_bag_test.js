@@ -38,17 +38,17 @@ test('070-3 migration: never set -> Sea level; sea -> Sea level; course -> Custo
     const { B, store } = bagBox(seed);
     const before = store.hardpan_bag_v1;
     // 1. never set -> sea
-    assert.deepStrictEqual(j(B.baseline('Ann Alder')), { mode: 'sea', name: '', ft: 0, tempF: null, chosen: false });
+    assert.deepStrictEqual(j(B.baseline('Ann Alder')), { mode: 'sea', name: '', ft: 0, tempF: null, chosen: false, picked: false });
     assert.strictEqual(B.baselineFt(B.baseline('Ann Alder')), 0);
-    assert.deepStrictEqual(j(B.baseline('Nobody Here')), { mode: 'sea', name: '', ft: 0, tempF: null, chosen: false }, 'no bag at all: Sea level too');
+    assert.deepStrictEqual(j(B.baseline('Nobody Here')), { mode: 'sea', name: '', ft: 0, tempF: null, chosen: false, picked: false }, 'no bag at all: Sea level too');
     // 2. sea -> sea
-    assert.deepStrictEqual(j(B.baseline('Ben Birch')), { mode: 'sea', name: '', ft: 0, tempF: 65, chosen: true });
+    assert.deepStrictEqual(j(B.baseline('Ben Birch')), { mode: 'sea', name: '', ft: 0, tempF: 65, chosen: true, picked: false });
     // 3. course -> Custom with its feet (and the course's name as where the number came from)
-    assert.deepStrictEqual(j(B.baseline('Cal Cedar')), { mode: 'custom', name: 'Grayhawk Golf Club', ft: 1530, tempF: 80, chosen: true });
+    assert.deepStrictEqual(j(B.baseline('Cal Cedar')), { mode: 'custom', name: 'Grayhawk Golf Club', ft: 1530, tempF: 80, chosen: true, picked: false });
     assert.strictEqual(B.baselineFt(B.baseline('Cal Cedar')), 1530);
     assert.strictEqual(B.baselineFt(B.baseline('Eve Elm')), null, 'a picked course with no height: Custom, altitude not available (as before)');
     // 4. none -> stays Don't adjust
-    assert.deepStrictEqual(j(B.baseline('Dee Dogwood')), { mode: 'none', name: '', ft: null, tempF: null, chosen: true });
+    assert.deepStrictEqual(j(B.baseline('Dee Dogwood')), { mode: 'none', name: '', ft: null, tempF: null, chosen: true, picked: false });
     assert.strictEqual(B.baselineFt(B.baseline('Dee Dogwood')), undefined, 'Don\'t adjust: no altitude at all');
     assert.strictEqual(store.hardpan_bag_v1, before, 'reading never rewrites what is stored');
     // Anything unknown that was stored stays Don't adjust (as 012 did); only "never chose" moves.
@@ -59,9 +59,9 @@ test('070-3 migration: never set -> Sea level; sea -> Sea level; course -> Custo
 test('070-3 setBaseline: Custom with typed feet; 012\'s "course" still accepted (stored as Custom); anything else = Don\'t adjust', () => {
     const { B, store } = bagBox();
     B.setBaseline('Gus Gum', { mode: 'custom', ft: '1200' });
-    assert.deepStrictEqual(j(B.baseline('Gus Gum')), { mode: 'custom', name: '', ft: 1200, tempF: null, chosen: true });
+    assert.deepStrictEqual(j(B.baseline('Gus Gum')), { mode: 'custom', name: '', ft: 1200, tempF: null, chosen: true, picked: false });
     B.setBaseline('Gus Gum', { mode: 'course', name: 'Papago Golf Course', ft: 1240.6 });
-    assert.deepStrictEqual(j(B.baseline('Gus Gum')), { mode: 'custom', name: 'Papago Golf Course', ft: 1241, tempF: null, chosen: true });
+    assert.deepStrictEqual(j(B.baseline('Gus Gum')), { mode: 'custom', name: 'Papago Golf Course', ft: 1241, tempF: null, chosen: true, picked: false });
     assert.strictEqual(JSON.parse(store.hardpan_bag_v1).golfers[k('Gus Gum')].alt.mode, 'custom');
     B.setBaseline('Gus Gum', { mode: 'custom', ft: '' });
     assert.strictEqual(B.baselineFt(B.baseline('Gus Gum')), null, 'blank feet: no height yet');
@@ -89,7 +89,7 @@ test('070-3 per golfer, on this phone only: two golfers keep their own choice + 
     B.resetAll('Ivy Ironwood');
     assert.strictEqual(B.baseline('Ivy Ironwood').mode, 'none', 'Reset all: a Don\'t adjust golfer keeps it');
     B.resetAll('Hal Hazel');
-    assert.deepStrictEqual(j(B.baseline('Hal Hazel')), { mode: 'custom', name: '', ft: 1200, tempF: 75, chosen: true });
+    assert.deepStrictEqual(j(B.baseline('Hal Hazel')), { mode: 'custom', name: '', ft: 1200, tempF: 75, chosen: true, picked: false });
     assert.strictEqual(B.suggestUsesElevation('Hal Hazel'), false);
     assert.deepStrictEqual(Object.keys(j(B.bag('Hal Hazel'))), [], 'Reset all still clears the clubs');
     assert.strictEqual(B.needsSetup('Hal Hazel'), true, 'and the first-time setup is due again, as before');
@@ -99,7 +99,7 @@ test('070-3 the switch: default ON; OFF kept when the baseline changes; setting 
     const { B } = bagBox();
     B.setSuggestUsesElevation('Kim Koa', false);
     assert.strictEqual(B.suggestUsesElevation('Kim Koa'), false);
-    assert.deepStrictEqual(j(B.baseline('Kim Koa')), { mode: 'sea', name: '', ft: 0, tempF: null, chosen: false });
+    assert.deepStrictEqual(j(B.baseline('Kim Koa')), { mode: 'sea', name: '', ft: 0, tempF: null, chosen: false, picked: false });
     B.setBaseline('Kim Koa', { mode: 'custom', ft: 3000 });
     assert.strictEqual(B.suggestUsesElevation('Kim Koa'), false, 'OFF survives a new baseline');
     B.setBaseline('Kim Koa', Object.assign({}, B.baseline('Kim Koa'), { tempF: 60 }));
@@ -187,4 +187,75 @@ test('070-3 My bag: the new wording, "Don\'t adjust" still a full choice next to
     // the setting still sits behind the bagAltitude switch and inside the paid GPS (S.pro) as before
     assert.ok(/data-feature="bagAltitude" role="group" aria-label="My club yardages are measured at"/.test(v));
     assert.ok(/if \(!S \|\| !S\.pro \|\| S\.mode !== 'measure'\) return null;/.test(fnSrc(v, 'playsTo')), 'plays-like (and so the club) stays paid');
+});
+
+// ---- 070 (Manny's answers, Oct 25): EXPLICIT PICKS, TEMPERATURE-ONLY EDITS, THE ONE-TIME NOTE ----
+const BAGSET = { shots: {}, set: { '7i': 160 } };
+test('070-3 a tap records an explicit pick (pick: 1); the temperature alone never writes a choice', () => {
+    const { B, store } = bagBox({ v: 1, golfers: { [k('Ola Olive')]: Object.assign({}, BAGSET) } });
+    B.setBaselineTemp('Ola Olive', 62);
+    assert.deepStrictEqual(j(B.baseline('Ola Olive')), { mode: 'sea', name: '', ft: 0, tempF: 62, chosen: false, picked: false }, 'temperature only: still the Sea level default, never chosen');
+    assert.ok(!('mode' in JSON.parse(store.hardpan_bag_v1).golfers[k('Ola Olive')].alt), 'no mode written by a temperature edit');
+    B.setBaselineTemp('Ola Olive', '');
+    assert.strictEqual(B.baseline('Ola Olive').tempF, null, 'blank = back to 70');
+    B.setBaseline('Ola Olive', { mode: 'none', picked: true });
+    assert.deepStrictEqual(j(B.baseline('Ola Olive')), { mode: 'none', name: '', ft: null, tempF: null, chosen: true, picked: true });
+    B.setBaselineTemp('Ola Olive', 80);
+    B.setBaseline('Ola Olive', Object.assign({}, B.baseline('Ola Olive'), { tempF: 81 }));
+    assert.strictEqual(B.baseline('Ola Olive').picked, true, 'the pick survives later temperature edits (either path)');
+    assert.strictEqual(B.baseline('Ola Olive').mode, 'none');
+    const v = read('gps-view.js');
+    assert.ok(/B\.setBaseline\(bagGolfer\(\), Object\.assign\(\{ tempF: cur\.tempF \}, a, \{ picked: true \}\)\);/.test(fnSrc(v, 'altSet')), 'every tap (Sea level, Custom height / course, Don\'t adjust) goes through altSet with picked: true');
+    assert.ok(/Bt\.setBaselineTemp\(bagGolfer\(\), tv === '' \? null : Number\(tv\)\)/.test(v), 'the temperature box writes the temperature only');
+});
+test('070-3 one-time note: a temperature-only golfer (new code) goes to Sea level and sees the note ONCE', () => {
+    const { B } = bagBox({ v: 1, golfers: { [k('Pia Pine')]: Object.assign({}, BAGSET) } });
+    B.setBaselineTemp('Pia Pine', 65);
+    assert.strictEqual(B.baseline('Pia Pine').mode, 'sea');
+    assert.strictEqual(B.elevNoteDue('Pia Pine'), true);
+    B.elevNoteSeen('Pia Pine');
+    assert.strictEqual(B.elevNoteDue('Pia Pine'), false, 'never again on this phone');
+    B.setBaselineTemp('Pia Pine', 70);
+    assert.strictEqual(B.elevNoteDue('Pia Pine'), false, 'still never again after more edits');
+});
+test('070-3 one-time note: a real "Don\'t adjust" pick stays and gets NO note; never-chose with a bag -> Sea level + note; no bag -> no note', () => {
+    const { B } = bagBox({ v: 1, golfers: {
+        [k('Quin Quince')]: Object.assign({}, BAGSET, { alt: { mode: 'none', pick: 1 } }),
+        [k('Rae Rowan')]: Object.assign({}, BAGSET),
+        [k('Sid Spruce')]: { shots: {}, set: {}, setupAt: 5 } } });
+    assert.strictEqual(B.baseline('Quin Quince').mode, 'none');
+    assert.strictEqual(B.elevNoteDue('Quin Quince'), false, 'Don\'t adjust picked: no note');
+    assert.strictEqual(B.baseline('Rae Rowan').mode, 'sea');
+    assert.strictEqual(B.elevNoteDue('Rae Rowan'), true, 'never chose, clubs typed: note');
+    assert.strictEqual(B.elevNoteDue('Sid Spruce'), true, 'never chose, bag set up (or skipped) here: note');
+    assert.strictEqual(B.elevNoteDue('Tess Teak'), false, 'no bag on this phone: no note');
+    B.setBaseline('Rae Rowan', { mode: 'custom', ft: 900, picked: true });
+    assert.strictEqual(B.elevNoteDue('Rae Rowan'), false, 'picks a choice before the note shows: no note');
+    // 012-era record { mode: 'none', tempF } with no pick flag - the case that cannot be told apart: unchanged here (see report).
+    const { B: B2 } = bagBox({ v: 1, golfers: { [k('Uma Umber')]: Object.assign({}, BAGSET, { alt: { mode: 'none', tempF: 65 } }) } });
+    assert.strictEqual(B2.baseline('Uma Umber').mode, 'none');
+    assert.strictEqual(B2.elevNoteDue('Uma Umber'), false);
+});
+test('070-3 Reset all keeps the elevation choice, the pick, the switch and the note-seen mark (only the clubs go)', () => {
+    const { B } = bagBox({ v: 1, golfers: { [k('Val Vine')]: Object.assign({}, BAGSET), [k('Wes Willow')]: Object.assign({}, BAGSET) } });
+    B.setBaseline('Val Vine', { mode: 'none', picked: true, tempF: 60 });
+    B.setSuggestUsesElevation('Val Vine', false);
+    B.resetAll('Val Vine');
+    assert.deepStrictEqual(j(B.baseline('Val Vine')), { mode: 'none', name: '', ft: null, tempF: 60, chosen: true, picked: true });
+    assert.strictEqual(B.suggestUsesElevation('Val Vine'), false);
+    assert.deepStrictEqual(Object.keys(j(B.bag('Val Vine'))), []);
+    B.elevNoteSeen('Wes Willow');
+    B.resetAll('Wes Willow');
+    B.set('Wes Willow', '7i', 158);
+    assert.strictEqual(B.baseline('Wes Willow').mode, 'sea');
+    assert.strictEqual(B.elevNoteDue('Wes Willow'), false, 'the note does not come back after Reset all');
+});
+test('070-3 the note in gps-view: Manny\'s words, OK closes it, only once the altitude is in the number, marked seen as it shows, never in tournament mode, placed left of the rail', () => {
+    const v = read('gps-view.js');
+    assert.ok(v.indexOf('Plays-like now adjusts for elevation (Sea level baseline). Change in Settings.') !== -1);
+    assert.ok(/class="gps-elevnote gps-float" data-feature="bagAltitude"/.test(v), 'behind bagAltitude (switch off: removed)');
+    const t = fnSrc(v, 'elevNoteTick');
+    assert.ok(/tournament\(\)/.test(t) && /B\.elevNoteDue\(g\)/.test(t) && /typeof al\.altFt !== 'number'/.test(t) && /B\.elevNoteSeen\(g\);/.test(t));
+    assert.ok(/ldClearBox\(\)/.test(fnSrc(v, 'elevNotePlace')), 'in the clear map: under the top bar, left of the rail, above the pill');
+    assert.ok(/on\(el, '\.gps-elevnote-ok', function \(\) \{ elevNoteHide\(\); \}\);/.test(v));
 });

@@ -208,10 +208,13 @@
         // Never chosen (no mode stored) = Sea level; anything unknown stored = Don't adjust (as before).
         var mode = a.mode === undefined || a.mode === null || a.mode === '' ? 'sea' : (altMode(a.mode) || 'none');
         return { mode: mode, name: mode === 'custom' ? String(a.name || '').slice(0, 80) : '', ft: mode === 'sea' ? 0 : (mode === 'custom' && a.ft !== null && a.ft !== undefined ? okFt(a.ft) : null),
-            tempF: okTemp(a.tempF), chosen: !(a.mode === undefined || a.mode === null || a.mode === '') };
+            tempF: okTemp(a.tempF), chosen: !(a.mode === undefined || a.mode === null || a.mode === ''), picked: a.pick === 1 };
     }
-    // a: { mode, name, ft, tempF } - only those fields, checked; anything else is dropped.
-    // The "Suggest clubs using elevation" choice (sug) is kept as it was.
+    // a: { mode, name, ft, tempF, picked } - only those fields, checked; anything else is dropped.
+    // The "Suggest clubs using elevation" choice (sug) and the one-time note (note) are kept.
+    // 070 (Manny): picked: true = the golfer TAPPED a choice (Sea level, Custom elevation and its
+    // height / course, Don't adjust) - kept as pick: 1, so an explicit pick can always be told
+    // apart from a value written as a side effect (012 wrote mode 'none' on a temperature edit).
     function setBaseline(golfer, a) {
         a = a || {};
         var mode = altMode(a.mode) || 'none';
@@ -219,7 +222,34 @@
         if (mode === 'custom') { out.name = String(a.name || '').slice(0, 80); out.ft = a.ft === null || a.ft === undefined || a.ft === '' ? null : okFt(a.ft); }
         var t = okTemp(a.tempF); if (t !== null) out.tempF = t;
         if (b.alt && b.alt.sug === false) out.sug = false;
+        if (a.picked === true || (b.alt && b.alt.pick === 1)) out.pick = 1;
+        if (b.alt && b.alt.note === 1) out.note = 1;
         b.alt = out;
+        return lsSet(BAG_KEY, r);
+    }
+    // 070: the typical temperature ONLY - never writes a choice (a golfer who has never chosen
+    // stays on the Sea level default). tempF blank / null = back to 70.
+    function setBaselineTemp(golfer, tempF) {
+        var r = bagRec(), b = bagOf(r, golferKey(golfer)), a = b.alt || {}, t = okTemp(tempF);
+        if (t !== null) a.tempF = t; else delete a.tempF;
+        b.alt = a;
+        return lsSet(BAG_KEY, r);
+    }
+    // 070 ONE-TIME NOTE (Manny): a golfer moved onto the Sea level default by this change - never
+    // picked a choice, has a bag on this phone (clubs typed, set up or learned) - sees once, on this
+    // phone: "Plays-like now adjusts for elevation (Sea level baseline). Change in Settings."
+    // elevNoteDue: should it show now; elevNoteSeen: shown, never again (kept through Reset all).
+    function elevNoteDue(golfer) {
+        var b = bagRec().golfers[golferKey(golfer)];
+        if (!b) return false;
+        var a = b.alt || {};
+        if (a.note === 1 || a.pick === 1) return false;
+        if (!(a.mode === undefined || a.mode === null || a.mode === '')) return false;   // a stored choice (incl. 012's 'none'): no note
+        return !!(b.setupAt || ['shots', 'set', 'base'].some(function (f) { return b[f] && Object.keys(b[f]).length; }));
+    }
+    function elevNoteSeen(golfer) {
+        var r = bagRec(), b = bagOf(r, golferKey(golfer)), a = b.alt || {};
+        a.note = 1; b.alt = a;
         return lsSet(BAG_KEY, r);
     }
     // 070 PART 3: "SUGGEST CLUBS USING ELEVATION" - default ON. ON: the club comes from the
@@ -297,6 +327,7 @@
         setup: setup, skipSetup: skipSetup, needsSetup: needsSetup, source: source,
         baseline: baseline, setBaseline: setBaseline, baselineFt: baselineFt, ALT_MODES: ALT_MODES,
         suggestUsesElevation: suggestUsesElevation, setSuggestUsesElevation: setSuggestUsesElevation,
+        setBaselineTemp: setBaselineTemp, elevNoteDue: elevNoteDue, elevNoteSeen: elevNoteSeen,
         syncOn: syncOn, syncPath: syncPath, syncShape: syncShape, syncSave: syncSave, syncLoad: syncLoad };
     W.HardPanGpsShots = { load: load, shots: shots, add: add, setLast: setLast, undo: undo, legs: legs, holesWithShots: holesWithShots, MAX_PER_HOLE: MAX_PER_HOLE, CLUBS: CLUBS };
 })();
