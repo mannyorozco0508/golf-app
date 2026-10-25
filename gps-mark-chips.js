@@ -120,6 +120,8 @@
             src: w ? srcOf(open.wind) : null
         };
         if (open.golfer) rec.golfer = open.golfer;
+        // 070 part 4: the course's height when the shot was hit (course sources only; the log checks too).
+        if (num(open.courseFt) != null && open.courseFtSrc) { rec.cft = open.courseFt; rec.cftSrc = open.courseFtSrc; }
         if (miss && END_KINDS.indexOf(miss.endKind) !== -1) {
             rec.offline = miss.endKind === 'hole-close' || num(miss.offline) == null ? null : miss.offline;
             rec.aimKind = miss.aimKind === 'target-ring' ? 'target-ring' : 'green-center';
@@ -168,7 +170,9 @@
                     green: info.green ? [info.green[0], info.green[1]] : null,
                     bearingDeg: info.green && bearing ? bearing(pt, info.green) : null,
                     wind: info.wind ? Object.assign({}, info.wind) : null,
-                    elevFt: num(info.elevFt), course: info.course || '', golfer: info.golfer || '', aim: null };
+                    elevFt: num(info.elevFt), course: info.course || '', golfer: info.golfer || '', aim: null,
+                    // 070 part 4: the COURSE's height (feet, a course number - never a position) and its source.
+                    courseFt: num(info.courseFt), courseFtSrc: typeof info.courseFtSrc === 'string' ? info.courseFtSrc : null };
                 aim(info.ring || null, pt);
             }
             return { closed: closed, open: open ? view() : null };

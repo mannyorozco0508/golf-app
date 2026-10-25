@@ -33,16 +33,42 @@
     function WL() { return W.HardPanWindLearn && typeof W.HardPanWindLearn.fit === 'function' ? W.HardPanWindLearn : null; }
     function Log() { return W.HardPanShotLog || null; }
 
+    // ---- 070 PART 4: LEARNED CARRIES AT THE GOLFER'S BASELINE ------------------------
+    // A shot marked at a 1,200 ft course carried a 1,200 ft distance. My bag's numbers are at the
+    // golfer's "My distances are from" baseline, and plays-like takes the altitude out again
+    // against it - so each learned carry is brought to the baseline first:
+    //   carryAtBaseline = stillAirCarry / altFactor(shot.cft, baselineFt)   (wind out first)
+    // A shot with no cft (logged before 070, or the course had no height / only the phone's
+    // estimate) is used as marked - "at this course". No baseline ("Don't adjust", or a picked
+    // course with no height): every shot as marked, exactly as before. On this phone only.
+    function Geo() { return W.HardPanGeo && typeof W.HardPanGeo.altFactor === 'function' ? W.HardPanGeo : null; }
+    function baselineFtOf(golfer) {
+        var B = W.HardPanGpsBag;
+        try { if (B && typeof B.baseline === 'function' && typeof B.baselineFt === 'function') { var b = B.baselineFt(B.baseline(golfer)); return isNum(b) ? b : null; } } catch (e) {}
+        return null;
+    }
+    // The divisor for one shot (1 = as marked).
+    function altDivOf(s, baseFt) {
+        var G = Geo();
+        if (!G || !s || !isNum(s.cft) || !isNum(baseFt)) return 1;
+        var f = G.altFactor(s.cft, baseFt);
+        return isNum(f) && f > 0 ? f : 1;
+    }
+    // A carry of shot s, brought to the golfer's baseline.
+    function atBaseline(carry, s, golfer) { return isNum(carry) ? carry / altDivOf(s, baselineFtOf(golfer)) : carry; }
+
     // ---- PER CLUB ------------------------------------------------------------------
     var cache = {};
-    function logSig(golfer) { var L = Log(); if (!L) return ''; var a = L.list({ golfer: golfer }); return a.length + ':' + (a[0] ? a[0].id : '') + ':' + L.hand(golfer); }
+    // 070 part 4: the baseline height is part of the key (a new baseline = new learned carries).
+    function logSig(golfer) { var L = Log(); if (!L) return ''; var a = L.list({ golfer: golfer }); return a.length + ':' + (a[0] ? a[0].id : '') + ':' + L.hand(golfer) + ':' + baselineFtOf(golfer) + ':' + !!Geo(); }
     // { club: fit } for every club with logged shots. Cached until the log changes.
     function fits(golfer) {
         var L = Log(), api = WL(); if (!L || !api) return {};
         var sig = logSig(golfer), k = L.golferKey(golfer);
         if (cache[k] && cache[k].sig === sig) return cache[k].fits;
-        var by = L.byClub(golfer), hand = L.hand(golfer), out = {};
-        Object.keys(by).forEach(function (c) { try { out[c] = api.fit(by[c], { hand: hand }); out[c].club = c; } catch (e) {} });
+        var by = L.byClub(golfer), hand = L.hand(golfer), out = {}, baseFt = baselineFtOf(golfer);
+        var altDiv = function (s) { return altDivOf(s, baseFt); };
+        Object.keys(by).forEach(function (c) { try { out[c] = api.fit(by[c], { hand: hand, altDiv: altDiv }); out[c].club = c; } catch (e) {} });
         cache[k] = { sig: sig, fits: out };
         return out;
     }
@@ -149,6 +175,7 @@
         + '#gps-overlay .gps-shist-w b{display:block;color:#f4f4ef;font-weight:700;font-size:13.5px;}'
         + '#gps-overlay .gps-shist-del{position:absolute;right:-76px;top:4px;bottom:4px;width:70px;border-radius:10px;background:#fca5a5 !important;color:#0b0f0c !important;font:800 13px/1 -apple-system,BlinkMacSystemFont,sans-serif !important;}'
         + '#gps-overlay .gps-shist-none{padding:14px 0;color:#c8d1ca;font:600 13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;}'
+        + '#gps-overlay .gps-shist-noft{margin:0 0 6px;font:600 11.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#9ca3af;}'
         + '#gps-overlay .gps-shist-foot{margin-top:8px;font:600 11.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#9ca3af;}'
         + '#gps-overlay .gps-bag-wind{flex:1 0 100%;font:700 12px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#d9f99d;padding-bottom:3px;display:flex;align-items:center;justify-content:space-between;gap:8px;}'
         + '#gps-overlay .gps-bag-wind.gen{color:#a7b3aa;font-weight:600;}'
@@ -234,6 +261,11 @@
         fill(sh.querySelector('.gps-shist-fd'), DIRS, H.dir, 'data-shist-d');
         var box = sh.querySelector('.gps-shist-list');
         box.textContent = '';
+        // 070 part 4: older shots with no course height are used as marked ("at this course").
+        var noFt = all.filter(function (s) { return s && !isNum(s.cft); }).length, nf = sh.querySelector('.gps-shist-noft');
+        if (!nf) { nf = document.createElement('div'); nf.className = 'gps-shist-noft'; box.parentNode.insertBefore(nf, box); }
+        nf.textContent = noFt ? noFt + ' shot' + (noFt === 1 ? '' : 's') + ' with no course height saved (older, or no height for that course): used as marked, at that course.' : '';
+        nf.style.display = noFt ? '' : 'none';
         if (!shown.length) { var n0 = document.createElement('div'); n0.className = 'gps-shist-none'; n0.textContent = all.length ? 'No ' + low(c.club) + ' shots in that wind yet.' : 'No marked ' + low(c.club) + ' shots yet. Mark shot, pick the club, and the next mark measures it.'; box.appendChild(n0); return; }
         shown.forEach(function (s) {
             var row = document.createElement('div'); row.className = 'gps-shist-row'; row.setAttribute('data-shist-id', s.id);
@@ -326,7 +358,7 @@
     W.HardPanShotBag = {
         LEARN_MIN: LEARN_MIN, QUALIFY: QUALIFY, WINDY_MPH: WINDY_MPH, api: WL,
         fits: fits, clubFit: clubFit, mergeBag: mergeBag, windLine: windLine, infoText: infoText, adjust: adjust,
-        windWords: windWords, stillAirOf: stillAirOf, nameOf: nameOf, ensureCss: ensureCss,
+        windWords: windWords, stillAirOf: stillAirOf, atBaseline: atBaseline, altDivOf: altDivOf, baselineFtOf: baselineFtOf, nameOf: nameOf, ensureCss: ensureCss,
         openHistory: histOpen, closeHistory: histClose, historyOpen: function () { return !!H; }, swipe: swipe, missOval: missOval, missStats: missStats
     };
 })();
