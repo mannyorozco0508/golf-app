@@ -325,6 +325,7 @@
     // ---- THE SCREENS ---------------------------------------------------------------------------
     var CSS = '.hp-off-banner{position:fixed;left:16px;right:16px;z-index:9000;margin:0;padding:10px 12px;border-radius:12px;font:600 14px/1.35 -apple-system,BlinkMacSystemFont,sans-serif;text-align:left;box-shadow:0 4px 14px rgba(0,0,0,.18);box-sizing:border-box}'
         + '.hp-off-banner.off{background:#fff4d6;color:#5a4300;border:1px solid #f0d58a}.hp-off-banner.ok{background:#e4f6e8;color:#0f4c3a;border:1px solid #9fd3ad}.hp-off-banner.wait{background:#eef2ff;color:#1d3557;border:1px solid #c7d2fe}'
+        + 'body.gps-side-gps .hp-off-banner{z-index:10200}'   // over the GPS map (z 10050), under its sheets (10400)
         + '.hp-off-banner .row{display:flex;gap:8px;margin-top:8px}.hp-off-banner .row button{flex:1;min-height:44px;border-radius:10px;font:700 15px -apple-system,sans-serif}'
         + '.hp-off-note{margin:8px 0;padding:10px 12px;border-radius:12px;font:600 14px/1.35 -apple-system,BlinkMacSystemFont,sans-serif;text-align:left;background:#fff4d6;color:#5a4300;border:1px solid #f0d58a}';
     function style() { if (!D || D.getElementById('hp-off-style')) return; var s = D.createElement('style'); s.id = 'hp-off-style'; s.textContent = CSS; (D.head || D.documentElement).appendChild(s); }
@@ -334,12 +335,13 @@
     function topOffset() {
         var best = 0;
         try {
-            Array.prototype.forEach.call(D.querySelectorAll('body *'), function (el) {
+            Array.prototype.forEach.call(D.querySelectorAll('#hp-strip, #gps-overlay .gps-ld-head, body > *'), function (el) {
                 if (el.classList && el.classList.contains('hp-off-banner')) return;
                 var cs = W.getComputedStyle(el);
-                if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') return;
+                if ((cs.position !== 'fixed' && cs.position !== 'absolute') || cs.display === 'none' || cs.visibility === 'hidden') return;
                 var r = el.getBoundingClientRect();
-                if (r.top < 40 && r.height > 30 && r.height < 260 && r.width > W.innerWidth * 0.6) best = Math.max(best, r.bottom);
+                // The scorecard strip (fixed), or the GPS map's top card + Menu row (absolute over the map).
+                if (r.top < 90 && r.height > 30 && r.height < 260 && r.width > W.innerWidth * 0.6) best = Math.max(best, r.bottom);
             });
         } catch (e) {}
         return Math.round(best + 8);
@@ -352,6 +354,7 @@
         b.innerHTML = html;
         b.style.top = topOffset() + 'px';
         b.style.display = '';
+        if (!b.__hpPlace) { b.__hpPlace = setInterval(function () { if (b.style.display !== 'none') b.style.top = topOffset() + 'px'; }, 1500); }
         return b;
     }
     function hideBanner() { var b = D && D.getElementById('hp-off-banner'); if (b) b.style.display = 'none'; }
