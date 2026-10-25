@@ -466,7 +466,14 @@
         var uid = myUid();
         if (!(d && d.ownerUid && uid && String(d.ownerUid) === String(uid))) return Promise.reject(new Error('not-owner'));
         var ref = D0.ref('events/' + c);
-        var connected = within(D0.ref('.info/connected').once('value').then(function (s) { return !!(s && s.val && s.val()); }), 3000).catch(function () { return false; });
+        // Connected now, or within 4 s (a page that just opened is still connecting): else no signal.
+        var connected = new Promise(function (res) {
+            var cr = D0.ref('.info/connected'), done = false;
+            var fin = function (v) { if (done) return; done = true; try { cr.off('value', h); } catch (e) {} res(v); };
+            var h = function (s) { if (s && s.val && s.val()) fin(true); };
+            setTimeout(function () { fin(false); }, 4000);
+            try { cr.on('value', h); } catch (e) { fin(false); }
+        });
         return connected.then(function (up) {
             if (!up) throw new Error('offline');
             var mark = {}; mark[END.MARK] = Date.now();
