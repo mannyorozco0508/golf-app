@@ -218,7 +218,11 @@ describe('073: End round - don\'t save, on the emulator with the LIVE rules', SK
     test('4 another golfer: no row, never asked, the live rules refuse their delete; their phone hears "The organizer ended this round."', { timeout: 40000 }, async () => {
         const R = roundOf('uid-o4', ['Ray Ortiz', 'Dan Kim']);
         await put('events/OTH444', R);
-        const memB = new Map(); seedPhone(memB, 'OTH444', R);
+        // B (another golfer) has ANOTHER round of its own on this phone, its own My bag and shot log.
+        const MINE = roundOf('uid-b4', ['Dan Kim']);
+        const memB = new Map(); seedPhone(memB, 'BOWN44', MINE); seedPhone(memB, 'OTH444', R); seedBag(memB, 'OTH444');
+        const bOwn = [...memB.keys()].filter((k) => k.indexOf('BOWN44') >= 0).map((k) => [k, memB.get(k)]);
+        const bBag = memB.get('hardpan_bag_v1');
         const B = phone(memB, 'uid-b4', [true, true]); phones.push(B);
         B.open('OTH444', R, false);
         assert.equal(B.HardPanRound.canEnd(), false, 'no row for another golfer');
@@ -245,10 +249,19 @@ describe('073: End round - don\'t save, on the emulator with the LIVE rules', SK
         const late = await vm.runInContext('db.ref("events/OTH444/scores/p102_h4").set(5).then(function(){return "ok";}, function(e){return String(e && e.message);})', B);
         assert.match(late, /permission_denied/i);
         assert.equal(await rest('events/OTH444'), null);
-        // Go Home: B's phone forgets the round (its History copy and queued scores).
+        // Go Home: B's phone forgets the round (its History copy and queued scores) and, Manny's answer 2,
+        // that round's stats / SG / Index round / marked shots / tagged shot-log records - nothing else.
         note.querySelector('[data-hp-ended-home]').onclick();
         assert.equal(memB.get('golfapp_snap_v1_OTH444'), undefined);
         assert.equal(B.location.href, 'home.html');
+        assert.deepEqual([...memB.keys()].filter((k) => k.indexOf('OTH444') >= 0), ['hardpan_nostats_OTH444']);
+        assert.equal(memB.get('hardpan_nostats_OTH444'), 'removed');
+        assert.deepEqual(JSON.parse(memB.get('hardpan_hp_index_v1')).rounds.map((r) => r.code), ['BOWN44']);
+        assert.deepEqual(JSON.parse(memB.get('hardpan_shotlog_v1')).golfers.me.shots.map((s) => s.id), ['id1000', 'id2000'], 'only the ended round\u2019s shot-log records went');
+        assert.equal(memB.get('hardpan_bag_v1'), bBag, 'B\u2019s My bag untouched');
+        bOwn.filter(([k]) => k !== 'golfapp_wq_v1' && k !== 'hardpan_last_round' && k !== 'hardpan_round_side' && k !== 'lastRoomCode')
+            .forEach(([k, v]) => assert.equal(memB.get(k), v, k + ' (B\u2019s own round) untouched'));
+        assert.deepEqual(JSON.parse(memB.get('golfapp_wq_v1')).map((o) => o.path), ['events/BOWN44/scores/p101_h4'], 'B\u2019s own round\u2019s queued score stays');
     });
 
     test('5 the organizer by link token on another uid: refused before any write - nothing deleted anywhere', { timeout: 30000 }, async () => {

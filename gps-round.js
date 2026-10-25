@@ -607,10 +607,13 @@
             (document.head || document.documentElement).appendChild(st);
         }
         el.querySelector('[data-hp-ended-home]').onclick = function () {
-            // The round is gone from the server: this phone forgets it (its copy and its queued scores).
+            // The round is gone from the server: this phone forgets it (its copy and its queued scores)
+            // and, as on the organizer's phone (Manny, 073 answer 2), this round's stats, SG, Index round,
+            // marked shots and tagged shot-log records - the same wipeLocal. My bag and other rounds stay.
             var H = Doors();
             try { if (H && typeof H.forgetRound === 'function') H.forgetRound(c, true); } catch (e) {}
             lsDel('golfapp_snap_v1_' + c);
+            try { wipeLocal(c); } catch (e) {}
             try { window.location.replace('home.html'); } catch (e) { window.location.href = 'home.html'; }
         };
     }
