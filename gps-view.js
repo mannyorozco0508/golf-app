@@ -186,11 +186,38 @@
     function tourneyRound() { try { var d = typeof currentData !== 'undefined' ? currentData : (S && S.round); return !!(d && d.tournamentMode === true); } catch (e) { return !!(S && S.round && S.round.tournamentMode === true); } }   /* global currentData */
     function tourneyPhone() { try { return localStorage.getItem(TOURNEY_KEY) === '1'; } catch (e) { return false; } }
     function tournament() { return tourneyRound() || tourneyPhone(); }
-    function hasGpsPro() {
-        if (iapOn()) return entitlement().isPro() === true;
-        if (cfg().iap === true) return false;
+    // URGENT-062: the paywall's master switch is HARDPAN_GPS_CONFIG.paywall - off (the repo, every
+    // install made from it, Manny's phone) = GPS on, no store asked, exactly as before the paywall.
+    // On: the App Store entitlement decides (StoreKit 2, gps-entitlement.js) - and A ROUND IN
+    // PROGRESS IS NEVER LOCKED: a round that opened GPS with the trial or subscription active
+    // holds a ROUND PASS (this phone, this round's code, ROUND_PASS_MS), so a trial that ends on
+    // hole 9 - or the app reopened mid-round after it ended - finishes the round with GPS.
+    function hasGpsPro(code) {
         if (cfg().paywall !== true) return true;
+        if (iapOn()) return entitlement().isPro() === true || roundPass(code);
         return false;
+    }
+    // ---- THE ROUND PASS (062) -----------------------------------------------------
+    // { code, at } on this phone: the round's code and when it first had GPS. Granted ONLY when a
+    // round opens GPS entitled; good for that round's code for ROUND_PASS_MS from then (a round
+    // is a day). Never turns GPS on for any other round, and never for a round that opened
+    // without it. Nothing about it leaves the phone.
+    var ROUND_PASS_KEY = 'hardpan_gps_round_pass';
+    var ROUND_PASS_MS = 12 * 3600 * 1000;
+    function passCode(code) { return String(code != null ? code : ((S && S.eventCode) || '')); }
+    function readPass() { try { var p = JSON.parse(localStorage.getItem(ROUND_PASS_KEY) || 'null'); return p && typeof p === 'object' ? p : null; } catch (e) { return null; } }
+    function roundPass(code, now) {
+        var c = passCode(code), p = readPass();
+        if (!c || !p || String(p.code) !== c) return false;
+        var age = (now == null ? Date.now() : now) - Number(p.at);
+        return age >= 0 && age < ROUND_PASS_MS;
+    }
+    function grantPass(code) {
+        var c = passCode(code);
+        if (!c || cfg().paywall !== true) return;
+        var p = readPass();
+        if (p && String(p.code) === c) return;           // keep the first time this round had GPS
+        try { localStorage.setItem(ROUND_PASS_KEY, JSON.stringify({ code: c, at: Date.now() })); } catch (e) {}
     }
 
     // ---- STATE --------------------------------------------------------------
@@ -3828,21 +3855,35 @@
     }
     // The paywall's words, from the store's offer (o), the founding window (f) and
     // the course (cov: { name, n, of }). Pure (gps_paywall_test.js).
+    // URGENT-062 (StoreKit 2): the store's offer carries TWO products - o.price is the regular
+    // yearly product's, o.founding { price, trial } the founding product's (null when the store
+    // no longer offers it). While the founding window is open AND the store offers the founding
+    // product, the paywall sells the founding product and says the regular price after it
+    // ("After the first 1,000 subscribers: <regular>/year"); otherwise the regular product, with
+    // no founding words. Every price is the store's own string. An offer with no founding field
+    // (the single-product RevenueCat shape) reads as before.
     function sheetText(o, f, cov) {
         o = o || {};
         f = f || foundingFrom(null);
-        var price = o.fromStore && o.price ? String(o.price) : '';
+        var two = !!(o.fromStore && 'founding' in o);
+        var fnd = two && o.founding && o.founding.price ? o.founding : null;
+        var useF = !!(f.open && fnd);
+        var open = two ? useF : !!f.open;
+        var price = useF ? String(fnd.price) : (o.fromStore && o.price ? String(o.price) : '');
+        var trial = useF ? fnd.trial : o.trial;
         // The store's product has no free introductory offer: no trial words at all.
-        var hasTrial = !(o.fromStore && !o.trial);
-        var trialLen = o.trial || '7-day';
+        var hasTrial = !(o.fromStore && !trial);
+        var trialLen = trial || '7-day';
         var cap = Number(f.cap) > 0 ? Number(f.cap) : FOUNDING_CAP;
         return {
             title: 'GPS Map',
             product: (o.fromStore && o.title) || 'HardPan GPS Map (yearly)',
             buy: hasTrial ? 'Start ' + trialLen + ' free trial' : 'Subscribe',
-            founding: f.open ? 'Founding price \u00b7 locked while subscribed \u00b7 first ' + cap.toLocaleString('en-US') + ' subscribers' : '',
-            price: price ? price + '/year' + (f.open ? ' founding price (locked while subscribed)' : '') : NO_PRICE,
+            founding: open ? 'Founding price \u00b7 locked while subscribed \u00b7 first ' + cap.toLocaleString('en-US') + ' subscribers' : '',
+            price: price ? price + '/year' + (open ? ' founding price (locked while subscribed)' : '') : NO_PRICE,
             priceSrc: price ? 'store' : 'none',
+            regular: useF && o.price ? 'After the first ' + cap.toLocaleString('en-US') + ' subscribers: ' + String(o.price) + '/year.' : '',
+            buyFounding: useF,
             length: '1-year subscription, renews automatically.',
             trial: hasTrial ? trialLen + ' free trial, then ' + (price ? price + '/year' : 'the yearly price the App Store shows') + '. Your Apple ID is charged when the trial ends unless you cancel at least 24 hours before.' : '',
             renew: RENEW,
@@ -3861,6 +3902,7 @@
         +     '<button type="button" class="gps-sheet-buy">Start 7-day free trial</button>'
         +     '<div class="gps-sheet-founding" style="display:none"></div>'
         +     '<div class="gps-sheet-price" data-price-src="none"></div>'
+        +     '<div class="gps-sheet-regular gps-sheet-fine" style="display:none"></div>'
         +     '<div class="gps-sheet-product gps-sheet-fine"></div>'
         +     '<div class="gps-sheet-length gps-sheet-fine"></div>'
         +     '<div class="gps-sheet-trial gps-sheet-fine"></div>'
@@ -3937,6 +3979,8 @@
         ptxt('.gps-sheet-price', t.price);
         var pe = pq('.gps-sheet-price');
         if (pe) pe.setAttribute('data-price-src', t.priceSrc);
+        ptxt('.gps-sheet-regular', t.regular);
+        pshow('.gps-sheet-regular', !!t.regular);
         ptxt('.gps-sheet-product', t.product);
         ptxt('.gps-sheet-length', t.length);
         ptxt('.gps-sheet-trial', t.trial);
@@ -3981,12 +4025,15 @@
         var mine = PW;
         sheetBusy(true);
         sheetMsg(kind === 'restore' ? 'Restoring\u2026' : '');
+        // 062: the product the sheet is selling (founding while its window is open and the store
+        // offers it, else the regular one).
+        var t = sheetText(PW.offer, PW.founding, null);
         E[kind === 'restore' ? 'restore' : 'purchase'](function (r) {
             if (PW !== mine) return;
             sheetBusy(false);
             if (r && r.pro && hasGpsPro()) { sheetMsg(''); closePaywall('yes'); becomePro(); return; }
             sheetMsg((r && r.message) || E.MSG.error);
-        });
+        }, { founding: !!t.buyFounding });
     }
     // THE GATE. go(): GPS may show. no(): it may not (declined, or ctx.quiet).
     function requireGps(ctx, go, no) {
@@ -4029,6 +4076,7 @@
     function becomePro() {
         if (!S || S.pro || !hasGpsPro()) return;
         S.pro = true;
+        grantPass(S.eventCode);
         S.el.classList.toggle('gps-locked', false);
         // Nothing was asked for while locked (no MapLibre): ask now, map and all.
         if (!S.map) S.mapRequested = false;
@@ -4036,6 +4084,51 @@
         render();
     }
     (function () { var E = entitlement(); if (E && E.onChange) E.onChange(function (p) { if (p) becomePro(); }); })();
+
+    // ---- THE GPS DOOR'S TAG ON HOME (062) -------------------------------------------
+    // Paywall on only. No trial / subscription: "7-day free trial" (only when the store says this
+    // Apple ID can still have it). In the trial: "Free trial · 6 days left" (the trial badge).
+    // Subscribed: nothing. Tapping the door is unchanged (the gate). Pure text: doorTag().
+    function doorTag(st, offer, now) {
+        if (st && st.door) return { text: st.door, kind: 'trial' };
+        if (st && st.line) return null;
+        var o = offer || {};
+        var tr = o.fromStore ? ((o.founding && o.founding.trial) || o.trial) : null;
+        return tr ? { text: tr + ' free trial', kind: 'offer' } : null;
+    }
+    function paintDoor() {
+        var E = entitlement();
+        if (typeof document === 'undefined' || cfg().paywall !== true || !E || !iapOn()) return;
+        var door = document.querySelector('.hp-door.gps.hs-door');
+        if (!door) return;
+        var put = function (tag) {
+            var el = door.querySelector('.hs-gps-tag');
+            if (!tag) { if (el) el.parentNode.removeChild(el); return; }
+            if (!el) {
+                if (!document.getElementById('hs-gps-tag-css')) {
+                    var st = document.createElement('style'); st.id = 'hs-gps-tag-css';
+                    st.textContent = '.hs-gps-tag{display:inline-block;margin-top:10px;padding:4px 10px;border-radius:999px;background:rgba(217,249,157,.18);color:#d9f99d;font-size:13px;font-weight:800;letter-spacing:.01em;}';
+                    (document.head || document.documentElement).appendChild(st);
+                }
+                el = document.createElement('span'); el.className = 'hs-gps-tag';
+                var host = door.querySelector('.d'); (host ? host.parentNode : door).appendChild(el);
+            }
+            el.setAttribute('data-tag', tag.kind);
+            if (el.textContent !== tag.text) el.textContent = tag.text;
+        };
+        E.whenKnown(function () {
+            var st = E.statusLine ? E.statusLine() : null;
+            if (st || E.isPro()) { put(doorTag(st, null)); return; }
+            E.offer(function (o) { put(doorTag(null, o)); });
+        }, PENDING_MS);
+    }
+    (function () {
+        var E = entitlement();
+        if (!E || typeof document === 'undefined') return;
+        if (E.onStatus) E.onStatus(paintDoor);
+        if (E.onChange) E.onChange(paintDoor);
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paintDoor); else paintDoor();
+    })();
 
     // ---- NO PULL-DOWN ON GPS ----------------------------------------------------
     // A drag on the GPS side moves the map and nothing else: no page scroll, no
@@ -7142,9 +7235,11 @@
             mode: 'measure', target: null, targetMoved: false, draft: null, localPins: {},
             geoError: null, framed: null, mapRequested: false, windKick: true, windPan: 0, loadingCourses: !window.HardPanGpsCourses,
             // Decided once per round, by the one check (hasGpsPro).
-            pro: hasGpsPro(),
+            pro: hasGpsPro(opts.eventCode),
             lc: lc, ld: lay === 'd'
         };
+        // 062: entitled now -> this round keeps GPS to its end (the round pass).
+        if (S.pro) grantPass(S.eventCode);
         // LAYOUT C: the top row and the panel change height without a render (a longer plays line,
         // the round chip wrapping, bigger text): the map's frame and what sits on the panel follow.
         if (lc && typeof ResizeObserver === 'function') {
@@ -8006,6 +8101,8 @@
         // The paywall's words for a store offer, a founding window and a course (pure;
         // gps_paywall_test.js), the founding default, and the course line.
         paywallText: function (o, f, cov) { return sheetText(o, f, cov); },
+        // 062: the Home door's tag (pure), and the round pass (never lock a round in progress).
+        doorTag: doorTag, roundPass: roundPass, grantRoundPass: grantPass, ROUND_PASS_MS: ROUND_PASS_MS,
         foundingFrom: foundingFrom, courseLine: courseLine,
         // The Wi-Fi iPad sentence (gps_ipad_test.js).
         ipadNoGps: ipadNoGps,

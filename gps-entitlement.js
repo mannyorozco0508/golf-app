@@ -23,6 +23,20 @@
 // store's answer, held in memory only (the plugin keeps its own cache for
 // offline launches). The checks stub the plugin itself.
 //
+// URGENT-062 - STOREKIT 2 IS THE STORE (HARDPAN_GPS_CONFIG.iapStore 'storekit'): our own
+// PhoneBridge plugin HardPanStore (gps-beta/ios/App/PhoneBridge/HardPanStorePlugin.swift,
+// window.Capacitor.Plugins.HardPanStore) - no new package. It answers with the subscription's
+// own facts, which RevenueCat's CustomerInfo only partly carries: active, which product
+// (founding or regular), the period's end (= the renewal date), auto-renew on or off, and
+// whether this period is the free trial. Kept in memory only, like before. The RevenueCat
+// path below stays, dormant (iapStore 'revenuecat'; its plugin and key are not in the app).
+// RevenueCat FOR 2.0 (Manny, Oct 24, to match Android's Play Billing on RevenueCat): gps-config
+// iapStore 'revenuecat' - @revenuecat/purchases-capacitor (13.7.3, pinned) with the PUBLIC appl_
+// key (empty until Manny sends it = no entitlement). The RevenueCat path gives the same facts as
+// the StoreKit one (rcFacts). HardPanStore stays in the app, unused unless iapStore is 'storekit'.
+// THE PAYWALL SWITCH: nothing here asks any store at launch unless HARDPAN_GPS_CONFIG.paywall
+// is true (gps-config.js) - an install with the paywall off never talks to the App Store.
+//
 // NO LOCATION, NO GOLFER DATA: the plugin is told nothing but the public SDK key.
 // It talks to the App Store and RevenueCat about the purchase, nothing else.
 //
@@ -45,9 +59,22 @@
             return (C && C.Plugins && C.Plugins.Purchases) || null;
         } catch (e) { return null; }
     }
+    // URGENT-062: which store. Only a literal 'storekit' picks StoreKit 2 (the shipped config).
+    function storeKit() { return cfg().iapStore === 'storekit'; }
+    function foundingId() { return String(cfg().iapFoundingProduct || ''); }
+    function ids() { return [productId(), foundingId()].filter(function (x) { return !!x; }); }
+    function skPlugin() {
+        try {
+            var C = window.Capacitor;
+            return (C && C.Plugins && C.Plugins.HardPanStore) || null;
+        } catch (e) { return null; }
+    }
 
     // ---- STATE (memory only - never localStorage) ---------------------------
     var pro = false;          // the last answer the store gave
+    // StoreKit 2 (062): the subscription's facts, from the store (memory only).
+    // { active, productId, expires (ms), willRenew, trial, founding } or null.
+    var sub = null;
     var known = false;        // has the store answered at all this launch?
     var started = null;       // the configure promise, once
     var listeners = [];
@@ -76,6 +103,27 @@
     }
     // The plugin answers { customerInfo } (purchase, restore, getCustomerInfo).
     function infoOf(r) { return r && r.customerInfo ? r.customerInfo : r; }
+    // URGENT-062 (RevenueCat for 2.0, Manny Oct 24): the SAME facts the StoreKit path gives, from
+    // CustomerInfo's "gps_map" EntitlementInfo: active, which product (founding / regular), the
+    // period's end (= the renewal date while auto-renew is on), willRenew, and periodType TRIAL.
+    // An Android product id may carry ":basePlan" - the part before ':' is compared. Pure.
+    function rcFacts(info) {
+        var act = info && info.entitlements && info.entitlements.active;
+        var e = act && act[entitlementId()];
+        if (!e || e.isActive === false) return { active: false, state: 'none' };
+        var exp = Number(e.expirationDateMillis) || (e.expirationDate ? Date.parse(e.expirationDate) : 0) || 0;
+        return { active: true, productId: String(e.productIdentifier || '').split(':')[0], expires: exp || null,
+            willRenew: e.willRenew !== false, trial: String(e.periodType || '').toUpperCase() === 'TRIAL', state: 'subscribed' };
+    }
+    // One CustomerInfo -> the one answer (activeIn, as before) and the facts for the screens.
+    function takeInfo(info) {
+        var on = activeIn(info);
+        sub = on ? subOf(rcFacts(info)) : null;
+        if (sub && !sub.active) sub = null;
+        set(on);
+        watchExpiry();
+        statusFns.slice().forEach(function (fn) { try { fn(); } catch (e) {} });
+    }
 
     // Configure the SDK once. Resolves true when it is ready to be asked.
     function start() {
@@ -84,6 +132,19 @@
         // BUILT config (never the repo's), so Manny's Cmd+R build reaches GPS without a store. A
         // release build is built without it and stays behind the paywall.
         if (cfg().devPro === true) { set(true); started = Promise.resolve(false); return started; }
+        if (storeKit()) {
+            var K = skPlugin();
+            if (!enabled() || !K) { started = Promise.resolve(false); return started; }
+            started = Promise.resolve().then(function () {
+                try {
+                    // The store's own news: a renewal, an expiry, a purchase on another device,
+                    // a refund, Ask to Buy approved - pushed by Transaction.updates.
+                    if (typeof K.addListener === 'function') K.addListener('storeChange', function (st) { take(st); });
+                } catch (e) {}
+                return true;
+            });
+            return started;
+        }
         var P = plugin(), key = String(cfg().revenueCatKey || '');
         if (!enabled() || !P || !key) { started = Promise.resolve(false); return started; }
         started = Promise.resolve().then(function () {
@@ -91,7 +152,7 @@
         }).then(function () {
             try {
                 if (typeof P.addCustomerInfoUpdateListener === 'function') {
-                    P.addCustomerInfoUpdateListener(function (info) { set(activeIn(infoOf(info))); });
+                    P.addCustomerInfoUpdateListener(function (info) { takeInfo(infoOf(info)); });
                 }
             } catch (e) {}
             return true;
@@ -106,8 +167,52 @@
         if (cfg().devPro === true) { set(true); done(true); return; }   // the dev build (see start)
         start().then(function (ok) {
             if (!ok) { set(false); return false; }
-            return plugin().getCustomerInfo().then(function (r) { set(activeIn(infoOf(r))); return pro; });
+            if (storeKit()) return skPlugin().status({ ids: ids() }).then(function (st) { take(st); return pro; });
+            return plugin().getCustomerInfo().then(function (r) { takeInfo(infoOf(r)); return pro; });
         }).then(function () { done(pro); }, function () { answered(); done(pro); });
+    }
+
+    // ---- STOREKIT 2: THE SUBSCRIPTION'S FACTS (062) -----------------------------
+    // The plugin's status -> sub, and the one answer. Pure apart from set(). An expiry date in
+    // the past is not active, whatever else was said (a phone left asleep past its renewal
+    // date asks again when it wakes - visibility, below).
+    function subOf(st, now) {
+        if (!st || typeof st !== 'object') return null;
+        var exp = Number(st.expires) || 0;
+        var known = ids();
+        var id = String(st.productId || '');
+        var active = st.active === true && (!exp || exp > (now == null ? Date.now() : now)) && (!id || known.indexOf(id) !== -1);
+        return { active: active, productId: id, expires: exp || null, willRenew: st.willRenew !== false,
+            trial: active && st.trial === true, founding: !!id && id === foundingId() };
+    }
+    function take(st) {
+        sub = subOf(st);
+        set(!!(sub && sub.active));
+        watchExpiry();
+        statusFns.slice().forEach(function (fn) { try { fn(); } catch (e) {} });
+    }
+    var statusFns = [];
+    // A phone back from sleep, or the period's end passing while the app is open: ask again.
+    var expTimer = null;
+    function watchExpiry() {
+        if (expTimer) { clearTimeout(expTimer); expTimer = null; }
+        if (!sub || !sub.active || !sub.expires) return;
+        var ms = sub.expires - Date.now() + 1000;
+        if (ms > 0 && ms < 2147483000) expTimer = setTimeout(function () { refresh(); }, ms);
+    }
+    // ---- THE PROFILE LINE AND THE BADGE (062; Manny: no renewal reminder, no cancel prompt) --
+    // "Golf GPS · renews Oct 21, 2027" - auto-renew off: "Golf GPS · ends <date>" (a fact, not
+    // a prompt). Trial: the same line, plus the badge "Free trial". Pure (gps_storekit_062_test.js).
+    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    function dateText(ms) { var d = new Date(Number(ms)); if (!(ms > 0) || isNaN(d.getTime())) return ''; return MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(); }
+    function daysLeft(ms, now) { return Math.max(0, Math.ceil((Number(ms) - (now == null ? Date.now() : now)) / 86400000)); }
+    function lineFor(s, now) {
+        if (!s || !s.active) return null;
+        var d = dateText(s.expires);
+        var line = 'Golf GPS' + (d ? ' \u00b7 ' + (s.willRenew ? 'renews ' : 'ends ') + d : '');
+        var badge = s.trial ? 'Free trial' : '';
+        var left = s.trial && s.expires ? daysLeft(s.expires, now) : null;
+        return { line: line, badge: badge, door: s.trial && left != null ? 'Free trial \u00b7 ' + left + (left === 1 ? ' day left' : ' days left') : '' };
     }
 
     // ---- THE OFFER: what the paywall shows ----------------------------------
@@ -137,27 +242,70 @@
         (cur.availablePackages || []).forEach(function (p) {
             if (p && p.product && (!pk || (want && p.product.identifier === want))) pk = p;
         });
-        return pk && pk.product ? { pkg: pk, product: pk.product } : null;
+        if (!pk || !pk.product) return null;
+        // 062: the founding product's package, when configured and offered (any package of the current offering).
+        var fid = foundingId(), fpk = null;
+        if (fid) (cur.availablePackages || []).forEach(function (p) { if (p && p.product && String(p.product.identifier).split(':')[0] === fid) fpk = p; });
+        if (fpk === pk) fpk = null;
+        return { pkg: pk, product: pk.product, founding: fpk };
+    }
+    // RevenueCat: is this Apple ID still eligible for the free trial? (2 eligible, 1 not, 0 unknown, 3 none).
+    function rcEligible(ids) {
+        var P = plugin();
+        if (!P || typeof P.checkTrialOrIntroductoryPriceEligibility !== 'function') return Promise.resolve({});
+        return Promise.resolve().then(function () { return P.checkTrialOrIntroductoryPriceEligibility({ productIdentifiers: ids }); })
+            .then(function (m) { return m || {}; }, function () { return {}; });
+    }
+    function rcTrial(pr, elig) {
+        var intro = pr && pr.introPrice;
+        if (!intro || Number(intro.price) !== 0) return null;
+        var st = elig && elig[pr.identifier] && Number(elig[pr.identifier].status);
+        return st === 1 ? null : introPeriod(intro);
     }
     var offerCache = null;
+    // StoreKit 2: both products from the store. -> the regular product's words, and
+    // founding: { price, trial } when the store offers the founding product. introEligible
+    // false: this Apple ID had its free trial in the group already - no trial words.
+    function skOffer(r) {
+        var list = (r && r.products) || [];
+        var by = {}; list.forEach(function (p) { if (p && p.id) by[p.id] = p; });
+        var reg = by[productId()], fnd = by[foundingId()];
+        if (!reg && !fnd) return { fromStore: false };
+        var base = reg || fnd;
+        var tr = function (p) { return p && p.trial && p.introEligible !== false ? periodText(p.trial) : null; };
+        return {
+            fromStore: true,
+            title: String(base.title || ''),
+            price: reg ? String(reg.price || '') : '',
+            period: periodText(base.period),
+            trial: tr(base),
+            founding: fnd ? { price: String(fnd.price || ''), trial: tr(fnd) } : null
+        };
+    }
     function offer(cb) {
         var none = { fromStore: false };
         if (!enabled()) { cb(none); return; }
         start().then(function (ok) {
             if (!ok) return none;
+            if (storeKit()) return skPlugin().products({ ids: ids() }).then(skOffer);
             return plugin().getOfferings().then(function (o) {
                 var sp = storeProduct(o && o.offerings ? o.offerings : o);
                 if (!sp) return none;
-                var pr = sp.product, intro = pr.introPrice || null;
+                var pr = sp.product, fp = sp.founding ? sp.founding.product : null;
                 offerCache = sp;
-                return {
-                    fromStore: true,
-                    title: String(pr.title || ''),
-                    price: String(pr.priceString || ''),
-                    period: periodText(pr.subscriptionPeriod),
-                    // A free intro offer: price 0, e.g. P1W / P7D.
-                    trial: intro && Number(intro.price) === 0 ? introPeriod(intro) : null
-                };
+                return rcEligible([pr.identifier].concat(fp ? [fp.identifier] : [])).then(function (elig) {
+                    var out = {
+                        fromStore: true,
+                        title: String(pr.title || ''),
+                        price: String(pr.priceString || ''),
+                        period: periodText(pr.subscriptionPeriod),
+                        // A free intro offer: price 0, e.g. P1W / P7D (not when this Apple ID already had it).
+                        trial: rcTrial(pr, elig)
+                    };
+                    // 062: the founding product (null = configured but not offered: the regular price only).
+                    if (foundingId()) out.founding = fp ? { price: String(fp.priceString || ''), trial: rcTrial(fp, elig) } : null;
+                    return out;
+                });
             });
         }).then(function (r) { cb(r || none); }, function () { cb(none); });
     }
@@ -180,14 +328,30 @@
     function pendingErr(e) { return !!(e && (String(e.code) === '20' || /PAYMENT_PENDING/.test(String(e.code || '')))); }
     function result(outcome, msgKey) { return { pro: pro, outcome: outcome, message: msgKey ? MSG[msgKey] : '' }; }
 
-    function purchase(cb) {
+    // opts.founding: buy the founding product (the paywall says so only while the window is
+    // open and the store offers it); else the regular one.
+    function skPurchase(opts) {
+        var id = opts && opts.founding && foundingId() ? foundingId() : productId();
+        return skPlugin().purchase({ id: id, ids: ids() }).then(function (r) {
+            r = r || {};
+            if (r.status) take(r.status);
+            if (r.outcome === 'cancelled') return result('cancelled', 'cancelled');
+            if (r.outcome === 'pending') return result('pending', 'pending');
+            if (r.outcome === 'unavailable') return result('unavailable', 'unavailable');
+            return pro ? result('pro') : result('error', 'error');
+        }, function () { return result('error', 'error'); });
+    }
+    function purchase(cb, opts) {
         if (!enabled()) { cb(result('unavailable', 'unavailable')); return; }
         start().then(function (ok) {
             if (!ok) return result('unavailable', 'unavailable');
+            if (storeKit()) return skPurchase(opts);
             var go = function (sp) {
                 if (!sp) return result('unavailable', 'unavailable');
-                return plugin().purchasePackage({ aPackage: sp.pkg }).then(function (r) {
-                    set(activeIn(infoOf(r)));
+                // 062: the founding package while the paywall sells it (opts.founding) and the store offers it.
+                var pkg = opts && opts.founding && sp.founding ? sp.founding : sp.pkg;
+                return plugin().purchasePackage({ aPackage: pkg }).then(function (r) {
+                    takeInfo(infoOf(r));
                     return pro ? result('pro') : result('error', 'error');
                 }, function (e) {
                     if (cancelled(e)) return result('cancelled', 'cancelled');
@@ -204,10 +368,15 @@
         if (!enabled()) { cb(result('unavailable', 'unavailable')); return; }
         start().then(function (ok) {
             if (!ok) return result('unavailable', 'unavailable');
+            // StoreKit 2: AppStore.sync() (the Apple ID may be asked to sign in), then the facts.
+            if (storeKit()) return skPlugin().restore({ ids: ids() }).then(function (r) {
+                take(r && r.status ? r.status : r);
+                return pro ? result('pro') : result('none', 'none');
+            }, function () { return result('error', 'restoreError'); });
             return plugin().restorePurchases().then(function (r) {
-                set(activeIn(infoOf(r)));
+                takeInfo(infoOf(r));
                 // Read it again from the store, so the answer is the store's own.
-                return plugin().getCustomerInfo().then(function (r2) { set(activeIn(infoOf(r2))); }, function () {}).then(function () {
+                return plugin().getCustomerInfo().then(function (r2) { takeInfo(infoOf(r2)); }, function () {}).then(function () {
                     return pro ? result('pro') : result('none', 'none');
                 });
             }, function () { return result('error', 'restoreError'); });
@@ -233,12 +402,22 @@
         },
         refresh: refresh, offer: offer, purchase: purchase, restore: restore,
         onChange: function (fn) { if (typeof fn === 'function') listeners.push(fn); },
+        // 062: the subscription's facts (StoreKit 2; null before the store answers, with the
+        // paywall off, or for a dev build), and the Profile line / trial badge built from them.
+        subscription: function () { return sub && enabled() ? JSON.parse(JSON.stringify(sub)) : null; },
+        statusLine: function (now) { return enabled() && cfg().paywall === true ? lineFor(sub, now) : null; },
+        onStatus: function (fn) { if (typeof fn === 'function') statusFns.push(fn); },
+        lineFor: lineFor, subOf: subOf, skOffer: skOffer, rcFacts: rcFacts, dateText: dateText,
         MSG: MSG
     };
     if (typeof window !== 'undefined') {
         window.HardPanEntitlement = api;
-        // At launch, flag on only: ask the store once.
-        if (enabled()) refresh();
+        // At launch, flag on AND the paywall on (062) only: ask the store once - and again when
+        // the app comes back to the front (a period may have ended, or renewed, meanwhile).
+        if (enabled() && cfg().paywall === true) {
+            refresh();
+            try { document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refresh(); }); } catch (e) {}
+        }
     }
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

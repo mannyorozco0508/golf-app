@@ -119,11 +119,12 @@ test('flag off: no purchase call at all, and GPS follows the build\'s paywall sw
     const r1 = await cb(E.purchase), r2 = await cb(E.restore), o = await cb(E.offer), p = await cb(E.refresh);
     assert.strictEqual(r1.pro, false); assert.strictEqual(r2.pro, false); assert.strictEqual(o.fromStore, false); assert.strictEqual(p, false);
     assert.deepStrictEqual(P.calls, [], 'flag off: the plugin was called');
-    // hasGpsPro: the entitlement when the flag is on; the flag on with no entitlement
-    // module = no GPS; the flag off = the build's paywall switch.
+    // hasGpsPro (URGENT-062): the build's paywall switch first (off = GPS on, no store asked);
+    // on: the entitlement (or this round's pass - a round in progress is never locked);
+    // on with no store = no GPS.
     const v = read('gps-view.js');
-    const fn = v.slice(v.indexOf('function hasGpsPro('), v.indexOf('}', v.indexOf('if (cfg().paywall !== true) return true;')) + 1);
-    assert.ok(/if \(iapOn\(\)\) return entitlement\(\)\.isPro\(\) === true;\s*if \(cfg\(\)\.iap === true\) return false;\s*if \(cfg\(\)\.paywall !== true\) return true;\s*return false;/.test(fn), fn);
+    const fn = v.slice(v.indexOf('function hasGpsPro('), v.indexOf('}', v.indexOf('function hasGpsPro(')) + 1);
+    assert.ok(/if \(cfg\(\)\.paywall !== true\) return true;\s*if \(iapOn\(\)\) return entitlement\(\)\.isPro\(\) === true \|\| roundPass\(code\);\s*return false;/.test(fn), fn);
 });
 
 test('whenKnown: answers once the store has, or after its timeout - never twice', { skip }, async () => {
