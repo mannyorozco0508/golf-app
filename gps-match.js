@@ -39,8 +39,11 @@
     function overpass(q) {
         var urls = cfg().overpassUrl ? [String(cfg().overpassUrl)] : OVERPASS_URLS;
         var one = function (i) {
-            return fetch(urls[i], { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q) })
-                .then(function (r) { if (!r.ok) throw new Error('overpass ' + r.status); return r.json(); })
+            // (071: a public server that never answers is given up after 60 s - the next one is asked, and the
+            // lookup ends instead of hanging; measured Oct 25: answers in 25-140 s, some never)
+            var ctl = typeof AbortController === 'function' ? new AbortController() : null, t = ctl ? setTimeout(function () { ctl.abort(); }, 60000) : null;
+            return fetch(urls[i], { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'data=' + encodeURIComponent(q), signal: ctl ? ctl.signal : undefined })
+                .then(function (r) { if (t) clearTimeout(t); if (!r.ok) throw new Error('overpass ' + r.status); return r.json(); }, function (e) { if (t) clearTimeout(t); throw e; })
                 .catch(function (e) { if (i + 1 < urls.length) return one(i + 1); throw e; });
         };
         return one(0);
