@@ -182,7 +182,8 @@
             if (!ph.set) { if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: true }); return verdict({}, of, { source: 'none', step: 0, how: ph.how }); }
             return finish(key, opts, p, ph, guard);
         }).catch(function () {
-            if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: false });
+            // (071: an OSM-only course has no other source - the map asks again rather than wait an hour)
+            if (!minN && !OSM_ONLY_RE.test(String(key || ''))) lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: false });
             return verdict({}, of, { source: 'none', how: 'OpenStreetMap could not be reached', kept: false });
         });
     }

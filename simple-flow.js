@@ -759,7 +759,7 @@
             }
             if (S.osmPick !== me) return;
             picked = true;
-            OSM_CARD[key] = { name: row.name, city: row.city, state: row.state, src: ok ? 'osm' : (r === 'wait' ? 'loading' : 'tap'), n: ok ? r.n : 0, of: n };
+            OSM_CARD[key] = { name: row.name, city: row.city, state: row.state, src: ok ? 'osm' : (r === 'wait' ? 'loading' : r && r.kept === false && /could not be reached/.test(r.how || '') ? 'unreached' : 'tap'), n: ok ? r.n : 0, of: n };
             S.osmPick = null; S.q = ''; S.changing = false; S.noCard = null; S.lookup = null; S.err1 = ''; S.pend = null;
             if (S.web) S.web.pull = null;
             pick(key, row.name);
@@ -797,7 +797,7 @@
         if (!o || !/^osm_[wr]\d+$/.test(String(key || ''))) return '';
         var nm = esc(String(o.name || '').split(' (')[0]);
         return '<div class="sf-card" id="sf-osmnote"><div class="sf-note" style="font-size:14px;margin-bottom:8px;">'
-            + (o.src === 'osm' ? '✓ GPS from OpenStreetMap (' + o.n + ' of ' + o.of + ' holes mapped).' : o.src === 'loading' ? '\u23f3 ' + nm + '\u2019s holes and greens are on the way from OpenStreetMap \u2014 the map shows them once they\u2019re in (you can start now).' : 'No GPS map data for ' + nm + ' yet — on the map, “Tap the middle of the green” sets each green.')
+            + (o.src === 'osm' ? '✓ GPS from OpenStreetMap (' + o.n + ' of ' + o.of + ' holes mapped).' : o.src === 'unreached' ? 'Couldn\u2019t reach OpenStreetMap for ' + nm + '\u2019s holes just now \u2014 the map tries again when it opens; until then \u201cTap the middle of the green\u201d sets each green.' : o.src === 'loading' ? '\u23f3 ' + nm + '\u2019s holes and greens are on the way from OpenStreetMap \u2014 the map shows them once they\u2019re in (you can start now).' : 'No GPS map data for ' + nm + ' yet — on the map, “Tap the middle of the green” sets each green.')
             + ' Pars and indexes aren’t set yet (par 4 shown) — add them now or later.</div>'
             + '<button type="button" class="sf-link" data-sf="osmpars" style="font-size:14px;padding:0;min-height:0;">Type the pars and indexes ›</button>'
             + ' <button type="button" class="sf-link muted" data-sf="request" style="font-size:13px;padding:0 0 0 10px;min-height:0;">Request this course</button></div>';
