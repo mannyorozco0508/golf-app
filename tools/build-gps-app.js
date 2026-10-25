@@ -57,6 +57,9 @@ if (missing.length) { console.error('MISSING (declared, not at the repo root): '
 if (process.env.GPS_DEV_PRO === '1') {
     fs.appendFileSync(path.join(OUT, 'gps-config.js'), '\n// DEV BUILD (GPS_DEV_PRO=1): counts as subscribed. NEVER ARCHIVE THIS BUILD.\nwindow.HARDPAN_GPS_CONFIG.devPro = true;\n');
     console.warn('DEV BUILD: GPS_DEV_PRO=1 - this build counts as subscribed. Do NOT archive or upload it.');
+    // 070 (Manny, Oct 25): THE SCORECARD SCAN, ON IN THE DEV APP ONLY (gps-scan-client.js serverOffHere reads
+    // features.scanServer; absent = off). A plain / release build never gets this line.
+    fs.appendFileSync(path.join(OUT, 'gps-config.js'), '\n// DEV BUILD (GPS_DEV_PRO=1): the scorecard scan server is on (uses the account\'s free scans).\nwindow.HARDPAN_GPS_CONFIG.features = window.HARDPAN_GPS_CONFIG.features || {};\nwindow.HARDPAN_GPS_CONFIG.features.scanServer = true;\n');
 }
 // THE PAYWALL SWITCH (URGENT-062): GPS_PAYWALL=1 turns the GPS paywall ON in THIS build's
 // gps-config.js (the repo keeps paywall: false, so a normal build or install never locks GPS).
