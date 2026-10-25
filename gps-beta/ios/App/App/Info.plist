@@ -25,6 +25,8 @@
 	<!-- ITMS-90683 (Apple's warning on builds 2-5): the location plugin's binary
 	     can ask for "Always", so Apple wants this key present. HardPan GPS never
 	     asks for Always - only When In Use - and the text says so. -->
+	<key>NSCameraUsageDescription</key>
+	<string>HardPan uses the camera only when you tap Scan scorecard, to read a paper scorecard so you don't have to type the scores. You check every number before anything is saved.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>HardPan saves your round recap image to Photos when you choose Save Image.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

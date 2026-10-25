@@ -10,6 +10,7 @@
 		AA0220000000000000000007 /* HardPanRoundAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000001 /* HardPanRoundAttributes.swift */; };
 		AA0220000000000000000008 /* HardPanLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000004 /* HardPanLiveActivityPlugin.swift */; };
 		AA0220000000000000000009 /* HardPanBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000005 /* HardPanBridgeViewController.swift */; };
+		AA0660000000000000000002 /* HardPanDocScanPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0660000000000000000001 /* HardPanDocScanPlugin.swift */; };
 		AA022000000000000000000A /* HardPanRoundAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000001 /* HardPanRoundAttributes.swift */; };
 		AA022000000000000000000B /* HardPanLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000002 /* HardPanLiveActivityWidget.swift */; };
 		AA022000000000000000000C /* HardPanLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0220000000000000000006 /* HardPanLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -89,6 +90,7 @@
 		AA0220000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA0220000000000000000004 /* HardPanLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanLiveActivityPlugin.swift; sourceTree = "<group>"; };
 		AA0220000000000000000005 /* HardPanBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanBridgeViewController.swift; sourceTree = "<group>"; };
+		AA0660000000000000000001 /* HardPanDocScanPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardPanDocScanPlugin.swift; sourceTree = "<group>"; };
 		AA0220000000000000000006 /* HardPanLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HardPanLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		C4B10A012F00000000000004 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		C4B10A032F00000000000004 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
@@ -190,6 +192,7 @@
 			isa = PBXGroup;
 			children = (
 				AA0220000000000000000005 /* HardPanBridgeViewController.swift */,
+				AA0660000000000000000001 /* HardPanDocScanPlugin.swift */,
 				AA0220000000000000000004 /* HardPanLiveActivityPlugin.swift */,
 				AA0620000000000000000001 /* HardPanStorePlugin.swift */,
 				D022A0000000000000000007 /* HardPanWatchPlugin.swift */,
@@ -410,6 +413,7 @@
 				AA0220000000000000000008 /* HardPanLiveActivityPlugin.swift in Sources */,
 				AA0220000000000000000009 /* HardPanBridgeViewController.swift in Sources */,
 				AA0620000000000000000002 /* HardPanStorePlugin.swift in Sources */,
+				AA0660000000000000000002 /* HardPanDocScanPlugin.swift in Sources */,
 				D022A000000000000000006A /* WatchProtocol.swift in Sources */,
 				D022A000000000000000006C /* HardPanWatchPlugin.swift in Sources */,
 				D022A000000000000000006D /* PhoneWatchSession.swift in Sources */,

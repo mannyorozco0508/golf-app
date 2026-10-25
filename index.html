@@ -137,6 +137,12 @@
     <!-- URGENT-045: the shared "Mark ..." button on the GPS screen (distances only), and KP by GPS ("Mark my KP" on a KP hole). -->
     <script src="gps-mark-distance.js"></script>
     <script src="gps-kp.js"></script>
+    <!-- 066 (2): scorecard scan - the shared validator, the camera + server client, the confirm grid.
+         The Scan button comes through feature-registry.js (Tools > Customize; off until turned on, Host lock with free scans).
+         Scores are written only by the card's own saveScore, after "Use these scores". -->
+    <script src="scorecard-validate.js"></script>
+    <script src="gps-scan-client.js"></script>
+    <script src="gps-scan-grid.js"></script>
     <!-- GPS:END -->
     <!-- GPS:BEGIN -->
     <!-- Bingo Bango Bongo + Vegas: their own engines and cards (HardPan, gps-games). -->
