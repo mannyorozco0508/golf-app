@@ -700,6 +700,9 @@
     function osmTwinRow(m) {
         var all = []; try { all = HC() && HC().osmOnly ? HC().osmOnly() : []; } catch (e) { all = []; }
         var tw = all.filter(function (o) { return o.greens > 0 && osmTwinOf(o, m); });
+        // More than one (the resort's own outline is a twin too): the one named for GolfAPI's course part.
+        var cw = twinWords(m.course || '');
+        if (tw.length > 1 && cw.length) tw = tw.filter(function (o) { var ow = twinWords(o.name); return cw.every(function (w) { return ow.indexOf(w) !== -1; }); });
         return tw.length === 1 ? tw[0] : null;
     }
     function osmKey(c) { var id = Number(c && c.osm); return isFinite(id) && id ? 'osm_' + (id < 0 ? 'r' + (-id) : 'w' + id) : ''; }
@@ -746,10 +749,17 @@
         if (row.pt) ls('hardpan_course_loc_v1_' + key, JSON.stringify({ lat: row.pt[0], lng: row.pt[1], city: row.city || '', state: row.state || '' }));
         try { if (HC() && HC().refresh) HC().refresh(); } catch (e) {}
         var M = W.HardPanGpsMatch, me = S.osmPick = { row: row, state: 'osm', key: key };
+        var picked = false;
         var done = function (r) {
-            if (S.osmPick !== me) return;
             var ok = r && (r.status === 'ready' || r.status === 'partial') && r.n > 0;
-            OSM_CARD[key] = { name: row.name, city: row.city, state: row.state, src: ok ? 'osm' : 'tap', n: ok ? r.n : 0, of: n };
+            if (picked) {   // the holes landed after the pick: the note says so (the map uses them from this phone)
+                if (ok && OSM_CARD[key]) { OSM_CARD[key].src = 'osm'; OSM_CARD[key].n = r.n; if (S.step === 1 && courseKey() === key) render(); }
+                else if (OSM_CARD[key] && OSM_CARD[key].src === 'loading') { OSM_CARD[key].src = 'tap'; if (S.step === 1 && courseKey() === key) render(); }
+                return;
+            }
+            if (S.osmPick !== me) return;
+            picked = true;
+            OSM_CARD[key] = { name: row.name, city: row.city, state: row.state, src: ok ? 'osm' : (r === 'wait' ? 'loading' : 'tap'), n: ok ? r.n : 0, of: n };
             S.osmPick = null; S.q = ''; S.changing = false; S.noCard = null; S.lookup = null; S.err1 = ''; S.pend = null;
             if (S.web) S.web.pull = null;
             pick(key, row.name);
@@ -757,7 +767,12 @@
         };
         if (!(row.greens > 0) || !row.pt) { done(null); return; }
         render1();
-        var t = setTimeout(function () { done(null); }, 25000);
+        // OpenStreetMap's public servers can take a minute or two (measured Oct 25: 58 s and 114 s for Shortys).
+        // After 20 s (or "Start without waiting") the course is picked and the lookup goes on: the note says
+        // the holes are on the way, and the map (which reads this phone's copy, or looks them up itself from
+        // the course's point) shows them once they are in.
+        var t = setTimeout(function () { done('wait'); }, 20000);
+        me.skip = function () { clearTimeout(t); done('wait'); };
         // (Round Setup loads the map helpers when a course is picked: loaded here first, the same way.)
         var need = function (src, ok) { return ok() || !fn('gpsLoadScript') ? Promise.resolve(ok()) : W.gpsLoadScript(src, ok); };
         need('gps-geo.js', function () { return !!W.HardPanGeo; }).then(function () { return need('gps-match.js', function () { return !!W.HardPanGpsMatch; }); })
@@ -770,7 +785,8 @@
         if (!p) return '';
         var nm = esc(p.row.name);
         if (p.state === 'busy' || p.state === 'osm') return '<div class="sf-card" id="sf-osmpick" style="display:flex;align-items:center;gap:10px;"><span class="sf-spin" aria-hidden="true">⏳</span><span class="sf-note" style="font-size:15px;">'
-            + (p.state === 'busy' ? 'Finding ' + nm + '’s GPS…' : 'Getting ' + nm + '’s holes and greens…') + '</span></div>';
+            + (p.state === 'busy' ? 'Finding ' + nm + '’s GPS…' : 'Getting ' + nm + '’s holes and greens from OpenStreetMap…') + '</span>'
+            + (p.state === 'osm' ? '<button type="button" class="sf-link" data-sf="osmskip" style="margin-left:auto;font-size:13px;padding:0;min-height:0;">Start without waiting</button>' : '') + '</div>';
         return '<div class="sf-card" id="sf-osmpick"><div style="font-weight:800;font-size:16px;margin-bottom:10px;">' + nm + ' has ' + p.matches.length + ' courses. Which one?</div>'
             + chooseOrder(p.matches).map(function (m) { return webRowHtml(m, null); }).join('')
             + '<button type="button" class="sf-btn" data-sf="osmmap" style="width:100%;min-height:46px;">Use the OpenStreetMap map instead</button></div>';
@@ -781,7 +797,7 @@
         if (!o || !/^osm_[wr]\d+$/.test(String(key || ''))) return '';
         var nm = esc(String(o.name || '').split(' (')[0]);
         return '<div class="sf-card" id="sf-osmnote"><div class="sf-note" style="font-size:14px;margin-bottom:8px;">'
-            + (o.src === 'osm' ? '✓ GPS from OpenStreetMap (' + o.n + ' of ' + o.of + ' holes mapped).' : 'No GPS map data for ' + nm + ' yet — on the map, “Tap the middle of the green” sets each green.')
+            + (o.src === 'osm' ? '✓ GPS from OpenStreetMap (' + o.n + ' of ' + o.of + ' holes mapped).' : o.src === 'loading' ? '\u23f3 ' + nm + '\u2019s holes and greens are on the way from OpenStreetMap \u2014 the map shows them once they\u2019re in (you can start now).' : 'No GPS map data for ' + nm + ' yet — on the map, “Tap the middle of the green” sets each green.')
             + ' Pars and indexes aren’t set yet (par 4 shown) — add them now or later.</div>'
             + '<button type="button" class="sf-link" data-sf="osmpars" style="font-size:14px;padding:0;min-height:0;">Type the pars and indexes ›</button>'
             + ' <button type="button" class="sf-link muted" data-sf="request" style="font-size:13px;padding:0 0 0 10px;min-height:0;">Request this course</button></div>';
@@ -1762,6 +1778,7 @@
         if (a === 'fullcourse') { var wn = $('sf-new-course-where'); if (wn) wn.remove(); away(step('course'), 'Course picked'); return; }
         if (a === 'signin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t2 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t2); show(true); S.lookup = null; lookup(courseKey(), courseName()); render(); } }, 600); } return; }
         if (a === 'osmpars') { var on = OSM_CARD[courseKey()] || {}; addOsm(on.name || courseName(), on.city || '', on.state || ''); return; }
+        if (a === 'osmskip') { var os = S.osmPick; if (os && os.skip) os.skip(); return; }
         if (a === 'osmmap') { var op = S.osmPick; if (op && op.row) osmGps(op.row); return; }
         if (a === 'webback') { if (S.web) S.web.pull = null; S.pend = null; render1(); var q2 = $('sf-q'); if (q2) q2.focus(); return; }
         if (a === 'webretry') { S.web = null; webSearch(); return; }
