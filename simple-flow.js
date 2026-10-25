@@ -799,16 +799,17 @@
         try { if (HC() && HC().refresh) HC().refresh(); } catch (e) {}
         var M = W.HardPanGpsMatch, me = S.osmPick = { row: row, state: 'osm', key: key };
         var picked = false;
+        var unreached = function (r) { return !!(r && r.kept === false && /could not be reached/.test(r.how || '')); };
         var done = function (r) {
             var ok = r && (r.status === 'ready' || r.status === 'partial') && r.n > 0;
             if (picked) {   // the holes landed after the pick: the note says so (the map uses them from this phone)
                 if (ok && OSM_CARD[key]) { OSM_CARD[key].src = 'osm'; OSM_CARD[key].n = r.n; if (S.step === 1 && courseKey() === key) render(); }
-                else if (OSM_CARD[key] && OSM_CARD[key].src === 'loading') { OSM_CARD[key].src = 'tap'; if (S.step === 1 && courseKey() === key) render(); }
+                else if (OSM_CARD[key] && OSM_CARD[key].src === 'loading') { OSM_CARD[key].src = unreached(r) ? 'unreached' : 'tap'; if (S.step === 1 && courseKey() === key) render(); }   // (071: a 504 says so)
                 return;
             }
             if (S.osmPick !== me) return;
             picked = true;
-            OSM_CARD[key] = { name: row.name, city: row.city, state: row.state, src: ok ? 'osm' : (r === 'wait' ? 'loading' : r && r.kept === false && /could not be reached/.test(r.how || '') ? 'unreached' : 'tap'), n: ok ? r.n : 0, of: n };
+            OSM_CARD[key] = { name: row.name, city: row.city, state: row.state, src: ok ? 'osm' : (r === 'wait' ? 'loading' : unreached(r) ? 'unreached' : 'tap'), n: ok ? r.n : 0, of: n, row: row };
             S.osmPick = null; S.q = ''; S.changing = false; S.noCard = null; S.lookup = null; S.err1 = ''; S.pend = null;
             if (S.web) S.web.pull = null;
             pick(key, row.name);
@@ -848,6 +849,7 @@
         return '<div class="sf-card" id="sf-osmnote"><div class="sf-note" style="font-size:14px;margin-bottom:8px;">'
             + (o.src === 'osm' ? '✓ GPS from OpenStreetMap (' + o.n + ' of ' + o.of + ' holes mapped).' : o.src === 'unreached' ? 'Couldn\u2019t reach OpenStreetMap for ' + nm + '\u2019s holes just now \u2014 the map tries again when it opens; until then \u201cTap the middle of the green\u201d sets each green.' : o.src === 'loading' ? '\u23f3 ' + nm + '\u2019s holes and greens are on the way from OpenStreetMap \u2014 the map shows them once they\u2019re in (you can start now).' : 'No GPS map data for ' + nm + ' yet — on the map, “Tap the middle of the green” sets each green.')
             + ' Pars and indexes aren’t set yet (par 4 shown) — add them now or later.</div>'
+            + (o.src === 'unreached' ? '<button type="button" class="sf-link" data-sf="osmretry" style="font-size:14px;padding:0 12px 0 0;min-height:0;">Try OpenStreetMap again</button>' : '')
             + '<button type="button" class="sf-link" data-sf="osmpars" style="font-size:14px;padding:0;min-height:0;">Type the pars and indexes ›</button>'
             + ' <button type="button" class="sf-link muted" data-sf="request" style="font-size:13px;padding:0 0 0 10px;min-height:0;">Request this course</button></div>';
     }
@@ -1830,6 +1832,7 @@
         if (a === 'fullcourse') { var wn = $('sf-new-course-where'); if (wn) wn.remove(); away(step('course'), 'Course picked'); return; }
         if (a === 'signin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t2 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t2); show(true); S.lookup = null; lookup(courseKey(), courseName()); render(); } }, 600); } return; }
         if (a === 'osmpars') { var on = OSM_CARD[courseKey()] || {}; addOsm(on.name || courseName(), on.city || '', on.state || ''); return; }
+        if (a === 'osmretry') { var orc = OSM_CARD[courseKey()]; if (orc && orc.row) { S.q = orc.row.name; osmGps(orc.row); } return; }   // 071
         if (a === 'osmskip') { var os = S.osmPick; if (os && os.skip) os.skip(); return; }
         if (a === 'osmmap') { var op = S.osmPick; if (op && op.row) osmGps(op.row); return; }
         if (a === 'webback') { if (S.web) S.web.pull = null; S.pend = null; render1(); var q2 = $('sf-q'); if (q2) q2.focus(); return; }

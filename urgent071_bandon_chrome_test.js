@@ -42,6 +42,7 @@ const FUNCS = (mode) => "(function(){ window.__fn = []; var of = window.fetch; v
     + " window.__over = 0; window.fetch = function (u, init) { var s = String(u);"
     // OPENSTREETMAP (Overpass), stood in: Shortys' outline, then 3 holes whose lines end in their greens.
     + "  if (/interpreter/.test(s)) { window.__over++; var q = decodeURIComponent(String(init && init.body || '').replace(/^data=/, '')); var j;"
+    + "   if (window.__fail504 > 0) { window.__fail504--; return Promise.resolve({ ok: false, status: 504, json: function () { return Promise.reject(new Error('html')); } }); }"
     + "   if (window.__overNone) j = { elements: [] };"
     + "   else if (/leisure/.test(q)) j = { elements: [{ type: 'way', id: 1540940976, tags: { leisure: 'golf_course', name: 'Shortys' }, center: { lat: 43.1789, lon: -124.394 } }] };"
     + "   else { var el = []; for (var n = 1; n <= 3; n++) { var la = 43.1789 + n * 0.0015, lo = -124.394; el.push({ type: 'way', id: 900 + n, tags: { golf: 'hole', ref: String(n), par: '3' }, geometry: [{ lat: la, lon: lo }, { lat: la + 0.0008, lon: lo }] });"
@@ -235,4 +236,19 @@ test('a saved match (Papago, a course the app has) shows with 0 gpsSearch calls;
     assert.equal(s.fn.filter((c) => c[0] === 'gpsSearch').length, 0, '0 gpsSearch calls');
     assert.match(s.text, /Search more courses/);
     assert.deepEqual(more.fn.filter((c) => c[0] === 'gpsSearch').map((c) => c[1].name), ['papago'], '"Search more courses": one call');
+});
+
+test('OpenStreetMap failing (HTTP 504 from both servers): "Couldn\'t reach OpenStreetMap", GPS still opens, and "Try OpenStreetMap again" gets the holes', { timeout: 200000 }, async () => {
+    const r = await open(AT_BANDON, 'error', [TYPE('Bandon'), PAUSE, SETTLED, { sleep: 400 }, X('window.__fail504 = 2; 1'), TAP_OSM('Shortys'),
+        { waitFor: "/^osm_/.test(document.getElementById('course-select').value) && !!document.getElementById('sf-osmnote')", timeout: 40000 }, { sleep: 500 }, X(SF),
+        X("(function(){ var b=document.querySelector('[data-sf=osmretry]'); if(b) b.click(); return b ? 'retry' : 'NO RETRY'; })()"),
+        { waitFor: "/GPS from OpenStreetMap/.test((document.getElementById('sf-osmnote')||{}).innerText||'')", timeout: 60000 }, { sleep: 300 }, X(SF)]);
+    assert.equal(r.ok, true, r.reason);
+    const [a, b] = J(r);
+    notWizard(a, 'Shortys, OSM 504');
+    assert.match(a.note, /Couldn’t reach OpenStreetMap/);
+    assert.match(a.note, /Try OpenStreetMap again/);
+    assert.equal(a.start && a.start.disabled, false, 'Start Round is live (tap the green until then)');
+    assert.match(b.note, /GPS from OpenStreetMap \(3 of 18 holes mapped\)/);
+    assert.equal(b.gps, 3);
 });

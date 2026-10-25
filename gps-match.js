@@ -179,6 +179,9 @@
             if (!course) return null;
             return overpass(G().courseHolesQuery(course)).then(function (raw) { return { course: course, raw: raw }; });
         }).then(function (got) {
+            // (071: an OSM-only course IS in OpenStreetMap - the app's list came from it - so "not found" there is the
+            // public server failing (an overloaded server answers 200 with no elements): unreachable, asked again)
+            if (!got && OSM_ONLY_RE.test(String(key || ''))) return verdict({}, of, { source: 'none', how: 'OpenStreetMap could not be reached', kept: false });
             if (!got) { if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: true }); return verdict({}, of, { source: 'none', how: 'not in OpenStreetMap near the course' }); }
             var ph = G().pickHoleSet(got.raw.elements, want);
             var p = { raw: got.raw, course: got.course, want: want, candidates: ph.candidates.length, how: ph.how };
