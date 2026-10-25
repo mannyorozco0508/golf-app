@@ -514,6 +514,20 @@
     // (host.saveScore -> index.html gpsSheetHole(n).save -> saveScore -> the offline queue).
     // A feature never writes a score. The same golfer + hole twice: the later one is used.
     // Resolves true when every score saved, false when cancelled or any save failed.
+    // phone3: SIRI / VOICE WITH THE ROUND OPEN BUT NOT THE GPS SCREEN (the card, Home's round): no
+    // mounted host, so the confirm uses the CARD's own save directly - the same call gps-view.js's host
+    // makes (index.html gpsSheetHole(n).save -> saveScore -> the offline queue). Read-only otherwise.
+    /* global gpsSheetHole, currentData, currentMode */
+    function pageHost() {
+        try {
+            if (typeof gpsSheetHole !== 'function' || typeof currentData === 'undefined' || !currentData) return null;
+            return {
+                round: function () { return currentData; },
+                code: function () { try { return String(currentMode || ''); } catch (e) { return ''; } },
+                saveScore: function (pid, hole, v) { gpsSheetHole(Number(hole)).save(pid, v); }
+            };
+        } catch (e) { return null; }
+    }
     function proposeScores(listIn, opts) {
         var seen = {}, list = [];
         (Array.isArray(listIn) ? listIn : []).forEach(function (s) {
@@ -521,8 +535,9 @@
             var k = String(s.pid) + '_' + Number(s.hole);
             if (seen[k] != null) list[seen[k]] = s; else { seen[k] = list.length; list.push(s); }
         });
-        if (!list.length || !host || typeof host.saveScore !== 'function') return Promise.resolve(false);
-        var d = (host.round && host.round()) || {};
+        var h = host || pageHost();
+        if (!list.length || !h || typeof h.saveScore !== 'function') return Promise.resolve(false);
+        var d = (h.round && h.round()) || {};
         var nameOf = function (pid) { var p = (d.players || []).filter(function (x) { return String(x.id) === String(pid); })[0]; return p ? p.name : 'Golfer'; };
         // Shown as a card: one line per golfer, their holes in order ("1:4 2:5 ..."), so a whole
         // scanned card is one screen to check and one tap to save.
@@ -546,7 +561,7 @@
             sh.addEventListener('click', function (e) {
                 if (e.target.closest('[data-hpf-save]')) {
                     var bad = 0;
-                    list.forEach(function (s) { try { host.saveScore(s.pid, Number(s.hole), Number(s.strokes)); } catch (x) { bad++; } });
+                    list.forEach(function (s) { try { h.saveScore(s.pid, Number(s.hole), Number(s.strokes)); } catch (x) { bad++; } });
                     closePanel(); resolve(bad === 0);
                 } else if (e.target.closest('[data-hpf-cancel]')) { closePanel(); resolve(false); }
             });
@@ -594,7 +609,7 @@
             + '.hpf-hint button{all:unset;cursor:pointer;font:700 14px/1.25 ' + F + ';padding:6px 2px;}.hpf-hint .hpf-hint-x{font-weight:900;opacity:.6;padding:6px 8px;}'
             + '.hpf-back{position:absolute;inset:0;z-index:60;background:rgba(0,0,0,.45);}'
             + '.hpf-sheet{position:absolute;z-index:61;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;max-height:calc(100% - var(--gps-bar-b,0px) - 24px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:#121614;color:#f2f5ef;border-radius:22px 22px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.55);font-family:' + F + ';padding:8px 16px calc(22px + env(safe-area-inset-bottom,0px));box-sizing:border-box;touch-action:pan-y;}'
-            + 'body > .hpf-sheet,body > .hpf-back{position:fixed;}'
+            + 'body > .hpf-sheet,body > .hpf-back{position:fixed;}body > .hpf-back{z-index:100000;}body > .hpf-sheet{z-index:100001;}'
             + '.hpf-grip{width:40px;height:5px;border-radius:3px;background:#55605a;margin:4px auto 10px;}'
             + '.hpf-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;}.hpf-title{font-size:22px;font-weight:800;}'
             + '.hpf-done{background:#cdee7c;color:#0d1a10;border:0;border-radius:16px;font:800 15px/1 ' + F + ';padding:10px 16px;min-height:44px;}'

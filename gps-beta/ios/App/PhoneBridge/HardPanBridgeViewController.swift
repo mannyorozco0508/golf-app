@@ -9,6 +9,7 @@
 //                          files are in the target (looked up by name, so this file compiles either way).
 //   HardPanDocScan       - the paper scorecard camera (066 scorecard-scan-ai, VisionKit), always; it opens
 //                          only when the golfer taps Scan scorecard (gps-scan-client.js).
+//   HardPanVoice         - voice scoring + the Siri intents' bridge to the page (066 feature 4), always.
 
 import UIKit
 import Capacitor
@@ -18,6 +19,7 @@ class HardPanBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(HardPanLiveActivityPlugin())
         bridge?.registerPluginInstance(HardPanStorePlugin())
         bridge?.registerPluginInstance(HardPanDocScanPlugin())
+        bridge?.registerPluginInstance(HardPanVoicePlugin())
         if let watch = NSClassFromString("HardPanWatchPlugin") as? CAPPlugin.Type {
             bridge?.registerPluginInstance(watch.init())
         }

@@ -128,7 +128,9 @@ describe('feature registry', () => {
         const src = fs.readFileSync(path.join(__dirname, 'feature-registry.js'), 'utf8');
         assert.ok(!/(^|[^.])saveScore\(|\.scores\[[^\]]+\]\s*=|ref\(['"]events/.test(src), 'no direct score write');
         assert.ok(!/calculate[A-Z]\w*\(/.test(src), 'no money engine call');
-        assert.ok(/host\.saveScore\(/.test(src), 'scores go through the card\'s own save, from the host');
+        // phone3: h = the mounted GPS host, or (no GPS screen: Siri / voice on the card) pageHost - the same card save.
+        assert.ok(/var h = host \|\| pageHost\(\);/.test(src) && /h\.saveScore\(/.test(src), 'scores go through the card\'s own save, from the host');
+        assert.ok(/saveScore: function \(pid, hole, v\) \{ gpsSheetHole\(Number\(hole\)\)\.save\(pid, v\); \}/.test(src), 'the page fallback is the card\'s own save (gpsSheetHole(n).save)');
         assert.ok(!/geolocation|getCurrentPosition|watchPosition/.test(src), 'no location');
     });
 

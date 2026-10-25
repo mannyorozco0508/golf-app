@@ -4734,6 +4734,9 @@ const SHELL_FILES = [
     './scorecard-validate.js',
     './gps-scan-client.js',
     './gps-scan-grid.js',
+    // URGENT-066 #4: voice scoring - the grammar (pure) and push-to-talk + Siri (proposes to the score sheet; nothing sent).
+    './gps-voice-parse.js',
+    './gps-voice.js',
     // URGENT-047 B: launch monitor quick entry - type carries, Update my bag (yards only, on the phone).
     './gps-bushnell.js',
     // URGENT-049: the club chips after Mark shot - counted shots to the shot log (distances + wind only).

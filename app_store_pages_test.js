@@ -178,7 +178,8 @@ describe('THE PRIVACY POLICY IS ACCURATE ABOUT THIS APP', () => {
     });
 
     test('it is explicit about what is NOT collected', () => {
-        [/No phone number/, /location/, /analytics or tracking/, /No contacts, photos, camera or microphone access/].forEach(re =>
+        // URGENT-066 #4 (2026-10-24): the microphone is voice scoring only (its own section), never recorded.
+        [/No phone number/, /location/, /analytics or tracking/, /No contacts, photos or camera access/, /microphone is used only for voice scoring/].forEach(re =>
             assert.match(P, re, 'the policy must state this'));
     });
 
@@ -212,7 +213,7 @@ describe('THE PRIVACY POLICY IS ACCURATE ABOUT THIS APP', () => {
         // Scores and names never go on that request.
         // store-legal: one "Who else is involved" section replaces "Third-party
         // directories", and it covers GPS search (GolfAPI) as well.
-        assert.match(P, /Last updated: 17 October 2026/);
+        assert.match(P, /Last updated: 24 October 2026/);   // URGENT-066 #4: the microphone section (was 17 October 2026)
         assert.match(P, /Course search text/);
         assert.match(P, /golfcourseapi\.com/);
         assert.match(P, /Cloudflare Worker/);

@@ -46,7 +46,7 @@
 </header>
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: 17 October 2026</p>
+<p class="updated">Last updated: 24 October 2026</p>
 
 <p>HardPan is a golf app for private groups: a live scorecard, the side games your group plays, a running tally of who owes who, and HardPan GPS yardages. Rattle Golf LLC operates HardPan and also Rattle Golf Tournaments, the separate events product, which this policy does not cover. This policy explains what HardPan stores, why, who else is involved, and how to delete it. It is written to be read, not to be survived.</p>
 
@@ -85,10 +85,17 @@
     <li><strong>Wind.</strong> Live wind is looked up for the <em>course</em>, using a point from the course data rounded to about 100 meters - never your own position. A HardPan build without the GPS screen does not ask for your location at all.</li>
 </ul>
 
+<h2>Microphone and voice scoring</h2>
+<ul>
+    <li><strong>Only when you ask.</strong> In the HardPan GPS app on iPhone you can say your score (for example "a 5, two putts") with the voice button, or through Siri. HardPan asks for microphone and Speech Recognition permission the first time, and the microphone is on only while you hold or tap the voice button.</li>
+    <li><strong>On your phone where possible.</strong> HardPan uses Apple's speech recognizer and asks it to work on your iPhone whenever your iPhone supports that. On an iPhone that can't, Apple's speech recognition service turns the audio into words, under Apple's privacy policy. When you use Siri, Siri handles what you say the same way.</li>
+    <li><strong>Nothing stored, nothing sent by HardPan.</strong> HardPan does not record or keep your voice, and it does not send audio or what you said to us or anyone else. The words become a score on the normal score sheet for you to check and save; only the score you save is stored, like any score you type. If you ask Siri for a score while your phone is locked, the words wait on your phone (for up to 2 hours) until you open your round.</li>
+</ul>
+
 <h2>What is never collected</h2>
 <ul>
     <li>No phone number, and no password: sign-in is through Apple, Google or an email link</li>
-    <li>No contacts, photos, camera or microphone access</li>
+    <li>No contacts, photos or camera access. The microphone is used only for voice scoring, as described above, and never recorded</li>
     <li>No advertising identifier, and no third-party analytics or tracking SDK</li>
     <li>No crash-reporting service: errors stay in your phone's own log</li>
     <li>No payment details of any kind - see Money and Purchases below</li>
@@ -99,7 +106,7 @@
 <ul>
     <li><strong>Google Firebase</strong> (Authentication, Realtime Database, Cloud Functions, Cloud Messaging): stores accounts and round data, runs our course and wind lookups, and delivers notifications.</li>
     <li><strong>Cloudflare</strong>: hosts the website and runs our course-search proxy and the service that sends notifications.</li>
-    <li><strong>Apple</strong>: Sign in with Apple, push notifications on iPhone, the App Store for any purchase, and Apple Weather (WeatherKit) for live wind when it is switched on. Our server sends Apple the course point only.</li>
+    <li><strong>Apple</strong>: Sign in with Apple, push notifications on iPhone, the App Store for any purchase, and Apple Weather (WeatherKit) for live wind when it is switched on. Our server sends Apple the course point only. Speech recognition for voice scoring and Siri runs on your iPhone where it can, and otherwise through Apple's speech service, as described under Microphone and voice scoring.</li>
     <li><strong>Google Sign-In</strong>, if you choose Continue with Google.</li>
     <li><strong>GolfAPI (golfapi.io)</strong>: for HardPan GPS course search, the text you type goes to our Cloud Function, which asks GolfAPI and saves the answer so the same search is not repeated.</li>
     <li><strong>golfcourseapi.com</strong>: the scorecard search on the round setup screen sends the text you type through our Cloudflare Worker to golfcourseapi.com to find a published scorecard. We may keep that search text on our proxy for a short time. Round scores and player names are not sent to golfcourseapi.</li>

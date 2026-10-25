@@ -123,7 +123,9 @@ describe('the privacy policy matches the shipped Consumer app', () => {
     // operations, and the one that was missed the first time.
     test('POLICY_MATCHES_MARKUP: no camera claim while no camera markup exists', () => {
         const policy = read('privacy.html');
-        const claimsNoCamera = /No contacts, photos, camera or microphone access/i.test(policy);
+        // URGENT-066 #4 (2026-10-24): the microphone left this sentence on purpose - voice scoring in
+        // the HardPan GPS app uses it - and the policy says so in its own section (test below).
+        const claimsNoCamera = /No contacts, photos or camera access/i.test(policy);
         assert.ok(claimsNoCamera,
             'privacy.html should state plainly that the app takes no camera/photo access.');
 
@@ -230,12 +232,43 @@ describe('HardPan GPS app: the camera opens only for the scorecard scan', () => 
 
     test('POLICY_MATCHES_MARKUP (GPS): while privacy.html says "no camera", nothing mounts the scan', { skip: !haveScan && 'Consumer tree' }, () => {
         const policy = read('privacy.html');
-        if (!/No contacts, photos, camera or microphone access/i.test(policy)) return;   // the policy now describes the scan
+        // phone3: 066 #4 reworded the line to "No contacts, photos or camera access" (the microphone got its own section) - still "no camera".
+        if (!/No contacts, photos,? (?:or )?camera/i.test(policy)) return;   // the policy now describes the scan
         const callers = allShell().filter(f => !SCAN_FILES.includes(f))
             .filter(f => /HardPanScan\.(open|scan)\s*\(/.test(read(f).split('\n').filter(l => !/^\s*(\/\/|\*|<!--)/.test(l)).join('\n')));
         assert.deepEqual(callers, [],
             'privacy.html still says the app takes no camera access, but these files mount the scorecard scan: ' + callers.join(', ')
             + '. Update privacy.html (camera used only to scan a scorecard; photo + names/course/par sent to Google Gemini, not stored) first.');
+    });
+});
+
+// URGENT-066 #4: THE MICROPHONE - the new truth, held the same way. The policy names the microphone
+// only for voice scoring; the Consumer app asks for no microphone at all (its Info.plist and its pages);
+// the HardPan GPS app's Info.plist carries both permission strings, and the voice files ship in GPS only.
+describe('the microphone: voice scoring in HardPan GPS only, and the policy says so', () => {
+    test('the policy explains the microphone and speech use - on the phone where possible, nothing kept', () => {
+        const policy = read('privacy.html');
+        assert.match(policy, /<h2>Microphone and voice scoring<\/h2>/);
+        assert.match(policy, /microphone is on only while you hold or tap the voice button/);
+        assert.match(policy, /on your iPhone whenever your iPhone supports that/);
+        assert.match(policy, /does not record or keep your voice/);
+        assert.match(policy, /does not send audio or what you said to us or anyone else/);
+        assert.doesNotMatch(policy, /No contacts, photos, camera or microphone access/, 'the retired claim');
+    });
+    test('the Consumer app asks for no microphone; the GPS app asks with both strings', () => {
+        const consumer = read('ios/App/App/Info.plist');
+        assert.match(consumer, /<key>CFBundleIdentifier<\/key>/, 'positive: the Consumer plist');
+        assert.doesNotMatch(consumer, /NSMicrophoneUsageDescription|NSSpeechRecognitionUsageDescription/);
+        const gpsPlist = path.join(REPO_ROOT, 'gps-beta/ios/App/App/Info.plist');
+        if (fs.existsSync(gpsPlist)) {
+            const g = fs.readFileSync(gpsPlist, 'utf8');
+            assert.match(g, /<key>NSMicrophoneUsageDescription<\/key>\s*<string>[^<]{40,}<\/string>/);
+            assert.match(g, /<key>NSSpeechRecognitionUsageDescription<\/key>\s*<string>[^<]{40,}<\/string>/);
+        }
+        const sync = read('sync-mobile-web.js');
+        const gpsShell = /const GPS_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
+        ['gps-voice.js', 'gps-voice-parse.js'].forEach(f => { if (fs.existsSync(path.join(REPO_ROOT, f))) assert.ok(gpsShell.includes("'" + f + "'"), f + ' ships in GPS only'); });
+        shellPages().forEach(page => assert.doesNotMatch(read(page).replace(/<!-- GPS:BEGIN -->[\s\S]*?<!-- GPS:END -->/g, ''), /getUserMedia|webkitSpeechRecognition|gps-voice/, page + ' opens a microphone outside GPS'));
     });
 });
 
