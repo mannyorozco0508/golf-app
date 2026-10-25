@@ -7031,6 +7031,8 @@
         + '#gps-overlay .gps-bag-alt-row button[aria-pressed="true"]{background:#d9f99d !important;color:#0b0f0c !important;}'
         + '#gps-overlay .gps-bag-alt-pick{margin-top:6px;display:flex;flex-direction:column;gap:6px;}#gps-overlay .gps-bag-alt-find{min-height:40px;border-radius:10px;padding:0 10px;font:600 15px/1 ' + FONT + ';}'
         + '#gps-overlay .gps-bag-alt-list{display:flex;flex-direction:column;gap:4px;}#gps-overlay .gps-bag-alt-list button{text-align:left;}'
+        + '#gps-overlay .gps-bag-alt-row button,#gps-overlay .gps-bag-alt-pick .gps-bag-alt-here{border:1px solid rgba(255,255,255,.28) !important;}'
+        + '#gps-overlay .gps-bag-alt-row button[aria-pressed="true"]{border-color:#d9f99d !important;}'
         + '#gps-overlay .gps-bag-alt-def{font-weight:600;opacity:.8;}#gps-overlay .gps-bag-alt-ftl{display:flex;align-items:center;gap:8px;color:#c8d1ca;}#gps-overlay .gps-bag-alt-ft{flex:1;min-width:0;min-height:40px;border-radius:10px;padding:0 10px;font:700 16px/1 ' + FONT + ';}'
         + '#gps-overlay .gps-bag-alt-this{margin-top:6px;color:#c8d1ca;}#gps-overlay .gps-bag-alt-this b{color:#fff;}'
         + '#gps-overlay .gps-bag-alt-sugl{display:flex;align-items:center;gap:10px;margin:8px 0 6px;}#gps-overlay .gps-bag-alt-sugt{flex:1;display:flex;flex-direction:column;gap:2px;}#gps-overlay .gps-bag-alt-sugt b{font-weight:800;}#gps-overlay .gps-bag-alt-sugs{color:#c8d1ca;font-weight:600;}'
