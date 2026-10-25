@@ -80,7 +80,7 @@ function wire(d) {
         // Its own namespace if bound; otherwise the course proxy's, which already
         // exists in production. Keys are prefixed scan: so they never collide.
         kv: d.kv || env.SCAN_KV || env.GOLFCOURSE_KV || null,
-        doFetch: d.fetch || globalThis.fetch,
+        doFetch: d.fetch || ((...a) => globalThis.fetch(...a)),   // never store fetch bare: Workers throw "Illegal invocation" when it is called as w.doFetch()
         now: d.clock && d.clock.date ? d.clock.date() : new Date(),
         subtle: d.subtle || (globalThis.crypto && globalThis.crypto.subtle),
         log: typeof d.log === 'function' ? d.log : (line) => { try { console.log(line); } catch (e) {} },
