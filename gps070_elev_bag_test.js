@@ -257,5 +257,6 @@ test('070-3 the note in gps-view: Manny\'s words, OK closes it, only once the al
     const t = fnSrc(v, 'elevNoteTick');
     assert.ok(/tournament\(\)/.test(t) && /B\.elevNoteDue\(g\)/.test(t) && /typeof al\.altFt !== 'number'/.test(t) && /B\.elevNoteSeen\(g\);/.test(t));
     assert.ok(/ldClearBox\(\)/.test(fnSrc(v, 'elevNotePlace')), 'in the clear map: under the top bar, left of the rail, above the pill');
+    assert.ok(/S\.el\.querySelector\('\.gps-under'\)/.test(fnSrc(v, 'elevNotePlace')) && /Math\.max\(top, ut\)/.test(fnSrc(v, 'elevNotePlace')), 'below the Customize bar / everything under Menu');
     assert.ok(/on\(el, '\.gps-elevnote-ok', function \(\) \{ elevNoteHide\(\); \}\);/.test(v));
 });

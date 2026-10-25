@@ -5545,6 +5545,10 @@
             var gr = S.el.querySelector('.gps-right'), b = gr && gr.offsetParent !== null ? gr.getBoundingClientRect() : null;
             if (b && b.width) right = er.right - b.left + 8;
         }
+        // Manny (070): never over the "Customize" bar (and anything else) under Menu - below the whole
+        // column under the top bar (.gps-under: the green size line, the golfer's Customize hint / extras).
+        var un = S.el.querySelector('.gps-under'), ub = un && un.offsetParent !== null ? un.getBoundingClientRect() : null;
+        if (ub && ub.height) { var ut = ub.bottom - er.top + 6; top = top == null || !isFinite(top) ? ut : Math.max(top, ut); }
         n.style.top = top != null && isFinite(top) ? Math.round(top) + 'px' : '';
         n.style.right = right != null && isFinite(right) ? Math.max(8, Math.round(right)) + 'px' : '';
     }
