@@ -165,20 +165,21 @@ test('012-4 gps-view: behind elevPerLeg - no projection, the own-spot cell gated
 });
 
 // ---- PART 5: "MY DISTANCES ARE FROM" - THE ALTITUDE BASELINE ---------------------------
-test('012-5 altitude: ALT_PCT_PER_1000FT = 2; 150 at sea level plays ~146 at 1,200 ft; same course = 0; a sea-level course vs a Scottsdale baseline plays longer', () => {
-    assert.strictEqual(geo.ALT_PCT_PER_1000FT, 2);
+test('012-5 / 070 altitude: ALT_PCT_PER_1000FT = 0.015 (Manny, Oct 24); f = 1 + p x (course - base) / 1000, plays like = D / f: 150 at sea level plays ~147 at 1,200 ft; same course = 0; a sea-level course vs a Scottsdale baseline plays longer', () => {
+    assert.strictEqual(geo.ALT_PCT_PER_1000FT, 0.015);
+    assert.ok(Math.abs(geo.altFactor(1200, 0) - 1.018) < 1e-12);
     const up = geo.playsLike({ yards: 150, altFt: 1200, altBaseFt: 0 });
-    assert.strictEqual(up.yards, 146); assert.ok(Math.abs(up.terms.alt + 3.6) < 1e-9);
+    assert.strictEqual(up.yards, 147); assert.ok(Math.abs(up.terms.alt - (150 / 1.018 - 150)) < 1e-9);
     const same = geo.playsLike({ yards: 150, altFt: 1500, altBaseFt: 1500, tempF: 70 });
     assert.strictEqual(same.terms.alt, 0); assert.strictEqual(same.yards, 150);
     const scottsdale = geo.playsLike({ yards: 150, altFt: 10, altBaseFt: 1257 });
-    assert.ok(scottsdale.exact > 150 && scottsdale.yards === 154, 'plays longer: ' + scottsdale.exact);
+    assert.ok(scottsdale.exact > 150 && scottsdale.yards === 153, 'plays longer: ' + scottsdale.exact);
 });
 test('012-5 altitude is applied BEFORE wind and temperature (their % on the adjusted yards); slope unchanged; the temperature baseline; "Don\'t adjust" = identical to today', () => {
     const o = { yards: 150, elevFromFt: 100, elevToFt: 112, windMph: 10, windFromDeg: 0, shotBearingDeg: 0, tempF: 60 };
     const today = geo.playsLike(o);
     const alt = geo.playsLike(Object.assign({ altFt: 1200, altBaseFt: 0 }, o));
-    const A = 150 * (1 - 0.024);
+    const A = 150 / 1.018;
     assert.ok(Math.abs(alt.terms.wind - A * 0.01 * 10) < 1e-9, 'headwind 1% per mph of the ADJUSTED yards');
     assert.ok(Math.abs(alt.terms.temp - A * 0.001 * 10) < 1e-9, 'temperature on the adjusted yards');
     assert.strictEqual(alt.terms.elev, today.terms.elev, 'slope: 1 yd per 3 ft, either way');
@@ -196,9 +197,9 @@ test('012-5 altitude is applied BEFORE wind and temperature (their % on the adju
 });
 test('012-5 the (i) sheet: "Altitude 1,200 ft vs sea level: −6"; a course baseline by name; no US data: "altitude not available here"', () => {
     const pl = geo.playsLike({ yards: 250, altFt: 1200, altBaseFt: 0 });
-    assert.strictEqual(geo.playsInfoRows({ pl, yards: 250, alt: { ft: 1200, baseFt: 0, baseName: '' } })[1], 'Altitude 1,200 ft vs sea level: −6');
+    assert.strictEqual(geo.playsInfoRows({ pl, yards: 250, alt: { ft: 1200, baseFt: 0, baseName: '' } })[1], 'Altitude 1,200 ft vs sea level: −4');
     const pc = geo.playsLike({ yards: 150, altFt: 20, altBaseFt: 1500 });
-    assert.strictEqual(geo.playsInfoRows({ pl: pc, yards: 150, alt: { ft: 20, baseFt: 1500, baseName: 'Grayhawk' } })[1], 'Altitude 20 ft vs Grayhawk (1,500 ft): +4');
+    assert.strictEqual(geo.playsInfoRows({ pl: pc, yards: 150, alt: { ft: 20, baseFt: 1500, baseName: 'Grayhawk' } })[1], 'Altitude 20 ft vs Grayhawk (1,500 ft): +3');
     const same = geo.playsLike({ yards: 150, altFt: 300, altBaseFt: 300 });
     assert.strictEqual(geo.playsInfoRows({ pl: same, yards: 150, alt: { ft: 300, baseFt: 300, baseName: 'Home' } })[1], 'Altitude 300 ft vs Home (300 ft): 0');
     assert.strictEqual(geo.playsInfoRows({ pl: geo.playsLike({ yards: 150, tempF: 60 }), yards: 150, alt: { ft: null, baseFt: 0, na: true } })[1], 'Altitude: not available here');
@@ -245,6 +246,6 @@ test('012-5 gps-view: behind bagAltitude, never in tournament mode; the club for
     assert.ok(/!inUS\(p\)/.test(fc) && /onLine === false/.test(fc) && /lsGet\(k\)/.test(fc) && !/\bfix\b|origin\(|o\.pt/.test(fc), 'US only, online, once; never the golfer');
     assert.ok(/altPickCourse\(\(S\.round && S\.round\.courseName\) \|\| 'This course', r && \(r\.mid \|\| r\.tee\), ft\)/.test(v), 'this course: its own green / tee point');
     ['My distances are from:', 'Sea level', 'A course I pick', "Don't adjust", 'Typical temperature when I set these'].forEach((w) => assert.ok(v.indexOf(w) !== -1, w));
-    assert.ok(/about 2% for every 1,000 feet above it/.test(v) && /var ALT_PCT_PER_1000FT = 2;/.test(read('gps-geo.js')), 'the (i) sheet says the very number the formula uses');
+    assert.ok(/about 1\.5% for every 1,000 feet above it/.test(v) && /var ALT_PCT_PER_1000FT = 0\.015;/.test(read('gps-geo.js')), 'the (i) sheet says the very number the formula uses');
     assert.ok(/data-feature="bagAltitude"/.test(v) && /if \(!altSwitch\(\)\) Array\.prototype\.forEach\.call\(el\.querySelectorAll\('\[data-feature="bagAltitude"\]'\)/.test(v), 'switch off: removed');
 });

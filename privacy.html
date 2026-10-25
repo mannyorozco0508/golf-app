@@ -112,6 +112,7 @@
     <li><strong>golfcourseapi.com</strong>: the scorecard search on the round setup screen sends the text you type through our Cloudflare Worker to golfcourseapi.com to find a published scorecard. We may keep that search text on our proxy for a short time. Round scores and player names are not sent to golfcourseapi.</li>
     <li><strong>National Weather Service (api.weather.gov)</strong>: when Apple Weather is off or unavailable, your phone asks the NWS for the wind at the course point, so the NWS sees that request and your internet address.</li>
     <li><strong>Esri (ArcGIS) and the U.S. Geological Survey (USGS)</strong>: the satellite picture on the GPS screen. Your phone asks them for the map squares of the course you are looking at, the same way any web map works, so they see that request and your internet address. USGS squares for a course may be saved on your phone so the picture works without signal. Hole and green outlines from OpenStreetMap ship inside the app.</li>
+    <li><strong>Course heights (U.S. Geological Survey, and the open Terrain Tiles on Amazon Web Services)</strong>: for plays-like, your phone asks for the height of the course's own points (in the U.S.), or for the one map square around the course (anywhere), never for where you are. If neither answers, your phone's own GPS altitude can be used while you are on that course; it stays on your phone and is never sent or saved with a position.</li>
 </ul>
 <p>Data is not sold, rented, or shared for advertising. We also share data where the law requires it.</p>
 

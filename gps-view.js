@@ -298,6 +298,9 @@
         var gen = watchGen;
         var onPos = function (pos) {
             if (gen !== watchGen || !S || !pos || !pos.coords) return;
+            // 070: the phone's own altitude - the LAST fallback for the course's height. Memory only,
+            // never kept with a position, never sent; only while this fix is inside the course area.
+            try { phoneAltSample([pos.coords.latitude, pos.coords.longitude], pos.coords.altitude, pos.coords.altitudeAccuracy); } catch (e) {}
             fix = { pt: [pos.coords.latitude, pos.coords.longitude], acc: pos.coords.accuracy, at: Date.now() };
             S.geoError = null;
             render();
@@ -1023,7 +1026,7 @@
             if (!O || S !== mine) return;
             // 009 (courseElev on): the WHOLE course's samples, this hole first; the screen redraws as they arrive.
             O.prefetchElevations(S.courseKey, (S.round && S.round.courseName) || '', { first: S.hole, progress: function () { if (S === mine) { S.celev = null; syncPlays(); } } })
-                .then(function () { if (S === mine) { S.celev = null; syncPlays(); } });
+                .then(function (res) { if (S === mine) { if (res && res.ok === false && res.reason !== 'offline') mine.usgsFailed = true; if (res && res.elev && res.elev.failed && !res.elev.fetched && !res.elev.had) mine.usgsFailed = true; S.celev = null; syncPlays(); } });
         });
     }
     function loadCourses(done) {
@@ -3396,7 +3399,7 @@
     function holeSamples() {
         if (!S || !celevSwitch() || !G.elevFromSamples) return null;
         if (!S.celev || S.celev.key !== S.courseKey) {
-            var rec = lsGet(CELEV_PREFIX + S.courseKey), h = {};
+            var rec = celevChecked(S.courseKey), h = {};
             if (rec && rec.v === 1 && rec.o && rec.h) Object.keys(rec.h).forEach(function (n) {
                 var a = rec.h[n] || [], list = [];
                 for (var i = 0; i + 2 < a.length; i += 3) list.push([rec.o[0] + a[i] / 1e5, rec.o[1] + a[i + 1] / 1e5, a[i + 2]]);
@@ -3533,8 +3536,10 @@
         if (!B || !B.baseline) return null;
         var a = B.baseline(bagGolfer()), base = B.baselineFt(a), out = { tempBaseF: a.tempF };
         if (base === undefined) return out;
-        var ft = courseFtNow(r);
-        out.info = { ft: ft, baseFt: base, baseName: a.mode === 'course' ? a.name : '', na: ft == null || base == null };
+        // 070: the course's height from every source in order (course record, USGS, terrain tile,
+        // the phone's own altitude) - courseElevNow; src says which.
+        var ce = courseElevNow(r), ft = ce.ft;
+        out.info = { ft: ft, baseFt: base, baseName: a.mode === 'course' ? a.name : '', na: ft == null || base == null, src: ce.src };
         if (!out.info.na) { out.altFt = ft; out.altBaseFt = base; }
         return out;
     }
@@ -3557,10 +3562,148 @@
     // The whole course's mean height from its samples on this phone (hardpan_celev_v1_), or null;
     // done: only once every point is in (no number that drifts while the course is sampled).
     function courseMeanFt(key, done) {
-        var rec = key ? lsGet(CELEV_PREFIX + key) : null, sum = 0, n = 0;
+        var rec = key ? celevChecked(key) : null, sum = 0, n = 0;
         if (done && !(rec && rec.done)) return null;
         if (rec && rec.v === 1 && rec.h) Object.keys(rec.h).forEach(function (h) { var a = rec.h[h] || []; for (var i = 2; i < a.length; i += 3) if (typeof a[i] === 'number') { sum += a[i]; n++; } });
         return n ? sum / n : null;
+    }
+    // ---- 070 THE COURSE'S HEIGHT, EVERY SOURCE IN ORDER (Manny, Oct 24) ------------------------
+    // courseElevNow(r) -> { ft: number | null, src: 'course' | 'usgs' | 'tile' | 'phone' | null }:
+    //   1 'course' our own course height record on this phone (hardpan_celev_v1_<course>, complete);
+    //   2 'usgs'   USGS EPQS (US): the hole on screen's tee / green from the samples or the
+    //              course-point cache, while the whole course is still being sampled;
+    //   3 'tile'   AWS Terrain Tiles (worldwide, no key): ONE z12 tile for the COURSE's own
+    //              point - only the tile number z/x/y is asked for; decoded on the phone;
+    //   4 'phone'  the phone's own GPS altitude, averaged, ONLY while the fix is inside this
+    //              course's area + 500 m - memory only, never kept with a position, never sent;
+    //   5 none     { ft: null, src: null } -> "not available here".
+    // THE WRONG-COURSE GUARD: every stored record keeps the course point it was read for (o) and is
+    // used only when o lies within ~3 km of THIS course's own points (gps-geo.elevOriginOk); a
+    // record that fails is discarded (and looked up again). Every value is keyed by the course key,
+    // so a course change starts from nothing - never the last course's height.
+    // courseFtNow (a number, USGS only) is kept as it was for its callers.
+    var CTILE_PREFIX = 'hardpan_ctile_v1_', PHONE_ALT_PAD_M = 500, PHONE_ALT_MAX = 30;
+    function courseOwnPts(key) {
+        var out = [];
+        try {
+            var osm = key ? osmRecord(key) : null, holes = (osm && osm.holes) || {};
+            Object.keys(holes).forEach(function (k) {
+                var o = holes[k] && holes[k].osm; if (!o) return;
+                if (o.tee) out.push(o.tee); if (o.end) out.push(o.end); if (o.mid) out.push(o.mid);
+                if (o.green && o.green.length) out.push(o.green[0]);
+            });
+            if (S && S.courseKey === key) { var r = resolved(); if (r && r.tee) out.push(r.tee); if (r && r.mid) out.push(r.mid); }
+        } catch (e) {}
+        return out.filter(function (p) { return p && isFinite(p[0]) && isFinite(p[1]); });
+    }
+    // A stored course record, only when it is THIS course's (its origin within ~3 km of the course's
+    // own points). Fails with course points known: discarded, so it is looked up again. No course
+    // points yet: not used, kept.
+    function elevRecChecked(prefix, key) {
+        var rec = key ? lsGet(prefix + key) : null;
+        if (!rec || !rec.o) return null;
+        // Checked once per record (memory): the same origin for the same course key is not re-measured on every fix.
+        var mk = prefix + key + '|' + rec.o[0] + ',' + rec.o[1];
+        if (S && S.elevOk && S.elevOk[mk]) return rec;
+        var pts = courseOwnPts(key);
+        if (!pts.length) return null;
+        if (G.elevOriginOk && !G.elevOriginOk(rec.o, pts)) { try { localStorage.removeItem(prefix + key); } catch (e) {} if (S && S.celev && S.celev.key === key) S.celev = null; return null; }
+        if (S) { S.elevOk = S.elevOk || {}; S.elevOk[mk] = true; }
+        return rec;
+    }
+    function celevChecked(key) { return elevRecChecked(CELEV_PREFIX, key); }
+    // The terrain tile's height for this course, from the phone (null: none yet / none there).
+    function tileFt(key) {
+        var rec = elevRecChecked(CTILE_PREFIX, key);
+        return rec && rec.v === 1 && typeof rec.ft === 'number' ? rec.ft : null;
+    }
+    // ASK ONCE PER COURSE: the z12 tile around the course's own point (the green of the hole on
+    // screen, else its tee), decoded here: the mean height of the course's own points inside that
+    // tile. Not in tournament mode, not without GPS Map, not offline, one at a time, 60 s after a
+    // failure. Only the tile number goes out - no position, no id, no account.
+    function fetchCourseTile(r) {
+        if (tournament() || !altSwitch() || !S || !S.pro || S.tileInFlight || typeof fetch !== 'function' || !G.terrainTile) return;
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+        if (S.tileFailedAt && Date.now() - S.tileFailedAt < 60000) return;
+        var key = S.courseKey, have = key ? lsGet(CTILE_PREFIX + key) : null;
+        if (!key || (have && elevRecChecked(CTILE_PREFIX, key))) return;
+        var o = r && (r.mid || r.tee);
+        if (!o) return;
+        o = r5(o);
+        var t = G.terrainTile(o);
+        if (!t) return;
+        var mine = S;
+        S.tileInFlight = true;
+        var done = function (ft) {
+            mine.tileInFlight = false;
+            lsSet(CTILE_PREFIX + key, ft == null ? { v: 1, o: o, z: t.z, x: t.x, y: t.y, none: 1, at: Date.now() } : { v: 1, o: o, z: t.z, x: t.x, y: t.y, ft: Math.round(ft), at: Date.now() });
+            if (S === mine) render();
+        };
+        fetch(String(cfg().terrainUrl || G.TERRAIN_URL).replace('{z}', t.z).replace('{x}', t.x).replace('{y}', t.y), { mode: 'cors', credentials: 'omit' })
+            .then(function (res) { if (!res.ok) throw new Error('tile ' + res.status); return res.blob(); })
+            .then(decodeTile)
+            .then(function (px) {
+                var pts = [o].concat(courseOwnPts(key)), sum = 0, n = 0;
+                pts.forEach(function (p) {
+                    var q = G.terrainPixel(p, t, px.w); if (!q) return;
+                    var i = (q.py * px.w + q.px) * 4, ft = G.terrariumFt(px.d[i], px.d[i + 1], px.d[i + 2]);
+                    if (ft != null) { sum += ft; n++; }
+                });
+                done(n ? sum / n : null);
+            })
+            .catch(function () { mine.tileInFlight = false; mine.tileFailedAt = Date.now(); });
+    }
+    // PNG -> RGBA pixels on the phone (a blob drawn on a canvas: no cross-origin taint).
+    function decodeTile(blob) {
+        var draw = function (img, w, h) {
+            var c = document.createElement('canvas'); c.width = w; c.height = h;
+            var x = c.getContext('2d'); x.drawImage(img, 0, 0);
+            return { w: w, h: h, d: x.getImageData(0, 0, w, h).data };
+        };
+        if (typeof createImageBitmap === 'function') return createImageBitmap(blob).then(function (b) { return draw(b, b.width, b.height); });
+        return new Promise(function (ok, no) {
+            var u = URL.createObjectURL(blob), im = new Image();
+            im.onload = function () { try { ok(draw(im, im.naturalWidth, im.naturalHeight)); } catch (e) { no(e); } URL.revokeObjectURL(u); };
+            im.onerror = function () { URL.revokeObjectURL(u); no(new Error('decode')); };
+            im.src = u;
+        });
+    }
+    // THE PHONE'S ALTITUDE: each fix with an altitude (meters above sea level) is added ONLY when the
+    // fix is inside the course's area (courseBounds + 500 m); the last PHONE_ALT_MAX readings are
+    // averaged, in memory, for this course key only. Outside the area: not used (inside = false).
+    function phoneAltSample(pt, altM, altAcc) {
+        if (!S || !G.insideBounds || !G.courseBounds) return;
+        var key = S.courseKey;
+        if (!S.phoneAlt || S.phoneAlt.key !== key) S.phoneAlt = { key: key, list: [], inside: false };
+        var b = G.courseBounds(osmRecord(key), [], PHONE_ALT_PAD_M);
+        S.phoneAlt.inside = !!(b && G.insideBounds(pt, b));
+        if (!S.phoneAlt.inside || typeof altM !== 'number' || !isFinite(altM)) return;
+        if (typeof altAcc === 'number' && isFinite(altAcc) && altAcc > 100) return;
+        S.phoneAlt.list.push(altM * 3.28084);
+        if (S.phoneAlt.list.length > PHONE_ALT_MAX) S.phoneAlt.list.shift();
+    }
+    function phoneFt() {
+        var a = S && S.phoneAlt;
+        if (!a || a.key !== S.courseKey || !a.inside || !a.list.length) return null;
+        return a.list.reduce(function (x, y) { return x + y; }, 0) / a.list.length;
+    }
+    function courseElevNow(r) {
+        var none = { ft: null, src: null };
+        if (!S || tournament()) return none;
+        var key = S.courseKey;
+        if (r === undefined) r = resolved();
+        var whole = courseMeanFt(key, true);
+        if (whole != null) return { ft: whole, src: 'course' };
+        var a = r && r.tee ? ptElev(r, r.tee, 'tee') : null, b = r && r.mid ? ptElev(r, r.mid, 'mid') : null;
+        if (a != null || b != null) return { ft: a != null && b != null ? (a + b) / 2 : (a != null ? a : b), src: 'usgs' };
+        var tf = tileFt(key);
+        if (tf != null) return { ft: tf, src: 'tile' };
+        // The tile is asked for outside the US at once; in the US only once USGS has failed.
+        var us = r && (r.mid || r.tee) ? inUS(r.mid || r.tee) : false;
+        if (r && (!us || S.elevFailedAt || S.usgsFailed)) fetchCourseTile(r);
+        var pf = phoneFt();
+        if (pf != null) return { ft: pf, src: 'phone' };
+        return none;
     }
     // Both legs, worked out on the phone: { toTarget, toGreen, single, heights } (gps-geo.playsLegs)
     // or null (tournament mode, no GPS Map, not measuring, on the green, outside the US).
@@ -3595,11 +3738,18 @@
         if (tournament()) return null;
         if (!S || !S.pro || S.mode !== 'measure') return null;
         var r = resolved(), o = origin(r), aim = targetPt || aimAt(r);
-        if (!r || !o || !aim || !inUS(aim)) return null;
+        if (!r || !o || !aim) return null;
         var nums = G.holeNumbers(o.pt, r);
         if (nums && nums.onGreen) return null;
         var D = G.haversineMeters(o.pt, aim) / G.M_PER_YD;
         if (D < PLAYS_MIN_YD) return null;
+        // 070 WORLDWIDE: outside the US there is no slope / NWS data - the ALTITUDE only (the course's
+        // height from the terrain tile or the phone vs My bag's baseline); none: no plays-like, as before.
+        if (!inUS(aim)) {
+            var alo = altNow(r);
+            if (!alo || typeof alo.altFt !== 'number' || typeof alo.altBaseFt !== 'number') return null;
+            return G.playsLike({ yards: D, altFt: alo.altFt, altBaseFt: alo.altBaseFt });
+        }
         // Today's manual wind (build 3) beats the live reading.
         var w = effectiveWind(), has = !!(w && !w.none);
         var to = targetPt ? ptElev(r, targetPt) : ptElev(r, r.mid, 'mid');
@@ -6480,8 +6630,8 @@
         +     '<li><b>Downwind:</b> about 0.5% shorter for every mph of tailwind - half as much.</li>'
         +     '<li><b>Crosswind:</b> no change in distance - aim off into the wind instead (about 0.5% of the distance for every mph across).</li>'
         +     '<li><b>Temperature:</b> about 1 yard for every 10\u00b0F per 100 yards - longer when it is cold, shorter when it is warm (from 70\u00b0F).</li>'
-        // 012 part 5: the altitude, vs My bag's "My distances are from" (gps-geo ALT_PCT_PER_1000FT = 2).
-        +     '<li><b>Altitude:</b> with My bag\u2019s \u201cMy distances are from\u201d set, about 2% for every 1,000 feet above it (shorter) or below it (longer) - worked out first.</li>'
+        // 012 part 5: the altitude, vs My bag's "My distances are from" (gps-geo ALT_PCT_PER_1000FT = 0.015, 070).
+        +     '<li><b>Altitude:</b> with My bag\u2019s \u201cMy distances are from\u201d set, about 1.5% for every 1,000 feet above it (shorter) or below it (longer) - worked out first.</li>'
         +   '</ul>'
         // 063: MY MISS - the formula in plain words (gps-miss-pattern.js infoText; its TUNE numbers), when My miss is allowed here.
         +   '<p class="gps-plinfo-miss" style="display:none"><b>My miss:</b> <span class="gps-plinfo-miss-t"></span></p>'
@@ -8117,6 +8267,7 @@
         tournament: function () { return tournament(); },
         // 012: the plays-like number, its club and the (i) sheet - for every layout (old, C, D).
         playsLine: function () { try { return playsLineNow(); } catch (e) { return null; } },
+        courseElev: function () { try { return courseElevNow(); } catch (e) { return { ft: null, src: null }; } },
         playsClub: function () { try { return playsClubNow(); } catch (e) { return null; } },
         openPlaysInfo: function () { try { openPlaysInfo(); } catch (e) {} },
         // 012 part 4: both legs - { toTarget, toGreen: { yards, plays, unit, text: '60 · plays 63' } | null, single, par3 }.

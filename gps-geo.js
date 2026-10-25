@@ -1487,15 +1487,22 @@
     //                temperature percentages then work on A (slope stays 1 yd per 3 ft).
     // o.tempBaseF: the temperature the numbers were set in (else 70) - T compares to it.
     // Neither given ("Don't adjust"): exactly as before.
-    // ALT_PCT_PER_1000FT = 2: about 2% shorter-playing for every 1,000 ft above the
-    // baseline (150 yds at sea level plays ~146 at 1,200 ft) - a common golf rule of thumb
-    // (published figures run ~1-2% per 1,000 ft of carry); kept simple, like the others.
-    var ALT_PCT_PER_1000FT = 2;
+    // 070 (Manny, Oct 24: "1.5% per 1,000 ft"): ALT_PCT_PER_1000FT = 0.015 - a FRACTION, the ball
+    // carries about 1.5% farther for every 1,000 ft above the baseline. ONE factor both ways:
+    //   f = 1 + ALT_PCT_PER_1000FT x (courseFt - baselineFt) / 1000      (altFactor)
+    //   plays like = D / f        carry here = carry x f
+    // so the number and the club always agree (151 yds at 1,200 ft vs sea level: f = 1.018,
+    // plays 148; an 8-iron 152 flies ~155 here). Before 070: 2% and D x (1 - x).
+    var ALT_PCT_PER_1000FT = 0.015;
     function isNum(x) { return typeof x === 'number' && isFinite(x); }
+    function altFactor(ft, baseFt) {
+        if (!isNum(ft) || !isNum(baseFt)) return 1;
+        return Math.max(0.5, Math.min(1.6, 1 + ALT_PCT_PER_1000FT * (ft - baseFt) / 1000));
+    }
     function playsLike(o) {
         if (!o || !isNum(o.yards)) return null;
         var D0 = o.yards, D = D0, terms = {}, n = 0;
-        if (isNum(o.altFt) && isNum(o.altBaseFt)) { D = D0 * (1 - ALT_PCT_PER_1000FT / 100 * (o.altFt - o.altBaseFt) / 1000); terms.alt = D - D0; n++; }
+        if (isNum(o.altFt) && isNum(o.altBaseFt)) { D = D0 / altFactor(o.altFt, o.altBaseFt); terms.alt = D - D0; n++; }
         if (isNum(o.elevFromFt) && isNum(o.elevToFt)) { terms.elev = (o.elevToFt - o.elevFromFt) / 3; n++; }
         if (isNum(o.windMph) && isNum(o.windFromDeg) && isNum(o.shotBearingDeg)) {
             var head = o.windMph * Math.cos(toRad(o.windFromDeg - o.shotBearingDeg));
@@ -1509,6 +1516,44 @@
         // estimate stays between half and 1.6 times the real distance.
         exact = Math.max(D0 * 0.5, Math.min(D0 * 1.6, exact));
         return { yards: Math.round(exact), exact: exact, terms: terms };
+    }
+    // ---- 070 WORLDWIDE COURSE HEIGHT: AWS TERRAIN TILES (Mapzen / Tilezen, terrarium) ----------
+    // No key, no account. ONE z12 tile per course, asked for by the tile number around the
+    // COURSE's own point (never the golfer's); each pixel is a height:
+    //   meters = R x 256 + G + B / 256 - 32768
+    // Credit (Acknowledgements): "Elevation: USGS 3DEP/SRTM, and the sources listed by Tilezen".
+    var TERRAIN_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
+    var TERRAIN_Z = 12, FT_PER_M = 3.28084;
+    function terrainTile(pt, z) {
+        pt = pinPt(pt); if (!pt) return null;
+        var zz = isNum(z) ? z : TERRAIN_Z, t = tileXY(pt[0], pt[1], zz);
+        return { z: zz, x: t[0], y: t[1], url: TERRAIN_URL.replace('{z}', zz).replace('{x}', t[0]).replace('{y}', t[1]) };
+    }
+    // Where a point falls inside its z tile, in pixels (0-255, size 256), or null when it is in another tile.
+    function terrainPixel(pt, tile, size) {
+        pt = pinPt(pt); if (!pt || !tile) return null;
+        var n = Math.pow(2, tile.z), sz = size || 256, latR = toRad(Math.max(-85.0511, Math.min(85.0511, pt[0])));
+        var fx = (pt[1] + 180) / 360 * n, fy = (1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n;
+        if (Math.floor(fx) !== tile.x || Math.floor(fy) !== tile.y) return null;
+        return { px: Math.min(sz - 1, Math.floor((fx - tile.x) * sz)), py: Math.min(sz - 1, Math.floor((fy - tile.y) * sz)) };
+    }
+    function terrariumFt(r, g, b) {
+        if (!isNum(r) || !isNum(g) || !isNum(b)) return null;
+        var m = r * 256 + g + b / 256 - 32768;
+        return m < -500 || m > 9000 ? null : m * FT_PER_M;
+    }
+    // THE WRONG-COURSE GUARD: a height record is used only when its origin (the course point it
+    // was read for) lies within ELEV_ORIGIN_M of one of THIS course's own points. Pure.
+    var ELEV_ORIGIN_M = 3000;
+    function elevOriginOk(o, pts) {
+        o = pinPt(o); if (!o) return false;
+        return (pts || []).some(function (p) { p = pinPt(p); return !!p && haversineMeters(o, p) <= ELEV_ORIGIN_M; });
+    }
+    // THE PHONE'S OWN ALTITUDE (the last fallback): used only while the fix is inside the course's
+    // area (courseBounds + 500 m). b: courseBounds' box. Pure.
+    function insideBounds(pt, b) {
+        pt = pinPt(pt);
+        return !!(pt && b && pt[0] >= b.south && pt[0] <= b.north && pt[1] >= b.west && pt[1] <= b.east);
     }
 
     // ---- PLAYS-LIKE, SPELLED OUT (009, switch playsBreakdown) -------------------------
@@ -1717,7 +1762,9 @@
     }
     var PLAYS_API = { playsParts: playsParts, playsText: playsText, playsInfoRows: playsInfoRows, windAim: windAim, AIM_PER_MPH: AIM_PER_MPH, holeElevPoints: holeElevPoints, courseElevPoints: courseElevPoints,
         elevFromSamples: elevFromSamples, ELEV_STEP_YD: ELEV_STEP_YD, ELEV_REACH_M: ELEV_REACH_M,
-        ALT_PCT_PER_1000FT: ALT_PCT_PER_1000FT,
+        ALT_PCT_PER_1000FT: ALT_PCT_PER_1000FT, altFactor: altFactor,
+        TERRAIN_URL: TERRAIN_URL, TERRAIN_Z: TERRAIN_Z, terrainTile: terrainTile, terrainPixel: terrainPixel, terrariumFt: terrariumFt,
+        ELEV_ORIGIN_M: ELEV_ORIGIN_M, elevOriginOk: elevOriginOk, insideBounds: insideBounds,
         playsLegs: playsLegs, legText: legText, LEG_SAME_M: LEG_SAME_M, offLineYards: offLineYards, OWN_SPOT_OFF_YD: OWN_SPOT_OFF_YD, elevCell: elevCell, ELEV_CELL_M: ELEV_CELL_M };
 
     // ---- ANY COURSE: THE OPENSTREETMAP LOOKUP, PURE PARTS (build 5) -------------
