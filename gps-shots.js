@@ -125,7 +125,9 @@
         delete b.set[club]; delete b.shots[club]; if (b.base) delete b.base[club];
         return lsSet(BAG_KEY, r);
     }
-    function resetBag(golfer) { var r = bagRec(); delete r.golfers[golferKey(golfer)]; return lsSet(BAG_KEY, r); }
+    // 070 PART 3: Reset all clears the clubs but KEEPS "My club yardages are measured at" (and the
+    // Suggest switch / temperature), so a golfer who chose "Don't adjust" keeps it (Manny, 070).
+    function resetBag(golfer) { var r = bagRec(), k = golferKey(golfer), keep = r.golfers[k] && r.golfers[k].alt; delete r.golfers[k]; if (keep) r.golfers[k] = { shots: {}, set: {}, alt: keep }; return lsSet(BAG_KEY, r); }
     // ---- FIRST-TIME SETUP (009, switch bagSetup) ------------------------------------
     // "Enter your carry for each club": the golfer's handicap gives a starting carry per
     // club (this table, scratch / 10 / 20 / 30, straight-line in between; under 0 = scratch,
@@ -186,32 +188,52 @@
     function source(v) { return !v ? '' : (v.set || v.base ? 'entered' : 'learned'); }
 
     // ---- "MY DISTANCES ARE FROM" (012 part 5, switch bagAltitude) ----------------------
-    // Where this golfer's club numbers hold: 'sea' (sea level, 0 ft), 'course' (a course they
-    // picked: its name and height in feet - null when it has no US height), or 'none' ("Don't
-    // adjust" - the DEFAULT: plays-like exactly as before). tempF: the typical temperature
-    // when they set them (blank = 70, as before). Kept per golfer ON THIS PHONE ONLY - it is
-    // not in syncShape, so the account sync never carries it; no position is kept (a
-    // course's name and height only).
-    var ALT_MODES = ['sea', 'course', 'none'];
+    // 070 PART 3: now "MY CLUB YARDAGES ARE MEASURED AT": 'sea' (sea level, 0 ft - the
+    // DEFAULT for a golfer who has never chosen), 'custom' (a height in feet: typed, or a
+    // course's - "Use this course" / "Find a course"; name = that course's name, '' when
+    // typed; ft null = no height yet), or 'none' ("Don't adjust" - still a choice: plays-like
+    // exactly as before). tempF: the typical temperature when they set them (blank = 70, as
+    // before). sug: false = "Suggest clubs using elevation" OFF (absent = ON).
+    // MIGRATION (on read; nothing is rewritten): never chosen (no stored mode) -> 'sea';
+    // 'sea' -> 'sea'; 012's 'course' (a course they picked) -> 'custom' with its feet and
+    // name; 'none' -> stays "Don't adjust". setBaseline still takes 'course' (stored as
+    // 'custom'). Kept per golfer ON THIS PHONE ONLY - it is not in syncShape, so the account
+    // sync never carries it; no position is kept (a course's name and height only).
+    var ALT_MODES = ['sea', 'custom', 'none'];
+    function altMode(m) { return m === 'course' ? 'custom' : ALT_MODES.indexOf(m) !== -1 ? m : null; }
     function okFt(v) { v = Number(v); return v !== null && isFinite(v) && v > -1500 && v < 15000 ? Math.round(v) : null; }
     function okTemp(v) { if (v === null || v === undefined || v === '') return null; v = Number(v); return isFinite(v) && v >= -20 && v <= 130 ? Math.round(v) : null; }
     function baseline(golfer) {
         var b = bagRec().golfers[golferKey(golfer)], a = (b && b.alt) || {};
-        var mode = ALT_MODES.indexOf(a.mode) !== -1 ? a.mode : 'none';
-        return { mode: mode, name: mode === 'course' ? String(a.name || '').slice(0, 80) : '', ft: mode === 'sea' ? 0 : (mode === 'course' && a.ft !== null && a.ft !== undefined ? okFt(a.ft) : null),
-            tempF: okTemp(a.tempF) };
+        // Never chosen (no mode stored) = Sea level; anything unknown stored = Don't adjust (as before).
+        var mode = a.mode === undefined || a.mode === null || a.mode === '' ? 'sea' : (altMode(a.mode) || 'none');
+        return { mode: mode, name: mode === 'custom' ? String(a.name || '').slice(0, 80) : '', ft: mode === 'sea' ? 0 : (mode === 'custom' && a.ft !== null && a.ft !== undefined ? okFt(a.ft) : null),
+            tempF: okTemp(a.tempF), chosen: !(a.mode === undefined || a.mode === null || a.mode === '') };
     }
     // a: { mode, name, ft, tempF } - only those fields, checked; anything else is dropped.
+    // The "Suggest clubs using elevation" choice (sug) is kept as it was.
     function setBaseline(golfer, a) {
         a = a || {};
-        var mode = ALT_MODES.indexOf(a.mode) !== -1 ? a.mode : 'none';
+        var mode = altMode(a.mode) || 'none';
         var r = bagRec(), b = bagOf(r, golferKey(golfer)), out = { mode: mode };
-        if (mode === 'course') { out.name = String(a.name || '').slice(0, 80); out.ft = a.ft === null || a.ft === undefined || a.ft === '' ? null : okFt(a.ft); }
+        if (mode === 'custom') { out.name = String(a.name || '').slice(0, 80); out.ft = a.ft === null || a.ft === undefined || a.ft === '' ? null : okFt(a.ft); }
         var t = okTemp(a.tempF); if (t !== null) out.tempF = t;
+        if (b.alt && b.alt.sug === false) out.sug = false;
         b.alt = out;
         return lsSet(BAG_KEY, r);
     }
-    // The baseline's height for playsLike's altBaseFt: a number, null (a course with no height:
+    // 070 PART 3: "SUGGEST CLUBS USING ELEVATION" - default ON. ON: the club comes from the
+    // plays-like number with the altitude in it (as before). OFF: from the plays-like number
+    // WITHOUT the altitude term (the number still shows it). Per golfer, on this phone only.
+    // It only matters when a baseline is set (Sea level / Custom).
+    function suggestUsesElevation(golfer) { var b = bagRec().golfers[golferKey(golfer)]; return !(b && b.alt && b.alt.sug === false); }
+    function setSuggestUsesElevation(golfer, on) {
+        var r = bagRec(), b = bagOf(r, golferKey(golfer)), a = b.alt || {};
+        if (on === false) a.sug = false; else delete a.sug;
+        b.alt = a;   // no mode written here: a golfer who has never chosen stays "never chosen" (Sea level)
+        return lsSet(BAG_KEY, r);
+    }
+    // The baseline's height for playsLike's altBaseFt: a number, null (Custom with no height:
     // altitude not available), or undefined ("Don't adjust": no altitude at all). Pure.
     function baselineFt(a) { if (!a || a.mode === 'none') return undefined; return a.mode === 'sea' ? 0 : (typeof a.ft === 'number' && isFinite(a.ft) ? a.ft : null); }
     // ---- ACCOUNT SYNC (009) - BUILT, SWITCHED OFF (HARDPAN_GPS_CONFIG.clubsSync) -------
@@ -274,6 +296,7 @@
         DEFAULT_HCPS: DEFAULT_HCPS, DEFAULT_CARRY: DEFAULT_CARRY, MID_HCP: MID_HCP, LEARN_MIN: LEARN_MIN, defaultCarries: defaultCarries,
         setup: setup, skipSetup: skipSetup, needsSetup: needsSetup, source: source,
         baseline: baseline, setBaseline: setBaseline, baselineFt: baselineFt, ALT_MODES: ALT_MODES,
+        suggestUsesElevation: suggestUsesElevation, setSuggestUsesElevation: setSuggestUsesElevation,
         syncOn: syncOn, syncPath: syncPath, syncShape: syncShape, syncSave: syncSave, syncLoad: syncLoad };
     W.HardPanGpsShots = { load: load, shots: shots, add: add, setLast: setLast, undo: undo, legs: legs, holesWithShots: holesWithShots, MAX_PER_HOLE: MAX_PER_HOLE, CLUBS: CLUBS };
 })();

@@ -86,6 +86,9 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // bagAltitude (part 5) = My bag's "My distances are from: Sea level | A course I pick | Don't
     // adjust" (default Don't adjust) + typical temperature; plays-like adjusts ~2% per 1,000 ft
     // of altitude vs that baseline (on this phone only) - off: no section, no altitude.
+    // 070: now "My club yardages are measured at: Sea level (default for a golfer who never
+    // chose) | Custom elevation [ft] | Don't adjust", 1.5% per 1,000 ft, + "Suggest clubs using
+    // elevation" (default ON).
     features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: true, bagSetup: true,
         // 011 (mailbox 011, mockup C): gpsLayoutC = the map clear at the top, one bottom panel
         // (F / MIDDLE / B, plays, Green | Hazards | Mark shot | Preview, the score row) - off:
