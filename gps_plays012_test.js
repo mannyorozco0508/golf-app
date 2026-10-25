@@ -41,7 +41,7 @@ test('012-3 gps-view: behind playsSimple the line is playsText only (no club, no
     assert.ok(/HardPanFeature\('playsSimple'\)/.test(v));
     const sb = fnSrc(v, 'syncBreakdown');
     const simple = sb.slice(sb.indexOf('if (pl && simpleSwitch()) {'), sb.indexOf('} else if (pl) {'));
-    assert.ok(simple.length > 20 && /G\.playsText\(pl, units\(\)\)/.test(simple), 'the simple branch');
+    assert.ok(simple.length > 20 && /G\.playsText(Elev)?\(pl, units\(\)/.test(simple), 'the simple branch');   // 070 part 2: playsTextElev = playsText + " · elev ..."
     assert.ok(!/suggestClub|windAim|playsParts|plClub = true/.test(simple), 'no club, no aim-off, no parts on the simple line');
     assert.ok(/G\.playsParts\(pl, has \? w\.mph : null, units\(\)\)/.test(sb), 'off: the 009 line is still there');
     // The (i) sheet carries the breakdown.
@@ -195,14 +195,15 @@ test('012-5 altitude is applied BEFORE wind and temperature (their % on the adju
     assert.ok(Math.abs(tb.terms.temp + 3) < 1e-9);
     assert.deepStrictEqual(geo.playsLike({ yards: 150, tempF: 60 }), geo.playsLike({ yards: 150, tempF: 60, tempBaseF: null }), 'blank = 70 as before');
 });
-test('012-5 the (i) sheet: "Altitude 1,200 ft vs sea level: −6"; a course baseline by name; no US data: "altitude not available here"', () => {
+test('012-5 the (i) sheet (070 part 2 wording): "Course elevation 1,200 ft vs your sea-level numbers: −N"; a course baseline by name; no height: "Elevation: not available here"', () => {
+    // 070 part 2: the row's words changed (plan 064-5 section 3); N is playsLike's own altitude term (1.5%).
     const pl = geo.playsLike({ yards: 250, altFt: 1200, altBaseFt: 0 });
-    assert.strictEqual(geo.playsInfoRows({ pl, yards: 250, alt: { ft: 1200, baseFt: 0, baseName: '' } })[1], 'Altitude 1,200 ft vs sea level: −4');
+    assert.strictEqual(geo.playsInfoRows({ pl, yards: 250, alt: { ft: 1200, baseFt: 0, baseName: '' } })[1], 'Course elevation 1,200 ft vs your sea-level numbers: −4');
     const pc = geo.playsLike({ yards: 150, altFt: 20, altBaseFt: 1500 });
-    assert.strictEqual(geo.playsInfoRows({ pl: pc, yards: 150, alt: { ft: 20, baseFt: 1500, baseName: 'Grayhawk' } })[1], 'Altitude 20 ft vs Grayhawk (1,500 ft): +3');
+    assert.strictEqual(geo.playsInfoRows({ pl: pc, yards: 150, alt: { ft: 20, baseFt: 1500, baseName: 'Grayhawk' } })[1], 'Course elevation 20 ft vs your numbers at Grayhawk (1,500 ft): +3');
     const same = geo.playsLike({ yards: 150, altFt: 300, altBaseFt: 300 });
-    assert.strictEqual(geo.playsInfoRows({ pl: same, yards: 150, alt: { ft: 300, baseFt: 300, baseName: 'Home' } })[1], 'Altitude 300 ft vs Home (300 ft): 0');
-    assert.strictEqual(geo.playsInfoRows({ pl: geo.playsLike({ yards: 150, tempF: 60 }), yards: 150, alt: { ft: null, baseFt: 0, na: true } })[1], 'Altitude: not available here');
+    assert.strictEqual(geo.playsInfoRows({ pl: same, yards: 150, alt: { ft: 300, baseFt: 300, baseName: 'Home' } })[1], 'Course elevation 300 ft vs your numbers at Home (300 ft): 0');
+    assert.strictEqual(geo.playsInfoRows({ pl: geo.playsLike({ yards: 150, tempF: 60 }), yards: 150, alt: { ft: null, baseFt: 0, na: true } })[1], 'Elevation: not available here');
     assert.strictEqual(geo.playsInfoRows({ pl: geo.playsLike({ yards: 150, tempF: 60, tempBaseF: 50 }), yards: 150, tempF: 60, tempBaseF: 50 })[1], 'Warm (60°F vs 50°F): −1', 'the temperature row names its baseline (warmer than it: shorter)');
 });
 function bagBox() {

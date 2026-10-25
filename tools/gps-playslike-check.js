@@ -333,11 +333,11 @@ const START = [W(2500), OPEN, W(3000)];
     f(ma && Math.abs(+ma[1] - ea.plays) <= 2, '11: altitude line ' + JSON.stringify(a0.line) + ', expected ~' + ea.plays.toFixed(1) + ' (inline, altitude first)');
     f(ma && +ma[1] > Math.round(expect(INTO).plays), '11: a lower course than the baseline does not play longer: ' + JSON.stringify(a0.line));
     f(ma && a0.sug === 'Suggested: ' + clubFor(+ma[1]), '11: the club is not for the altitude-adjusted ' + (ma && ma[1]) + ': ' + a0.sug);
-    f((aRows.rows || []).some((x) => new RegExp('^Altitude \\d+ ft vs Scottsdale \\(1,257 ft\\): \\+' + Math.round(ea.alt) + '$').test(x)), '11: the sheet\'s altitude row: ' + JSON.stringify(aRows.rows));
+    f((aRows.rows || []).some((x) => new RegExp('^Course elevation \\d+ ft vs your numbers at Scottsdale \\(1,257 ft\\): \\+' + Math.round(ea.alt) + '$').test(x)), '11: the sheet\'s altitude row: ' + JSON.stringify(aRows.rows));
     f(isFinite(courseFt) && courseFt > 0, '11: could not read this course\'s mean height: ' + courseFt);
     f(aBag.bag && aBag.bag.mode === 'course' && aBag.bag.name === 'Caledonia Golf & Fish Club' && Math.abs(aBag.bag.ft - courseFt) <= 0.5, '11: "This course" did not keep this course\'s height: ' + JSON.stringify(aBag));
     f(/^Plays like \d+y$/.test(a1.line || '') && Math.abs(+/\d+/.exec(a1.line)[0] - expect(INTO).plays) <= 2, '11: the same course as the baseline is not the no-altitude number: ' + a1.line);
-    f((aRows1.rows || []).some((x) => /^Altitude \d+ ft vs Caledonia Golf & Fish Club \(\d+ ft\): 0$/.test(x)), '11: same course: the altitude row is not 0: ' + JSON.stringify(aRows1.rows));
+    f((aRows1.rows || []).some((x) => /^Course elevation \d+ ft vs your numbers at Caledonia Golf & Fish Club \(\d+ ft\): 0$/.test(x)), '11: same course: the altitude row is not 0: ' + JSON.stringify(aRows1.rows));
     f(aSea.bag && aSea.bag.mode === 'sea' && /sea level/.test(aSea.now || ''), '11: "Sea level" not kept: ' + JSON.stringify(aSea));
     errs(s, 'altitude');
 

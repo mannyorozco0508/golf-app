@@ -1588,6 +1588,42 @@
     // raw distance), windMph, tempF, tempBaseF, aim (windAim's), unit, label }. Pure.
     var MINUS = '\u2212';
     function ftWords(x) { return String(Math.round(x)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+
+
+    // ---- 070 PART 2: THE ELEVATION ON THE PILL AND IN THE (i) SHEET (display only) ----------
+    // The altitude term in yards (minus = the shot plays shorter): playsLike's own terms.alt
+    // when it is there (what really moved the number), else D / f - D (altFactor). null when
+    // there is nothing to show. Pure.
+    function elevAltYd(pl, yards, ft, baseFt) {
+        var t = pl && pl.terms;
+        if (t && isNum(t.alt)) return t.alt;
+        if (!isNum(yards) || !isNum(ft) || !isNum(baseFt)) return null;
+        var f = altFactor(ft, baseFt);
+        return isNum(f) && f > 0 ? yards / f - yards : null;
+    }
+    // THE PILL'S SECOND LINE (layout D) - and the tail of layouts C / old's one line:
+    // "elev +1,200 ft" (this course vs the golfer's baseline, in feet as the height sources give
+    // them), "elev ~+1,180 ft (phone)" from the phone's own altitude (to the nearest 10 ft - a
+    // rougher number, and it says so), "elev −800 ft" below the baseline. Only when a
+    // baseline is set ("Don't adjust": none) and the altitude term rounds to 1 yd or more.
+    // o: { ft, baseFt, src: 'course' | 'usgs' | 'tile' | 'phone' | null, altYd }. '' = no line. Pure.
+    function elevLine(o) {
+        o = o || {};
+        if (!isNum(o.ft) || !isNum(o.baseFt) || !isNum(o.altYd) || Math.abs(Math.round(o.altYd)) < 1) return '';
+        var phone = o.src === 'phone', d = o.ft - o.baseFt;
+        d = phone ? Math.round(d / 10) * 10 : Math.round(d);
+        if (!d) return '';
+        return 'elev ' + (phone ? '~' : '') + (d > 0 ? '+' : MINUS) + ftWords(Math.abs(d)) + ' ft' + (phone ? ' (phone)' : '');
+    }
+    // Layouts C and old: ONE line, "Plays like 147y · elev +1,200 ft" (no elevation: as before).
+    function playsTextElev(pl, unit, elev) {
+        var t = playsText(pl, unit);
+        return t && elev ? t + ' · ' + elev : t;
+    }
+    // "Height source: this course / USGS / open terrain map / your phone".
+    var ELEV_SRC_WORDS = { course: 'this course', usgs: 'USGS', tile: 'open terrain map', phone: 'your phone' };
+    function elevSrcWords(src) { return Object.prototype.hasOwnProperty.call(ELEV_SRC_WORDS, src) ? ELEV_SRC_WORDS[src] : ''; }
+
     function playsInfoRows(o) {
         o = o || {};
         var pl = o.pl, out = [];
@@ -1597,11 +1633,20 @@
         var sg = function (x) { return (x > 0 ? '+' : MINUS) + Math.abs(x); };
         var t = pl.terms || {};
         out.push((o.label || 'This shot') + ': ' + (isNum(o.yards) ? r(o.yards) + u + ', ' : '') + 'plays like ' + r(pl.exact));
-        // 012 part 5: "Altitude 1,200 ft vs sea level: \u22126" (applied first) - or why there is none.
+        // 012 part 5: the altitude row (applied first) - or why there is none.
+        // 070 part 2 (the plan's section 3 wording): "Course elevation 1,200 ft vs your sea-level
+        // numbers: \u22123", then "Height source: USGS"; no height: "Elevation: not available
+        // here". A picked course: "vs your numbers at Grayhawk (1,500 ft)"; a height with no
+        // name: "vs your numbers at 1,500 ft". The phone's own height: "~" (nearest 10 ft).
         var al = o.alt;
-        if (al && al.na) out.push('Altitude: not available here');
-        else if (al && isNum(al.ft)) out.push('Altitude ' + ftWords(al.ft) + ' ft vs ' + (al.baseName ? al.baseName + (isNum(al.baseFt) ? ' (' + ftWords(al.baseFt) + ' ft)' : '') : 'sea level')
-            + ': ' + (isNum(t.alt) && r(t.alt) ? sg(r(t.alt)) : '0'));
+        if (al && al.na) out.push('Elevation: not available here');
+        else if (al && isNum(al.ft)) {
+            var ph = al.src === 'phone', shownFt = ph ? Math.round(al.ft / 10) * 10 : al.ft;
+            var vs = al.baseName ? 'your numbers at ' + al.baseName + (isNum(al.baseFt) ? ' (' + ftWords(al.baseFt) + ' ft)' : '')
+                : (isNum(al.baseFt) && Math.round(al.baseFt) !== 0 ? 'your numbers at ' + ftWords(al.baseFt) + ' ft' : 'your sea-level numbers');
+            out.push('Course elevation ' + (ph ? '~' : '') + ftWords(shownFt) + ' ft vs ' + vs + ': ' + (isNum(t.alt) && r(t.alt) ? sg(r(t.alt)) : '0'));
+            if (elevSrcWords(al.src)) out.push('Height source: ' + elevSrcWords(al.src));
+        }
         if (isNum(t.elev) && r(t.elev)) out.push((t.elev > 0 ? 'Uphill' : 'Downhill') + ': ' + sg(r(t.elev)));
         if (isNum(t.wind) && r(t.wind)) out.push((t.wind > 0 ? 'Into the wind' : 'Downwind') + (isNum(o.windMph) ? ' (' + Math.round(o.windMph) + ' mph)' : '') + ': ' + sg(r(t.wind)));
         if (isNum(t.temp) && r(t.temp)) out.push((t.temp > 0 ? 'Cold' : 'Warm') + (isNum(o.tempF) ? ' (' + Math.round(o.tempF) + '°F vs ' + (isNum(o.tempBaseF) ? Math.round(o.tempBaseF) : 70) + '°F)' : '') + ': ' + sg(r(t.temp)));
@@ -1765,6 +1810,7 @@
         ALT_PCT_PER_1000FT: ALT_PCT_PER_1000FT, altFactor: altFactor,
         TERRAIN_URL: TERRAIN_URL, TERRAIN_Z: TERRAIN_Z, terrainTile: terrainTile, terrainPixel: terrainPixel, terrariumFt: terrariumFt,
         ELEV_ORIGIN_M: ELEV_ORIGIN_M, elevOriginOk: elevOriginOk, insideBounds: insideBounds,
+        elevAltYd: elevAltYd, elevLine: elevLine, playsTextElev: playsTextElev, elevSrcWords: elevSrcWords,   // 070 part 2
         playsLegs: playsLegs, legText: legText, LEG_SAME_M: LEG_SAME_M, offLineYards: offLineYards, OWN_SPOT_OFF_YD: OWN_SPOT_OFF_YD, elevCell: elevCell, ELEV_CELL_M: ELEV_CELL_M };
 
     // ---- ANY COURSE: THE OPENSTREETMAP LOOKUP, PURE PARTS (build 5) -------------
