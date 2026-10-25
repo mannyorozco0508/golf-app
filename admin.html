@@ -1305,6 +1305,9 @@ body::before {
         NET.waiters.push(fire);
         timer = setTimeout(fire, GRACE_MS);
         try { W.addEventListener('offline', fire); } catch (e) {}
+        // A READ THAT ANSWERS IS A CONNECTION too: the same kind of read the tap makes first (a round's
+        // code under events/). It waits for the connection like every read; when it answers, go.
+        try { if (typeof db !== 'undefined' && db) db.ref('events/' + (code() || 'ZZZZZZ')).once('value').then(function () { NET.up = true; fire(); }, function () {}); } catch (e) {}   /* global db */
     }
     W.HardPanGamesLobby = { whenConnected: whenConnected, net: function () { return NET.up; }, GRACE_MS: GRACE_MS };
     function wire() {
@@ -10523,6 +10526,36 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (typeof splitTrailingHcpFlight !== 'function' || !splitTrailingHcpFlight(input.value)) return;
         renderPlayerList();
     }
+    // GPS:BEGIN
+    // URGENT-068: A LIST PASTED INTO A NAME BOX BECOMES GOLFERS. Games & Bets' Players step is the original
+    // setup (URGENT-016), whose "player list" is one-line Name boxes; the list-splitting box (017's
+    // Players step) is behind "📋 Paste Player List", below every row. Manny copied his Monday list,
+    // long-pressed a Name box, tapped Paste - and the phone flattened the list into ONE name (the box
+    // shows its first dozen letters, so it looked like nothing pasted). Now a paste that is a list
+    // (roster-paste.js rosterPasteListText: lines, numbered "1. Name", "Ann, Bob, Cal") goes through
+    // Paste Player List's own commit - the same parser, groups, flights and tees, appended after the
+    // golfers already there, the empty row it landed in dropped. One name pastes as it always did.
+    // Long-press Paste and keyboard paste both arrive here as a 'paste' event with the text in it.
+    function hpPasteListIntoRows(ev) {
+        const t = ev && ev.target;
+        if (!t || !t.classList || !t.classList.contains('p-name-input') || !t.closest || !t.closest('#player-list')) return false;
+        let raw = '';
+        try { raw = (ev.clipboardData || window.clipboardData).getData('text/plain') || (ev.clipboardData || window.clipboardData).getData('text') || ''; } catch (e) { raw = ''; }
+        const list = typeof rosterPasteListText === 'function' ? rosterPasteListText(raw) : '';
+        if (!list) return false;
+        const ta = document.getElementById('paste-players-textarea');
+        if (!ta || typeof commitPastedPlayers !== 'function' || typeof parsePlayerPasteText !== 'function') return false;
+        const got = parsePlayerPasteText(list, roundTeeNames()).validPlayers.length;
+        if (!got) return false;
+        ev.preventDefault();
+        // The row it landed in: an empty row is dropped by the commit; a row with a golfer keeps them.
+        ta.value = list;
+        commitPastedPlayers();
+        try { if (typeof uiToast === 'function') uiToast('📋 Added ' + got + ' golfer' + (got === 1 ? '' : 's') + ' from the paste.'); } catch (e) {}
+        return true;
+    }
+    document.addEventListener('paste', (ev) => { try { hpPasteListIntoRows(ev); } catch (e) { /* the box's own paste */ } }, true);
+    // GPS:END
     // One line above the roster: the fix count and, when two golfers share a name,
     // the ask for a last initial. Replaced on every redraw.
     function showRosterFixNote(fixText) {

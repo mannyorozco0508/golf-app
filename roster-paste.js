@@ -632,6 +632,22 @@ function rosterPasteNormalizeGolfer(line) {
     return t.replace(/\s+/g, ' ').trim();
 }
 
+// URGENT-068: A LIST PASTED INTO ONE NAME BOX. Games & Bets' Players step shows one-line Name boxes
+// (the original setup, URGENT-016), and a phone flattens a pasted list's line breaks into spaces there -
+// "Ann 8 Bob 12 Cal 4" became ONE golfer. This says whether pasted text is a list of golfers, and gives
+// it back one golfer a line for parsePlayerPasteText (Paste Player List's own parser):
+//   two or more lines (CRLF, numbered "1. Name", bullets: the parser's own rules) -> the text as it is;
+//   one line of comma/semicolon items, two or more of them with letters ("Ann, Bob, Cal") -> one a line;
+//   anything else - one golfer, "Mike Jones, 12" (a name and its handicap) - '' (not a list).
+function rosterPasteListText(text) {
+    const t = String(text == null ? '' : text).replace(/\r\n?/g, '\n').replace(/[\u2028\u2029]/g, '\n').trim();
+    if (!t) return '';
+    if (t.split('\n').filter((l) => l.trim()).length >= 2) return t;
+    const parts = t.split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+    if (parts.length >= 2 && parts.filter((x) => /[A-Za-z\u00C0-\u024F]/.test(x)).length >= 2) return parts.join('\n');
+    return '';
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     // IN NODE THERE IS NO SCRIPT ORDER. The browser gets stripTrailingNote from
     // my-groups.js, loaded before this file; a require here gives a test of this
@@ -644,5 +660,5 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = { rosterPasteCheckLines, rosterPasteEmptyCellFlight, rosterPasteCleanLine, rosterPasteNormalizeGolfer, rosterFlightHeader, BARE_HCP_RE, LEAD_FLIGHT_RE, ROSTER_HEADER_WORDS, splitNameAndHcp,
         splitLeadingFlight, splitTrailingTee, rosterPasteSeparator, parsePlayerPasteText,
         TRAIL_HCP_FLIGHT_RE, splitTrailingHcpFlight, fixPastedRows, duplicateRosterNames, duplicateNamesNote,
-        flightHcpNumber, formatFlightCutoff, flightSplitAssign, flightSplitSuggestion };
+        flightHcpNumber, formatFlightCutoff, flightSplitAssign, flightSplitSuggestion, rosterPasteListText };
 }

@@ -139,6 +139,19 @@
         e.addEventListener('change', onChange);
         e.addEventListener('keydown', typeKey);
         e.addEventListener('paste', function (ev) { if (ev.target && ev.target.id === 'sf-paste') setTimeout(function () { if (readPaste()) sumOnly(); }, 0); });
+        // URGENT-068: a LIST pasted into a "Type names" Name box becomes golfers (the phone flattened it
+        // into one name): Round Setup's own Paste Player List commit, appended, the empty row dropped.
+        e.addEventListener('paste', function (ev) {
+            var t = ev.target;
+            if (!t || !t.getAttribute || !t.getAttribute('data-sf-tname') || typeof W.rosterPasteListText !== 'function') return;
+            var raw = ''; try { raw = ev.clipboardData.getData('text/plain') || ev.clipboardData.getData('text') || ''; } catch (x) { raw = ''; }
+            var list = W.rosterPasteListText(raw), ta = $('paste-players-textarea'), commit = fn('commitPastedPlayers');
+            if (!list || !ta || !commit) return;
+            ev.preventDefault();
+            ta.value = list;
+            try { commit(); } catch (x) { try { console.error('[simple flow] paste into a name', x); } catch (y) {} }
+            render();
+        });
         return e;
     }
     function show(on) {
