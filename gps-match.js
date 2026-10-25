@@ -158,8 +158,13 @@
         var tried = lsGet(OSM_LOOKUP + 'tried_' + key);
         if (!opts.force && !opts.recheck && tried && Date.now() - tried.at < (tried.none ? RETRY_NONE_MS : RETRY_ERR_MS)) return Promise.resolve(verdict({}, of, { source: 'none', how: 'looked up recently, nothing found' }));
         lsSet(CHECKED + key, { at: Date.now() });
-        return lookup(opts, of, null);
+        // 071: ONE lookup per course at a time on this page (the search's OSM pick and Round Setup's own link
+        // on the pick asked together; the public server then refused both).
+        if (flying[key]) return flying[key];
+        flying[key] = lookup(opts, of, null).then(function (r) { delete flying[key]; return r; }, function (e) { delete flying[key]; throw e; });
+        return flying[key];
     }
+    var flying = {};
     // ONE LOOKUP: the courses near the course point, ours by name, its holes and
     // greens, this course's holes picked. guard (a fresh pull over a copy): kept
     // only when newer and with at least as many holes, and a club that would need
