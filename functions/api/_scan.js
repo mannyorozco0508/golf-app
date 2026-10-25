@@ -260,7 +260,22 @@ export async function callGemini(w, model, image, round) {
     } catch (e) { return { error: 'network' }; }
     if (!res) return { error: 'upstream_error' };
     if (res.status === 429) return { error: 'busy' };
-    if (!res.ok) return { error: 'upstream_error' };
+    if (!res.ok) {
+        // Why Google refused, as codes only (Manny OK'd this logging Oct 25): the HTTP status,
+        // Google's error.status word and its ErrorInfo reason enums (e.g. API_KEY_INVALID,
+        // SERVICE_DISABLED, API_KEY_HTTP_REFERRER_BLOCKED). Never the message text, body or key.
+        const upstream = { http: res.status };
+        try {
+            const eb = await res.json();
+            const e = eb && eb.error;
+            if (e && typeof e.status === 'string') upstream.status = e.status.slice(0, 40);
+            const reasons = (e && Array.isArray(e.details) ? e.details : [])
+                .map((d) => d && typeof d.reason === 'string' ? d.reason.slice(0, 60) : null)
+                .filter((r) => r && /^[A-Z0-9_]+$/.test(r));
+            if (reasons.length) upstream.reasons = reasons.slice(0, 3);
+        } catch (e) { /* no JSON body: the HTTP status is enough */ }
+        return { error: 'upstream_error', upstream };
+    }
     let body;
     try { body = await res.json(); } catch (e) { return { error: 'upstream_error' }; }
     const u = (body && body.usageMetadata) || {};
@@ -311,7 +326,7 @@ export async function handleScan(d) {
     const started = Date.now();
     const first = await callGemini(w, w.model, body.image, body.round);
     if (first.error) {
-        w.log(JSON.stringify({ ev: 'scorecard_scan', outcome: first.error, model: w.model, ms: Date.now() - started }));
+        w.log(JSON.stringify({ ev: 'scorecard_scan', outcome: first.error, model: w.model, ms: Date.now() - started, upstream: first.upstream }));
         return unavailable(first.error);
     }
     let pick = { model: w.model, parsed: first.parsed, validation: V.validateScan(first.parsed, body.round) };
