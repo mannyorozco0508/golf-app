@@ -63,7 +63,7 @@ const SEED2 = "localStorage.setItem('hardpan_shotlog_v1', " + JSON.stringify(JSO
 for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
     test('My miss at ' + vp.width + 'x' + vp.height, { timeout: 240000 }, async () => {
         const pid = (round().players[0] || {}).id;
-        const PRE = 'window.__hardpanDoors = true; window.__simpleFlow = true;' + iapStub({ active: true }) + CFG + GEO + 'window.HardPanGolfApi = ' + JSON.stringify(GAPI) + ';'
+        const PRE = 'window.__hardpanDoors = true; window.__simpleFlow = true; window.__hardpanNoHint = true;'   /* phone3: 066 #1's one-time Customize hint (2 buttons, gone after 12 s) would skew the before / after button count */ + '' + iapStub({ active: true }) + CFG + GEO + 'window.HardPanGolfApi = ' + JSON.stringify(GAPI) + ';'
             + "try{localStorage.setItem('golfapp_me_" + CODE + "','" + pid + "');localStorage.setItem('hardpan_round_side','gps|" + CODE + "');sessionStorage.setItem('groupPickDismissed:" + CODE + "','1');}catch(e){}" + SEED
             + "if (!sessionStorage.getItem('seeded052')) { sessionStorage.setItem('seeded052', '1'); " + SEED2 + " }";
         const j = await openJourney({ db: { events: { [CODE]: round() }, global_courses: { [KEY]: { name: 'Chips Test Golf Club', data: CD, location: { latitude: TEE[0], longitude: TEE[1], city: 'Phoenix', state: 'AZ' } } }, trips: {}, organizers: {}, tournaments: {} },
