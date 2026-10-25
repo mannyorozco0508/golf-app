@@ -183,8 +183,19 @@
     function buildBody(image, ctx) {
         return { image: { data: String(image || ''), mimeType: 'image/jpeg' }, round: ctx };
     }
+    // phone3: THE SERVER SWITCH, in the app only. The scan route is not deployed yet, and from the app
+    // (capacitor://localhost, cross-origin) the live /api catch-all's 404 answers the CORS preflight, so
+    // the fetch fails like no signal and the golfer would read "Something went wrong". Until gps-config
+    // features.scanServer is true (absent = off, as features.layoutSync), the app says the plain
+    // not_configured words at once - no camera, and no photo leaves the phone. A browser (same origin)
+    // reads the server's own answer, as before.
+    function serverOffHere() {
+        if (!apiBase()) return false;
+        try { var f = (W.HARDPAN_GPS_CONFIG || {}).features || {}; return f.scanServer !== true; } catch (e) { return true; }
+    }
     // -> Promise<{ ok: true, scan, validation, model, retried, scansLeft } | { ok: false, code, message }>
     function request(image, ctx) {
+        if (serverOffHere()) return Promise.resolve(fail('not_configured'));
         if (W.navigator && W.navigator.onLine === false) return Promise.resolve(fail('offline'));
         var f = W.fetch;
         if (typeof f !== 'function') return Promise.resolve(fail('server'));
@@ -227,7 +238,7 @@
         } catch (e) { return false; }
     }
 
-    var api = { capture: capture, nativeCameraHere: nativeCameraHere, roundContext: roundContext, buildBody: buildBody, request: request, messageFor: messageFor, codeOf: codeOf,
+    var api = { capture: capture, nativeCameraHere: nativeCameraHere, serverOffHere: serverOffHere, roundContext: roundContext, buildBody: buildBody, request: request, messageFor: messageFor, codeOf: codeOf,
         MESSAGES: MESSAGES, ROUTE: ROUTE, LONG_EDGE: LONG_EDGE, QUALITY: QUALITY, apiBase: apiBase };
     W.HardPanScanClient = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

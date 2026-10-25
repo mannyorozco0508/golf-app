@@ -110,6 +110,8 @@
     }
     function shoot() {
         if (!st || !C()) return;
+        // phone3: the scan server is not switched on for the app yet - say so before the camera opens.
+        if (typeof C().serverOffHere === 'function' && C().serverOffHere()) { say(C().messageFor('not_configured'), false); return; }
         var s = st;
         C().capture().then(function (shot) {
             if (st !== s) return;

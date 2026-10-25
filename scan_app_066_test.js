@@ -204,3 +204,28 @@ test('phone3: the scan def on the REAL feature registry - lock with free scans, 
     assert.equal(C.codeOf('no_such_route', 404), 'not_configured');
     for (const k of ['HardPanFeatures', 'HardPanFeatureQueue', 'HardPanScan', 'HardPanScanClient', 'Capacitor', 'HARDPAN_GPS_CONFIG', 'localStorage']) delete global[k];
 });
+
+test('phone3: in the app the scan server is OFF until features.scanServer is true - plain words, no request, no photo sent', async () => {
+    const fetch0 = global.fetch;
+    const mk = (cfg) => {
+        let called = false;
+        global.window = global;
+        global.document = { documentElement: { classList: { contains: (c) => c === 'is-native' } } };
+        global.HARDPAN_GPS_CONFIG = cfg;
+        global.fetch = () => { called = true; return Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve('{}') }); };
+        delete require.cache[require.resolve('./gps-scan-client.js')];
+        const C = require('./gps-scan-client.js');
+        return { C, called: () => called };
+    };
+    let t = mk({ features: {} });
+    assert.equal(t.C.serverOffHere(), true);
+    const r = await t.C.request('QUJD', {});
+    assert.equal(r.ok, false); assert.equal(r.code, 'not_configured'); assert.equal(r.message, t.C.MESSAGES.not_configured);
+    assert.equal(t.called(), false, 'no request, no photo sent');
+    t = mk({ features: { scanServer: true } });
+    assert.equal(t.C.serverOffHere(), false, 'switched on: the server answers');
+    const g = fs.readFileSync(path.join(__dirname, 'gps-scan-grid.js'), 'utf8');
+    assert.ok(g.indexOf('serverOffHere()') < g.indexOf('C().capture()'), 'said before the camera opens');
+    for (const k of ['HARDPAN_GPS_CONFIG', 'HardPanScanClient']) delete global[k];
+    global.fetch = fetch0; global.document = {};
+});
