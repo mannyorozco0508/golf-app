@@ -1270,11 +1270,49 @@ body::before {
         var i = $('join-code-input');
         if (show && i) { try { i.focus(); } catch (e) {} }
     }
+    // URGENT-068: "CONNECTING…" FIRST, LIKE THE GPS DOOR (fix-false-nosignal, 0222fef). Game Day and Same as
+    // last week are the two cards here that need the server (a new round's code is checked against it). On
+    // a weak bar the page's FIRST database connection can take longer than the code check's 8 s, and
+    // .info/connected reads false until it comes up - which the lobby took for "No signal" (Manny, 1 bar,
+    // 3:14 AM). Now: connected -> the card's own function at once, as before; the phone says offline ->
+    // the card's own function at once too (its "No signal" words are right then); still connecting ->
+    // the card reads "⏳ Connecting…" and runs its function the moment the connection is up (or after
+    // GRACE_MS, when the old words are fair). Nothing here asks for signal while just looking.
+    var NET = { up: null, waiters: [] }, GRACE_MS = 20000;
+    function netWatch() {
+        try {
+            if (typeof db === 'undefined' || !db) return;   /* global db */
+            db.ref('.info/connected').on('value', function (s) {
+                NET.up = !!(s && typeof s.val === 'function' && s.val());
+                if (NET.up) { var w = NET.waiters.splice(0); w.forEach(function (f) { try { f(); } catch (e) {} }); }
+            });
+        } catch (e) {}
+    }
+    function phoneOffline() { try { return W.navigator.onLine === false; } catch (e) { return false; } }
+    function whenConnected(card, go) {
+        if (!card || card.getAttribute('aria-disabled') === 'true') return;
+        if (NET.up === true || phoneOffline()) { go(); return; }
+        var d = card.querySelector('.d'), was = d ? d.textContent : '', done = false, timer = null;
+        card.setAttribute('aria-disabled', 'true'); card.setAttribute('data-gl-connecting', '1');
+        if (d) d.textContent = '⏳ Connecting…';
+        var fire = function () {
+            if (done) return; done = true; clearTimeout(timer);
+            try { W.removeEventListener('offline', fire); } catch (e) {}
+            card.removeAttribute('aria-disabled'); card.removeAttribute('data-gl-connecting');
+            if (d) d.textContent = was;
+            go();
+        };
+        NET.waiters.push(fire);
+        timer = setTimeout(fire, GRACE_MS);
+        try { W.addEventListener('offline', fire); } catch (e) {}
+    }
+    W.HardPanGamesLobby = { whenConnected: whenConnected, net: function () { return NET.up; }, GRACE_MS: GRACE_MS };
     function wire() {
+        netWatch();
         $('gl-back').addEventListener('click', function () { W.location.href = 'home.html'; });
-        $('gl-gameday').addEventListener('click', function () { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); });
+        $('gl-gameday').addEventListener('click', function () { whenConnected($('gl-gameday'), function () { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('quick'); }); });
         $('gl-trip').addEventListener('click', function () { if (typeof W.selectHomeWidget === 'function') W.selectHomeWidget('trip'); });
-        $('gl-same').addEventListener('click', function () { if (typeof W.sameAsLastWeek === 'function') W.sameAsLastWeek($('same-as-last-week')); });
+        $('gl-same').addEventListener('click', function () { whenConnected($('gl-same'), function () { if (typeof W.sameAsLastWeek === 'function') W.sameAsLastWeek($('same-as-last-week')); }); });
         $('gl-code').addEventListener('click', openJoin);
         $('gl-resume').addEventListener('click', function () { if (typeof W.resumeGame === 'function') W.resumeGame(); });
         mirror($('hw-quick'), $('gl-gameday'), '⏳ Starting…');
