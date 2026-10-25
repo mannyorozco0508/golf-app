@@ -47,7 +47,7 @@ const FUNCS = (mode) => "(function(){ window.__fn = []; var of = window.fetch; v
     + "   else { var el = []; for (var n = 1; n <= 3; n++) { var la = 43.1789 + n * 0.0015, lo = -124.394; el.push({ type: 'way', id: 900 + n, tags: { golf: 'hole', ref: String(n), par: '3' }, geometry: [{ lat: la, lon: lo }, { lat: la + 0.0008, lon: lo }] });"
     + "     var g = la + 0.0008, d = 0.00012; el.push({ type: 'way', id: 950 + n, tags: { golf: 'green' }, geometry: [{ lat: g - d, lon: lo - d }, { lat: g - d, lon: lo + d }, { lat: g + d, lon: lo + d }, { lat: g + d, lon: lo - d }, { lat: g - d, lon: lo - d }] }); }"
     + "     j = { osm3s: { timestamp_osm_base: '2026-10-25T00:00:00Z' }, elements: el }; }"
-    + "   return Promise.resolve({ ok: true, status: 200, json: function () { return Promise.resolve(j); } }); }"
+    + "   return new Promise(function (ok) { setTimeout(function () { ok({ ok: true, status: 200, json: function () { return Promise.resolve(j); } }); }, window.__overDelay || 0); }); }"
     + "  var m = /cloudfunctions\\.net\\/(gps\\w+)$/.exec(s); if (!m) return of.apply(this, arguments);"
     + "  var data = JSON.parse(init.body).data; window.__fn.push([m[1], data]); var res;"
     + "  if (m[1] === 'gpsSearch') res = Promise.resolve(MODE === 'live' ? { status: 'ok', results: SAVED[data.name] || [] } : MODE === 'findonly' ? (data.name === 'bandon tr' ? { status: 'error', results: [] } : { status: 'ok', results: SAVED[data.name] || [] }) : { status: MODE, results: [] });"
@@ -170,4 +170,17 @@ test('Games & Bets keeps the 064 path: an OSM-only row opens Round Setup\'s Add 
     const [s] = J(r);
     assert.equal(s.form, 'block', 'Add a course is open');
     assert.equal(s.name, 'Shortys');
+});
+
+test('OpenStreetMap slow (a minute or more on its public servers): picked after 20 s with "on the way", Start Round live; the holes land later and the note says so', { timeout: 200000 }, async () => {
+    const r = await open(AT_BANDON, 'error', [TYPE('Bandon'), PAUSE, SETTLED, { sleep: 400 }, X('window.__overDelay = 15000; 1'), TAP_OSM('Shortys'),
+        { waitFor: "/^osm_/.test(document.getElementById('course-select').value)", timeout: 40000 }, { sleep: 500 }, X(SF),
+        { waitFor: "/GPS from OpenStreetMap/.test((document.getElementById('sf-osmnote')||{}).innerText||'')", timeout: 60000 }, { sleep: 300 }, X(SF)]);
+    assert.equal(r.ok, true, r.reason);
+    const [early, late] = J(r);
+    notWizard(early, 'Shortys, slow OSM');
+    assert.match(early.note, /on the way from OpenStreetMap/);
+    assert.equal(early.start && early.start.disabled, false, 'Start Round is live while the holes come');
+    assert.match(late.note, /GPS from OpenStreetMap \(3 of 18 holes mapped\)/);
+    assert.equal(late.gps, 3);
 });
