@@ -134,10 +134,10 @@ describe('NOBODY IS ASKED TO TYPE A CODE', () => {
         const ticked = all.filter((t) => /type="checkbox"/.test(t));
         assert.equal(typed.length, 5,
             'the home screen asks for ' + typed.length + ' things to be typed');
-        assert.equal(ticked.length, 2,
-            'two switches, both in the account panel: Bets and Hype. Essentials is NOT a '
-            + 'switch - it cannot be turned off, so the panel says so instead of offering a '
-            + 'control that does nothing.');
+        // 066 #1 (Manny, approved 2026-10-24): notifications are opt-in, so Essentials
+        // ("Round results") is a switch now too - three, all off until turned on.
+        assert.equal(ticked.length, 3,
+            'three switches, all in the account panel: Round results, Bets and Hype - all opt-in.');
         assert.match(afterWidgets, /id="email-link-input"/, 'the sign-in email');
         assert.match(afterWidgets, /id="email-link-paste"/, 'the pasted sign-in link');
         assert.match(afterWidgets, /id="join-code-input"/, 'the game code');
