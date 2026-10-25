@@ -3750,6 +3750,7 @@
         if (!inUS(aim)) {
             var alo = altNow(r);
             if (!alo || typeof alo.altFt !== 'number' || typeof alo.altBaseFt !== 'number') return null;
+            if (noAlt) return { yards: Math.round(D), exact: D, terms: {} };   // 070 part 3: the club's yards without the altitude
             return G.playsLike({ yards: D, altFt: alo.altFt, altBaseFt: alo.altBaseFt });
         }
         // Today's manual wind (build 3) beats the live reading.

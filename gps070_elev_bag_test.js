@@ -166,6 +166,7 @@ test('070-3 gps-view wiring: every club pick goes through clubYd; playsTo(.., no
     assert.ok(/if \(pl\) yd = clubYd\(pl, moved \? to : null\);/.test(v), 'the Suggested: line');
     assert.ok(/clubYd\(pl, moved \? S\.target : null\)/.test(v), 'the 009 line');
     assert.ok(/if \(noAlt\) \{ delete q\.altFt; delete q\.altBaseFt;/.test(fnSrc(v, 'playsTo')), 'only the altitude is left out');
+    assert.ok(/if \(noAlt\) return \{ yards: Math\.round\(D\), exact: D, terms: \{\} \};/.test(fnSrc(v, 'playsTo')), 'outside the US (altitude only): the club\'s yards = D');
     assert.ok(/suggestUsesElevation: function \(\) \{ try \{ return suggestUsesElevation\(\);/.test(v), 'exposed');
     assert.ok(/terms: pl\.terms, aimPt: tp \|\| null/.test(fnSrc(v, 'playsLineNow')));
 });
