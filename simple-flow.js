@@ -1759,7 +1759,10 @@
         }
         if ((b = t.closest('[data-sf-lkpick]'))) { lookPick(S.lookup && S.lookup.key, b.getAttribute('data-sf-lkpick')); return; }
         if ((b = t.closest('[data-sf-web]'))) { webPull(b.getAttribute('data-sf-web'), b.getAttribute('data-sf-name')); return; }
-        if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.pend = null; S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; lookup(pk, pn); return; }
+        if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.pend = null; S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0;
+            // 071: a course with no GPS yet is looked up online - gps-live first when the page hasn't loaded it
+            if (W.HardPanGpsLive) lookup(pk, pn); else needLive(function () { if (courseKey() === pk && W.HardPanGpsLive) { lookup(pk, pn); if (S.step === 1) render(); } });
+            return; }
         if ((b = t.closest('[data-sf-tee]'))) {
             var tk = b.getAttribute('data-sf-tee'), tr = teeRows(courseKey()).filter(function (x) { return x.key === tk; })[0];
             setVal('tee-rating-select', tk); if (fn('applySelectedTee')) W.applySelectedTee();
