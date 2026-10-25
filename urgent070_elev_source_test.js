@@ -51,13 +51,13 @@ test('070 formula: ALT_PCT_PER_1000FT = 0.015, f = 1 + p x (course - base) / 100
     assert.ok(!('alt' in G.playsLike({ yards: 150, tempF: 60 }).terms));
 });
 
-test('070 terrain tiles: the z12 tile number for a COURSE point, the pixel inside it, terrarium decode', () => {
+test('070 terrain tiles: the z13 tile number for a COURSE point, the pixel inside it, terrarium decode', () => {
     assert.strictEqual(G.TERRAIN_URL, 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png');
-    assert.strictEqual(G.TERRAIN_Z, 12);
+    assert.strictEqual(G.TERRAIN_Z, 13);
     const stAndrews = [56.3433, -2.8025];
     const t = G.terrainTile(stAndrews);
-    assert.deepStrictEqual([t.z, t.x, t.y], [12, 2016, 1268]);
-    assert.strictEqual(t.url, 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/12/2016/1268.png');
+    assert.deepStrictEqual([t.z, t.x, t.y], [13, 4032, 2536]);
+    assert.strictEqual(t.url, 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/13/4032/2536.png');
     const px = G.terrainPixel(stAndrews, t);
     assert.ok(px && px.px >= 0 && px.px < 256 && px.py >= 0 && px.py < 256);
     assert.strictEqual(G.terrainPixel([33.45, -111.95], t), null, 'a point in another tile: null');

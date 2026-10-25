@@ -3572,7 +3572,7 @@
     //   1 'course' our own course height record on this phone (hardpan_celev_v1_<course>, complete);
     //   2 'usgs'   USGS EPQS (US): the hole on screen's tee / green from the samples or the
     //              course-point cache, while the whole course is still being sampled;
-    //   3 'tile'   AWS Terrain Tiles (worldwide, no key): ONE z12 tile for the COURSE's own
+    //   3 'tile'   AWS Terrain Tiles (worldwide, no key): ONE z13 tile for the COURSE's own
     //              point - only the tile number z/x/y is asked for; decoded on the phone;
     //   4 'phone'  the phone's own GPS altitude, averaged, ONLY while the fix is inside this
     //              course's area + 500 m - memory only, never kept with a position, never sent;
@@ -3617,7 +3617,7 @@
         var rec = elevRecChecked(CTILE_PREFIX, key);
         return rec && rec.v === 1 && typeof rec.ft === 'number' ? rec.ft : null;
     }
-    // ASK ONCE PER COURSE: the z12 tile around the course's own point (the green of the hole on
+    // ASK ONCE PER COURSE: the z13 tile around the course's own point (the green of the hole on
     // screen, else its tee), decoded here: the mean height of the course's own points inside that
     // tile. Not in tournament mode, not without GPS Map, not offline, one at a time, 60 s after a
     // failure. Only the tile number goes out - no position, no id, no account.

@@ -1518,12 +1518,12 @@
         return { yards: Math.round(exact), exact: exact, terms: terms };
     }
     // ---- 070 WORLDWIDE COURSE HEIGHT: AWS TERRAIN TILES (Mapzen / Tilezen, terrarium) ----------
-    // No key, no account. ONE z12 tile per course, asked for by the tile number around the
+    // No key, no account. ONE z13 tile per course (~4 km; z12 read 65 ft low at Thistle, z13 within 1 ft of USGS), asked for by the tile number around the
     // COURSE's own point (never the golfer's); each pixel is a height:
     //   meters = R x 256 + G + B / 256 - 32768
     // Credit (Acknowledgements): "Elevation: USGS 3DEP/SRTM, and the sources listed by Tilezen".
     var TERRAIN_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
-    var TERRAIN_Z = 12, FT_PER_M = 3.28084;
+    var TERRAIN_Z = 13, FT_PER_M = 3.28084;
     function terrainTile(pt, z) {
         pt = pinPt(pt); if (!pt) return null;
         var zz = isNum(z) ? z : TERRAIN_Z, t = tileXY(pt[0], pt[1], zz);
