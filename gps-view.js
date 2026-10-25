@@ -385,10 +385,10 @@
     function osmRecord(key) {
         // URGENT-022: the ONE rule (gps-geo courseGps) - the Course & Tees list asks the same thing.
         if (G.courseGps) return G.courseGps({ key: key, name: S && S.courseKey === key && S.round ? S.round.courseName : null, loc: S && S.courseLoc ? S.courseLoc : null,
-            ga: golfapiFor(key) || null, osmOn: osmOn(), osmTable: (typeof window !== 'undefined' && window.HardPanGpsCourses) || {}, lookedUp: lookedUp(key) });
+            ga: golfapiFor(key) || null, osmOn: osmOn(key), osmTable: (typeof window !== 'undefined' && window.HardPanGpsCourses) || {}, lookedUp: lookedUp(key) });
         var ga = golfapiFor(key);
         if (ga) return ga;
-        if (!osmOn()) return null;   // GPS LIVE: GolfAPI or nothing - Tools > Set the green
+        if (!osmOn(key)) return null;   // GPS LIVE: GolfAPI or nothing - Tools > Set the green
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
         // Bundled first; else what an OpenStreetMap lookup found for this course
         // (this phone's, or the shared one) - see ANY COURSE below.
@@ -543,7 +543,7 @@
         var all = (typeof window !== 'undefined' && window.HardPanGpsCourses) || {};
         // No pull on the tee: a course the phone has is used as the pick left it.
         if (osmRecord(key)) { fin(true); return; }
-        if (!osmOn()) {
+        if (!osmOn(key)) {
             var L = window.HardPanGpsLive;
             if (!liveOn() || !L) { fin(false); return; }
             L.ensure(key).then(function (got) {
@@ -1057,7 +1057,9 @@
     // GPS LIVE (gps-config.js live: true) and OPENSTREETMAP (osm: false = off; build 10
     // is osm: true, live: false).
     function liveOn() { var c = cfg(); return golfapiOn() && c.live === true && !!c.liveBase; }
-    function osmOn() { return cfg().osm !== false; }
+    // URGENT-071: an OpenStreetMap-only course (key osm_w<id> / osm_r<id>, picked from a "Not set up
+    // yet" search row) uses its OpenStreetMap holes even in a GolfAPI-only build (gps-match.js).
+    function osmOn(key) { var c = cfg(); if (c.osm !== false) return true; var k = key != null ? key : (S && S.courseKey); return c.osmOnlyCourses !== false && /^osm_[wr]\d+$/.test(String(k || '')); }
     // THE ROUND'S GOLFAPI COURSE, if there is one: then it is the ONLY source for
     // this course (no OpenStreetMap greens mixed in). gps-geo.golfapiMatch: a puller
     // link, a 27-hole pairing's nines, or the name within 5 km.

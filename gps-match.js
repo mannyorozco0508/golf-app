@@ -71,11 +71,18 @@
     }
     // OPENSTREETMAP OFF (gps-live: gps-config.js osm: false): no bundle greens, no
     // kept lookup, no Overpass - GolfAPI or nothing ("Tools > Set the green").
-    function osmOn() { return cfg().osm !== false; }
+    // URGENT-071 (Manny: "Every course should be searchable" - Shorty's at Bandon is only in
+    // OpenStreetMap): a course picked from an OpenStreetMap-only search row has its own key,
+    // osm_w<way id> / osm_r<relation id>. For THAT course only, OpenStreetMap is on even when the
+    // build says osm: false (GolfAPI has no such course) - gps-config osmOnlyCourses: false turns it off.
+    // Its lookup is kept on this phone only (never offered to course_gps).
+    var OSM_ONLY_RE = /^osm_[wr]\d+$/;
+    function osmOnly(key) { return cfg().osmOnlyCourses !== false && OSM_ONLY_RE.test(String(key || '')); }
+    function osmOn(key) { return cfg().osm !== false || osmOnly(key); }
     function known(key, of, name, loc) {
         var ga = golfapiKnown(key, of, name, loc);
         if (ga) return ga;
-        if (!osmOn()) return null;
+        if (!osmOn(key)) return null;
         var g = G(), all = W.HardPanGpsCourses || {};
         var b = g && g.osmCourse(all, g.bundleKeyFor(all, key, name, loc || null));
         var l = lsGet(OSM_LOOKUP + key);
@@ -93,7 +100,7 @@
     }
     function keep(key, rec, db) {
         lsSet(OSM_LOOKUP + key, rec);
-        if (db && typeof db.ref === 'function') {
+        if (db && typeof db.ref === 'function' && !OSM_ONLY_RE.test(String(key || ''))) {
             try { var w = db.ref('course_gps/' + key + '/osm').set(rec); if (w && typeof w.then === 'function') w.then(null, function () {}); } catch (e) {}
         }
     }
@@ -121,7 +128,7 @@
         if (have && have.source === 'golfapi') return Promise.resolve(have);
         // GPS LIVE: the course from Firebase (gps_links / gps_courses - no GolfAPI
         // call, no function), else no GPS data. Never OpenStreetMap.
-        if (!osmOn()) {
+        if (!osmOn(key)) {
             var L = W.HardPanGpsLive;
             if (!L || !L.on()) return Promise.resolve(verdict({}, of, { source: 'none', how: 'no GPS data' }));
             return L.ensure(key).then(function () {
@@ -183,7 +190,7 @@
     function choose(key, id, opts) {
         var p = pending[key];
         lsSet(CHOICE + key, id);
-        if (opts && opts.db && typeof opts.db.ref === 'function') {
+        if (opts && opts.db && typeof opts.db.ref === 'function' && !OSM_ONLY_RE.test(String(key || ''))) {
             try { var w = opts.db.ref('course_gps/' + key + '/holeChoice').set(id); if (w && typeof w.then === 'function') w.then(null, function () {}); } catch (e) {}
         }
         if (!p) return Promise.resolve(null);
