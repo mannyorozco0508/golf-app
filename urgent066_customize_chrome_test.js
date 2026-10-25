@@ -182,13 +182,15 @@ test('the first-round hint shows once and never again', { timeout: 240000 }, asy
 
 test('a paid extra (a stand-in scan button) shows a lock that explains, and mounts in the dock', { timeout: 240000 }, async () => {
     const j = await roundScreen({ width: 393, height: 852 }, {});
-    await j.evaluate("(window.HardPanFeatureQueue = window.HardPanFeatureQueue || []).push({ id: 'testscan', label: 'Scan scorecard', sub: 'Photo of a paper card to scores', icon: '\\uD83D\\uDCF7', isNew: true, slot: 'dock', tier: 'host', freeUses: 3,"
+    await j.evaluate("(window.HardPanFeatureQueue = window.HardPanFeatureQueue || []).push({ id: 'testscan', label: 'Scan scorecard', sub: 'Photo of a paper card to scores', icon: '\\uD83D\\uDCF7', isNew: true, slot: 'dock', tier: 'host', freeUses: 3, unit: 'scan',"
         + " mount: function (el) { el.innerHTML = '<button type=\"button\"><span>\\uD83D\\uDCF7</span>Scan</button>'; return {}; } })");
     await j.evaluate('HardPanFeatures.openPanel()'); await sleep(400);
     assert.match(await j.evaluate("document.querySelector('[data-hpf-lock=\"testscan\"]').innerText"), /Host · 3 free/);
     await j.evaluate("document.querySelector('[data-hpf-lock=\"testscan\"]').click()"); await sleep(300);
     const ex = await j.evaluate("document.querySelector('.hpf-expl').innerText");
-    assert.match(ex, /Part of the Host plan/); assert.match(ex, /3 free/);
+    assert.match(ex, /Part of the Host plan/); assert.match(ex, /You have 3 free scans to try it/);
+    assert.match(await j.evaluate("document.querySelector('[data-hpf-try]').innerText"), /^Try a free scan$/);
+    assert.match(await j.evaluate("document.querySelector('[data-hpf-notnow]').innerText"), /^Not now$/);
     await shot(j, '17-7-lock');
     await j.evaluate("document.querySelector('[data-hpf-try]').click()"); await sleep(300);
     assert.ok(await j.evaluate("!!document.querySelector('[data-hpf-sw=\"testscan\"].on')"), 'back in the panel, on');

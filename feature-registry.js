@@ -31,7 +31,7 @@
 //   (window.HardPanFeatureQueue = window.HardPanFeatureQueue || []).push({
 //       id, label, sub, icon, isNew, kind: 'button'|'strip'|'panel', slot: 'strip'|'side'|'dock',
 //       screens: ['round'], defaultOn: false | { scorekeeper, playing, watching },
-//       tier: 'free'|'gps'|'host'|'allin', freeUses, available(ctx), unlocked(ctx),
+//       tier: 'free'|'gps'|'host'|'allin', freeUses, unit ('scan': "3 free scans"), available(ctx), unlocked(ctx),
 //       mount(el, ctx) -> { update(ctx), unmount() }, lockedTap(ctx) });
 // Plain var / function, no const at the top level (a page that re-declares a
 // name must not die).
@@ -497,9 +497,11 @@
         var d = byId[id]; if (!d) return;
         if (typeof d.lockedTap === 'function') { try { d.lockedTap(ctx); return; } catch (e) {} }
         var left = ctx.usesLeft(id), tier = TIERS[d.tier] || 'a paid plan';
+        // def.unit names one free use ('scan' -> "3 free scans", "Try a free scan"; Manny's wording, 2026-10-24).
+        var unit = d.unit ? String(d.unit) : 'try', units = unit === 'try' ? 'tries' : unit + 's';
         var sh = openSheet('<div class="hpf-expl"><h3>' + esc((d.icon ? d.icon + ' ' : '') + d.label) + '</h3><p>' + esc(d.sub || '') + '</p>'
-            + '<p>Part of the ' + esc(tier) + ' plan.' + (Number(d.freeUses) > 0 ? (left > 0 ? ' You have <b>' + left + ' free</b> to try it.' : ' Your free tries are used up.') : '') + '</p>'
-            + (left > 0 ? '<button type="button" class="hpf-b1" data-hpf-try>Try a free one</button>' : '')
+            + '<p>Part of the ' + esc(tier) + ' plan.' + (Number(d.freeUses) > 0 ? (left > 0 ? ' You have <b>' + left + ' free ' + esc(left === 1 ? unit : units) + '</b> to try it.' : ' Your free ' + esc(units) + ' are used up.') : '') + '</p>'
+            + (left > 0 ? '<button type="button" class="hpf-b1" data-hpf-try>Try a free ' + esc(unit === 'try' ? 'one' : unit) + '</button>' : '')
             + '<button type="button" class="hpf-b2" data-hpf-notnow>Not now</button></div>');
         sh.addEventListener('click', function (e) {
             if (e.target.closest('[data-hpf-try]')) { tryIt(); back(); }
