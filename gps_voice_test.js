@@ -232,6 +232,16 @@ test('words Siri held while the page slept: proposed on their hole; with no hole
     assert.deepEqual(rc.proposed[0].list, [{ pid: '101', hole: 6, strokes: 4 }], 'bogey on 6 (a par 3)');
 });
 
+test('yardage words: the GPS numbers; plays-like only for the one-leg (no target) case', () => {
+    const { V } = load();
+    assert.equal(V._yardageWords({ front: 504, middle: 520, back: 535, playsLike: 512, units: 'yd' }).say, '520 yards to the middle, 504 front, 535 back. Plays 512.');
+    assert.equal(V._yardageWords({ middle: 150, units: 'm' }).say, '150 meters to the middle.');
+    assert.equal(V._yardageWords({ middle: null }).ok, false);
+    // a target is set: toGreen is the target -> green leg (288 here), never read as the golfer's plays-like
+    assert.equal(V._greenLeg({ single: false, toTarget: { yards: 230, plays: 232 }, toGreen: { yards: 290, plays: 288 } }), null);
+    assert.deepEqual(V._greenLeg({ single: true, toTarget: null, toGreen: { yards: 520, plays: 512 } }), { yards: 520, plays: 512 });
+});
+
 test('nothing leaves the phone: no network, position, database or score write in the voice files', () => {
     const strip = (f) => fs.readFileSync(path.join(__dirname, f), 'utf8').split('\n').filter((l) => !/^\s*(\/\/|\*)/.test(l)).join('\n');
     const js = strip('gps-voice.js') + strip('gps-voice-parse.js');

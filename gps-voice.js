@@ -152,11 +152,15 @@
             var txt = function (sel) { var e = D.querySelector('#gps-overlay ' + sel); var v = e ? String(e.textContent || '').trim() : ''; return /^\d{1,4}$/.test(v) ? Number(v) : null; };
             var legs = null; try { legs = typeof G.playsLegs === 'function' ? G.playsLegs() : null; } catch (e) { legs = null; }
             var u = D.querySelector('#gps-overlay .gps-units');
-            y = { front: txt('.gps-f'), middle: txt('.gps-m') != null ? txt('.gps-m') : (legs && legs.toGreen ? legs.toGreen.yards : null), back: txt('.gps-b'),
-                playsLike: legs && legs.toGreen ? legs.toGreen.plays : null, units: u && /meter/i.test(u.textContent || '') ? 'm' : 'yd' };
+            var one = greenLeg(legs);
+            y = { front: txt('.gps-f'), middle: txt('.gps-m') != null ? txt('.gps-m') : (one ? one.yards : null), back: txt('.gps-b'),
+                playsLike: one ? one.plays : null, units: u && /meter/i.test(u.textContent || '') ? 'm' : 'yd' };
         }
         return yardageWords(y);
     }
+    // The plays-like to the GREEN only when there is one leg (no target set): with a target, toGreen is
+    // the target -> green leg, not the golfer's own number.
+    function greenLeg(legs) { return legs && legs.single && legs.toGreen && Number(legs.toGreen.yards) > 0 ? legs.toGreen : null; }
     function yardageWords(y) {
         if (!y || !(Number(y.middle) > 0)) return { ok: false, say: 'No yardage yet — the GPS is still finding you.' };
         var unit = y.units === 'm' ? 'meters' : 'yards';
@@ -426,6 +430,7 @@
         setContext: function (fn) { ctxFn = typeof fn === 'function' ? fn : null; },
         feature: DEF,
         intent: function (ev) { return intent(ev); }, held: function () { return held(); },
+        _greenLeg: greenLeg, _yardageWords: yardageWords,
         _plugin: function (p) { testPlugin = p || null; hooked = false; if (p) hook(p); },
         _reset: function () { cancel(); st = { open: false, phase: 'idle', text: '', result: null, listening: false, from: null, held: null, msg: '' }; ctxFn = null; regCtx = null; pendingStart = null; }
     };
