@@ -59,7 +59,7 @@ for (const vp of [{ width: 402, height: 874 }, { width: 375, height: 667 }]) {
         const PRE = 'window.__hardpanDoors = true; window.__simpleFlow = true;' + iapStub({ active: true }) + CFG + GEO + 'window.HardPanGolfApi = ' + JSON.stringify(GAPI) + ';'
             + "try{localStorage.setItem('golfapp_me_" + CODE + "','" + pid + "');localStorage.setItem('hardpan_round_side','gps|" + CODE + "');sessionStorage.setItem('groupPickDismissed:" + CODE + "','1');}catch(e){}" + SEED + SEED2;
         const j = await openJourney({ db: { events: { [CODE]: round() }, global_courses: { [KEY]: { name: 'Chips Test Golf Club', data: CD, location: { latitude: TEE[0], longitude: TEE[1], city: 'Phoenix', state: 'AZ' } } }, trips: {}, organizers: {}, tournaments: {} },
-            viewport: vp, webgl: true, preScript: PRE });
+            viewport: vp, webgl: true, preScript: PRE, blockUrls: ['*nationalmap.gov*', '*arcgis*', '*googleapis*', '*weather.gov*'] });
         const ev = (x) => j.evaluate(x);
         const until = async (x, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await ev(x)) return true; await sleep(250); } return false; };
         const shot = async (n) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await sleep(1200); await j.shot(path.join(SHOTS, 'chrome061-' + vp.width + 'x' + vp.height + '-' + n + '.png')); } };
@@ -108,6 +108,20 @@ for (const vp of [{ width: 402, height: 874 }, { width: 375, height: 667 }]) {
             clear(c3, '125 out');
             console.log('# ' + vp.width + ' 125 ' + JSON.stringify(c3));
             await shot('3-125-short-iron');
+            // 085b: the short irons / wedges every 5 yds from 140 to 105 out - whichever club the plays-like picks
+            // (9-iron or pitching wedge at 125 was a coin flip; the wedge's oval had the green's "B" label right
+            // above it), the label is clear of everything, once it has settled (the same text and spot twice).
+            for (let out = 140; out >= 105; out -= 5) {
+                const p4 = G.destination(MID, 180, out * G.M_PER_YD);
+                await ev('__moveTo(' + p4[0] + ',' + p4[1] + ')');
+                let prev = '', L = null;
+                for (let k = 0; k < 30; k++) { await sleep(400); L = await lbl(); const sig = L && L.box ? L.text + '@' + JSON.stringify(L.box) : 'none:' + await ev('JSON.stringify(HardPanGps.missNow().why)'); if (sig === prev) break; prev = sig; }
+                // No oval at this spot is the app's own rule (HardPanGps.missNow().why, e.g. the aim ring left as a lay-up
+                // while walking in) - nothing to place; where there IS a label it must be clear.
+                if (!L) { const why = await ev('HardPanGps.missNow().why'); assert.ok(why && why !== 'no-data', out + ' out: no label, and a reason: ' + why); console.log('# ' + vp.width + ' ' + out + ' (no oval: ' + why + ')'); continue; }
+                clear(L, out + ' out');
+                console.log('# ' + vp.width + ' ' + out + ' ' + L.text + ' ' + L.at);
+            }
         } finally { await j.close(); }
     });
 }

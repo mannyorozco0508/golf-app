@@ -5205,6 +5205,14 @@
                 { how: 'below', l: cl(box.l), t: below }, { how: 'below', l: cl(box.r - sw), t: below },
                 { how: 'above', l: cl(box.l), t: above }, { how: 'above', l: cl(box.r - sw), t: above });
         });
+        // 085b (urgent061 at 402x874, a pitching-wedge oval with the green's "B" label right above it): every
+        // spot above was covered and the label landed on "B". Further out, and against either edge of the clear
+        // map, before anything that covers a label - still only picked when every nearer spot is covered.
+        [80, 110, 140].forEach(function (G) {
+            var below = box.b + G - 2, above = box.t - G + 2 - sh;
+            [cl(cx - sw / 2), cl(box.l), cl(box.r - sw), B.l, B.r - sw].forEach(function (l) { out.push({ how: 'below', l: l, t: below }, { how: 'above', l: l, t: above }); });
+            out.push({ how: 'right', l: box.r + G, t: ct(cy - sh / 2) }, { how: 'left', l: box.l - G - sw, t: ct(cy - sh / 2) });
+        });
         // No room outside the oval at all (a small phone, close in): the sides clamped onto the screen,
         // or just inside the oval's top / bottom edge.
         out.push({ how: 'above', l: cl(cx - sw / 2), t: ct(box.t - 6 - sh) }, { how: 'below', l: cl(cx - sw / 2), t: ct(box.b + 6) },
@@ -8533,6 +8541,8 @@
         roundScore: roundScore, roundScoreText: roundScoreText,
         // POLISH #17: F / C / B screen offsets when they crowd (pure; polish_map_chrome_test.js).
         pinSpread: pinSpread,
+        // 085b: the My miss label's candidate spots (pure; urgent085b_mymiss_spots_test.js).
+        missLblSpots: missLblSpots,
         // LAYOUT D (012): which layout shows ('d' | 'c' | 'old'), and Tools > Screen layout's switch.
         layout: function () { return layoutNow(); },
         setLayout: function (name) { if (S) setLayout(name === 'c' ? 'c' : 'd'); },
