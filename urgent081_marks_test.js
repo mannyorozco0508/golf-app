@@ -1,7 +1,7 @@
 // ============================================================================
 // URGENT-081 (Manny, 2026-10-26), the GPS app: the bogey square and the double
-// square (score-marks-hp.js, since gps-marks 2026-10-16) take the circles' colour
-// and line weight on every hole-by-hole card; the hole-difficulty row reads "HCP"
+// square (score-marks-hp.js, since gps-marks 2026-10-16) take the web's navy
+// (--brand-navy #1d3557, Manny 2026-10-26) on every hole-by-hole card, circles stay red; the hole-difficulty row reads "HCP"
 // (US) instead of "SI" (UK), and the pars entry's index box says HCP.
 //   GROSS vs par only, par plain, net row plain, circles unchanged.
 //   DISPLAY ONLY: score-marks.js (protected) byte-identical, no score, money,
@@ -72,31 +72,32 @@ describe('THE CARDS: HCP label, net plain, numbers unchanged', () => {
     });
 });
 
-describe('THE SQUARES TAKE THE CIRCLES\' COLOUR AND LINE (was the number\'s own colour)', () => {
+describe('THE SQUARES ARE THE WEB\'S NAVY (was the number\'s own colour)', () => {
     test('leaderboard.html expanded card', () => {
         const s = read('leaderboard.html');
-        assert.match(s, /\.sc-stack \.receipt-table td\.mark-bogey \{ box-shadow: inset 0 0 0 2px var\(--accent-red\); border-radius: 3px; \}/);
-        assert.match(s, /\.sc-stack \.receipt-table td\.mark-double \{ box-shadow: inset 0 0 0 2px var\(--accent-red\), inset 0 0 0 3px var\(--bg-card\), inset 0 0 0 5px var\(--accent-red\); border-radius: 3px; \}/);
+        assert.match(s, /\.sc-stack \.receipt-table td\.mark-bogey \{ box-shadow: inset 0 0 0 2px var\(--brand-navy\); border-radius: 3px; \}/);
+        assert.match(s, /\.sc-stack \.receipt-table td\.mark-double \{ box-shadow: inset 0 0 0 2px var\(--brand-navy\), inset 0 0 0 3px var\(--bg-card\), inset 0 0 0 5px var\(--brand-navy\); border-radius: 3px; \}/);
     });
     test('settlement.html Receipt: screen and print', () => {
         const s = read('settlement.html');
-        assert.match(s, /\.receipt-table td\.mark-bogey, \.legend-bogey \{ box-shadow: inset 0 0 0 2px var\(--accent-red\); border-radius: 3px; \}/);
-        assert.match(s, /\.receipt-table td\.mark-bogey, \.legend-bogey \{ box-shadow: inset 0 0 0 2px #c1121f !important;/);
+        assert.match(s, /\.receipt-table td\.mark-bogey, \.legend-bogey \{ box-shadow: inset 0 0 0 2px var\(--brand-navy\); border-radius: 3px; \}/);
+        assert.match(s, /\.receipt-table td\.mark-bogey, \.legend-bogey \{ box-shadow: inset 0 0 0 2px #1d3557 !important;/);
         assert.ok(!/mark-(bogey|double)[^{]*\{[^}]*#1a1a1a/.test(s), 'no black box left');
+        assert.match(s, /\.receipt-table td\.mark-double, \.receipt-table td\.mark-eagle \{ padding-left: 7px; padding-right: 7px; \}/, 'the eagle ring has room');
     });
     test('index.html Card view + live score box: screen and print', () => {
         const s = read('index.html');
-        assert.match(s, /\.score-input-wrapper\.mark-bogey::after \{ inset: 9px; box-shadow: inset 0 0 0 2px var\(--accent-red\); \}/);
-        assert.match(s, /\.card-table td\.mark-bogey \{\s*box-shadow: inset 0 0 0 2px #c1121f !important;/);
+        assert.match(s, /\.score-input-wrapper\.mark-bogey::after \{ inset: 9px; box-shadow: inset 0 0 0 2px var\(--brand-navy\); \}/);
+        assert.match(s, /\.card-table td\.mark-bogey \{\s*box-shadow: inset 0 0 0 2px #1d3557 !important;/);
         const marks = s.slice(s.indexOf('.receipt-table td.mark-bogey,'), s.indexOf('.receipt-table td.mark-double, .receipt-table td.mark-eagle { padding-left'));
-        assert.ok(marks.length > 200 && !/1a1a1a/.test(marks), 'the screen rules are red');
+        assert.ok(marks.length > 200 && !/1a1a1a/.test(marks), 'the screen rules are navy');
     });
     test('shared.html, the GPS score button, the recap picture', () => {
-        assert.match(read('shared.html'), /\.score-cell\.mark-bogey \{ box-shadow: inset 0 0 0 2px #e63946;/);
-        assert.match(read('gps-view.js'), /\.gps-score-n\.mark-bogey\{box-shadow:inset 0 0 0 2px #c1121f;/);
+        assert.match(read('shared.html'), /\.score-cell\.mark-bogey \{ box-shadow: inset 0 0 0 2px #1d3557;/);
+        assert.match(read('gps-view.js'), /\.gps-score-n\.mark-bogey\{box-shadow:inset 0 0 0 2px #1d3557;/);
         const rc = read('round-recap.js');
-        assert.match(rc, /op: 'box', x: cxm - 20, y: cym - 20, w: 40, h: 40, color: C\.neg, w2: 2\.5 \}/);
-        assert.match(rc, /op: 'box', x: cxm - 25, y: cym - 25, w: 50, h: 50, color: C\.neg, w2: 2\.5 \}/);
+        assert.match(rc, /op: 'box', x: cxm - 20, y: cym - 20, w: 40, h: 40, color: '#1d3557', w2: 2\.5 \}/);
+        assert.match(rc, /op: 'box', x: cxm - 25, y: cym - 25, w: 50, h: 50, color: '#1d3557', w2: 2\.5 \}/);
         assert.match(rc, /op: 'ring', cx: cxm, cy: cym, r: 21, color: C\.neg, w: 2\.5 \}/, 'the circles are what they were');
     });
 });
