@@ -95,6 +95,9 @@
   :root { --hs-lime: #d4f27c; --hs-lime-ink: #10392d; --hs-ink: #12392e; --hs-bg: #f2f4ef; }
   #v-simple { background: var(--hs-bg); gap: 12px; }
   #v-simple .hs-hello { font-size: 26px; font-weight: 800; margin: 26px 0 6px; color: #13241d; }
+  /* 077 (new logo, Oct 25 pick): the HardPan mark beside the title, as on the pick sheet. */
+  #v-simple .hs-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  #v-simple .hs-mark { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 9px; display: block; }
   .hs-same { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; border: 0; border-radius: 18px; background: var(--hs-lime); color: var(--hs-lime-ink); padding: 18px 16px; font-family: inherit; cursor: pointer; min-height: 92px; justify-content: center; }
   .hs-same .t { font-size: 21px; font-weight: 800; } .hs-same .s { font-size: 14px; line-height: 1.35; text-align: center; opacity: .85; }
   .hs-new { width: 100%; min-height: 58px; border: 0; border-radius: 16px; background: var(--hp-green); color: #fff; font-size: 19px; font-weight: 800; font-family: inherit; cursor: pointer; }
@@ -153,7 +156,7 @@
 <div class="hp-view" id="v-simple">
   <!-- URGENT-048: the profile spot, top right of the title row (hp-account-ui.js): "Sign in" pill when
        signed out or anonymous, the golfer's initial when signed in. Nothing on Home needs it. -->
-  <div class="hpa-hrow"><div class="hs-hello" id="hs-hello">HardPan Golf</div><button type="button" id="hpa-spot" class="hpa-pill" data-hpa-state="out" aria-label="Sign in"><span class="pi"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0f4c3a" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>Sign in</button></div>
+  <div class="hpa-hrow"><div class="hs-brand"><img class="hs-mark" src="hp-home-mark.png" alt="" width="40" height="40"><div class="hs-hello" id="hs-hello">HardPan Golf</div></div><button type="button" id="hpa-spot" class="hpa-pill" data-hpa-state="out" aria-label="Sign in"><span class="pi"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0f4c3a" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>Sign in</button></div>
   <!-- URGENT-065 (Manny, 10:46 AM: look B with look C's green GPS card). THE GPS CARD: where you are
        (front-door.js homeCard - URGENT-060's "You're here" rule: within 0.5 mi of the course point or
        any tee / green), the games you can add, and Start round (still the GPS door, data-hp-act
