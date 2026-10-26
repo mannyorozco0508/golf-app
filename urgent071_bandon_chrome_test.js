@@ -238,9 +238,13 @@ test('a saved match (Papago, a course the app has) shows with 0 gpsSearch calls;
     assert.equal(r.ok, true, r.reason);
     const [s, more] = J(r);
     assert.ok(s.list.some((t) => /^LOCAL Papago/.test(t)), 'Papago shown: ' + JSON.stringify(s.list));
-    assert.equal(s.fn.filter((c) => c[0] === 'gpsSearch').length, 0, '0 gpsSearch calls');
+    // 079b (Manny, Oct 26: YES): the one exception - our "Papago Golf Club" row has no card in this fixture, so its club is
+    // asked ONCE by name; the typed text itself is still never searched.
+    const typed = (f) => f.filter((c) => c[0] === 'gpsSearch' && c[1].name !== 'Papago Golf Club');
+    assert.equal(typed(s.fn).length, 0, '0 gpsSearch calls for the typed text');
+    assert.ok(s.fn.filter((c) => c[0] === 'gpsSearch' && c[1].name === 'Papago Golf Club').length <= 1, 'the club asked at most once');
     assert.match(s.text, /Search more courses/);
-    assert.deepEqual(more.fn.filter((c) => c[0] === 'gpsSearch').map((c) => c[1].name), ['papago'], '"Search more courses": one call');
+    assert.deepEqual(typed(more.fn).map((c) => c[1].name), ['papago'], '"Search more courses": one call');
 });
 
 test('OpenStreetMap failing (HTTP 504 from every server: 071 asked 2; 074 asks 3 mirrors + 1 retry): "Map data server busy, try again." + "Couldn\'t reach OpenStreetMap", GPS still opens, and "Try OpenStreetMap again" gets the holes', { timeout: 200000 }, async () => {

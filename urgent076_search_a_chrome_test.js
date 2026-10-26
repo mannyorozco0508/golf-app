@@ -127,8 +127,12 @@ test('"Search more courses" and "Not listed? Add a course" sit under the results
     assert.ok(s.rows.some((t) => /^LOCAL Papago/.test(t)), JSON.stringify(s.rows));
     const iMore = s.order.indexOf('MORE'), iNot = s.order.indexOf('NOTLISTED'), iLast = s.order.lastIndexOf('ROW');
     assert.ok(iMore > iLast && iNot > iMore, 'the rows, then Search more, then Not listed: ' + JSON.stringify(s.order));
-    assert.deepEqual(s.fn, [], '0 calls');
-    assert.deepEqual(more.fn, ['gpsSearch:papago'], 'Search more: one call');
+    // 079b (Manny, Oct 26: YES): the one exception - our "Papago Golf Club" row has no card in this fixture, so its club is
+    // asked ONCE by name (gpsSearch "Papago Golf Club"); the typed text itself is still never searched (0 calls).
+    const club = (f) => f.filter((x) => x !== 'gpsSearch:Papago Golf Club');
+    assert.deepEqual(club(s.fn), [], '0 calls for the typed text');
+    assert.ok(s.fn.filter((x) => x === 'gpsSearch:Papago Golf Club').length <= 1, 'the club asked at most once: ' + JSON.stringify(s.fn));
+    assert.deepEqual(club(more.fn), ['gpsSearch:papago'], 'Search more: one call');
     assert.doesNotMatch(more.text, /NEAR YOU/);
 });
 

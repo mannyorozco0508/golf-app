@@ -428,6 +428,8 @@
             return L.course(hit.id, key);
         }).then(function (r) {
             if (r && (r.status === 'choose' || r.status === 'ambiguous')) ls(LOOK + key, null);
+            // 079b: the club's courses are now known on this phone - search draws them as their own rows next time
+            if (r && r.status === 'choose' && r.oneClub) { try { ls(CLUB + webKey(clubName(name)), JSON.stringify({ at: Date.now(), results: r.matches })); } catch (e) {} }
             if (!S.lookup || S.lookup.key !== key) return;
             if (r && r.status === 'choose') { S.lookup = { key: key, state: 'choose', oneClub: r.oneClub, matches: r.matches }; if (S.step === 1) render(); return; }
             landed(key, r);
@@ -581,12 +583,65 @@
             return gl.some(function (m) { var cw = twinWords(String(m.name).split(' (')[0]); return near3(x.c, m) && sameState(x.c.state, m.state) && ow.some(function (w) { return cw.indexOf(w) !== -1; }); });
         });
     }
+    // ---- 079b (Manny: "show Starfire King 18 and Starfire Mulligan as their OWN two rows, King 18 first") ----
+    // A course of ours with no card yet ("Starfire Golf Club · Tap to load") whose name IS what was typed: its club's
+    // GolfAPI ✓ GPS courses are drawn as their own rows, right before ours (our row stays - only add). KNOWN = this
+    // phone's saved answers (any search answer, or the club's courses the "Which one?" lookup found - kept 30 days):
+    // 0 calls. Not known yet: ONE search for the club's name (clubFill - the exception, Manny's YES), then known.
+    var CLUB = 'hardpan_webclub_';
+    function clubAsk(raw) {
+        if (!liveOn()) return null;
+        var x = localHits(courses(), raw).filter(function (h) { return h.s >= 2 && !h.c.ready && !hasCard(h.c.key) && nameTier(h.c.name, raw, h.s) === 0; })[0];
+        return x ? x.c : null;
+    }
+    function clubRowsFor(c) {
+        var sn = strictName(clubName(c.name)), out = [], seen = {};
+        if (!sn) return out;
+        try { Object.keys(W.localStorage || {}).forEach(function (key) {
+            if (key.indexOf(WEB) !== 0 && key.indexOf(CLUB) !== 0) return;
+            var v = null; try { v = JSON.parse(ls(key) || 'null'); } catch (e) {}
+            if (!v || !v.at || Date.now() - v.at >= WEB_MS) return;
+            (v.results || []).forEach(function (m) { if (m && m.gps && m.id && !seen[m.id] && strictName(m.club || m.name) === sn && sameState(c.state, m.state)) { seen[m.id] = 1; out.push(m); } });
+        }); } catch (e) {}
+        return out;
+    }
+    function clubFill(raw, k) {
+        var c = clubAsk(raw); if (!c) return false;
+        var add = function (rows) {
+            if (!S.web || S.web.k !== k || !rows.length) return false;
+            var have = {}; (S.web.results || []).forEach(function (m) { have[m.id] = 1; });
+            var nw = rows.filter(function (m) { return !have[m.id]; });
+            if (!nw.length) return false;
+            S.web.results = (S.web.results || []).concat(nw); return true;
+        };
+        var kn = clubRowsFor(c);
+        if (kn.length >= 2) return add(kn);   // several courses at one club, known on this phone: 0 calls
+        // THE ONE EXCEPTION to 071/076's "a saved match makes 0 online calls" (Manny, Oct 26, answer to 079b Q1: YES):
+        // the typed name IS one of OUR club rows with no card, and this phone has never asked about that club -> ONE
+        // gpsSearch for the club's name, once per club per 30 days (kept under hardpan_webclub_<name> even when it finds
+        // nothing). The server answers from its saved search when anyone asked before (Starfire: 0 GolfAPI credits);
+        // only a search the server hasn't saved costs 0.1 and counts toward the golfer's daily searches.
+        var L = W.HardPanGpsLive, nm = clubName(c.name), ck = CLUB + webKey(nm);
+        if (!L || !L.search || (typeof navigator !== 'undefined' && navigator.onLine === false)) return false;
+        var seen = null; try { seen = JSON.parse(ls(ck) || 'null'); } catch (e) {}
+        if ((seen && seen.at && Date.now() - seen.at < WEB_MS) || (S.clubAsked = S.clubAsked || {})[ck]) return false;
+        S.clubAsked[ck] = 1;
+        try { (W.__sfWeb = W.__sfWeb || []).push(nm); } catch (e) {}
+        Promise.resolve().then(function () { return L.search(nm); }).then(function (r) {
+            if (!(r && r.status === 'ok')) { S.clubAsked[ck] = 0; return; }
+            ls(ck, JSON.stringify({ at: Date.now(), results: (r.results || []).slice(0, 25) }));
+            var rows = clubRowsFor(c);
+            if (rows.length >= 2 && add(rows)) render1();
+        }, function () { S.clubAsked[ck] = 0; });
+        return false;
+    }
     function webSearch(force) {
         var raw = String(S.q || '').trim(), L = W.HardPanGpsLive;
         if (S.step !== 1 || raw.length < 3) return;
         if (!L) { needLive(function () { if (W.HardPanGpsLive) webSearch(force); }); return; }   // 071
         if (!liveOn() || !L.search) return;
         var k = webKey(raw);
+        if (!force && S.web && S.web.k === k && S.web.state === 'saved' && clubFill(raw, k)) render1();   // 079b: the club's courses learned since (the "Which one?" lookup)
         if (k.length < 3 || (!force && S.web && S.web.k === k && S.web.state !== 'error')) return;
         if (force && S.web && S.web.k === k && S.web.state === 'busy') return;
         var hit = null; try { hit = JSON.parse(ls(WEB + k) || 'null'); } catch (e) {}
@@ -595,7 +650,7 @@
             // (the old rule - 3 good matches on the phone, no online search - is kept, now with "Search more")
             // URGENT-079: ...plus the GolfAPI ✓ GPS courses of this phone's answer for a shorter search ("ariz" for
             // "arizo"; 0 calls), so a GolfAPI course the list doesn't hold still shows over its OpenStreetMap copy.
-            if ((localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3 || savedHits(raw).length) && !(siblingsOnline(raw) && !prefixCache(k, raw))) { var spre = (prefixCache(k, raw) || []).filter(function (m) { return m.gps; }); S.web = spre.length ? { k: k, state: 'saved', more: true, results: spre } : { k: k, state: 'saved', more: true }; render1(); return; }
+            if ((localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3 || savedHits(raw).length) && !(siblingsOnline(raw) && !prefixCache(k, raw))) { var spre = (prefixCache(k, raw) || []).filter(function (m) { return m.gps; }); S.web = spre.length ? { k: k, state: 'saved', more: true, results: spre } : { k: k, state: 'saved', more: true }; clubFill(raw, k); render1(); return; }
             var pre = prefixCache(k, raw);
             if (pre) { S.web = { k: k, state: 'ok', results: pre, more: true }; render1(); return; }
         }
@@ -717,12 +772,19 @@
     }
     function searchOrder(items, raw) {
         items.forEach(function (x) { x.t = nameTier(x.name, raw, x.s); });
+        // 079b: a club's GolfAPI ✓ GPS courses sit right before our no-card row of that club (Starfire), the 18-hole first.
+        items.forEach(function (x) {
+            if (x.kind !== 'local' || !x.c || x.c.ready || hasCard(x.c.key)) return;
+            var sn = strictName(clubName(x.c.name)); if (!sn) return;
+            items.forEach(function (y) { if (y.kind === 'web' && y.m && y.m.gps && strictName(y.m.club || y.m.name) === sn) { y.t = Math.min(y.t, x.t); if (x.d != null) y.d = x.d; y.club = 1; x.after = 1; } });
+        });
         return items.sort(function (a, b) {
             // 071: a "Not set up yet" OpenStreetMap row sorts as 3 mi farther - GolfAPI / our ✓ GPS rows in the
             // same town come first (Bandon: the OSM points were 1 mi closer than the resort's, so the
             // first two rows a golfer saw over the keyboard were "Add this course").
             var da = a.d == null ? null : a.d + (a.kind === 'osm' ? 3 : 0), db = b.d == null ? null : b.d + (b.kind === 'osm' ? 3 : 0);
-            return (a.t - b.t) || ((da == null) - (db == null)) || ((da || 0) - (db || 0)) || String(a.name).localeCompare(String(b.name));
+            return (a.t - b.t) || ((da == null) - (db == null)) || ((da || 0) - (db || 0)) || ((a.after || 0) - (b.after || 0))
+                || (a.club && b.club ? ((Number(b.m.holes) >= 18) - (Number(a.m.holes) >= 18)) || ((Number(b.m.holes) || 0) - (Number(a.m.holes) || 0)) : 0) || String(a.name).localeCompare(String(b.name));
         });
     }
     function osmRowHtml(c, d) {
