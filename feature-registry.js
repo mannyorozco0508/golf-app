@@ -92,6 +92,9 @@
         var at = Number(p.at); if (!isFinite(at) || at < 0) at = 0;
         return { v: 1, order: order, on: on, at: at };
     }
+    // ANDROID (android-2.0, 024 A3): no push on Android until the FCM step (024 D2), so the
+    // Customize panel has no NOTIFICATIONS section there (0.2 had no notifications card either).
+    function androidApp() { try { return isNative() && W.Capacitor.getPlatform() === 'android'; } catch (e) { return false; } }
     function isNative() { try { return !!(W.Capacitor && typeof W.Capacitor.isNativePlatform === 'function' && W.Capacitor.isNativePlatform()); } catch (e) { return false; } }
     function syncOn() { try { var f = (W.HARDPAN_GPS_CONFIG || {}).features || {}; return f.layoutSync === true; } catch (e) { return false; } }
     function signedInUid() {
@@ -423,12 +426,12 @@
                 + '<div class="hpf-h">ALWAYS ON</div>'
                 + coreRow('✏️', 'Score entry', 'Hole, Enter score, Card') + coreRow('🎲', 'Your games', 'Menu: games, standings, settle up') + coreRow('📍', 'GPS map & yardages', 'Map, front / middle / back, plays like')
                 + '<div class="hpf-h">EXTRAS ON YOUR ROUND SCREEN</div><div class="hpf-list">' + eff.map(rowHtml).join('') + '</div>'
-                + '<div class="hpf-h">NOTIFICATIONS</div>' + notifHtml()
+                + (androidApp() ? '' : '<div class="hpf-h">NOTIFICATIONS</div>' + notifHtml())
                 + '<div class="hpf-foot"><span class="hpf-dim">' + (syncOn() && signedInUid() ? 'Saved to your account and this phone' : 'Saved on this phone') + '</span><button type="button" class="hpf-reset">Back to simple</button></div>';
             sh.scrollTop = top;
         };
         draw();
-        notifLoad(draw);
+        if (!androidApp()) notifLoad(draw);
         var finish = function () {
             if (dirty) savePrefs(asPrefs());
             closePanel();

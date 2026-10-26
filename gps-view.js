@@ -4480,6 +4480,7 @@
     function isNative() {
         try { return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); } catch (e) { return false; }
     }
+    function androidApp() { try { return isNative() && window.Capacitor.getPlatform() === 'android'; } catch (e) { return false; } }
 
     // ZOOM, HALF WAY DOWN THE RIGHT EDGE - unless the right-hand stack (wind, Green, Mark shot)
     // reaches that far (a short phone): then just under it, never on top of it.
@@ -6366,7 +6367,8 @@
         var PS = window.HardPanGpsStats, pc = String(S.eventCode || '');
         sw('practice', !!(PS && PS.practiceOn && pc && PS.practiceOn(pc)), !!(PS && PS.setPractice && pc));
         var LAs = window.HardPanLiveActivity;
-        sw('lockscreen', !!(LAs && LAs.isOn()), !!(LAs && isNative()));
+        // android-2.0: on Android only when its plugin is in the app (none until 024 D5); iOS as before.
+        sw('lockscreen', !!(LAs && LAs.isOn()), !!(LAs && isNative() && (!androidApp() || (typeof LAs.here === 'function' && LAs.here()))));
         sw('mymiss', missPref(), missShown());
         Array.prototype.forEach.call(t.querySelectorAll('[data-ts-sec="maplayers"]'), function (x) { x.style.display = (missShown() || planAllowed()) ? '' : 'none'; });  // int-061: Distance arcs lives here too
         Array.prototype.forEach.call(t.querySelectorAll('[data-ts-tile]'), function (b) {

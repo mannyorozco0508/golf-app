@@ -58,11 +58,13 @@ describe('VERSION', () => {
         // android-gps (2026-10-17): Android ships the GPS app as 0.2, the iOS GPS
         // beta's MARKETING_VERSION, so MAJOR.MINOR is accepted alongside the full form.
         assert.match(m[1], /^[0-9]+\.[0-9]+(\.[0-9]+)?$/, 'versionName must be MAJOR.MINOR[.PATCH]: ' + m[1]);
-        assert.equal(m[1], '0.2', 'Android ships the GPS app 0.2; move this pin when Android moves');
+        // android-2.0 (2026-10-25, 024 A4): the port of iOS 2.0 ships as 2.0, versionCode 12
+        // (11 stays reserved for job 022's 0.2 build, on hold).
+        assert.equal(m[1], '2.0', 'Android ships the GPS app 2.0; move this pin when Android moves');
     });
 
     test('versionCode is its own sequence and is pinned here', () => {
-        assert.match(GRADLE, /versionCode 10\b/, 'versionCode is not 10; the iOS build number is not this sequence');
+        assert.match(GRADLE, /versionCode 12\b/, 'versionCode is not 12; the iOS build number is not this sequence');
     });
 });
 

@@ -22,10 +22,15 @@
     var testPlugin = null;
 
     function native() { try { return !!(W.Capacitor && typeof W.Capacitor.isNativePlatform === 'function' && W.Capacitor.isNativePlatform()); } catch (e) { return false; } }
+    // ANDROID (android-2.0, 024 A3): no HardPanLiveActivity until the ongoing-notification step
+    // (024 D5); registerPlugin() would hand back a stand-in whose calls all fail. There it counts
+    // only when Capacitor says the plugin is really in the app. iOS keeps the path below.
+    function android() { try { return W.Capacitor.getPlatform() === 'android'; } catch (e) { return false; } }
     function plugin() {
         if (testPlugin) return testPlugin;
         if (!native()) return null;
         var C = W.Capacitor;
+        if (android() && !(typeof C.isPluginAvailable === 'function' && C.isPluginAvailable('HardPanLiveActivity'))) return null;
         try { return (C.Plugins && C.Plugins.HardPanLiveActivity) || (typeof C.registerPlugin === 'function' ? (C.__hpLA = C.__hpLA || C.registerPlugin('HardPanLiveActivity')) : null); } catch (e) { return null; }
     }
     function isOn() { try { return W.localStorage.getItem(KEY) !== 'off'; } catch (e) { return true; } }
@@ -92,6 +97,8 @@
     W.HardPanLiveActivity = {
         sync: sync, end: end, isOn: isOn, setOn: setOn,
         running: function () { return st.running; },
+        // The plugin is in this app (android-2.0: the Lock Screen row shows only then on Android).
+        here: function () { return !!plugin(); },
         GAP_MS: GAP_MS, MOVE: MOVE,
         _plugin: function (p) { testPlugin = p || null; },
         _reset: function () { if (st.timer) clearTimeout(st.timer); if (st.watch) clearInterval(st.watch); st = { running: false, starting: false, round: null, last: null, lastAt: 0, lastHole: null, lastMid: null, pending: null, timer: null, watch: null }; }

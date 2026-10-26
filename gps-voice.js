@@ -49,10 +49,16 @@
 
     // ---- the native plugin -----------------------------------------------------------------
     function native() { try { return !!(W.Capacitor && typeof W.Capacitor.isNativePlatform === 'function' && W.Capacitor.isNativePlatform()); } catch (e) { return false; } }
+    // ANDROID (android-2.0, 024 A3): registerPlugin() hands back a stand-in for a plugin the app
+    // does not have, and every call on it fails "not implemented" - a mic button that does
+    // nothing. Android has no HardPanVoice until its own step (024 D4), so there it counts only
+    // when Capacitor says the plugin is really in the app. iOS keeps the path below as it was.
+    function android() { try { return W.Capacitor.getPlatform() === 'android'; } catch (e) { return false; } }
     function plugin() {
         if (testPlugin) return testPlugin;
         if (!native()) return null;
         var C = W.Capacitor;
+        if (android() && !(typeof C.isPluginAvailable === 'function' && C.isPluginAvailable('HardPanVoice'))) return null;
         try { return (C.Plugins && C.Plugins.HardPanVoice) || (typeof C.registerPlugin === 'function' ? (C.__hpVoice = C.__hpVoice || C.registerPlugin('HardPanVoice')) : null); } catch (e) { return null; }
     }
     function featureOn() { try { return typeof W.HardPanFeature !== 'function' || W.HardPanFeature('voice') !== false; } catch (e) { return true; } }
