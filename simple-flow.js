@@ -616,7 +616,12 @@
         // URGENT-035: the box is kept (keepBox), focus and cursor untouched; only a rebuilt box is focused again.
         var q = $('sf-q'); if (typing && q && q !== a) { q.focus(); try { q.setSelectionRange(q.value.length, q.value.length); } catch (e) {} }
     }
-    function webRowHtml(m, d) {
+    function webRowHtml(m, d, two) {
+        if (two) {   // 076: GolfAPI's own club / course fields - the course big, the club + town small
+            var tn = twoNames(m.club, m.course, m.name, m.city, m.state);
+            return '<button type="button" class="sf-row" data-sf-web="' + esc(m.id) + '" data-sf-name="' + esc(m.name || m.club) + '" data-sf-full="' + esc(m.name || m.club) + '">' + twoHtml(tn)
+                + '<span class="s">' + esc(d != null ? miStr(d) : '') + (m.gps ? (d != null ? ' · ' : '') + '✓ GPS' : '') + '</span></button>';
+        }
         var where = [d != null ? miStr(d) : '', [m.city, m.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
         return '<button type="button" class="sf-row" data-sf-web="' + esc(m.id) + '" data-sf-name="' + esc(m.name || m.club) + '"><span class="n">' + esc(m.name || m.club) + '</span>'
             + '<span class="s">' + esc(where) + (m.gps ? (where ? ' · ' : '') + '✓ GPS' : '') + '</span></button>';
@@ -1100,13 +1105,42 @@
     // 076: THE PICKED COURSE ALONE AT THE TOP (option A): the green PLAYING card - name, town, distance,
     // ✓ GPS ("You're here" when he is at it) and Change - then what was under the picked course before
     // (the lookup / OpenStreetMap notes, TEES, the start). A course still loading is the card, with its line.
+    // 076 (Manny: long names): the COURSE name big ("Bandon Preserve"), the resort / club + town small under it
+    // ("Bandon Dunes Golf Resort · Bandon, OR"). Club and course the same, or one inside the other ("Papago Golf
+    // Club"): the name once, big, and the town. A course called only "18-hole course" / "Championship" says
+    // nothing alone: the club big, that word small. The result's own club / course fields; only a course with
+    // none (our own cards) is read from its "Club (Course)" name.
+    var GENERIC_COURSE = /^(the )?(((\d+|nine|eighteen)[- ]?holes?|regulation|executive|championship|main|par[- ]?3)( (golf )?course)?|(golf )?course)$/i;
+    function twoNames(club, course, full, city, state) {
+        var nk = function (t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }, town = [city, state].filter(Boolean).join(', ');
+        club = String(club || '').trim(); course = String(course || '').trim();
+        if (!club && !course) { var m = /^(.*\S)\s*\(([^()]+)\)\s*$/.exec(String(full || '')); if (m) { club = m[1]; course = m[2]; } else club = String(full || '').trim(); }
+        var a = nk(club), b = nk(course);
+        if (!a || !b || a.indexOf(b) !== -1 || b.indexOf(a) !== -1) return { big: (b.length > a.length ? course : club) || String(full || ''), small: town };
+        if (GENERIC_COURSE.test(course)) return { big: club, small: [course, town].filter(Boolean).join(' \u00b7 ') };
+        return { big: course, small: [club, town].filter(Boolean).join(' \u00b7 ') };
+    }
+    // A course on the phone: GolfAPI's fields when we have them (the app's GolfAPI file, or the online answer).
+    function namesOf(c, city, state) {
+        var f = null, id = /^gapi_(\d+)$/.exec(String(c.key || ''));
+        if (id) {
+            var g = W.HardPanGolfApi && W.HardPanGolfApi.courses && W.HardPanGolfApi.courses[id[1]];
+            if (g && (g.club || g.course)) f = g;
+            if (!f) f = ((S.web && S.web.results) || []).filter(function (m) { return String(m.id) === id[1] && (m.club || m.course); })[0] || null;
+        }
+        return twoNames(f && f.club, f && f.course, nameOf(c), city || c.city, state || c.state);
+    }
+    function twoHtml(tn) {
+        return '<span style="display:block;min-width:0;flex:1 1 auto;"><span class="n" style="display:block;overflow-wrap:anywhere;">' + esc(tn.big) + '</span>'
+            + (tn.small ? '<span class="sf-sub" style="display:block;font-size:13px;color:#667;margin-top:2px;overflow-wrap:anywhere;">' + esc(tn.small) + '</span>' : '') + '</span>';
+    }
     function playCard(o) {
-        var line = [o.here ? '<span class="sf-here">You\u2019re here</span>' : '', esc(o.where || ''), esc(miStr(o.d)), o.ready ? '\u2713 GPS' : ''].filter(Boolean).join(' \u00b7 ');
+        var line = [o.here ? '<span class="sf-here">You\u2019re here</span>' : '', esc(o.where || ''), esc(miStr(o.d)), o.ready ? '\u2713 GPS' : ''].filter(Boolean).join(' \u00b7 ');   // (where = the club + town, 076)
         return '<div class="sf-card sf-play" id="sf-course" data-sf-playing="' + esc(o.key || '') + '"' + (o.here ? ' data-sf-playing-here="1"' : '') + ' style="background:#0f4c3a;border:0;color:#fff;padding:12px 14px;">'
             + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;"><span style="font-size:11px;font-weight:800;letter-spacing:.1em;opacity:.8;">PLAYING</span>'
             + '<button type="button" class="sf-change" data-sf="change" style="background:#d4f27c;color:#10392d;border:0;border-radius:999px;font-weight:800;font-size:13px;padding:6px 14px;min-height:0;">Change</button></div>'
-            + '<div class="n" style="font-size:19px;font-weight:800;margin-top:2px;line-height:1.25;">' + esc(o.name) + '</div>'
-            + (line ? '<div class="s" style="font-size:13px;opacity:.88;margin-top:3px;">' + line + '</div>' : '')
+            + '<div class="n" style="font-size:19px;font-weight:800;margin-top:2px;line-height:1.25;overflow-wrap:anywhere;">' + esc(o.name) + '</div>'
+            + (line ? '<div class="s" style="font-size:13px;opacity:.88;margin-top:3px;overflow-wrap:anywhere;">' + line + '</div>' : '')
             + (o.why ? '<div class="s" style="font-size:13px;opacity:.88;margin-top:6px;">' + esc(o.why) + '</div>' : '') + '</div>';
     }
     function playBody(key) {
@@ -1118,13 +1152,16 @@
                 : p.state === 'offline' ? 'No signal \u2014 it loads when the signal is back.'
                 : p.state === 'signin' ? 'Sign in to load it.'
                 : p.state === 'none' ? 'It isn\u2019t in our course data yet.' : 'Couldn\u2019t load it right now.';
-            return playCard({ key: '', name: clubName(p.name), where: [wm.city, wm.state].filter(Boolean).join(', '), d: wm.city ? distSearch({ name: p.name, club: wm.club, city: wm.city }) : null, ready: !!wm.gps, why: (p.state === 'busy' || p.state === 'offline' ? '\u23f3 ' : '') + why })
+            var ptn = twoNames(wm.club, wm.course, p.name, wm.city, wm.state);
+            return playCard({ key: '', name: ptn.big, where: ptn.small, d: wm.city ? distSearch({ name: p.name, club: wm.club, city: wm.city }) : null, ready: !!wm.gps, why: (p.state === 'busy' || p.state === 'offline' ? '\u23f3 ' : '') + why })
                 + (p.state === 'busy' ? '' : webBox([]));
         }
         var c = courses().filter(function (x) { return x.key === key; })[0], o = OSM_CARD[key] || {}, name = courseName();
         var atKey = hereKey();
         var loc = (typeof globalCourses !== 'undefined' && globalCourses && globalCourses[key] && globalCourses[key].location) || {};   /* global globalCourses */
-        return playCard({ key: key, name: c ? nameOf(c) : clubName(o.name || name), where: [(c && c.city) || o.city || loc.city, (c && c.state) || o.state || loc.state].filter(Boolean).join(', '),
+        var city = (c && c.city) || o.city || loc.city, st = (c && c.state) || o.state || loc.state;
+        var tn = c ? namesOf(c, city, st) : namesOf({ key: key, name: o.name || name }, city, st);
+        return playCard({ key: key, name: tn.big, where: tn.small,
             d: c ? distTo(c) : null, ready: c ? c.ready : readyOf(key), here: !!(key && (atKey === key || S.autoKey === key)) })
             + lookupBox(key, name) + osmCardNote(key) + courseCard() + (key ? '<div id="sf-offline-slot"></div>' : '');
     }
@@ -1186,7 +1223,7 @@
             var items = hits.map(function (c) { return { kind: 'local', c: c, name: c.name, s: matchScore(c, rawQ), d: distSearch(c) }; })
                 .concat((S.webRows || []).map(function (m) { return { kind: 'web', m: m, name: m.name || m.club, s: Math.max(matchScore({ name: m.name || m.club }, rawQ), matchScore({ name: m.club }, rawQ)), d: distSearch({ name: m.name || m.club, club: m.club, city: m.city }) }; }))
                 .concat(osm);
-            var rowsHtml = searchOrder(items, rawQ).map(function (x) { return x.kind === 'local' ? rowHtml(x.c, x.d, x.c.key === key) : x.kind === 'web' ? webRowHtml(x.m, x.d) : osmRowHtml(x.c, x.d); }).join('');
+            var rowsHtml = searchOrder(items, rawQ).map(function (x) { return x.kind === 'local' ? rowHtml(x.c, x.d, x.c.key === key, false, A) : x.kind === 'web' ? webRowHtml(x.m, x.d, A) : osmRowHtml(x.c, x.d); }).join('');
             // 071: the online search's line (searching / couldn't search · Try again) sits OVER the rows while the
             // "Not set up yet" rows are on screen, so they never look like the whole answer.
             var webTop = web && osm.length && S.web && !S.web.pull && !/sf-more/.test(web);
@@ -1233,6 +1270,9 @@
         var ok = courseName() && !pend ? '' : ' disabled';
         var pendLbl = pend ? (pend.state === 'busy' || pend.state === 'offline' || pend.state === 'card' ? 'Loading ' + tidy(pend.name) + '\u2026' : 'Start Round') : '';
         // NO ROUND CODE YET (polish 029 #5): Start Round waits for the signal - said on the button.
+        // 076 (Manny): no Start Round on the results list - while typing, or with no course picked. It comes back
+        // with the PLAYING card (a tapped course, or the one he is at). The box empty with a course held: as before.
+        if (A && !playing && (typed || !courseName())) return shell('Where are you playing?', body, S.err1 ? '<div class="sf-err">' + esc(S.err1) + '</div>' : '', 0);
         if (S.offline === 'wait') return shell('Where are you playing?', body, '<button type="button" class="sf-cta lime" data-sf="retrycode" disabled>Getting a round code\u2026<span class="sub">One moment</span></button>', 0);
         if (S.offline) return shell('Where are you playing?', body, '<button type="button" class="sf-cta lime" data-sf="retrycode"' + (S.minting ? ' disabled' : '') + '>'
             + (S.minting ? 'Getting a round code\u2026' : 'Start Round') + '<span class="sub">' + (S.minting ? 'One bar is enough' : 'Needs a moment of signal \u2014 one bar is enough') + '</span></button>', 0);
@@ -1254,7 +1294,12 @@
         Object.keys(W.localStorage || {}).forEach(function (k) { if (k.indexOf(TEE_MEM) === 0) add(k.slice(TEE_MEM.length), ''); });
         return out.slice(0, 6);
     }
-    function rowHtml(c, d, on, here) {
+    function rowHtml(c, d, on, here, two) {
+        if (two) {   // 076: the course big, the club + town small (GPS results)
+            var tn = namesOf(c);
+            return '<button type="button" class="sf-row' + (on ? ' sf-sel' : '') + '" data-sf-course="' + esc(c.key) + '" data-sf-name="' + esc(c.name) + '" data-sf-full="' + esc(nameOf(c)) + '">' + twoHtml(tn)
+                + '<span class="s">' + esc(miStr(d)) + (c.ready ? (d != null ? ' · ' : '') + '✓ GPS' : (!hasCard(c.key) && liveOn() ? (d != null ? ' · ' : '') + 'Tap to load' : '')) + '</span></button>';
+        }
         return '<button type="button" class="sf-row' + (on ? ' sf-sel' : '') + '" data-sf-course="' + esc(c.key) + '" data-sf-name="' + esc(c.name) + '"' + (here ? ' data-sf-here="1"' : '') + '><span class="n">' + esc(nameOf(c)) + '</span>'
             + '<span class="s">' + (here ? '<span class="sf-here" style="font-weight:800;color:#0f4c3a;">You\u2019re here</span> · ' : '') + esc(miStr(d)) + (c.ready ? (d != null ? ' · ' : '') + '✓ GPS' : (!hasCard(c.key) && liveOn() ? (d != null ? ' · ' : '') + 'Tap to load' : '')) + '</span></button>';
     }

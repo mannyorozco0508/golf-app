@@ -67,7 +67,7 @@ const GC = { ['gapi_' + ID]: { name: 'Talking Stick Golf Club (South - Piipaash)
 const GAPI = { v: 1, built: 'test', links: {}, courses: { [ID]: { id: ID, club: 'Talking Stick Golf Club', course: 'South - Piipaash', city: 'Scottsdale', state: 'AZ', lat: 33.539874, lng: -111.870432, holes: 18,
     h: { 1: { g: { f: [33.5445, -111.8690], c: [33.5444, -111.8691], b: [33.5443, -111.8692] }, t: { b: [33.5467, -111.8663], f: [33.5460, -111.8678] } } } } } };
 const AT_TS = [33.5399, -111.8704];   // on Talking Stick South
-const open = (at, steps, flow) => arriveCold({ url: fileUrl('admin.html', 'start=quick'), db: { events: {}, global_courses: GC, trips: {}, tournaments: {}, organizers: {} }, settleMs: 2500, viewport: { width: 393, height: 852 },
+const open = (at, steps, flow, vp) => arriveCold({ url: fileUrl('admin.html', 'start=quick'), db: { events: {}, global_courses: GC, trips: {}, tournaments: {}, organizers: {} }, settleMs: 2500, viewport: vp || { width: 393, height: 852 },
     preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + FUNCS + 'window.HardPanGolfApi = ' + JSON.stringify(GAPI) + ';' + "try{sessionStorage.setItem('hardpan_simple_flow'," + JSON.stringify(flow || 'gps') + ");}catch(e){}"
         + "if (/admin\\.html$/.test(location.pathname)) document.addEventListener('DOMContentLoaded', function () { var s = document.createElement('script'); s.src = 'gps-live.js'; document.head.appendChild(s); });", steps: [
         { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: at[0], longitude: at[1], accuracy: 10 } } },
@@ -94,7 +94,7 @@ test('auto-picked at a course: the PLAYING card says "You\'re here" (alone at th
     const [a, b] = J(r);
     alone(a, 'auto-picked');
     assert.equal(a.card.here, true);
-    assert.match(a.card.text, /Talking Stick Golf Club \(South - Piipaash\) \| You’re here · Scottsdale, AZ · [\d.]+ mi · ✓ GPS$/, 'name, then You\'re here · town · distance · ✓ GPS: ' + a.card.text);
+    assert.match(a.card.text, /\| South - Piipaash \| You’re here · Talking Stick Golf Club · Scottsdale, AZ · [\d.]+ mi · ✓ GPS$/, 'name, then You\'re here · town · distance · ✓ GPS: ' + a.card.text);
     assert.match(a.order.slice(-1)[0], /START/);
     assert.ok(b.box && b.box.focused && b.box.value === '', 'Change: the box, empty, focused (keyboard up): ' + JSON.stringify(b.box));
     assert.equal(b.card, null, 'Change: the card is gone');
@@ -111,7 +111,7 @@ test('typing 1+ letters hides NEAR YOU: only "RESULTS FOR \'<text>\'", best matc
     assert.equal(one.order[0], "H:RESULTS FOR 'p'", JSON.stringify(one.order));
     assert.doesNotMatch(s.text, /NEAR YOU|LAST PLAYED|PLAYING/, 'typing: nothing but the results (the picked course is not shown either)');
     assert.equal(s.order[0], "H:RESULTS FOR 'Arizona country club'");
-    assert.match(s.rows[0], /^WEB The Arizona Country Club \(The Arizona Country Club\) \| [\d.]+ mi · Phoenix, AZ · ✓ GPS$/, 'best name match first: ' + JSON.stringify(s.rows));
+    assert.match(s.rows[0], /^WEB The Arizona Country Club \| Phoenix, AZ \| [\d.]+ mi · ✓ GPS$/, 'best name match first: ' + JSON.stringify(s.rows));
     s.rows.forEach((t) => { if (!/Arizona National/.test(t)) assert.ok(mi(t) != null, 'a distance: ' + t); });
     s.rows.filter((t) => /^WEB /.test(t)).forEach((t) => assert.match(t, /✓ GPS/, '✓ GPS: ' + t));
     const rest = s.rows.slice(1).map(mi).filter((d) => d != null);
@@ -132,17 +132,22 @@ test('"Search more courses" and "Not listed? Add a course" sit under the results
 });
 
 test('a tapped result is ALONE at the top: the PLAYING card (name, town, distance, ✓ GPS, Change), TEES under it, Start Round - no other course; Change brings back the box with its text, focused; an empty box brings back NEAR YOU', { timeout: 150000 }, async () => {
-    const r = await open(AWAY_AZ, [TYPE('Talking Stick'), { sleep: 2000 }, TAP('#sf [data-sf-course="gapi_' + ID + '"]'), { waitFor: "document.querySelectorAll('#sf [data-sf-tee]').length > 0", timeout: 20000 }, { sleep: 500 }, X(SNAP),
+    const r = await open(AWAY_AZ, [X(SNAP), TYPE('Talking Stick'), { sleep: 2000 }, X(SNAP), TAP('#sf [data-sf-course="gapi_' + ID + '"]'), { waitFor: "document.querySelectorAll('#sf [data-sf-tee]').length > 0", timeout: 20000 }, { sleep: 500 }, X(SNAP),
         CHANGE, { sleep: 800 }, X(SNAP), TYPE(''), { sleep: 800 }, X(SNAP)]);
     assert.equal(r.ok, true, r.reason);
-    const [p, c, e] = J(r);
+    const [e0, t0, p, c, e] = J(r);
+    assert.equal(e0.order.indexOf('START'), -1, 'no course picked: no Start Round: ' + JSON.stringify(e0.order));
+    assert.equal(t0.order.indexOf('START'), -1, 'typing: no Start Round: ' + JSON.stringify(t0.order));
+    assert.match(t0.rows.join('\n'), /^LOCAL South - Piipaash \| Talking Stick Golf Club · Scottsdale, AZ \| [\d.]+ mi · ✓ GPS$/m, '076 long names (our course, the GolfAPI file\'s club / course): ' + JSON.stringify(t0.rows));
     alone(p, 'picked from search');
     assert.equal(p.card.here, false, 'not at it: no "You\'re here"');
-    assert.match(p.card.text, /Talking Stick Golf Club \(South - Piipaash\) \| Scottsdale, AZ · [\d.]+ mi · ✓ GPS$/, p.card.text);
+    assert.match(p.card.text, /\| South - Piipaash \| Talking Stick Golf Club · Scottsdale, AZ · [\d.]+ mi · ✓ GPS$/, p.card.text);
     assert.ok(c.box && c.box.value === 'Talking Stick' && c.box.focused, 'Change: the box with "Talking Stick", focused: ' + JSON.stringify(c.box));
     assert.equal(c.order[0], "H:RESULTS FOR 'Talking Stick'", JSON.stringify(c.order));
+    assert.equal(c.order.indexOf('START'), -1, 'Change, the text back: the results list, no Start Round');
     assert.doesNotMatch(c.text, /NEAR YOU|PLAYING/);
     assert.equal(e.order[0], 'H:NEAR YOU', 'box cleared: NEAR YOU again: ' + JSON.stringify(e.order));
+    assert.ok(e.order.indexOf('START') > 0, 'box empty, a course held: Start Round as before: ' + JSON.stringify(e.order));
     assert.doesNotMatch(e.text, /RESULTS/);
 });
 
@@ -153,12 +158,18 @@ test('Bandon (online rows): typing still shows the GolfAPI ✓ GPS rows first; a
     assert.equal(r.ok, true, r.reason);
     const [t, busy, p, c] = J(r);
     assert.ok(t.rows.slice(0, 5).every((x) => /^WEB .*✓ GPS/.test(x)), 'the first 5 rows are GolfAPI ✓ GPS: ' + JSON.stringify(t.rows));
+    // 076 long names: the course big, the resort + town small; the same name once (big) with just the town.
+    assert.ok(t.rows.some((x) => /^WEB Bandon Preserve \| Bandon Dunes Golf Resort · Bandon, OR \| [\d,.]+ mi · ✓ GPS$/.test(x)), JSON.stringify(t.rows));
+    assert.ok(t.rows.some((x) => /^WEB Pacific Dunes \| Bandon Dunes Golf Resort · Bandon, OR \| /.test(x)), JSON.stringify(t.rows));
+    assert.ok(t.rows.some((x) => /^WEB Bandon Dunes Golf Resort \| Bandon, OR \| /.test(x)), 'club "Bandon Dunes Golf Resort" holds course "Bandon Dunes": once: ' + JSON.stringify(t.rows));
+    assert.ok(t.rows.some((x) => /^WEB Bandon Crossings Golf Course \| Bandon, OR \| /.test(x)), JSON.stringify(t.rows));
+    assert.equal(t.order.indexOf('START'), -1, 'typing: no Start Round');
     assert.doesNotMatch(t.text, /NEAR YOU/);
     assert.ok(busy.card && /Bandon Dunes Golf Resort/.test(busy.card.text), 'while it loads, the tapped course is the card: ' + busy.text.slice(0, 300));
     assert.deepEqual(busy.rows, [], 'no list while it loads');
     alone(p, 'online course picked');
     assert.equal(p.key, 'gapi_' + TRAILS.id);
-    assert.match(p.card.text, /Bandon Dunes Golf Resort \(Bandon Trails\)|Bandon Trails/, p.card.text);
+    assert.match(p.card.text, /\| Bandon Trails \| Bandon Dunes Golf Resort · Bandon, OR · /, '076 long names: the course big, the resort + town small: ' + p.card.text);
     assert.ok(c.box && c.box.value === 'Bandon' && c.box.focused, JSON.stringify(c.box));
     assert.ok(c.rows.slice(0, 5).every((x) => /^WEB .*✓ GPS|^LOCAL .*Bandon/.test(x)) && c.rows.length >= 5, 'the results again: ' + JSON.stringify(c.rows));
     assert.equal(c.fn.filter((x) => /^gpsSearch/.test(x)).length, 1, 'Change: no new search: ' + JSON.stringify(c.fn));
@@ -173,6 +184,7 @@ test('the closest course Round Setup holds by itself (he is at none) is NOT a pi
     assert.ok(a.box && a.card === null, 'no PLAYING card: ' + JSON.stringify(a.order));
     assert.equal(a.order[0], 'H:NEAR YOU', JSON.stringify(a.order));
     assert.ok(a.order.indexOf('H:TEES') > a.order.indexOf('ROW'), 'its tees under the list, as today: ' + JSON.stringify(a.order));
+    assert.ok(a.order.indexOf('START') > a.order.indexOf('H:TEES'), 'Start Round as today (the held course): ' + JSON.stringify(a.order));
     alone(b, 'tapped');
 });
 
@@ -189,4 +201,22 @@ test('Games & Bets\' course picker is unchanged: the box and NEAR YOU with the p
     assert.equal(s.order[0], 'H:RESULTS', JSON.stringify(s.order));
     assert.equal(s.card, null);
     assert.ok(p.box && p.card === null && p.rows.length > 0, 'a pick keeps the box and the list (no PLAYING card): ' + JSON.stringify(p.order));
+});
+
+test('long names fit a small phone (375x667): every result and the PLAYING card - no text cut off, nothing wider than the screen; a generic course name ("18-hole course") stays small under its club', { timeout: 150000 }, async () => {
+    const FIT = "JSON.stringify(Array.prototype.map.call(document.querySelectorAll('#sf .sf-row, #sf .sf-row .n, #sf .sf-row .sf-sub, #sf .sf-row .s, #sf [data-sf-playing], #sf [data-sf-playing] .n, #sf [data-sf-playing] .s'), function(e){ var r=e.getBoundingClientRect(); return { t: e.innerText.slice(0,60), over: e.scrollWidth > e.clientWidth + 1, right: Math.round(r.right), vw: window.innerWidth }; }).filter(function(x){ return x.over || x.right > x.vw; }))";
+    const r = await open(AWAY_AZ, [TYPE('Bandon'), { waitFor: "document.querySelectorAll('#sf [data-sf-web]').length >= 5", timeout: 15000 }, { sleep: 600 }, X(SNAP), X(FIT),
+        TYPE('Arizona'), { sleep: 2500 }, TAP('#sf-more'), { waitFor: "document.querySelectorAll('#sf [data-sf-web]').length >= 5", timeout: 15000 }, { sleep: 600 }, X(SNAP), X(FIT),
+        TYPE('Bandon'), { sleep: 1500 }, TAP('#sf [data-sf-web="0121658411581759626"]'), { sleep: 200 }, X(SNAP), X(FIT)], 'gps', { width: 375, height: 667 });
+    assert.equal(r.ok, true, r.reason);
+    const v = r.value.filter((x) => typeof x === 'string' && /^[[{]/.test(x)).map((x) => JSON.parse(x));
+    const [b, bFit, a, aFit, p, pFit] = v;
+    assert.ok(b.rows.length >= 8, JSON.stringify(b.rows));
+    assert.deepEqual(bFit, [], 'Bandon results fit');
+    assert.ok(a.rows.some((x) => /^WEB Arizona Traditions Golf Club \| 18-hole course · Surprise, AZ \| /.test(x)), JSON.stringify(a.rows));
+    assert.ok(a.rows.some((x) => /^WEB Arizona Golf Resort \| Championship · Mesa, AZ \| /.test(x)), JSON.stringify(a.rows));
+    assert.ok(a.rows.some((x) => /^WEB The Arizona Country Club \| Phoenix, AZ \| /.test(x)), JSON.stringify(a.rows));
+    assert.deepEqual(aFit, [], 'Arizona results fit');
+    assert.ok(p.card && /^PLAYING \| Change \| Bandon Preserve \| Bandon Dunes Golf Resort · Bandon, OR/.test(p.card.text), 'the PLAYING card (loading): ' + JSON.stringify(p.card));
+    assert.deepEqual(pFit, [], 'the card fits');
 });

@@ -87,14 +87,23 @@ async function check(c) {
         await j.cdp('Emulation.setGeolocationOverride', { latitude: c.at[0], longitude: c.at[1], accuracy: 10 });
         await j.cdp('Browser.grantPermissions', { permissions: ['geolocation'] });
         await ev("(function(){ var b=document.querySelector('[data-sf=relocate]'); if(b) b.click(); return 1; })()");
-        await until("document.querySelectorAll('#sf [data-sf-course]').length > 0 || /No courses we know/.test((document.getElementById('sf')||{}).innerText||'')", 30000);
+        await until("document.querySelectorAll('#sf [data-sf-course]').length > 0 || !!document.querySelector('#sf [data-sf-playing]') || /No courses we know/.test((document.getElementById('sf')||{}).innerText||'')", 30000);
         await sleep(2500);
+        // 076 (option A): a course picked by itself because he is AT it is the green PLAYING card ("You're here"), alone.
+        // It is recorded, then Change shows NEAR YOU (the box empty) and the checks below run on it as before.
+        const pcard = JSON.parse(await ev("(function(){ var c=document.querySelector('#sf [data-sf-playing]'); return JSON.stringify(c ? { key: c.getAttribute('data-sf-playing'), here: c.getAttribute('data-sf-playing-here') === '1', sel: document.getElementById('course-select').value, rows: document.querySelectorAll('#sf [data-sf-course]').length, text: c.innerText.replace(/\\n/g, ' | ') } : null); })()"));
+        out.card076 = pcard;
+        if (pcard) {
+            await ev("(function(){ var b=document.querySelector('#sf-course [data-sf=change]'); if(b) b.click(); return 1; })()");
+            await until("!!document.getElementById('sf-q') && document.querySelectorAll('#sf [data-sf-course]').length > 0", 15000);
+            await sleep(1000);
+        }
         const re = c.name.source, fl = c.name.flags;
-        const near = JSON.parse(await ev("(function(){ var re=new RegExp(" + JSON.stringify(re) + "," + JSON.stringify(fl) + "); var head=(document.querySelector('#sf-course .n')||{}).textContent||''; var rows=Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return [b.getAttribute('data-sf-course'), (b.querySelector('.n')||{}).textContent||'', /✓ GPS/.test(b.textContent)]; }); var hr=document.querySelector('#sf [data-sf-here]'); return JSON.stringify({ head: head, headKey: document.getElementById('course-select').value, nRows: Array.prototype.filter.call(document.querySelectorAll('#sf .sf-h, #sf [data-sf-course]'), function(){ return 1; }).reduce(function(a,n){ if(n.classList.contains('sf-h')) a.sec=n.textContent; else if(a.sec==='NEAR YOU') a.n++; return a; }, {sec:'', n:0}).n, here: hr ? [hr.getAttribute('data-sf-course'), (hr.querySelector('.n')||{}).textContent||'', /You\u2019re here/.test(hr.textContent), hr.classList.contains('sf-sel'), hr.getAttribute('data-sf-course') === document.getElementById('course-select').value] : null, hits: rows.filter(function(r){return re.test(r[1]);}).concat(re.test(head) ? [[document.getElementById('course-select').value, head, /✓ GPS/.test((document.getElementById('sf-course')||{}).textContent||'')]] : []) }); })()"));
+        const near = JSON.parse(await ev("(function(){ var re=new RegExp(" + JSON.stringify(re) + "," + JSON.stringify(fl) + "); var head=(document.querySelector('#sf-course .n')||{}).textContent||''; var rows=Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return [b.getAttribute('data-sf-course'), (b.getAttribute('data-sf-full')||(b.querySelector('.n')||{}).textContent||''), /✓ GPS/.test(b.textContent)]; }); var hr=document.querySelector('#sf [data-sf-here]'); return JSON.stringify({ head: head, headKey: document.getElementById('course-select').value, nRows: Array.prototype.filter.call(document.querySelectorAll('#sf .sf-h, #sf [data-sf-course]'), function(){ return 1; }).reduce(function(a,n){ if(n.classList.contains('sf-h')) a.sec=n.textContent; else if(a.sec==='NEAR YOU') a.n++; return a; }, {sec:'', n:0}).n, here: hr ? [hr.getAttribute('data-sf-course'), (hr.querySelector('.n')||{}).textContent||'', /You\u2019re here/.test(hr.textContent), hr.classList.contains('sf-sel'), hr.getAttribute('data-sf-course') === document.getElementById('course-select').value] : null, hits: rows.filter(function(r){return re.test(r[1]);}).concat(re.test(head) ? [[document.getElementById('course-select').value, head, /✓ GPS/.test((document.getElementById('sf-course')||{}).textContent||'')]] : []) }); })()"));
         // Search.
         await ev("(function(){ var i=document.getElementById('sf-q'); i.value=" + JSON.stringify(c.q) + "; i.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
         await sleep(1200);
-        const found = JSON.parse(await ev("(function(){ var re=new RegExp(" + JSON.stringify(re) + "," + JSON.stringify(fl) + "); return JSON.stringify(Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return [b.getAttribute('data-sf-course'), (b.querySelector('.n')||{}).textContent||'', /✓ GPS/.test(b.textContent)]; }).filter(function(r){return re.test(r[1]);})); })()"));
+        const found = JSON.parse(await ev("(function(){ var re=new RegExp(" + JSON.stringify(re) + "," + JSON.stringify(fl) + "); return JSON.stringify(Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return [b.getAttribute('data-sf-course'), (b.getAttribute('data-sf-full')||(b.querySelector('.n')||{}).textContent||''), /✓ GPS/.test(b.textContent)]; }).filter(function(r){return re.test(r[1]);})); })()"));
         const nearN = near.hits.length, searchN = found.length;
         out.badge = near.hits.concat(found).some((h) => h[2]);
         const badge = out.badge ? ', ✓ GPS' : ', no ✓ GPS';
@@ -102,12 +111,12 @@ async function check(c) {
         // YOU exactly once, with a "You're here" row first, picked; from off the course (the golfer elsewhere)
         // it may have dropped off NEAR YOU (never twice), and search must find it exactly once.
         const onCourse = !c.golfer && !process.env.AWAY;
-        const hereOk = !onCourse || (near.here && near.here[2] && near.here[3] && near.here[4]);
+        const hereOk = !onCourse || (near.here && near.here[2] && near.here[3] && near.here[4] && !!pcard && pcard.here && pcard.key === near.here[0] && pcard.rows === 0);   // (076: + the PLAYING card, alone, "You're here")
         const nearOk = onCourse ? nearN === 1 : nearN <= 1;
         out.once = (nearOk && searchN === 1 && near.nRows <= 3 && hereOk ? 'PASS' : 'FAIL') + ` (near ${nearN}${onCourse ? '' : ' off-course'}, search ${searchN}${badge}${near.here ? ', here: ' + near.here[1] : ''})`;
         if (!nearOk) out.why.push('NEAR YOU lists it ' + nearN + 'x: ' + near.hits.map((h) => h[1]).join(' / '));
         if (near.nRows > 3) out.why.push('NEAR YOU shows ' + near.nRows + ' rows (3 max)');
-        if (!hereOk) out.why.push('on the course but no picked "You\u2019re here" row: ' + JSON.stringify(near.here));
+        if (!hereOk) out.why.push('on the course but no picked "You\u2019re here" row / PLAYING card: ' + JSON.stringify(near.here) + ' ' + JSON.stringify(pcard));
         if (searchN !== 1) out.why.push('search lists it ' + searchN + 'x: ' + found.map((h) => h[1] + ' (' + h[0] + ')').join(' / '));
         // Pick it (the GPS row when there are two).
         const pick = (found.filter((h) => h[2])[0] || found[0] || near.hits[0] || [])[0];
@@ -116,7 +125,7 @@ async function check(c) {
         await until("document.querySelectorAll('#sf [data-sf-tee]').length > 0", 15000);
         if (c.nines) for (const [i, side] of [['0', 'front'], ['1', 'back']]) await ev("(function(){ var b=Array.prototype.filter.call(document.querySelectorAll('#sf [data-sf-nine=\"" + side + "\"]'), function(x){ return x.textContent.indexOf(" + JSON.stringify(c.nines[Number(i)]) + ") === 0; })[0]; if(b) b.click(); return 1; })()");
         await sleep(800);
-        const tees = JSON.parse(await ev("JSON.stringify(Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-tee]'), function(b){ var n=(b.querySelector('.n')||{}).textContent||''; var y=(/([\\d,]+) yds/.exec(b.textContent)||[])[1]||''; return [n, y]; }))"));
+        const tees = JSON.parse(await ev("JSON.stringify(Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-tee]'), function(b){ var n=(b.getAttribute('data-sf-full')||(b.querySelector('.n')||{}).textContent||''); var y=(/([\\d,]+) yds/.exec(b.textContent)||[])[1]||''; return [n, y]; }))"));
         const realTees = tees.filter((t) => t[0] && !/^[^A-Za-z]*$/.test(t[0]) && t[1]);
         out.tees = (realTees.length && realTees.length === tees.length ? 'PASS' : 'FAIL') + ' (' + tees.map((t) => t[0] + (t[1] ? ' ' + t[1] : '')).join(', ') + ')';
         if (!(realTees.length && realTees.length === tees.length)) out.why.push(tees.length ? 'a tee with no real name or no yards' : 'no tees');
