@@ -35,7 +35,7 @@ function el(id, display, log) {
     return e;
 }
 
-function homeOnAndroid(platform, open) {
+function homeOnAndroid(platform, open, extra) {
     const log = [];
     const listeners = {};
     const els = new Map();
@@ -47,7 +47,7 @@ function homeOnAndroid(platform, open) {
     };
     const W = {
         Capacitor: { getPlatform: () => platform, isNativePlatform: () => platform !== 'web', Plugins: { Geolocation: {}, App } },
-        location: { pathname: '/home.html', search: '', href: 'home.html', replace() {} },
+        location: { pathname: '/' + ((extra && extra.__page) || 'home.html'), search: '', href: (extra && extra.__page) || 'home.html', replace() {} },
         history: { back() { log.push('history.back'); } },
         navigator: { onLine: true },
         localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
@@ -63,6 +63,7 @@ function homeOnAndroid(platform, open) {
         URL, URLSearchParams, Promise, JSON, Math, Date, String, Number, Array, Object, RegExp, Error
     };
     W.window = W;
+    if (extra) Object.assign(W, extra);
     // Home's Main view is on (nothing of Home's own is open).
     const main = el('v-main', '', log); main.classList.contains = c => c === 'on'; els.set('v-main', main);
     // The 2.0 files' own APIs, each reporting closed unless the test opens it.
@@ -149,4 +150,30 @@ describe('the names the Back table relies on still exist in each file', () => {
     for (const f of Object.keys(need)) {
         test(f, { skip }, () => { const src = read(f); need[f].forEach(re => assert.match(src, re)); });
     }
+});
+
+describe('ANDROID: the map in a 2.0 round leaves Back to the round (no map <-> card loop)', () => {
+    // Measured on the emulator (2026-10-25): with 0.2's "map -> card" layer AND gps-round.js's own
+    // round Back (the screen before, then the Round Menu), Back went map -> card -> map forever.
+    // On a round page front-door.js registers its probes with pwa-boot's GolfBack; these are read
+    // the way pwa-boot reads them (isOpen), and nothing of the page is called.
+    function probesOn(opts) {
+        const probes = [];
+        const gps = { backLayer: () => opts.layer, back: () => 'x' };
+        const extra = { __page: 'index.html', GolfBack: { register: (p) => { probes.push(p); return true; } }, HardPanGps: gps };
+        if (opts.round) { extra.HardPanRound = { openMenu() {} }; extra.HardPanBet = { on: () => true }; }
+        homeOnAndroid('android', [], extra);
+        return probes.reduce((o, p) => { o[p.name] = p; return o; }, {});
+    }
+    test('2.0 round on: the map is the round\'s (the GPS probe stands aside)', { skip }, () => {
+        const p = probesOn({ layer: 'map', round: true });
+        assert.ok(p.gps, 'front-door registers its GPS probe');
+        assert.equal(p.gps.isOpen(), false);
+    });
+    test('2.0 round on: a GPS sheet over the map still closes here (wind)', { skip }, () => {
+        assert.equal(probesOn({ layer: 'wind', round: true }).gps.isOpen(), true);
+    });
+    test('no 2.0 round Back (0.2 screens): the map still goes to the card here', { skip }, () => {
+        assert.equal(probesOn({ layer: 'map', round: false }).gps.isOpen(), true);
+    });
 });

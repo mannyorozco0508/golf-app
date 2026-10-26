@@ -2852,6 +2852,7 @@
     // ANDROID ONLY. iOS has no back button and the web never presses one; armBack()
     // returns before registering anything unless Capacitor says android.
     function shownId(id) { var e = $(id); return !!(e && e.style.display !== 'none'); }
+    function roundOwnsBack() { try { var B = W.HardPanBet; return !!(W.HardPanRound && B && typeof B.on === 'function' && B.on()); } catch (e) { return false; } }
     // THE 2.0 SHEETS (android-2.0, 024 C). Each one the 2.0 screens open over a page, topmost
     // first, closed the way its own Close / Not now / tap-outside closes it - through the file's
     // own API where it has one, else by tapping that same control. Nothing here opens, saves or
@@ -2889,7 +2890,11 @@
         if (shownId('fd-addgame')) return 'add-game';
         if (shownId('fd-share')) return 'share';
         var G = W.HardPanGps, g = G && typeof G.backLayer === 'function' ? G.backLayer() : null;
-        if (g) return 'gps-' + g;
+        // THE MAP ITSELF, IN A 2.0 ROUND (android-2.0, measured on the emulator 2026-10-25): gps-round.js
+        // owns Back between the map and the card (the screen before, then the Round Menu, whose "Leave
+        // round" is the way out). 0.2's "map -> card" here fought it: map -> card -> map, forever. So
+        // with the round's own Back on, the map is left to it; the GPS sheets above still close here.
+        if (g && !(g === 'map' && roundOwnsBack())) return 'gps-' + g;
         var main = $('v-main');
         if (main && !main.classList.contains('on')) return 'home-view';
         return null;
