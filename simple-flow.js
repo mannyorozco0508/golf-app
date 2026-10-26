@@ -1704,7 +1704,7 @@
         var a = S.parsAsk, rows = '';
         for (var i = 1; i <= a.n; i++) rows += '<div class="sf-line" style="gap:8px;"><span class="l" style="min-width:56px;">Hole ' + i + '</span>'
             + '<input type="number" inputmode="numeric" min="3" max="6" class="sf-search" data-sf-par="' + i + '" value="' + esc(a.p[i] || '') + '" placeholder="Par" style="margin:0;width:84px;">'
-            + (a.idx ? '<input type="number" inputmode="numeric" min="1" max="' + a.n + '" class="sf-search" data-sf-si="' + i + '" value="' + esc(a.si[i] || '') + '" placeholder="Index" style="margin:0;width:84px;">' : '') + '</div>';
+            + (a.idx ? '<input type="number" inputmode="numeric" min="1" max="' + a.n + '" class="sf-search" data-sf-si="' + i + '" value="' + esc(a.si[i] || '') + '" placeholder="HCP" aria-label="Hole HCP (stroke index)" style="margin:0;width:84px;">' : '') + '</div>';
         var nm = esc(String(courseName() || '').split(' (')[0]);
         return '<div id="sf-pars" style="position:fixed;inset:0;z-index:6;background:rgba(10,20,15,.45);display:flex;align-items:flex-end;justify-content:center;">'
             + '<div class="sf-card" style="width:100%;max-width:520px;max-height:88vh;overflow:auto;margin:0 12px calc(env(safe-area-inset-bottom) + 12px);padding:16px;" role="dialog" aria-labelledby="sf-pars-t">'
