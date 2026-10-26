@@ -172,8 +172,8 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     iapTermsUrl: 'https://golf-app-5a5.pages.dev/terms.html', iapPrivacyUrl: 'https://golf-app-5a5.pages.dev/privacy.html' };
 // ONE READER FOR THE 008 SWITCHES: a feature is on unless its switch is exactly false.
 window.HardPanFeature = function (name) { var f = (window.HARDPAN_GPS_CONFIG || {}).features || {}; return f[name] !== false; };
-// ANDROID: GPS IS FREE UNTIL PLAY BILLING (Manny, 2026-10-24: billing goes through RevenueCat,
-// and until that step lands GPS stays free on Android). The Android app has no purchase plugin,
+// ANDROID: NO PAYWALL UNTIL PLAY BILLING (Manny, 2026-10-24: billing goes through RevenueCat,
+// and until that step lands GPS stays open on Android). The Android app has no purchase plugin,
 // so with iap on it would wait on a store that never answers, and with the paywall on it would
 // lock GPS. Android ONLY: iOS and the web keep the settings above exactly as they are. Both are
 // fixed (a later write is ignored), so even a GPS_PAYWALL=1 build, which turns the paywall

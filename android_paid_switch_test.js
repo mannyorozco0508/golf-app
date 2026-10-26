@@ -62,8 +62,8 @@ test('a GPS_PAYWALL=1 build: iOS gets the paywall, Android still cannot be locke
     try {
         execFileSync(process.execPath, [path.join(__dirname, 'tools/build-gps-app.js')], { env: Object.assign({}, process.env, { GPS_APP_DEST: out, GPS_PAYWALL: '1', GPS_DEV_PRO: '' }), stdio: 'ignore' });
         const built = fs.readFileSync(path.join(out, 'gps-config.js'), 'utf8');
-        assert.ok(built.indexOf('HARDPAN_GPS_CONFIG.paywall = true;') > built.indexOf('GPS IS FREE UNTIL PLAY BILLING'), 'the build appends the paywall line after the Android block');
-        assert.ok(built.indexOf('GPS IS FREE UNTIL PLAY BILLING') > 0, 'the Android block is in the build');
+        assert.ok(built.indexOf('HARDPAN_GPS_CONFIG.paywall = true;') > built.indexOf('NO PAYWALL UNTIL PLAY BILLING'), 'the build appends the paywall line after the Android block');
+        assert.ok(built.indexOf('NO PAYWALL UNTIL PLAY BILLING') > 0, 'the Android block is in the build');
         const ios = phone('ios', built), a = phone('android', built);
         assert.strictEqual(ios.HARDPAN_GPS_CONFIG.paywall, true, 'positive control: the paywall build does turn it on for iOS');
         assert.strictEqual(ios.HardPanEntitlement.known(), false, 'iOS waits for the store');
