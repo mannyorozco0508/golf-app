@@ -5,7 +5,9 @@
 //      "You're at <course> · 0.0 mi" on a course (URGENT-060's rule), "Nearest: <course> · N mi" away
 //      from every course, a plain line with no location - the chips Nassau · Skins · KP by GPS ·
 //      Long Drive · + more, and the lime "Start round ›".
-//   2  Start round on a course: ONE tap - the round starts there on the golfer's default tees (Profile's
+//   (URGENT-085, Manny Oct 26: Start round / a chip never jumps to hole 1 - "Where are you playing?" first, with the
+//    course you're at in the PLAYING card; Start Round there starts it. Tests 2 and 3 tap Start Round on that screen.)
+//   2  Start round on a course: Where are you playing?, then Start Round - the round starts there on the golfer's default tees (Profile's
 //      "Back" here - the middle tee would be White) and opens the round; away: Course & Tees with the nearest course picked, nothing
 //      started; no location: Course & Tees as before (nothing picked).
 //   3  Each chip starts the round the same way with that game's setup open: Nassau / Skins = the + Bet
@@ -79,11 +81,15 @@ test('1 card states: on a course "You\'re at", away "Nearest:", no location a pl
     assert.equal(c.where, 'Pick your course when you start');
 });
 
-test('2 Start round: on a course ONE tap starts it on the default tees; away = Course & Tees with the nearest picked; no location = Course & Tees as before', { timeout: 200000 }, async () => {
+test('2 Start round: on a course Where are you playing? then Start Round starts it on the default tees; away = Course & Tees with the nearest picked; no location = Course & Tees as before', { timeout: 200000 }, async () => {
     const j = await home({ at: DOBSON, seed: { hardpan_default_tees: 'Back' } });
     assert.ok(await until(j, "document.getElementById('hs-where').getAttribute('data-hs-state') === 'at'", 30000));
     assert.ok(await j.tap('#hs-gps [data-hp-act="sgpsdoor"]'), 'Start round');
-    assert.ok(await until(j, "/index\\.html$/.test(location.pathname) && typeof currentData !== 'undefined' && !!currentData && (currentData.courseData||[]).length === 18", 60000), 'the round is open after one tap: ' + await ev(j, SF));
+    assert.ok(await until(j, "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-playing]') && document.querySelectorAll('#sf [data-sf-tee]').length > 0", 40000), 'URGENT-085: Where are you playing? first (PLAYING card + TEES): ' + await ev(j, SF));
+    await sleep(1500);
+    assert.equal(await ev(j, "/admin\\.html$/.test(location.pathname)"), true, 'URGENT-085: no jump to hole 1 - the golfer taps Start Round');
+    assert.ok(await ev(j, "(function(){ var b=Array.prototype.filter.call(document.querySelectorAll('#sf button'), function(x){ return x.offsetParent !== null && /Start Round/i.test(x.textContent); })[0]; if (b) b.click(); return !!b; })()"), 'Start Round');
+    assert.ok(await until(j, "/index\\.html$/.test(location.pathname) && typeof currentData !== 'undefined' && !!currentData && (currentData.courseData||[]).length === 18", 60000), 'the round is open after Start Round: ' + await ev(j, SF));
     const r = JSON.parse(await ev(j, "JSON.stringify({ course: currentData.courseName, key: currentData.activeCourseKey, tee: currentData.teeRating && currentData.teeRating.teeName, slope: currentData.teeRating && currentData.teeRating.slope, players: (currentData.players||[]).length, side: localStorage.getItem('hardpan_round_side') })"));
     assert.equal(r.key, 'gca_zgkynkan', JSON.stringify(r));
     assert.match(r.tee || '', /\bBack\b/, 'the golfer\'s default tees: ' + JSON.stringify(r));
@@ -119,10 +125,14 @@ const CHIPS = [
     { id: 'more', label: '+ more', open: "!!document.getElementById('fd-addgame') && getComputedStyle(document.getElementById('fd-addgame')).display !== 'none' && /ALL GAMES/.test(document.getElementById('fd-addgame').innerText)" }
 ];
 for (const c of CHIPS) {
-    test('3 chip ' + c.label + ': starts the round (one tap, on the course) with its setup open', { timeout: 150000 }, async () => {
+    test('3 chip ' + c.label + ': starts the round (after Where are you playing?, on the course) with its setup open', { timeout: 150000 }, async () => {
         const j = await home({ at: DOBSON, webgl: true });
         assert.ok(await until(j, "document.getElementById('hs-where').getAttribute('data-hs-state') === 'at'", 30000));
         assert.ok(await j.tap('#hs-gps [data-hs-game="' + c.id + '"]'), c.label);
+    assert.ok(await until(j, "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-playing]') && document.querySelectorAll('#sf [data-sf-tee]').length > 0", 40000), 'URGENT-085: Where are you playing? first (PLAYING card + TEES): ' + await ev(j, SF));
+    await sleep(1500);
+    assert.equal(await ev(j, "/admin\\.html$/.test(location.pathname)"), true, 'URGENT-085: no jump to hole 1 - the golfer taps Start Round');
+    assert.ok(await ev(j, "(function(){ var b=Array.prototype.filter.call(document.querySelectorAll('#sf button'), function(x){ return x.offsetParent !== null && /Start Round/i.test(x.textContent); })[0]; if (b) b.click(); return !!b; })()"), 'Start Round');
         assert.ok(await until(j, "/index\\.html$/.test(location.pathname) && typeof currentData !== 'undefined' && !!currentData && (currentData.courseData||[]).length === 18", 60000), 'the round: ' + await ev(j, SF));
         assert.ok(await until(j, c.open, 30000), c.label + '\'s setup is open');
         await sleep(500);

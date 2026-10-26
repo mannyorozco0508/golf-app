@@ -84,6 +84,8 @@ test('#5 #11 #35 #1: the GPS door with no signal stays on Course & Tees; the mid
     await j.goto(fileUrl('home.html', ''), 2500);
     await ev(j, "localStorage.setItem('u29off', '1'); 1");
     await click(j, '[data-hp-act="sgpsdoor"]');
+    // URGENT-085: a round in progress (Dobson) - Home's Start round asks Resume or New round first; New round.
+    if (await until(j, "(function(){ var a=document.getElementById('hs-ask85'); return !!a && a.style.display !== 'none'; })()", 2500)) await click(j, '#hs-ask85 [data-ask85="new"]');
     assert.ok(await until(j, "/admin\\.html/.test(location.pathname) && !!document.getElementById('sf-offline')", 20000), 'the offline Course & Tees screen');
     // The code check is refused (no signal) - and the screen stays.
     assert.ok(await until(j, "(window.__mintRefused || 0) >= 1", 15000), 'the round code was asked for');
@@ -145,6 +147,8 @@ test('#5 / #11 at 375x667: the offline screen and the tees fit (layout shots)', 
     await j.goto(fileUrl('home.html', ''), 2500);
     await ev(j, "localStorage.setItem('u29off', '1'); 1");
     await click(j, '[data-hp-act="sgpsdoor"]');
+    // URGENT-085: a round in progress (Dobson) - Home's Start round asks Resume or New round first; New round.
+    if (await until(j, "(function(){ var a=document.getElementById('hs-ask85'); return !!a && a.style.display !== 'none'; })()", 2500)) await click(j, '#hs-ask85 [data-ask85="new"]');
     assert.ok(await until(j, "!!document.getElementById('sf-offline') && /White/.test(" + TEE_ON + ")", 30000), 'offline screen with the tees');
     const w = JSON.parse(await ev(j, "JSON.stringify({ sw: document.getElementById('sf').scrollWidth, cw: document.getElementById('sf').clientWidth })"));
     assert.ok(w.sw <= w.cw, 'no sideways scroll: ' + JSON.stringify(w));

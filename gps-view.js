@@ -725,8 +725,48 @@
         var bottom = -1e9;
         items.forEach(function (it) {
             var top = it.y - it.h / 2, dy = top < bottom + 2 ? bottom + 2 - top : 0;
-            try { it.m.setOffset([4, Math.round(dy)]); } catch (e) {}
+            try { it.m.setOffset([4, Math.round(dy)]); it.m.__sdy = Math.round(dy); } catch (e) {}
             bottom = top + dy + it.h;
+        });
+    }
+    // URGENT-085 (Manny's hole 1 at The Arizona CC: "Dr 285 generic", "3W ... ge" and "342y" on top of each other):
+    // the step-down above only looks up and down. After the distance bubbles are placed (placePills), each carry
+    // label in priority order (the arcs' own order: the longest club first) must touch NO other carry label, NO
+    // distance bubble ("342y"), the "20 yd" ring label or a F / C / B label. Covered: nudged - down / up a label's
+    // height at a time, then to the other (left) side of its arc's end; nowhere clear on the map: that label is
+    // hidden (the lower-priority one; its arc line stays). The bubble always wins. Display only.
+    function clearCarryLbls() {
+        if (!S || !S.map || !S.markers) return;
+        var keys = Object.keys(S.markers).filter(function (k) { return /^c52_/.test(k); })
+            .sort(function (a, b) { return Number(a.slice(4)) - Number(b.slice(4)); });
+        if (!keys.length) return;
+        var wrap = S.el.querySelector('.gps-map-wrap'); if (!wrap) return;
+        var wr = wrap.getBoundingClientRect(), obs = [];
+        var box = function (e) { var b = e.getBoundingClientRect(); return { l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top, w: b.width, h: b.height }; };
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl'), function (e) {
+            if (e.offsetParent === null || e.style.display === 'none' || getComputedStyle(e).visibility === 'hidden') return;
+            var b = box(e); if (b.w > 0 && b.h > 0) obs.push(b);
+        });
+        var G = 3, hit = function (a) { return obs.some(function (o) { return a.l < o.r + G && a.r > o.l - G && a.t < o.b + G && a.b > o.t - G; }); };
+        keys.forEach(function (k) {
+            var m = S.markers[k], el = m && m.getElement(); if (!el) return;
+            var base = Number(m.__sdy) || 0;
+            el.style.visibility = ''; el.removeAttribute('data-carry-hidden'); el.removeAttribute('data-carry-nudged');
+            try { m.setOffset([4, base]); } catch (e) { return; }
+            var r0 = box(el); if (!(r0.w > 0 && r0.h > 0)) return;
+            var step = r0.h + 2, left = -(r0.w + 12), tries = [[4, base]];
+            [4, left].forEach(function (x) { if (x !== 4) tries.push([x, base]); for (var i = 1; i <= 4; i++) tries.push([x, base + i * step], [x, base - i * step]); });
+            var pick = null;
+            for (var i = 0; i < tries.length && !pick; i++) {
+                var dx = tries[i][0] - 4, dy = tries[i][1] - base;
+                var c = { l: r0.l + dx, r: r0.r + dx, t: r0.t + dy, b: r0.b + dy };
+                // Where it sits (i = 0) it may run off the screen's edge as before; a nudge never takes it off the screen.
+                if (hit(c) || (i > 0 && (c.l < 0 || c.t < 0 || c.r > wr.width || c.b > wr.height))) continue;
+                pick = { off: tries[i], rc: c };
+            }
+            if (!pick) { el.style.visibility = 'hidden'; el.setAttribute('data-carry-hidden', '1'); return; }
+            if (pick.off[0] !== 4 || pick.off[1] !== base) { try { m.setOffset(pick.off); } catch (e) {} el.setAttribute('data-carry-nudged', '1'); }
+            obs.push(pick.rc);
         });
     }
     // THE TEE PLAN sheet (the Hazards sheet's look).
@@ -2860,7 +2900,7 @@
     }
     function hits(a, b) { return a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t; }
     // int-061: the My miss label is placed after the bubbles, so it can keep off them.
-    function placePills() { placePills0(); try { missPlaceLbl(); } catch (e) {} }
+    function placePills() { placePills0(); try { clearCarryLbls(); } catch (e) {} try { missPlaceLbl(); } catch (e) {} }
     function placePills0() {
         if (!S) return;
         placeSaveLine();
@@ -6072,7 +6112,11 @@
             var short = club.replace(CL_GENERIC, '').replace(/^the\s+/i, '').trim() || club;
             var flat = function (x) { return String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); };
             // "Papago Golf Club (Papago)", "Caledonia Golf & Fish Club (Caledonia)": one course - the club's name.
-            shown = !part || flat(part) === flat(short) || flat(part) === flat(club) ? club : short + ' \u00b7 ' + part;
+            // URGENT-085: GolfAPI's "The Arizona Country Club (The Arizona)" - the course part with its own "The" /
+            // "Golf Club"-type ending off is the club's short name too: one course, the club's real name once
+            // (was "Arizona \u00b7 The Arizona").
+            var core = clStr(part).replace(CL_GENERIC, '').replace(/\s+golf$/i, '').replace(/^the\s+/i, '').trim();
+            shown = !part || flat(part) === flat(short) || flat(part) === flat(club) || (core && flat(core) === flat(short)) ? club : short + ' \u00b7 ' + part;
         }
         var place = [clStr(city), clState(state)].filter(Boolean);
         if (!place.length || !shown) return shown;
@@ -8548,6 +8592,25 @@
             return { oval: S.missOval || null, why: S.missWhy || null, screen: scr };
         },
         // int-061 (checks): the My miss label's box on screen and anything it touches (rail, bubbles, "20 yd", pill, labels).
+        // URGENT-085 (checks): each carry label's box, shown / nudged / hidden, and anything visible it touches.
+        carryLbls: function () {
+            try {
+                var wrap = S && S.el.querySelector('.gps-map-wrap'); if (!wrap || !S.markers) return [];
+                var wr = wrap.getBoundingClientRect(), B = function (e) { var b = e.getBoundingClientRect(); return { l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top }; };
+                var vis = function (e) { return e.offsetParent !== null && e.style.display !== 'none' && getComputedStyle(e).visibility !== 'hidden'; };
+                var lbls = Object.keys(S.markers).filter(function (k) { return /^c52_/.test(k); }).sort(function (a, b) { return Number(a.slice(4)) - Number(b.slice(4)); }).map(function (k) { return S.markers[k].getElement(); });
+                var others = Array.prototype.filter.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl'), vis);
+                var ov = function (a, b) { return Math.min(a.r, b.r) - Math.max(a.l, b.l) > 0.5 && Math.min(a.b, b.b) - Math.max(a.t, b.t) > 0.5; };
+                return lbls.map(function (e) {
+                    var r = B(e), shown = vis(e), hits = [];
+                    if (shown) {
+                        lbls.forEach(function (o) { if (o !== e && vis(o) && ov(r, B(o))) hits.push(o.getAttribute('data-l')); });
+                        others.forEach(function (o) { if (ov(r, B(o))) hits.push(String(o.className).split(' ').slice(0, 2).join('.') + ':' + o.textContent); });
+                    }
+                    return { l: e.getAttribute('data-l'), shown: shown, nudged: e.getAttribute('data-carry-nudged') === '1', box: { l: Math.round(r.l), t: Math.round(r.t), r: Math.round(r.r), b: Math.round(r.b) }, hits: hits, w: Math.round(wr.width), h: Math.round(wr.height) };
+                });
+            } catch (e) { return [{ err: String(e && e.message || e) }]; }
+        },
         missLbl: function () {
             try {
                 var m = S && S.markers && S.markers.mymiss, sp = m && m.getElement().firstChild, wrap = S && S.el.querySelector('.gps-map-wrap');
