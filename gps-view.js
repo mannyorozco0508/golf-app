@@ -4901,6 +4901,7 @@
         var ctx = { hole: S.hole, green: green, wind: effectiveWind(), elevFt: r ? ptElev(r, pt) : null, course: chipsCourse(), golfer: bagGolfer(),
             // On the green (a putt) or no green to aim at: this mark only closes the shot before.
             noOpen: !green || !!(nums && nums.onGreen), ring: chipsRing() };
+        if (S.eventCode) ctx.round = String(S.eventCode);   // 073: the shot log knows the round (End round - don't save)
         var cft = courseFtForLog();   // 070 part 4: the course's height (a course number), for My bag's baseline
         if (cft) { ctx.courseFt = cft.ft; ctx.courseFtSrc = cft.src; }
         var plYd = pl && isFinite(pl.exact) ? pl.exact : null, mine = S;

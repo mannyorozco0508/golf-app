@@ -106,6 +106,8 @@
         // 070 part 4: the course's height (whole feet), course sources only. Old records: absent.
         var cft = num(o.cft);
         if (cft !== null && cft > -1500 && cft < 15000 && CFT_SRCS.indexOf(o.cftSrc) !== -1) { out.cft = Math.round(cft); out.cftSrc = o.cftSrc; }
+        // 073: the round's code (End round - don't save takes that round's records out). Old records: absent.
+        if (typeof o.round === 'string' && /^(L-)?[A-Za-z0-9]{4,12}$/.test(o.round)) out.round = o.round.toUpperCase();
         // 052 B: the miss. Only when the record says how the shot ended (old records: absent).
         if (END_KINDS.indexOf(o.endKind) !== -1) {
             var offl = num(o.offline);
@@ -138,6 +140,21 @@
             if (g.shots.length !== n) hit = true;
         });
         return hit ? lsSet(KEY, r) : false;
+    }
+    // 073: END ROUND - DON'T SAVE. Every golfer's records from THIS round (tagged round === code) go;
+    // every other record - every earlier round's - is left exactly as it was. Returns how many went.
+    function removeRound(code) {
+        code = String(code || '').toUpperCase();
+        if (!code) return 0;
+        var r = rec(), n = 0;
+        Object.keys(r.golfers).forEach(function (k) {
+            var g = r.golfers[k]; if (!g || !Array.isArray(g.shots)) return;
+            var before = g.shots.length;
+            g.shots = g.shots.filter(function (s) { return !(s && s.round === code); });
+            n += before - g.shots.length;
+        });
+        if (n) lsSet(KEY, r);
+        return n;
     }
     // ---- THE FILTERS (Shot history) -----------------------------------------------
     // strength: calm (< 5 mph) | '5-10' | '10-15' | '15+' (mph, lower bound in).
@@ -202,7 +219,7 @@
 
     W.HardPanShotLog = {
         KEY: KEY, CLUBS: CLUBS, CFT_SRCS: CFT_SRCS, MAX_PER_GOLFER: MAX_PER_GOLFER, AIM_KINDS: AIM_KINDS, END_KINDS: END_KINDS, hasMiss: hasMiss,
-        add: add, remove: remove, list: list, byClub: byClub, reset: reset,
+        add: add, remove: remove, removeRound: removeRound, list: list, byClub: byClub, reset: reset,
         hand: hand, setHand: setHand, strengthOf: strengthOf, dirOf: dirOf, clean: clean, bytes: bytes,
         golferKey: golferKey, syncOn: syncOn
     };
