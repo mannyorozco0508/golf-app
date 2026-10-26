@@ -62,7 +62,7 @@
     <tr><td>A green's position, only when you tap "set the green here" on the GPS screen</td><td>To fix that hole's green for your round. The saved point carries no account id and no name.</td></tr>
     <tr><td>Course search queries (the course name or town you type)</td><td>Sent through our server to look up the course and its published scorecard. This is text you type, not your phone's location. Not kept with your account and not sold.</td></tr>
     <tr><td>Imported course reference (course name, par, stroke index by hole, provider course id)</td><td>Saved into the round so everyone scores the same card, and kept in the shared course list so a later round can use it.</td></tr>
-    <tr><td><strong>Scorecard-scan counts</strong> (your account ID, how many scorecard scans you have used, and short-lived per-minute and per-day counts)</td><td>So each account gets its free scans and no one can run up the cost. The photo itself is never stored - see Scorecard scan below.</td></tr>
+    <tr><td><strong>Scorecard-scan counts</strong> (your account ID, how many scorecard scans you have used, and short-lived per-minute and per-day counts)</td><td>So each account gets its free scans and no one can run up the cost. The count of scans you have used is kept under your account ID to enforce the free limit, and it is not erased by Delete account at this time. The photo itself is never stored - see Scorecard scan below.</td></tr>
 </table>
 
 <h2>Microphone and voice scoring</h2>
@@ -77,13 +77,13 @@
     <li><strong>The camera, only when you ask.</strong> HardPan uses the camera only when you tap to scan a paper scorecard. If you pick a photo instead, only the one picture you choose is read; HardPan does not browse your photo library.</li>
     <li><strong>What is sent.</strong> The photo goes to our server (Cloudflare) together with what the round already knows: the course name, tee, par and stroke index for each hole, and the round's player names (with any initials or nicknames). Handicaps, if the round has them, go to our server only, to check the result; they are not sent on. Our server sends the photo, the course details and the player names to Google's Gemini API, which reads the scores and sends them back. Your sign-in token is sent so the server knows the scan is yours; it is not passed to Google. Your location is never sent.</li>
     <li><strong>What is kept.</strong> HardPan does not store the photo. It is processed in memory and is not written to our database or our logs. Our server's log records only counts, timing, which model was used and whether the result checked out - no photo, no names. Nothing goes on the scorecard until you check the scores and tap to use them; then they are saved exactly as if you had typed them.</li>
-    <li><strong>Google.</strong> HardPan uses the paid Gemini API. Under Google's Gemini API Additional Terms of Service for paid services, Google does not use your prompts or responses (including images) to improve its products, and logs them for a limited period of time only to detect and prevent violations of its Prohibited Use Policy (ai.google.dev/gemini-api/terms).</li>
+    <li><strong>Google.</strong> HardPan uses the paid Gemini API. Under Google's Gemini API Additional Terms of Service for paid services, Google does not use your prompts or responses (including images) to improve its products, and logs them for a limited period of time only to detect and prevent violations of its Prohibited Use Policy, and for legal or regulatory disclosures where required by law (ai.google.dev/gemini-api/terms).</li>
 </ul>
 
 <h2>What is never collected</h2>
 <ul>
     <li>No password or phone number, and an email address only if you choose to sign in</li>
-    <li>No background location, and your GPS position is not sent to us (see Your location)</li>
+    <li>Your GPS position is never sent to us, and background location is used only while a round's Lock Screen view is on (see Your location)</li>
     <li>No contacts access, and no browsing of your photo library. The camera is used only when you choose to scan a scorecard (see Scorecard scan above). The microphone is used only for voice scoring, as described above, and never recorded.</li>
     <li>No advertising identifier, and no third-party analytics or tracking SDK</li>
     <li>No payment details of any kind — see Money, below</li>
@@ -91,7 +91,7 @@
 
 <h2>Your location</h2>
 <ul>
-    <li>HardPan asks for location only to show yardages on the GPS screen, and only while the app is open. It never asks for background location.</li>
+    <li>HardPan uses location only to show yardages: on the GPS screen while the app is open, and, if you turn on a round's Lock Screen view, while your phone is locked so the yardages on the Lock Screen stay current. That background use happens only while the Lock Screen view is on, stays on your phone, and stops when the round's Lock Screen view ends.</li>
     <li>Your position stays on your phone. It turns into yardages on the screen and is not sent to us, stored in your account, or put in a link.</li>
     <li>The one exception is "set the green here": that saves the spot you are standing on as the green, without your name or account.</li>
     <li>"Near you" (nearby courses) is worked out on your phone.</li>
@@ -134,7 +134,7 @@
 
 <h2>Deleting your data</h2>
 <ul>
-    <li><strong>Your account:</strong> in the app, open Account and tap Delete account (it appears once you have signed in; if you never signed in, see <a href="delete-account.html">delete-account</a>). That deletes your sign-in (email and account id) and your saved groups straight away. The <a href="delete-account.html">delete-account</a> page lists exactly what is deleted and what stays.</li>
+    <li><strong>Your account:</strong> in the app, open Account and tap Delete account (it appears once you have signed in; if you never signed in, see <a href="delete-account.html">delete-account</a>). That deletes your sign-in (email and account id) and your saved groups straight away. The <a href="delete-account.html">delete-account</a> page lists exactly what is deleted and what stays. The count of scorecard scans you have used is not erased at this time; it holds only your account ID and a number, and is kept to enforce the free-scan limit.</li>
     <li><strong>A whole round:</strong> the organizer can use "End &amp; Wipe Round," which deletes that round's data.</li>
     <li><strong>On your device:</strong> clearing your browser's site data, or deleting the app, removes everything stored locally.</li>
     <li><strong>Anything else, or if you can't open the app:</strong> email <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a> from the address you signed in with (or with the round code). We'll reply within 7 days and delete within 30 days.</li>
