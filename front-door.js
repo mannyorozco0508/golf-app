@@ -292,7 +292,7 @@
                 var same = nm ? out.filter(function (c) { return nameKey(c.name).indexOf(nk) === 0; })[0] : null;
                 if (same) { if (!same.city && r[2]) same.city = r[2]; if (!same.state) same.state = st; if (!same.pt && r[7] != null) same.pt = [r[7], r[8]]; return; }
                 if (!nm) return;
-                out.push({ key: null, osm: r[0], name: nm, city: r[2] || '', state: st, ready: false, pt: r[7] != null ? [r[7], r[8]] : null });
+                out.push({ key: null, osm: r[0], name: nm, city: r[2] || '', state: st, ready: false, pt: r[7] != null ? [r[7], r[8]] : null, greens: Number(r[3]) || 0, holes: Number(r[5]) || 0 });   // (071: + greens / holes)
             });
         });
         C.list = out;
@@ -452,7 +452,7 @@
         var G = W.HardPanGeo, c = W.HARDPAN_GPS_CONFIG || {};
         if (!G || !G.courseGps) return null;
         var lk = null; try { var v = JSON.parse(W.localStorage.getItem('hardpan_osm_v1_' + key) || 'null'); lk = v && v.holes && Object.keys(v.holes).length ? v : null; } catch (e) {}
-        return G.courseGps({ key: key, name: name || null, loc: loc || null, golfapi: (live() || !!c.golfapiFile) ? gaTable() : null, osmOn: c.osm !== false, osmTable: W.HardPanGpsCourses || {}, lookedUp: lk });
+        return G.courseGps({ key: key, name: name || null, loc: loc || null, golfapi: (live() || !!c.golfapiFile) ? gaTable() : null, osmOn: c.osm !== false || (c.osmOnlyCourses !== false && /^osm_[wr]\d+$/.test(String(key || ''))), osmTable: W.HardPanGpsCourses || {}, lookedUp: lk });   // (071: an OSM-only course's own holes)
     }
     function teeRows(rec) {
         var out = [], seen = {}, arr = function (v) { return Array.isArray(v) ? v : v && typeof v === 'object' ? Object.keys(v).sort(function (a, b) { return a - b; }).map(function (k) { return v[k]; }) : []; };

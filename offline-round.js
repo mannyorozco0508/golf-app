@@ -255,6 +255,7 @@
         return { from: L, to: code, holes: holes, theirs: theirs || null };
     }
 
+    function ended(L) { var t = jget('hardpan_ended_rounds_v1', {}); return !!(t && t[L]); }
     var busy = false;
     function syncOne(db, L, txMs) {
         var TX = txMs || TX_MS;
@@ -284,9 +285,13 @@
                 var tx;
                 try { tx = ref.transaction(function (cur) { return cur === null ? value : undefined; }, undefined, false); } catch (e) { tx = Promise.reject(e); }
                 return within(tx, TX, 'the round code ' + code).then(function (r) {
+                    // 073: ended on this phone (End round - don't save) while this try was on its way: the
+                    // copy that landed is taken back (this uid owns it) and nothing moves here.
+                    if (r && r.committed && ended(L)) return Promise.resolve(ref.remove()).then(function () { return null; }, function () { return null; });
                     if (r && r.committed) return move(L, code, value, sent, theirs);
                     var cur = r && r.snapshot && typeof r.snapshot.val === 'function' ? r.snapshot.val() : null;
                     var os = cur && cur.offlineStart;
+                    if (os && os.from === L && ended(L)) return Promise.resolve(ref.remove()).then(function () { return null; }, function () { return null; });   // 073
                     if (os && os.from === L) return move(L, code, cur, sent, theirs);   // mine, from an earlier try
                     if (os && os.key === key && !theirs) {
                         theirs = { code: code, by: os.by || null, names: ((cur.players || []).map(function (p) { return p && p.name; }).filter(Boolean)) };

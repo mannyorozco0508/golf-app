@@ -13,7 +13,8 @@
 // shapes the oval. It still feeds the 052 B extras, kept (URGENT-067 "only add"): his shots as dots on
 // the club screen's picture and the "70% right, 9 yds avg" line (shotStats / statsLine).
 // THE CLUBS: irons and wedges only - 4i-9i, PW, GW, SW, LW. Never Driver, woods or hybrids.
-// WHEN IT SHOWS (shows()): an APPROACH into the green - never off the tee (the first shot), and
+// WHEN IT SHOWS (shows()): an APPROACH into the green - never off the tee (the first shot), except
+// on a PAR 3 (072: the tee shot is the approach; same clubs, same checks), and
 // only when the green is in range of the club: the plays-like yards to the green's center
 // within the club's carry +/- the margin below. A layup (green out of range) gets nothing.
 // THE SHAPE (right-handed; mirrored for a left-hander - 049's I play setting):
@@ -80,10 +81,14 @@
 
     // DOES IT SHOW? q: { club, carry (My bag's), greenYd (plays-like yards to the green's
     // center), fromTee (the tee shot / first shot), layup (the target is off the green) }.
+    // ctx (072, optional): { par } - the hole's par. On a PAR 3 the tee shot IS the approach, so
+    // the tee shot shows it too, with the same clubs (4i-LW), range and layup checks below;
+    // woods, hybrids and driver stay off. Par 4/5 (or no par): never off the tee, as before.
     // Returns { ok, why }.
-    function shows(q) {
+    function shows(q, ctx) {
         q = q || {};
-        if (q.fromTee) return { ok: false, why: 'tee' };
+        var par3Tee = !!(q.fromTee && ctx && Number(ctx.par) === 3);
+        if (q.fromTee && !par3Tee) return { ok: false, why: 'tee' };
         if (!isClub(q.club)) return { ok: false, why: 'club' };
         if (!isNum(q.carry) || !(q.carry > 0)) return { ok: false, why: 'carry' };
         if (q.layup) return { ok: false, why: 'layup' };
@@ -158,7 +163,7 @@
             + 'It is centred on that carry along your line to the target' + (TUNE.PLAYS_CENTER ? ' (where it lands today, with the plays-like wind, slope and temperature)' : '') + ': ' + pc(TUNE.DEPTH_PCT) + '% of the carry long and short, '
             + pc(TUNE.WIDTH_PCT) + '% of the carry left and right, tilted ' + TUNE.TILT_DEG + '° so your right side sits short and your left side sits long (mirrored if you play left-handed). '
             + 'A 178 7-iron: ±' + (Math.round(ex.b * 10) / 10) + ' deep, ±' + (Math.round(ex.a * 10) / 10) + ' wide. '
-            + 'It shows only on an approach into the green with a 4-iron to a lob wedge - never from the tee, never for driver, woods or hybrids, and not when the green is out of the club’s range.';
+            + 'It shows only on an approach into the green, or a par-3 tee shot, with a 4-iron to a lob wedge - never from the tee on a par 4 or 5, never for driver, woods or hybrids, and not when the green is out of the club’s range.';
     }
 
     // THE OVAL'S OUTLINE, in yards: [[side, along]] - side + right of the aim line, along =

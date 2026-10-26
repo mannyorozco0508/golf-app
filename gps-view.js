@@ -388,7 +388,7 @@
     function osmRecord(key) {
         // URGENT-022: the ONE rule (gps-geo courseGps) - the Course & Tees list asks the same thing.
         if (G.courseGps) return G.courseGps({ key: key, name: S && S.courseKey === key && S.round ? S.round.courseName : null, loc: S && S.courseLoc ? S.courseLoc : null,
-            ga: golfapiFor(key) || null, osmOn: osmOn(), osmTable: (typeof window !== 'undefined' && window.HardPanGpsCourses) || {}, lookedUp: lookedUp(key) });
+            ga: golfapiFor(key) || null, osmOn: osmOn(key), osmTable: (typeof window !== 'undefined' && window.HardPanGpsCourses) || {}, lookedUp: lookedUp(key) });
         var ga = golfapiFor(key);
         if (ga) return ga;
         if (!osmOn()) return null;   // GPS LIVE: GolfAPI or nothing - Tools > Set the green
@@ -1060,7 +1060,9 @@
     // GPS LIVE (gps-config.js live: true) and OPENSTREETMAP (osm: false = off; build 10
     // is osm: true, live: false).
     function liveOn() { var c = cfg(); return golfapiOn() && c.live === true && !!c.liveBase; }
-    function osmOn() { return cfg().osm !== false; }
+    // URGENT-071: an OpenStreetMap-only course (key osm_w<id> / osm_r<id>, picked from a "Not set up
+    // yet" search row) uses its OpenStreetMap holes even in a GolfAPI-only build (gps-match.js).
+    function osmOn(key) { var c = cfg(); if (c.osm !== false) return true; var k = key != null ? key : (S && S.courseKey); return c.osmOnlyCourses !== false && /^osm_[wr]\d+$/.test(String(k || '')); }
     // THE ROUND'S GOLFAPI COURSE, if there is one: then it is the ONLY source for
     // this course (no OpenStreetMap greens mixed in). gps-geo.golfapiMatch: a puller
     // link, a 27-hole pairing's nines, or the name within 5 km.
@@ -1715,6 +1717,9 @@
         // 010: an OpenStreetMap hole line shapes this GolfAPI hole's path - its ODbL credit
         // on the map itself, not only behind ⓘ (where the lines' source always lists it).
         var op = !!osmPathFor(S.hole), oc = S.el.querySelector('.gps-credit-osm');
+        // 074: an OpenStreetMap-only course (osm_w / osm_r key - from the copy saved for everyone or this phone's
+        // own lookup): its greens ARE OpenStreetMap's, so the same credit shows on the map for its mapped holes.
+        if (!op && /^osm_[wr]\d+$/.test(String(S.courseKey || ''))) { var orc = lookedUp(S.courseKey); op = !!(orc && orc.holes && orc.holes[String(S.hole)]); }
         if (oc) oc.style.display = op ? '' : 'none';
         var me = S.el.querySelector('.gps-map');
         if (me) me.setAttribute('data-osm-path', op ? '1' : '0');
@@ -4900,6 +4905,7 @@
         var ctx = { hole: S.hole, green: green, wind: effectiveWind(), elevFt: r ? ptElev(r, pt) : null, course: chipsCourse(), golfer: bagGolfer(),
             // On the green (a putt) or no green to aim at: this mark only closes the shot before.
             noOpen: !green || !!(nums && nums.onGreen), ring: chipsRing() };
+        if (S.eventCode) ctx.round = String(S.eventCode);   // 073: the shot log knows the round (End round - don't save)
         var cft = courseFtForLog();   // 070 part 4: the course's height (a course number), for My bag's baseline
         if (cft) { ctx.courseFt = cft.ft; ctx.courseFtSrc = cft.src; }
         var plYd = pl && isFinite(pl.exact) ? pl.exact : null, mine = S;
@@ -5010,7 +5016,8 @@
     // 063: the oval comes ONLY from the club's average carry as My bag shows it (bagNow - typed,
     // Range, good marked shots), sized by the numbers in gps-miss-pattern.js TUNE. Irons and
     // wedges only, and only on an APPROACH into the green (missPlan): never from the tee, never
-    // a layup (the target off the green, or the green out of the club's range). The club: the
+    // a layup (the target off the green, or the green out of the club's range). 072: a PAR-3 tee
+    // shot counts as the approach (same clubs, same checks; woods / hybrids / driver stay off). The club: the
     // one picked at Mark shot while that shot is open and the golfer still at its ball, else the
     // one My bag suggests for the plays-like yards to the green. Drawn along the line ball ->
     // aim (the target ring on the green, else the green center), centred on the club's carry.
@@ -5042,6 +5049,8 @@
         var v = club ? bag[club] : null, carry = v && v.yd > 0 ? v.yd : null;
         var tg = S.target || null, layup = !!(tg && G.haversineMeters(tg, r.mid) > M.TUNE.GREEN_AIM_YD * G.M_PER_YD);
         var ok = M.shows({ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup });
+        // 072: a PAR-3 tee shot is the approach - the same checks again, with the hole's par (irons / wedges only).
+        if (!ok.ok && ok.why === 'tee' && isPar3()) ok = M.shows({ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup }, { par: 3 });
         S.missWhy = ok.ok ? null : ok.why;
         if (!ok.ok) return null;
         var rawYd = G.haversineMeters(o.pt, r.mid) / G.M_PER_YD;

@@ -13,6 +13,9 @@
 //      first, then Mulligan 9 - never "isn't in our course data"; nothing kept as a 30-day miss (an old
 //      mark from before is not trusted either); King 18 tapped: pulled with NO ourKey (no gps_links
 //      write), its card is the pick, its tees listed.
+// 071 (Manny: "Every course should be searchable" - an OSM row's tap now OPENS GPS in the GPS flow): 1 and 2
+// tap the row (the GPS flow stays, the course's own osm_ key is the pick), then the kept link "Type the pars
+// and indexes" - the same Add a course, name and city filled in, as 064 built it.
 // The Cloud Functions are stood in by a fetch stand-in (gpsSearch answers the SAVED Starfire answer;
 // gpsCourse's server write is done by the stand-in, path recorded). No network, no GolfAPI call.
 // Synthetic course cards only.
@@ -78,10 +81,16 @@ const nearStarfire = [33.5990, -111.9078];   // ~0.7 mi north of Starfire's poin
 const writesOf = (s) => s.writes.filter((w) => !/^set global_courses\/gapi_\d+$/.test(w));   // (the stand-in server's own write)
 
 test('Goldendale: "Goldendale Golf Club · Not set up yet · Add this course", no ✓ GPS; a tap opens Add a course with the name (and city) filled in; nothing written', { timeout: 150000 }, async () => {
-    const r = await open(PAPAGO, [X(SF), TYPE('Goldendale'), { waitFor: "document.querySelectorAll('#sf [data-sf-osm]').length > 0 && !/Searching all courses/.test(document.getElementById('sf').innerText)", timeout: 15000 }, { sleep: 400 }, X(SF),
-        X("(function(){ var b=document.querySelector('#sf [data-sf-osm][data-sf-name=\"Goldendale Golf Club\"]'); if(b) b.click(); return b ? 'tapped' : 'NO ROW'; })()"), { sleep: 1200 }, X(SF)]);
+    const r = await open(PAPAGO, [X(SF), TYPE('Goldendale'), { sleep: 1800 }, { waitFor: "document.querySelectorAll('#sf [data-sf-osm]').length > 0 && !/Searching all courses/.test(document.getElementById('sf').innerText)", timeout: 15000 }, { sleep: 400 }, X(SF),
+        X("(function(){ var b=document.querySelector('#sf [data-sf-osm][data-sf-name=\"Goldendale Golf Club\"]'); if(b) b.click(); return b ? 'tapped' : 'NO ROW'; })()"),
+        { waitFor: "!!document.querySelector('#sf [data-sf=osmpars]')", timeout: 20000 }, { sleep: 600 }, X(SF),
+        X("(function(){ var b=document.querySelector('#sf [data-sf=osmpars]'); if(b) b.click(); return 1; })()"), { sleep: 1200 }, X(SF)]);
     assert.equal(r.ok, true, r.reason);
-    const [before, s, add] = J(r);
+    const [before, s, gps, add] = J(r);
+    // 071: the tap OPENS GPS (the GPS flow stays; Goldendale's own key; no map data in OSM: tap the green)
+    assert.equal(gps.sfShown, true, 'the GPS flow stays');
+    assert.equal(gps.key, 'osm_w484975066', 'its own key is the pick');
+    assert.equal(gps.start && gps.start.disabled, false, 'Start Round is live');
     // (067: the distance from the golfer comes first on every row)
     assert.match(s.osm[0], /^Goldendale Golf Club \| [\d,.]+ mi · Goldendale, WA · Not set up yet · Add this course$/, 'first: ' + JSON.stringify(s.osm));
     assert.equal(s.osm.filter((t) => /Goldendale Golf Club/.test(t)).length, 1, 'once');
@@ -96,17 +105,21 @@ test('Goldendale: "Goldendale Golf Club · Not set up yet · Add this course", n
     assert.equal(add.name, 'Goldendale Golf Club', 'the name filled in');
     assert.equal(add.where, 'Goldendale, WA · from OpenStreetMap', 'the city shown');
     assert.match(add.back, /back to New round/);
-    assert.equal(add.key, '', 'nothing picked yet - the golfer adds it');
+    assert.equal(add.key, 'osm_w484975066', '(071) the GPS pick stays until the golfer saves the course there');
     assert.deepEqual(writesOf(add).slice(before.writes.length), [], 'no database write from search or the tap');
-    assert.deepEqual(add.fn.map((c) => c[0]), ['gpsSearch'], 'no gpsCourse pull');
+    assert.deepEqual(add.fn.filter((c) => c[0] !== 'gpsSearch'), [], 'no gpsCourse pull (071: the tap asks gpsSearch by its name + town first)');
 });
 
 test('any OpenStreetMap-only course (one from the OR list, picked from the app\'s own list): the Add row, then Add a course with its name', { timeout: 150000 }, async () => {
-    const PICK = "(function(){ var c=(HardPanCourse.osmOnly()||[]).filter(function(x){ return x.state==='OR' && /^[A-Za-z ]{8,40}$/.test(x.name) && x.city; })[0]; window.__osmPick=c; var i=document.getElementById('sf-q'); i.focus(); i.value=c.name; i.dispatchEvent(new Event('input',{bubbles:true})); return JSON.stringify({ pick: c }); })()";
-    const r = await open(PAPAGO, [X(SF), X(PICK), { waitFor: "document.querySelectorAll('#sf [data-sf-osm]').length > 0 && !/Searching all courses/.test(document.getElementById('sf').innerText)", timeout: 15000 }, { sleep: 400 }, X(SF),
-        X("(function(){ var b=Array.prototype.filter.call(document.querySelectorAll('#sf [data-sf-osm]'), function(x){ return x.getAttribute('data-sf-name')===window.__osmPick.name; })[0]; if(b) b.click(); return b ? 'tapped' : 'NO ROW'; })()"), { sleep: 1200 }, X(SF)]);
+    const PICK = "(function(){ var c=(HardPanCourse.osmOnly()||[]).filter(function(x){ return x.state==='OR' && /^[A-Za-z ]{8,40}$/.test(x.name) && x.city && !x.greens; })[0]; window.__osmPick=c; var i=document.getElementById('sf-q'); i.focus(); i.value=c.name; i.dispatchEvent(new Event('input',{bubbles:true})); return JSON.stringify({ pick: c }); })()";
+    const r = await open(PAPAGO, [X(SF), X(PICK), { sleep: 1800 }, { waitFor: "document.querySelectorAll('#sf [data-sf-osm]').length > 0 && !/Searching all courses/.test(document.getElementById('sf').innerText)", timeout: 15000 }, { sleep: 400 }, X(SF),
+        X("(function(){ var b=Array.prototype.filter.call(document.querySelectorAll('#sf [data-sf-osm]'), function(x){ return x.getAttribute('data-sf-name')===window.__osmPick.name; })[0]; if(b) b.click(); return b ? 'tapped' : 'NO ROW'; })()"),
+        { waitFor: "!!document.querySelector('#sf [data-sf=osmpars]')", timeout: 20000 }, { sleep: 600 }, X(SF),
+        X("(function(){ var b=document.querySelector('#sf [data-sf=osmpars]'); if(b) b.click(); return 1; })()"), { sleep: 1200 }, X(SF)]);
     assert.equal(r.ok, true, r.reason);
-    const [before, p, s, add] = J(r);
+    const [before, p, s, gps, add] = J(r);
+    assert.equal(gps.sfShown, true, '(071) the tap opens GPS: the GPS flow stays');
+    assert.match(gps.key, /^osm_[wr]\d+$/, '(071) its own OpenStreetMap key');
     const c = p.pick;
     assert.ok(c && c.name && !c.key, 'a keyless OSM course: ' + JSON.stringify(c));
     const row = s.osm.filter((t) => t.indexOf(c.name + ' | ') === 0)[0];

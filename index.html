@@ -2884,6 +2884,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 if (typeof window.HardPanDoors.sendHeld === 'function') window.HardPanDoors.sendHeld(db);
             }
             else if (!incoming && window.OfflineQueue && window.OfflineQueue.loadSnapshot(localStorage, currentMode) && window.HardPanDoors && typeof window.HardPanDoors.stuckRound === 'function') window.HardPanDoors.stuckRound(currentMode, 'gone');
+            // 073: the organizer ended this round (End round - don't save): every other phone on it says so.
+            if (window.HardPanRound && typeof window.HardPanRound.endedCheck === 'function') window.HardPanRound.endedCheck(currentMode, incoming);
             hpFollowStart();
             hpCheckGroupKey();
             if (window.HardPanDoors && typeof window.HardPanDoors.spectatorMode === 'function') window.HardPanDoors.spectatorMode(hpSpectating(), hasGroupLock && hpKeyState === 'bad');

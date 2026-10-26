@@ -79,6 +79,7 @@
         + '.hp-sheet .hs-ways{display:grid;gap:8px;margin-top:12px;}'
         + '.hp-sheet .hs-way{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;min-height:56px;padding:10px 14px;border:1px solid #d6dfd9;background:#fff;color:#0f1f17;border-radius:14px;text-align:left;cursor:pointer;font-family:' + FONT + ';}'
         + '.hp-sheet .hs-way b{font-size:16px;font-weight:800;}.hp-sheet .hs-way span{font-size:12.5px;color:#5b6b63;}'
+        + '.hp-sheet .hs-way.hs-end b{color:#9b1c1c;}'
         + '.hp-sheet .hs-finish{display:block;width:100%;margin-top:16px;min-height:56px;border:2px solid #0f4d3a;background:#fff;color:#0f4d3a;border-radius:16px;font:800 18px/1 ' + FONT + ';cursor:pointer;}'
         + '.hp-sheet .hs-note{text-align:center;font:500 13px/1.4 ' + FONT + ';color:#5d6b64;margin-top:12px;}.hp-sheet .hs-note a{color:#0f4d3a;font-weight:700;}'
         + '.hp-sheet .hs-h{font:700 12px/1.3 ' + FONT + ';letter-spacing:.04em;color:#5d6b64;text-transform:uppercase;margin:18px 0 8px;}'
@@ -200,6 +201,8 @@
             + '<div class="hs-ways">'
             + '<button type="button" class="hs-way" data-hs="change-course"><b>\u26F3 Change course</b><span>' + (scored() ? 'Start a new round somewhere else - this one stays in History' : 'Pick another course - nothing scored yet') + '</span></button>'
             + '<button type="button" class="hs-way" data-hs="leave"><b>\uD83C\uDFE0 Leave round \u203a Home</b><span>It stays on Home under In progress - Resume picks up on this hole</span></button>'
+            // 073: End round - don't save (organizer only; nobody else sees the row).
+            + (canEnd() ? '<button type="button" class="hs-way hs-end" data-hs="end-round"><b>\uD83D\uDDD1\uFE0F End round \u2014 don\u2019t save</b><span>Delete this round: its scores, stats and shots aren\u2019t kept</span></button>' : '')
             + '</div>'
             // POLISH #23: Home has no "More" - its row is Join · Trip · History · My stats, so the
             // footer names that row and links plain Home (home.html#more landed on plain Home anyway).
@@ -325,6 +328,7 @@
         if (a === 'finish') { openFinish(); return; }
         if (a === 'change-course') { closeSheet(true); changeCourse(); return; }
         if (a === 'leave') { closeSheet(true); leaveRound(); return; }
+        if (a === 'end-round') { closeSheet(true); endRoundAsk(); return; }
         if (a === 'share-link') { var d = data() || {}; shareText(d.eventName || 'Our round', 'Join ' + (d.courseName || 'the round') + ' - code ' + code(), roundUrl()); return; }
         if (a === 'qr') {
             closeSheet(true);
@@ -379,6 +383,239 @@
         } catch (e) {}
         window.location.href = 'home.html';
         return true;
+    }
+
+    // ---- 073: END ROUND - DON'T SAVE ----------------------------------------------
+    // Manny 2026-10-25: a row in the Round Menu. It asks once (twice when the round has other
+    // golfers or games / bets) and then deletes the round EVERYWHERE IT LIVES:
+    //   server   events/<code> - first a one-line marker (endedByOrganizer) so the other phones
+    //            on the round can say "The organizer ended this round.", then the whole record.
+    //            The LIVE rules (Oct 20 read-back = database.rules.layout-base.json) let the signed-in
+    //            uid that owns the round (ownerUid) do both. An "L-" offline round has no server copy.
+    //   phone    the History copy (golfapp_snap_v1_<code>), its queued writes and held setup, Resume
+    //            pointers, every per-round key, this round's stats / Strokes Gained / Index round
+    //            (HardPanGpsStats.removeRound), its marked shots (hardpan_shots_v1_<code>) and this
+    //            round's records in the shot log (tagged with the round from 073 on).
+    // NEVER TOUCHED: My bag (hardpan_bag_v1) and every shot-log record from another round, so the
+    // distances learned from earlier rounds stay exactly as they are; caddie notes; other rounds.
+    // Finish & settle up, Change course, Leave round and Round settings > Delete are unchanged.
+    var END = {
+        title: 'End this round and delete it?',
+        body: 'Scores, stats and shots from this round won’t be saved. This can’t be undone.',
+        yes: 'Delete round', no: 'Keep playing',
+        title2: 'Delete it for everyone?',
+        yes2: 'Delete for everyone',
+        ended: 'The organizer ended this round.',
+        MARK: 'endedByOrganizer', TOMB: 'hardpan_ended_rounds_v1'
+    };
+    var LOCAL_CODE = /^L-[A-HJ-NP-Z2-9]{10}$/;
+    function Doors() { return window.HardPanDoors || null; }
+    function held(c) { var H = Doors(); try { return !!(H && typeof H.heldFor === 'function' && H.heldFor(c)); } catch (e) { return false; } }
+    function myUid() { try { return (window.authBootState && window.authBootState.uid) || null; } catch (e) { return null; } }
+    function dbRef() { try { return typeof db !== 'undefined' && db && typeof db.ref === 'function' ? db : null; } catch (e) { return null; } }   /* global db */
+    // A round tied to other rounds (a trip, a Ryder Cup) is not offered: its totals live across rounds.
+    function linked(d) { return !!(d && (d.tripCode || d.ryderCupRef || d.ryderCup || d.tournamentId)); }
+    // ONLY THE ORGANIZER sees the row: the uid that made the round, the organizer link's token, or
+    // the phone holding an offline round it started (canReachSetup is the same "Edit round setup" gate).
+    function canEnd() {
+        var c = code(), d = data();
+        if (!c) return false;
+        if (LOCAL_CODE.test(c)) return held(c) || organizer();
+        if (!d || linked(d)) return false;
+        return organizer();
+    }
+    function otherGolfers(d) { return Math.max(0, ((d && d.players) || []).filter(function (p) { return p && String(p.name || '').trim(); }).length - 1); }
+    function hasMoney(d) {
+        if (!d) return false;
+        var H = Doors();
+        try { if (H && typeof H.hasGames === 'function' && H.hasGames(d)) return true; } catch (e) {}
+        return !!(Object.keys(d.challenges || {}).length || Object.keys(d.sideMatches || {}).length || Object.keys(d.matchPresses || {}).length || Object.keys(d.strokePresses || {}).length);
+    }
+    // Asks twice: the round has other golfers, or any game or bet.
+    function needsTwice(d) { return otherGolfers(d) > 0 || hasMoney(d); }
+    function secondBody(d) {
+        var n = otherGolfers(d), m = hasMoney(d);
+        var who = n ? n + ' other golfer' + (n === 1 ? '' : 's') : '';
+        var what = who && m ? who + ' and games or bets' : (who || 'games or bets');
+        return 'This round has ' + what + '. It is deleted on every phone' + (m ? ' and its bets won’t count' : '') + '. '
+            + (n ? 'They’ll see “' + END.ended + '”' : 'This can’t be undone.');
+    }
+    function confirmSheet(o) { return typeof window.uiConfirm === 'function' ? window.uiConfirm(o) : Promise.resolve(false); }
+    function endRoundAsk() {
+        if (!canEnd()) return Promise.resolve(false);   // checked again here, not only when the row is drawn
+        var d = data() || {};
+        return confirmSheet({ title: END.title, body: END.body, confirmText: END.yes, cancelText: END.no, danger: true }).then(function (yes) {
+            if (!yes) return false;   // Keep playing: nothing happens
+            if (!needsTwice(d)) return true;
+            return confirmSheet({ title: END.title2, body: secondBody(d), confirmText: END.yes2, cancelText: END.no, danger: true });
+        }).then(function (go) { return go ? endRoundNow() : false; }, function () { return false; });
+    }
+    function within(p, ms) {
+        return new Promise(function (res, rej) {
+            var t = setTimeout(function () { rej(new Error('timeout')); }, ms);
+            Promise.resolve(p).then(function (v) { clearTimeout(t); res(v); }, function (e) { clearTimeout(t); rej(e); });
+        });
+    }
+    function fail(msg) { try { if (typeof window.uiFail === 'function') window.uiFail(msg); else say(msg); } catch (e) {} return false; }
+    // THE SERVER HALF. Refused before any write when this phone cannot finish it: no signal, or not
+    // signed in as the uid that owns the round (the live rules would refuse the delete). Nothing is
+    // deleted anywhere then - never half a round.
+    function serverEnd(c, d) {
+        var D0 = dbRef();
+        if (!D0) return Promise.reject(new Error('no-db'));
+        var uid = myUid();
+        if (!(d && d.ownerUid && uid && String(d.ownerUid) === String(uid))) return Promise.reject(new Error('not-owner'));
+        var ref = D0.ref('events/' + c);
+        // Connected now, or within 4 s (a page that just opened is still connecting): else no signal.
+        var connected = new Promise(function (res) {
+            var cr = D0.ref('.info/connected'), done = false;
+            var fin = function (v) { if (done) return; done = true; try { cr.off('value', h); } catch (e) {} res(v); };
+            var h = function (s) { if (s && s.val && s.val()) fin(true); };
+            setTimeout(function () { fin(false); }, 4000);
+            try { cr.on('value', h); } catch (e) { fin(false); }
+        });
+        return connected.then(function (up) {
+            if (!up) throw new Error('offline');
+            var mark = {}; mark[END.MARK] = Date.now();
+            return within(ref.update(mark), 15000).then(function () {
+                // The History copy steps aside first: this page then reads the delete as this phone's
+                // own (no "isn't on the server any more" sheet). It comes back if the delete fails.
+                var snapK = 'golfapp_snap_v1_' + c, snapV = null;
+                try { snapV = localStorage.getItem(snapK); } catch (x) {}
+                lsDel(snapK);
+                return within(ref.remove(), 15000).catch(function (e) {
+                    // The record stays: take the marker back so nobody is told it ended.
+                    if (snapV != null) lsPut(snapK, snapV);
+                    try { var un = {}; un[END.MARK] = null; ref.update(un); } catch (x) {}
+                    throw e;
+                });
+            });
+        });
+    }
+    function lsKeys() { var out = []; try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k) out.push(k); } } catch (e) {} return out; }
+    function lsGetJ(k, dflt) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? dflt : v; } catch (e) { return dflt; } }
+    function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+    function lsPut(k, v) { try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)); } catch (e) {} }
+    // A key belongs to the round when the code is one of its parts (golfapp_snap_v1_ABC123,
+    // hardpan_qstats_v1_ABC123_p101, groupPickDismissed:ABC123 ...). The learned bag and the shot
+    // log never carry a code in their key, and are listed here as never touched all the same.
+    var KEEP = ['hardpan_bag_v1', 'hardpan_shotlog_v1', 'hardpan_caddie_v1', 'hardpan_mymiss_v1'];
+    function ofRound(k, c) { return KEEP.indexOf(k) < 0 && String(k).split(/[^A-Za-z0-9-]+/).indexOf(c) >= 0; }
+    // THE PHONE HALF. codes: the round's code and any "L-" code it had before it synced.
+    function wipeLocal(c) {
+        c = String(c || '').toUpperCase();
+        if (!c) return 0;
+        var codes = [c];
+        var synced = lsGetJ('hardpan_offline_synced_v1', {});
+        Object.keys(synced || {}).forEach(function (L) { if (synced[L] && String(synced[L].code || '').toUpperCase() === c && codes.indexOf(L) < 0) codes.push(L); });
+        var n = 0;
+        // Its queued writes and held setup (the offline queue keeps one list for every round).
+        var q = lsGetJ('golfapp_wq_v1', []);
+        if (Array.isArray(q)) {
+            var keep = q.filter(function (op) {
+                var p = String((op && op.path) || ''), ck = String((op && op.coalesceKey) || '');
+                return !codes.some(function (x) { return p === 'events/' + x || p.indexOf('events/' + x + '/') === 0 || ck === 'round-setup:' + x; });
+            });
+            if (keep.length !== q.length) { n += q.length - keep.length; lsPut('golfapp_wq_v1', keep); }
+        }
+        var hm = lsGetJ('hardpan_held_rounds_v1', {}), hmc = false;
+        codes.forEach(function (x) { if (hm && hm[x]) { delete hm[x]; hmc = true; } });
+        if (hmc) lsPut('hardpan_held_rounds_v1', hm);
+        // Resume / the last-round pointers.
+        var lr = lsGetJ('hardpan_last_round', null);
+        if (lr && codes.indexOf(String(lr.code || '').toUpperCase()) >= 0) lsDel('hardpan_last_round');
+        var side = String((function () { try { return localStorage.getItem('hardpan_round_side') || ''; } catch (e) { return ''; } })());
+        if (codes.some(function (x) { return side === 'gps|' + x || side === 'bets|' + x; })) lsDel('hardpan_round_side');
+        try { if (codes.indexOf(String(localStorage.getItem('lastRoomCode') || '').toUpperCase()) >= 0) lsDel('lastRoomCode'); } catch (e) {}
+        var dr = lsGetJ('hardpan_setup_draft_v1', null);
+        if (dr && codes.indexOf(String(dr.code || '').toUpperCase()) >= 0) lsDel('hardpan_setup_draft_v1');
+        // Every per-round key: the History copy, marked shots, stats, SG, who-am-I, the hole, the token...
+        lsKeys().forEach(function (k) { if (codes.some(function (x) { return ofRound(k, x); })) { lsDel(k); n++; } });
+        try { for (var i = sessionStorage.length - 1; i >= 0; i--) { var sk = sessionStorage.key(i); if (sk && codes.some(function (x) { return ofRound(sk, x); })) sessionStorage.removeItem(sk); } } catch (e) {}
+        codes.forEach(function (x) {
+            if (synced && synced[x]) delete synced[x];
+            var tr = lsGetJ('hardpan_offline_tried_v1', {}); if (tr && tr[x]) { delete tr[x]; lsPut('hardpan_offline_tried_v1', tr); }
+        });
+        Object.keys(synced || {}).forEach(function (L) { if (codes.indexOf(L) >= 0 || (synced[L] && String(synced[L].code || '').toUpperCase() === c)) delete synced[L]; });
+        lsPut('hardpan_offline_synced_v1', synced || {});
+        // Stats / Strokes Gained / the HardPan Index's round (also marks it so it never comes back).
+        var St = window.HardPanGpsStats;
+        codes.forEach(function (x) {
+            try { if (St && typeof St.removeRound === 'function') St.removeRound(x); else lsPut('hardpan_nostats_' + x, 'removed'); } catch (e) {}
+            try { var I = window.HardPanIndex; if (I && typeof I.removeRound === 'function') I.removeRound(x); } catch (e) {}
+        });
+        // This round's records in the shot log (073 tags them); every other round's stay as they are.
+        try { var Lg = window.HardPanShotLog; if (Lg && typeof Lg.removeRound === 'function') codes.forEach(function (x) { n += Lg.removeRound(x) || 0; }); } catch (e) {}
+        // Remembered as ended, so an "L-" sync that was already on its way does not bring it back.
+        var tomb = lsGetJ(END.TOMB, {}); codes.forEach(function (x) { tomb[x] = Date.now(); }); lsPut(END.TOMB, tomb);
+        return n;
+    }
+    var ending = null;
+    function endRoundNow() {
+        var c = code(), d = data() || {};
+        if (!c || ending) return Promise.resolve(false);
+        ending = c;
+        var local = LOCAL_CODE.test(c);
+        var server = local ? Promise.resolve(true) : serverEnd(c, d);
+        return server.then(function () {
+            wipeLocal(c);
+            try { if (typeof window.closeLiveBoard === 'function') window.closeLiveBoard(); } catch (e) {}
+            window.location.href = 'home.html';
+            return true;
+        }, function (e) {
+            ending = null;
+            var m = String((e && e.message) || e || '');
+            if (m === 'offline' || m === 'timeout') return fail('No signal - the round wasn’t deleted. Try again when you have signal.');
+            if (m === 'not-owner' || /PERMISSION_DENIED/i.test(m)) return fail('This phone isn’t signed in as the account that started this round, so it can’t delete it. Nothing was deleted.');
+            return fail('Couldn’t delete the round - nothing was deleted. Try again.');
+        });
+    }
+    // THE OTHER PHONES (index.html calls this with every copy of the round the server sends). The
+    // marker arrives first, then the round is gone: either way they see the organizer's message.
+    var endedShown = null;
+    function seenKey(c) { return 'hp_ended_seen:' + c; }
+    function endedCheck(c, incoming) {
+        c = String(c || '').toUpperCase();
+        if (!c || ending === c) return false;
+        var seen = false;
+        try { seen = sessionStorage.getItem(seenKey(c)) === '1'; } catch (e) {}
+        if (incoming && incoming[END.MARK]) { try { sessionStorage.setItem(seenKey(c), '1'); } catch (e) {} seen = true; }
+        else if (incoming) return false;
+        if (!seen) return false;
+        endedNotice(c);
+        return true;
+    }
+    function endedNotice(c) {
+        if (endedShown === c && document.getElementById('hp-ended-round')) return;
+        endedShown = c;
+        var el = document.getElementById('hp-ended-round');
+        if (!el) {
+            el = document.createElement('div'); el.id = 'hp-ended-round'; el.setAttribute('role', 'alertdialog');
+            el.style.cssText = 'position:fixed;inset:0;z-index:2147483001;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);font-family:-apple-system,system-ui,sans-serif;color-scheme:light;';
+            (document.body || document.documentElement).appendChild(el);
+        }
+        el.innerHTML = '<div style="width:100%;max-width:520px;box-sizing:border-box;background:#fff;color:#1a1a1a;border-radius:18px 18px 0 0;padding:20px 16px calc(env(safe-area-inset-bottom) + 16px);">'
+            + '<div data-hp-ended-msg style="font-weight:800;font-size:1.15rem;color:#0f1f17;">' + esc(END.ended) + '</div>'
+            + '<button type="button" data-hp-ended-home style="display:block;width:100%;min-height:52px;border-radius:14px;font-weight:800;font-size:1.05rem;margin-top:14px;border:0;background:#0f4c3a;color:#fff;">Go Home</button>'
+            + '</div>';
+        el.style.display = 'flex';
+        // The older "isn't on the server any more" sheet says less than this one: it stays out of
+        // the way for THIS round only (a style that applies while this message is up).
+        if (!document.getElementById('hp-ended-css')) {
+            var st = document.createElement('style'); st.id = 'hp-ended-css';
+            st.textContent = '#hp-stuck-round{display:none !important;}';
+            (document.head || document.documentElement).appendChild(st);
+        }
+        el.querySelector('[data-hp-ended-home]').onclick = function () {
+            // The round is gone from the server: this phone forgets it (its copy and its queued scores)
+            // and, as on the organizer's phone (Manny, 073 answer 2), this round's stats, SG, Index round,
+            // marked shots and tagged shot-log records - the same wipeLocal. My bag and other rounds stay.
+            var H = Doors();
+            try { if (H && typeof H.forgetRound === 'function') H.forgetRound(c, true); } catch (e) {}
+            lsDel('golfapp_snap_v1_' + c);
+            try { wipeLocal(c); } catch (e) {}
+            try { window.location.replace('home.html'); } catch (e) { window.location.href = 'home.html'; }
+        };
     }
 
     // ---- ROUND SETTINGS = today's Round Menu, plus GPS tools ---------------------
@@ -1135,6 +1372,8 @@
         openBets: openBets, closeBets: closeBets, closeSheet: closeSheet, go: go, barFor: barFor, refresh: refresh,
         toGps: toGps, toCard: toCard, toFullCard: toFullCard, holeView: holeView, openCompactCard: openCompactCard, closeCompactCard: closeCompactCard, compactCardOpen: compactOpen, tidyCourse: tidyCourse, screen: screen, sheetKind: function () { return sheetOpen() ? sheetKind : null; },
         payText: function () { return payText(settle()); }, feed: feed, enterScore: enterScore,
-        changeCourse: changeCourse, leaveRound: leaveRound, scored: scored
+        changeCourse: changeCourse, leaveRound: leaveRound, scored: scored,
+        // 073: End round - don't save.
+        canEnd: canEnd, needsTwice: needsTwice, endRoundAsk: endRoundAsk, endRoundNow: endRoundNow, wipeLocal: wipeLocal, endedCheck: endedCheck, END: END
     };
 })();

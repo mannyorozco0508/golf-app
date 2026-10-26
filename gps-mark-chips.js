@@ -120,6 +120,7 @@
             src: w ? srcOf(open.wind) : null
         };
         if (open.golfer) rec.golfer = open.golfer;
+        if (open.round) rec.round = open.round;   // 073: which round (a code, never a position)
         // 070 part 4: the course's height when the shot was hit (course sources only; the log checks too).
         if (num(open.courseFt) != null && open.courseFtSrc) { rec.cft = open.courseFt; rec.cftSrc = open.courseFtSrc; }
         if (miss && END_KINDS.indexOf(miss.endKind) !== -1) {
@@ -173,6 +174,8 @@
                     elevFt: num(info.elevFt), course: info.course || '', golfer: info.golfer || '', aim: null,
                     // 070 part 4: the COURSE's height (feet, a course number - never a position) and its source.
                     courseFt: num(info.courseFt), courseFtSrc: typeof info.courseFtSrc === 'string' ? info.courseFtSrc : null };
+                // 073: the round's code (text, no position), so End round - don't save can take this round's shots out.
+                if (typeof info.round === 'string' && info.round) open.round = info.round;
                 aim(info.ring || null, pt);
             }
             return { closed: closed, open: open ? view() : null };
