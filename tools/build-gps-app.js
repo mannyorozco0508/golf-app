@@ -51,6 +51,13 @@ FILES.forEach((file) => {
     else fs.copyFileSync(src, path.join(OUT, file));
 });
 if (missing.length) { console.error('MISSING (declared, not at the repo root): ' + missing.join(', ')); process.exit(1); }
+// 077 THE NEW HARDPAN LOGO (Manny's Oct 25 pick, ~/Desktop/HardPan-Logo): THIS APP ONLY. The repo-root
+// icon-192/512, favicon-32, hardpan-icon.svg and logo-mark.png stay the old HP ball (the web and the
+// Consumer app keep them until Manny OKs those); the GPS app gets the new files laid over them here,
+// plus the Home title mark (hp-home-mark.png, root).
+const BRAND_APP = path.join(ROOT, 'assets', 'brand', 'hardpan-2026', 'app');
+fs.readdirSync(BRAND_APP).forEach((f) => fs.copyFileSync(path.join(BRAND_APP, f), path.join(OUT, f)));
+fs.copyFileSync(path.join(ROOT, 'hp-home-mark.png'), path.join(OUT, 'hp-home-mark.png'));
 // THE DEV SWITCH (mailbox 008): GPS_DEV_PRO=1 makes THIS build count as subscribed (Manny's Cmd+R
 // beta-testing of the GPS features while the store isn't set up). Written into the built
 // gps-config.js only; never archive a build made with it.
