@@ -687,8 +687,90 @@
         }
         return el;
     }
+    // ---- 071b (Manny, URGENT-075): A BET ON A STAND-IN CARD ASKS FOR THE PARS FIRST --------------------
+    // A GPS-only round on an OpenStreetMap course (activeCourseKey osm_w<id> / osm_r<id>) was started on the par-4
+    // stand-in card (071). A bet added on it now asks first - the same screen as Start Round's (simple-flow.js):
+    // the pars, and the stroke indexes when the bet is NET and some golfer in it gets a stroke (the engines' own
+    // getStrokes / allocateMatchStrokes). Saved: the round's card (events/<code>/courseData), then the bet.
+    // "Not now": no bet is added. A round whose card has real pars is never asked.
+    function standInCard() {
+        var d = data() || {}, cd = (d.courseData || []).slice();
+        if (!/^osm_[wr]\d+$/.test(String(d.activeCourseKey || '')) || !cd.length) return false;
+        return cd.every(function (h) { return Number(h.par) === 4 && Number(h.hcpIndex) === Number(h.hole); });
+    }
+    function strokesAmong(ids) {
+        var ps = (ids && ids.length ? ids.map(byId).filter(Boolean) : players()), hs = ps.map(function (p) { try { return typeof parseHcp === 'function' ? parseHcp(String(p.hcp == null ? '' : p.hcp)) : Number(p.hcp) || 0; } catch (e) { return 0; } });   /* global parseHcp, getStrokes, allocateMatchStrokes */
+        if (!hs.length) return false;
+        var lo = Math.min.apply(null, hs), gets = false;
+        for (var i = 1; i <= 18 && !gets; i++) hs.forEach(function (h) {
+            try { if (typeof getStrokes === 'function' && getStrokes(i, h)) gets = true; if (typeof allocateMatchStrokes === 'function' && allocateMatchStrokes(h - lo, i)) gets = true; } catch (e) {}
+        });
+        return gets;
+    }
+    var PA = null;
+    function parsRoot() {
+        var r = document.getElementById('hp-pars');
+        if (r) return r;
+        r = document.createElement('div'); r.id = 'hp-pars';
+        r.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(10,20,15,.45);display:none;align-items:flex-end;justify-content:center;font-family:inherit;';
+        document.body.appendChild(r);
+        r.addEventListener('click', function (e) {
+            var b = e.target.closest ? e.target.closest('[data-pa]') : null; if (!b || !PA) return;
+            if (b.getAttribute('data-pa') === 'save') parsSave(); else parsCancel();
+        });
+        r.addEventListener('input', function (e) {
+            var t = e.target; if (!PA || !t.getAttribute) return;
+            if (t.getAttribute('data-pa-par')) PA.p[t.getAttribute('data-pa-par')] = t.value;
+            if (t.getAttribute('data-pa-si')) PA.si[t.getAttribute('data-pa-si')] = t.value;
+        });
+        return r;
+    }
+    // then(): runs after the card is saved. cancel(): "Not now".
+    function askPars(idx, then, cancel) {
+        var d = data() || {}, n = (d.courseData || []).length || 18;
+        PA = { n: n, idx: !!idx, p: {}, si: {}, err: '', then: then, cancel: cancel, saving: false };
+        try { (window.__hbParsAsk = window.__hbParsAsk || []).push({ idx: !!idx }); } catch (e) {}
+        parsDraw();
+    }
+    function parsDraw() {
+        var r = parsRoot(), a = PA, rows = '', inp = 'font:inherit;font-size:16px;padding:10px 12px;border:1px solid #cfd8d3;border-radius:12px;width:84px;';
+        if (!a) { r.style.display = 'none'; r.innerHTML = ''; return; }
+        for (var i = 1; i <= a.n; i++) rows += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #e3e9e5;"><span style="min-width:56px;flex:1;">Hole ' + i + '</span>'
+            + '<input type="number" inputmode="numeric" min="3" max="6" data-pa-par="' + i + '" value="' + esc(a.p[i] || '') + '" placeholder="Par" style="' + inp + '">'
+            + (a.idx ? '<input type="number" inputmode="numeric" min="1" max="' + a.n + '" data-pa-si="' + i + '" value="' + esc(a.si[i] || '') + '" placeholder="Index" style="' + inp + '">' : '') + '</div>';
+        var nm = esc(String((data() || {}).courseName || '').split(' (')[0]);
+        r.innerHTML = '<div style="width:100%;max-width:520px;max-height:88vh;overflow:auto;margin:0 12px calc(env(safe-area-inset-bottom) + 12px);padding:16px;background:#fff;border-radius:18px;color:#13261d;" role="dialog" aria-labelledby="hp-pars-t">'
+            + '<div id="hp-pars-t" style="font-size:18px;font-weight:800;line-height:1.3;margin-bottom:4px;">' + (a.idx ? 'Pars and stroke indexes' : 'Pars') + ' for ' + nm + '</div>'
+            + '<div style="font-size:14px;color:#5b6b63;margin-bottom:10px;">Your game needs the real ' + (a.idx ? 'pars and stroke indexes (net strokes go by the index)' : 'pars') + ' — from the scorecard. Once, for this round.</div>'
+            + rows + (a.err ? '<div id="hp-pars-err" style="color:#b3261e;font-weight:700;margin-top:8px;">' + esc(a.err) + '</div>' : '')
+            + '<button type="button" data-pa="save" style="display:block;width:100%;margin-top:12px;min-height:52px;border:0;border-radius:14px;background:#c6f36b;color:#0f2a1c;font:inherit;font-weight:800;font-size:17px;"' + (a.saving ? ' disabled' : '') + '>' + (a.saving ? 'Saving…' : 'Save and add the bet') + '</button>'
+            + '<button type="button" data-pa="cancel" style="display:block;width:100%;margin-top:8px;min-height:46px;border:1px solid #cfd8d3;border-radius:14px;background:#fff;font:inherit;font-weight:700;">Not now</button></div>';
+        r.style.display = 'flex';
+    }
+    function parsCancel() { var c = PA && PA.cancel; PA = null; parsDraw(); if (typeof c === 'function') c(); }
+    function parsSave() {
+        var a = PA; if (!a || a.saving) return;
+        var cd = ((data() || {}).courseData || []).slice().sort(function (x, y) { return x.hole - y.hole; }), out = [], seen = {}, bad = '';
+        for (var i = 1; i <= a.n; i++) {
+            var par = Number(a.p[i]), si = a.idx ? Number(a.si[i]) : ((cd[i - 1] || {}).hcpIndex || i);
+            if (!(par >= 3 && par <= 6 && Math.round(par) === par)) { bad = bad || 'Hole ' + i + ': a par of 3, 4, 5 or 6.'; continue; }
+            if (a.idx && (!(si >= 1 && si <= a.n && Math.round(si) === si) || seen[si])) { bad = bad || 'Hole ' + i + ': a stroke index from 1 to ' + a.n + ', each used once.'; continue; }
+            seen[si] = 1;
+            out.push(Object.assign({}, cd[i - 1] || {}, { hole: (cd[i - 1] && cd[i - 1].hole) || i, par: par, hcpIndex: si }));
+        }
+        if (bad) { a.err = bad; parsDraw(); return; }
+        if (typeof requireOnlineForMoney === 'function' && !requireOnlineForMoney('NOT SAVED', 'Reconnect before saving the pars.')) return;
+        a.saving = true; a.err = ''; parsDraw();
+        db.ref('events/' + code() + '/courseData').set(out).then(function () {
+            try { if (currentData) currentData.courseData = out; } catch (e) {}
+            var then = a.then; PA = null; parsDraw();
+            if (typeof then === 'function') then();
+        }, function (err) { a.saving = false; a.err = 'NOT SAVED — ' + ((err && err.message) || 'try again'); parsDraw(); });
+    }
     function start() {
         var b = buildBet({ game: st.game, mode: st.mode, press: st.press, picks: st.picks, stake: st.stake, scoring: st.scoring, startHole: st.from });
+        // 071b: a stand-in card - the pars first (and the indexes when this net bet gives strokes); "Not now" = no bet
+        if (standInCard() && !b.refuse) { var keep = st; askPars(st.scoring === 'net' && strokesAmong(st.picks), function () { if (st === keep) start(); }, function () { if (st === keep) { var rtc = st.returnTo; close(); if (rtc && /\.html/.test(rtc)) goBack(rtc); } }); return; }
         if (b.refuse) { var w = root().querySelector('.hb-why'); if (w) w.textContent = b.refuse; return; }
         var editId = st.editId, rt = st.returnTo, res;
         try { res = write(b, editId); } catch (e) { say('fail', 'Could not save: ' + (e && e.message)); return; }
@@ -888,6 +970,8 @@
         if (!organizerHere()) { wk.err = 'Only the round’s organizer can change the Weekly Game.'; wkDraw(); return; }
         var pool = wk.on ? wkPool() : null;
         if (pool) { var v = wkCheck(pool); if (!v.valid) { wk.err = 'NOT SAVED — ' + (v.errors || ['check the pot'])[0]; wkDraw(); return; } }
+        // 071b: the Weekly Game on a stand-in card - the pars first (indexes when its skins are net with strokes)
+        if (pool && standInCard()) { var wkeep = wk; askPars(!!(pool.skins && pool.skins.scoring === 'net' && strokesAmong([])), function () { if (wk === wkeep) wkSave(); }, function () {}); return; }
         if (typeof requireOnlineForMoney === 'function' && !requireOnlineForMoney('NOT SAVED', 'Reconnect before changing the Weekly Game.')) return;
         wk.saving = true; wkDraw();
         var w = wk, cb = w.onDone, rt = w.returnTo;
