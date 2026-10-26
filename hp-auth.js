@@ -230,7 +230,12 @@
     // Resolves { uid, preserved, note, state } - preserved: the uid did not change, so
     // every round this phone set up stays this account's. Rejects with the flow's own
     // coded error, plus .message = the sentence the existing flow shows for it.
+    // ANDROID (android-2.0, 024 C): no Apple sign-in on Android (Manny, 2026-10-24) and no Google
+    // until 024 D1. The sheet offers neither; this refuses any other caller in plain words rather
+    // than opening a flow that cannot finish. iOS and the web go on as before.
+    function androidApp() { try { return !!(W.Capacitor && typeof W.Capacitor.getPlatform === 'function' && W.Capacitor.getPlatform() === 'android'); } catch (e) { return false; } }
     function oauth(which) {
+        if (androidApp()) return Promise.reject(coded('android-email-only', 'On Android, sign in with email.'));
         return ready().then(needOauth).then(function (ok) {
             if (!ok) throw coded('sdk-absent', 'Sign-in is not ready yet. Wait a moment and try again.');
             var O = W.oauthSignin;

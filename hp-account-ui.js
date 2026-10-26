@@ -205,11 +205,18 @@
     }
 
     // ---- 2. THE SIGN-IN SHEET -----------------------------------------------------
+    // ANDROID (android-2.0, 024 C; Manny, 2026-10-24): email is the way in on Android. No Apple
+    // there, ever; Google comes with its own step (024 D1, once the app's Play signing keys are
+    // in Firebase). So the sheet offers "Sign in with email" alone, and its email step goes back
+    // to it with a plain Back. iOS and the web keep all three, exactly as before.
+    function android() { try { return !!(W.Capacitor && typeof W.Capacitor.getPlatform === 'function' && W.Capacitor.getPlatform() === 'android'); } catch (e) { return false; } }
     function pickHtml() {
         return '<div class="hpa-why">' + esc(WORDS.why) + '</div>'
-            + '<button type="button" class="hpa-btn apple" data-hpa="apple">' + APPLE_SVG + esc(WORDS.apple) + '</button>'
-            + '<button type="button" class="hpa-btn google" data-hpa="google">' + GOOGLE_SVG + esc(WORDS.google) + '</button>'
-            + '<button type="button" class="hpa-email" data-hpa="email">' + esc(WORDS.email) + '</button>'
+            + (android()
+                ? '<button type="button" class="hpa-btn" data-hpa="email">' + esc(WORDS.emailTitle) + '</button>'
+                : '<button type="button" class="hpa-btn apple" data-hpa="apple">' + APPLE_SVG + esc(WORDS.apple) + '</button>'
+                    + '<button type="button" class="hpa-btn google" data-hpa="google">' + GOOGLE_SVG + esc(WORDS.google) + '</button>'
+                    + '<button type="button" class="hpa-email" data-hpa="email">' + esc(WORDS.email) + '</button>')
             + '<div class="hpa-msg" role="status" aria-live="polite"></div>'
             + '<div class="hpa-ok"><span class="e" aria-hidden="true">📍</span><span><b>' + esc(WORDS.okBold) + '</b>' + esc(WORDS.okRest) + '</span></div>'
             + '<div class="hpa-fine"><a href="' + LEGAL.privacy + '" target="_blank" rel="noopener">Privacy</a> · <a href="' + LEGAL.terms + '" target="_blank" rel="noopener">Terms</a></div>';
@@ -222,7 +229,7 @@
             + '<input type="email" id="hpa-email-in" value="' + esc(emailTo) + '" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="email" inputmode="email" placeholder="you@example.com" aria-label="Email">'
             + '<div class="hpa-msg" role="status" aria-live="polite"></div>'
             + '<button type="button" class="hpa-save" data-hpa="emailsend">' + esc(WORDS.emailSend) + '</button>'
-            + '<button type="button" class="hpa-cancel" data-hpa="pick">‹ ' + esc(WORDS.otherWays) + '</button></div>';
+            + '<button type="button" class="hpa-cancel" data-hpa="pick">‹ ' + esc(android() ? 'Back' : WORDS.otherWays) + '</button></div>';
         return '<div class="hpa-edit" data-hpa-email="2"><div class="hpa-why">' + esc(note || WORDS.emailSent.replace('{e}', emailTo)) + '</div>'
             + '<input type="text" id="hpa-email-paste" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="' + esc(WORDS.pastePh) + '" aria-label="' + esc(WORDS.pastePh) + '">'
             + '<div class="hpa-msg" role="status" aria-live="polite"></div>'
