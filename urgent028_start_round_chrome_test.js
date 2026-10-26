@@ -78,9 +78,17 @@ const KEY = "document.getElementById('course-select').value";
 const BTN = "JSON.stringify((function(){ var b=document.querySelector('[data-sf=startgps]'); var c=document.getElementById('sf-course'); return { text: b ? b.innerText : null, off: b ? b.disabled : null, card: c ? c.innerText : null, key: document.getElementById('course-select').value, at: location.pathname.split('/').pop(), code: new URLSearchParams(location.search).get('game') }; })())";
 const ROUND = "JSON.stringify({ code: currentMode, course: currentData && currentData.courseName, key: currentData && currentData.activeCourseKey, hole1: currentData && currentData.courseData && currentData.courseData[0], at: location.pathname.split('/').pop() })";
 // The GPS door from Home: Course & Tees for a new round.
-async function gpsDoor(j) {
-    await j.goto(fileUrl('home.html', ''), 2500);
-    await click(j, '[data-hp-act="sgpsdoor"]');
+// URGENT-085: with a round in progress, Home's Start round first asks "Resume your round at <course>, or start a
+// new round?" - New round goes on to Course & Tees (and Start Round there does not ask again). `plain`: the GPS door
+// with no Home ask (home.html#gpsdoor - the round's Change course and the old door), where URGENT-028's own
+// "End your Papago round" ask is what guards a round with scores.
+async function gpsDoor(j, plain) {
+    if (plain) await j.goto(fileUrl('home.html', '') + '#gpsdoor', 2500);
+    else {
+        await j.goto(fileUrl('home.html', ''), 2500);
+        await click(j, '#hs-gps [data-hp-act="sgpsdoor"]');
+        if (await until(j, "(function(){ var a=document.getElementById('hs-ask85'); return !!a && a.style.display !== 'none'; })()", 2500)) await click(j, '#hs-ask85 [data-ask85="new"]');
+    }
     assert.ok(await until(j, "/admin\\.html/.test(location.pathname) && /game=/.test(location.search) && !!document.getElementById('sf-q') && !!window.HardPanGpsLive", 30000), 'Course & Tees');
 }
 // Papago picked (the closest - or one tap in NEAR YOU), its tees in.
@@ -157,7 +165,7 @@ test('Papago, then Aguila (online, slow): "Loading Aguila…" (off) while it loa
 
 test('a Papago round WITH scores: "End your Papago round (thru 3) and start at Aguila?" - Resume opens Papago; Start new is a new round, Papago keeps its scores', { timeout: 180000 }, async () => {
     const j = await open({ PAPSC1: papagoRound('PAPSC1', 3) }, 'PAPSC1');
-    await gpsDoor(j);
+    await gpsDoor(j, true);
     await papagoPicked(j);
     await searchAguila(j);
     await click(j, '#sf [data-sf-web]');
@@ -172,7 +180,7 @@ test('a Papago round WITH scores: "End your Papago round (thru 3) and start at A
     await click(j, '#sf-ask [data-sf="askresume"]');
     assert.ok(await until(j, "/index\\.html/.test(location.pathname) && /game=PAPSC1/.test(location.search)", 20000), 'Resume opens Papago');
     // Again - Start new this time.
-    await gpsDoor(j);
+    await gpsDoor(j, true);
     await papagoPicked(j);
     await pickAguilaAgain(j);
     await aguilaIn(j);

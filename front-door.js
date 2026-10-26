@@ -1707,12 +1707,58 @@
     }
     // START ROUND (and a chip): the GPS door's own gate first (gps-entitlement, exactly as the door had it),
     // then Course & Tees through the lobby's code hop (admin.html?start=quick), its mark saying what to do:
-    //   at a course      { pick, go }  - picked and started there, one tap (simple-flow.js oneTap)
+    //   at a course      { pick }      - Course & Tees, the course you're at picked (You're here); you tap Start Round (085)
     //   not at a course  { pick }      - Course & Tees with the nearest course picked
     //   no location / no signal         - Course & Tees as before ('gps')
     // A chip also leaves its game for the round page (HOME_GAME): its setup opens once the round is up.
-    var HOME_GAME = 'hardpan_home_game';
+    // URGENT-085 (Manny, Oct 26: "I hit start round and ... it jumps all the way to the first hole"): at a course
+    // the mark no longer carries `go` - Start round ALWAYS shows "Where are you playing?" (the PLAYING card,
+    // You're here, TEES, Start Round) and the golfer taps Start Round there. simple-flow.js oneTap is kept
+    // (nothing else asks for it now). WITH A ROUND IN PROGRESS (Home's IN PROGRESS card is up) it asks ONCE
+    // first - "Resume your round at <course>, or start a new round?" [Resume] [New round]: Resume is exactly
+    // the IN PROGRESS card's Resume (that round's page; a chip's game opens over it as on a new round); New
+    // round goes on to the screen, and its Start Round does not ask about that round again (URGENT-028's
+    // "already said yes", the same as gps-round.js Change course).
+    var HOME_GAME = 'hardpan_home_game', ASK85 = 'hs-ask85';
+    function homeInProgress() {
+        var b = W.document.querySelector('#hs-progress .hs-prog[data-hp-open]');
+        if (!b || b.offsetParent === null) return null;
+        var code = String(b.getAttribute('data-hp-open') || '').toUpperCase();
+        return code ? { code: code, course: b.getAttribute('data-hs-prog-course') || '' } : null;
+    }
+    function homeAsk(o, game) {
+        var el = $(ASK85);
+        if (!el) {
+            el = W.document.createElement('div'); el.id = ASK85; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+            el.style.cssText = 'position:fixed;inset:0;z-index:60;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);font-family:-apple-system,system-ui,sans-serif;';
+            (W.document.body || W.document.documentElement).appendChild(el);
+        }
+        var btn = 'display:block;width:100%;min-height:52px;border-radius:14px;font-weight:800;font-size:17px;';
+        el.innerHTML = '<div style="width:100%;max-width:520px;box-sizing:border-box;background:#fff;color:#1a1a1a;border-radius:18px 18px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 16px);">'
+            + '<div id="hs-ask85-t" style="font-weight:800;font-size:19px;line-height:1.3;margin-bottom:14px;">Resume your round at ' + esc(o.course || 'your course') + ', or start a new round?</div>'
+            + '<button type="button" data-ask85="resume" style="' + btn + 'border:0;background:#0f4c3a;color:#fff;margin-bottom:8px;">Resume</button>'
+            + '<button type="button" data-ask85="new" style="' + btn + 'border:1px solid #0f4c3a;background:#fff;color:#0f4c3a;">New round</button></div>';
+        el.setAttribute('aria-labelledby', 'hs-ask85-t');
+        el.style.display = 'flex';
+        el.onclick = function (ev) {
+            var t = ev.target, b = t.closest && t.closest('[data-ask85]');
+            if (!b) { if (t === el) el.style.display = 'none'; return; }   // a tap outside: nothing happens
+            el.style.display = 'none';
+            if (b.getAttribute('data-ask85') === 'resume') {
+                ss(HOME_GAME, game ? JSON.stringify({ id: game, at: Date.now() }) : null);
+                W.location.href = roundHref(o.code);
+                return;
+            }
+            ss('hardpan_change_from', o.code);
+            homeNewRound(game);
+        };
+    }
     function homeStartRound(game) {
+        var o = homeInProgress();
+        if (o) { homeAsk(o, game); return; }
+        homeNewRound(game);
+    }
+    function homeNewRound(game) {
         gpsGate(homeCourse(), function () {
             setDoor('gps'); ss(QUICK, null);
             ss(HOME_GAME, game ? JSON.stringify({ id: game, at: Date.now() }) : null);
@@ -1721,7 +1767,7 @@
             var m = null;
             if (!offline && st && st.c && st.c.key && (st.kind === 'at' || st.kind === 'near')) {
                 m = { mode: 'gps', pick: { key: st.c.key, name: st.c.name } };
-                if (st.kind === 'at') m.go = 1;
+                // (URGENT-065's `if (st.kind === 'at') m.go = 1` one-tap start: off since URGENT-085 - see above.)
             }
             ss(SIMPLE, m ? JSON.stringify(m) : 'gps');
             W.location.href = 'admin.html?start=quick';
@@ -1802,7 +1848,7 @@
         timeout(H.db.ref('events/' + last).once('value'), 6000, 'round').then(function (s) { var d = withQueued(s && s.val ? s.val() : null, last); if (d || !local) paint(d); }, function () {});
     }
     function simpleProgress(code, course, thru) {
-        return '<button type="button" class="hs-card hs-prog" data-hp-open="' + esc(code) + '"><span><span class="h">IN PROGRESS</span>'
+        return '<button type="button" class="hs-card hs-prog" data-hp-open="' + esc(code) + '" data-hs-prog-course="' + esc(shownName(String(course || '').split(' (')[0])) + '"><span><span class="h">IN PROGRESS</span>'
             + '<span class="n">' + esc(shownName(String(course || 'Your round').split(' (')[0])) + ' \u00b7 ' + (thru ? 'Thru ' + thru : 'Not started') + '</span></span><span class="go">Resume \u203A</span></button>';
     }
     function simpleAct(a, b) {
