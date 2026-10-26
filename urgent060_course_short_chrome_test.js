@@ -146,7 +146,7 @@ test('search still finds the courses that dropped off NEAR YOU (and "Not listed?
     assert.equal(after.key, f.drop, 'tapping it picks it');
     assert.equal(after.card, true, 'a course picked from search (in neither list) shows as the picked card above its tees');
     assert.equal(near(after).length, 0, '076: the picked course alone at the top - no NEAR YOU under it');
-    assert.equal(after.notListed, false, '076: "Not listed?" sits under the results (one Change away), not under the PLAYING card');
+    assert.equal(after.notListed, true, '"Not listed? Add a course" still there (076: under the PLAYING card\'s tees)');
 });
 
 test('on the far side of a big course (more than 0.5 mi from its point, next to its holes): still "You\'re here", picked; the distance shown is unchanged', { timeout: 150000 }, async () => {

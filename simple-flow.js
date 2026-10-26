@@ -1235,7 +1235,7 @@
         var pend = pendBusy() ? S.pend : null, pendOld = pend && pend.state !== 'card';
         // THE PICKED COURSE'S TEES (POLISH 029 #11: the tees and the start right under the course).
         var picked = function (head) { return pendOld ? pendHead(pend) : S.changing ? '' : (head ? courseHead() : '') + lookupBox(key, courseName()) + osmCardNote(key) + courseCard() + (S.mode === 'gps' && key ? '<div id="sf-offline-slot"></div>' : ''); };
-        if (playing) {}   // 076: playBody drew the course, its tees and the rest
+        if (playing) body += '<button type="button" class="sf-link muted" data-sf="fullcourse">Not listed? Add a course ›</button>';   // 076: kept under the card too (only add)
         else if (typed) { if (!A) body += picked(true); }   // 076: GPS - nothing but the results while typing
         else {
             // URGENT-060 (Manny, 5:25 PM): SHORTER. Under the search: NEAR YOU = the 3 closest only (the

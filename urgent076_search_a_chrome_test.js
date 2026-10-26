@@ -86,6 +86,7 @@ const alone = (s, what) => {
     assert.doesNotMatch(s.text, /NEAR YOU|RESULTS|LAST PLAYED/, what + ': no lists');
     const iCard = s.order.indexOf('CARD'), iTees = s.order.indexOf('H:TEES'), iTee = s.order.indexOf('TEE'), iStart = s.order.indexOf('START');
     assert.ok(iCard === 0 && iTees === 1 && iTee === 2 && iStart > iTee, what + ': the card, then TEES right under it, then Start Round: ' + JSON.stringify(s.order));
+    assert.ok(s.order.indexOf('NOTLISTED') > iTee, what + ': "Not listed? Add a course" kept (only add): ' + JSON.stringify(s.order));
 };
 
 test('auto-picked at a course: the PLAYING card says "You\'re here" (alone at the top, TEES, Start Round); Change: the box, focused, empty -> NEAR YOU with that course "You\'re here"', { timeout: 150000 }, async () => {

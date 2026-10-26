@@ -125,7 +125,7 @@ test('Papago, then Aguila (online, slow): "Loading Aguila…" (off) while it loa
     const busy = JSON.parse(await ev(j, BTN));
     assert.equal(busy.text, 'Loading Aguila…', 'the button names the course it waits for');
     assert.equal(busy.off, true, 'and is off');
-    assert.match(busy.card, /^PLAYING\nChange\n[\s\S]*Aguila Golf Club/, 'the selected card (076: the PLAYING card) is Aguila, not Papago: ' + busy.card);
+    assert.match(busy.card, /^PLAYING\nChange\nChampionship\nAguila Golf Club/, 'the selected card (076: the PLAYING card) is Aguila, not Papago: ' + busy.card);
     assert.doesNotMatch(busy.card, /Papago/);
     // A tap now (Manny's) starts nothing - never Papago.
     await ev(j, "(function(){ var b=document.querySelector('[data-sf=startgps]'); b.disabled=false; b.click(); return 1; })()");
@@ -214,7 +214,7 @@ test('no signal: an online course tapped stays the pick - "Loading Aguila…" (o
     await sleep(600);
     const off = JSON.parse(await ev(j, BTN));
     assert.deepEqual([off.text, off.off], ['Loading Aguila…', true], 'the loading state');
-    assert.match(off.card, /^PLAYING\nChange\n[\s\S]*Aguila Golf Club[\s\S]*No signal/, 'the selected card (076: the PLAYING card) is Aguila, waiting for a signal: ' + off.card);
+    assert.match(off.card, /^PLAYING\nChange\nChampionship\nAguila Golf Club[\s\S]*No signal/, 'the selected card (076: the PLAYING card) is Aguila, waiting for a signal: ' + off.card);
     assert.equal(await ev(j, 'window.__pulls.length'), 0, 'not pulled with no signal');
     await ev(j, "(function(){ var b=document.querySelector('[data-sf=startgps]'); b.disabled=false; b.click(); return 1; })()");
     await sleep(1500);
