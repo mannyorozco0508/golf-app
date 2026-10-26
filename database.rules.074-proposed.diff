@@ -1,0 +1,123 @@
+--- database.rules.layout-base.json	2026-10-25 16:26:06
++++ database.rules.074-proposed.json	2026-10-25 16:30:17
+@@ -540,6 +540,120 @@
+       "$uid": {
+         ".read": "auth != null && auth.uid === $uid",
+         ".write": false
++      }
++    },
++    "gps_osm": {
++      "$osmKey": {
++        ".read": "auth != null",
++        ".write": "auth != null && newData.exists() && $osmKey.matches(/^osm_[wr][0-9]{1,12}$/) && (!data.exists() || ((data.child('fetchedAt').val() < now - 7776000000 || newData.child('n').val() > data.child('n').val()) && newData.child('fetchedAt').val() > data.child('fetchedAt').val()))",
++        ".validate": "newData.hasChildren(['v','src','osm','fetched','fetchedAt','n','of','attribution','holes'])",
++        "v": {
++          ".validate": "newData.val() === 1"
++        },
++        "src": {
++          ".validate": "newData.val() === 'osm'"
++        },
++        "osm": {
++          ".validate": "newData.isString() && newData.val().matches(/^(way|relation)\\/[0-9]{1,12}$/)"
++        },
++        "name": {
++          ".validate": "newData.isString() && newData.val().length <= 120"
++        },
++        "osmBase": {
++          ".validate": "newData.isString() && newData.val().length <= 30"
++        },
++        "fetched": {
++          ".validate": "newData.isString() && newData.val().length <= 30 && newData.val().matches(/^20[0-9][0-9]-[01][0-9]-[0-3][0-9]T/)"
++        },
++        "fetchedAt": {
++          ".validate": "newData.isNumber() && newData.val() <= now + 600000 && newData.val() >= now - 600000"
++        },
++        "n": {
++          ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 36"
++        },
++        "of": {
++          ".validate": "newData.val() === 9 || newData.val() === 18"
++        },
++        "attribution": {
++          ".validate": "newData.hasChildren(['text','url'])",
++          "text": {
++            ".validate": "newData.val() === '© OpenStreetMap contributors, ODbL 1.0'"
++          },
++          "url": {
++            ".validate": "newData.val() === 'https://www.openstreetmap.org/copyright'"
++          },
++          "$other": {
++            ".validate": false
++          }
++        },
++        "holes": {
++          ".validate": "newData.hasChildren()",
++          "$h": {
++            ".validate": "$h.matches(/^([1-9]|[12][0-9]|3[0-6])$/) && newData.hasChildren(['osm'])",
++            "osm": {
++              ".validate": "newData.hasChildren(['tee','end'])",
++              "tee": {
++                ".validate": "newData.child('0').isNumber() && newData.child('0').val() >= -90 && newData.child('0').val() <= 90 && newData.child('1').isNumber() && newData.child('1').val() >= -180 && newData.child('1').val() <= 180 && !newData.child('2').exists() && newData.hasChildren(['0','1'])"
++              },
++              "end": {
++                ".validate": "newData.child('0').isNumber() && newData.child('0').val() >= -90 && newData.child('0').val() <= 90 && newData.child('1').isNumber() && newData.child('1').val() >= -180 && newData.child('1').val() <= 180 && !newData.child('2').exists() && newData.hasChildren(['0','1'])"
++              },
++              "mid": {
++                ".validate": "newData.child('0').isNumber() && newData.child('0').val() >= -90 && newData.child('0').val() <= 90 && newData.child('1').isNumber() && newData.child('1').val() >= -180 && newData.child('1').val() <= 180 && !newData.child('2').exists() && newData.hasChildren(['0','1'])"
++              },
++              "lineM": {
++                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1500"
++              },
++              "line": {
++                "$i": {
++                  ".validate": "$i.matches(/^([0-9]|[1-4][0-9])$/) && newData.child('0').isNumber() && newData.child('0').val() >= -90 && newData.child('0').val() <= 90 && newData.child('1').isNumber() && newData.child('1').val() >= -180 && newData.child('1').val() <= 180 && !newData.child('2').exists()"
++                }
++              },
++              "green": {
++                "$i": {
++                  ".validate": "$i.matches(/^([0-9]|[1-4][0-9])$/) && newData.child('0').isNumber() && newData.child('0').val() >= -90 && newData.child('0').val() <= 90 && newData.child('1').isNumber() && newData.child('1').val() >= -180 && newData.child('1').val() <= 180 && !newData.child('2').exists()"
++                }
++              },
++              "fairway": {
++                "$f": {
++                  ".validate": "$f.matches(/^[0-7]$/)",
++                  "$i": {
++                    ".validate": "$i.matches(/^([0-9]|[1-4][0-9])$/) && newData.child('0').isNumber() && newData.child('0').val() >= -90 && newData.child('0').val() <= 90 && newData.child('1').isNumber() && newData.child('1').val() >= -180 && newData.child('1').val() <= 180 && !newData.child('2').exists()"
++                  }
++                }
++              },
++              "teeFrom": {
++                ".validate": "newData.isString() && newData.val().length <= 16"
++              },
++              "greenId": {
++                ".validate": "newData.isNumber() || (newData.isString() && newData.val().length <= 24)"
++              },
++              "$other": {
++                ".validate": false
++              }
++            },
++            "$other": {
++              ".validate": false
++            }
++          }
++        },
++        "pick": {
++          "step": {
++            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 9"
++          },
++          "how": {
++            ".validate": "newData.isString() && newData.val().length <= 200"
++          },
++          "candidates": {
++            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 99"
++          },
++          "$other": {
++            ".validate": false
++          }
++        },
++        "$other": {
++          ".validate": false
++        }
+       }
+     },
+     "$other": {

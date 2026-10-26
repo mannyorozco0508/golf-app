@@ -223,6 +223,66 @@
             return r;
         });
     }
+    // ---- 074: AN OPENSTREETMAP-ONLY COURSE, SAVED FOR EVERYONE (gpsCourse's OSM mode) ----------------
+    // osm_w<id> / osm_r<id>: gps_courses/<that key> first (written only by gpsCourse, with admin rights;
+    // read one at a time like every gps_courses record), else gpsCourse fetches it from OpenStreetMap's
+    // servers (main + 2 mirrors + 1 retry) and saves it. A saved copy over 90 days old is used at once and
+    // refreshed in the background (gpsCourse refresh: true - it overwrites only with real data).
+    // The phone asks with a long, explicit timeout (the server may wait minutes on OpenStreetMap): while
+    // it waits the course shows "holes on the way", and the phone never asks OpenStreetMap itself at the
+    // same moment. Timed out = 'timeout' (the server may still be fetching: no second ask); the function
+    // not there at all = 'unreachable' (the phone's own 071 lookup then runs). Nothing but the key is sent.
+    var OSM_KEY_RE = /^osm_[wr]\d{1,12}$/, OSM_FRESH_MS = 90 * 86400000, OSM_CALL_MS = 310000;
+    function osmList(x) { return Array.isArray(x) ? x.filter(function (v) { return v != null; }) : x && typeof x === 'object' ? Object.keys(x).sort(function (a, b) { return a - b; }).map(function (k) { return x[k]; }) : []; }
+    function normalOsm(r) {
+        if (!r || typeof r !== 'object') return r;
+        r.elements = osmList(r.elements).map(function (e) {
+            if (e && e.geometry) e.geometry = osmList(e.geometry);
+            if (e && e.members) e.members = osmList(e.members).map(function (m) { if (m && m.geometry) m.geometry = osmList(m.geometry); return m; });
+            return e;
+        });
+        return r;
+    }
+    function osmCall(payload) {
+        if (!on()) return Promise.resolve({ status: 'off' });
+        if (offline()) return Promise.resolve({ status: 'offline' });
+        var user = null;
+        try { user = W.firebase && W.firebase.auth && W.firebase.auth().currentUser; } catch (e) { user = null; }
+        if (!user || typeof user.getIdToken !== 'function') return Promise.resolve({ status: 'signin' });
+        var base = String(cfg().liveBase).replace(/\/+$/, ''), ms = cfg().osmCallMs != null ? Number(cfg().osmCallMs) : OSM_CALL_MS, timedOut = false;
+        return user.getIdToken().then(function (tok) {
+            var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+            var t = ctl ? setTimeout(function () { timedOut = true; ctl.abort(); }, ms) : null;
+            return fetch(base + '/gpsCourse', { method: 'POST', credentials: 'omit', signal: ctl ? ctl.signal : undefined,
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ data: payload }) })
+                .then(function (r) { if (t) clearTimeout(t); if (r.status === 404) return { status: 'unreachable' }; return r.json().then(function (j) { return (j && j.result) || { status: 'error' }; }, function () { return { status: 'unreachable' }; }); },
+                    function (e) { if (t) clearTimeout(t); throw e; });
+        }).catch(function () { return { status: timedOut ? 'timeout' : 'unreachable' }; });
+    }
+    var osmRefreshing = {};
+    function osmRefresh(key) {
+        if (osmRefreshing[key]) return;
+        osmRefreshing[key] = true;
+        osmCall({ courseId: key, refresh: true }).then(function () { delete osmRefreshing[key]; }, function () { delete osmRefreshing[key]; });
+    }
+    function osmCourse(key) {
+        key = String(key || '');
+        if (!OSM_KEY_RE.test(key) || !on()) return Promise.resolve({ status: 'off' });
+        if (offline()) return Promise.resolve({ status: 'offline' });
+        return readOnce('gps_courses/' + key).then(function (rec) {
+            if (rec && rec.src === 'osm' && rec.elements) {
+                rec = normalOsm(rec);
+                var stale = !(Number(rec.fetchedAt) > Date.now() - OSM_FRESH_MS);
+                if (stale) osmRefresh(key);
+                return { status: 'ready', osm: rec, src: 'saved', stale: stale };
+            }
+            return osmCall({ courseId: key }).then(function (r) {
+                if (r && r.osm) r.osm = normalOsm(r.osm);
+                if (r && r.status === 'ready' && r.stale && !r.refreshed) osmRefresh(key);
+                return r || { status: 'error' };
+            });
+        });
+    }
     // What the golfer reads for each answer.
     var MESSAGES = {
         ready: 'GPS ✓ ready',
@@ -239,5 +299,5 @@
     };
     function message(status) { return Object.prototype.hasOwnProperty.call(MESSAGES, status) ? MESSAGES[status] : MESSAGES.error; }
 
-    W.HardPanGpsLive = { find: find, clubKey: clubKey, nameVariants: nameVariants, stateCode: stateCode, normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, wind: wind, message: message, _store: store };
+    W.HardPanGpsLive = { find: find, clubKey: clubKey, nameVariants: nameVariants, stateCode: stateCode, normal: normal, on: on, merge: merge, ensure: ensure, idFor: idFor, search: search, course: course, wind: wind, message: message, _store: store, osmCourse: osmCourse };
 })();
