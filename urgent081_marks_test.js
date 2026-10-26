@@ -8,8 +8,8 @@
 //   birdie / eagle           the circles, exactly as before (score-marks.js, a
 //                            protected file, is byte-identical and still answers
 //                            only birdie / eagle)
-//   GROSS vs par only. The net row stays plain. Same colour and 2px line as the
-//   circles. DISPLAY ONLY: no score, money, data key or settlement code moves.
+//   GROSS vs par only. The net row stays plain. The site's navy for the squares (Manny), the
+//   circles' 2px line. DISPLAY ONLY: no score, money, data key or settlement code moves.
 // ============================================================================
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
@@ -105,19 +105,21 @@ describe('THE CARDS', () => {
 });
 
 describe('THE PAGES', () => {
-    test('leaderboard.html: the card asks markWithBoxes; the squares are the circles\' red and 2px', () => {
+    test('leaderboard.html: the card asks markWithBoxes; the squares are the site\'s navy (--brand-navy), 2px like the circles', () => {
         const src = read('leaderboard.html');
         assert.match(src, /const ringOf = ScorecardRows\.markWithBoxes/);
-        assert.match(src, /\.sc-stack \.receipt-table td\.mark-bogey \{ box-shadow: inset 0 0 0 2px var\(--accent-red\);/);
-        assert.match(src, /\.sc-stack \.receipt-table td\.mark-double \{ box-shadow: inset 0 0 0 2px var\(--accent-red\), inset 0 0 0 3px var\(--bg-card\), inset 0 0 0 5px var\(--accent-red\);/);
+        assert.match(src, /\.sc-stack \.receipt-table td\.mark-bogey \{ box-shadow: inset 0 0 0 2px var\(--brand-navy\);/);
+        assert.match(src, /\.sc-stack \.receipt-table td\.mark-double \{ box-shadow: inset 0 0 0 2px var\(--brand-navy\), inset 0 0 0 3px var\(--bg-card\), inset 0 0 0 5px var\(--brand-navy\);/);
+        assert.match(src, /--brand-navy: #1d3557;/); assert.match(src, /--brand-navy: #4a7bb5;/, 'a dark-mode navy exists');
         // the circles' own rules are still there, word for word
         assert.match(src, /\.sc-stack \.receipt-table td\.mark-birdie \{ box-shadow: inset 0 0 0 2px var\(--accent-red\); border-radius: 50%; \}/);
     });
     test('settlement.html: markWithBoxes, screen + print squares, the legend names them; the circles\' legend stays', () => {
         const src = read('settlement.html');
         assert.match(src, /ScorecardRows\.markWithBoxes\(score, par\)/);
-        assert.match(src, /\.receipt-table td\.mark-bogey \{ box-shadow: inset 0 0 0 2px var\(--accent-red\)/);
-        assert.match(src, /\.receipt-table td\.mark-bogey, \.legend-bogey \{\s*box-shadow: inset 0 0 0 2px #c1121f !important/);
+        assert.match(src, /\.receipt-table td\.mark-bogey \{ box-shadow: inset 0 0 0 2px var\(--brand-navy\)/);
+        assert.match(src, /\.receipt-table td\.mark-double, \.receipt-table td\.mark-eagle \{ padding-left: 7px; padding-right: 7px; \}/, 'the eagle and double rings get room (Manny, 081)');
+        assert.match(src, /\.receipt-table td\.mark-bogey, \.legend-bogey \{\s*box-shadow: inset 0 0 0 2px #1d3557 !important/);
         assert.match(src, /<span class="legend-dot legend-birdie"><\/span> Birdie/);
         assert.match(src, /<span class="legend-dot legend-eagle"><\/span> Eagle or better/);
         assert.match(src, /legend-bogey"><\/span> Bogey/);
@@ -131,10 +133,10 @@ describe('THE PAGES', () => {
         assert.match(html, /mark-(bogey|double)|mark-(birdie|eagle)/);
         assert.match(html, /<th class="rt-name">HCP<\/th>/);
     });
-    test('index.html Card view: the bogey / double squares are red 2px, inside the score box', () => {
+    test('index.html Card view: the bogey / double squares are navy 2px, inside the score box', () => {
         const src = read('index.html');
-        assert.match(src, /\.shape-box-1 \{ top: 9px; left: 9px; right: 9px; bottom: 9px; border: 2px solid var\(--accent-red\); border-radius: 3px; \}/);
-        assert.match(src, /\.shape-box-2 \{ top: 5px; left: 5px; right: 5px; bottom: 5px; border: 2px solid var\(--accent-red\); border-radius: 3px; \}/);
+        assert.match(src, /\.shape-box-1 \{ top: 9px; left: 9px; right: 9px; bottom: 9px; border: 2px solid var\(--brand-navy\); border-radius: 3px; \}/);
+        assert.match(src, /\.shape-box-2 \{ top: 5px; left: 5px; right: 5px; bottom: 5px; border: 2px solid var\(--brand-navy\); border-radius: 3px; \}/);
         // the elements themselves are drawn as before: gross vs par
         assert.match(src, /if \(grossDiff === 1\) \{\s*shapeHtml = `<div class="shape-box-1"><\/div>`;/);
     });
@@ -142,7 +144,7 @@ describe('THE PAGES', () => {
         const src = read('shared.html');
         assert.match(src, /\} else if \(diff === 1\) \{\s*shape = `<div class="box-1"><\/div>`;/);
         assert.match(src, /\} else if \(diff >= 2\) \{\s*shape = `<div class="box-1"><\/div><div class="box-2"><\/div>`;/);
-        assert.match(src, /\.box-1 \{[^}]*border: 2px solid #e63946/);
+        assert.match(src, /\.box-1 \{[^}]*border: 2px solid #1d3557/);
     });
     test('tournament.html course card: the row reads Hcp, not SI; the values are still hcpIndex', () => {
         const src = read('tournament.html');
