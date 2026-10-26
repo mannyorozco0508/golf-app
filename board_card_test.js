@@ -164,7 +164,7 @@ describe('THE CARD IS THE GOLFER\'S OWN SCORES, THE SAME NUMBERS THE RECEIPT PRI
         const html = board(sb);
         const row = cardOf(html, '102');
         const card = row.slice(row.indexOf('<td colspan="5">') + '<td colspan="5">'.length, row.length - '</td></tr>'.length);
-        const expected = vm.runInContext(`ScorecardRows.scorecardStackedHtml({ courseData: currentBoardData.courseData, scores: currentBoardData.scores, players: [currentBoardData.players[1]], showNet: true, ringOf: (s, p) => scoreMarkClass(s, p).trim() })`, sb);
+        const expected = vm.runInContext(`ScorecardRows.scorecardStackedHtml({ courseData: currentBoardData.courseData, scores: currentBoardData.scores, players: [currentBoardData.players[1]], showNet: true, ringOf: ScorecardRows.markWithBoxes })`, sb);   // URGENT-081: the board's ringOf adds the squares
         assert.equal(card, expected, 'the page draws no cell of its own - the card IS the shared layout');
         // The Receipt, same round, Ben's row: the same 18 numbers in one line.
         const st = loadHtmlInlineScript('settlement.html', []);
