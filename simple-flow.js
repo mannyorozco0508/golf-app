@@ -531,14 +531,56 @@
             .sort(function (a, b) { return (b.s - a.s) || (b.c.ready - a.c.ready) || a.c.name.localeCompare(b.c.name); });
     }
     function webKey(raw) { var w = qWords(raw).join(' '); return w.length >= 3 ? w : String(raw || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
-    function webSearch() {
+    // URGENT-071 (Manny's phone, 10:45 AM: "Bandon" -> 5 "Not set up yet" rows, no online rows). THE CAUSE:
+    // Round Setup loads gps-live.js only inside gpsGolfApiLoad(), which runs when a course gets PICKED (its
+    // GPS badge / link). A golfer who isn't at a course has nothing picked, so HardPanGpsLive never existed
+    // and this search returned at once - no call, no cached answer, no line - every time. Now gps-live is
+    // loaded on demand (the same loader), and the search runs when it is in.
+    var liveWait = null;
+    function needLive(cb) {
+        if (W.HardPanGpsLive) { cb(); return; }
+        if (!liveWait) {
+            var go = fn('gpsGolfApiLoad') ? function () { return W.gpsGolfApiLoad(); } : fn('gpsLoadScript') ? function () { return W.gpsLoadScript('gps-live.js', function () { return !!W.HardPanGpsLive; }); } : null;
+            if (!go) { cb(); return; }
+            try { (W.__sfLiveLoad = W.__sfLiveLoad || []).push(Date.now()); } catch (e) {}
+            liveWait = Promise.resolve().then(go).then(function () { liveWait = null; }, function () { liveWait = null; });
+        }
+        liveWait.then(cb);
+    }
+    // 071 (Manny: "saved courses first"): a course already on the phone or saved in Firebase (the course list:
+    // our cards + every course pulled for anyone, global_courses) whose name is what was typed (exactly,
+    // starts with it, or holds it) - or this phone's answer for a SHORTER search ("bandon" for "bandon
+    // dunes") - is shown at once, with no gpsSearch call; "Search more courses" under the results asks.
+    function savedHits(raw) { return localHits(courses(), raw).filter(function (x) { return x.s >= 3 || nameTier(x.c.name, raw, x.s) <= 1; }); }
+    function prefixCache(k, raw) {
+        var best = null;
+        try { Object.keys(W.localStorage || {}).forEach(function (key) {
+            if (key.indexOf(WEB) !== 0) return;
+            var p = key.slice(WEB.length);
+            if (p.length < 3 || p === k || k.indexOf(p) !== 0 || (best && best.p.length >= p.length)) return;
+            var v = null; try { v = JSON.parse(ls(key) || 'null'); } catch (e) {}
+            if (v && v.at && Date.now() - v.at < WEB_MS) best = { p: p, v: v };
+        }); } catch (e) {}
+        if (!best) return null;
+        var rows = (best.v.results || []).filter(function (m) { return Math.max(matchScore({ name: m.name || m.club }, raw), matchScore({ name: (m.club || '') + ' ' + (m.course || '') }, raw)) >= 2; });
+        return rows.length ? rows : null;
+    }
+    function webSearch(force) {
         var raw = String(S.q || '').trim(), L = W.HardPanGpsLive;
-        if (S.step !== 1 || raw.length < 3 || !liveOn() || !L || !L.search) return;
+        if (S.step !== 1 || raw.length < 3) return;
+        if (!L) { needLive(function () { if (W.HardPanGpsLive) webSearch(force); }); return; }   // 071
+        if (!liveOn() || !L.search) return;
         var k = webKey(raw);
-        if (k.length < 3 || (S.web && S.web.k === k && S.web.state !== 'error')) return;
-        if (localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3) return;
+        if (k.length < 3 || (!force && S.web && S.web.k === k && S.web.state !== 'error')) return;
+        if (force && S.web && S.web.k === k && S.web.state === 'busy') return;
         var hit = null; try { hit = JSON.parse(ls(WEB + k) || 'null'); } catch (e) {}
         if (hit && hit.at && Date.now() - hit.at < WEB_MS) { S.web = { k: k, state: 'ok', results: hit.results || [] }; render1(); return; }
+        if (!force) {
+            // (the old rule - 3 good matches on the phone, no online search - is kept, now with "Search more")
+            if (localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3 || savedHits(raw).length) { S.web = { k: k, state: 'saved', more: true }; render1(); return; }
+            var pre = prefixCache(k, raw);
+            if (pre) { S.web = { k: k, state: 'ok', results: pre, more: true }; render1(); return; }
+        }
         if (typeof navigator !== 'undefined' && navigator.onLine === false) { S.web = { k: k, state: 'offline' }; render1(); return; }
         var seq = S.webSeq = (S.webSeq || 0) + 1;   // URGENT-035: only the newest search's answer is used
         S.web = { k: k, state: 'busy', seq: seq };
@@ -546,12 +588,21 @@
         render1();
         var cur = function () { return S.web && S.web.k === k && S.webSeq === seq; };
         var done = false, t = setTimeout(function () { if (!done) { done = true; if (cur()) { S.web = { k: k, state: 'error' }; render1(); } } }, 20000);
+        // 071: GolfAPI's name search is strict - "Old Macdonald" finds nothing, it says "Old McDonald". No
+        // answer: the Mac / Mc spelling is asked once too (cached for everyone like any search).
+        var alt = k.split(' ').map(function (w) { return /^mac[a-z]{3}/.test(w) ? 'mc' + w.slice(3) : /^mc[a-z]{3}/.test(w) ? 'mac' + w.slice(2) : w; }).join(' ');
         Promise.resolve().then(function () { return L.search(k); }).then(function (r) {
+            if (r && r.status === 'ok' && !(r.results || []).length && alt !== k) {
+                try { (W.__sfWeb = W.__sfWeb || []).push(alt); } catch (e) {}
+                return L.search(alt).then(function (r2) { return r2 && r2.status === 'ok' ? r2 : r; }, function () { return r; });
+            }
+            return r;
+        }).then(function (r) {
             if (done) return; done = true; clearTimeout(t);
             if (!cur()) return;
             var st = r && r.status;
             if (st === 'ok') { var res = (r.results || []).slice(0, 25); ls(WEB + k, JSON.stringify({ at: Date.now(), results: res })); S.web = { k: k, state: 'ok', results: res }; }
-            else S.web = { k: k, state: st === 'signin' || st === 'account' ? 'signin' : st === 'offline' ? 'offline' : 'error' };
+            else S.web = { k: k, state: st === 'signin' || st === 'account' ? 'signin' : st === 'offline' ? 'offline' : st === 'limit' || st === 'soon' ? 'limit' : 'error' };   // (071: + limit)
             render1();
         }, function () { if (done) return; done = true; clearTimeout(t); if (cur()) { S.web = { k: k, state: 'error' }; render1(); } });
     }
@@ -584,10 +635,14 @@
                 + '<button type="button" class="sf-cta" data-sf="webback" style="margin-bottom:8px;">Pick another course</button>'
                 + '<button type="button" class="sf-btn" data-sf="webrequest" style="width:100%;min-height:46px;">Request this course</button></div>';
         }
+        var MORE = '<button type="button" class="sf-link" id="sf-more" data-sf="websearchmore" style="display:block;font-size:14px;margin:2px 2px 10px;padding:0;min-height:0;">\ud83d\udd0d Search more courses \u203a</button>';
+        if (w.state === 'saved') return MORE;
         if (w.state === 'busy') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;display:flex;align-items:center;gap:8px;"><span class="sf-spin" aria-hidden="true">⏳</span>Searching all courses…</div>';
         if (w.state === 'offline') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">No signal — searching all courses needs a connection.</div>';
         if (w.state === 'signin') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">Sign in to search all courses. <button type="button" class="sf-link" data-sf="websignin" style="padding:0 0 0 4px;min-height:0;">Sign in</button></div>';
         if (w.state === 'error') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">Couldn’t search all courses right now. <button type="button" class="sf-link" data-sf="webretry" style="padding:0 0 0 4px;min-height:0;">Try again</button></div>';
+        // 071: the server's limit (20 new searches a golfer a day) or its pause: said, with Try again.
+        if (w.state === 'limit') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">Couldn’t search online right now · these may not be all the courses. <button type="button" class="sf-link" data-sf="webretry" style="padding:0 0 0 4px;min-height:0;">Try again</button></div>';
         var HCx = HC(), all = courses(), ck = function (t) { return String(t || '').toLowerCase().replace(/[^a-z]/g, ''); };
         var rows = (w.results || []).filter(function (m) {
             var rv = null; try { rv = HCx ? HCx.resolve({ key: 'gapi_' + m.id, name: m.name }) : null; } catch (e) {}
@@ -600,7 +655,7 @@
         // 067: the rows themselves are drawn by step1, in ONE list with the courses on the phone (best name
         // match, then closest); this box keeps only the online search's own line (searching / no signal / ...).
         S.webRows = rows;
-        return '';
+        return w.more ? MORE : '';
     }
     // ---- 064: OPENSTREETMAP-ONLY COURSES IN SEARCH (Manny, Goldendale: "show OSM-only courses as 'Not set
     // up yet · Add this course'") ---------------------------------------------------------------------
@@ -616,7 +671,10 @@
         if (!all.length) return [];
         var have = {};
         (listed || []).concat(S.webRows || []).forEach(function (x) { have[qWords(x.name || x.club).join(' ')] = 1; if (x.club) have[qWords(x.club).join(' ')] = 1; });
-        return searchOrder(localHits(all, raw).filter(function (x) { return !have[qWords(x.c.name).join(' ')]; }).map(function (x) { return { kind: 'osm', c: x.c, name: x.c.name, s: x.s, d: distTo(x.c) }; }), raw).slice(0, OSM_SHOWN);
+        // 071: ...nor one whose words are all in a GolfAPI course WITH GPS in the same town ("Bandon Trails" =
+        // "Bandon Dunes Golf Resort (Bandon Trails)"): the GolfAPI row is that course's one row.
+        var gw = (S.webRows || []).filter(function (m) { return m.gps; });
+        return searchOrder(localHits(all, raw).filter(function (x) { return !have[qWords(x.c.name).join(' ')] && !gw.some(function (m) { return osmTwinOf(x.c, m); }); }).map(function (x) { return { kind: 'osm', c: x.c, name: x.c.name, s: x.s, d: distTo(x.c) }; }), raw).slice(0, OSM_SHOWN);
     }
     // ---- 067: SEARCH = BEST NAME MATCH FIRST, THEN CLOSEST (Manny: "we still need to see the closest
     // courses first ... We should only add.") -------------------------------------------------------
@@ -635,7 +693,11 @@
     function searchOrder(items, raw) {
         items.forEach(function (x) { x.t = nameTier(x.name, raw, x.s); });
         return items.sort(function (a, b) {
-            return (a.t - b.t) || ((a.d == null) - (b.d == null)) || ((a.d || 0) - (b.d || 0)) || String(a.name).localeCompare(String(b.name));
+            // 071: a "Not set up yet" OpenStreetMap row sorts as 3 mi farther - GolfAPI / our ✓ GPS rows in the
+            // same town come first (Bandon: the OSM points were 1 mi closer than the resort's, so the
+            // first two rows a golfer saw over the keyboard were "Add this course").
+            var da = a.d == null ? null : a.d + (a.kind === 'osm' ? 3 : 0), db = b.d == null ? null : b.d + (b.kind === 'osm' ? 3 : 0);
+            return (a.t - b.t) || ((da == null) - (db == null)) || ((da || 0) - (db || 0)) || String(a.name).localeCompare(String(b.name));
         });
     }
     function osmRowHtml(c, d) {
@@ -658,6 +720,139 @@
         } else if (note) note.remove();
         try { (W.__sfAddOsm = W.__sfAddOsm || []).push(name); } catch (e) {}
     }
+
+    // ---- URGENT-071: AN OPENSTREETMAP ROW OPENS GPS (Manny: "This is a terrible bug. Every course should be
+    // searchable." - "Bandon Trails · Not set up yet · Add this course" ended in the Games & Bets form) ----
+    // The tap, in the GPS flow:
+    //   1. GolfAPI first: the same course in the online answer on screen (its words all in GolfAPI's club +
+    //      course, same town), else ONE gps-live find (name + city / state; the Starfire same-club rule).
+    //      One with GPS: the normal pull (webPull) - its card, tees and greens. More than one (a resort's
+    //      outline): "Which one?".
+    //   2. Not in GolfAPI: the course's own OpenStreetMap holes and greens (gps-match, from the COURSE's
+    //      point - never the golfer's), kept on this phone under the course's own key osm_w<id> / osm_r<id>.
+    //   3. No data at all: GPS still opens - "Tap the middle of the green" sets each green.
+    // Pars and indexes come later: the round starts on a par-4 card held on this phone (nothing written to
+    // the shared course list); "Type the pars and indexes" (Round Setup's Add a course - the 064 path) is
+    // kept as a link. Games & Bets (money needs real pars): GolfAPI first, else that form, as before.
+    function macMc(w) { return w.replace(/^mac(?=[a-z]{3})/, 'mc'); }
+    function twinWords(s) { return qWords(s).map(macMc); }
+    function sameTown(a, b) { var ck = function (t) { return String(t || '').toLowerCase().replace(/[^a-z]/g, ''); }; return !ck(a) || !ck(b) || ck(a) === ck(b); }
+    function sameState(a, b) { var L = W.HardPanGpsLive, sc = function (t) { try { return L && L.stateCode ? L.stateCode(t) : String(t || '').toUpperCase(); } catch (e) { return String(t || '').toUpperCase(); } }; return !a || !b || sc(a) === sc(b); }
+    // An OSM course and a GolfAPI result are the same course: every word of the OSM name is in GolfAPI's
+    // club + course ("Bandon Trails" = "Bandon Dunes Golf Resort (Bandon Trails)"), in the same town.
+    function osmTwinOf(o, m) {
+        var ow = twinWords(o.name), mw = twinWords(String(m.club || '') + ' ' + String(m.course || '') + ' ' + String(m.name || ''));
+        if (!ow.length || !sameTown(o.city, m.city) || !sameState(o.state, m.state)) return false;
+        return ow.every(function (w) { return mw.indexOf(w) !== -1; });
+    }
+    function osmTwinRow(m) {
+        var all = []; try { all = HC() && HC().osmOnly ? HC().osmOnly() : []; } catch (e) { all = []; }
+        var tw = all.filter(function (o) { return o.greens > 0 && osmTwinOf(o, m); });
+        // More than one (the resort's own outline is a twin too): the one named for GolfAPI's course part.
+        var cw = twinWords(m.course || '');
+        if (tw.length > 1 && cw.length) tw = tw.filter(function (o) { var ow = twinWords(o.name); return cw.every(function (w) { return ow.indexOf(w) !== -1; }); });
+        return tw.length === 1 ? tw[0] : null;
+    }
+    function osmKey(c) { var id = Number(c && c.osm); return isFinite(id) && id ? 'osm_' + (id < 0 ? 'r' + (-id) : 'w' + id) : ''; }
+    function osmRowFor(id, name) {
+        var all = []; try { all = HC() && HC().osmOnly ? HC().osmOnly() : []; } catch (e) { all = []; }
+        var c = all.filter(function (x) { return String(x.osm) === String(id); })[0] || all.filter(function (x) { return x.name === name; })[0];
+        if (c) return c;
+        try { (W.HardPanGpsCoverage ? Object.keys(W.HardPanGpsCoverage) : []).some(function (st) { return ((W.HardPanGpsCoverage[st] || {}).rows || []).some(function (r) { if (String(r[0]) === String(id)) { c = { key: null, osm: r[0], name: r[1], city: r[2] || '', state: st, pt: r[7] != null ? [r[7], r[8]] : null, greens: Number(r[3]) || 0, holes: Number(r[5]) || 0 }; return true; } return false; }); }); } catch (e) {}
+        return c || null;
+    }
+    function tapOsm(id, name, city, state, again) {
+        var row = osmRowFor(id, name) || { osm: id, name: name, city: city, state: state, pt: null, greens: 0, holes: 18 };
+        if (!W.HardPanGpsLive && !again) { S.osmPick = { row: row, state: 'busy' }; render1(); var mine = S.osmPick; needLive(function () { if (S.osmPick === mine) tapOsm(id, name, city, state, true); }); return; }   // 071: GolfAPI first needs gps-live
+        try { (W.__sfOsmTap = W.__sfOsmTap || []).push(name); } catch (e) {}
+        var twins = ((S.web && S.web.results) || []).filter(function (m) { return m.gps && osmTwinOf(row, m); });
+        if (twins.length === 1) { webPull(twins[0].id, twins[0].name || twins[0].club); return; }
+        if (twins.length > 1) { S.osmPick = { row: row, state: 'choose', matches: twins }; render1(); return; }
+        var L = W.HardPanGpsLive;
+        if (liveOn() && L && L.find && !(typeof navigator !== 'undefined' && navigator.onLine === false)) {
+            var me = S.osmPick = { row: row, state: 'busy' };
+            render1();
+            L.find(row.name, { city: row.city || '', state: row.state || '' }).then(function (f) {
+                if (S.osmPick !== me) return;
+                var ms = f && f.status === 'ok' ? (f.matches || []).filter(function (m) { return m.gps; }) : [];
+                var tw = ms.filter(function (m) { return osmTwinOf(row, m); });
+                var hit = tw.length === 1 ? tw[0] : (!tw.length && f && f.clear && f.clear.gps && sameTown(row.city, f.clear.city) ? f.clear : null);
+                if (hit) { S.osmPick = null; webPull(hit.id, hit.name || hit.club); return; }
+                if (tw.length > 1) { S.osmPick = { row: row, state: 'choose', matches: tw }; render1(); return; }
+                osmGps(row);
+            }, function () { if (S.osmPick === me) osmGps(row); });
+            return;
+        }
+        osmGps(row);
+    }
+    // Not in GolfAPI: the course's own key, a par-4 card on this phone, its OpenStreetMap holes when mapped.
+    var OSM_CARD = {};
+    function osmGps(row, force) {
+        var key = osmKey(row);
+        if (!key) { S.osmPick = null; addOsm(row.name, row.city, row.state); return; }
+        var n = Number(row.holes) === 9 ? 9 : 18, data = [];
+        for (var i = 1; i <= n; i++) data.push({ hole: i, par: 4, hcpIndex: i });
+        var rec = { name: row.name, data: data, gpsOnly: true, source: 'openstreetmap' };
+        if (row.pt) rec.location = { latitude: row.pt[0], longitude: row.pt[1], city: row.city || '', state: row.state || '' };
+        try { if (typeof globalCourses !== 'undefined' && globalCourses && !(globalCourses[key] && (globalCourses[key].data || []).length)) globalCourses[key] = rec; } catch (e) {}   /* global globalCourses */
+        if (row.pt) ls('hardpan_course_loc_v1_' + key, JSON.stringify({ lat: row.pt[0], lng: row.pt[1], city: row.city || '', state: row.state || '' }));
+        try { if (HC() && HC().refresh) HC().refresh(); } catch (e) {}
+        var M = W.HardPanGpsMatch, me = S.osmPick = { row: row, state: 'osm', key: key };
+        var picked = false;
+        var unreached = function (r) { return !!(r && r.kept === false && /could not be reached/.test(r.how || '')); };
+        var done = function (r) {
+            var ok = r && (r.status === 'ready' || r.status === 'partial') && r.n > 0;
+            if (picked) {   // the holes landed after the pick: the note says so (the map uses them from this phone)
+                if (ok && OSM_CARD[key]) { OSM_CARD[key].src = 'osm'; OSM_CARD[key].n = r.n; if (S.step === 1 && courseKey() === key) render(); }
+                else if (OSM_CARD[key] && OSM_CARD[key].src === 'loading') { OSM_CARD[key].src = unreached(r) ? 'unreached' : 'tap'; if (S.step === 1 && courseKey() === key) render(); }   // (071: a 504 says so)
+                return;
+            }
+            if (S.osmPick !== me) return;
+            picked = true;
+            OSM_CARD[key] = { name: row.name, city: row.city, state: row.state, src: ok ? 'osm' : (r === 'wait' ? 'loading' : unreached(r) ? 'unreached' : 'tap'), n: ok ? r.n : 0, of: n, row: row };
+            S.osmPick = null; S.q = ''; S.changing = false; S.noCard = null; S.lookup = null; S.err1 = ''; S.pend = null;
+            if (S.web) S.web.pull = null;
+            pick(key, row.name);
+            render(); try { el().scrollTop = 0; } catch (e) {}
+        };
+        if (!(row.greens > 0) || !row.pt) { done(null); return; }
+        render1();
+        // OpenStreetMap's public servers can take a minute or two (measured Oct 25: 58 s and 114 s for Shortys).
+        // After 20 s (or "Start without waiting") the course is picked and the lookup goes on: the note says
+        // the holes are on the way, and the map (which reads this phone's copy, or looks them up itself from
+        // the course's point) shows them once they are in.
+        var t = setTimeout(function () { done('wait'); }, 20000);
+        me.skip = function () { clearTimeout(t); done('wait'); };
+        // (Round Setup loads the map helpers when a course is picked: loaded here first, the same way.)
+        var need = function (src, ok) { return ok() || !fn('gpsLoadScript') ? Promise.resolve(ok()) : W.gpsLoadScript(src, ok); };
+        need('gps-geo.js', function () { return !!W.HardPanGeo; }).then(function () { return need('gps-match.js', function () { return !!W.HardPanGpsMatch; }); })
+            .then(function () { M = W.HardPanGpsMatch; return M && M.match ? M.match({ key: key, name: row.name, loc: row.pt, holes: n, force: !!force }) : null; })
+            .then(function (r) { clearTimeout(t); done(r); }, function () { clearTimeout(t); done(null); });
+    }
+    // While it looks: "Looking up …"; more than one GolfAPI course in that outline: "Which one?".
+    function osmPickBox() {
+        var p = S.osmPick;
+        if (!p) return '';
+        var nm = esc(p.row.name);
+        if (p.state === 'busy' || p.state === 'osm') return '<div class="sf-card" id="sf-osmpick" style="display:flex;align-items:center;gap:10px;"><span class="sf-spin" aria-hidden="true">⏳</span><span class="sf-note" style="font-size:15px;">'
+            + (p.state === 'busy' ? 'Finding ' + nm + '’s GPS…' : 'Getting ' + nm + '’s holes and greens from OpenStreetMap…') + '</span>'
+            + (p.state === 'osm' ? '<button type="button" class="sf-link" data-sf="osmskip" style="margin-left:auto;font-size:13px;padding:0;min-height:0;">Start without waiting</button>' : '') + '</div>';
+        return '<div class="sf-card" id="sf-osmpick"><div style="font-weight:800;font-size:16px;margin-bottom:10px;">' + nm + ' has ' + p.matches.length + ' courses. Which one?</div>'
+            + chooseOrder(p.matches).map(function (m) { return webRowHtml(m, null); }).join('')
+            + '<button type="button" class="sf-btn" data-sf="osmmap" style="width:100%;min-height:46px;">Use the OpenStreetMap map instead</button></div>';
+    }
+    // The picked OSM-only course: where its GPS comes from, and the pars link (the Games & Bets path).
+    function osmCardNote(key) {
+        var o = OSM_CARD[key];
+        if (!o || !/^osm_[wr]\d+$/.test(String(key || ''))) return '';
+        var nm = esc(String(o.name || '').split(' (')[0]);
+        return '<div class="sf-card" id="sf-osmnote"><div class="sf-note" style="font-size:14px;margin-bottom:8px;">'
+            + (o.src === 'osm' ? '✓ GPS from OpenStreetMap (' + o.n + ' of ' + o.of + ' holes mapped).' : o.src === 'unreached' ? 'Couldn\u2019t reach OpenStreetMap for ' + nm + '\u2019s holes just now \u2014 the map tries again when it opens; until then \u201cTap the middle of the green\u201d sets each green.' : o.src === 'loading' ? '\u23f3 ' + nm + '\u2019s holes and greens are on the way from OpenStreetMap \u2014 the map shows them once they\u2019re in (you can start now).' : 'No GPS map data for ' + nm + ' yet — on the map, “Tap the middle of the green” sets each green.')
+            + ' Pars and indexes aren’t set yet (par 4 shown) — add them now or later.</div>'
+            + (o.src === 'unreached' ? '<button type="button" class="sf-link" data-sf="osmretry" style="font-size:14px;padding:0 12px 0 0;min-height:0;">Try OpenStreetMap again</button>' : '')
+            + '<button type="button" class="sf-link" data-sf="osmpars" style="font-size:14px;padding:0;min-height:0;">Type the pars and indexes ›</button>'
+            + ' <button type="button" class="sf-link muted" data-sf="request" style="font-size:13px;padding:0 0 0 10px;min-height:0;">Request this course</button></div>';
+    }
     // URGENT-028 (Manny, 1:03 PM: Papago open -> back -> Aguila from search -> Start Round -> Papago
     // hole 1 again). THE CAUSE: a tapped online course is only the pick once its pull (gpsCourse) and
     // its card record are in - seconds on a phone. Until then Round Setup's course (course-select)
@@ -670,6 +865,11 @@
     function webPull(id, name) {
         var L = W.HardPanGpsLive, w = S.web;
         if (!L || !L.course) return;
+        // 071: GolfAPI has the course but no GPS (Bandon Dunes' Sheep Ranch): its OpenStreetMap twin's holes
+        // and greens, when the app's OSM list has it - never a dead end when the map data exists.
+        var wm = ((w && w.results) || []).filter(function (m) { return String(m.id) === String(id); })[0];
+        if (S.mode === 'gps' && wm && !wm.gps) { var ot = osmTwinRow(wm); if (ot) { S.osmPick = null; osmGps(ot); return; } }
+        S.osmPick = null;
         var me = { id: id, name: name, state: 'busy' };
         if (w) w.pull = me;
         S.pend = me; S.err1 = '';
@@ -681,6 +881,7 @@
             var st = r && r.status;
             if (st === 'account' || st === 'signin') return say('signin');
             if (st === 'offline') return say('offline');
+            if (st === 'nogps' && S.mode === 'gps' && S.pend === me) { var ot2 = osmTwinRow(wm || { name: name, club: clubName(name) }); if (ot2) { S.pend = null; if (S.web) S.web.pull = null; osmGps(ot2); return; } }
             if (st !== 'ready') return say(st === 'nogps' || st === 'unknown' ? 'none' : 'error');
             if (!r.cardKey || !wizDb()) return say('none');
             return wizDb().ref('global_courses/' + r.cardKey).once('value').then(function (snap) {
@@ -935,14 +1136,17 @@
                 .concat((S.webRows || []).map(function (m) { return { kind: 'web', m: m, name: m.name || m.club, s: Math.max(matchScore({ name: m.name || m.club }, rawQ), matchScore({ name: m.club }, rawQ)), d: distSearch({ name: m.name || m.club, club: m.club, city: m.city }) }; }))
                 .concat(osm);
             var rowsHtml = searchOrder(items, rawQ).map(function (x) { return x.kind === 'local' ? rowHtml(x.c, x.d, x.c.key === key) : x.kind === 'web' ? webRowHtml(x.m, x.d) : osmRowHtml(x.c, x.d); }).join('');
-            body += '<div class="sf-h">RESULTS</div>' + rowsHtml + web
+            // 071: the online search's line (searching / couldn't search · Try again) sits OVER the rows while the
+            // "Not set up yet" rows are on screen, so they never look like the whole answer.
+            var webTop = web && osm.length && S.web && !S.web.pull && !/sf-more/.test(web);
+            body += osmPickBox() + '<div class="sf-h">RESULTS</div>' + (webTop ? web : '') + rowsHtml + (webTop ? '' : web)
                 + (!hits.length && !web && !osm.length && !(S.webRows || []).length && !waiting ? '<div class="sf-note">' + (q.trim().length < 3 ? 'Keep typing — 3 letters searches all courses.' : 'No course found by that name.') + '</div>' : '')
                 + '<button type="button" class="sf-link muted" data-sf="fullcourse" style="font-size:13px;">Not listed? Add a course ›</button>';
         }
         // URGENT-028: a tapped online course still loading IS the selected card (never the one before it).
         var pend = pendBusy() ? S.pend : null, pendOld = pend && pend.state !== 'card';
         // THE PICKED COURSE'S TEES (POLISH 029 #11: the tees and the start right under the course).
-        var picked = function (head) { return pendOld ? pendHead(pend) : S.changing ? '' : (head ? courseHead() : '') + lookupBox(key, courseName()) + courseCard() + (S.mode === 'gps' && key ? '<div id="sf-offline-slot"></div>' : ''); };
+        var picked = function (head) { return pendOld ? pendHead(pend) : S.changing ? '' : (head ? courseHead() : '') + lookupBox(key, courseName()) + osmCardNote(key) + courseCard() + (S.mode === 'gps' && key ? '<div id="sf-offline-slot"></div>' : ''); };
         if (q.length >= 2) body += picked(true);
         else {
             // URGENT-060 (Manny, 5:25 PM): SHORTER. Under the search: NEAR YOU = the 3 closest only (the
@@ -1547,10 +1751,20 @@
     function onClick(ev) {
         var t = ev.target, b;
         if (!t || !t.closest) return;
-        if ((b = t.closest('[data-sf-osm]'))) { addOsm(b.getAttribute('data-sf-name'), b.getAttribute('data-sf-city'), b.getAttribute('data-sf-state')); return; }
+        if ((b = t.closest('[data-sf-osm]'))) {
+            // 071: the GPS flow opens GPS (GolfAPI, else OpenStreetMap, else tap the green); Games & Bets keeps
+            // the 064 form unless GolfAPI has the course (money needs the real pars).
+            if (S.mode === 'gps') { tapOsm(b.getAttribute('data-sf-osm'), b.getAttribute('data-sf-name'), b.getAttribute('data-sf-city'), b.getAttribute('data-sf-state')); return; }
+            var orow = osmRowFor(b.getAttribute('data-sf-osm'), b.getAttribute('data-sf-name')), otw = orow ? ((S.web && S.web.results) || []).filter(function (m) { return m.gps && osmTwinOf(orow, m); }) : [];
+            if (otw.length === 1) { webPull(otw[0].id, otw[0].name || otw[0].club); return; }
+            addOsm(b.getAttribute('data-sf-name'), b.getAttribute('data-sf-city'), b.getAttribute('data-sf-state')); return;
+        }
         if ((b = t.closest('[data-sf-lkpick]'))) { lookPick(S.lookup && S.lookup.key, b.getAttribute('data-sf-lkpick')); return; }
         if ((b = t.closest('[data-sf-web]'))) { webPull(b.getAttribute('data-sf-web'), b.getAttribute('data-sf-name')); return; }
-        if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.pend = null; S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0; lookup(pk, pn); return; }
+        if ((b = t.closest('[data-sf-course]'))) { var pk = b.getAttribute('data-sf-course'), pn = b.getAttribute('data-sf-name'); S.pend = null; S.noCard = null; S.lookup = null; pick(pk, pn); S.q = ''; S.changing = false; S.err1 = ''; render(); el().scrollTop = 0;
+            // 071: a course with no GPS yet is looked up online - gps-live first when the page hasn't loaded it
+            if (W.HardPanGpsLive) lookup(pk, pn); else needLive(function () { if (courseKey() === pk && W.HardPanGpsLive) { lookup(pk, pn); if (S.step === 1) render(); } });
+            return; }
         if ((b = t.closest('[data-sf-tee]'))) {
             var tk = b.getAttribute('data-sf-tee'), tr = teeRows(courseKey()).filter(function (x) { return x.key === tk; })[0];
             setVal('tee-rating-select', tk); if (fn('applySelectedTee')) W.applySelectedTee();
@@ -1617,8 +1831,13 @@
         if (a === 'mix') { away(step('players'), 'Tees set'); return; }
         if (a === 'fullcourse') { var wn = $('sf-new-course-where'); if (wn) wn.remove(); away(step('course'), 'Course picked'); return; }
         if (a === 'signin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t2 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t2); show(true); S.lookup = null; lookup(courseKey(), courseName()); render(); } }, 600); } return; }
+        if (a === 'osmpars') { var on = OSM_CARD[courseKey()] || {}; addOsm(on.name || courseName(), on.city || '', on.state || ''); return; }
+        if (a === 'osmretry') { var orc = OSM_CARD[courseKey()]; if (orc && orc.row) { S.q = orc.row.name; osmGps(orc.row, true); } return; }   // 071 (the golfer asked: no wait)
+        if (a === 'osmskip') { var os = S.osmPick; if (os && os.skip) os.skip(); return; }
+        if (a === 'osmmap') { var op = S.osmPick; if (op && op.row) osmGps(op.row); return; }
         if (a === 'webback') { if (S.web) S.web.pull = null; S.pend = null; render1(); var q2 = $('sf-q'); if (q2) q2.focus(); return; }
         if (a === 'webretry') { S.web = null; webSearch(); return; }
+        if (a === 'websearchmore') { webSearch(true); return; }   // 071: the golfer asks for the online search
         if (a === 'websignin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t3 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t3); show(true); S.web = null; webSearch(); render1(); } }, 600); } return; }
         if (a === 'webrequest') {
             var wp = (S.web && S.web.pull) || {};
@@ -1661,13 +1880,16 @@
             // URGENT-035: the list follows each letter (one redraw a frame, the box itself never redrawn);
             // online only after typing pauses: ~400 ms, longer for a slow typist (twice their own gap
             // between letters, up to 800 ms) so a pause is a pause, never a call per letter.
-            S.q = t.value; clearTimeout(S.wt);
+            S.q = t.value; clearTimeout(S.wt); S.osmPick = null;
+            if (!W.HardPanGpsLive && String(S.q).trim().length >= 2) needLive(function () {});   // 071: in by the time typing stops
             var now = Date.now(), gap = S.lastKey ? now - S.lastKey : 0; S.lastKey = now;
             if (gap > 0 && gap < 1500) S.gaps = (S.gaps || []).concat(gap).slice(-4);
             var gs = (S.gaps || []).slice().sort(function (a, b) { return a - b; }), med = gs.length ? gs[Math.floor(gs.length / 2)] : 0;
             // (the letter is painted first, the list the frame after: typing never waits on the list)
             if (!S.qf) S.qf = (W.requestAnimationFrame || function (f) { return setTimeout(f, 16); })(function () { setTimeout(function () { S.qf = 0; render1(); }, 0); });
-            S.wt = setTimeout(webSearch, Math.min(800, Math.max(400, 2 * med)));   // URGENT-027: online after a pause, never per letter
+            // 071: a longer pause (700 ms, up to 1.2 s for a slow typist; was 400-800 ms) - each new prefix
+            // GolfAPI hasn't seen is a search that counts against the golfer's 20 a day (gpsSearch 'limit').
+            S.wt = setTimeout(webSearch, Math.min(1200, Math.max(700, 2 * med)));   // URGENT-027: online after a pause, never per letter
             return;
         }
         if (t.id === 'sf-paste') { S.pasted = t.value; return; }   // read on paste / leaving the box / Done
