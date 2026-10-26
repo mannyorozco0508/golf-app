@@ -116,8 +116,10 @@ describe('THE LOCKUP SVG', () => {
 
     test('the icon svg is the ball only, on near-black', () => {
         const icon = read('hardpan-icon.svg');
-        assert.match(icon, /#0B0F0C/);
-        assert.match(icon, /#2E7A4B/);
+        // 077b ONE APP, ONE ICON (Manny, Oct 26 2026): the new logo's night field and pin green
+        // (were #0B0F0C / #2E7A4B, the old ball; old files in assets/brand/legacy/).
+        assert.match(icon, /#0b100d/i);
+        assert.match(icon, /#2e7d4f/i);
         assert.match(icon, /<circle /);
         assert.ok(!/#C43C2C/.test(icon), 'the pin-flag red is back');
         assert.ok(!/HARDPAN/.test(icon), 'the icon must not carry the wordmark');
@@ -138,7 +140,8 @@ describe('THE WEB ICONS', () => {
             const img = readPng(path.join(__dirname, f));
             assert.equal(img.width, img.height);
             const corner = px(img, 0, 0);
-            assert.deepEqual(corner, [0x0B, 0x0F, 0x0C], f + ' corner is ' + corner.join(','));
+            // 077b: the new logo's night field (was [0x0B, 0x0F, 0x0C], the old ball).
+            assert.deepEqual(corner, [0x0B, 0x10, 0x0D], f + ' corner is ' + corner.join(','));
             let green = 0, bone = 0;
             for (let i = 0; i < img.data.length; i += 4) {
                 const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];
