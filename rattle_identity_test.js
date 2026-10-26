@@ -342,8 +342,10 @@ describe('APP ICON ASSET SEAM', () => {
         const crypto = require('crypto');
         const sha = f => crypto.createHash('sha256')
             .update(fs.readFileSync(path.join(__dirname, f))).digest('hex');
-        // THE MERGED APP'S ICON (mailbox 004, Manny 2026-10-17): the HP ball + green location pin.
-        const MASTER_SHA = '23cd2d1d823c8e6c6f544ea374c467eb4e7e9d1361e4365419773ae93e673947';
+        // THE MERGED APP'S ICON (mailbox 004, Manny 2026-10-17). 077b ONE APP, ONE ICON (Manny,
+        // Oct 26 2026): the new HardPan logo, Manny's HardPan-AppIcon-1024-square.png byte for byte
+        // (was the HP ball + pin, 23cd2d1d823c8e6c…, kept at assets/brand/legacy/icon-1024.png).
+        const MASTER_SHA = '3c615977250b974ed8eaed554215d7191910723291d63e5158c012ef8bf5a866';
         const STROKE_R_SHA = '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112';
         assert.equal(sha(MASTER), MASTER_SHA, 'icon-1024.png moved');
         assert.equal(sha('ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png'), MASTER_SHA,

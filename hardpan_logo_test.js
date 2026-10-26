@@ -35,9 +35,14 @@ const TOURNAMENT_PAGES = ['tournament.html', 'tournament-scorecard.html'];
 
 const NATIVE_ICONS = {
     // THE MERGED APP'S ICON (mailbox 004, Manny 2026-10-17): com.rattlegolf.app takes the GPS
-    // app's HP ball + green location pin, the whole slot set (gps-beta's AppIcon.appiconset).
+    // app's whole slot set (gps-beta's AppIcon.appiconset).
+    // 077b ONE APP, ONE ICON (Manny, Oct 26 2026): that set is now the new HardPan logo (#71,
+    // ~/Desktop/HardPan-Logo/HardPan-AppIcon-1024-square.png, byte for byte). Was the HP ball
+    // + pin, 23cd2d1d823c8e6c…; the old file is kept at assets/brand/legacy/icon-1024.png.
+    // The Android launcher pins below are still the old ball: the Android session regenerates
+    // them from the new icon-1024.png (tools/android-icons.js) and moves these pins with it.
     'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png':
-        '23cd2d1d823c8e6c6f544ea374c467eb4e7e9d1361e4365419773ae93e673947',
+        '3c615977250b974ed8eaed554215d7191910723291d63e5158c012ef8bf5a866',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher.png':
         '300cf9f2ff551ccd3aa45dc64d933ca9a53a0830d312cd2906cbb1f6ec801ddd',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png':
@@ -118,8 +123,9 @@ describe('THE LOCKUP SVG', () => {
 
     test('the icon svg is the ball only, on near-black', () => {
         const icon = read('hardpan-icon.svg');
-        assert.match(icon, /#0B0F0C/);
-        assert.match(icon, /#2E7A4B/);
+        // 077b: the new logo's night field and pin green (were #0B0F0C / #2E7A4B, the old ball).
+        assert.match(icon, /#0b100d/i);
+        assert.match(icon, /#2e7d4f/i);
         assert.match(icon, /<circle /);
         assert.ok(!/#C43C2C/.test(icon), 'the pin-flag red is back');
         assert.ok(!/HARDPAN/.test(icon), 'the icon must not carry the wordmark');
@@ -140,7 +146,8 @@ describe('THE WEB ICONS', () => {
             const img = readPng(path.join(__dirname, f));
             assert.equal(img.width, img.height);
             const corner = px(img, 0, 0);
-            assert.deepEqual(corner, [0x0B, 0x0F, 0x0C], f + ' corner is ' + corner.join(','));
+            // 077b: the new logo's night field (was [0x0B, 0x0F, 0x0C], the old ball).
+            assert.deepEqual(corner, [0x0B, 0x10, 0x0D], f + ' corner is ' + corner.join(','));
             let green = 0, bone = 0;
             for (let i = 0; i < img.data.length; i += 4) {
                 const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];
@@ -190,7 +197,7 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.equal(master, NATIVE_ICONS['ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png']);
         assert.notEqual(master, STROKE_R_MASTER, 'icon-1024.png is still the Stroke R');
         const img = readPng(path.join(__dirname, 'icon-1024.png'));
-        assert.deepEqual(px(img, 0, 0), [0x0B, 0x0F, 0x0C]);
+        assert.deepEqual(px(img, 0, 0), [0x0B, 0x10, 0x0D]); // 077b: new logo field (was 0B0F0C)
         let green = 0, bone = 0;
         for (let i = 0; i < img.data.length; i += 4) {
             const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];

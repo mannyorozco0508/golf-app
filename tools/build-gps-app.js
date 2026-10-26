@@ -51,6 +51,9 @@ FILES.forEach((file) => {
     else fs.copyFileSync(src, path.join(OUT, file));
 });
 if (missing.length) { console.error('MISSING (declared, not at the repo root): ' + missing.join(', ')); process.exit(1); }
+// 077b (Manny, Oct 26: "one app, one icon"): the repo-root icon-192/512, favicon-32 and hardpan-icon.svg
+// are now these same new files too, so this overlay copies identical bytes for them; logo-mark.png
+// (receipt) still differs. Kept as is so the GPS app never depends on the root files.
 // 077 THE NEW HARDPAN LOGO (Manny's Oct 25 pick, ~/Desktop/HardPan-Logo): THIS APP ONLY. The repo-root
 // icon-192/512, favicon-32, hardpan-icon.svg and logo-mark.png stay the old HP ball (the web and the
 // Consumer app keep them until Manny OKs those); the GPS app gets the new files laid over them here,

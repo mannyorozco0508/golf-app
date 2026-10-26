@@ -36,7 +36,12 @@ const RES = path.join(ROOT, 'android', 'app', 'src', 'main', 'res');
 const PLAY = path.join(ROOT, 'android', 'app', 'src', 'main', 'ic_launcher-playstore.png');
 
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
-const FOREGROUND_SCALE = 0.92;     // ball: fills the 66/108 safe circle without clipping
+// 077b ONE APP, ONE ICON (Manny, Oct 26 2026): icon-1024.png is now the new HardPan logo (HP + the
+// ball-in-pin + GOLF · GPS · GAMES). It is a wide mark: its farthest pixel is ~501px from the mark
+// centre, so 0.92 (the old ball) would reach 1.47x the safe circle and the script refuses to write.
+// 0.60 puts the reach at ~0.96 of the safe circle (same decision as before: fit and fill it).
+// The old ball's value was 0.92; kept here for the record.
+const FOREGROUND_SCALE = 0.60;     // new logo: fills the 66/108 safe circle without clipping (ball was 0.92)
 const ROUND_RADIUS_FRACTION = 0.86; // legacy round icon: the mark's reach as a fraction of the circle
 const THRESHOLD = 40;
 
