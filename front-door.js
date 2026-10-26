@@ -2861,6 +2861,9 @@
     function has(o, fn) { return !!(o && typeof o[fn] === 'function'); }
     function tapIn(id, sel) { var e = $(id), b = e && (sel ? e.querySelector(sel) : e); if (b && typeof b.click === 'function') b.click(); }
     var SHEETS_2 = [
+        // The app's own "Are you sure?" (ui-dialogs.js uiConfirm; 073's End round asks with it): above
+        // every sheet, so it goes first. Back is its cancel - "Keep playing" for End round. Never yes.
+        ['confirm', function () { var e = $('ui-sheet'); return !!(e && e.classList && e.classList.contains('open')); }, function () { tapIn('ui-sheet', '#ui-sheet-no'); }],
         ['voice', function () { var V = api('HardPanVoice'); return has(V, 'isOpen') && !!V.isOpen(); }, function () { api('HardPanVoice').cancel(); }],
         ['needs-account', function () { var N = api('HardPanNeedsAccount'); return has(N, 'isOpen') && N.isOpen(); }, function () { var e = W.document.querySelector('[data-hpna-scrim]'); if (e) e.click(); }],
         ['account', function () { var A = api('HardPanAccountUI'); return has(A, 'isOpen') && !!A.isOpen(); }, function () { api('HardPanAccountUI').close(); }],
@@ -2876,6 +2879,8 @@
         ['score-sheet', function () { return shownId('hp-score-sheet'); }, function () { tapIn('hp-score-sheet'); }],
         ['stats', function () { var G = api('HardPanGpsStats'); return has(G, 'isOpen') && G.isOpen(); }, function () { api('HardPanGpsStats').close(); }],
         ['my-stats', function () { return shownId('hp-my-stats'); }, function () { api('HardPanGpsStats').closeMy(); }],
+        // 071b's pars sheet over the new-round flow (inside #sf): its "Not now", not the flow's own back.
+        ['pars-start', function () { return !!$('sf-pars'); }, function () { tapIn('sf-pars', '[data-sf=parscancel]'); }],
         ['new-round-ask', function () { return !!$('sf-ask'); }, function () { tapIn('sf-ask'); }],
         ['new-round', function () { return shownId('sf') && !!W.document.querySelector('#sf .sf-back'); }, function () { tapIn('sf', '.sf-back'); }]
     ];

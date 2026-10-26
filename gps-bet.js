@@ -1068,6 +1068,10 @@
     window.HardPanBet = api;
     if (window.GolfBack && typeof window.GolfBack.register === 'function') {
         try { window.GolfBack.register({ name: 'hp-weekly', priority: 2, isOpen: wkOpen, close: wkClose }); } catch (e) {}
+        // ANDROID (android-2.0): 071b's pars sheet opens OVER the bet sheet, so it has to close first -
+        // its "Not now" (no bet is added), never a step of the bet sheet under it. Android only.
+        // Priority 0.5, not 0: pwa-boot reads a 0 as "none given" and files it last (Number(p) || 9).
+        try { var C = window.Capacitor; if (C && typeof C.getPlatform === 'function' && C.getPlatform() === 'android') window.GolfBack.register({ name: 'hp-pars', priority: 0.5, isOpen: function () { var r = document.getElementById('hp-pars'); return !!(PA && r && r.style.display !== 'none'); }, close: parsCancel }); } catch (e) {}
         try { window.GolfBack.register({ name: 'hp-bet', priority: 1, isOpen: isOpen, close: function () { if (st && st.step > 1) { st.step -= 1; draw(); } else close(); } }); } catch (e) {}
     }
 })();

@@ -8,6 +8,8 @@
 //   its own Close / Not now / tap-outside does - never the page under it, never the app.
 //   Each sheet is reached the way the hardware button reaches it: the App plugin's
 //   backButton listener that front-door.js arms on Home. No page function is called here.
+//   Add-on port (071b / 073): + 'confirm' (the app's "Are you sure?") and 'pars-start' (071b's pars sheet
+//   in #sf). 41 tests, 41 pass. Controls: no 'confirm' row -> 39 / 2; no 'pars-start' row -> 39 / 2.
 //   What this harness cannot prove: that each file's own isOpen() matches what is on a real
 //   screen. That is the emulator pass (each sheet opened by tapping, then Back).
 // ============================================================================
@@ -88,6 +90,9 @@ function homeOnAndroid(platform, open, extra) {
     els.set('hp-range', el('hp-range', is('range-home') ? '' : 'none', log));
     els.set('hp-score-sheet', Object.assign(el('hp-score-sheet', is('score-sheet') ? '' : 'none', log), { click: () => log.push('close:score-sheet') }));
     W.HardPanGpsStats = { isOpen: () => is('stats'), close: () => log.push('close:stats'), closeMy: () => log.push('close:my-stats') };
+    // The add-ons (071b / 073): the app's own "Are you sure?" and the Start pars sheet inside #sf.
+    if (is('confirm')) { const u = el('ui-sheet', '', log); u.classList.contains = c => c === 'open'; u.__kid('#ui-sheet-no', Object.assign(el('ui-sheet-no', '', log), { click: () => log.push('close:confirm') })); els.set('ui-sheet', u); }
+    if (is('pars-start')) { const sp = el('sf-pars', '', log); sp.__kid('[data-sf=parscancel]', Object.assign(el('parscancel', '', log), { click: () => log.push('close:pars-start') })); els.set('sf-pars', sp); }
     if (is('new-round-ask')) els.set('sf-ask', Object.assign(el('sf-ask', '', log), { click: () => log.push('close:new-round-ask') }));
     const sf = el('sf', is('new-round') ? '' : 'none', log);
     if (is('new-round')) { const b = Object.assign(el('sf-back', '', log), { click: () => log.push('close:new-round') }); sf.__kid('.sf-back', b); docSel['#sf .sf-back'] = b; }
@@ -97,7 +102,7 @@ function homeOnAndroid(platform, open, extra) {
     return { sb, log, press: () => (listeners.backButton || []).forEach(fn => fn({ canGoBack: true })), listeners };
 }
 
-const SHEETS = ['voice', 'needs-account', 'account', 'scan', 'sg-info', 'my-stats-ask', 'customize', 'shot-history', 'mark',
+const SHEETS = ['confirm', 'pars-start', 'voice', 'needs-account', 'account', 'scan', 'sg-info', 'my-stats-ask', 'customize', 'shot-history', 'mark',
     'launch-entry', 'range', 'range-home', 'score-sheet', 'stats', 'my-stats', 'new-round-ask', 'new-round'];
 
 describe('ANDROID: one Back press closes the top 2.0 sheet, and only that', () => {
@@ -118,6 +123,16 @@ describe('ANDROID: one Back press closes the top 2.0 sheet, and only that', () =
         const h = homeOnAndroid('android', ['new-round', 'new-round-ask']);
         h.press();
         assert.deepEqual(h.log, ['close:new-round-ask']);
+    });
+    test('add-ons: the app\'s "Are you sure?" (073 End round) over the score sheet closes the ask only - its cancel, never yes', { skip }, () => {
+        const h = homeOnAndroid('android', ['score-sheet', 'confirm']);
+        h.press();
+        assert.deepEqual(h.log, ['close:confirm']);
+    });
+    test('add-ons: 071b\'s pars sheet inside the new-round flow is its "Not now", not the flow\'s own back', { skip }, () => {
+        const h = homeOnAndroid('android', ['new-round', 'pars-start']);
+        h.press();
+        assert.deepEqual(h.log, ['close:pars-start']);
     });
     test('nothing open on Home Main: Back minimises the app, as in 0.2', { skip }, () => {
         const h = homeOnAndroid('android', []);
