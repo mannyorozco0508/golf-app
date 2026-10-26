@@ -737,7 +737,7 @@
         if (!a) { r.style.display = 'none'; r.innerHTML = ''; return; }
         for (var i = 1; i <= a.n; i++) rows += '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #e3e9e5;"><span style="min-width:56px;flex:1;">Hole ' + i + '</span>'
             + '<input type="number" inputmode="numeric" min="3" max="6" data-pa-par="' + i + '" value="' + esc(a.p[i] || '') + '" placeholder="Par" style="' + inp + '">'
-            + (a.idx ? '<input type="number" inputmode="numeric" min="1" max="' + a.n + '" data-pa-si="' + i + '" value="' + esc(a.si[i] || '') + '" placeholder="Index" style="' + inp + '">' : '') + '</div>';
+            + (a.idx ? '<input type="number" inputmode="numeric" min="1" max="' + a.n + '" data-pa-si="' + i + '" value="' + esc(a.si[i] || '') + '" placeholder="HCP" aria-label="Hole HCP (stroke index)" style="' + inp + '">' : '') + '</div>';
         var nm = esc(String((data() || {}).courseName || '').split(' (')[0]);
         r.innerHTML = '<div style="width:100%;max-width:520px;max-height:88vh;overflow:auto;margin:0 12px calc(env(safe-area-inset-bottom) + 12px);padding:16px;background:#fff;border-radius:18px;color:#13261d;" role="dialog" aria-labelledby="hp-pars-t">'
             + '<div id="hp-pars-t" style="font-size:18px;font-weight:800;line-height:1.3;margin-bottom:4px;">' + (a.idx ? 'Pars and stroke indexes' : 'Pars') + ' for ' + nm + '</div>'

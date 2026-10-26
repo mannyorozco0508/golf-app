@@ -341,8 +341,8 @@
                         ops.push({ op: 'ring', cx: cxm, cy: cym, r: 21, color: C.neg, w: 2.5 });
                         if (cell.mark === 'eagle') ops.push({ op: 'ring', cx: cxm, cy: cym, r: 26, color: C.neg, w: 2.5 });
                     } else if (cell.mark === 'bogey' || cell.mark === 'double') {
-                        ops.push({ op: 'box', x: cxm - 20, y: cym - 20, w: 40, h: 40, color: C.ink, w2: 2 });
-                        if (cell.mark === 'double') ops.push({ op: 'box', x: cxm - 25, y: cym - 25, w: 50, h: 50, color: C.ink, w2: 2 });
+                        ops.push({ op: 'box', x: cxm - 20, y: cym - 20, w: 40, h: 40, color: '#1d3557', w2: 2.5 });   // URGENT-081: the web's navy (--brand-navy), the circles' line
+                        if (cell.mark === 'double') ops.push({ op: 'box', x: cxm - 25, y: cym - 25, w: 50, h: 50, color: '#1d3557', w2: 2.5 });
                     }
                     text({ x: cxm, y: base, text: cell.v, font: font(col.c.sec ? 28 : 27, col.c.sec ? 800 : 500), color: cell.net ? C.green : C.ink, align: 'center',
                         role: cell.net ? 'net' : (col.c.sec ? 'sec' : 'hole'), gi: gi, col: col.c.label });
