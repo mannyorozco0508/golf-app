@@ -3,7 +3,7 @@
 // Mulligan as their OWN two rows, King 18 first, NOT under 'Search more'").
 //   1  "starfire" on a phone that knows the club's GolfAPI courses (a saved answer, or its "Which one?" lookup): King 18,
 //      then Mulligan (✓ GPS), then our "Starfire Golf Club · Tap to load" (kept, right after them); 0 searches.
-//   1b A fresh phone: as before (our row, 0 calls); the tap's "Which one?" remembers the club's courses.
+//   1b A fresh phone: ONE search for the club's name (Manny's YES), then the same rows; again: 0 calls.
 //   2  Nothing else moves: Talking Stick (2 courses) and "Arizo" as in 079; a course of ours WITH a card asks nothing.
 // The Cloud Functions are stood in at fetch. No network, no GolfAPI call. Synthetic cards.
 // ============================================================================
@@ -95,17 +95,26 @@ test('"starfire" when the phone knows the club\'s GolfAPI courses: King 18 then 
     assert.deepEqual(c.fn, [], '0 searches');
 });
 
-test('a fresh phone: "starfire" shows our row as before (0 calls); tapping it asks "Which one?" once; after that "starfire" shows King 18, Mulligan, ours - with no new search', { timeout: 200000 }, async () => {
-    const r = await open(AWAY, [CHANGE, { sleep: 300 }, TYPE('starfire'), { sleep: 3500 }, X(SNAP),
+test('a fresh phone: "starfire" asks ONCE (gpsSearch "Starfire Golf Club"), then King 18, Mulligan, our row; typing it again: 0 more calls', { timeout: 200000 }, async () => {
+    const r = await open(AWAY, [CHANGE, { sleep: 300 }, TYPE('starfire'), { waitFor: "document.querySelectorAll('#sf [data-sf-web]').length >= 2", timeout: 15000 }, { sleep: 800 }, X(SNAP),
+        TYPE(''), { sleep: 1200 }, TYPE('starfire'), { sleep: 3500 }, X(SNAP)]);
+    assert.equal(r.ok, true, r.reason);
+    const [a, b] = J(r);
+    assert.deepEqual(a.fn, ['Starfire Golf Club'], 'exactly one search, for the club');
+    assert.deepEqual(rowsOf(a, /Starfire|King 18|Mulligan/).map((x) => x.split(' |')[0]), ['WEB King 18', 'WEB Mulligan', 'LOCAL Starfire Golf Club'], JSON.stringify(a.rows));
+    assert.deepEqual(rowsOf(b, /Starfire|King 18|Mulligan/).map((x) => x.split(' |')[0]), ['WEB King 18', 'WEB Mulligan', 'LOCAL Starfire Golf Club'], 'again: ' + JSON.stringify(b.rows));
+    assert.deepEqual(b.fn, ['Starfire Golf Club'], 'a second time: 0 more calls');
+});
+
+test('the "Which one?" lookup\'s answer is remembered: tapping our row on a phone that already asked keeps 0 extra searches for "starfire"', { timeout: 200000 }, async () => {
+    const r = await open(AWAY, [CHANGE, { sleep: 300 }, TYPE('starfire'), { waitFor: "document.querySelectorAll('#sf [data-sf-web]').length >= 2", timeout: 15000 }, { sleep: 600 },
         X("(function(){ var b=document.querySelector('#sf [data-sf-course=\"az_starfire\"]'); if(b) b.click(); return b ? 'tapped' : 'NO ROW'; })()"), { waitFor: "document.querySelectorAll('#sf [data-sf-lkpick]').length >= 2", timeout: 20000 }, { sleep: 600 }, X(SNAP),
         CHANGE, { sleep: 1500 }, X(SNAP)]);
     assert.equal(r.ok, true, r.reason);
-    const [a, b, c] = J(r);
-    assert.deepEqual(rowsOf(a, /Starfire|King 18|Mulligan/).map((x) => x.split(' |')[0]), ['LOCAL Starfire Golf Club'], 'before: our row only: ' + JSON.stringify(a.rows));
-    assert.deepEqual(a.fn, [], '0 calls');
-    assert.match(b.text, /King 18[\s\S]*Mulligan/, '"Which one?" lists King 18 then Mulligan: ' + b.text.slice(0, 400));
-    assert.deepEqual(rowsOf(c, /Starfire|King 18|Mulligan/).map((x) => x.split(' |')[0]), ['WEB King 18', 'WEB Mulligan', 'LOCAL Starfire Golf Club'], 'after: ' + JSON.stringify(c.rows));
-    assert.deepEqual(c.fn, b.fn, 'no new search after the lookup');
+    const [b, c] = J(r);
+    assert.match(b.text, /King 18[\s\S]*Mulligan/, '"Which one?" lists King 18 then Mulligan');
+    assert.deepEqual(rowsOf(c, /Starfire|King 18|Mulligan/).map((x) => x.split(' |')[0]), ['WEB King 18', 'WEB Mulligan', 'LOCAL Starfire Golf Club'], 'after Change: ' + JSON.stringify(c.rows));
+    assert.equal(c.fn.filter((x) => x === 'starfire').length, 0, 'the typed text is never searched');
 });
 
 test('nothing else moves: "Arizo" at Manny\'s house - one GolfAPI row first, 0 searches (the Biltmore "Tap to load" rows only START with the text: no club search)', { timeout: 200000 }, async () => {

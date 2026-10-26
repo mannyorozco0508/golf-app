@@ -587,7 +587,7 @@
     // A course of ours with no card yet ("Starfire Golf Club · Tap to load") whose name IS what was typed: its club's
     // GolfAPI ✓ GPS courses are drawn as their own rows, right before ours (our row stays - only add). KNOWN = this
     // phone's saved answers (any search answer, or the club's courses the "Which one?" lookup found - kept 30 days):
-    // 0 calls. Not known yet: as before ("Search more courses" asks once; a tap on our row asks "Which one?").
+    // 0 calls. Not known yet: ONE search for the club's name (clubFill - the exception, Manny's YES), then known.
     var CLUB = 'hardpan_webclub_';
     function clubAsk(raw) {
         if (!liveOn()) return null;
@@ -614,7 +614,26 @@
             if (!nw.length) return false;
             S.web.results = (S.web.results || []).concat(nw); return true;
         };
-        return add(clubRowsFor(c));   // known only: no online call here (071/076: a saved match makes 0 calls; "Search more" asks)
+        var kn = clubRowsFor(c);
+        if (kn.length >= 2) return add(kn);   // several courses at one club, known on this phone: 0 calls
+        // THE ONE EXCEPTION to 071/076's "a saved match makes 0 online calls" (Manny, Oct 26, answer to 079b Q1: YES):
+        // the typed name IS one of OUR club rows with no card, and this phone has never asked about that club -> ONE
+        // gpsSearch for the club's name, once per club per 30 days (kept under hardpan_webclub_<name> even when it finds
+        // nothing). The server answers from its saved search when anyone asked before (Starfire: 0 GolfAPI credits);
+        // only a search the server hasn't saved costs 0.1 and counts toward the golfer's daily searches.
+        var L = W.HardPanGpsLive, nm = clubName(c.name), ck = CLUB + webKey(nm);
+        if (!L || !L.search || (typeof navigator !== 'undefined' && navigator.onLine === false)) return false;
+        var seen = null; try { seen = JSON.parse(ls(ck) || 'null'); } catch (e) {}
+        if ((seen && seen.at && Date.now() - seen.at < WEB_MS) || (S.clubAsked = S.clubAsked || {})[ck]) return false;
+        S.clubAsked[ck] = 1;
+        try { (W.__sfWeb = W.__sfWeb || []).push(nm); } catch (e) {}
+        Promise.resolve().then(function () { return L.search(nm); }).then(function (r) {
+            if (!(r && r.status === 'ok')) { S.clubAsked[ck] = 0; return; }
+            ls(ck, JSON.stringify({ at: Date.now(), results: (r.results || []).slice(0, 25) }));
+            var rows = clubRowsFor(c);
+            if (rows.length >= 2 && add(rows)) render1();
+        }, function () { S.clubAsked[ck] = 0; });
+        return false;
     }
     function webSearch(force) {
         var raw = String(S.q || '').trim(), L = W.HardPanGpsLive;
