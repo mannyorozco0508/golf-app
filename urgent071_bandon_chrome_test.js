@@ -170,10 +170,13 @@ test('the online line sits over the OSM rows when the search failed (limit), Try
     assert.ok(om.list.some((t) => /^WEB Bandon Dunes Golf Resort \(Old McDonald\) \|.*✓ GPS/.test(t)), JSON.stringify(om.list));
 });
 
-test('Games & Bets keeps the 064 path: an OSM-only row opens Round Setup\'s Add a course (the pars)', { timeout: 150000 }, async () => {
-    const r = await open(AT_BANDON, 'error', [TYPE('Bandon'), PAUSE, SETTLED, { sleep: 400 }, TAP_OSM('Shortys'), { sleep: 1500 }, X(SF)], '', 'new');
+test('Games & Bets keeps the 064 path: an OSM-only row is the course (071b: pars asked at Start when there is a game), and "Type the pars and indexes" opens Round Setup\'s Add a course', { timeout: 150000 }, async () => {
+    const r = await open(AT_BANDON, 'error', [TYPE('Bandon'), PAUSE, SETTLED, { sleep: 400 }, TAP_OSM('Shortys'),
+        { waitFor: "!!document.querySelector('#sf [data-sf=osmpars]')", timeout: 40000 }, { sleep: 500 }, X(SF),
+        X("(function(){ var b=document.querySelector('#sf [data-sf=osmpars]'); if(b) b.click(); return 1; })()"), { sleep: 1500 }, X(SF)], '', 'new');
     assert.equal(r.ok, true, r.reason);
-    const [s] = J(r);
+    const [picked, s] = J(r);
+    assert.equal(picked.key, 'osm_w1540940976', 'the OSM course is the pick');
     assert.equal(s.form, 'block', 'Add a course is open');
     assert.equal(s.name, 'Shortys');
 });

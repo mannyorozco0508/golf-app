@@ -176,6 +176,7 @@
         else if (S.step === 3) html = step3();
         else html = share();
         if (S.ask && S.step === 1) html += askHtml();
+        if (S.parsAsk) html += parsHtml();   // 071b
         if (!(S.step === 1 && keepBox(e, html, keep))) e.innerHTML = html;
         if (S.step === 1) offlineMount();
         if (S.step === 3 && S.moreOpen) placePool(true);
@@ -848,7 +849,7 @@
         var nm = esc(String(o.name || '').split(' (')[0]);
         return '<div class="sf-card" id="sf-osmnote"><div class="sf-note" style="font-size:14px;margin-bottom:8px;">'
             + (o.src === 'osm' ? '✓ GPS from OpenStreetMap (' + o.n + ' of ' + o.of + ' holes mapped).' : o.src === 'unreached' ? '<b id="sf-osmbusy">Map data server busy, try again.</b> Couldn\u2019t reach OpenStreetMap for ' + nm + '\u2019s holes just now \u2014 the map tries again when it opens; until then \u201cTap the middle of the green\u201d sets each green.' : o.src === 'loading' ? '\u23f3 ' + nm + '\u2019s holes and greens are on the way from OpenStreetMap \u2014 the map shows them once they\u2019re in (you can start now).' : 'No GPS map data for ' + nm + ' yet — on the map, “Tap the middle of the green” sets each green.')
-            + ' Pars and indexes aren’t set yet (par 4 shown) — add them now or later.</div>'
+            + (standInPars(key) ? ' Pars' + (standInPars(key).indexSet ? ' and stroke indexes' : '') + ' set for this round.' : ' Pars and indexes aren’t set yet (par 4 shown) — add them now or later; a round with a game asks for them at Start.') + '</div>'
             + (o.src === 'unreached' ? '<button type="button" class="sf-link" data-sf="osmretry" style="font-size:14px;padding:0 12px 0 0;min-height:0;">Try OpenStreetMap again</button>' : '')
             + '<button type="button" class="sf-link" data-sf="osmpars" style="font-size:14px;padding:0;min-height:0;">Type the pars and indexes ›</button>'
             + ' <button type="button" class="sf-link muted" data-sf="request" style="font-size:13px;padding:0 0 0 10px;min-height:0;">Request this course</button></div>';
@@ -1518,6 +1519,69 @@
     }
 
     // ---- START ROUND: ONE TAP -----------------------------------------------------
+    // ---- 071b (Manny, answer 3): A ROUND WITH A GAME ON A STAND-IN CARD ASKS FOR THE PARS FIRST --------
+    // An OpenStreetMap course (osm_w<id>) starts on a par-4 stand-in card (071). A GPS-only round keeps it. A
+    // round with ANY game or bet asks at Start for the pars - and the stroke indexes when a game needs them:
+    // the engines give strokes by hole index only in NET scoring (match-engine getStrokes / allocateMatchStrokes,
+    // hilo-engine strokesFor: "Gross: none"), and only when some golfer gets a stroke. The card is kept on this
+    // phone and in the round (never written to the shared course list).
+    function standInRec(key) { try { var r = typeof globalCourses !== 'undefined' && globalCourses ? globalCourses[key] : null; return r && r.gpsOnly ? r : null; } catch (e) { return null; } }   /* global globalCourses */
+    function standInPars(key) { var r = standInRec(key); return r && r.parsSet ? r : null; }
+    function anyGame() { return GAMES.some(function (g) { return S.games[g.k] && (!g.only || g.only()); }); }
+    function indexNeeded() {
+        if (!anyGame() || S.scoring !== 'net') return false;
+        var hs = players().map(function (p) { var hb = p.hcp != null ? p.hcp : ''; try { return typeof W.parseHcp === 'function' ? W.parseHcp(String(hb)) : Number(hb) || 0; } catch (e) { return 0; } });
+        if (!hs.length) return false;
+        var lo = Math.min.apply(null, hs), gets = false;
+        for (var i = 1; i <= 18 && !gets; i++) hs.forEach(function (h) {
+            try {
+                if (typeof W.getStrokes === 'function' && W.getStrokes(i, h)) gets = true;
+                if (typeof W.allocateMatchStrokes === 'function' && W.allocateMatchStrokes(h - lo, i)) gets = true;
+            } catch (e) {}
+        });
+        return gets;
+    }
+    // true: asked (the overlay is up) - the caller stops; it runs again from Save.
+    function askPars(then) {
+        var key = courseKey(), r = standInRec(key);
+        if (!r || r.parsSet || !anyGame()) return false;
+        var n = (r.data || []).length || 18, idx = indexNeeded();
+        S.parsAsk = { key: key, n: n, idx: idx, p: {}, si: {}, err: '', then: then };
+        try { (W.__sfParsAsk = W.__sfParsAsk || []).push({ key: key, idx: idx }); } catch (e) {}
+        render();
+        return true;
+    }
+    function parsHtml() {
+        var a = S.parsAsk, rows = '';
+        for (var i = 1; i <= a.n; i++) rows += '<div class="sf-line" style="gap:8px;"><span class="l" style="min-width:56px;">Hole ' + i + '</span>'
+            + '<input type="number" inputmode="numeric" min="3" max="6" class="sf-search" data-sf-par="' + i + '" value="' + esc(a.p[i] || '') + '" placeholder="Par" style="margin:0;width:84px;">'
+            + (a.idx ? '<input type="number" inputmode="numeric" min="1" max="' + a.n + '" class="sf-search" data-sf-si="' + i + '" value="' + esc(a.si[i] || '') + '" placeholder="Index" style="margin:0;width:84px;">' : '') + '</div>';
+        var nm = esc(String(courseName() || '').split(' (')[0]);
+        return '<div id="sf-pars" style="position:fixed;inset:0;z-index:6;background:rgba(10,20,15,.45);display:flex;align-items:flex-end;justify-content:center;">'
+            + '<div class="sf-card" style="width:100%;max-width:520px;max-height:88vh;overflow:auto;margin:0 12px calc(env(safe-area-inset-bottom) + 12px);padding:16px;" role="dialog" aria-labelledby="sf-pars-t">'
+            + '<div id="sf-pars-t" style="font-size:18px;font-weight:800;line-height:1.3;margin-bottom:4px;">' + (a.idx ? 'Pars and stroke indexes' : 'Pars') + ' for ' + nm + '</div>'
+            + '<div class="sf-note" style="margin-bottom:10px;">Your game needs the real ' + (a.idx ? 'pars and stroke indexes (net strokes go by the index)' : 'pars') + ' — from the scorecard. Once, for this round.</div>'
+            + rows + (a.err ? '<div class="sf-err" id="sf-pars-err">' + esc(a.err) + '</div>' : '')
+            + '<button type="button" class="sf-cta lime" data-sf="parssave" style="margin-top:10px;">Save and start</button>'
+            + '<button type="button" class="sf-btn" data-sf="parscancel" style="width:100%;min-height:46px;margin-top:8px;">Not now</button></div></div>';
+    }
+    function parsSave() {
+        var a = S.parsAsk, r = a && standInRec(a.key);
+        if (!r) { S.parsAsk = null; render(); return; }
+        var data = [], seen = {}, bad = '';
+        for (var i = 1; i <= a.n; i++) {
+            var par = Number(a.p[i]), si = a.idx ? Number(a.si[i]) : ((r.data || [])[i - 1] || {}).hcpIndex || i;
+            if (!(par >= 3 && par <= 6 && Math.round(par) === par)) { bad = bad || 'Hole ' + i + ': a par of 3, 4, 5 or 6.'; continue; }
+            if (a.idx && (!(si >= 1 && si <= a.n && Math.round(si) === si) || seen[si])) { bad = bad || 'Hole ' + i + ': a stroke index from 1 to ' + a.n + ', each used once.'; continue; }
+            seen[si] = 1;
+            data.push({ hole: i, par: par, hcpIndex: si });
+        }
+        if (bad) { a.err = bad; render(); return; }
+        r.data = data; r.parsSet = true; r.indexSet = !!a.idx;
+        try { if (fn('handleCourseChange')) W.handleCourseChange(); } catch (e) {}
+        var then = a.then; S.parsAsk = null; render();
+        if (typeof then === 'function') then();
+    }
     function start() {
         S.err3 = '';
         if (!courseName() || pendBusy()) { go(1); return; }
@@ -1526,6 +1590,7 @@
         if (dupList().length) { S.dupOpen = true; S.err2 = 'Two golfers have the same name — add an initial, then Start.'; go(2); return; }
         var bad = ['nassau', 'match', 'hilo'].filter(function (k) { return S.games[k] && (k !== 'hilo' || hiloHere()) && !sides(k, players()); });
         if (bad.length) { S.err3 = 'Pick who’s in the ' + bad.map(function (k) { return k === 'hilo' ? 'Hi-Lo' : k.replace(/^\w/, function (c) { return c.toUpperCase(); }); }).join(' and ') + '.'; render(); return; }
+        if (askPars(start)) return;   // 071b: a game on a stand-in card - the pars first
         apply();
         ls(PMODE, pmode());
         if (!cardInHand(courseKey())) { needCard('err1', function () { go(3); start(); }); return; }
@@ -1549,6 +1614,7 @@
     function startGps() {
         S.err1 = '';
         if (!courseName()) return;
+        if (askPars(startGps)) return;   // 071b: only when the round has a game (a GPS-only round keeps the par-4 card)
         var boxes = D.querySelectorAll('#player-list .p-name-input');
         var named = Array.prototype.some.call(boxes, function (i) { return String(i.value || '').trim(); });
         if (!named) {
@@ -1754,7 +1820,10 @@
         if ((b = t.closest('[data-sf-osm]'))) {
             // 071: the GPS flow opens GPS (GolfAPI, else OpenStreetMap, else tap the green); Games & Bets keeps
             // the 064 form unless GolfAPI has the course (money needs the real pars).
-            if (S.mode === 'gps') { tapOsm(b.getAttribute('data-sf-osm'), b.getAttribute('data-sf-name'), b.getAttribute('data-sf-city'), b.getAttribute('data-sf-state')); return; }
+            // 071b (Manny): every flow - GolfAPI first, else the OSM course's own card; a round with a game asks
+            // for the pars (and the stroke indexes when a game needs them) at Start. The Add a course form
+            // stays one tap away ("Type the pars and indexes").
+            tapOsm(b.getAttribute('data-sf-osm'), b.getAttribute('data-sf-name'), b.getAttribute('data-sf-city'), b.getAttribute('data-sf-state')); return;
             var orow = osmRowFor(b.getAttribute('data-sf-osm'), b.getAttribute('data-sf-name')), otw = orow ? ((S.web && S.web.results) || []).filter(function (m) { return m.gps && osmTwinOf(orow, m); }) : [];
             if (otw.length === 1) { webPull(otw[0].id, otw[0].name || otw[0].club); return; }
             addOsm(b.getAttribute('data-sf-name'), b.getAttribute('data-sf-city'), b.getAttribute('data-sf-state')); return;
@@ -1832,6 +1901,8 @@
         if (a === 'fullcourse') { var wn = $('sf-new-course-where'); if (wn) wn.remove(); away(step('course'), 'Course picked'); return; }
         if (a === 'signin') { if (fn('openAccountPanel')) { show(false); W.openAccountPanel(); var t2 = setInterval(function () { var ap = $('account-modal'); if (!ap || !ap.classList.contains('open')) { clearInterval(t2); show(true); S.lookup = null; lookup(courseKey(), courseName()); render(); } }, 600); } return; }
         if (a === 'osmpars') { var on = OSM_CARD[courseKey()] || {}; addOsm(on.name || courseName(), on.city || '', on.state || ''); return; }
+        if (a === 'parssave') { parsSave(); return; }   // 071b
+        if (a === 'parscancel') { S.parsAsk = null; render(); return; }
         if (a === 'osmretry') { var orc = OSM_CARD[courseKey()]; if (orc && orc.row) { S.q = orc.row.name; osmGps(orc.row, true); } return; }   // 071 (the golfer asked: no wait)
         if (a === 'osmskip') { var os = S.osmPick; if (os && os.skip) os.skip(); return; }
         if (a === 'osmmap') { var op = S.osmPick; if (op && op.row) osmGps(op.row); return; }
@@ -1876,6 +1947,10 @@
     }
     function onInput(ev) {
         var t = ev.target;
+        if (S.parsAsk && (t.getAttribute('data-sf-par') || t.getAttribute('data-sf-si'))) {   // 071b: kept across redraws
+            if (t.getAttribute('data-sf-par')) S.parsAsk.p[t.getAttribute('data-sf-par')] = t.value; else S.parsAsk.si[t.getAttribute('data-sf-si')] = t.value;
+            return;
+        }
         if (t.id === 'sf-q') {
             // URGENT-035: the list follows each letter (one redraw a frame, the box itself never redrawn);
             // online only after typing pauses: ~400 ms, longer for a slow typist (twice their own gap
