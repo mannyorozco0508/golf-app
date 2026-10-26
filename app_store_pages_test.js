@@ -149,9 +149,9 @@ describe('THE PRIVACY POLICY IS ACCURATE ABOUT THIS APP', () => {
         // through functions/api/course-search.js to api.golfcourseapi.com.
         // The imported card is written onto the round and into global_courses.
         // Scores and names never go on that request.
-        // RE-PINNED (job 019): the 17 October 2026 policy (anonymous accounts, GPS,
+        // RE-PINNED (privacy-scan-mic, Oct 26): the 26 October 2026 policy adds voice + scan. Was (job 019): the 17 October 2026 policy (anonymous accounts, GPS,
         // services list). was: Last updated: 23 September 2026
-        assert.match(P, /Last updated: 17 October 2026/);
+        assert.match(P, /Last updated: 26 October 2026/);
         assert.match(P, /Course search queries/);
         assert.match(P, /golfcourseapi\.com/);
         assert.match(P, /Cloudflare Worker/);

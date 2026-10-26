@@ -44,12 +44,12 @@
 </header>
 
 <h1>Privacy Policy</h1>
-<p class="updated">Last updated: 17 October 2026 · Rattle Golf LLC</p>
+<p class="updated">Last updated: 26 October 2026 · Rattle Golf LLC</p>
 
 <p>HardPan is a golf app for private groups: GPS yardages, scoring, and the games your group plays. It is made by Rattle Golf LLC, and the App Store listing may say Rattle Golf. Rattle Golf Tournaments is a separate events product and is not covered by this policy. This policy explains what HardPan stores, why, and what it does not do.</p>
 
 <div class="callout">
-    <strong>The short version.</strong> HardPan keeps your group's golf: names, scores and the games you play. It makes you an anonymous account so the rounds you start stay yours. An email address is asked for only if you choose to sign in. Your GPS position is used on your phone to measure yardages and is not sent to us, with one exception you control (setting a green, below). No ads, no analytics, no tracking, and nothing is sold.
+    <strong>The short version.</strong> HardPan keeps your group's golf: names, scores and the games you play. It makes you an anonymous account so the rounds you start stay yours. An email address is asked for only if you choose to sign in. Your GPS position is used on your phone to measure yardages and is not sent to us, with one exception you control (setting a green, below). If you choose to scan a paper scorecard, that one photo is sent to Google's Gemini service to read the scores, and HardPan does not keep it. No ads, no analytics, no tracking, and nothing is sold.
 </div>
 
 <h2>What is stored</h2>
@@ -62,13 +62,29 @@
     <tr><td>A green's position, only when you tap "set the green here" on the GPS screen</td><td>To fix that hole's green for your round. The saved point carries no account id and no name.</td></tr>
     <tr><td>Course search queries (the course name or town you type)</td><td>Sent through our server to look up the course and its published scorecard. This is text you type, not your phone's location. Not kept with your account and not sold.</td></tr>
     <tr><td>Imported course reference (course name, par, stroke index by hole, provider course id)</td><td>Saved into the round so everyone scores the same card, and kept in the shared course list so a later round can use it.</td></tr>
+    <tr><td><strong>Scorecard-scan counts</strong> (your account ID, how many scorecard scans you have used, and short-lived per-minute and per-day counts)</td><td>So each account gets its free scans and no one can run up the cost. The photo itself is never stored - see Scorecard scan below.</td></tr>
 </table>
+
+<h2>Microphone and voice scoring</h2>
+<ul>
+    <li><strong>Only when you ask.</strong> In the HardPan GPS app on iPhone you can say your score (for example "a 5, two putts") with the voice button, or through Siri. HardPan asks for microphone and Speech Recognition permission the first time, and the microphone is on only while you hold or tap the voice button.</li>
+    <li><strong>On your phone where possible.</strong> HardPan uses Apple's speech recognizer and asks it to work on your iPhone whenever your iPhone supports that. On an iPhone that can't, Apple's speech recognition service turns the audio into words, under Apple's privacy policy. When you use Siri, Siri handles what you say the same way.</li>
+    <li><strong>Nothing stored, nothing sent by HardPan.</strong> HardPan does not record or keep your voice, and it does not send audio or what you said to us or anyone else. The words become a score on the normal score sheet for you to check and save; only the score you save is stored, like any score you type. If you ask Siri for a score while your phone is locked, the words wait on your phone (for up to 2 hours) until you open your round.</li>
+</ul>
+
+<h2>Scorecard scan</h2>
+<ul>
+    <li><strong>The camera, only when you ask.</strong> HardPan uses the camera only when you tap to scan a paper scorecard. If you pick a photo instead, only the one picture you choose is read; HardPan does not browse your photo library.</li>
+    <li><strong>What is sent.</strong> The photo goes to our server (Cloudflare) together with what the round already knows: the course name, tee, par and stroke index for each hole, and the round's player names (with any initials or nicknames). Handicaps, if the round has them, go to our server only, to check the result; they are not sent on. Our server sends the photo, the course details and the player names to Google's Gemini API, which reads the scores and sends them back. Your sign-in token is sent so the server knows the scan is yours; it is not passed to Google. Your location is never sent.</li>
+    <li><strong>What is kept.</strong> HardPan does not store the photo. It is processed in memory and is not written to our database or our logs. Our server's log records only counts, timing, which model was used and whether the result checked out - no photo, no names. Nothing goes on the scorecard until you check the scores and tap to use them; then they are saved exactly as if you had typed them.</li>
+    <li><strong>Google.</strong> HardPan uses the paid Gemini API. Under Google's Gemini API Additional Terms of Service for paid services, Google does not use your prompts or responses (including images) to improve its products, and logs them for a limited period of time only to detect and prevent violations of its Prohibited Use Policy (ai.google.dev/gemini-api/terms).</li>
+</ul>
 
 <h2>What is never collected</h2>
 <ul>
     <li>No password or phone number, and an email address only if you choose to sign in</li>
     <li>No background location, and your GPS position is not sent to us (see Your location)</li>
-    <li>No contacts, photos, camera or microphone access</li>
+    <li>No contacts access, and no browsing of your photo library. The camera is used only when you choose to scan a scorecard (see Scorecard scan above). The microphone is used only for voice scoring, as described above, and never recorded.</li>
     <li>No advertising identifier, and no third-party analytics or tracking SDK</li>
     <li>No payment details of any kind — see Money, below</li>
 </ul>
@@ -95,8 +111,10 @@
 <li><strong>GolfAPI</strong> (golfapi.io), through our server: the course name you search for and course ids. Never your position or name.</li>
 <li><strong>Esri (ArcGIS)</strong> and the <strong>U.S. Geological Survey</strong> (USGS): the satellite map on the GPS screen. Your phone asks them for map tiles of the course, and they see that request and your internet address. USGS also gives heights for points on the course (for "plays like"). If a course has no map data, the map can be centered where you stand, so Esri and USGS see tile requests for that area.</li>
 <li><strong>U.S. National Weather Service</strong> (api.weather.gov): the wind. Your phone sends the course's location, not yours, and the service sees your internet address.</li>
-<li><strong>Apple</strong>, on iPhone only: Sign in with Apple if you use it, and push notifications if you allow them (your device's notification token and your notification choices are stored so a round can notify you).</li>
+<li><strong>Apple</strong>, on iPhone only: Sign in with Apple if you use it, and push notifications if you allow them (your device's notification token and your notification choices are stored so a round can notify you). Speech recognition for voice scoring and Siri runs on your iPhone where it can, and otherwise through Apple's speech service, as described under Microphone and voice scoring.</li>
 <li><strong>GolfCourseAPI</strong> (golfcourseapi.com), for published scorecards: see Third-party directories.</li>
+<li><strong>Cloudflare</strong>: runs our scorecard-search proxy and the scorecard-scan service.</li>
+<li><strong>Google Gemini API</strong>: only if you scan a scorecard. It receives that photo, the course name, tee, par and stroke index, and the round's player names, and returns the scores it reads. See Scorecard scan above.</li>
 </ul>
 
 <h2>Third-party directories</h2>

@@ -121,20 +121,43 @@ describe('the privacy policy matches the shipped Consumer app', () => {
     // product to it. If the scanner ever returns, this fails until somebody
     // deliberately rewrites the policy to match - which is the correct order of
     // operations, and the one that was missed the first time.
-    test('POLICY_MATCHES_MARKUP: no camera claim while no camera markup exists', () => {
+    //
+    // URGENT-066 (2026-10-24): the AI scorecard scan IS returning, and the policy
+    // was rewritten FIRST, on purpose. It no longer says "no camera"; it says the
+    // camera is used only when you choose to scan a scorecard, and names Google
+    // Gemini as where the photo goes. The guard now holds BOTH directions:
+    //   - a policy that still says "no camera" -> no page may open one;
+    //   - a page that opens the camera -> the policy must carry the scan
+    //     section (camera only on request, the photo sent to Gemini, not kept).
+    test('POLICY_MATCHES_MARKUP: the camera claim and the camera markup agree', () => {
         const policy = read('privacy.html');
-        const claimsNoCamera = /No contacts, photos, camera or microphone access/i.test(policy);
-        assert.ok(claimsNoCamera,
-            'privacy.html should state plainly that the app takes no camera/photo access.');
+        const claimsNoCamera = /No contacts, photos, camera or microphone access/i.test(policy)
+            || /No [^<.]*\bcamera\b[^<.]*access/i.test(policy);
+        const describesScan = /The camera, only when you ask/i.test(policy)
+            && /HardPan uses the camera only when you tap to scan a paper scorecard/i.test(policy)
+            && /Google Gemini API/.test(policy)
+            && /HardPan does not store the photo/i.test(policy);
+        assert.ok(claimsNoCamera || describesScan,
+            'privacy.html must either say plainly that there is no camera access, or describe the scorecard scan.');
+        assert.ok(!(claimsNoCamera && describesScan),
+            'privacy.html both denies camera access and describes the camera scan - it must say one thing.');
 
         const offenders = [];
         shellPages().forEach(page => {
             const src = read(page);
             if (CAMERA_MARKUP.some(rx => rx.test(src))) offenders.push(page);
         });
-        assert.deepEqual(offenders, [],
-            'privacy.html claims no camera or photo access, but these pages open one: '
-            + offenders.join(', ') + '. Fix the app or fix the policy - they must agree.');
+        if (claimsNoCamera) {
+            assert.deepEqual(offenders, [],
+                'privacy.html claims no camera or photo access, but these pages open one: '
+                + offenders.join(', ') + '. Fix the app or fix the policy - they must agree.');
+        }
+    });
+
+    test('the policy still denies photo-library browsing and contacts', () => {
+        const policy = read('privacy.html');
+        assert.match(policy, /HardPan does not browse your photo library/);
+        assert.match(policy, /No contacts/);
     });
 });
 
