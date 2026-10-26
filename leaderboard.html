@@ -1430,6 +1430,21 @@ ${ind.slice(4)}</tr>`;
     // scorekeeper links already use) so nobody has to scroll a 28-name list to find their group.
     // Each card shows that group's own mini-leaderboard plus how far they've gotten, and a small
     // banner up top still answers "who's actually winning" across the whole field.
+    // WERE GROUPS SET FOR THIS ROUND? (082, Manny Oct 26)
+    //
+    // Every round has groups to grouping.js: with nothing saved it makes them 4 at
+    // a time in list order. Those are nobody's pairings, so the Groups button shows
+    // only when the round SAVED its group sizes - a paste with blank lines between
+    // groups, the wizard's per-group -/+, My Groups' split, a Players-sheet move /
+    // add / new group, or the setup's automatic sizes for an eight or big field
+    // (Manny: those count as set). One positive number anywhere is enough. Firebase
+    // hands the sizes back as an ARRAY when they start at 0 ([4, 4, 3, 4, 3]) and as
+    // an object otherwise; both are read. Kept on this page: grouping.js is pinned
+    // engine code and stays byte-identical.
+    function boardGroupsWereSet(overrides) {
+        if (!overrides || typeof overrides !== 'object') return false;
+        return Object.keys(overrides).some(k => { const v = Number(overrides[k]); return isFinite(v) && v > 0; });
+    }
     function renderGroupedBoard(results, boundaries, container) {
         let html = fieldLeaderBannerHtml(results);
         // THE ROUND'S PAIRINGS, NOT THE STANDINGS (082, 2026-10-26). `boundaries`
@@ -1519,8 +1534,7 @@ ${ind.slice(4)}</tr>`;
             // the groups are just 4 at a time in list order - nobody's pairings - so
             // the Groups button is hidden and All (and Flights) remain. A round with
             // saved sizes (paste blocks, wizard, Players sheet, Game Day) is as before.
-            const multiGroup = boundaries.length > 1
-                && (typeof groupsWereSet !== 'function' || groupsWereSet(currentBoardData.groupSizeOverrides));
+            const multiGroup = boundaries.length > 1 && boardGroupsWereSet(currentBoardData.groupSizeOverrides);
 
             if (!flightsOn) {
                 if (groupViewMode === 'flight') groupViewMode = 'group';
