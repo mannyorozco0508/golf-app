@@ -167,7 +167,7 @@ describe('1. LOCATION: Android asks once, for precise, and never times out under
         assert.ok(!g3.log.some(c => c[0] === 'getCurrentPosition'), 'denied asks for no position');
     });
 
-    test('iOS UNCHANGED: no permission calls, low accuracy, and the clock starts at once', { skip }, async () => {
+    test('iOS UNCHANGED: no requestPermissions, low accuracy, and the clock starts at once', { skip }, async () => {
         const geo = geoStub({ location: 'prompt' });
         const sb = windowFor('ios', 'home.html', { geo });
         // The iOS path's getCurrentPosition never answers, so the 15 s clock is what ends it.
@@ -176,8 +176,11 @@ describe('1. LOCATION: Android asks once, for precise, and never times out under
         const got = [];
         sb.HardPanBack.position((p, why) => got.push([p, why]));
         await settle();
-        assert.deepEqual(geo.log.map(c => c[0]), ['getCurrentPosition'], 'iOS asks for permission through getCurrentPosition, as before');
-        assert.deepEqual(JSON.parse(JSON.stringify(geo.log[0][1])), { enableHighAccuracy: false, timeout: 10000 });
+        // android-2.0 (2026-10-25): iOS's own path now reads checkPermissions first (URGENT-016:
+        // already refused -> 'denied' at once) and, when not refused, asks through getCurrentPosition.
+        // Still no requestPermissions on iOS, still low accuracy: the Android ask stays Android's.
+        assert.deepEqual(geo.log.map(c => c[0]), ['checkPermissions', 'getCurrentPosition'], 'iOS checks, then asks through getCurrentPosition (URGENT-016)');
+        assert.deepEqual(JSON.parse(JSON.stringify(geo.log[1][1])), { enableHighAccuracy: false, timeout: 10000 });
         sb.__advance(15000);
         await settle();
         assert.deepEqual(JSON.parse(JSON.stringify(got)), [[null, 'timeout']], 'iOS still gives up at LOC_MS');
