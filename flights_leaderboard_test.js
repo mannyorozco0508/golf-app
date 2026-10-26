@@ -40,8 +40,11 @@ function scoresFor(players) {
     return s;
 }
 const ON = { enabled: true, scopes: { skins: 'flight', birdies: 'flight' } };
+// 082: the round SAVED its groups (4 at a time) - the Groups button shows only then.
+const savedFours = n => { const o = {}; for (let i = 0; i * 4 < n; i++) o[i] = Math.min(4, n - i * 4); return o; };
 const round = (players, flights, extra) => Object.assign({ players, gameFormat: 'skins', skinsBuyIn: 8, skinsPotFormat: 'gross',
-    skinsCarryOver: false, courseData: CD, scores: scoresFor(players), settlementMode: 'whole-dollar', skinsRounding: 'odd-dollar' },
+    skinsCarryOver: false, courseData: CD, scores: scoresFor(players), settlementMode: 'whole-dollar', skinsRounding: 'odd-dollar',
+    groupSizeOverrides: savedFours(players.length) },
     flights === undefined ? {} : { flights }, extra || {});
 
 // Interleaved tags, so a slice by roster position and a slice by tag differ.
