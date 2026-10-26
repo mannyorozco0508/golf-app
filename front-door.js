@@ -2852,7 +2852,39 @@
     // ANDROID ONLY. iOS has no back button and the web never presses one; armBack()
     // returns before registering anything unless Capacitor says android.
     function shownId(id) { var e = $(id); return !!(e && e.style.display !== 'none'); }
+    // THE 2.0 SHEETS (android-2.0, 024 C). Each one the 2.0 screens open over a page, topmost
+    // first, closed the way its own Close / Not now / tap-outside closes it - through the file's
+    // own API where it has one, else by tapping that same control. Nothing here opens, saves or
+    // decides anything: Back is "not now" for every sheet.
+    function api(name) { return W[name] || null; }
+    function has(o, fn) { return !!(o && typeof o[fn] === 'function'); }
+    function tapIn(id, sel) { var e = $(id), b = e && (sel ? e.querySelector(sel) : e); if (b && typeof b.click === 'function') b.click(); }
+    var SHEETS_2 = [
+        ['voice', function () { var V = api('HardPanVoice'); return has(V, 'isOpen') && !!V.isOpen(); }, function () { api('HardPanVoice').cancel(); }],
+        ['needs-account', function () { var N = api('HardPanNeedsAccount'); return has(N, 'isOpen') && N.isOpen(); }, function () { var e = W.document.querySelector('[data-hpna-scrim]'); if (e) e.click(); }],
+        ['account', function () { var A = api('HardPanAccountUI'); return has(A, 'isOpen') && !!A.isOpen(); }, function () { api('HardPanAccountUI').close(); }],
+        ['scan', function () { return !!$('hp-scan'); }, function () { var S2 = api('HardPanScan'); if (has(S2, 'close')) S2.close(); }],
+        ['sg-info', function () { return !!$('hp-sg-info'); }, function () { tapIn('hp-sg-info', 'button'); }],
+        ['my-stats-ask', function () { var e = $('hp-my-stats'); return !!(e && e.style.display !== 'none' && e.querySelector('.ms-ask')); }, function () { var e = $('hp-my-stats').querySelector('.ms-ask'); if (e) e.remove(); }],
+        ['customize', function () { return !!W.document.querySelector('.hpf-sheet'); }, function () { api('HardPanFeatures').closePanel(); }],
+        ['shot-history', function () { var B = api('HardPanShotBag'); return has(B, 'historyOpen') && B.historyOpen(); }, function () { api('HardPanShotBag').closeHistory(); }],
+        ['mark', function () { var K = api('HardPanMark'); return has(K, 'sheetOpen') && K.sheetOpen(); }, function () { api('HardPanMark').closeSheet(); }],
+        ['launch-entry', function () { var L = api('HardPanLaunchEntry'); return has(L, 'isOpen') && L.isOpen(); }, function () { api('HardPanLaunchEntry').close(); }],
+        ['range', function () { var R = api('HardPanRange'); return has(R, 'isOpen') && R.isOpen(); }, function () { api('HardPanRange').close(); }],
+        ['range-home', function () { return shownId('hp-range'); }, function () { api('HardPanRange').closeHome(); }],
+        ['score-sheet', function () { return shownId('hp-score-sheet'); }, function () { tapIn('hp-score-sheet'); }],
+        ['stats', function () { var G = api('HardPanGpsStats'); return has(G, 'isOpen') && G.isOpen(); }, function () { api('HardPanGpsStats').close(); }],
+        ['my-stats', function () { return shownId('hp-my-stats'); }, function () { api('HardPanGpsStats').closeMy(); }],
+        ['new-round-ask', function () { return !!$('sf-ask'); }, function () { tapIn('sf-ask'); }],
+        ['new-round', function () { return shownId('sf') && !!W.document.querySelector('#sf .sf-back'); }, function () { tapIn('sf', '.sf-back'); }]
+    ];
+    function sheet2() {
+        for (var i = 0; i < SHEETS_2.length; i++) { try { if (SHEETS_2[i][1]()) return SHEETS_2[i]; } catch (e) {} }
+        return null;
+    }
     function backLayer() {
+        var s2 = sheet2();
+        if (s2) return 'sheet-' + s2[0];
         if (shownId('hp-opts')) return 'start-options';
         if (shownId('fd-addgame')) return 'add-game';
         if (shownId('fd-share')) return 'share';
@@ -2864,7 +2896,8 @@
     }
     function back() {
         var layer = backLayer();
-        if (layer === 'start-options') $('hp-opts').style.display = 'none';
+        if (layer && layer.indexOf('sheet-') === 0) { var s2 = sheet2(); if (s2) s2[2](); }
+        else if (layer === 'start-options') $('hp-opts').style.display = 'none';
         else if (layer === 'add-game') closeAddGame();
         else if (layer === 'share') $('fd-share').style.display = 'none';
         else if (layer && layer.indexOf('gps-') === 0) W.HardPanGps.back();
