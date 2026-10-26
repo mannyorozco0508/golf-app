@@ -5012,7 +5012,8 @@
     // 063: the oval comes ONLY from the club's average carry as My bag shows it (bagNow - typed,
     // Range, good marked shots), sized by the numbers in gps-miss-pattern.js TUNE. Irons and
     // wedges only, and only on an APPROACH into the green (missPlan): never from the tee, never
-    // a layup (the target off the green, or the green out of the club's range). The club: the
+    // a layup (the target off the green, or the green out of the club's range). 072: a PAR-3 tee
+    // shot counts as the approach (same clubs, same checks; woods / hybrids / driver stay off). The club: the
     // one picked at Mark shot while that shot is open and the golfer still at its ball, else the
     // one My bag suggests for the plays-like yards to the green. Drawn along the line ball ->
     // aim (the target ring on the green, else the green center), centred on the club's carry.
@@ -5044,6 +5045,8 @@
         var v = club ? bag[club] : null, carry = v && v.yd > 0 ? v.yd : null;
         var tg = S.target || null, layup = !!(tg && G.haversineMeters(tg, r.mid) > M.TUNE.GREEN_AIM_YD * G.M_PER_YD);
         var ok = M.shows({ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup });
+        // 072: a PAR-3 tee shot is the approach - the same checks again, with the hole's par (irons / wedges only).
+        if (!ok.ok && ok.why === 'tee' && isPar3()) ok = M.shows({ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup }, { par: 3 });
         S.missWhy = ok.ok ? null : ok.why;
         if (!ok.ok) return null;
         var rawYd = G.haversineMeters(o.pt, r.mid) / G.M_PER_YD;
