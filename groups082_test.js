@@ -9,7 +9,7 @@
 //   1. Each group is the golfers the round put in it (players list + saved
 //      sizes), ranked inside the group. Net and gross. 4/4/3/4/3.
 //   2. The Groups button shows only when the round SAVED its group sizes
-//      (grouping.js groupsWereSet). Game Day's automatic sizes count as set
+//      (leaderboard.html boardGroupsWereSet). Game Day's automatic sizes count as set
 //      (Manny). More than 4 golfers and nothing saved: hidden, All shown.
 //   3. "+ New group" in the in-round Players sheet: a new last group a move or
 //      an add can fill, written through the existing guarded whole write
@@ -147,9 +147,9 @@ describe('2. THE GROUPS BUTTON ONLY WHEN GROUPS WERE SET', () => {
         const d = ucwz({ flights: null, groupSizeOverrides: { 0: 4 } }); d.players = d.players.slice(0, 4);
         assert.equal(board(d).pillGroup, 'none');
     });
-    test('groupsWereSet: array, object, empty, zeros, junk', () => {
-        const G = loadJsFile('grouping.js');
-        const f = x => vm.runInContext('groupsWereSet(' + JSON.stringify(x) + ')', G);
+    test('boardGroupsWereSet: array, object, empty, zeros, junk', () => {
+        const G = loadHtmlInlineScript('leaderboard.html');
+        const f = x => vm.runInContext('boardGroupsWereSet(' + JSON.stringify(x) + ')', G);
         assert.equal(f([4, 4, 3, 4, 3]), true);
         assert.equal(f({ 0: 4, 1: 4 }), true);
         assert.equal(f({ 3: 5 }), true);
