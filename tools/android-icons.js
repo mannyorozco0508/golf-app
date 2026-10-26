@@ -31,12 +31,16 @@ const path = require('path');
 const { readPng, writePng, canvasColour } = require('../helpers/png.js');
 
 const ROOT = path.join(__dirname, '..');
-const SRC = path.join(ROOT, 'icon-1024.png');
+// 077 (Manny, 2026-10-26: "(a) full art, to match iOS"): the new HardPan logo's App Store square,
+// the same file iOS 077 made its AppIcon from. icon-1024.png (the HP ball) is kept, not overwritten.
+const SRC = path.join(ROOT, 'assets', 'brand', 'hardpan-2026', 'HardPan-AppIcon-1024-square.png');
 const RES = path.join(ROOT, 'android', 'app', 'src', 'main', 'res');
 const PLAY = path.join(ROOT, 'android', 'app', 'src', 'main', 'ic_launcher-playstore.png');
 
 const DENSITIES = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
-const FOREGROUND_SCALE = 0.92;     // ball: fills the 66/108 safe circle without clipping
+// 077: the full square art (HP, ball pin, line, GOLF · GPS · GAMES) reaches 501px from the mark centre;
+// 0.58 puts that at about 0.93 of the 313px safe circle - the same rule the ball had (it was 0.92).
+const FOREGROUND_SCALE = 0.58;     // full 077 art: fits the 66/108 safe circle without clipping
 const ROUND_RADIUS_FRACTION = 0.86; // legacy round icon: the mark's reach as a fraction of the circle
 const THRESHOLD = 40;
 
@@ -214,7 +218,7 @@ function main() {
 
     fs.writeFileSync(path.join(RES, 'values', 'ic_launcher_background.xml'),
         '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
-        + '    <!-- The icon\'s own canvas colour, read from icon-1024.png by tools/android-icons.js.\n'
+        + '    <!-- The icon\'s own canvas colour, read from ' + path.relative(ROOT, SRC) + ' by tools/android-icons.js.\n'
         + '         The foreground layer is an opaque field around the mark, so this must match it. -->\n'
         + '    <color name="ic_launcher_background">' + hex(m.bg) + '</color>\n</resources>\n');
     written.push('values/ic_launcher_background.xml');

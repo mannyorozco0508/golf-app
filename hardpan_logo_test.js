@@ -38,36 +38,39 @@ const NATIVE_ICONS = {
     // app's HP ball + green location pin, the whole slot set (gps-beta's AppIcon.appiconset).
     'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png':
         '23cd2d1d823c8e6c6f544ea374c467eb4e7e9d1361e4365419773ae93e673947',
+    // 077 (Manny, 2026-10-26 "(a) full art, to match iOS"): the Android launcher files are re-pinned to
+    // the new logo (tools/android-icons.js from assets/brand/hardpan-2026/HardPan-AppIcon-1024-square.png).
+    // The iOS file above and icon-1024.png stay the HP ball until the iOS session moves them.
     'android/app/src/main/res/mipmap-hdpi/ic_launcher.png':
-        '300cf9f2ff551ccd3aa45dc64d933ca9a53a0830d312cd2906cbb1f6ec801ddd',
+        '2403b1eac5159f503b6741a797335f2218d9707f8617958c82d6bf22f976ad88',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png':
-        'eb537777c7e0f814c5b7c68849ba09d4217bcaac2b8404841b7f522f5e3c9068',
+        '6702a989e328c1627a98c3913ff0f36c5d46e7c118481d4a58094b6b96c4c3cb',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png':
-        'dc916f6379dd67b06fdd216a6114797c04163162c498b855b6d054320279f53d',
+        '5b37fa599d45e7a8b57f59ac9abae56c8bbf094b3e3f7b7d697b04b3ea51a374',
     'android/app/src/main/res/mipmap-mdpi/ic_launcher.png':
-        'dd76337ed182bacea3ce948c4d12eb2ee2f657157f768893e7080d9626a37eff',
+        'fcbedcc8b2b8b13ca947666d0659ff9e6d43c50accb58728140ba57c6104eab2',
     'android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png':
-        'f74f99db0c06fb321ee21e6821ca23d1b4bc2cca166ccbc0c9938f9fac7e2da9',
+        '30408548a8f2c9d7befe529b04250a9bc1fa4a7482f5296a4c7670b5dd0ddc5b',
     'android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png':
-        '12f5f94eddf00b47ab3732375700678eadd856fa2314bfc95a322890befb2fef',
+        '8e6dfd9fadb1b649cb4ff4dc7c335dc4066d2e06489b4a00f94950c03fff5aa7',
     'android/app/src/main/res/mipmap-xhdpi/ic_launcher.png':
-        '2f35d487a3b9539179a07f6909e4552d35aa6373016fe528937b004283e75509',
+        'e2a2381d56ec94ae342a912f210baa25370004a33b45e62511e21893f7c6b05c',
     'android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png':
-        'e118285edff6d8c1289b371165e191d58c80d1d3e122770af2589e7fee0a539c',
+        '6bb86fa3e285968c27ef836c3f249f9d737105c6a53b9e4836e428551adaca20',
     'android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png':
-        'bb7a2922f9dccd6a91d53172eaf04f807623a50338b07d78486b1cacf0718c61',
+        'c8d793e0dc9d0d15a57addef547c214d4ba2e683b01994871b9911be693ea8f7',
     'android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png':
-        '4cd5250a36c874e973615a460082ede1277e30f444d28cbe3fce44ef829e8064',
+        '5a659e4594f4f27f3ac71e51e96a9d7501f6950ef071134750ecb18841e24508',
     'android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png':
-        '0d578336ab24b78ee7e50947c53caf95dd71849a80e8a51c74a24c4d2c2f4c41',
+        'f252b9ee4bfe63da67f706de5aaea482b75d7721a48f8fce1a3b75dc2814bde5',
     'android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png':
-        '9c500c7ce7e733a24c7494d8346888d211b3ed37ca81f1fa978d79346f331092',
+        '7136c8d07b3e7d723e7129f34625979f41c839d3ed6c279b06bc7d1cdcc12e0e',
     'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png':
-        'e9887d8e3959e8b8b0dda6d0136127bc9f60df16124dd4659b29a76847fad3e2',
+        '28be5bf8ef7b51fe4d08c8cf40892fc7c608e144e6d93885742799dcf36f4b4b',
     'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png':
-        '6c31b2a9457bf7736b00376df9bd0114975214f7f55da075147786d3e0f62d9e',
+        '33398e9912523c8830241bce6f33ff80178c72a4d8d27b3d0c9a970db2c69376',
     'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png':
-        '84b76758a5fb254f95e57a0b232b708ea62eafc20351ba51f17213245927b573',
+        '8a48f0b436b0d1963fafc4e3786da8a13da8218006eafc85e1b038ce7c3143f4',
 };
 const STROKE_R_MASTER = '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112';
 

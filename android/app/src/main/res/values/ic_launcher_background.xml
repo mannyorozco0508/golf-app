@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The icon's own canvas colour, read from icon-1024.png by tools/android-icons.js.
+    <!-- The icon's own canvas colour, read from assets/brand/hardpan-2026/HardPan-AppIcon-1024-square.png by tools/android-icons.js.
          The foreground layer is an opaque field around the mark, so this must match it. -->
-    <color name="ic_launcher_background">#0B0F0C</color>
+    <color name="ic_launcher_background">#0B100D</color>
 </resources>
