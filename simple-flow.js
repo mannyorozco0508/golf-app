@@ -579,7 +579,9 @@
         if (hit && hit.at && Date.now() - hit.at < WEB_MS) { S.web = { k: k, state: 'ok', results: hit.results || [] }; render1(); return; }
         if (!force) {
             // (the old rule - 3 good matches on the phone, no online search - is kept, now with "Search more")
-            if (localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3 || savedHits(raw).length) { S.web = { k: k, state: 'saved', more: true }; render1(); return; }
+            // URGENT-079: ...plus the GolfAPI ✓ GPS courses of this phone's answer for a shorter search ("ariz" for
+            // "arizo"; 0 calls), so a GolfAPI course the list doesn't hold still shows over its OpenStreetMap copy.
+            if (localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3 || savedHits(raw).length) { var spre = (prefixCache(k, raw) || []).filter(function (m) { return m.gps; }); S.web = spre.length ? { k: k, state: 'saved', more: true, results: spre } : { k: k, state: 'saved', more: true }; render1(); return; }
             var pre = prefixCache(k, raw);
             if (pre) { S.web = { k: k, state: 'ok', results: pre, more: true }; render1(); return; }
         }
@@ -643,7 +645,7 @@
                 + '<button type="button" class="sf-btn" data-sf="webrequest" style="width:100%;min-height:46px;">Request this course</button></div>';
         }
         var MORE = '<button type="button" class="sf-link" id="sf-more" data-sf="websearchmore" style="display:block;font-size:14px;margin:2px 2px 10px;padding:0;min-height:0;">\ud83d\udd0d Search more courses \u203a</button>';
-        if (w.state === 'saved') return MORE;
+        if (w.state === 'saved' && !(w.results || []).length) return MORE;
         if (w.state === 'busy') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;display:flex;align-items:center;gap:8px;"><span class="sf-spin" aria-hidden="true">⏳</span>Searching all courses…</div>';
         if (w.state === 'offline') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">No signal — searching all courses needs a connection.</div>';
         if (w.state === 'signin') return '<div class="sf-note" id="sf-web" style="margin:2px 2px 10px;">Sign in to search all courses. <button type="button" class="sf-link" data-sf="websignin" style="padding:0 0 0 4px;min-height:0;">Sign in</button></div>';
@@ -681,7 +683,9 @@
         // 071: ...nor one whose words are all in a GolfAPI course WITH GPS in the same town ("Bandon Trails" =
         // "Bandon Dunes Golf Resort (Bandon Trails)"): the GolfAPI row is that course's one row.
         var gw = (S.webRows || []).filter(function (m) { return m.gps; });
-        return searchOrder(localHits(all, raw).filter(function (x) { return !have[qWords(x.c.name).join(' ')] && !gw.some(function (m) { return osmTwinOf(x.c, m); }); }).map(function (x) { return { kind: 'osm', c: x.c, name: x.c.name, s: x.s, d: distTo(x.c) }; }), raw).slice(0, OSM_SHOWN);
+        // URGENT-079: ...nor one that is a GolfAPI ✓ GPS course of the course list (the saved-first answer).
+        gw = gw.concat((listed || []).map(asWeb).filter(function (m) { return m && m.gps; }));
+        return searchOrder(localHits(all, raw).filter(function (x) { return !have[qWords(x.c.name).join(' ')] && !gw.some(function (m) { return osmTwinOf(x.c, m); }) && !sameNamed(x.c, gw); }).map(function (x) { return { kind: 'osm', c: x.c, name: x.c.name, s: x.s, d: distTo(x.c) }; }), raw).slice(0, OSM_SHOWN);
     }
     // ---- 067: SEARCH = BEST NAME MATCH FIRST, THEN CLOSEST (Manny: "we still need to see the closest
     // courses first ... We should only add.") -------------------------------------------------------
@@ -749,8 +753,31 @@
     // club + course ("Bandon Trails" = "Bandon Dunes Golf Resort (Bandon Trails)"), in the same town.
     function osmTwinOf(o, m) {
         var ow = twinWords(o.name), mw = twinWords(String(m.club || '') + ' ' + String(m.course || '') + ' ' + String(m.name || ''));
-        if (!ow.length || !sameTown(o.city, m.city) || !sameState(o.state, m.state)) return false;
+        // URGENT-079: ...or a NEIGHBOR town within ~3 mi (the OSM "Arizona Country Club" says Scottsdale, GolfAPI's says Phoenix)
+        if (!ow.length || !(sameTown(o.city, m.city) || near3(o, m)) || !sameState(o.state, m.state)) return false;
         return ow.every(function (w) { return mw.indexOf(w) !== -1; });
+    }
+    // URGENT-079: where a GolfAPI course is - its own point (a row of the course list: gapi_<id>, placed by its own
+    // GolfAPI data), else none. Never a point borrowed by name.
+    function webPt(m) {
+        if (!m) return null;
+        if (m.pt) return m.pt;
+        if (m.lat != null && m.lng != null && isFinite(Number(m.lat)) && isFinite(Number(m.lng))) return [Number(m.lat), Number(m.lng)];
+        var k = m.id ? 'gapi_' + m.id : '', c = k ? courses().filter(function (x) { return x.key === k; })[0] : null;
+        return c && c.pt ? c.pt : null;
+    }
+    function near3(o, m) { var H = HD(), a = o && o.pt, b = webPt(m); return !!(a && b && typeof H.miles === 'function' && H.miles(a, b) <= 3); }
+    // URGENT-079: a GolfAPI ✓ GPS course of the course list (gapi_<id>) in the shape osmTwinOf reads.
+    function asWeb(c) { var m = /^gapi_(\d+)$/.exec(String(c && c.key || '')); return m ? { id: m[1], key: c.key, club: c.name, course: '', name: c.name, city: c.city || '', state: c.state || '', pt: c.pt || null, gps: !!c.ready } : null; }
+    // URGENT-079: the ONE GolfAPI ✓ GPS course in the list of the same name ("The" / "Country Club" / "CC" / "Golf Club"
+    // ignored; "Resort", "Links" and the course part kept) in the same state - a never-pulled GolfAPI course has no
+    // point yet, so a neighbor town can't be measured. Two or more of that name: not guessed (both kept).
+    function sameNamed(o, list) { var sn = strictName(o.name); if (!sn) return false; return (list || []).filter(function (m) { return m && m.gps && strictName(m.club || m.name) === sn && sameState(o.state, m.state); }).length === 1; }
+    function strictName(n) { var c = HC(); try { return c && c.strictName ? c.strictName(n) : normName(n); } catch (e) { return normName(n); } }
+    // URGENT-079 (Manny: "the GolfAPI course with real pars and tees ALWAYS wins"): the GolfAPI ✓ GPS courses of the
+    // course list that are this OSM course (osmTwinOf: its words, the same town or within ~3 mi).
+    function localTwins(o) {
+        return courses().map(asWeb).filter(function (m) { return m && m.gps && osmTwinOf(o, m); });
     }
     function osmTwinRow(m) {
         var all = []; try { all = HC() && HC().osmOnly ? HC().osmOnly() : []; } catch (e) { all = []; }
@@ -772,6 +799,10 @@
         var row = osmRowFor(id, name) || { osm: id, name: name, city: city, state: state, pt: null, greens: 0, holes: 18 };
         if (!W.HardPanGpsLive && !again) { S.osmPick = { row: row, state: 'busy' }; render1(); var mine = S.osmPick; needLive(function () { if (S.osmPick === mine) tapOsm(id, name, city, state, true); }); return; }   // 071: GolfAPI first needs gps-live
         try { (W.__sfOsmTap = W.__sfOsmTap || []).push(name); } catch (e) {}
+        // URGENT-079: the GolfAPI course of the course list with GPS (its card, tees and greens) - picked as its own row
+        var lt = localTwins(row);
+        if (lt.length > 1) { var lsn = strictName(row.name), lsame = lt.filter(function (m) { return strictName(m.name) === lsn; }); if (lsame.length === 1) lt = lsame; }   // a resort's outline: the same-named one, else not guessed
+        if (lt.length === 1) { S.osmPick = null; pickLocal(lt[0].key, lt[0].name); return; }
         var twins = ((S.web && S.web.results) || []).filter(function (m) { return m.gps && osmTwinOf(row, m); });
         if (twins.length === 1) { webPull(twins[0].id, twins[0].name || twins[0].club); return; }
         if (twins.length > 1) { S.osmPick = { row: row, state: 'choose', matches: twins }; render1(); return; }
@@ -784,6 +815,9 @@
                 var ms = f && f.status === 'ok' ? (f.matches || []).filter(function (m) { return m.gps; }) : [];
                 var tw = ms.filter(function (m) { return osmTwinOf(row, m); });
                 var hit = tw.length === 1 ? tw[0] : (!tw.length && f && f.clear && f.clear.gps && sameTown(row.city, f.clear.city) ? f.clear : null);
+                // URGENT-079: ...or the ONE GolfAPI ✓ GPS course of the SAME name in the state, its town a neighbor ("Arizona Country
+                // Club", Scottsdale = "The Arizona Country Club", Phoenix). Two or more: not guessed.
+                if (!hit && !tw.length) { var sn = strictName(row.name), same = ms.filter(function (m) { return sn && strictName(m.club || m.name) === sn && sameState(row.state, m.state); }); if (same.length === 1) hit = same[0]; }
                 if (hit) { S.osmPick = null; webPull(hit.id, hit.name || hit.club); return; }
                 if (tw.length > 1) { S.osmPick = { row: row, state: 'choose', matches: tw }; render1(); return; }
                 osmGps(row);
@@ -920,6 +954,11 @@
     function pendBusy() { return !pendDone(); }
     // No signal while it waited: pulled again as soon as the signal is back.
     try { W.addEventListener('online', function () { var p = S.pend; if (p && p.state === 'offline' && S.open && S.step === 1) webPull(p.id, p.name); }); } catch (e) {}
+    // URGENT-079: a course of the list picked for the golfer (the OSM copy's GolfAPI twin) - exactly what a tap on its row does.
+    function pickLocal(pk, pn) {
+        S.pend = null; S.noCard = null; S.lookup = null; pick(pk, pn); chosen(); S.q = ''; S.changing = false; S.err1 = ''; render(); try { el().scrollTop = 0; } catch (e) {}
+        if (W.HardPanGpsLive) lookup(pk, pn); else needLive(function () { if (courseKey() === pk && W.HardPanGpsLive) { lookup(pk, pn); if (S.step === 1) render(); } });
+    }
     function pick(key, name) {
         var f = fn('selectCourse');
         if (!f) return;

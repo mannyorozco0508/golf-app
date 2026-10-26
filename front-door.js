@@ -316,6 +316,24 @@
         var L = rec && rec.location;
         return L && L.latitude != null && isFinite(Number(L.latitude)) && isFinite(Number(L.longitude)) ? [Number(L.latitude), Number(L.longitude)] : null;
     }
+    // URGENT-079: a GolfAPI course's own point and town - the saved GPS record this phone read
+    // (gps_courses/<id>, one at a time) or the app's GolfAPI file: hole 1's tee / green, else its lat/lng.
+    function gapiOwn(k) {
+        var m = /^gapi_(\d{6,30})$/.exec(String(k || '')); if (!m) return null;
+        var c = (GPSK.gc || {})[m[1]] || ((W.HardPanGolfApi || {}).courses || {})[m[1]];
+        if (!c) return null;
+        var ok = function (p) { return p && isFinite(Number(p[0])) && isFinite(Number(p[1])) && (Number(p[0]) || Number(p[1])) ? [Number(p[0]), Number(p[1])] : null; };
+        // Hole 1 (its tee, else its green) first - the place the map draws; GolfAPI's club lat/lng can be miles off
+        // (Whisper Rock: 13 mi from its holes; Streamsong: 2 mi) - it is used only when no hole 1 is known.
+        var h1 = c.h && (c.h['1'] || c.h[1]), tk = h1 && h1.t ? Object.keys(h1.t) : [];
+        var pt = (h1 && h1.t && ok(h1.t.b || h1.t.f || (tk.length ? h1.t[tk[0]] : null))) || (h1 && h1.g && ok(h1.g.c || h1.g.f || h1.g.b))
+            || (c.lat != null && c.lng != null ? ok([c.lat, c.lng]) : null) || null;
+        return { pt: pt, city: String(c.city || ''), state: String(c.state || '') };
+    }
+    // URGENT-079 (Manny: ignore a leading "The", "Golf Club", "Golf Course", "Country Club", "CC", "Golf", "Club"):
+    // the name two copies of ONE course share. "Resort", "Links" and the course part are kept, so "Arizona Golf
+    // Resort" is not "The Arizona Country Club", and "Bandon Trails" is not "Bandon Dunes".
+    function crStrict(n) { return String(n || '').split('(')[0].toLowerCase().replace(/['’`.]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/^the /, '').replace(/\b(golf|club|course|country|cc|gc)\b/g, ' ').replace(/\s+/g, ' ').trim(); }
     function courseList() {
         var base = allCourses(), gc = crShared();
         // The GPS answers change when the GolfAPI courses land (the app's file, a course pulled or read
@@ -334,8 +352,13 @@
             if (!/^(gca_|gapi_|comm_)/.test(k) && base.some(function (b) { return crNk(b.name) === crNk(r.name); })) return;
             var cov = base.filter(function (c) { return !c.key && crNk(c.name) === crNk(r.name); })[0];
             var sib = base.filter(function (b) { return b.pt && crClub(b.name) === crClub(r.name); })[0];   // a pairing: its club's place
-            var pt = bundledPoint(k) || (cov && cov.pt) || crLoc(r) || (sib && sib.pt) || null;
-            out.push({ key: k, name: r.name, ready: ready(k, r.name, pt), pt: pt, city: (cov && cov.city) || (r.location && r.location.city) || '', state: (cov && cov.state) || (r.location && r.location.state) || '' });
+            // URGENT-079 (Manny, "The Arizona Country Club" by his house showed 17 mi away, no ✓ GPS): a GolfAPI
+            // course (gapi_<id>) is placed by its OWN GolfAPI point (the saved gps_courses/<id> this phone read,
+            // or the app's GolfAPI file), never by a "same club" course: the club squeeze makes "The Arizona
+            // Country Club" = "Arizona Golf Resort" (Mesa). No own point known yet: no point (no distance).
+            var own = gapiOwn(k), isGapi = /^gapi_\d+$/.test(k);
+            var pt = bundledPoint(k) || (own && own.pt) || (cov && cov.pt) || crLoc(r) || (!isGapi && sib && sib.pt) || null;
+            out.push({ key: k, name: r.name, ready: ready(k, r.name, pt), pt: pt, city: (cov && cov.city) || (r.location && r.location.city) || (own && own.city) || '', state: (cov && cov.state) || (r.location && r.location.state) || (own && own.state) || '' });
         });
         // A GolfAPI copy set up for a course of ours that is linked to it: ours is the course.
         var links = GPSK.links || {}, linked = {};
@@ -366,12 +389,19 @@
         rows.forEach(function (r) { names[crNk(r.name)] = 1; var k = crClub(r.name); (clubs[k] = clubs[k] || []).push(r); });
         // (067: a listed course with no point of its own - "Arizona Biltmore (Links)" - is the same club as
         // OSM's "Arizona Biltmore Links Course": a long club name that starts the same is not drawn twice)
+        var gapiRows = rows.filter(function (r) { return /^gapi_/.test(r.key); });
         var noPt = rows.filter(function (r) { return !r.pt && crClub(r.name).length >= 8; }).map(function (r) { return crClub(r.name); });
         var out = base.filter(function (c) {
             if (c.key || !c.name || names[crNk(c.name)]) return false;
             var cc = crClub(c.name);
             if (noPt.some(function (k) { return cc.indexOf(k) === 0; })) return false;
-            return !(clubs[cc] || []).some(function (r) { return !r.pt || !c.pt || miles(r.pt, c.pt) <= 0.5; });
+            // URGENT-079: a GolfAPI course with no point yet hides only an OSM copy of the SAME name (crStrict),
+            // never a different course whose squeezed club matches ("Arizona Golf Resort").
+            if ((clubs[cc] || []).some(function (r) { return /^gapi_/.test(r.key) && !r.pt ? crStrict(r.name) === crStrict(c.name) : (!r.pt || !c.pt || miles(r.pt, c.pt) <= 0.5); })) return false;
+            // URGENT-079 (Manny: "the GolfAPI course ALWAYS wins"): the OSM copy of a GolfAPI course of the same name
+            // (The / Country Club / CC ignored) within ~3 mi - neighbor towns, Phoenix / Scottsdale - is not drawn.
+            var sc = crStrict(c.name);
+            return !(sc && c.pt && gapiRows.some(function (r) { return r.pt && crStrict(r.name) === sc && miles(r.pt, c.pt) <= 3; }));
         });
         CR.osm = out; CR.osmRows = rows; CR.osmBase = base;
         return out;
@@ -484,7 +514,7 @@
         return (gpsFirst ? at.filter(function (x) { return x.c.ready; })[0] : null) || at[0];
     }
     W.HardPanCourse = { list: courseList, osmOnly: courseOsmOnly, spot: courseSpot, near: courseNear, resolve: courseResolve, hasCard: courseHasCard, gps: courseGpsRec, teeRows: teeRows,
-        atMi: courseAtMi, hereOf: courseHereOf, HERE_MI: HERE_MI,
+        atMi: courseAtMi, hereOf: courseHereOf, HERE_MI: HERE_MI, strictName: crStrict,
         refresh: function () { C.list = null; CR.rows = null; } };
     function where(c, dist) {
         var bits = [];
