@@ -201,13 +201,12 @@
             };
             html += head('HOLE', c.header.hole, lab => lab);
             html += head('PAR', c.header.par, (lab, key) => c.header.par[key]);
-            // SI, NOT HCP (v201). This row is the hole's STROKE INDEX - its
-            // difficulty rank, 1..18 - and calling it HCP put the hole's number
-            // under a column header that reads as the golfer's handicap, directly
-            // beneath a board row that may show no handicap at all. The Receipt's
-            // own layout (scorecardRowsHtml) is a different builder and keeps its
-            // wording; this is the board's expanded card.
-            html += head('SI', c.header.hcp, () => '');
+            // HCP (URGENT-081, Manny, 2026-10-26: US cards say HCP; SI is the UK
+            // term). v201 had made this row "SI"; it is the hole's stroke index -
+            // its difficulty rank, 1..18 - and now reads HCP like the Receipt's own
+            // row (scorecardRowsHtml) and the Card view. A label only: the values
+            // are c.header.hcp, unchanged.
+            html += head('HCP', c.header.hcp, () => '');
             c.golfers.forEach(g => {
                 let r = `<tr${g.out ? ' class="golfer-out"' : ''}><td class="rt-name">${esc(firstNameOf(g.name))}</td>`;
                 g.gross[n.side].forEach(x => { r += cell(dashOr(x.value), x.cls); });
@@ -225,8 +224,26 @@
         return html + '</div>';
     }
 
+    // BOXES ABOVE PAR (URGENT-081, Manny, 2026-10-26). A square for a bogey, a
+    // double square for a double bogey or worse, beside the circles. score-marks.js
+    // is a protected file and is NOT edited: its scoreMarkClass still answers only
+    // birdie / eagle. markWithBoxes asks it first and only adds a box where it
+    // returned nothing. GROSS vs par, DISPLAY ONLY: two numbers in, a class out.
+    // Blank / 0 / no par / par -> ''. The net row never asks (it passes no class).
+    function boxMarkClass(score, par) {
+        const s = parseInt(score, 10), p = parseInt(par, 10);
+        if (!s || !p || s <= 0 || p <= 0) return '';
+        const over = s - p;
+        return over === 1 ? 'mark-bogey' : (over >= 2 ? 'mark-double' : '');
+    }
+    function markWithBoxes(score, par) {
+        const ring = (typeof scoreMarkClass === 'function') ? String(scoreMarkClass(score, par) || '').trim() : '';
+        return ring || boxMarkClass(score, par);
+    }
+
     const api = { scorecardCells: scorecardCells, scorecardRowsHtml: scorecardRowsHtml,
-                  scorecardStackedHtml: scorecardStackedHtml, netMattersOn: netMattersOn };
+                  scorecardStackedHtml: scorecardStackedHtml, netMattersOn: netMattersOn,
+                  boxMarkClass: boxMarkClass, markWithBoxes: markWithBoxes };
     if (typeof window !== 'undefined') window.ScorecardRows = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(this);

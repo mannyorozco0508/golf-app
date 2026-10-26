@@ -245,6 +245,10 @@
         .sc-stack .receipt-table tr.rt-net td { color: var(--text-muted); font-style: italic; }
         .sc-stack .receipt-table td.mark-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); border-radius: 50%; }
         .sc-stack .receipt-table td.mark-eagle { box-shadow: inset 0 0 0 2px var(--accent-red), inset 0 0 0 3px var(--bg-card), inset 0 0 0 5px var(--accent-red); border-radius: 50%; }
+        /* URGENT-081: a square for a bogey, a double square for a double bogey or worse -
+           the circles' own colour and line weight, square corners instead of round. */
+        .sc-stack .receipt-table td.mark-bogey { box-shadow: inset 0 0 0 2px var(--accent-red); border-radius: 3px; }
+        .sc-stack .receipt-table td.mark-double { box-shadow: inset 0 0 0 2px var(--accent-red), inset 0 0 0 3px var(--bg-card), inset 0 0 0 5px var(--accent-red); border-radius: 3px; }
         /* LIVE MATCHES & PRESSES. The widget whose absence sent a caddie hunting
            through tabs during a real Nassau. Segments stack; presses indent under the
            segment they belong to so a press can never be mistaken for a base match. */
@@ -1305,7 +1309,8 @@ ${ind.slice(4)}</tr>`;
         const data = currentBoardData || {};
         const player = (data.players || []).find(p => String(p.id) === key);
         if (!player || typeof ScorecardRows === 'undefined') return '';
-        const ringOf = (typeof scoreMarkClass === 'function') ? (s, par) => scoreMarkClass(s, par).trim() : () => '';
+        const ringOf = ScorecardRows.markWithBoxes   // URGENT-081: the circles (score-marks.js) + squares above par
+            || ((typeof scoreMarkClass === 'function') ? (s, par) => scoreMarkClass(s, par).trim() : () => '');
         const card = ScorecardRows.scorecardStackedHtml({
             courseData: data.courseData || [], scores: data.scores || {}, players: [player],
             showNet: ScorecardRows.netMattersOn(data), ringOf: ringOf

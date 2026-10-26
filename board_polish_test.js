@@ -19,10 +19,9 @@
 //      is the floor. Still a >= 44px tap target.
 //   5. THE WHOLE ROW toggles the card (it used to need the name cell, so a tap
 //      on the score or on the little marker did nothing).
-//   6. The expanded card's "HCP" header row is "SI" - it is the hole's stroke
-//      index, not the golfer's handicap, and it sat directly under a row that
-//      may show no handicap at all. scorecardStackedHtml only: the Receipt's
-//      own layout (scorecardRowsHtml) keeps its wording.
+//   6. The expanded card's hole-handicap row was "SI" (v201) and is "HCP" again
+//      (URGENT-081, Manny 2026-10-26: US cards say HCP; SI is the UK term) - the
+//      same word as the Receipt's own layout (scorecardRowsHtml). Label only.
 //
 // WHAT THE HARNESS CAN PROVE. mini-dom has no layout, so the ROW HEIGHT and
 // the tap target are measured in Chrome (below), never here; the CSS is pinned
@@ -244,23 +243,23 @@ describe('4. + 5. COMPACT ROWS, and the WHOLE ROW opens the card', () => {
     });
 });
 
-describe('6. THE EXPANDED CARD SAYS "SI", not "HCP"', () => {
-    test('the board\'s card header row reads SI and carries the hole stroke indexes', () => {
+describe('6. THE EXPANDED CARD SAYS "HCP", not "SI" (URGENT-081)', () => {
+    test('the board\'s card header row reads HCP and carries the hole stroke indexes', () => {
         const sb = page(round());
         run(sb, "openCards.add('101'); renderBoard();");
         const card = board(sb).slice(board(sb).indexOf('board-card-row'));
-        assert.match(card, /<th class="rt-name">SI<\/th>/);
-        assert.ok(!/<th class="rt-name">HCP<\/th>/.test(card), 'the misleading label is gone');
+        assert.match(card, /<th class="rt-name">HCP<\/th>/);
+        assert.ok(!/<th class="rt-name">SI<\/th>/.test(card), 'the UK label is gone');
         assert.match(card, /<th class="rt-name">HOLE<\/th>/);
         assert.match(card, /<th class="rt-name">PAR<\/th>/);
     });
-    test('the RECEIPT\'s own layout is untouched: scorecardRowsHtml still says HCP', () => {
+    test('both layouts say HCP: the Receipt (scorecardRowsHtml) and the board (scorecardStackedHtml)', () => {
         const src = read('scorecard-rows.js');
         const rowsFn = src.slice(src.indexOf('function scorecardRowsHtml('), src.indexOf('function scorecardStackedHtml('));
         assert.match(rowsFn, /headRow\('HCP'/, 'the Receipt keeps its wording');
         const stacked = src.slice(src.indexOf('function scorecardStackedHtml('));
-        assert.match(stacked, /head\('SI'/);
-        assert.ok(!/head\('HCP'/.test(stacked));
+        assert.match(stacked, /head\('HCP'/);
+        assert.ok(!/head\('SI'/.test(stacked));
     });
 });
 
@@ -326,7 +325,7 @@ before(async () => {
     const r = await arriveCold({ url: fileUrl('leaderboard.html', 'game=BRD1'), db: DB, settleMs: 4000, steps: [
         { expression: PROBE },
         { tap: '#board-content tr[data-player-id]:nth-of-type(3) td.score-cell', nth: 0 }, { sleep: 350 },
-        { expression: "JSON.stringify({ cards: document.querySelectorAll('.board-card-row').length, si: (document.querySelector('.board-card-row') || { innerText: '' }).innerText.indexOf('SI') >= 0, openFor: (document.querySelector('.board-card-row') || { getAttribute: () => null }).getAttribute('data-card-for') })" },
+        { expression: "JSON.stringify({ cards: document.querySelectorAll('.board-card-row').length, hcp: (document.querySelector('.board-card-row') || { innerText: '' }).innerText.indexOf('HCP') >= 0, openFor: (document.querySelector('.board-card-row') || { getAttribute: () => null }).getAttribute('data-card-for') })" },
     ] });
     C.ok = r.ok; C.reason = r.reason;
     const objs = (r.value || []).filter(x => typeof x === 'string' && x.charAt(0) === '{').map(x => JSON.parse(x));
@@ -353,10 +352,10 @@ describe('COLD CHROME at 390x844: compact rows, a tap on the row body, the card'
     test('the skins badges rendered on the real page', () => {
         assert.ok(C.v.badges >= 1, 'badges: ' + C.v.badges);
     });
-    test('a real tap on the SCORE cell of the third row opened THAT golfer\'s card, and it says SI', () => {
+    test('a real tap on the SCORE cell of the third row opened THAT golfer\'s card, and it says HCP', () => {
         assert.equal(C.v.cards, 0, 'nothing open on arrival');
         assert.equal(C.after.cards, 1);
         assert.equal(C.after.openFor, C.v.thirdId);
-        assert.equal(C.after.si, true);
+        assert.equal(C.after.hcp, true);   // URGENT-081: the card's hole row reads HCP
     });
 });

@@ -55,10 +55,22 @@ describe('THE RECEIPT RENDERS BYTE FOR BYTE WHAT IT RENDERED AT 8d2eabf', () => 
         assert.ok((PREV.html.net.match(/mark-(birdie|eagle)/g) || []).length === 18, 'captured with rings');
         assert.ok(PREV.html.frontOnly.includes('OUT') === false || !PREV.html.frontOnly.includes('>IN<'), 'the nine-only capture has no IN column');
     });
+    // URGENT-081 (2026-10-26): the Receipt now also draws a square for a bogey and a
+    // double square for a double bogey or worse (a class on the cell) and names them
+    // in the legend. Those are the ONLY differences allowed: with the two new classes
+    // and the two new legend entries taken out, every byte - every number, total,
+    // net figure and label - is still what 8d2eabf rendered.
+    const without081 = html => html
+        .replace(/<td class="mark-(bogey|double)">/g, '<td>')
+        .replace(/\s*<span class="legend-pair"><span class="legend-dot legend-bogey"><\/span> Bogey<\/span>\s*<span class="legend-pair"><span class="legend-dot legend-double"><\/span> Double bogey or worse<\/span>/, '');
     Object.keys(R).forEach(k => {
-        test(`${k}: identical`, () => {
-            assert.equal(receiptHtml(R[k]), PREV.html[k]);
+        test(`${k}: identical (apart from the URGENT-081 squares)`, () => {
+            assert.equal(without081(receiptHtml(R[k])), PREV.html[k]);
         });
+    });
+    test('URGENT-081: the squares are really there on a round with bogeys', () => {
+        const all = Object.keys(R).map(k => receiptHtml(R[k])).join('');
+        assert.ok(/<td class="mark-bogey">/.test(all) || /<td class="mark-double">/.test(all), 'some round in the corpus has a box');
     });
 });
 
