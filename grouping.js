@@ -103,6 +103,21 @@ function groupLinkNoteText(playerCount) {
         : 'Scorekeeper link \u2014 send this to whoever is keeping the card.';
 }
 
+// WERE GROUPS SET FOR THIS ROUND? (082, Manny Oct 26)
+//
+// Every round has groups to the code above: with nothing saved it makes them 4 at
+// a time in list order. Those are not anybody's pairings, so the leaderboard's
+// Groups button shows only when the round SAVED its group sizes - a paste with
+// blank lines between groups, the wizard's per-group -/+, My Groups' split, a
+// Players-sheet move / add / new group, or Game Day's size answer (Manny: those
+// count as set). One positive number anywhere is enough. Firebase hands the
+// sizes back as an ARRAY when they start at 0 ([4, 4, 3, 4, 3]) and as an object
+// otherwise; both are read.
+function groupsWereSet(overrides) {
+    if (!overrides || typeof overrides !== 'object') return false;
+    return Object.keys(overrides).some(function (k) { var v = Number(overrides[k]); return isFinite(v) && v > 0; });
+}
+
 // Which group each golfer is in, keyed by id: { '101': 1, '102': 1, '105': 2 }.
 //
 // The same slicing computeGroupBoundaries hands out, folded into a lookup so a

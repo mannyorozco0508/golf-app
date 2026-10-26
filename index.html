@@ -1708,6 +1708,7 @@
         /* v195: the Players sheet, and a golfer marked Out. */
         .ps-content { max-width: 440px; }
         .ps-group { font-size: 0.72rem; font-weight: bold; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 12px 0 4px 0; display: flex; justify-content: space-between; align-items: center; }
+        .ps-new-group { margin-top: 12px; }
         .ps-add { background: none; border: 1px solid var(--brand-green); color: var(--brand-green); border-radius: 12px; padding: 4px 10px; font-size: 0.72rem; font-weight: bold; cursor: pointer; min-height: 32px; }
         /* v199: a [Group ▾] selector per row - a move goes to the END of the target group. */
         .ps-row { display: grid; grid-template-columns: 1fr 52px 40px 58px 54px; gap: 6px; align-items: center; padding: 4px 0; border-top: 1px solid var(--border-faint); }
@@ -8181,6 +8182,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             title: '\uD83D\uDC65 Players',
             bullets: [
                 'One row per golfer: fix a name, fix a handicap, move somebody to another group.',
+                '+ New group adds one more group at the end: move a golfer into it, or add one there. An empty new group is not saved.',
                 'Organizer only. A group scorekeeper link does not show this.',
                 'Out takes somebody out of the round mid-way. Their scores stay in the record \u2014 no surface shows them once the row is gone.',
                 'Adding that person back starts a fresh card under a new id, so the old scores do not come with them.',
@@ -8189,8 +8191,33 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         });
     }
 
+    // "+ NEW GROUP" (082, Manny Oct 26). One new group per opening of the sheet:
+    // it becomes Group N+1, offered in every row's [Group] selector and with its
+    // own "+ Add golfer". Saved only when somebody is moved or added into it - an
+    // empty group is not a group (the grouping rule has none) - and through the
+    // same guarded whole write a move already uses (players + groupSizeOverrides).
+    let psNewGroups = 0;
+    function psAddNewGroup() {
+        const body = document.getElementById('players-sheet-body');
+        if (!body || psNewGroups >= 1) return;
+        const base = computeGroupBoundaries((currentData.players || []).length, currentData.groupSizeOverrides || {}).length;
+        const g = base + 1;
+        psNewGroups = 1;
+        body.querySelectorAll('select.ps-grp').forEach(sel => {
+            const o = document.createElement('option'); o.value = String(g); o.textContent = 'G' + g; sel.appendChild(o);
+        });
+        const head = document.createElement('div');
+        head.className = 'ps-group ps-group-new';
+        head.innerHTML = '<span>Group ' + g + ' (new)</span><button type="button" class="ps-add" onclick="psAddRow(' + g + ')">+ Add golfer</button>';
+        const adds = document.createElement('div'); adds.className = 'ps-adds'; adds.id = 'ps-adds-' + g;
+        const btn = document.getElementById('ps-new-group');
+        body.insertBefore(head, btn || null); body.insertBefore(adds, btn || null);
+        if (btn) btn.style.display = 'none';
+        psRefreshMoney();
+    }
     function openPlayersSheet() {
         if (!canReachSetup()) return;
+        psNewGroups = 0;
         psSnapshot = rosterSignature(currentData.players);
         renderPlayersSheet(currentData);
         const el = document.getElementById('players-sheet');
@@ -8299,6 +8326,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             }
             html += '<div class="ps-adds" id="ps-adds-' + b.group + '"></div>';
         });
+        html += '<button type="button" class="ps-add ps-new-group" id="ps-new-group" onclick="psAddNewGroup()">+ New group</button>';
         body.innerHTML = html;
         psRefreshMoney();
     }
@@ -8322,7 +8350,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     }
     // What the sheet holds now: the edits per roster index and the added golfers.
     function collectPlayersSheet() {
-        const draft = { edits: [], added: [] };
+        const draft = { edits: [], added: [], newGroups: psNewGroups };
         const body = document.getElementById('players-sheet-body');
         if (!body) return draft;
         body.querySelectorAll('.ps-row').forEach(row => {
@@ -8438,6 +8466,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // so a second move sees the first. Adds follow, on the same sizes.
         const moves = (draft.edits || []).filter(e => e.group !== undefined && e.group !== null && players[e.idx] && groupOfIdx['i' + e.idx] !== undefined && parseInt(e.group, 10) !== groupOfIdx['i' + e.idx]);
         let sizes = computeGroupSizes(players.length, data.groupSizeOverrides || {});
+        // 082: "+ New group" - an empty group at the end that a move or an add may
+        // fill. Left empty, it is dropped below and nothing about it is written.
+        const baseGroups = sizes.length;
+        const newGroups = Math.min(1, Math.max(0, parseInt(draft.newGroups, 10) || 0));
+        for (let k = 0; k < newGroups; k++) sizes.push(0);
+        const addsIntoNew = (draft.added || []).some(a => (parseInt(a.group, 10) || 0) > baseGroups);
+        const dropEmptyNew = () => { while (sizes.length > baseGroups && sizes[sizes.length - 1] === 0) sizes.pop(); };
         if (moves.length) {
             whole = true; changed = true;
             const nGroups = sizes.length;
@@ -8457,6 +8492,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 warnings.push('Group ' + target + '\u2019s link now includes ' + golferLabel(mover));
                 if (sizes[from - 1] === 0 && emptied.indexOf(from) < 0) emptied.push(from);
             });
+            if (!addsIntoNew) dropEmptyNew();
             emptied.forEach(g => {
                 if (sizes[g - 1] !== 0) return;   // refilled by a later move
                 const origin = (data.players || []).filter((p, i) => groupOfIdx['i' + i] === g);
@@ -8486,6 +8522,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 players.splice(end, 0, np);
                 sizes[g - 1] += 1;
             });
+            dropEmptyNew();
             groupSizeOverrides = {}; sizes.forEach((s, i) => { groupSizeOverrides[i] = s; });
         }
         const after = Object.assign({}, data, { players, groupSizeOverrides: groupSizeOverrides || data.groupSizeOverrides });
