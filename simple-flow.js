@@ -567,6 +567,20 @@
         var rows = (best.v.results || []).filter(function (m) { return Math.max(matchScore({ name: m.name || m.club }, raw), matchScore({ name: (m.club || '') + ' ' + (m.course || '') }, raw)) >= 2; });
         return rows.length ? rows : null;
     }
+    // URGENT-079 (the course table: "bandon" once Bandon Dunes was pulled showed Trails / Preserve / Sheep Ranch as
+    // "Not set up yet"): a "Not set up yet" course within ~3 mi of a GolfAPI ✓ GPS course of the list, sharing a word of
+    // its club (a resort's other courses), may be in GolfAPI too - the saved-first answer then also asks online (once;
+    // the server's saved answer costs no GolfAPI call when someone asked it before).
+    function siblingsOnline(raw) {
+        var c = HC(), all = []; try { all = c && c.osmOnly ? c.osmOnly() : []; } catch (e) { all = []; }
+        if (!all.length) return false;
+        var gl = localHits(courses(), raw).map(function (x) { return asWeb(x.c); }).filter(function (m) { return m && m.gps && m.pt; });
+        if (!gl.length) return false;
+        return localHits(all, raw).some(function (x) {
+            var ow = twinWords(x.c.name);
+            return gl.some(function (m) { var cw = twinWords(String(m.name).split(' (')[0]); return near3(x.c, m) && sameState(x.c.state, m.state) && ow.some(function (w) { return cw.indexOf(w) !== -1; }); });
+        });
+    }
     function webSearch(force) {
         var raw = String(S.q || '').trim(), L = W.HardPanGpsLive;
         if (S.step !== 1 || raw.length < 3) return;
@@ -581,7 +595,7 @@
             // (the old rule - 3 good matches on the phone, no online search - is kept, now with "Search more")
             // URGENT-079: ...plus the GolfAPI ✓ GPS courses of this phone's answer for a shorter search ("ariz" for
             // "arizo"; 0 calls), so a GolfAPI course the list doesn't hold still shows over its OpenStreetMap copy.
-            if (localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3 || savedHits(raw).length) { var spre = (prefixCache(k, raw) || []).filter(function (m) { return m.gps; }); S.web = spre.length ? { k: k, state: 'saved', more: true, results: spre } : { k: k, state: 'saved', more: true }; render1(); return; }
+            if ((localHits(courses(), raw).filter(function (x) { return x.s >= 2; }).length >= 3 || savedHits(raw).length) && !(siblingsOnline(raw) && !prefixCache(k, raw))) { var spre = (prefixCache(k, raw) || []).filter(function (m) { return m.gps; }); S.web = spre.length ? { k: k, state: 'saved', more: true, results: spre } : { k: k, state: 'saved', more: true }; render1(); return; }
             var pre = prefixCache(k, raw);
             if (pre) { S.web = { k: k, state: 'ok', results: pre, more: true }; render1(); return; }
         }

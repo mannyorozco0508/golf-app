@@ -74,8 +74,8 @@ const BANDON_AT = [43.1500, -124.3000];    // near Bandon, on no course
 const SEED = (k, rows) => "try{localStorage.setItem('hardpan_websearch_" + k + "', JSON.stringify({ at: Date.now(), results: " + JSON.stringify(rows) + " }));}catch(e){}";
 const open = (at, steps, opts) => {
     opts = opts || {};
-    const gc = opts.pulled === false ? {} : { ['gapi_' + AZ_ID]: AZ_REC };
-    const gps = opts.pulled === false || opts.noGps ? {} : { [AZ_ID]: AZ_GPS };
+    const gc = Object.assign(opts.pulled === false ? {} : { ['gapi_' + AZ_ID]: AZ_REC }, opts.gc || {});
+    const gps = Object.assign(opts.pulled === false || opts.noGps ? {} : { [AZ_ID]: AZ_GPS }, opts.gps || {});
     return arriveCold({ url: fileUrl('admin.html', 'start=quick'), db: { events: {}, global_courses: gc, gps_courses: gps, gps_links: {}, trips: {}, tournaments: {}, organizers: {} }, settleMs: 2500, viewport: { width: 393, height: 852 },
         preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + FUNCS() + (opts.seed || '') + "try{sessionStorage.setItem('hardpan_simple_flow','gps');}catch(e){}"
             + "if (/admin\\.html$/.test(location.pathname)) document.addEventListener('DOMContentLoaded', function () { var s = document.createElement('script'); s.src = 'gps-live.js'; document.head.appendChild(s); });", steps: [
@@ -180,4 +180,19 @@ test('a GolfAPI course whose own point isn\'t known yet is never placed by a "sa
     assert.ok(mi(az[0]) == null || mi(az[0]) < 1, 'never Mesa\'s 17 mi: ' + az[0]);
     assert.deepEqual(osmAzcc(s.rows), [], 'GolfAPI wins: its OSM copy (the same name) is not drawn');
     assert.ok(s.rows.some((x) => /^OSM Arizona Golf Resort \| [\d.]+ mi · Mesa, AZ/.test(x)), 'Mesa\'s course still shows: ' + JSON.stringify(s.rows));
+});
+
+test('Bandon Dunes pulled (a GolfAPI course of the list): "bandon" still shows GolfAPI\'s Trails / Preserve / Pacific Dunes with ✓ GPS (one online search), not their OSM "Not set up yet" copies; Shortys (OSM-only) stays', { timeout: 200000 }, async () => {
+    const BD = '012141521036241695493', bh = (i) => ({ t: { b: [43.1878 + i * 0.001, -124.3910] }, g: { c: [43.1890 + i * 0.001, -124.3915] } });
+    const BD_GPS = { id: BD, club: 'Bandon Dunes Golf Resort', course: 'Bandon Dunes', city: 'Bandon', state: 'OR', lat: 43.1879, lng: -124.3903, holes: 18, h: {} };
+    for (let i = 1; i <= 18; i++) BD_GPS.h[i] = bh(i - 1);
+    const BD_REC = { name: 'Bandon Dunes Golf Resort (Bandon Dunes)', data: CD, tees: { male: [TEE('Black', 6700, 74, 140), TEE('Green', 6200, 71, 130)] } };
+    const r = await open(BANDON_AT, [TYPE('bandon'), { waitFor: "document.querySelectorAll('#sf [data-sf-web]').length >= 4", timeout: 20000 }, { sleep: 800 }, X(SNAP)], { gc: { ['gapi_' + BD]: BD_REC }, gps: { [BD]: BD_GPS } });
+    assert.equal(r.ok, true, r.reason);
+    const [s] = J(r);
+    ['Bandon Trails', 'Bandon Preserve', 'Pacific Dunes', 'Old McDonald'].forEach((n) => assert.ok(s.rows.some((x) => /^WEB /.test(x) && x.indexOf(n) !== -1 && /✓ GPS$/.test(x)), n + ': GolfAPI\'s row: ' + JSON.stringify(s.rows)));
+    assert.ok(!s.rows.some((x) => /^OSM Bandon (Trails|Preserve)\b/.test(x)), 'no OSM copies of GolfAPI courses: ' + JSON.stringify(s.rows));
+    assert.ok(s.rows.some((x) => /^LOCAL Bandon Dunes/.test(x)), 'the pulled Bandon Dunes once');
+    assert.ok(s.rows.some((x) => /^OSM Shortys/.test(x)), 'Shortys (OSM-only) still shows: ' + JSON.stringify(s.rows));
+    assert.deepEqual(s.fn, ['bandon'], 'one online search');
 });
