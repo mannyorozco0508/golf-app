@@ -1189,7 +1189,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 const nine = card.data.slice(off, off + 9);
                 html += '<tr><th>Hole</th>' + nine.map(h => `<th>${h.hole}</th>`).join('') + '</tr>';
                 html += '<tr><td>Par</td>' + nine.map(h => `<td>${h.par}</td>`).join('') + '</tr>';
-                html += '<tr><td>SI</td>' + nine.map(h => `<td>${h.hcpIndex}</td>`).join('') + '</tr>';
+                html += '<tr><td>Hcp</td>' + nine.map(h => `<td>${h.hcpIndex}</td>`).join('') + '</tr>';   // URGENT-081: was "SI"; a label only
             });
             table.innerHTML = html;
             panel.appendChild(table);

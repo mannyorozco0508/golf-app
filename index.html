@@ -419,12 +419,12 @@
                 print-color-adjust: exact !important;
             }
             .score-input-wrapper.mark-bogey::after, .card-table td.mark-bogey {
-                box-shadow: inset 0 0 0 2px #1a1a1a !important; border-radius: 3px !important;
+                box-shadow: inset 0 0 0 2px #c1121f !important; border-radius: 3px !important;
             }
             .score-input-wrapper.mark-double::after, .card-table td.mark-double {
-                box-shadow: inset 0 0 0 2px #1a1a1a,
+                box-shadow: inset 0 0 0 2px #c1121f,
                             inset 0 0 0 4px #ffffff,
-                            inset 0 0 0 6px #1a1a1a !important;
+                            inset 0 0 0 6px #c1121f !important;
                 border-radius: 3px !important;
             }
             /* GPS:END */
@@ -1103,17 +1103,17 @@
         }
         /* GPS:BEGIN */
         /* HARDPAN: a box for a bogey, a double box for a double bogey or worse (score-marks.js),
-           in the number's own colour - the same shapes on the GPS button and the Receipt. */
+           in the circles' red since URGENT-081 (was the number's own colour) - the same shapes on the GPS button and the Receipt. */
         .receipt-table td.mark-bogey,
         .card-table td.mark-bogey {
-            box-shadow: inset 0 0 0 2px var(--text-main, #1a1a1a);
+            box-shadow: inset 0 0 0 2px var(--accent-red);
             border-radius: 3px;
         }
         .receipt-table td.mark-double,
         .card-table td.mark-double {
-            box-shadow: inset 0 0 0 2px var(--text-main, #1a1a1a),
+            box-shadow: inset 0 0 0 2px var(--accent-red),
                         inset 0 0 0 4px var(--bg-card),
-                        inset 0 0 0 6px var(--text-main, #1a1a1a);
+                        inset 0 0 0 6px var(--accent-red);
             border-radius: 3px;
         }
         /* THE SCORE BOX ALREADY HAS A BORDER (Manny, 2026-10-16): a box drawn on the box's edge read
@@ -1127,12 +1127,12 @@
            give way to these, so a bogey is one box, not two. */
         .score-input-wrapper.mark-bogey .shape-box-1, .score-input-wrapper.mark-bogey .shape-box-2,
         .score-input-wrapper.mark-double .shape-box-1, .score-input-wrapper.mark-double .shape-box-2 { display: none; }
-        .score-input-wrapper.mark-bogey::after { inset: 9px; box-shadow: inset 0 0 0 2px var(--text-main, #1a1a1a); }
+        .score-input-wrapper.mark-bogey::after { inset: 9px; box-shadow: inset 0 0 0 2px var(--accent-red); }
         .score-input-wrapper.mark-double::after {
             inset: 7px;
-            box-shadow: inset 0 0 0 2px var(--text-main, #1a1a1a),
+            box-shadow: inset 0 0 0 2px var(--accent-red),
                         inset 0 0 0 4px var(--bg-card),
-                        inset 0 0 0 6px var(--text-main, #1a1a1a);
+                        inset 0 0 0 6px var(--accent-red);
         }
         .receipt-table td.mark-double, .receipt-table td.mark-eagle { padding-left: 7px; padding-right: 7px; }
         /* QUICK STATS (008): one small line under the golfer's score box - putts, fairway, GIR.
