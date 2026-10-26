@@ -23,6 +23,8 @@ const TEE = (name, y) => ({ name, rating: 71, slope: 125, parTotal: 72, totalYar
 const REC = { name: 'Papago Golf Club (Papago)', data: CD, tees: { male: [TEE('Blue', 6800)] }, location: { city: 'Phoenix', state: 'AZ', latitude: 33.461251, longitude: -111.960768 } };
 const GPS = { id: ID, club: 'Papago Golf Club', course: 'Papago', city: 'Phoenix', state: 'AZ', lat: 33.461251, lng: -111.960768, holes: 18,
     h: { 1: { g: { f: [33.4598, -111.9590], c: [33.4597, -111.9591], b: [33.4596, -111.9592] }, t: { b: [33.4620, -111.9610], f: [33.4615, -111.9605] } } } };
+// 086 (Manny, Oct 26): "✓ GPS" needs a green on EVERY hole - the made-up hole 1 stands for holes 2-18 too.
+for (let i = 2; i <= 18; i++) GPS.h[i] = GPS.h[1];
 const LATE = (ms) => "(function(){ var hold = function () { var F = window.firebase; if (!F || !F.database || F.__late) return false; var od = F.database; F.database = function () { var d = od.apply(F, arguments), r = d.ref; return Object.assign({}, d, { ref: function (p) { var x = r.apply(d, arguments); if (String(p) === 'global_courses') { var o = x.once; x.once = function () { var a = arguments; window.__lateAsked = (window.__lateAsked || 0) + 1; return new Promise(function (res) { setTimeout(function () { res(o.apply(x, a)); }, " + ms + "); }); }; } return x; } }); }; F.__late = true; return true; };"
     + " if (!hold()) { var t = setInterval(function () { if (hold()) clearInterval(t); }, 5); } })();"
     + "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{liveTest:true});}});})();"
