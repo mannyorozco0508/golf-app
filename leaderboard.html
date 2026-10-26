@@ -1432,8 +1432,16 @@ ${ind.slice(4)}</tr>`;
     // banner up top still answers "who's actually winning" across the whole field.
     function renderGroupedBoard(results, boundaries, container) {
         let html = fieldLeaderBannerHtml(results);
+        // THE ROUND'S PAIRINGS, NOT THE STANDINGS (082, 2026-10-26). `boundaries`
+        // are positions in the PLAYERS list; `results` is the standings, sorted by
+        // score. Slicing the standings made "Group 1" the four best scores - on
+        // UCWZ8T, Todd/Jeremy/Bob/Kopp instead of Skeens/Paul/Matt B/Lance - and the
+        // groups reshuffled with every score. Each group is now the golfers the
+        // round put in it, still in board order inside the group.
+        const plist = (currentBoardData && currentBoardData.players) || [];
         boundaries.forEach(b => {
-            const groupResults = results.slice(b.startIdx, b.startIdx + b.size);
+            const ids = new Set(plist.slice(b.startIdx, b.startIdx + b.size).map(p => String(p.id)));
+            const groupResults = results.filter(r => ids.has(String(r.id)));
             html += boardSectionHtml(`👥 Group ${b.group}`, groupResults, null);
         });
         html += `<button class="btn-primary" onclick="shareResults()">📲 Text Live Link</button>`;
@@ -1507,7 +1515,12 @@ ${ind.slice(4)}</tr>`;
 
             const boundaries = computeGroupBoundaries(players.length, currentBoardData.groupSizeOverrides || {});
             const flightsOn = boardFlightsOn();
-            const multiGroup = boundaries.length > 1;
+            // GROUPS ONLY WHEN THE ROUND SET THEM (082). With no saved group sizes
+            // the groups are just 4 at a time in list order - nobody's pairings - so
+            // the Groups button is hidden and All (and Flights) remain. A round with
+            // saved sizes (paste blocks, wizard, Players sheet, Game Day) is as before.
+            const multiGroup = boundaries.length > 1
+                && (typeof groupsWereSet !== 'function' || groupsWereSet(currentBoardData.groupSizeOverrides));
 
             if (!flightsOn) {
                 if (groupViewMode === 'flight') groupViewMode = 'group';
@@ -1515,6 +1528,7 @@ ${ind.slice(4)}</tr>`;
                 // not chosen - groupViewChosen still wins, and still sticks for the
                 // session. A single-group round has nothing to group by either way.
                 if (!groupViewChosen) groupViewMode = multiGroup ? bigFieldDefault(players) : 'all';
+                if (groupViewMode === 'group' && !multiGroup) groupViewMode = 'all';   // 082: no Groups to show
                 syncViewControl({ mode: groupViewMode, multiGroup: multiGroup, flights: false });
                 if (multiGroup && groupViewMode === 'group') {
                     renderGroupedBoard(results, boundaries, container);
