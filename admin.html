@@ -19,6 +19,8 @@
          Loads the auth SDK itself, asynchronously, so no page waits for it. -->
     <script src="auth-boot.js"></script>
     <script src="organizer-gate.js"></script>
+    <!-- 084: Rounds I'm running (Home list + the owner's pointer after a save). -->
+    <script src="my-rounds.js"></script>
     <script src="my-groups.js"></script>
     <script src="roster-paste.js"></script>
     <script src="./firebase-database-compat.js"></script>
@@ -846,6 +848,8 @@
         /* A CONTROL GROUP IS A CARD. The heading carries the sentence, the control
            sits under it, and the helper line sits under the control sharing its left
            edge - which is the whole of "words not lined up". */
+        /* 084: Rounds I'm running - the card takes the page's own colours (light + dark). */
+        .my-rounds { margin-top: var(--widget-gap, 12px); --mr-card: var(--bg-card); --mr-line: var(--border-mid); --mr-text: var(--text-main); --mr-muted: var(--text-muted); --mr-green: var(--brand-green); --mr-link: var(--brand-navy); --mr-warn-bg: var(--warn-bg); --mr-warn: var(--warn-text); }
         .w-card {
             box-sizing: border-box;
             padding: var(--widget-pad);
@@ -1102,6 +1106,10 @@ html {
     <div id="coach-container">
         <a class="resume-link coach-link" id="coach-link" onclick="startSetupCoach(this)">&#129517; Help me set this up</a>
     </div>
+
+    <!-- 084: ROUNDS I'M RUNNING (my-rounds.js). Hidden until there is a row; 1 row + "See all N"
+         so the one-screen Home stays one screen. Never shows an organizer link. -->
+    <div id="my-rounds" class="my-rounds" style="display:none;"></div>
 
     <div id="event-type-framing" class="lobby-framing" style="display:none;"></div>
 
@@ -10220,6 +10228,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 loadedExistingRound = true;
                 loadedOrganizerToken = data.organizerToken || null;
                 loadedOwnerUid = data.ownerUid || null;
+                // 084: the owner opening setup heals a missing Rounds I'm running pointer
+                // (a round saved before 084). Fire-and-forget; refused for anyone else.
+                if (data.ownerUid && window.HardPanMyRounds) {
+                    const mrData = data, mrCode = currentMode;
+                    Promise.resolve(window.authReady).then((bootUid) => {
+                        let mrUid = bootUid;
+                        try { const u = window.firebase.auth().currentUser; if (u && u.uid) mrUid = u.uid; } catch (e) {}
+                        if (mrUid && mrUid === mrData.ownerUid) window.HardPanMyRounds.remember(db, mrUid, mrCode, mrData);
+                    }).catch(() => {});
+                }
             }
             groupSizeOverrides = data.groupSizeOverrides || {};
             if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
@@ -11597,6 +11615,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // THE ROUND NOW EXISTS. Only here is it true that there is
                 // something to resume, so only here is the pointer written.
                 localStorage.setItem('lastRoomCode', currentMode);
+                // 084: the owner's "Rounds I'm running" pointer (organizers/<uid>/rounds/<code>).
+                // NOT RETURNED, NOT AWAITED: refused by the rules until they are published,
+                // and a refusal here must never touch the save, its button or its messages.
+                try {
+                    const mrUser = window.firebase && typeof window.firebase.auth === 'function' ? window.firebase.auth().currentUser : null;
+                    const mrUid = (mrUser && mrUser.uid) || (window.authBootState && window.authBootState.uid) || null;
+                    if (mrUid && window.HardPanMyRounds) window.HardPanMyRounds.remember(db, mrUid, currentMode, payload);
+                } catch (e) { /* the list is a convenience; the save already landed */ }
                 // v191: a NEW round looks for the unfinished round it replaces
                 // (offerRetire) BEFORE this save is remembered, so the new code
                 // never nominates itself; then the save is remembered.
@@ -11827,5 +11853,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
 </script>
 
+<script>
+    // 084: Rounds I'm running on Home. Mounted once auth-boot has an answer (signed in,
+    // anonymous, or none when offline); it re-draws on every sign-in change.
+    (function () {
+        var box = document.getElementById('my-rounds');
+        if (!box || !window.HardPanMyRounds) return;
+        var go = function (auth) {
+            window.HardPanMyRounds.mount(box, { db: (typeof db !== 'undefined') ? db : null, auth: auth, store: (function () { try { return localStorage; } catch (e) { return null; } })(), show: 1,
+                signIn: function () { if (typeof openAccountPanel === 'function') openAccountPanel(); } });
+        };
+        Promise.resolve(window.authReady).then(function () { go(window.firebase.auth()); }, function () { go(null); });
+    })();
+</script>
 </body>
 </html>
