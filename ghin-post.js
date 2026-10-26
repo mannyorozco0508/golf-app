@@ -47,6 +47,13 @@
     var APP_LINK = 'https://www.ghin.com/overview/';            // universal link claimed by the GHIN app
     var WEB_POST = 'https://www.ghin.com/post-score';           // ghin.com's own score posting
     var APP_STORE = 'https://apps.apple.com/us/app/ghin/id491796218';
+    // ANDROID (android-2.0, 024 C; read 2026-10-25 from GHIN's own files, not guessed):
+    // https://www.ghin.com/.well-known/assetlinks.json names the Android app
+    // com.advancedmobile.android.ghin (handle_all_urls), and its Play listing is "GHIN: Handicap
+    // Index® & GPS". The same APP_LINK opens it through Android App Links when it is installed;
+    // when it is not, the browser opens ghin.com, whose own script goes on to Google Play.
+    // So Android changes only the words: Google Play, not the App Store.
+    var PLAY_STORE = 'https://play.google.com/store/apps/details?id=com.advancedmobile.android.ghin';
     // The paths GHIN's apple-app-site-association claims (2026-10-24), for the tests.
     var CLAIMED = ['/challenges/', '/upgrade-to-enhanced-gps/', '/overview/', '/myGPS/'];
 
@@ -56,8 +63,10 @@
         sub: 'HardPan doesn’t post scores. This opens the GHIN app, or the App Store if you don’t have it. You post there.',
         button: 'Post to GHIN',
         web: 'Post on ghin.com instead',
-        foot: 'Nothing is sent from HardPan. HardPan is not affiliated with the USGA or GHIN.'
+        foot: 'Nothing is sent from HardPan. HardPan is not affiliated with the USGA or GHIN.',
+        subAndroid: 'HardPan doesn’t post scores. This opens the GHIN app, or Google Play if you don’t have it. You post there.'
     };
+    function androidApp() { try { var C = W.Capacitor; return !!(C && typeof C.getPlatform === 'function' && C.getPlatform() === 'android'); } catch (e) { return false; } }
 
     function enabled() { var c = W.HARDPAN_GPS_CONFIG; return !!(c && c.ghinButton === true); }
 
@@ -86,7 +95,7 @@
             + '<div class="ghin-k">' + WORDS.kick + '</div>'
             + '<div class="ghin-box">'
             + '<div class="ghin-title">' + WORDS.title + '</div>'
-            + '<div class="ghin-sub">' + WORDS.sub + '</div>'
+            + '<div class="ghin-sub">' + (androidApp() ? WORDS.subAndroid : WORDS.sub) + '</div>'
             + '<a class="ghin-btn" id="ghin-post" href="' + href + '" target="_blank" rel="noopener">' + WORDS.button + '</a>'
             + (href === WEB_POST ? '' : '<a class="ghin-web" id="ghin-web" href="' + WEB_POST + '" target="_blank" rel="noopener">' + WORDS.web + '</a>')
             + '<div class="ghin-foot">' + WORDS.foot + '</div>'
@@ -131,6 +140,6 @@
         if (!d.getElementById('ghin-card')) host.innerHTML = cardHtml();
     }
 
-    W.HardPanGhin = { APP_LINK: APP_LINK, WEB_POST: WEB_POST, APP_STORE: APP_STORE, CLAIMED: CLAIMED, WORDS: WORDS,
+    W.HardPanGhin = { APP_LINK: APP_LINK, WEB_POST: WEB_POST, APP_STORE: APP_STORE, PLAY_STORE: PLAY_STORE, CLAIMED: CLAIMED, WORDS: WORDS,
         enabled: enabled, isPhone: isPhone, target: target, cardHtml: cardHtml, show: show };
 })();
