@@ -65,7 +65,8 @@ function homeOnAndroid(platform, open, extra) {
     W.window = W;
     if (extra) Object.assign(W, extra);
     // Home's Main view is on (nothing of Home's own is open).
-    const main = el('v-main', '', log); main.classList.contains = c => c === 'on'; els.set('v-main', main);
+    const views = (extra && extra.__views) || { main: true };
+    Object.keys(views).forEach((v) => { const e = el('v-' + v, '', log); const on = new Set(views[v] ? ['on'] : []); e.classList.contains = c => on.has(c); e.classList.add = c => on.add(c); e.classList.remove = c => on.delete(c); e.classList.toggle = (c, f) => { const w = f === undefined ? !on.has(c) : !!f; if (w) on.add(c); else on.delete(c); return w; }; els.set('v-' + v, e); });
     // The 2.0 files' own APIs, each reporting closed unless the test opens it.
     const is = name => open.indexOf(name) !== -1;
     W.HardPanVoice = { isOpen: () => is('voice'), cancel: () => log.push('close:voice') };
@@ -175,5 +176,20 @@ describe('ANDROID: the map in a 2.0 round leaves Back to the round (no map <-> c
     });
     test('no 2.0 round Back (0.2 screens): the map still goes to the card here', { skip }, () => {
         assert.equal(probesOn({ layer: 'map', round: false }).gps.isOpen(), true);
+    });
+});
+
+describe('ANDROID: Back on the 2.0 Home minimises the app (not the old Home screen first)', () => {
+    // Measured on the emulator (2026-10-25): 2.0's Home is v-simple (the simpleFlow switch); 0.2's code
+    // only knew v-main, so the first Back on Home showed the old v-main screen.
+    test('2.0 Home (v-simple on): one Back minimises', { skip }, () => {
+        const h = homeOnAndroid('android', [], { HardPanFeature: (n) => n === 'simpleFlow', __views: { simple: true, main: false } });
+        h.press();
+        assert.deepEqual(h.log, ['minimizeApp']);
+    });
+    test('2.0 Home switch on, but another Home view showing (v-main): Back returns to v-simple, app stays', { skip }, () => {
+        const h = homeOnAndroid('android', [], { HardPanFeature: (n) => n === 'simpleFlow', __views: { simple: false, main: true } });
+        h.press();
+        assert.ok(!h.log.includes('minimizeApp'), JSON.stringify(h.log));
     });
 });

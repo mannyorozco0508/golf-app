@@ -2895,7 +2895,9 @@
         // round" is the way out). 0.2's "map -> card" here fought it: map -> card -> map, forever. So
         // with the round's own Back on, the map is left to it; the GPS sheets above still close here.
         if (g && !(g === 'map' && roundOwnsBack())) return 'gps-' + g;
-        var main = $('v-main');
+        // HOME'S OWN TOP: 2.0's Home is v-simple (homeView(), the simpleFlow switch), not 0.2's v-main -
+        // measured on the emulator 2026-10-25: Back on the 2.0 Home showed the old v-main screen first.
+        var main = $('v-' + homeView());
         if (main && !main.classList.contains('on')) return 'home-view';
         return null;
     }
@@ -2906,7 +2908,7 @@
         else if (layer === 'add-game') closeAddGame();
         else if (layer === 'share') $('fd-share').style.display = 'none';
         else if (layer && layer.indexOf('gps-') === 0) W.HardPanGps.back();
-        else if (layer === 'home-view') show('main');
+        else if (layer === 'home-view') show(homeView());
         return layer;
     }
     function armBack() {
