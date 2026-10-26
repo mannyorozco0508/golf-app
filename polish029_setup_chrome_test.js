@@ -101,8 +101,10 @@ test('#5 #11 #35 #1: the GPS door with no signal stays on Course & Tees; the mid
     assert.match(s.btn, /^Start Round/);
     // URGENT-060 (was #11: TEES above NEAR YOU): NEAR YOU (the 3 closest, the picked course its first row),
     // then the picked course's TEES; the middle tee, not the tips.
-    const ti = s.text.indexOf('TEES'), ni = s.text.indexOf('NEAR YOU'), ci = s.text.indexOf('Papago Golf Club');
-    assert.ok(ni >= 0 && ni < ci && ci < ti, 'NEAR YOU, then the course, then TEES: ' + [ni, ci, ti]);
+    // 076 (Manny, option A): the course he is at is the green PLAYING card ("You're here") ALONE at the top, then its TEES.
+    const ti = s.text.indexOf('TEES'), ni = s.text.indexOf('PLAYING'), ci = s.text.indexOf('Papago Golf Club');
+    assert.ok(ni >= 0 && ni < ci && ci < ti, 'PLAYING, then the course, then TEES: ' + [ni, ci, ti]);
+    assert.doesNotMatch(s.text, /NEAR YOU/, '076: no list under the picked course');
     assert.equal(await ev(j, TEE_ON), 'White');
     // #35
     assert.deepEqual(s.chips, ['Hole 1', 'Hole 10', 'Shotgun']);

@@ -63,7 +63,8 @@ const X = (e) => ({ expression: e });
 const TYPE = (v) => X("(function(){ var i=document.getElementById('sf-q'); if(!i){ var b=document.querySelector('[data-sf=change]'); if(b) b.click(); i=document.getElementById('sf-q'); } i.focus(); i.value=" + JSON.stringify(v) + "; i.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
 const TAP_OSM = (name) => X("(function(){ var b=document.querySelector('#sf [data-sf-osm][data-sf-name=\"" + name + "\"]'); if(b) b.click(); return b ? 'tapped' : 'NO ROW'; })()");
 const SF = "JSON.stringify({ key: document.getElementById('course-select').value, text: (document.getElementById('sf')||{}).innerText||'',"
-    + " list: Array.prototype.map.call(document.querySelectorAll('#sf .sf-row'), function(b){ return (b.getAttribute('data-sf-osm') != null ? 'OSM ' : b.getAttribute('data-sf-web') ? 'WEB ' : 'LOCAL ') + b.innerText.replace(/\\n/g,' | '); }),"
+    + " list: Array.prototype.map.call(document.querySelectorAll('#sf .sf-row'), function(b){ return (b.getAttribute('data-sf-osm') != null ? 'OSM ' : b.getAttribute('data-sf-web') ? 'WEB ' : 'LOCAL ') + (b.getAttribute('data-sf-full') ? b.getAttribute('data-sf-full') + ' | ' + (b.querySelector('.s')||{}).innerText : b.innerText.replace(/\\n/g,' | ')); }),"   // 076: a two-line row (the course big, the club + town small) read as its full name
+    + ""
     + " webLine: (document.getElementById('sf-web')||{}).innerText||'', lineFirst: (function(){ var w=document.getElementById('sf-web'), o=document.querySelector('#sf [data-sf-osm]'); return !!(w && o && (w.compareDocumentPosition(o) & 4)); })(),"
     + " note: (document.getElementById('sf-osmnote')||{}).innerText||'', pickBox: (document.getElementById('sf-osmpick')||{}).innerText||'',"
     + " sfShown: (function(){ var s=document.getElementById('sf'); return !!s && getComputedStyle(s).display !== 'none' && s.style.visibility !== 'hidden'; })(),"

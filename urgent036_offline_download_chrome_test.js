@@ -132,6 +132,8 @@ test('no signal: "No signal - download it where you have signal", nothing downlo
 test('URGENT-035 kept: with the row on screen the search box is never redrawn while typing', { timeout: 120000 }, async () => {
     const j = await open();
     assert.ok(await until(j, "!!document.querySelector('#sf #sf-offline-row button')", 15000));
+    // 076 (option A): the row sits under the PLAYING card; Change brings back the box (search takes over the screen)
+    await ev(j, "(function(){ " + "var i=document.getElementById('sf-q'); if(!i){ var cb=document.querySelector('#sf-course [data-sf=change]'); if(cb) cb.click(); } return 1; })()");
     await ev(j, "window.__q0 = document.getElementById('sf-q'); window.__q0.focus(); 1");
     for (const c of 'Pap') {
         await j.cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: c, text: c, unmodifiedText: c });

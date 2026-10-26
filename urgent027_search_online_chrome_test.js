@@ -68,7 +68,8 @@ test('found online: one call after the pause, "Searching all courses…", rows w
     const [busy, s, again, picked] = J(r);
     assert.match(busy.web, /Searching all courses…/);
     assert.deepEqual(s.searches, ['aguila'], 'typed fast: one online call, "GC" dropped');
-    assert.deepEqual(s.webRows, ['Aguila Golf Course | Laveen, AZ · ✓ GPS', 'Aguila Golf Course (Executive) | Laveen, AZ'], 'city/state, ✓ GPS only with greens');
+    // 076 (Manny, long names): the course big, the club + town small; the same name once, the town small.
+    assert.deepEqual(s.webRows, ['Aguila Golf Course | Laveen, AZ | ✓ GPS', 'Executive | Aguila Golf Course · Laveen, AZ'], 'city/state, ✓ GPS only with greens');
     assert.equal(s.notListed, true, '"Not listed? Add a course" under the results');
     assert.doesNotMatch(s.text, /No course in the list by that name/);
     assert.deepEqual(again.searches, ['aguila', 'encanto'], 'the same query again: from this phone, no second call');
@@ -101,7 +102,7 @@ test('nothing online: "No course found by that name." and "Not listed? Add a cou
     assert.equal(r.ok, true, r.reason);
     const [s] = J(r);
     assert.deepEqual(s.searches, ['zzqxgolf']);
-    assert.match(s.text, /RESULTS\nNo course found by that name\.\nNot listed\? Add a course/);
+    assert.match(s.text, /RESULTS FOR 'zzqxgolf'\nNo course found by that name\.\nNot listed\? Add a course/);
 });
 
 test('offline: said plainly, no spinner forever', { timeout: 120000 }, async () => {

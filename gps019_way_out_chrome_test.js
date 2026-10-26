@@ -66,13 +66,15 @@ test('no scores: GPS "‹" -> Course & Tees for a new round -> Dobson -> Start G
     const back = JSON.parse(await ev(j, "(function(){ var b=document.querySelector('#gps-overlay .gps-back'); var r=b.getBoundingClientRect(); return JSON.stringify({ w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.left), y: Math.round(r.top), vis: getComputedStyle(b).display !== 'none' }); })()"));
     assert.ok(back.vis && back.w >= 44 && back.x < 80 && back.y < 140, 'a "‹" top-left, 44px: ' + JSON.stringify(back));
     await click(j, '#gps-overlay .gps-back'); taps++;
-    assert.ok(await until(j, "/admin\\.html/.test(location.pathname) && /game=/.test(location.search) && !!document.querySelector('#sf [data-sf-course]')", 30000), 'Course & Tees for a new round');
+    assert.ok(await until(j, "/admin\\.html/.test(location.pathname) && /game=/.test(location.search) && (!!document.querySelector('#sf [data-sf-course]') || !!document.querySelector('#sf [data-sf-playing]'))", 30000), 'Course & Tees for a new round');   // (076: at a course, its PLAYING card)
     const s1 = JSON.parse(await ev(j, "JSON.stringify({ h1: (document.querySelector('#sf h1')||{}).textContent, rows: Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function (b) { return b.getAttribute('data-sf-course'); }), code: new URLSearchParams(location.search).get('game') })"));
     assert.equal(s1.h1, 'Where are you playing?');
     assert.notEqual(s1.code, 'TSNONE');
     // Dobson: picked already (the closest GPS course with a card here) or one tap in the list.
     if (!(await ev(j, "document.getElementById('course-select').value === 'gca_zgkynkan'"))) {
         // URGENT-060: NEAR YOU is the 3 closest only - Dobson (12 mi from Talking Stick) comes from search.
+        // 076 (option A): the course he is at is the PLAYING card, alone - Change brings back the box and NEAR YOU.
+        if (await ev(j, "!!document.querySelector('#sf-course [data-sf=change]')")) { await click(j, '#sf-course [data-sf=change]'); await until(j, "!!document.getElementById('sf-q')", 5000); }
         if (!s1.rows.includes('gca_zgkynkan')) {
             await ev(j, "(function(){ var i=document.getElementById('sf-q'); i.value='dobson'; i.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
             assert.ok(await until(j, "!!document.querySelector('#sf [data-sf-course=\"gca_zgkynkan\"]')", 10000), 'Dobson found by search');
