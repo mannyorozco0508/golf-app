@@ -428,6 +428,8 @@
             return L.course(hit.id, key);
         }).then(function (r) {
             if (r && (r.status === 'choose' || r.status === 'ambiguous')) ls(LOOK + key, null);
+            // 079b: the club's courses are now known on this phone - search draws them as their own rows next time
+            if (r && r.status === 'choose' && r.oneClub) { try { ls(CLUB + webKey(clubName(name)), JSON.stringify({ at: Date.now(), results: r.matches })); } catch (e) {} }
             if (!S.lookup || S.lookup.key !== key) return;
             if (r && r.status === 'choose') { S.lookup = { key: key, state: 'choose', oneClub: r.oneClub, matches: r.matches }; if (S.step === 1) render(); return; }
             landed(key, r);
@@ -583,9 +585,9 @@
     }
     // ---- 079b (Manny: "show Starfire King 18 and Starfire Mulligan as their OWN two rows, King 18 first") ----
     // A course of ours with no card yet ("Starfire Golf Club · Tap to load") whose name IS what was typed: its club's
-    // GolfAPI ✓ GPS courses are drawn as their own rows, right before ours (our row stays - only add). Known from this
-    // phone's saved answers (0 calls), else ONE search for the club's name (the server's saved answer: 0 GolfAPI calls
-    // when anyone asked it before), kept on this phone 30 days.
+    // GolfAPI ✓ GPS courses are drawn as their own rows, right before ours (our row stays - only add). KNOWN = this
+    // phone's saved answers (any search answer, or the club's courses the "Which one?" lookup found - kept 30 days):
+    // 0 calls. Not known yet: as before ("Search more courses" asks once; a tap on our row asks "Which one?").
     var CLUB = 'hardpan_webclub_';
     function clubAsk(raw) {
         if (!liveOn()) return null;
@@ -604,7 +606,7 @@
         return out;
     }
     function clubFill(raw, k) {
-        var c = clubAsk(raw); if (!c) return;
+        var c = clubAsk(raw); if (!c) return false;
         var add = function (rows) {
             if (!S.web || S.web.k !== k || !rows.length) return false;
             var have = {}; (S.web.results || []).forEach(function (m) { have[m.id] = 1; });
@@ -612,17 +614,7 @@
             if (!nw.length) return false;
             S.web.results = (S.web.results || []).concat(nw); return true;
         };
-        if (add(clubRowsFor(c))) return;
-        var L = W.HardPanGpsLive, nm = clubName(c.name), ck = CLUB + webKey(nm);
-        if (!L || !L.search || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
-        if ((S.clubAsked = S.clubAsked || {})[ck]) return;
-        S.clubAsked[ck] = 1;
-        try { (W.__sfWeb = W.__sfWeb || []).push(nm); } catch (e) {}
-        Promise.resolve().then(function () { return L.search(nm); }).then(function (r) {
-            if (!(r && r.status === 'ok')) { S.clubAsked[ck] = 0; return; }
-            ls(ck, JSON.stringify({ at: Date.now(), results: (r.results || []).slice(0, 25) }));
-            if (add(clubRowsFor(c))) render1();
-        }, function () { S.clubAsked[ck] = 0; });
+        return add(clubRowsFor(c));   // known only: no online call here (071/076: a saved match makes 0 calls; "Search more" asks)
     }
     function webSearch(force) {
         var raw = String(S.q || '').trim(), L = W.HardPanGpsLive;
@@ -630,6 +622,7 @@
         if (!L) { needLive(function () { if (W.HardPanGpsLive) webSearch(force); }); return; }   // 071
         if (!liveOn() || !L.search) return;
         var k = webKey(raw);
+        if (!force && S.web && S.web.k === k && S.web.state === 'saved' && clubFill(raw, k)) render1();   // 079b: the club's courses learned since (the "Which one?" lookup)
         if (k.length < 3 || (!force && S.web && S.web.k === k && S.web.state !== 'error')) return;
         if (force && S.web && S.web.k === k && S.web.state === 'busy') return;
         var hit = null; try { hit = JSON.parse(ls(WEB + k) || 'null'); } catch (e) {}
