@@ -1107,10 +1107,10 @@
     // (the lookup / OpenStreetMap notes, TEES, the start). A course still loading is the card, with its line.
     // 076 (Manny: long names): the COURSE name big ("Bandon Preserve"), the resort / club + town small under it
     // ("Bandon Dunes Golf Resort · Bandon, OR"). Club and course the same, or one inside the other ("Papago Golf
-    // Club"): the name once, big, and the town. A course called only "18-hole course" / "Championship" says
+    // Club"): the name once, big, and the town. A course called only "18-hole course" / "Course" says
     // nothing alone: the club big, that word small. The result's own club / course fields; only a course with
     // none (our own cards) is read from its "Club (Course)" name.
-    var GENERIC_COURSE = /^(the )?(((\d+|nine|eighteen)[- ]?holes?|regulation|executive|championship|main|par[- ]?3)( (golf )?course)?|(golf )?course)$/i;
+    var GENERIC_COURSE = /^(the )?((\d+|nine|eighteen)[- ]?holes?( (golf )?course)?|(golf )?course)$/i;
     function twoNames(club, course, full, city, state) {
         var nk = function (t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }, town = [city, state].filter(Boolean).join(', ');
         club = String(club || '').trim(); course = String(course || '').trim();

@@ -214,7 +214,7 @@ test('long names fit a small phone (375x667): every result and the PLAYING card 
     assert.ok(b.rows.length >= 8, JSON.stringify(b.rows));
     assert.deepEqual(bFit, [], 'Bandon results fit');
     assert.ok(a.rows.some((x) => /^WEB Arizona Traditions Golf Club \| 18-hole course · Surprise, AZ \| /.test(x)), JSON.stringify(a.rows));
-    assert.ok(a.rows.some((x) => /^WEB Arizona Golf Resort \| Championship · Mesa, AZ \| /.test(x)), JSON.stringify(a.rows));
+    assert.ok(a.rows.some((x) => /^WEB Championship \| Arizona Golf Resort · Mesa, AZ \| /.test(x)), JSON.stringify(a.rows));
     assert.ok(a.rows.some((x) => /^WEB The Arizona Country Club \| Phoenix, AZ \| /.test(x)), JSON.stringify(a.rows));
     assert.deepEqual(aFit, [], 'Arizona results fit');
     assert.ok(p.card && /^PLAYING \| Change \| Bandon Preserve \| Bandon Dunes Golf Resort · Bandon, OR/.test(p.card.text), 'the PLAYING card (loading): ' + JSON.stringify(p.card));

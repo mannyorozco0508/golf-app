@@ -42,19 +42,26 @@ const HERE = [{ cdp: { method: 'Emulation.setGeolocationOverride', params: { lat
 const STEP1 = "JSON.stringify({ text: (document.getElementById('sf') || {}).innerText || '', key: document.getElementById('course-select').value,"
     + " head: (document.querySelector('#sf-course') || {}).innerText || '', headSel: !!document.querySelector('#sf-course.sf-sel'), sel: (document.querySelector('#sf .sf-row.sf-sel') || {}).innerText || '',"
     + " near: Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function (b) { return b.innerText.replace(/\\n/g, ' | '); }),"
+    + " card: (function(){ var c = document.querySelector('#sf [data-sf-playing]'); return c ? { text: c.innerText.replace(/\\n/g, ' | '), here: c.getAttribute('data-sf-playing-here') === '1' } : null; })(),"
     + " order: (function(){ var t = (document.getElementById('sf') || {}).innerText || ''; return [t.indexOf('NEAR YOU'), t.indexOf('TEES')]; })() })";
+const CHANGE = [{ tap: '#sf-course [data-sf=change]' }, { sleep: 1000 }];   // 076 (option A): the PLAYING card's Change -> the box, NEAR YOU
 
 describe('URGENT-016: the GPS door', () => {
     test('GPS: Home -> "Where are you playing?" with no frame of the old lobby; NEAR YOU (the 3 closest, the picked one first, "You\'re here") above its tees; a tap switches it', { timeout: 120000 }, async () => {
         const r = await arriveCold({ url: fileUrl('home.html', ''), db: DB(), settleMs: 2000, viewport: { width: 393, height: 852 }, preScript: BASE + FRAMES, steps: [
             ...HERE,
             { tap: '[data-hp-act="sgpsdoor"]' },
-            { waitFor: "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-tee]') && document.querySelectorAll('#sf [data-sf-course]').length > 0", timeout: 30000 }, { sleep: 800 },
+            { waitFor: "/game=/.test(location.search) && !!document.querySelector('#sf [data-sf-tee]') && (document.querySelectorAll('#sf [data-sf-course]').length > 0 || !!document.querySelector('#sf [data-sf-playing]'))", timeout: 30000 }, { sleep: 800 },
             X(STEP1),
             X("JSON.stringify({ frames: JSON.parse(sessionStorage.getItem('u16_frames') || '{}'), cover: document.documentElement.classList.contains('sf-pre') })"),
-            { tap: '#sf [data-sf-course]', nth: 1 }, { sleep: 1200 }, X(STEP1)] });
+            ...CHANGE, X(STEP1),
+            { tap: '#sf [data-sf-course]', nth: 1 }, { sleep: 1200 }, X(STEP1), ...CHANGE, X(STEP1)] });
         assert.equal(r.ok, true, r.reason);
-        const [s1, fr, after] = J(r);
+        const [card, fr, s1, picked, after] = J(r);
+        // 076 (Manny, option A): the course he is at is the green PLAYING card, alone, "You're here"; Change shows NEAR YOU.
+        assert.ok(card.card && card.card.here && /^PLAYING \| Change \| Dobson Ranch Golf Course \| You’re here/.test(card.card.text), JSON.stringify(card.card));
+        assert.deepEqual(card.near, [], 'the picked course alone');
+        assert.match(card.text, /^‹\nGPS\nWhere are you playing\?/);
         assert.match(s1.text, /^‹\nGPS\nWhere are you playing\?/);
         // the old lobby never on screen, on either hop - and the hop page was drawn (sampled) at all
         assert.ok(fr.frames.start && fr.frames.start.frames > 0, 'the start=quick hop was sampled: ' + JSON.stringify(fr.frames));
@@ -67,12 +74,15 @@ describe('URGENT-016: the GPS door', () => {
         assert.match(s1.near[0], /^Dobson Ranch Golf Course \| You’re here · 0\.0 mi( · ✓ GPS)?$/);   // ✓ GPS = what the map draws (URGENT-022)
         assert.match(s1.sel, /^Dobson Ranch Golf Course\n/, 'the picked course is its highlighted row');
         assert.equal(s1.head, '', 'not repeated as a second card');
-        assert.ok(s1.order[0] > 0 && s1.order[0] < s1.order[1], 'URGENT-060: NEAR YOU, then the TEES: ' + JSON.stringify(s1.order));
+        // 076: the tees sit under the PLAYING card; after Change, NEAR YOU alone (the search view)
+        assert.ok(card.order[0] === -1 && card.order[1] > 0, '076: the card, then its TEES: ' + JSON.stringify(card.order));
+        assert.ok(s1.order[0] > 0 && s1.order[1] === -1, '076: after Change, NEAR YOU (no tees): ' + JSON.stringify(s1.order));
         assert.equal(s1.near.length, 3, 'the 3 closest only: ' + JSON.stringify(s1.near));
         assert.ok(s1.near.every((t) => / mi/.test(t)), 'each row shows its distance: ' + JSON.stringify(s1.near));
         // (✓ GPS badges: only what the map draws - the course check covers them on the phone's rules.)
         // a tap on a nearby course switches it in place
         assert.notEqual(after.key, 'gca_zgkynkan', 'the tap switched the course');
+        assert.ok(picked.card && !/Dobson/.test(picked.card.text) && picked.near.length === 0, '076: the tapped course is the PLAYING card, alone: ' + JSON.stringify(picked.card));
         assert.equal(after.sel.split('\n')[0], s1.near[1].split(' | ')[0]);
         assert.ok(/^Dobson Ranch Golf Course \| You’re here/.test(after.near[0]), 'Dobson stays first, "You\'re here", not picked');
     });

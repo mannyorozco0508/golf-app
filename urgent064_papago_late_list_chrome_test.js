@@ -28,7 +28,8 @@ const LATE = (ms) => "(function(){ var hold = function () { var F = window.fireb
     + "(function(){var c;Object.defineProperty(window,'HARDPAN_GPS_CONFIG',{configurable:true,get:function(){return c;},set:function(v){c=Object.assign({},v,{liveTest:true});}});})();"
     + "try{ localStorage.removeItem('hardpan_course_index_v1'); }catch(e){}";
 const X = (e) => ({ expression: e });
-const NEAR = "JSON.stringify({ t: Date.now(), late: window.__lateAsked || 0, gc: Object.keys((typeof globalCourses !== 'undefined' && globalCourses) || {}), rows: Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return b.getAttribute('data-sf-course') + ' | ' + b.innerText.replace(/\\n/g,' | '); }), key: document.getElementById('course-select').value })";
+const NEAR = "JSON.stringify({ t: Date.now(), late: window.__lateAsked || 0, gc: Object.keys((typeof globalCourses !== 'undefined' && globalCourses) || {}), rows: Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return b.getAttribute('data-sf-course') + ' | ' + b.innerText.replace(/\\n/g,' | '); }), key: document.getElementById('course-select').value,"
+    + " card: (function(){ var c=document.querySelector('#sf [data-sf-playing]'); return c ? { key: c.getAttribute('data-sf-playing'), here: c.getAttribute('data-sf-playing-here') === '1', text: c.innerText.replace(/\\n/g,' | ') } : null; })() })";
 
 test('the shared list lands 6 s late: NEAR YOU becomes Papago\'s own record - "You\'re here", ✓ GPS - with no tap', { timeout: 150000 }, async () => {
     const r = await arriveCold({ url: fileUrl('admin.html', 'start=quick'), db: { events: {}, global_courses: { ['gapi_' + ID]: REC }, gps_courses: { [ID]: GPS }, trips: {}, tournaments: {}, organizers: {} }, settleMs: 1500, viewport: { width: 393, height: 852 },
@@ -37,11 +38,15 @@ test('the shared list lands 6 s late: NEAR YOU becomes Papago\'s own record - "Y
             { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: 33.4612, longitude: -111.9604, accuracy: 10 } } },
             { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
             X("(function(){ var b=document.querySelector('[data-sf=relocate]'); if(b) b.click(); return 'relocate'; })()"),
-            { waitFor: "document.querySelectorAll('#sf [data-sf-course]').length > 0", timeout: 40000 }, X(NEAR),
-            { waitFor: "/gapi_" + ID + "/.test(Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return b.getAttribute('data-sf-course') + ' ' + b.innerText; }).join(' ')) && /✓ GPS/.test(document.getElementById('sf').innerText)", timeout: 30000 }, { sleep: 800 }, X(NEAR)] });
+            { waitFor: "document.querySelectorAll('#sf [data-sf-course]').length > 0 || !!document.querySelector('#sf [data-sf-playing]')", timeout: 40000 }, X(NEAR),
+            // 076 (option A): the course he is at is the PLAYING card, alone - it becomes Papago's own record, then Change shows NEAR YOU
+            { waitFor: "!!document.querySelector('#sf [data-sf-playing=\"gapi_" + ID + "\"]') && /✓ GPS/.test(document.getElementById('sf').innerText)", timeout: 30000 }, { sleep: 800 }, X(NEAR),
+            X("(function(){ var b=document.querySelector('#sf-course [data-sf=change]'); if(b) b.click(); return 1; })()"), { sleep: 1000 }, X(NEAR)] });
     assert.equal(r.ok, true, r.reason);
     const s = r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
-    const [early, late] = s;
+    const [early, card, late] = s;
+    assert.ok(card.card && card.card.here && /^PLAYING \| Change \| Papago Golf Club \| You’re here · Phoenix, AZ · [\d.]+ mi · ✓ GPS$/.test(card.card.text), '076: the PLAYING card: ' + JSON.stringify(card.card));
+    assert.deepEqual(card.rows, [], '076: alone');
     assert.ok(early.late >= 1, 'the list was held back');
     assert.equal(early.gc.length, 0, 'NEAR YOU drawn before the list landed: ' + JSON.stringify(early));
     const pap = late.rows.filter((t) => /Papago/.test(t));

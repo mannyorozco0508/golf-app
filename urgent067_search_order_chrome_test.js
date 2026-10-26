@@ -98,8 +98,9 @@ test('"Arizona country club": The Arizona Country Club FIRST, then the rest clos
     assert.equal(r.ok, true, r.reason);
     const [before, s, empty] = J(r);
     const mi = (t) => { const m = / \| ([\d.]+) mi/.exec(t); return m ? Number(m[1]) : null; };
-    assert.match(s.all[0], /^The Arizona Country Club \(The Arizona Country Club\) \| [\d.]+ mi · Phoenix, AZ · ✓ GPS$/, 'the name as typed is FIRST: ' + JSON.stringify(s.all));
-    const bilt = s.all.filter((t) => /^Arizona Biltmore/.test(t));
+    // 076 (long names): the course big, the club + town small - here the same name: once, and the town
+    assert.match(s.all[0], /^The Arizona Country Club \| Phoenix, AZ \| [\d.]+ mi · ✓ GPS$/, 'the name as typed is FIRST: ' + JSON.stringify(s.all));
+    const bilt = s.all.filter((t) => /Arizona Biltmore/.test(t));
     assert.equal(bilt.length, 2, JSON.stringify(s.all));
     bilt.forEach((t) => assert.ok(mi(t) != null && /Tap to load/.test(t), 'Biltmore has its distance (and still "Tap to load"): ' + t));
     // every row has a distance except a course the app has no place for (Arizona National, Tucson: none in our lists)

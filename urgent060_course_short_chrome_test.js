@@ -45,13 +45,17 @@ const steps0 = (p) => [
     { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: p[0], longitude: p[1], accuracy: 10 } } },
     { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
     { sleep: 2500 }, X("(function(){ var b=document.querySelector('[data-sf=relocate]'); if(b) b.click(); return 'relocate'; })()"),
-    { waitFor: "document.querySelectorAll('#sf [data-sf-course]').length > 0", timeout: 40000 }, { sleep: 3000 }, SET_H(p), X(SNAP)];
+    { waitFor: "document.querySelectorAll('#sf [data-sf-course]').length > 0 || !!document.querySelector('#sf [data-sf-playing]')", timeout: 40000 }, { sleep: 3000 }, SET_H(p), X(CARD),
+    // 076 (option A): the course he is at is the PLAYING card alone; Change shows NEAR YOU (the screen checked below)
+    X("(function(){ var b=document.querySelector('#sf-course [data-sf=change]'); if(b) b.click(); return 1; })()"), { sleep: 1000 }, X(SNAP)];
+const CARD = "JSON.stringify({ card076: (function(){ var c=document.querySelector('#sf [data-sf-playing]'); return c ? { key: c.getAttribute('data-sf-playing'), here: c.getAttribute('data-sf-playing-here') === '1', text: c.innerText.replace(/\\n/g,' | '), rows: document.querySelectorAll('#sf [data-sf-course]').length, tees: Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-tee]'), function(n){ return n.innerText.split('\\n')[0]; }) } : null; })() })";
 const open = (p, more) => arriveCold({ url: fileUrl('admin.html', 'start=quick'), db: { events: {}, global_courses: GC, trips: {}, tournaments: {}, organizers: {} }, settleMs: 2500, viewport: { width: 393, height: 852 },
     preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + PHONE + "try{sessionStorage.setItem('hardpan_simple_flow','gps');}catch(e){}", steps: steps0(p).concat(more || []) });
-const J = (r) => r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
+const J = (r) => r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{' && v.indexOf('{"card076"') !== 0).map((v) => JSON.parse(v));
+const CARDS = (r) => r.value.filter((v) => typeof v === 'string' && v.indexOf('{"card076"') === 0).map((v) => JSON.parse(v).card076);
 const near = (s) => s.rows.filter((x) => x.sec === 'NEAR YOU');
 // The position read again (as when he walks): the list is dropped and locate() runs on the redraw.
-const RELOCATE = [X("(function(){ var S=HardPanSimpleFlow.state(); S.near=null; var i=document.getElementById('sf-q'); i.value=''; i.dispatchEvent(new Event('input',{bubbles:true})); return 'relocated'; })()"), { sleep: 3500 }, X(SNAP)];
+const RELOCATE = [X("(function(){ var S=HardPanSimpleFlow.state(); S.near=null; var i=document.getElementById('sf-q'); if(!i){ var cb=document.querySelector('#sf-course [data-sf=change]'); if(cb) cb.click(); i=document.getElementById('sf-q'); } i.value=''; i.dispatchEvent(new Event('input',{bubbles:true})); return 'relocated'; })()"), { sleep: 3500 }, X(SNAP)];
 // Set "last played" (this phone's last round) to a course, then redraw the screen by re-asking the position.
 const LAST = (expr) => X("(function(){ var c=" + expr + "; if(!c) return 'NO COURSE'; localStorage.setItem('hardpan_last_round', JSON.stringify({ course: c[1] })); window.__last=c[0];"
     + " var i=document.getElementById('sf-q'); i.value='x'; i.dispatchEvent(new Event('input',{bubbles:true})); i.value=''; i.dispatchEvent(new Event('input',{bubbles:true})); return 'last '+c[0]; })()");
@@ -59,7 +63,11 @@ const LAST = (expr) => X("(function(){ var c=" + expr + "; if(!c) return 'NO COU
 test('within 0.5 mi: NEAR YOU is the 3 closest only, the course he is at first, auto-picked, "You\'re here"; then its tees, Start Round; "Not listed?" stays', { timeout: 150000 }, async () => {
     const r = await open(AT_TS);
     assert.equal(r.ok, true, r.reason);
-    const [s] = J(r);
+    const [s] = J(r), [card] = CARDS(r);
+    // 076 (Manny, option A): the course he is at is first the green PLAYING card ALONE ("You're here"), its tees under it;
+    // Change (box empty) shows NEAR YOU - the screen this test checked before, now without the tees under it.
+    assert.ok(card && card.here && card.key === 'gapi_' + ID && card.rows === 0, '076: the PLAYING card, alone: ' + JSON.stringify(card));
+    assert.deepEqual(card.tees, ['Black', 'Gold', 'Jade'], '076: its tees under the card');
     const n = near(s);
     assert.equal(n.length, 3, 'exactly 3 under NEAR YOU: ' + JSON.stringify(n));
     assert.equal(n[0].key, 'gapi_' + ID, 'the course he is at is first');
@@ -72,11 +80,10 @@ test('within 0.5 mi: NEAR YOU is the 3 closest only, the course he is at first, 
     assert.deepEqual(n.map((x) => x.key), want);
     assert.ok(s.here.length > 3, 'there were more courses nearby - they are no longer listed: ' + JSON.stringify(s.here));
     n.slice(1).forEach((x) => assert.match(x.s, /^\d+(\.\d)? mi/, 'distances still shown: ' + x.s));
-    assert.deepEqual(s.tees, ['Black', 'Gold', 'Jade'], 'the picked course\'s tees');
-    assert.deepEqual(s.order.filter((h) => h !== 'LAST PLAYED'), ['NEAR YOU', 'TEES'], 'NEAR YOU, then TEES - no longer list: ' + JSON.stringify(s.order));
+    assert.deepEqual(s.order.filter((h) => h !== 'LAST PLAYED'), ['NEAR YOU'], '076: after Change, NEAR YOU (the tees are under the card) - no longer list: ' + JSON.stringify(s.order));
     assert.equal(s.card, false, 'the picked course is its highlighted row - not a second card');
     assert.ok(s.start && /Start Round/.test(s.start.text), 'Start Round');
-    assert.ok(s.text.indexOf('NEAR YOU') < s.text.indexOf('TEES') && s.text.indexOf('TEES') < s.text.lastIndexOf('Not listed? Add a course'), 'order: NEAR YOU, tees, Not listed');
+    assert.ok(s.text.indexOf('NEAR YOU') < s.text.lastIndexOf('Not listed? Add a course'), 'order: NEAR YOU, Not listed');
     assert.equal(s.notListed, true, '"Not listed? Add a course" is still there');
 });
 
@@ -95,7 +102,7 @@ test('farther than 0.5 mi from every course: no "You\'re here", nothing auto-pic
     assert.equal(s.key, '', 'nothing auto-picked');
     assert.ok(!s.rows.some((x) => x.sel), 'nothing highlighted');
     assert.equal(s.tees.length, 0, 'no tees until a course is picked');
-    assert.ok(s.start && s.start.disabled, 'Start Round waits for a course');
+    assert.equal(s.start, null, '076 (Manny): no course picked - no Start Round (it was there, off)');
     assert.equal(s.notListed, true);
     // a course picked before: the next position read keeps it
     const tapped = near(s)[1].key;
@@ -116,7 +123,7 @@ test('LAST PLAYED: 1 course under NEAR YOU when it is not one of the 3; skipped 
     assert.ok(!near(s).some((x) => x.key === last[0].key), 'not one of the 3');
     assert.ok(!last[0].sel, 'shown, not picked');
     assert.match(last[0].s, /\d mi/, 'with its distance');
-    assert.deepEqual(s.order, ['NEAR YOU', 'LAST PLAYED', 'TEES'], 'NEAR YOU, LAST PLAYED, then the tees');
+    assert.deepEqual(s.order, ['NEAR YOU', 'LAST PLAYED'], 'NEAR YOU, LAST PLAYED (076: the tees are under the PLAYING card)');
     assert.equal(near(s).length, 3);
     // duplicate: the last round's course is one of the 3 -> no LAST PLAYED section
     assert.ok(near(d).some((x) => x.key === d.here.filter((c) => c[0] !== 'gapi_' + ID)[0][0]), 'precondition: that course is in NEAR YOU');
@@ -138,8 +145,8 @@ test('search still finds the courses that dropped off NEAR YOU (and "Not listed?
     assert.equal(f.notListed, true, '"Not listed? Add a course" under the results too');
     assert.equal(after.key, f.drop, 'tapping it picks it');
     assert.equal(after.card, true, 'a course picked from search (in neither list) shows as the picked card above its tees');
-    assert.equal(near(after).length, 3, 'NEAR YOU still the 3 closest');
-    assert.equal(after.notListed, true);
+    assert.equal(near(after).length, 0, '076: the picked course alone at the top - no NEAR YOU under it');
+    assert.equal(after.notListed, false, '076: "Not listed?" sits under the results (one Change away), not under the PLAYING card');
 });
 
 test('on the far side of a big course (more than 0.5 mi from its point, next to its holes): still "You\'re here", picked; the distance shown is unchanged', { timeout: 150000 }, async () => {
@@ -154,5 +161,7 @@ test('on the far side of a big course (more than 0.5 mi from its point, next to 
     assert.ok(n[0].here && n[0].sel, '"You\'re here", picked: ' + JSON.stringify(n[0]));
     assert.match(n[0].s, /^You’re here · 0\.[6-9] mi · ✓ GPS$/, 'the distance to the course\'s point, as before: ' + n[0].s);
     assert.equal(s.key, 'gapi_' + ID);
-    assert.deepEqual(s.tees, ['Black', 'Gold', 'Jade']);
+    const [card] = CARDS(r);
+    assert.ok(card && card.here, '076: the PLAYING card says "You\'re here": ' + JSON.stringify(card));
+    assert.deepEqual(card.tees, ['Black', 'Gold', 'Jade']);
 });

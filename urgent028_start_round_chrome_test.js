@@ -88,13 +88,14 @@ async function papagoPicked(j) {
     if (!(await until(j, KEY + " === 'az_papago'", 6000))) await click(j, '#sf [data-sf-course="az_papago"]');
     assert.ok(await until(j, KEY + " === 'az_papago' && !!document.querySelector('#sf [data-sf-tee]')", 15000), 'Papago picked, its tees');
 }
+// 076 (option A): a course picked is the PLAYING card alone - its Change brings back the box first.
 async function searchAguila(j) {
-    await ev(j, "(function(){ var i=document.getElementById('sf-q'); i.focus(); i.value='aguila'; i.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
+    await ev(j, "(function(){ var i=document.getElementById('sf-q'); if(!i){ var cb=document.querySelector('#sf-course [data-sf=change]'); if(cb) cb.click(); i=document.getElementById('sf-q'); } i.focus(); i.value='aguila'; i.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
     assert.ok(await until(j, "!!document.querySelector('#sf [data-sf-web]')", 10000), 'Aguila found online');
 }
 // Aguila again on this phone: listed by now (its record is in), one row - local or online.
 async function pickAguilaAgain(j) {
-    await ev(j, "(function(){ var i=document.getElementById('sf-q'); i.focus(); i.value='aguila'; i.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
+    await ev(j, "(function(){ var i=document.getElementById('sf-q'); if(!i){ var cb=document.querySelector('#sf-course [data-sf=change]'); if(cb) cb.click(); i=document.getElementById('sf-q'); } i.focus(); i.value='aguila'; i.dispatchEvent(new Event('input',{bubbles:true})); return 1; })()");
     assert.ok(await until(j, "!!document.querySelector('#sf [data-sf-web], #sf [data-sf-course=\"" + AGUILA_KEY + "\"]')", 10000), 'Aguila found');
     await click(j, '#sf [data-sf-web], #sf [data-sf-course="' + AGUILA_KEY + '"]');
 }
@@ -124,7 +125,8 @@ test('Papago, then Aguila (online, slow): "Loading Aguila…" (off) while it loa
     const busy = JSON.parse(await ev(j, BTN));
     assert.equal(busy.text, 'Loading Aguila…', 'the button names the course it waits for');
     assert.equal(busy.off, true, 'and is off');
-    assert.match(busy.card, /^Aguila Golf Club\n/, 'the selected card is Aguila, not Papago: ' + busy.card);
+    assert.match(busy.card, /^PLAYING\nChange\n[\s\S]*Aguila Golf Club/, 'the selected card (076: the PLAYING card) is Aguila, not Papago: ' + busy.card);
+    assert.doesNotMatch(busy.card, /Papago/);
     // A tap now (Manny's) starts nothing - never Papago.
     await ev(j, "(function(){ var b=document.querySelector('[data-sf=startgps]'); b.disabled=false; b.click(); return 1; })()");
     await sleep(1500);
@@ -134,7 +136,7 @@ test('Papago, then Aguila (online, slow): "Loading Aguila…" (off) while it loa
     assert.equal(Object.keys((await j.harvest()).events || {}).length, 1, 'no round written');
     await aguilaIn(j);
     const fresh = JSON.parse(await ev(j, BTN));
-    assert.match(fresh.card, /^Aguila Golf Club/);
+    assert.match(fresh.card, /^PLAYING\nChange\nChampionship\nAguila Golf Club/, '076: the PLAYING card - the course big, the club + town small');
     await click(j, '[data-sf="startgps"]');
     assert.ok(await until(j, "/index\\.html/.test(location.pathname) && (typeof currentData !== 'undefined' && !!currentData && !!currentData.players) && !!window.HardPanGps && HardPanGps.isMounted()", 30000), 'the new round');
     const agu = JSON.parse(await ev(j, ROUND));
@@ -212,7 +214,7 @@ test('no signal: an online course tapped stays the pick - "Loading Aguila…" (o
     await sleep(600);
     const off = JSON.parse(await ev(j, BTN));
     assert.deepEqual([off.text, off.off], ['Loading Aguila…', true], 'the loading state');
-    assert.match(off.card, /^Aguila Golf Club\n[\s\S]*No signal/, 'the selected card is Aguila, waiting for a signal: ' + off.card);
+    assert.match(off.card, /^PLAYING\nChange\n[\s\S]*Aguila Golf Club[\s\S]*No signal/, 'the selected card (076: the PLAYING card) is Aguila, waiting for a signal: ' + off.card);
     assert.equal(await ev(j, 'window.__pulls.length'), 0, 'not pulled with no signal');
     await ev(j, "(function(){ var b=document.querySelector('[data-sf=startgps]'); b.disabled=false; b.click(); return 1; })()");
     await sleep(1500);

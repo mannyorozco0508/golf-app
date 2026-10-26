@@ -141,7 +141,7 @@ test('a course we have with GPS (Talking Stick South) still shows ✓ GPS exactl
     assert.equal((ts[0].match(/✓ GPS/g) || []).length, 1, '✓ GPS once: ' + ts[0]);
     assert.equal(s.osm.filter((t) => /Talking Stick/.test(t)).length, 0, 'no OSM twin: ' + JSON.stringify(s.osm));
     assert.equal(s.web.filter((t) => /Talking Stick/.test(t)).length, 0);
-    const results = s.text.split('RESULTS\n')[1].split('Not listed?')[0];   // (the picked course's own head below says ✓ GPS too)
+    const results = s.text.split(/RESULTS[^\n]*\n/)[1].split('Not listed?')[0];   // (the picked course's own head below says ✓ GPS too)
     assert.equal((results.match(/✓ GPS/g) || []).length, 1, 'one ✓ GPS in the results: ' + JSON.stringify(results));
 });
 

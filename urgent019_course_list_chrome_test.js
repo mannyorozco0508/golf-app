@@ -39,17 +39,22 @@ const open = (lat, lon, more) => arriveCold({ url: fileUrl('admin.html', 'start=
         { cdp: { method: 'Emulation.setGeolocationOverride', params: { latitude: lat, longitude: lon, accuracy: 10 } } },
         { cdp: { method: 'Browser.grantPermissions', params: { permissions: ['geolocation'] } } },
         { sleep: 2500 }, X("(function(){ var b=document.querySelector('[data-sf=relocate]'); if(b) b.click(); return 'relocate'; })()"),
-        { waitFor: "document.querySelectorAll('#sf [data-sf-course]').length > 0", timeout: 40000 }, { sleep: 3000 }, X(ROWS)].concat(more || []) });
+        { waitFor: "document.querySelectorAll('#sf [data-sf-course]').length > 0 || !!document.querySelector('#sf [data-sf-playing]')", timeout: 40000 }, { sleep: 3000 }, X(ROWS),
+        // 076 (option A): the course he is at is the PLAYING card alone - Change shows NEAR YOU (the rows below)
+        X("(function(){ var b=document.querySelector('#sf-course [data-sf=change]'); if(b) b.click(); return b ? 'change' : 'no card'; })()"), { sleep: 1000 }, X(ROWS)].concat(more || []) });
 const J = (r) => r.value.filter((v) => typeof v === 'string' && v.charAt(0) === '{').map((v) => JSON.parse(v));
 
 test('Talking Stick: the GolfAPI course is picked (✓ GPS, Black / Gold / Jade); its directory twin is not listed; O\'odham stays without ✓ GPS', { timeout: 120000 }, async () => {
     const r = await open(33.5399, -111.8704);
     assert.equal(r.ok, true, r.reason);
-    const [s] = J(r);
+    const [card, s] = J(r);
+    assert.equal(card.key, 'gapi_' + ID);
+    assert.match(card.head, /^PLAYING\nChange\nSouth - Piipaash\nYou’re here · Talking Stick Golf Club · Scottsdale, AZ · 0\.0 mi · ✓ GPS$/, '076: the PLAYING card');
+    assert.deepEqual(card.rows, [], '076: alone');
+    assert.deepEqual(card.tees, ['Black', 'Gold', 'Jade']);
     assert.equal(s.key, 'gapi_' + ID);
     // URGENT-060: the picked course is the first NEAR YOU row, "You're here" (no second card).
     assert.match(s.rows[0], /^gapi_990000000000000001 \| Talking Stick Golf Club \(South - Piipaash\) \| You’re here · 0\.0 mi · ✓ GPS$/);
-    assert.deepEqual(s.tees, ['Black', 'Gold', 'Jade']);
     assert.ok(!s.rows.some((x) => /^az_talking_piipaash /.test(x)), 'the directory twin is gone: ' + JSON.stringify(s.rows));
     const ood = s.rows.filter((x) => /^az_talking_oodham /.test(x))[0];
     assert.ok(ood && !/✓ GPS/.test(ood), 'O\'odham listed, honestly without ✓ GPS: ' + JSON.stringify(s.rows));
@@ -63,7 +68,7 @@ test('Papago (no card, no online lookup here): said plainly - Pick another cours
         { tap: '[data-sf="enterpars"]' }, { sleep: 800 },
         X("JSON.stringify({ away: getComputedStyle(document.getElementById('sf')).display === 'none', ret: !!document.getElementById('sf-return'), step: typeof currentWizardStep !== 'undefined' ? currentWizardStep : null })")]);
     assert.equal(r.ok, true, r.reason);
-    const [s0, s, away] = J(r);
+    const [, s0, s, away] = J(r);   // (076: the first snapshot is before the Change step - no card here)
     assert.ok(!/✓ GPS/.test(s0.rows.filter((x) => /^az_papago /.test(x))[0] || ''), 'Papago never shows ✓ GPS');
     assert.equal(s.key, 'az_papago');
     assert.match(s.text, /Papago Golf Club isn’t in our course data yet\.\nPick another course\nRequest this course\nEnter pars yourself/);
