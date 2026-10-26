@@ -131,6 +131,8 @@
         var rec = { v: 1, src: 'osm-lookup', osm: p.course.type + '/' + p.course.id, name: (p.course.tags && p.course.tags.name) || '',
                     osmBase: (p.raw.osm3s && p.raw.osm3s.timestamp_osm_base) || null, at: Date.now(), holes: holes,
                     pick: { step: ph.step, how: ph.how, candidates: p.candidates || 0 } };
+        // 074: from the copy saved for everyone - where it came from, and its ODbL credit, kept with it.
+        if (p.shared) { rec.from = 'shared'; rec.fetched = p.shared.fetched || null; rec.attribution = p.shared.attribution || null; }
         keep(key, rec, opts.db);
         lsSet(OSM_LOOKUP + 'tried_' + key, { at: Date.now(), none: false });
         return verdict(holes, p.want.holes, { source: 'lookup', step: ph.step, how: ph.how });
@@ -190,18 +192,37 @@
         var want = { name: opts.name || '', holes: of, pars: opts.pars || [], yards: opts.yards || [], nines: opts.nines || ninesFromName(opts.name),
                      choice: lsGet(CHOICE + key) || opts.choice || null };
         var busy = overpassBusy;   // (071's remark rule - also checked per server inside overpass(), 074)
-        return overpass(G().golfCoursesQuery(opts.loc)).then(busy).then(function (j) {
-            var course = G().pickGolfCourse(j && j.elements, opts.name || '');
-            if (!course) return null;
-            return overpass(G().courseHolesQuery(course)).then(busy).then(function (raw) { return { course: course, raw: raw }; });
-        }).then(function (got) {
+        var phone = function () {   // the phone's own lookup (071)
+            return overpass(G().golfCoursesQuery(opts.loc)).then(busy).then(function (j) {
+                var course = G().pickGolfCourse(j && j.elements, opts.name || '');
+                if (!course) return null;
+                return overpass(G().courseHolesQuery(course)).then(busy).then(function (raw) { return { course: course, raw: raw }; });
+            });
+        };
+        // 074: an OpenStreetMap-only course is SAVED FOR EVERYONE by gpsCourse (gps_courses/<osm key>): that copy
+        // first (0 Overpass calls), else gpsCourse fetches and saves it. The server's answer is OpenStreetMap's own
+        // (the course + its holes and greens), so the hole pick below is the same as 071's. The server busy, or
+        // still fetching when the phone stops waiting: "could not be reached" - the phone does NOT ask
+        // OpenStreetMap itself then (no double ask). The function not reachable at all (not deployed, signed out,
+        // no live build): the phone's own lookup, as in 071.
+        var L = W.HardPanGpsLive;
+        var source = (OSM_ONLY_RE.test(String(key || '')) && L && typeof L.osmCourse === 'function' && L.on && L.on())
+            ? L.osmCourse(key).then(function (r) {
+                var o = r && r.osm;
+                if (r && r.status === 'ready' && o && o.course && o.elements) return { course: o.course, raw: { osm3s: o.osm3s || { timestamp_osm_base: o.osmBase || null }, elements: o.elements }, shared: o };
+                if (r && r.status === 'none') return null;
+                if (r && (r.status === 'busy' || r.status === 'timeout')) throw new Error('map data server busy');
+                return phone();
+            })
+            : phone();
+        return source.then(function (got) {
             // (071: for an OSM-only course a REAL empty answer is kept 1 day, not 7 - the app's own list says it is mapped)
             if (!got) { if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: osmOnlyMark(key, true), none: true }); return verdict({}, of, { source: 'none', how: 'not in OpenStreetMap near the course' }); }
             var ph = G().pickHoleSet(got.raw.elements, want);
-            var p = { raw: got.raw, course: got.course, want: want, candidates: ph.candidates.length, how: ph.how };
+            var p = { raw: got.raw, course: got.course, want: want, candidates: ph.candidates.length, how: ph.how, shared: got.shared || null };
             if (!ph.set && ph.step === 5) {
                 if (minN) return verdict({}, of, { source: 'none', how: ph.how, kept: false });
-                pending[key] = { raw: got.raw, course: got.course, want: want, candidates: ph.candidates, how: ph.how };
+                pending[key] = { raw: got.raw, course: got.course, want: want, candidates: ph.candidates, how: ph.how, shared: got.shared || null };
                 return { status: 'ask', n: 0, of: of, candidates: ph.candidates, how: ph.how, step: 5 };
             }
             if (!ph.set) { if (!minN) lsSet(OSM_LOOKUP + 'tried_' + key, { at: osmOnlyMark(key, true), none: true }); return verdict({}, of, { source: 'none', step: 0, how: ph.how }); }
@@ -224,7 +245,7 @@
         var want = Object.assign({}, p.want, { choice: id });
         var ph = G().pickHoleSet(p.raw.elements, want);
         if (!ph.set) return Promise.resolve(verdict({}, want.holes, { source: 'none', how: ph.how }));
-        return Promise.resolve(finish(key, opts || {}, { raw: p.raw, course: p.course, want: want, candidates: p.candidates.length }, ph));
+        return Promise.resolve(finish(key, opts || {}, { raw: p.raw, course: p.course, want: want, candidates: p.candidates.length, shared: p.shared || null }, ph));
     }
     // The organizer changes it: forget the choice and the kept lookup; the next
     // match asks again.

@@ -1714,6 +1714,9 @@
         // 010: an OpenStreetMap hole line shapes this GolfAPI hole's path - its ODbL credit
         // on the map itself, not only behind ⓘ (where the lines' source always lists it).
         var op = !!osmPathFor(S.hole), oc = S.el.querySelector('.gps-credit-osm');
+        // 074: an OpenStreetMap-only course (osm_w / osm_r key - from the copy saved for everyone or this phone's
+        // own lookup): its greens ARE OpenStreetMap's, so the same credit shows on the map for its mapped holes.
+        if (!op && /^osm_[wr]\d+$/.test(String(S.courseKey || ''))) { var orc = lookedUp(S.courseKey); op = !!(orc && orc.holes && orc.holes[String(S.hole)]); }
         if (oc) oc.style.display = op ? '' : 'none';
         var me = S.el.querySelector('.gps-map');
         if (me) me.setAttribute('data-osm-path', op ? '1' : '0');
