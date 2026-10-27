@@ -3722,7 +3722,29 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // and nothing more - the panel it opens is the same one the Account button
         // opens.
         if (urlParams.get('account') === '1' && typeof openAccountPanel === 'function') openAccountPanel();
+        // 088 (website half, tfweb-2): a Delete account whose scan-count erase missed
+        // left a pending note on this browser; try it once more now.
+        retryPendingScanErase();
     });
+    // THE SCAN-ERASE RETRY (088 / tfweb-2). Only when the pending note exists
+    // (hp.scanErasePending); retryScanErase itself drops a note past its ~1 h
+    // token window without calling anything. Once per page load, never awaited,
+    // never throws - the page does not wait on it.
+    let scanEraseRetried = false;
+    function retryPendingScanErase() {
+        if (scanEraseRetried) return;
+        scanEraseRetried = true;
+        try {
+            const X = window.accountExit;
+            if (!X || typeof X.retryScanErase !== 'function' || typeof fetch !== 'function') return;
+            let pending = null;
+            try { pending = window.localStorage ? window.localStorage.getItem(X.SCAN_PENDING_KEY) : null; } catch (e) { pending = null; }
+            if (!pending) return;
+            setTimeout(() => {
+                try { Promise.resolve(X.retryScanErase({ fetch: (u, o) => fetch(u, o) })).catch(() => { }); } catch (e) { }
+            }, 0);
+        } catch (e) { }
+    }
     // ------------------
 
     // ========================================================================

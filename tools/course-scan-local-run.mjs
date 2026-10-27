@@ -3,7 +3,7 @@
 // The key is read from a file into memory only. It is never printed or logged,
 // never put in a URL (it goes in the x-goog-api-key header), and the output
 // below carries only the read, the checks and the token counts.
-//   node tools/course-scan-local-test.mjs <photo.jpg> <out.json>
+//   node tools/course-scan-local-run.mjs <photo.jpg> <out.json>
 import fs from 'fs';
 import os from 'os';
 import path from 'path';

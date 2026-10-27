@@ -263,3 +263,84 @@ describe('tfweb-2 privacy page: the course-scan camera sentence, every old sente
     });
 });
 
+// ---------------------------------------------------------------------------
+// tfweb-2 follow-up: THE RETRY ON PAGE LOAD. admin.html's retryPendingScanErase
+// runs once from DOMContentLoaded: only when the pending note exists, inside its
+// ~1 h window, once per load, never awaited. Run here against the REAL
+// account-exit.js and the REAL function text from admin.html, in a vm.
+// ---------------------------------------------------------------------------
+describe('tfweb-2 the scan-erase retry on page load (admin.html)', () => {
+    const vm = require('vm');
+    const ADMIN = fs.readFileSync(path.join(REPO_ROOT, 'admin.html'), 'utf8');
+    const AE = fs.readFileSync(path.join(REPO_ROOT, 'account-exit.js'), 'utf8');
+    const start = ADMIN.indexOf('let scanEraseRetried = false;');
+    const end = ADMIN.indexOf('// ------------------', start);
+    const FN = ADMIN.slice(start, end);
+    function page(store, reply) {
+        const timers = [];
+        const ctx = { console, Promise, JSON, Date, Math, String, Number, Buffer,
+            atob: (x) => Buffer.from(x, 'base64').toString('binary'),
+            setTimeout: (fn) => { timers.push(fn); return timers.length; }, clearTimeout: () => { } };
+        ctx.window = ctx; ctx.globalThis = ctx; ctx.localStorage = store;
+        const f = recFetch(reply || okErase);
+        ctx.fetch = f;
+        vm.createContext(ctx);
+        vm.runInContext(AE, ctx);
+        vm.runInContext(FN + '\nthis.retryPendingScanErase = retryPendingScanErase;', ctx);
+        const flush = async () => { while (timers.length) timers.shift()(); for (let i = 0; i < 10; i++) await Promise.resolve(); await new Promise((r) => setImmediate(r)); };
+        return { ctx, f, timers, flush };
+    }
+    test('the function exists and DOMContentLoaded calls it', () => {
+        assert.ok(start > 0 && end > start, 'retryPendingScanErase is in admin.html');
+        const dcl = ADMIN.slice(ADMIN.indexOf("document.addEventListener('DOMContentLoaded'"), start);
+        assert.match(dcl, /retryPendingScanErase\(\);/);
+    });
+    test('a pending note inside its window is retried once: one POST with the saved token, note cleared', async () => {
+        const store = memStore();
+        const tok = tokenFor('uid-gone', Date.now() + 30 * 60 * 1000);
+        store.setItem('hp.scanErasePending', JSON.stringify({ token: tok, until: Date.now() + 30 * 60 * 1000 }));
+        const p = page(store);
+        p.ctx.retryPendingScanErase();
+        assert.equal(p.f.calls.length, 0, 'never in the load path itself: deferred, the page does not wait');
+        await p.flush();
+        assert.equal(p.f.calls.length, 1);
+        assert.equal(p.f.calls[0].url, '/api/scan-erase');
+        assert.equal(p.f.calls[0].init.headers.Authorization, 'Bearer ' + tok);
+        assert.equal(store.getItem('hp.scanErasePending'), null);
+        p.ctx.retryPendingScanErase();
+        await p.flush();
+        assert.equal(p.f.calls.length, 1, 'once per load');
+    });
+    test('a failed retry keeps the note for the next load', async () => {
+        const store = memStore();
+        store.setItem('hp.scanErasePending', JSON.stringify({ token: tokenFor('u', Date.now() + 3600e3), until: Date.now() + 3600e3 }));
+        const p = page(store, offline);
+        p.ctx.retryPendingScanErase();
+        await p.flush();
+        assert.equal(p.f.calls.length, 1);
+        assert.notEqual(store.getItem('hp.scanErasePending'), null);
+    });
+    test('NEGATIVE CONTROL: no note -> no call at all', async () => {
+        const p = page(memStore());
+        p.ctx.retryPendingScanErase();
+        await p.flush();
+        assert.equal(p.f.calls.length, 0);
+        assert.equal(p.timers.length, 0);
+    });
+    test('NEGATIVE CONTROL: a note past its ~1 h window -> no call, note dropped', async () => {
+        const store = memStore();
+        store.setItem('hp.scanErasePending', JSON.stringify({ token: 'x.y.z', until: Date.now() - 1000 }));
+        const p = page(store);
+        p.ctx.retryPendingScanErase();
+        await p.flush();
+        assert.equal(p.f.calls.length, 0);
+        assert.equal(store.getItem('hp.scanErasePending'), null);
+    });
+    test('storage that throws never breaks the page', async () => {
+        const p = page({ getItem: () => { throw new Error('blocked'); }, setItem: () => { }, removeItem: () => { } });
+        assert.doesNotThrow(() => p.ctx.retryPendingScanErase());
+        await p.flush();
+        assert.equal(p.f.calls.length, 0);
+    });
+});
+
