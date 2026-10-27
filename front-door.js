@@ -2984,6 +2984,10 @@
         // 085's "Resume your round at <course>, or start a new round?" (its own sheet over Home, not ui-sheet):
         // Back is a tap outside it - the ask closes, Home stays. Never Resume, never New round.
         ['start-ask', function () { var e = $('hs-ask85'); return !!(e && e.style.display === 'flex'); }, function () { tapIn('hs-ask85'); }],
+        // 080's "Scan the scorecard" sheet (gps-course-scan.js #hcs-sheet, over the pars sheet / Add a course; a tap
+        // outside does nothing there): Back is "Type them instead" - the sheet closes, nothing is saved. While the
+        // card is still being read there is no button, so Back does nothing and the scan isn't lost. Never "Use".
+        ['course-scan', function () { return !!$('hcs-sheet'); }, function () { tapIn('hcs-sheet', '[data-hcs="type"]'); }],
         ['voice', function () { var V = api('HardPanVoice'); return has(V, 'isOpen') && !!V.isOpen(); }, function () { api('HardPanVoice').cancel(); }],
         ['needs-account', function () { var N = api('HardPanNeedsAccount'); return has(N, 'isOpen') && N.isOpen(); }, function () { var e = W.document.querySelector('[data-hpna-scrim]'); if (e) e.click(); }],
         ['account', function () { var A = api('HardPanAccountUI'); return has(A, 'isOpen') && !!A.isOpen(); }, function () { api('HardPanAccountUI').close(); }],

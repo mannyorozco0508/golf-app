@@ -12,6 +12,10 @@
 //   in #sf). 41 tests, 41 pass. Controls: no 'confirm' row -> 39 / 2; no 'pars-start' row -> 39 / 2.
 //   Add-on 085: + 'start-ask' (Home's "Resume or new round?" sheet, #hs-ask85) and its hidden-ask case. 43 tests,
 //   43 pass (android-2.0-addons 80d6cd56 + the fix). Baseline without the row: 41 pass / 2 fail (the 2 new tests).
+//   Add-on 080 (tfnew-5): + 'course-scan' ("Scan the scorecard", #hcs-sheet: Back = "Type them instead"), its
+//   "still reading" case (no button yet: Back does nothing), the scan sheet over the pars sheet, and its names.
+//   47 tests, 47 pass (android-2.0-addons 6c4847a5 + the fix). Baseline without the row (front-door.js restored by
+//   sha from a saved copy): 44 pass / 3 fail - the 3 new Back cases; the gps-course-scan.js names test passes either way.
 //   What this harness cannot prove: that each file's own isOpen() matches what is on a real
 //   screen. That is the emulator pass (each sheet opened by tapping, then Back).
 // ============================================================================
@@ -98,6 +102,10 @@ function homeOnAndroid(platform, open, extra) {
     // 085's Resume-or-new ask over Home: a click on the overlay itself is its tap outside (Home's own handler hides it).
     if (is('start-ask')) els.set('hs-ask85', Object.assign(el('hs-ask85', 'flex', log), { click: () => log.push('close:start-ask') }));
     else els.set('hs-ask85', el('hs-ask85', 'none', log));
+    // 080's scan sheet: present only while open (gps-course-scan.js removes it on close). Its "Type them instead"
+    // button exists on the grid and the error screen; 'course-scan-busy' = "Reading the card…" (no button yet).
+    if (is('course-scan')) { const h = el('hcs-sheet', 'flex', log); h.__kid('[data-hcs="type"]', Object.assign(el('hcs-type', '', log), { click: () => log.push('close:course-scan') })); els.set('hcs-sheet', h); }
+    else if (is('course-scan-busy')) els.set('hcs-sheet', el('hcs-sheet', 'flex', log));
     if (is('new-round-ask')) els.set('sf-ask', Object.assign(el('sf-ask', '', log), { click: () => log.push('close:new-round-ask') }));
     const sf = el('sf', is('new-round') ? '' : 'none', log);
     if (is('new-round')) { const b = Object.assign(el('sf-back', '', log), { click: () => log.push('close:new-round') }); sf.__kid('.sf-back', b); docSel['#sf .sf-back'] = b; }
@@ -107,7 +115,7 @@ function homeOnAndroid(platform, open, extra) {
     return { sb, log, press: () => (listeners.backButton || []).forEach(fn => fn({ canGoBack: true })), listeners };
 }
 
-const SHEETS = ['confirm', 'start-ask', 'pars-start', 'voice', 'needs-account', 'account', 'scan', 'sg-info', 'my-stats-ask', 'customize', 'shot-history', 'mark',
+const SHEETS = ['confirm', 'start-ask', 'course-scan', 'pars-start', 'voice', 'needs-account', 'account', 'scan', 'sg-info', 'my-stats-ask', 'customize', 'shot-history', 'mark',
     'launch-entry', 'range', 'range-home', 'score-sheet', 'stats', 'my-stats', 'new-round-ask', 'new-round'];
 
 describe('ANDROID: one Back press closes the top 2.0 sheet, and only that', () => {
@@ -147,6 +155,16 @@ describe('ANDROID: one Back press closes the top 2.0 sheet, and only that', () =
         g.press();
         assert.deepEqual(g.log, ['minimizeApp']);
     });
+    test('add-ons: 080\'s scan sheet over the pars sheet closes the scan only ("Type them instead"), never the pars sheet', { skip }, () => {
+        const h = homeOnAndroid('android', ['new-round', 'pars-start', 'course-scan']);
+        h.press();
+        assert.deepEqual(h.log, ['close:course-scan']);
+    });
+    test('add-ons: 080 while the card is still being read (no button yet): Back does nothing - not the pars sheet, not the app', { skip }, () => {
+        const h = homeOnAndroid('android', ['new-round', 'pars-start', 'course-scan-busy']);
+        h.press();
+        assert.deepEqual(h.log, []);
+    });
     test('nothing open on Home Main: Back minimises the app, as in 0.2', { skip }, () => {
         const h = homeOnAndroid('android', []);
         h.press();
@@ -174,6 +192,7 @@ describe('the names the Back table relies on still exist in each file', () => {
         'gps-mark-distance.js': [/closeSheet: function \(\) \{ st\.sheet = false; paint\(\); \}/, /sheetOpen: function/],
         'gps-bushnell.js': [/var api = \{ open: open, close: close, isOpen: isOpen/],
         'gps-range.js': [/var api = \{ open: open, close: close, isOpen: isOpen/, /closeHome: closeHome/, /box\.id = 'hp-range'/],
+        'gps-course-scan.js': [/host\.id = 'hcs-sheet';/, /data-hcs="type"/, /if \(a === 'type'\) \{ close\(\); return; \}/, /if \(!st\) \{ if \(host\) host\.remove\(\); return; \}/],
         'simple-flow.js': [/<div id="sf-ask" data-sf="askclose"/, /class="sf-back" data-sf="back"/, /e\.id = 'sf';/]
     };
     for (const f of Object.keys(need)) {
