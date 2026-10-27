@@ -375,7 +375,7 @@ export async function handleScan(d) {
 }
 
 export function statusFor(out) {
-    if (out.status === 'ok') return 200;
+    if (out.status === 'ok' || out.status === 'erased') return 200;   // erased: 088 scan-erase
     if (out.status === 'not_configured') return 503;
     return STATUS_CODE[out.reason] || 503;
 }
@@ -388,4 +388,55 @@ export function toResponse(out, init) {
             'cache-control': 'no-store'
         }, (init && init.headers) || {})
     });
+}
+
+// ============================================================================
+// ERASE MY SCAN COUNTS (088 item 1, 078 "ADDED Oct 26" must-have)
+//
+// POST /api/scan-erase, called by Delete account (account-exit.js). It deletes
+// ONLY the counts kept under the caller's own account id - the uid comes from
+// the verified Firebase ID token, never from the body, so nobody can name
+// another account. What goes:
+//   scan:free:<uid>          the score-scan free count
+//   scan:course:<uid>        the course-card free count (080 course mode;
+//                            the same literal as 080's courseFreeKey, so this
+//                            needs nothing from that branch)
+//   scan:min:<uid>:<minute>  the burst counts: this minute and the two before
+//                            (they live 120 s, so no older one can exist)
+//   scan:day:<uid>:<day>     the per-day counts: today and the two days before
+//                            (they live 2 days)
+// What stays: scan:month:<YYYY-MM>, the ONE global monthly total - it has no
+// account id in it and no way to take one person's share back out.
+//
+// Inert like the scan: no KV binding answers not_configured. It does NOT need
+// the Gemini key - erasing spends nothing. Idempotent: a second call deletes
+// nothing and still answers erased, so the app can retry safely.
+// ============================================================================
+export function eraseKeysFor(uid, now) {
+    const keys = [freeKey(uid), 'scan:course:' + uid];
+    for (let i = 0; i < 3; i++) keys.push(minuteKey(uid, new Date(now.getTime() - i * 60 * 1000)));
+    for (let i = 0; i < 3; i++) keys.push(dayKey(uid, new Date(now.getTime() - i * 24 * 3600 * 1000)));
+    return keys;
+}
+
+export async function handleScanErase(d) {
+    const w = wire(d);
+    if (!w.kv || typeof w.kv.delete !== 'function') return notConfigured();
+    const auth = String(d.authorization || '');
+    const m = /^Bearer\s+(.+)$/i.exec(auth.trim());
+    if (!m) return refused('sign_in');
+    const who = await verifyIdToken(m[1].trim(), w);
+    if (who.error === 'network') return unavailable('network');
+    if (who.error) return refused('sign_in');
+    const keys = eraseKeysFor(who.uid, w.now);
+    let erased = 0;
+    for (const k of keys) {
+        let had = false;
+        try { had = (await w.kv.get(k)) !== null; } catch (e) { had = false; }
+        try { await w.kv.delete(k); } catch (e) { return unavailable('upstream_error'); }
+        if (had) erased++;
+    }
+    // Counts only, never the account id (the same rule as the scan's log line).
+    w.log(JSON.stringify({ ev: 'scan_erase', outcome: 'ok', erased }));
+    return { status: 'erased', erased };
 }
