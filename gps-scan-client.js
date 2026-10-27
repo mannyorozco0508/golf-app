@@ -228,6 +228,58 @@
         return out;
     }
 
+    // ---- 088-3 COURSE MODE (080): a photo of a BLANK printed card -> pars, Men's + Ladies' HCP, tee yardages ----
+    // Its own body (functions/api/_scan.js readCourseBody): exactly { mode:'course', image, course:{ name, holes } }.
+    // No players, no scores, no location. The score request above is unchanged.
+    var COURSE_MESSAGES = {
+        needs_pass: 'You’ve used your free course scans. Type the pars and indexes instead.',
+        unreadable: 'We couldn’t read the pars on that card. Try again in better light, or type them in.',
+        offline: 'Scanning needs signal. Type the pars and indexes, or scan when you have signal.',
+        not_configured: 'Course card scan isn’t switched on yet. Type the pars and indexes for now.',
+        server: 'Something went wrong reading the card. Try again, or type the pars and indexes.'
+    };
+    function courseMessageFor(code) { return COURSE_MESSAGES[code] || MESSAGES[code] || COURSE_MESSAGES.server; }
+    function buildCourseBody(image, course) {
+        var c = course || {};
+        var out = { holes: Number(c.holes) === 9 ? 9 : 18 };
+        if (c.name) out.name = String(c.name).slice(0, 120);
+        return { mode: 'course', image: { data: String(image || ''), mimeType: 'image/jpeg' }, course: out };
+    }
+    // -> Promise<{ ok: true, card, validation, model, retried, paid, courseScansLeft } | { ok: false, code, message, courseScansLeft? }>
+    function courseFail(code, status, body) {
+        var c = codeOf(code, status);
+        var out = { ok: false, code: c, message: courseMessageFor(c) };
+        if (body && typeof body.courseScansLeft === 'number') out.courseScansLeft = body.courseScansLeft;
+        return out;
+    }
+    function requestCourse(image, course) {
+        if (serverOffHere()) return Promise.resolve(courseFail('not_configured'));
+        if (W.navigator && W.navigator.onLine === false) return Promise.resolve(courseFail('offline'));
+        var f = W.fetch;
+        if (typeof f !== 'function') return Promise.resolve(courseFail('server'));
+        return idToken().then(function (tok) {
+            var headers = { 'Content-Type': 'application/json' };
+            if (tok) headers.Authorization = 'Bearer ' + tok;
+            var timer, timedOut = false;
+            var t = new Promise(function (resolve) { timer = setTimeout(function () { timedOut = true; resolve(null); }, TIMEOUT_MS); });
+            var call = f.call(W, apiBase() + ROUTE, { method: 'POST', headers: headers, body: JSON.stringify(buildCourseBody(image, course)) });
+            return Promise.race([call, t]).then(function (res) {
+                clearTimeout(timer);
+                if (timedOut || !res) return courseFail('timeout');
+                return res.text().then(function (txt) {
+                    var j = null;
+                    try { j = JSON.parse(txt); } catch (e) {}
+                    if (j && j.status === 'not_configured') return courseFail('not_configured', res.status, j);
+                    if (!j || j.status !== 'ok' || !res.ok) return courseFail(j && (j.reason || j.status), res.status, j);
+                    var card = j.result;
+                    if (!card || j.mode !== 'course' || !Array.isArray(card.par)) return courseFail('unreadable', res.status, j);
+                    return { ok: true, card: card, validation: j.validation || null, model: j.model || null, retried: !!j.retried, paid: !!j.paid,
+                        courseScansLeft: typeof j.courseScansLeft === 'number' ? j.courseScansLeft : null };
+                });
+            }, function () { clearTimeout(timer); return courseFail(W.navigator && W.navigator.onLine === false ? 'offline' : 'server'); });
+        });
+    }
+
     // The scan button shows only in the app with the document camera plugin in it (the feature
     // registry's available()): never on the web, in Consumer, or in a build without the plugin.
     function nativeCameraHere() {
@@ -239,6 +291,7 @@
     }
 
     var api = { capture: capture, nativeCameraHere: nativeCameraHere, serverOffHere: serverOffHere, roundContext: roundContext, buildBody: buildBody, request: request, messageFor: messageFor, codeOf: codeOf,
+        requestCourse: requestCourse, buildCourseBody: buildCourseBody, courseMessageFor: courseMessageFor,   // 088-3 course mode
         MESSAGES: MESSAGES, ROUTE: ROUTE, LONG_EDGE: LONG_EDGE, QUALITY: QUALITY, apiBase: apiBase };
     W.HardPanScanClient = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

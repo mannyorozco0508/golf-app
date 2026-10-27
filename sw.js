@@ -4738,6 +4738,9 @@ const SHELL_FILES = [
     './scorecard-validate.js',
     './gps-scan-client.js',
     './gps-scan-grid.js',
+    // 088-3 (080): course-card scan - the shared course validator + the check grid on the pars / Add a course screens.
+    './course-card-validate.js',
+    './gps-course-scan.js',
     // URGENT-066 #4: voice scoring - the grammar (pure) and push-to-talk + Siri (proposes to the score sheet; nothing sent).
     './gps-voice-parse.js',
     './gps-voice.js',

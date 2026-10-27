@@ -90,6 +90,10 @@ window.HARDPAN_GPS_CONFIG = { esriKey: 'AAPTaTQ7ZS-NvPIIFgRrQ2QiJ0g..wJ4gVx3626s
     // chose) | Custom elevation [ft] | Don't adjust", 1.5% per 1,000 ft, + "Suggest clubs using
     // elevation" (default ON).
     features: { autoAdvance: true, quickStats: true, hazards: true, clubs: true, flyover: true, pathTarget: true, hpIndex: true, watch: true, bagSetup: true,
+        // 088-3 (080, DECISIONS Oct 26): a scanned course card is published to the SHARED course list only
+        // with this ON - OFF until the 2.0 submission + updated Review Notes. Off: the card saves on the
+        // phone + in the round, exactly like typed pars. Read as === true (absent = off).
+        courseScanShare: false,
         // 011 (mailbox 011, mockup C): gpsLayoutC = the map clear at the top, one bottom panel
         // (F / MIDDLE / B, plays, Green | Hazards | Mark shot | Preview, the score row) - off:
         // the old layout exactly. gpsRoundScore = the "Thru 3 · 14 (+2) · Net 13 (+1)" chip.

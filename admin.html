@@ -43,6 +43,12 @@
     <script src="simple-flow.js"></script>
     <!-- GPS:END -->
     <!-- GPS:BEGIN -->
+    <!-- 088-3 (080): course-card scan on the pars sheet + Add a course - the shared validator, the scan client (course mode), the check grid. -->
+    <script src="course-card-validate.js"></script>
+    <script src="gps-scan-client.js"></script>
+    <script src="gps-course-scan.js"></script>
+    <!-- GPS:END -->
+    <!-- GPS:BEGIN -->
     <!-- HardPan Index (unofficial): the Account card and the Round Setup chip (HardPan, 008). -->
     <script src="hp-index.js"></script>
     <!-- GPS:END -->
@@ -1948,6 +1954,10 @@ body::before {
             </label>
             <div id="custom-course-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px; overflow-x: auto;">
                 <p id="custom-course-warning" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0; margin-bottom: 12px;">Make quick adjustments from your phone if the course isn't mapped accurately.</p>
+                <!-- GPS:BEGIN -->
+                <!-- 088-3 (080): 📷 Scan the scorecard - fills the boxes below from a photo of the printed card (gps-course-scan.js); saved by the normal button, like typing. -->
+                <div id="hcs-admin-slot"></div>
+                <!-- GPS:END -->
 
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <!-- Front 9 -->
