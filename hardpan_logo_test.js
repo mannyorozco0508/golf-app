@@ -75,7 +75,8 @@ function px(img, x, y) {
 }
 
 describe('THE LOCKUP SVG', () => {
-    const svg = read('hardpan-lockup.svg');
+    // 087 (Manny's OK, Oct 26 2026): the old lockup no longer ships; this is its backup copy.
+    const svg = read('assets/brand/legacy/hardpan-lockup.svg');
 
     test('it is the ball, the firm ground, and an outlined HARDPAN', () => {
         assert.match(svg, /#2E7A4B/);
@@ -126,9 +127,14 @@ describe('THE LOCKUP SVG', () => {
     });
 
     test('assets/brand holds the same svg bytes the pages load', () => {
-        ['hardpan-lockup.svg', 'hardpan-icon.svg'].forEach(f => {
+        ['hardpan-icon.svg'].forEach(f => {
             assert.equal(sha('assets/brand/' + f), sha(f), f + ' drifted from assets/brand');
         });
+        // 087: hardpan-lockup.svg (the old ball + HARDPAN) left the root and assets/brand;
+        // its one copy is the backup in assets/brand/legacy/.
+        assert.ok(!fs.existsSync(path.join(__dirname, 'hardpan-lockup.svg')), 'the old lockup is back at the root');
+        assert.ok(!fs.existsSync(path.join(__dirname, 'assets/brand/hardpan-lockup.svg')), 'the old lockup is back in assets/brand');
+        assert.ok(fs.existsSync(path.join(__dirname, 'assets/brand/legacy/hardpan-lockup.svg')), 'the backup copy is gone');
     });
 });
 
@@ -173,7 +179,10 @@ describe('THE WEB ICONS', () => {
         const sync = read('sync-mobile-web.js');
         const consumer = /const CONSUMER_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
         const tournament = /const TOURNAMENT_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
-        ['hardpan-lockup.svg', 'hardpan-icon.svg', 'favicon-32.png'].forEach(f => {
+        // 087: the new lockup + print mark joined; the old hardpan-lockup.svg left (Manny's OK).
+        assert.ok(!sw.includes("'./hardpan-lockup.svg'"), 'the old lockup is precached again');
+        assert.ok(!consumer.includes("'hardpan-lockup.svg'"), 'the old lockup ships natively again');
+        ['hardpan-lockup-light.png', 'hardpan-print-mark.png', 'hardpan-icon.svg', 'favicon-32.png'].forEach(f => {
             assert.ok(sw.includes("'./" + f + "'"), f + ' is not precached');
             assert.ok(consumer.includes("'" + f + "'"), f + ' is not in the consumer shell');
             assert.ok(!tournament.includes("'" + f + "'"), f + ' leaked into Tournament');
