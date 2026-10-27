@@ -32,12 +32,15 @@ fs.mkdirSync(outdir, { recursive: true });
 function cliGet(p, shallow) {
     const args = ['database:get', p, '--project', PROJECT];
     if (shallow) args.push('--shallow');
-    const out = execFileSync('firebase', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-    return JSON.parse(out || 'null');
+    // The CLI sometimes fails its project lookup once ("Failed to get details for project"): retry.
+    for (let i = 0; ; i++) {
+        try { return JSON.parse(execFileSync('firebase', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }) || 'null'); }
+        catch (e) { if (i >= 3) throw e; execFileSync('sleep', [String(3 * (i + 1))]); }
+    }
 }
-async function restGet(p) {
+async function restGet(p, q) {
     for (let i = 0; i < 3; i++) {
-        try { const r = await fetch(DB + '/' + p + '.json'); if (r.ok) return r.json(); } catch (e) {}
+        try { const r = await fetch(DB + '/' + p + '.json' + (q || '')); if (r.ok) return r.json(); } catch (e) {}
         await new Promise((r) => setTimeout(r, 500 * (i + 1)));
     }
     throw new Error('read failed: ' + p);
@@ -54,6 +57,11 @@ async function plan() {
         const d = {};
         const vals = await Promise.all(FIELDS.map((f) => restGet('events/' + code + '/' + f)));
         FIELDS.forEach((f, i) => { if (vals[i] != null) d[f] = vals[i]; });
+        // The first score edit dates an undated round (push keys sort by time): one entry, not the log.
+        if (!d.createdAt) {
+            const first = await restGet('events/' + code + '/auditLog', '?orderBy=%22%24key%22&limitToFirst=1');
+            if (first && typeof first === 'object') d.auditLog = first;
+        }
         return { code, d };
     });
     const tripCodes = [...new Set(rounds.map((r) => r.d.tripCode).filter((t) => typeof t === 'string'))];
@@ -61,9 +69,13 @@ async function plan() {
     tripCodes.forEach((t) => { trips[t] = { ownerUid: cliGet('/trips/' + t + '/ownerUid'), rounds: cliGet('/trips/' + t + '/rounds') || {} }; });
     const at = Date.now();
     const byUid = {}, rows = [];
+    let undated = 0;
     const add = (uid, code, d, day, why) => {
         if (!uid || !/^[A-Z0-9]{4,10}$/.test(code)) return;
         const p = M.pointerFor(code, d, { at, day });
+        // NO DAY ANYWHERE (no tee date, createdAt or score edit): no pointer. It could only ever show as
+        // "today"; its next save writes one (the app's own path), dated that day.
+        if (!p.day) { undated++; return; }
         (byUid[uid] = byUid[uid] || {})[code] = p;
         rows.push({ uid, code, why, day: p.day ? new Date(p.day).toISOString().slice(0, 10) : '', name: p.name });
     };
@@ -74,12 +86,13 @@ async function plan() {
         if (d.ownerUid) add(d.ownerUid, code, d, day, 'round owner'); else noOwner++;
         if (trip && trip.ownerUid && trip.ownerUid !== d.ownerUid) add(trip.ownerUid, code, d, day, 'trip owner (' + d.tripCode + ')');
     });
-    const plan = { builtAt: new Date(at).toISOString(), rounds: codes.length, roundsWithoutOwner: noOwner, uids: Object.keys(byUid).length, pointers: rows.length, byUid };
+    const plan = { builtAt: new Date(at).toISOString(), rounds: codes.length, roundsWithoutOwner: noOwner, undatedSkipped: undated, uids: Object.keys(byUid).length, pointers: rows.length, byUid };
     fs.writeFileSync(path.join(outdir, 'plan.json'), JSON.stringify(plan, null, 1));
     const uidShort = (u) => u.slice(0, 6) + '…';
     fs.writeFileSync(path.join(outdir, 'plan.txt'), rows.sort((a, b) => a.uid.localeCompare(b.uid) || b.day.localeCompare(a.day))
         .map((r) => [uidShort(r.uid), r.code, r.day, r.why, r.name].join('\t')).join('\n') + '\n');
-    console.log(JSON.stringify({ rounds: plan.rounds, roundsWithoutOwner: noOwner, owners: plan.uids, pointers: plan.pointers }));
+    const recent = rows.filter((r) => r.day && (Date.now() - Date.parse(r.day)) <= 15 * 86400000).length;
+    console.log(JSON.stringify({ rounds: plan.rounds, roundsWithoutOwner: noOwner, undatedSkipped: undated, owners: plan.uids, pointers: plan.pointers, inTheLast14Days: recent }));
     return plan;
 }
 

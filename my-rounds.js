@@ -49,6 +49,14 @@
     }
     function cut(s, n) { s = String(s == null ? '' : s).trim(); return s.length > n ? s.slice(0, n) : s; }
 
+    function firstAudit(log) {
+        var min = 0;
+        if (log && typeof log === 'object') Object.keys(log).forEach(function (k) {
+            var t = Number(log[k] && log[k].ts);
+            if (t > 0 && (!min || t < min)) min = t;
+        });
+        return min;
+    }
     // THE POINTER, from a round's own data. No token, no players, no scores.
     function pointerFor(code, d, opts) {
         d = d || {}; opts = opts || {};
@@ -57,7 +65,9 @@
         if (!name || name === 'Single Round') name = course || ('Round ' + code);
         var p = { at: opts.at != null ? opts.at : Date.now(), name: name };
         if (course) p.course = course;
-        var day = dayValue(opts.day) || dayValue(d.teeDate) || Number(d.createdAt) || 0;
+        // THE ROUND'S DAY: the trip's tee date, createdAt (few rounds carry one), else the first score
+        // edit in its audit log. None of those = no day (the list then uses the pointer's `at`).
+        var day = dayValue(opts.day) || dayValue(d.teeDate) || Number(d.createdAt) || firstAudit(d.auditLog) || 0;
         if (day > 0) p.day = midnight(day);
         return p;
     }
@@ -209,12 +219,20 @@
         try { return root.firebase.database.ServerValue.TIMESTAMP; } catch (e) { return Date.now(); }
     }
     // remember(db, uid, code, roundData, opts) -> Promise<boolean>. Never rejects.
+    //   opts.day       a known day (a trip's 'YYYY-MM-DD' tee date)
+    //   opts.newRound  the round was just created: no other day known -> today
+    //   opts.healOnly  the owner opened setup: write only when the round's day is known from its data
+    //                  (an undated old round must not turn up as "Today" because its setup was opened)
+    // An UPDATE, not a set: a re-save keeps the day the pointer was first written with.
     function remember(db, uid, code, data, opts) {
         try {
+            opts = opts || {};
             code = String(code || '').toUpperCase();
             if (!db || !uid || !codeOk(code)) return Promise.resolve(false);
-            var p = pointerFor(code, data, { at: serverTime(), day: opts && opts.day });
-            return Promise.resolve(db.ref('organizers/' + uid + '/rounds/' + code).set(p)).then(function () { return true; }, function () { return false; });
+            var p = pointerFor(code, data, { at: serverTime(), day: opts.day });
+            if (!p.day && opts.newRound) p.day = midnight(Date.now());
+            if (!p.day && opts.healOnly) return Promise.resolve(false);
+            return Promise.resolve(db.ref('organizers/' + uid + '/rounds/' + code).update(p)).then(function () { return true; }, function () { return false; });
         } catch (e) { return Promise.resolve(false); }
     }
     function load(db, uid) {
@@ -299,7 +317,7 @@
         return { refresh: refresh, repaint: paint, state: st };
     }
 
-    var api = { pointerFor: pointerFor, when: when, dayLabel: dayLabel, rows: rows, localEvidence: localEvidence, localRows: localRows,
+    var api = { firstAudit: firstAudit, pointerFor: pointerFor, when: when, dayLabel: dayLabel, rows: rows, localEvidence: localEvidence, localRows: localRows,
         cardHtml: cardHtml, setupHref: setupHref, remember: remember, load: load, mount: mount, CSS: CSS, PAST_DAYS: PAST_DAYS };
     root.HardPanMyRounds = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
