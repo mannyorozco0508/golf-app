@@ -14,8 +14,8 @@
         background: var(--cream); color: var(--ink); margin: 0; padding: 24px 16px 64px 16px; line-height: 1.6; }
     .wrap { max-width: 720px; margin: 0 auto; }
     header { text-align: center; margin-bottom: 32px; }
-    .brand { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; background: #0B0F0C; border-radius: 14px; padding: 4px 16px 4px 2px; line-height: 1; }
-    .brand img { display: block; width: 52px; height: 52px; flex: 0 0 auto; }
+    .brand { display: inline-flex; align-items: center; max-width: 100%; background: #F5F2EA; border-radius: 14px; padding: 0; height: 60px; overflow: hidden; line-height: 1; } /* 087: the new light lockup (was the ball + HARDPAN on #0B0F0C) */
+    .brand img { display: block; width: 198px; height: 60px; max-width: 100%; object-fit: contain; flex: 0 0 auto; }
     .brand-word { color: #F2EDE4; font-weight: 800; font-size: 1.25rem; letter-spacing: 0.05em; }
     .rule { height: 3px; width: 56px; background: var(--lime); margin: 12px auto 0 auto; border-radius: 2px; }
     h1 { font-size: 1.45rem; color: var(--forest); margin: 28px 0 6px 0; }
@@ -36,7 +36,7 @@
 <div class="wrap">
 
 <header>
-    <div class="brand"><img src="hardpan-icon.svg" alt="" width="52" height="52"><span class="brand-word">HARDPAN</span></div>
+    <div class="brand"><img src="hardpan-lockup-light.png" alt="HardPan Golf" width="198" height="60"></div>
     <div class="rule"></div>
 </header>
 

@@ -134,7 +134,8 @@ describe('RATTLE GOLF — THE INSTALLED PWA IDENTITY', () => {
 describe('RATTLE GOLF — THE GOLFER-FACING SURFACES', () => {
 
     test('the lobby shows HardPan', () => {
-        assert.match(ADMIN, /<span class="lobby-word">HARDPAN<\/span>/);
+        // 087: the new light lockup names it (alt "HardPan Golf"); was the HTML word HARDPAN.
+        assert.match(ADMIN, /<img src="hardpan-lockup-light\.png" alt="HardPan Golf"/);
     });
 
     test('a shared invite says HardPan and no longer says Beta', () => {
@@ -250,7 +251,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v330-onecourseentry';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v331-new-logo';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -476,10 +477,12 @@ describe('THE HOMEPAGE BRAND MARK', () => {
     const header = ADMIN.slice(ADMIN.indexOf('id="lobby-screen"'), ADMIN.indexOf('class="home-widgets"'));
 
     test('the header shows the ball icon and the HTML word, not the Stroke R', () => {
-        assert.match(header, /<img src="hardpan-icon\.svg" alt="" width="72" height="72">/,
-            'the homepage brand mark must be the ball icon');
-        assert.match(header, /<span class="lobby-word">HARDPAN<\/span>/,
-            'the word must be HTML, so a phone can read it');
+        // 087 (Manny, Oct 26 2026): the brand mark is the new light lockup, named in alt
+        // (was the ball icon + the HTML word HARDPAN).
+        assert.match(header, /<img src="hardpan-lockup-light\.png" alt="HardPan Golf" width="277" height="84">/,
+            'the homepage brand mark must be the new light lockup');
+        assert.ok(!/<span class="lobby-word">HARDPAN<\/span>/.test(header),
+            'the old HARDPAN word banner must not come back');
         assert.ok(!/hardpan-lockup\.svg/.test(header),
             'the outlined lockup is illegible at phone width');
         assert.ok(!/logo-mark\.png/.test(header),
@@ -501,7 +504,7 @@ describe('THE HOMEPAGE BRAND MARK', () => {
             'a second heading under the bar says the name twice');
         const marks = header.match(/hardpan/gi) || [];
         assert.equal(marks.length, 2,
-            'exactly two: the icon filename and the HTML word. A third means the name was stacked again.');
+            'exactly two: the lockup filename and its alt. A third means the name was stacked again.');
     });
 
     test('the two Consumer mode icons are the approved pair', () => {
@@ -517,10 +520,10 @@ describe('THE HOMEPAGE BRAND MARK', () => {
             'that is a different screen and must not inherit the brand mark');
     });
 
-    test('the lockup sits on the near-black field in both themes', () => {
-        // The wordmark is bone. On the light card that colour disappears, so the
-        // chip carries #0B0F0C itself and dark mode does not repaint it.
-        assert.match(ADMIN, /\.lobby-lockup \{[^}]*background:\s*#0B0F0C/);
+    test('the lockup sits on its own cream field in both themes', () => {
+        // 087: the light lockup carries its cream field #F5F2EA (was #0B0F0C behind the
+        // bone word); dark mode does not repaint it.
+        assert.match(ADMIN, /\.lobby-lockup \{[^}]*background:\s*#F5F2EA/);
         const dark = ADMIN.slice(ADMIN.indexOf('html.dark-mode'), ADMIN.indexOf('.lobby-lockup'));
         assert.ok(!/\.lobby-lockup/.test(dark),
             'dark mode must not repaint the lockup off the near-black field');
@@ -553,9 +556,13 @@ describe('THE BRAND MARK ASSET', () => {
         assert.equal(buf[25], 6, 'logo-mark.png needs an alpha channel');
     });
 
-    test('the mark ships to Consumer and to the native bundle', () => {
-        assert.ok(read('sw.js').includes("'./logo-mark.png'"), 'must be precached');
-        assert.ok(read('sync-mobile-web.js').includes("'logo-mark.png'"), 'must ship natively');
+    // 087 (Manny OK, Oct 26 2026 6:43 PM): the old ball no longer ships in the app bundle or the
+    // offline cache (was: must be precached, must ship natively). The website still serves it from
+    // the root for the Tournaments page; a backup copy is kept in assets/brand/legacy/.
+    test('the old mark no longer ships to Consumer or to the native bundle; its backup is kept', () => {
+        assert.ok(!read('sw.js').includes("'./logo-mark.png'"), 'the old mark is precached again');
+        assert.ok(!read('sync-mobile-web.js').includes("'logo-mark.png'"), 'the old mark ships natively again');
+        assert.ok(exists('assets/brand/legacy/logo-mark.png'), 'the backup copy is gone');
     });
 
     test('the mark file stays Consumer-owned — Tournament may show it as parent brand, not take it', () => {
@@ -575,8 +582,8 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v330-onecourseentry';/);
-        assert.match(BUILD, /cacheName: 'consumer-v164-onecourseentry'/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v331-new-logo';/);
+        assert.match(BUILD, /cacheName: 'consumer-v165-new-logo'/);
         assert.match(BUILD, /cacheName: 'tournament-v57-remove-team'/,
             'Tournament cache moved because the product name is Rattle Golf again');
     });

@@ -73,7 +73,7 @@ async function arrive(page) {
         if (s.img.display !== 'none') problems.push('screen: the mark is ' + s.img.display + ', not display:none');
         if (!same(s.img.rect, [0, 0, 0, 0])) problems.push('screen: the mark takes space: ' + JSON.stringify(s.img.rect));
         if (!s.img.complete || s.img.natural[0] < 1) problems.push('screen: the mark is not loaded (complete ' + s.img.complete + ', natural ' + s.img.natural + ') - print would wait on a fetch');
-        if (s.img.src !== 'logo-mark.png') problems.push('screen: src is ' + s.img.src + ', not the precached logo-mark.png');
+        if (s.img.src !== 'hardpan-print-mark.png') problems.push('screen: src is ' + s.img.src + ', not the precached hardpan-print-mark.png (087; was logo-mark.png)');
     }
     if (s.scrollW > 390) problems.push('screen: horizontal overflow ' + s.scrollW);
     if (s.exportHasRattle !== false) problems.push('export: the native text lines carry the alt text (' + s.exportHasRattle + ')');
