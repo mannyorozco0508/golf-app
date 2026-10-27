@@ -19,6 +19,8 @@
          Loads the auth SDK itself, asynchronously, so no page waits for it. -->
     <script src="auth-boot.js"></script>
     <script src="organizer-gate.js"></script>
+    <!-- 084: Rounds I'm running (Home list + the owner's pointer after a save). -->
+    <script src="my-rounds.js"></script>
     <script src="my-groups.js"></script>
     <script src="roster-paste.js"></script>
     <!-- GPS:BEGIN -->
@@ -12648,6 +12650,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 loadedExistingRound = true;
                 loadedOrganizerToken = data.organizerToken || null;
                 loadedOwnerUid = data.ownerUid || null;
+                // 084: the owner opening setup heals a missing Rounds I'm running pointer
+                // (a round saved before 084). Fire-and-forget; refused for anyone else.
+                if (data.ownerUid && window.HardPanMyRounds) {
+                    const mrData = data, mrCode = currentMode;
+                    Promise.resolve(window.authReady).then((bootUid) => {
+                        let mrUid = bootUid;
+                        try { const u = window.firebase.auth().currentUser; if (u && u.uid) mrUid = u.uid; } catch (e) {}
+                        if (mrUid && mrUid === mrData.ownerUid) window.HardPanMyRounds.remember(db, mrUid, mrCode, mrData, { healOnly: true });
+                    }).catch(() => {});
+                }
             }
             groupSizeOverrides = data.groupSizeOverrides || {};
             if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
@@ -14252,6 +14264,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // THE ROUND NOW EXISTS. Only here is it true that there is
                 // something to resume, so only here is the pointer written.
                 localStorage.setItem('lastRoomCode', currentMode);
+                // 084: the owner's "Rounds I'm running" pointer (organizers/<uid>/rounds/<code>).
+                // NOT RETURNED, NOT AWAITED: refused by the rules until they are published,
+                // and a refusal here must never touch the save, its button or its messages.
+                try {
+                    const mrUser = window.firebase && typeof window.firebase.auth === 'function' ? window.firebase.auth().currentUser : null;
+                    const mrUid = (mrUser && mrUser.uid) || (window.authBootState && window.authBootState.uid) || null;
+                    if (mrUid && window.HardPanMyRounds) window.HardPanMyRounds.remember(db, mrUid, currentMode, payload, { newRound: !loadedExistingRound });
+                } catch (e) { /* the list is a convenience; the save already landed */ }
                 // v191: a NEW round looks for the unfinished round it replaces
                 // (offerRetire) BEFORE this save is remembered, so the new code
                 // never nominates itself; then the save is remembered.

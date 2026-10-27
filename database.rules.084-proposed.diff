@@ -1,0 +1,30 @@
+--- database.rules.layout-base.json	2026-10-26 13:32:13
++++ database.rules.084-proposed.json	2026-10-26 18:25:35
+@@ -352,6 +352,27 @@
+         "pass": {
+           ".write": false
+         },
++        "rounds": {
++          "$code": {
++            ".write": "auth != null && auth.uid === $uid",
++            ".validate": "newData.val() === null || ($code.matches(/^[A-Z0-9]{4,10}$/) && newData.hasChildren(['at', 'name']) && (root.child('events/' + $code + '/ownerUid').val() === $uid || (root.child('events/' + $code + '/tripCode').isString() && root.child('trips/' + root.child('events/' + $code + '/tripCode').val() + '/ownerUid').val() === $uid)))",
++            "at": {
++              ".validate": "newData.isNumber() && newData.val() <= now"
++            },
++            "name": {
++              ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80"
++            },
++            "course": {
++              ".validate": "newData.isString() && newData.val().length <= 80"
++            },
++            "day": {
++              ".validate": "newData.isNumber()"
++            },
++            "$other": {
++              ".validate": false
++            }
++          }
++        },
+         "groups": {
+           ".write": "auth != null && auth.uid === $uid",
+           "$groupId": {
