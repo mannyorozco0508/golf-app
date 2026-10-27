@@ -260,6 +260,26 @@ VARIANTS.forEach(([title, build]) => {
                 const lead = J(ENG.computeNetToParStandings(PLAYERS, CD, SCORES, { basis: scoring })).filter(x => x.thru > 0)
                     .sort((a, b) => a.sortVal - b.sortVal)[0];
                 const want = boardV202(v201, flat ? { banner: foldedBannerHtml(lead.name, lead.toPar, lead.thru) } : {});
+                if (!flat) {
+                    // RE-PINNED 2026-10-26 (082, Manny's answers 1 and 3), the two BY GROUP
+                    // boards only. (a) This round SAVED no groups, so the Groups button is
+                    // hidden and a Groups choice renders the flat board - held byte for
+                    // byte against the flat golden. (b) With its groups saved (4/4), the
+                    // cards are the PAIRINGS - Ann-Dee and Eli-Hal. The frozen NET capture
+                    // had sliced the standings (Eli/Cal/Gus/Ben in Group 1: the 082 bug,
+                    // frozen); the frozen GROSS capture happened to rank Ann-Dee first, so
+                    // it is still held whole, sha for sha.
+                    const flatWant = boardV202(boardV201(FIX.boards[scoring + '_all'], { holes: CD.length, noneFinished: true, skinsByName: SKINS_BY_NAME }),
+                        { banner: foldedBannerHtml(lead.name, lead.toPar, lead.thru) });
+                    assert.equal(html, flatWant, firstDiff(html, flatWant));
+                    const saved = renderBoard(Object.assign({}, data, { groupSizeOverrides: { 0: 4, 1: 4 } }), scoring, 'group');
+                    const cards = saved.split('Group ').slice(1).filter(c => /^\d/.test(c))
+                        .map(c => (c.match(/player-name">([A-Z][a-z]+)/g) || []).map(x => x.split('>')[1]).sort());
+                    assert.deepEqual(cards, [['Ann', 'Ben', 'Cal', 'Dee'], ['Eli', 'Fay', 'Gus', 'Hal']]);
+                    if (scoring === 'gross') assert.equal(saved, want, firstDiff(saved, want));
+                    assert.equal(sha(FIX.boards[key]), FIX.boardSha256[key]);
+                    return;
+                }
                 assert.equal(sha(html), sha(want), firstDiff(html, want));
                 assert.equal(html, want);
                 // the frozen capture is still the frozen capture
@@ -269,7 +289,7 @@ VARIANTS.forEach(([title, build]) => {
 
         test('the rendered boards are not vacuous: eight names, ranks, HCPs, and two group cards in the grouped view', () => {
             const flat = renderBoard(data, 'net', 'all');
-            const grouped = renderBoard(data, 'net', 'group');
+            const grouped = renderBoard(Object.assign({}, data, { groupSizeOverrides: { 0: 4, 1: 4 } }), 'net', 'group');   // 082: groups saved
             PLAYERS.forEach(p => { assert.ok(flat.includes(p.name)); assert.ok(grouped.includes(p.name)); });
             assert.ok(/<td>1<\/td>[\s\S]*Eli/.test(flat), 'Eli is ranked first on the net flat board');
             assert.ok(/HCP 20/.test(flat), 'v201: "HCP 20", on the name line, no colon');

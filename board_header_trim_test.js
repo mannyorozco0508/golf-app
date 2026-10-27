@@ -58,7 +58,9 @@ function round(n, extra) {
     const scores = {};
     players.forEach((p, i) => { const t = i === 0 ? 18 : 9; for (let h = 1; h <= t; h++) scores['p' + p.id + '_h' + h] = CD[h - 1].par; });
     scores['p101_h1'] = 2; scores['p102_h2'] = 2;
-    const d = Object.assign({ players, gameFormat: 'stroke', courseData: CD, scores }, POOL, extra || {});
+    // 082: the round SAVED its groups (4 at a time) - the Groups button shows only then.
+    const saved = {}; for (let i = 0; i * 4 < n; i++) saved[i] = Math.min(4, n - i * 4);
+    const d = Object.assign({ players, gameFormat: 'stroke', courseData: CD, scores, groupSizeOverrides: saved }, POOL, extra || {});
     if (extra && extra.flights) d.players.forEach((p, i) => { p.flight = i < Math.ceil(d.players.length / 2) ? 'A' : 'B'; });
     return d;
 }
