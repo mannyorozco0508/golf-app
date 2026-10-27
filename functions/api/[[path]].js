@@ -26,6 +26,7 @@ import * as courseSearch from './course-search.js';
 import * as courseDetail from './course/[id].js';
 import * as pushSend from './push-send.js';
 import * as scorecardScan from './scorecard-scan.js';
+import * as scanErase from './scan-erase.js';
 
 // onRequestGet -> 'GET', onRequestPost -> 'POST', ...
 const methodsOf = (mod) => Object.keys(mod)
@@ -48,7 +49,10 @@ export const ROUTES = [
       methods: methodsOf(pushSend) },
     // POST only, like push-send: a GET gets 405 Allow: POST, never the SPA.
     { file: 'scorecard-scan.js', matches: (seg) => seg.length === 1 && seg[0] === 'scorecard-scan',
-      methods: methodsOf(scorecardScan) }
+      methods: methodsOf(scorecardScan) },
+    // 088: POST only, like scorecard-scan.
+    { file: 'scan-erase.js', matches: (seg) => seg.length === 1 && seg[0] === 'scan-erase',
+      methods: methodsOf(scanErase) }
 ];
 
 export async function onRequest(context) {
