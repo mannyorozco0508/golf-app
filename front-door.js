@@ -2940,6 +2940,9 @@
         // The app's own "Are you sure?" (ui-dialogs.js uiConfirm; 073's End round asks with it): above
         // every sheet, so it goes first. Back is its cancel - "Keep playing" for End round. Never yes.
         ['confirm', function () { var e = $('ui-sheet'); return !!(e && e.classList && e.classList.contains('open')); }, function () { tapIn('ui-sheet', '#ui-sheet-no'); }],
+        // 085's "Resume your round at <course>, or start a new round?" (its own sheet over Home, not ui-sheet):
+        // Back is a tap outside it - the ask closes, Home stays. Never Resume, never New round.
+        ['start-ask', function () { var e = $('hs-ask85'); return !!(e && e.style.display === 'flex'); }, function () { tapIn('hs-ask85'); }],
         ['voice', function () { var V = api('HardPanVoice'); return has(V, 'isOpen') && !!V.isOpen(); }, function () { api('HardPanVoice').cancel(); }],
         ['needs-account', function () { var N = api('HardPanNeedsAccount'); return has(N, 'isOpen') && N.isOpen(); }, function () { var e = W.document.querySelector('[data-hpna-scrim]'); if (e) e.click(); }],
         ['account', function () { var A = api('HardPanAccountUI'); return has(A, 'isOpen') && !!A.isOpen(); }, function () { api('HardPanAccountUI').close(); }],

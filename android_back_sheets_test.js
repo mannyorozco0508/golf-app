@@ -10,6 +10,8 @@
 //   backButton listener that front-door.js arms on Home. No page function is called here.
 //   Add-on port (071b / 073): + 'confirm' (the app's "Are you sure?") and 'pars-start' (071b's pars sheet
 //   in #sf). 41 tests, 41 pass. Controls: no 'confirm' row -> 39 / 2; no 'pars-start' row -> 39 / 2.
+//   Add-on 085: + 'start-ask' (Home's "Resume or new round?" sheet, #hs-ask85) and its hidden-ask case. 43 tests,
+//   43 pass (android-2.0-addons 80d6cd56 + the fix). Baseline without the row: 41 pass / 2 fail (the 2 new tests).
 //   What this harness cannot prove: that each file's own isOpen() matches what is on a real
 //   screen. That is the emulator pass (each sheet opened by tapping, then Back).
 // ============================================================================
@@ -93,6 +95,9 @@ function homeOnAndroid(platform, open, extra) {
     // The add-ons (071b / 073): the app's own "Are you sure?" and the Start pars sheet inside #sf.
     if (is('confirm')) { const u = el('ui-sheet', '', log); u.classList.contains = c => c === 'open'; u.__kid('#ui-sheet-no', Object.assign(el('ui-sheet-no', '', log), { click: () => log.push('close:confirm') })); els.set('ui-sheet', u); }
     if (is('pars-start')) { const sp = el('sf-pars', '', log); sp.__kid('[data-sf=parscancel]', Object.assign(el('parscancel', '', log), { click: () => log.push('close:pars-start') })); els.set('sf-pars', sp); }
+    // 085's Resume-or-new ask over Home: a click on the overlay itself is its tap outside (Home's own handler hides it).
+    if (is('start-ask')) els.set('hs-ask85', Object.assign(el('hs-ask85', 'flex', log), { click: () => log.push('close:start-ask') }));
+    else els.set('hs-ask85', el('hs-ask85', 'none', log));
     if (is('new-round-ask')) els.set('sf-ask', Object.assign(el('sf-ask', '', log), { click: () => log.push('close:new-round-ask') }));
     const sf = el('sf', is('new-round') ? '' : 'none', log);
     if (is('new-round')) { const b = Object.assign(el('sf-back', '', log), { click: () => log.push('close:new-round') }); sf.__kid('.sf-back', b); docSel['#sf .sf-back'] = b; }
@@ -102,7 +107,7 @@ function homeOnAndroid(platform, open, extra) {
     return { sb, log, press: () => (listeners.backButton || []).forEach(fn => fn({ canGoBack: true })), listeners };
 }
 
-const SHEETS = ['confirm', 'pars-start', 'voice', 'needs-account', 'account', 'scan', 'sg-info', 'my-stats-ask', 'customize', 'shot-history', 'mark',
+const SHEETS = ['confirm', 'start-ask', 'pars-start', 'voice', 'needs-account', 'account', 'scan', 'sg-info', 'my-stats-ask', 'customize', 'shot-history', 'mark',
     'launch-entry', 'range', 'range-home', 'score-sheet', 'stats', 'my-stats', 'new-round-ask', 'new-round'];
 
 describe('ANDROID: one Back press closes the top 2.0 sheet, and only that', () => {
@@ -133,6 +138,14 @@ describe('ANDROID: one Back press closes the top 2.0 sheet, and only that', () =
         const h = homeOnAndroid('android', ['new-round', 'pars-start']);
         h.press();
         assert.deepEqual(h.log, ['close:pars-start']);
+    });
+    test('add-ons: 085\'s "Resume or new round?" ask (hidden, not removed, once answered) is closed by Back as a tap outside; a hidden one is not seen', { skip }, () => {
+        const h = homeOnAndroid('android', ['start-ask']);
+        h.press();
+        assert.deepEqual(h.log, ['close:start-ask']);
+        const g = homeOnAndroid('android', []);   // #hs-ask85 exists with display none (answered earlier)
+        g.press();
+        assert.deepEqual(g.log, ['minimizeApp']);
     });
     test('nothing open on Home Main: Back minimises the app, as in 0.2', { skip }, () => {
         const h = homeOnAndroid('android', []);
