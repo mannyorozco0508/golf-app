@@ -82,7 +82,8 @@ function px(img, x, y) {
 }
 
 describe('THE LOCKUP SVG', () => {
-    const svg = read('hardpan-lockup.svg');
+    // 087 (Manny's OK, Oct 26 2026): the old lockup no longer ships; this is its backup copy.
+    const svg = read('assets/brand/legacy/hardpan-lockup.svg');
 
     test('it is the ball, the firm ground, and an outlined HARDPAN', () => {
         assert.match(svg, /#2E7A4B/);
@@ -132,9 +133,14 @@ describe('THE LOCKUP SVG', () => {
     });
 
     test('assets/brand holds the same svg bytes the pages load', () => {
-        ['hardpan-lockup.svg', 'hardpan-icon.svg'].forEach(f => {
+        ['hardpan-icon.svg'].forEach(f => {
             assert.equal(sha('assets/brand/' + f), sha(f), f + ' drifted from assets/brand');
         });
+        // 087: hardpan-lockup.svg (the old ball + HARDPAN) left the root and assets/brand;
+        // its one copy is the backup in assets/brand/legacy/.
+        assert.ok(!fs.existsSync(path.join(__dirname, 'hardpan-lockup.svg')), 'the old lockup is back at the root');
+        assert.ok(!fs.existsSync(path.join(__dirname, 'assets/brand/hardpan-lockup.svg')), 'the old lockup is back in assets/brand');
+        assert.ok(fs.existsSync(path.join(__dirname, 'assets/brand/legacy/hardpan-lockup.svg')), 'the backup copy is gone');
     });
 });
 
@@ -179,7 +185,10 @@ describe('THE WEB ICONS', () => {
         const sync = read('sync-mobile-web.js');
         const consumer = /const CONSUMER_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
         const tournament = /const TOURNAMENT_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
-        ['hardpan-lockup.svg', 'hardpan-icon.svg', 'favicon-32.png'].forEach(f => {
+        // 087: the new lockup + print mark joined; the old hardpan-lockup.svg left (Manny's OK).
+        assert.ok(!sw.includes("'./hardpan-lockup.svg'"), 'the old lockup is precached again');
+        assert.ok(!consumer.includes("'hardpan-lockup.svg'"), 'the old lockup ships natively again');
+        ['hardpan-lockup-light.png', 'hardpan-print-mark.png', 'hardpan-icon.svg', 'favicon-32.png'].forEach(f => {
             assert.ok(sw.includes("'./" + f + "'"), f + ' is not precached');
             assert.ok(consumer.includes("'" + f + "'"), f + ' is not in the consumer shell');
             assert.ok(!tournament.includes("'" + f + "'"), f + ' leaked into Tournament');
@@ -237,13 +246,16 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.deepEqual(names, ['HardPan', 'HardPan']);
     });
 
-    test('the launch splash is the ball on the existing cream field', () => {
+    // 087 (Manny, Oct 26 2026: one app, one logo): the live app's launch screen is the GPS app's
+    // 077 splash - cream + the light mark, and black + the night mark in dark mode. Was the
+    // ball on cream (70944081…, kept in assets/brand/legacy/ios-Splash.imageset).
+    test('the launch splash is the new light mark on the cream field, the same set as the GPS app', () => {
         const files = [
             'ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png',
             'ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-1.png',
             'ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-2.png',
         ];
-        const SPLASH_SHA = '70944081a8a6bc200faf20a52de649f3159fe9c84b04a79ad3c9a325eab5da12';
+        const SPLASH_SHA = '25da1c1bb715da66cdb1427fcae5ea6cbdd66edd1dfa39192c8b47902733b7e9';
         const STROKE_R_SPLASH = '5719f2b14f7327b1d55e49410908a65b0e56eae99de2276befe27730b07b60e1';
         files.forEach(f => {
             assert.equal(sha(f), SPLASH_SHA, f + ' is not the cream HardPan splash');
@@ -251,9 +263,13 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         });
         const img = readPng(path.join(__dirname, files[0]));
         assert.equal(img.width, 2732);
-        assert.deepEqual(px(img, 0, 0), [0xFB, 0xF5, 0xEB]);
+        assert.deepEqual(px(img, 0, 0), [245, 242, 234]);
         const mid = px(img, 1366, 1366);
-        assert.deepEqual(mid, [247, 244, 238], 'the centre is not the ball');
+        assert.deepEqual(mid, [234, 234, 226], 'the centre is not the new mark');
+        const gpsSet = 'gps-beta/ios/App/App/Assets.xcassets/Splash.imageset/';
+        fs.readdirSync(path.join(__dirname, gpsSet)).forEach(f => assert.ok(
+            fs.readFileSync(path.join(__dirname, gpsSet, f)).equals(fs.readFileSync(path.join(__dirname, 'ios/App/App/Assets.xcassets/Splash.imageset', f))),
+            'the live app splash ' + f + ' is not the GPS app\'s'));
         let green = 0;
         for (let i = 0; i < img.data.length; i += 4) {
             const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];
