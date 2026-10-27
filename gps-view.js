@@ -8534,6 +8534,17 @@
         // Build 5: does hole n have a green (or tee) to measure to? The card asks
         // before it hands a hole back to GPS.
         holeHasData: function (n) { try { return holeHasData(n); } catch (e) { return false; } },
+        // 086 (the course check MEASURES the map's GPS): does hole n have a green - the same test as the
+        // "Tap the middle of the green" banner (no green = !r.mid) - and go to hole n (as the Watch does).
+        holeHasGreen: function (n) {
+            try {
+                if (!S || !G) return false;
+                var h = n == null ? S.hole : n, osm = osmRecord(S.courseKey);
+                var r = G.resolveHole(osm && osm.holes ? osm.holes[String(h)] : null, pinsFor(h));
+                return !!(r && r.mid);
+            } catch (e) { return false; }
+        },
+        goHole: function (n) { var h = Number(n); if (!S || !(h >= 1 && h <= 36)) return false; if (typeof S.gotoHole === 'function') S.gotoHole(h); else setHole(h); return true; },
         // THE WATCH (feature 10; gps_watch_test.js): what render sent, and a watch score in.
         watchSent: function () { return watchLast ? JSON.parse(watchLast) : null; },
         watchScore: function (ev) { return watchScore(ev); },
