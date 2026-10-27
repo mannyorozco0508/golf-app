@@ -11131,6 +11131,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 deps.appleCode = () => window.oauthSignin.appleAuthorizationCode();
             }
         }
+        // 088: Delete account also erases this account's scorecard-scan counts on the
+        // scan server. Never stops the delete; a miss is retried on the next load.
+        if (step === 'delete2' && typeof fetch === 'function' && typeof window.accountExit.scanEraser === 'function') {
+            deps.scanErase = window.accountExit.scanEraser({ auth: auth, fetch: (u, o) => fetch(u, o) });
+        }
         const run = step === 'signout'
             ? window.accountExit.signOut(deps)
             : window.accountExit.deleteAccount(deps);
