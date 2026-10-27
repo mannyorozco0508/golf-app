@@ -66,6 +66,8 @@ const GC = { ['gapi_' + ID]: { name: 'Talking Stick Golf Club (South - Piipaash)
     location: { city: 'Scottsdale', state: 'AZ', latitude: 33.539874, longitude: -111.870432 } } };
 const GAPI = { v: 1, built: 'test', links: {}, courses: { [ID]: { id: ID, club: 'Talking Stick Golf Club', course: 'South - Piipaash', city: 'Scottsdale', state: 'AZ', lat: 33.539874, lng: -111.870432, holes: 18,
     h: { 1: { g: { f: [33.5445, -111.8690], c: [33.5444, -111.8691], b: [33.5443, -111.8692] }, t: { b: [33.5467, -111.8663], f: [33.5460, -111.8678] } } } } } };
+// 086 (Manny, Oct 26): "✓ GPS" needs a green on EVERY hole - the made-up hole 1 stands for holes 2-18 too.
+for (let i = 2; i <= 18; i++) GAPI.courses[ID].h[i] = GAPI.courses[ID].h[1];
 const AT_TS = [33.5399, -111.8704];   // on Talking Stick South
 const open = (at, steps, flow, vp) => arriveCold({ url: fileUrl('admin.html', 'start=quick'), db: { events: {}, global_courses: GC, trips: {}, tournaments: {}, organizers: {} }, settleMs: 2500, viewport: vp || { width: 393, height: 852 },
     preScript: 'window.__hardpanDoors = true; window.__freshPhone = true;' + iapStub({ active: true }) + FUNCS + 'window.HardPanGolfApi = ' + JSON.stringify(GAPI) + ';' + "try{sessionStorage.setItem('hardpan_simple_flow'," + JSON.stringify(flow || 'gps') + ");}catch(e){}"
@@ -127,8 +129,12 @@ test('"Search more courses" and "Not listed? Add a course" sit under the results
     assert.ok(s.rows.some((t) => /^LOCAL Papago/.test(t)), JSON.stringify(s.rows));
     const iMore = s.order.indexOf('MORE'), iNot = s.order.indexOf('NOTLISTED'), iLast = s.order.lastIndexOf('ROW');
     assert.ok(iMore > iLast && iNot > iMore, 'the rows, then Search more, then Not listed: ' + JSON.stringify(s.order));
-    assert.deepEqual(s.fn, [], '0 calls');
-    assert.deepEqual(more.fn, ['gpsSearch:papago'], 'Search more: one call');
+    // 079b (Manny, Oct 26: YES): the one exception - our "Papago Golf Club" row has no card in this fixture, so its club is
+    // asked ONCE by name (gpsSearch "Papago Golf Club"); the typed text itself is still never searched (0 calls).
+    const club = (f) => f.filter((x) => x !== 'gpsSearch:Papago Golf Club');
+    assert.deepEqual(club(s.fn), [], '0 calls for the typed text');
+    assert.ok(s.fn.filter((x) => x === 'gpsSearch:Papago Golf Club').length <= 1, 'the club asked at most once: ' + JSON.stringify(s.fn));
+    assert.deepEqual(club(more.fn), ['gpsSearch:papago'], 'Search more: one call');
     assert.doesNotMatch(more.text, /NEAR YOU/);
 });
 

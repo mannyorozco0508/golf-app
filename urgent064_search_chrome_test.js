@@ -76,6 +76,8 @@ const PAPAGO = [33.4560, -111.9480];
 const GAPI_ID = '990000000000000001';
 const GAPI = { v: 1, built: 'test', links: {}, courses: { [GAPI_ID]: { id: GAPI_ID, club: 'Talking Stick Golf Club', course: 'South - Piipaash', city: 'Scottsdale', state: 'AZ', lat: 33.539874, lng: -111.870432, holes: 18,
     h: { 1: { g: { f: [33.5445, -111.8690], c: [33.5444, -111.8691], b: [33.5443, -111.8692] }, t: { b: [33.5467, -111.8663], f: [33.5460, -111.8678] } } } } } };
+// 086 (Manny, Oct 26): "✓ GPS" needs a green on EVERY hole - the made-up hole 1 stands for holes 2-18 too.
+for (let i = 2; i <= 18; i++) GAPI.courses[GAPI_ID].h[i] = GAPI.courses[GAPI_ID].h[1];
 const AT_TS = [33.5399, -111.8704];
 const nearStarfire = [33.5990, -111.9078];   // ~0.7 mi north of Starfire's point: listed, not "You're here"
 const writesOf = (s) => s.writes.filter((w) => !/^set global_courses\/gapi_\d+$/.test(w));   // (the stand-in server's own write)

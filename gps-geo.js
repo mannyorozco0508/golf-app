@@ -2178,7 +2178,9 @@
     function golfapiRecord(courses) {
         var holes = {};
         courses.forEach(function (c, i) { golfapiHoles(c, 9 * i, holes); });
-        return { v: 1, src: 'golfapi', golfapiIds: courses.map(function (c) { return c.id; }), osmBase: courses.map(function (c) { return c.fetched || c.updated || null; })[0], holes: holes };
+        // 086: of = the course's hole count (a 27-hole pairing = its nines), for "GPS · N of 18 holes".
+        var of = courses.length > 1 ? 9 * courses.length : (Number(courses[0] && courses[0].holes) === 9 ? 9 : 18);
+        return { v: 1, src: 'golfapi', golfapiIds: courses.map(function (c) { return c.id; }), osmBase: courses.map(function (c) { return c.fetched || c.updated || null; })[0], holes: holes, of: of };
     }
     // WHICH GOLFAPI COURSE IS THIS ROUND'S? In order: an explicit link from the
     // puller (links[ourKey]); a 27-hole pairing - our name "Club (A / B)" - from
@@ -2382,9 +2384,24 @@
         if (!loc) return true;
         return haversineMeters(loc, g) <= (maxM || 2000);
     }
+    // 086 (Manny, Oct 26): ✓ GPS only when EVERY hole has a green; a course with greens on some holes
+    // says "GPS · N of 18 holes" (its other holes: "Tap the middle of the green" on the map). Counts holes
+    // 1..of with a green point; data in the wrong place (no green within maxM of the course) counts 0,
+    // the holeOneNear rule.  -> { n, of }
+    function greensOf(rec, of, loc, maxM) {
+        var hs = (rec && rec.holes) || {}, n = 0, near = !loc;
+        of = Number(of) > 0 ? Number(of) : 18;
+        for (var i = 1; i <= of; i++) {
+            var h = hs[String(i)] || hs[i], x = h && (h.osm || h), g = x && (x.mid || (x.green && x.green[0]));
+            if (!Array.isArray(g) || !isFinite(g[0]) || !isFinite(g[1])) continue;
+            n++;
+            if (!near && haversineMeters(loc, g) <= (maxM || 2000)) near = true;
+        }
+        return { n: near ? n : 0, of: of };
+    }
     var api = {
         teeTarget: teeTarget, teeTargetNote: teeTargetNote, TEE_HAZARD_SHORT_YD: TEE_HAZARD_SHORT_YD,
-        courseGps: courseGps, holeOneNear: holeOneNear,
+        courseGps: courseGps, holeOneNear: holeOneNear, greensOf: greensOf,
         courseNameWords: courseNameWords, golfCoursesQuery: golfCoursesQuery, pickGolfCourse: pickGolfCourse,
         defaultTarget: defaultTarget, pointAlongHole: pointAlongHole, snapToFairway: snapToFairway, lengthAlong: lengthAlong, simplifyLine: simplifyLine,
         DEFAULT_SHOT_YD: DEFAULT_SHOT_YD, MIN_LEFT_YD: MIN_LEFT_YD, GREEN_REACH_YD: GREEN_REACH_YD,

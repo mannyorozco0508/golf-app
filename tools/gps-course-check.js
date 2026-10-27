@@ -32,6 +32,27 @@ const dir = process.argv[2];
 if (!dir) { console.error('usage: node tools/gps-course-check.js <dumps dir>'); process.exit(2); }
 const rd = (f) => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) || {};
 const DB = { events: {}, global_courses: rd('global_courses.json'), gps_links: rd('gps_links.json'), gps_courses: rd('gps_courses.json'), course_gps: fs.existsSync(path.join(dir, 'course_gps.json')) ? rd('course_gps.json') : {}, trips: {}, tournaments: {}, organizers: {} };
+// 086 (Manny, Oct 26): TWO FIXTURES, in this check's copy of the data only (nothing is written anywhere;
+// the check's pages run on the Firebase stand-in, so no live call is made). Las Colinas got real GolfAPI
+// greens (all 18, since Oct 22), so it can no longer be the "no greens" control - it stays as a course.
+//   test086_nogreens  a card, a point, NO GPS anywhere (no link, no GolfAPI name, OSM off on the phone).
+//   test086_partial   linked to a GolfAPI-style record with greens on holes 1-9 only (Las Colinas's
+//                     record moved 0.3 deg east, holes 10-18 without greens): "GPS · 9 of 18 holes".
+const FIX_LC = '012141520635191357064', FIX_ID = '086000000000000000001', FIX_DLNG = 0.3;
+(function fixtures() {
+    const lcKey = Object.keys(DB.gps_links || {}).filter((k) => String(DB.gps_links[k]) === FIX_LC)[0];
+    const lcCard = lcKey && DB.global_courses[lcKey], lcRec = DB.gps_courses[FIX_LC];
+    if (!lcCard || !lcRec) { console.error('fixtures: Las Colinas card / record not in the dumps - the fixture courses are skipped'); return; }
+    const card = (name, lat, lng) => Object.assign(JSON.parse(JSON.stringify(lcCard)), { name, location: { latitude: lat, longitude: lng, city: 'Fixture', state: 'AZ' } });
+    DB.global_courses.test086_nogreens = card('Test No-Greens Golf Club', 33.3000, -111.4000);
+    const shift = (v) => (Array.isArray(v) && v.length === 2 && isFinite(v[0]) && isFinite(v[1]) ? [v[0], v[1] + FIX_DLNG] : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, shift(x)])) : v);
+    const rec = JSON.parse(JSON.stringify(lcRec));
+    rec.h = (Array.isArray(rec.h) ? rec.h : Object.values(rec.h)).map((h, i) => { if (!h || typeof h !== 'object') return h; const x = shift(h); if (i >= 10) delete x.g; return x; });
+    Object.assign(rec, { id: FIX_ID, club: 'Test Partial-GPS Golf Club', course: '18-hole course', lng: Number(rec.lng) + FIX_DLNG, city: 'Fixture', state: 'AZ' });
+    DB.gps_courses[FIX_ID] = rec;
+    DB.gps_links.test086_partial = FIX_ID;
+    DB.global_courses.test086_partial = card('Test Partial-GPS Golf Club', Number(lcCard.location && lcCard.location.latitude || rec.lat), Number(lcCard.location && lcCard.location.longitude || rec.lng - FIX_DLNG) + FIX_DLNG);
+})();
 if (!fs.existsSync(path.join(WWW, 'admin.html'))) { console.error('no build at ' + WWW + ' - run tools/build-gps-app.js first'); process.exit(2); }
 if (!fs.existsSync(path.join(WWW, 'gps-golfapi.js'))) console.error('WARNING: the build has no gps-golfapi.js - the bundled GolfAPI courses are missing from this check');
 
@@ -45,8 +66,13 @@ const COURSES = (process.env.ONLY ? null : null) || [
     { label: 'Caledonia (Myrtle)', name: /^Caledonia/i, q: 'caledonia', at: [33.4528, -79.1547] },
     { label: 'Chambers Bay', name: /^Chambers Bay/i, q: 'chambers', at: [47.2008, -122.5715] },
     // A course with a card and NO greens anywhere: the map must show the COURSE AREA with "Tap the middle
-    // of the green" - never the golfer's location (run with the golfer 2 km away).
-    { label: 'No greens: Las Colinas', name: /^Las Colinas/i, q: 'las colinas', at: [33.2441784, -111.6180444], noGreens: true, golfer: [33.2620, -111.6180] },
+    // of the green" - never the golfer's location (run with the golfer 2 km away). 086: a fixture (above);
+    // Las Colinas has real greens now (all 18) and stays as an ordinary course.
+    { label: 'No greens: Test No-Greens (fixture)', name: /^Test No-Greens/i, q: 'test no-greens', at: [33.3000, -111.4000], noGreens: true, golfer: [33.3180, -111.4000] },
+    { label: 'Las Colinas', name: /^Las Colinas/i, q: 'las colinas', at: [33.2441784, -111.6180444] },
+    // 086: greens on SOME holes - "GPS · 9 of 18 holes" (never ✓), the map's hole 1 measured, hole 10
+    // "Tap the middle of the green".
+    { label: 'Partial GPS: Test Partial (fixture, 9 of 18)', name: /^Test Partial-GPS/i, q: 'test partial', at: [33.2441784, -111.6180444 + 0.3], partial: { n: 9, of: 18, noGreenHole: 10 } },
     // (URGENT-060: the golfer ON the course - by MacKay hole 1's tee; the old spot was 1.1 mi south of every hole)
     { label: 'Thistle (MacKay/Cameron)', name: /^Thistle.*MacKay.*Cameron/i, q: 'thistle', at: [33.9051, -78.5447] }
 ].filter((c) => !process.env.ONLY || new RegExp(process.env.ONLY, 'i').test(c.label));
@@ -105,6 +131,14 @@ async function check(c) {
         await sleep(1200);
         const found = JSON.parse(await ev("(function(){ var re=new RegExp(" + JSON.stringify(re) + "," + JSON.stringify(fl) + "); return JSON.stringify(Array.prototype.map.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return [b.getAttribute('data-sf-course'), (b.getAttribute('data-sf-full')||(b.querySelector('.n')||{}).textContent||''), /✓ GPS/.test(b.textContent)]; }).filter(function(r){return re.test(r[1]);})); })()"));
         const nearN = near.hits.length, searchN = found.length;
+        // 086: THE LIST'S GPS MARK, read as the golfer reads it - "✓ GPS" (every hole), "GPS · N of M holes",
+        // or nothing - on its rows and on the PLAYING card; all must say the same.
+        const markOf = (t) => { const m = /GPS \u00b7 (\d+) of (\d+) holes/.exec(t || ''); return m ? { kind: 'partial', n: +m[1], of: +m[2] } : /\u2713 GPS/.test(t || '') ? { kind: 'full' } : { kind: 'none' }; };
+        const rowTexts = JSON.parse(await ev("(function(){ var re=new RegExp(" + JSON.stringify(re) + "," + JSON.stringify(fl) + "); return JSON.stringify(Array.prototype.filter.call(document.querySelectorAll('#sf [data-sf-course]'), function(b){ return re.test(b.getAttribute('data-sf-full')||(b.querySelector('.n')||{}).textContent||''); }).map(function(b){ return b.textContent; })); })()"));
+        const marks = rowTexts.map(markOf).concat(pcard && pcard.text ? [markOf(pcard.text)] : []);
+        out.listMark = marks[0] || { kind: 'none' };
+        const markStr = (m) => m.kind === 'partial' ? 'GPS ' + m.n + '/' + m.of : m.kind === 'full' ? '✓ GPS' : 'no mark';
+        if (marks.some((m) => markStr(m) !== markStr(out.listMark))) out.why.push('the list\u2019s rows / PLAYING card disagree: ' + marks.map(markStr).join(' / '));
         out.badge = near.hits.concat(found).some((h) => h[2]);
         const badge = out.badge ? ', ✓ GPS' : ', no ✓ GPS';
         // URGENT-060: NEAR YOU is the 3 closest only (the rest from search). ON the course it must be in NEAR
@@ -158,6 +192,15 @@ async function check(c) {
         const midY = (/(\d{2,3})/.exec(g.mid) || [])[1];
         out.gps = (g.up && g.data && midY ? 'PASS' : 'FAIL') + ` (hole ${g.hole}: ${g.f || '-'} / ${g.mid || '-'} / ${g.b || '-'})`;
         if (!(g.up && g.data && midY)) out.why.push('GPS: ' + (g.up ? (g.data ? 'no MIDDLE number' : 'no green on hole 1') : 'map did not open') + (g.banner ? ' - "' + g.banner + '"' : ''));
+        // 086: a partial course - the hole with no green says "Tap the middle of the green"; then back to hole 1.
+        if (c.partial) {
+            await ev("HardPanGps.goHole(" + c.partial.noGreenHole + ")"); await sleep(2500);
+            const pb = await ev("((document.querySelector('.gps-banner')||{}).textContent||'').trim()");
+            const pOk = /Tap the middle of the green/.test(pb);
+            out.gps += ` · hole ${c.partial.noGreenHole}: "${pb}"`;
+            if (!pOk) { out.gps = out.gps.replace(/^PASS/, 'FAIL'); out.why.push('partial: hole ' + c.partial.noGreenHole + ' banner "' + pb + '"'); }
+            await ev("HardPanGps.goHole(1)"); await sleep(2500);
+        }
         // 6 (URGENT-022): the map frames hole 1 - its tee and green in view - and the green is within 2 km
         // of the course (data in the wrong place, or a map on the golfer's street, fails here).
         const hc = JSON.parse(await ev("JSON.stringify(window.HardPanGps && HardPanGps.holeCheck ? HardPanGps.holeCheck() : null)"));
@@ -198,9 +241,14 @@ async function check(c) {
         out.plays = !ov.pill ? 'n/a (no pill)' : (ov.hits.length ? 'FAIL (' + ov.hits.join('; ') + ')' : 'PASS');
         if (/^FAIL/.test(out.plays)) out.why.push('Plays-like pill covered: ' + ov.hits.join('; '));
         // 7 (URGENT-022): the list's ✓ GPS says what the map does - one answer for both.
-        const mapHasGps = c.noGreens ? false : /^PASS/.test(out.gps);
-        out.same = (out.badge === mapHasGps ? 'PASS' : 'FAIL') + ` (list ${out.badge ? '✓ GPS' : 'no ✓'}, map ${mapHasGps ? 'GPS' : 'no GPS'})`;
-        if (out.badge !== mapHasGps) out.why.push('badge and map disagree');
+        // 086: MEASURED, not assumed - every hole of the card asked on the map (a green to measure to, the
+        // same test as its "Tap the middle of the green" banner). The list's mark must say the same.
+        const mapN = await ev("(function(){ var n=0, of=(currentData.courseData||[]).length||18; for (var i=1;i<=of;i++) if (window.HardPanGps && HardPanGps.holeHasGreen && HardPanGps.holeHasGreen(i)) n++; return n; })()");
+        const mapOf = card.n || 18;
+        out.mapMark = mapN >= mapOf ? { kind: 'full' } : mapN > 0 ? { kind: 'partial', n: mapN, of: mapOf } : { kind: 'none' };
+        const sameMark = markStr(out.listMark) === markStr(out.mapMark) && (!c.partial || markStr(out.mapMark) === 'GPS ' + c.partial.n + '/' + c.partial.of) && (!c.noGreens || out.mapMark.kind === 'none');
+        out.same = (sameMark ? 'PASS' : 'FAIL') + ` (list ${markStr(out.listMark)}, map ${markStr(out.mapMark)})`;
+        if (!sameMark) out.why.push('badge and map disagree');
         // + Bet.
         await ev("(function(){ try { HardPanBet.open(); } catch (e) {} return 1; })()");
         await sleep(800);

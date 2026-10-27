@@ -5206,6 +5206,14 @@
                 { how: 'below', l: cl(box.l), t: below }, { how: 'below', l: cl(box.r - sw), t: below },
                 { how: 'above', l: cl(box.l), t: above }, { how: 'above', l: cl(box.r - sw), t: above });
         });
+        // 085b (urgent061 at 402x874, a pitching-wedge oval with the green's "B" label right above it): every
+        // spot above was covered and the label landed on "B". Further out, and against either edge of the clear
+        // map, before anything that covers a label - still only picked when every nearer spot is covered.
+        [80, 110, 140].forEach(function (G) {
+            var below = box.b + G - 2, above = box.t - G + 2 - sh;
+            [cl(cx - sw / 2), cl(box.l), cl(box.r - sw), B.l, B.r - sw].forEach(function (l) { out.push({ how: 'below', l: l, t: below }, { how: 'above', l: l, t: above }); });
+            out.push({ how: 'right', l: box.r + G, t: ct(cy - sh / 2) }, { how: 'left', l: box.l - G - sw, t: ct(cy - sh / 2) });
+        });
         // No room outside the oval at all (a small phone, close in): the sides clamped onto the screen,
         // or just inside the oval's top / bottom edge.
         out.push({ how: 'above', l: cl(cx - sw / 2), t: ct(box.t - 6 - sh) }, { how: 'below', l: cl(cx - sw / 2), t: ct(box.b + 6) },
@@ -8560,6 +8568,17 @@
         // Build 5: does hole n have a green (or tee) to measure to? The card asks
         // before it hands a hole back to GPS.
         holeHasData: function (n) { try { return holeHasData(n); } catch (e) { return false; } },
+        // 086 (the course check MEASURES the map's GPS): does hole n have a green - the same test as the
+        // "Tap the middle of the green" banner (no green = !r.mid) - and go to hole n (as the Watch does).
+        holeHasGreen: function (n) {
+            try {
+                if (!S || !G) return false;
+                var h = n == null ? S.hole : n, osm = osmRecord(S.courseKey);
+                var r = G.resolveHole(osm && osm.holes ? osm.holes[String(h)] : null, pinsFor(h));
+                return !!(r && r.mid);
+            } catch (e) { return false; }
+        },
+        goHole: function (n) { var h = Number(n); if (!S || !(h >= 1 && h <= 36)) return false; if (typeof S.gotoHole === 'function') S.gotoHole(h); else setHole(h); return true; },
         // THE WATCH (feature 10; gps_watch_test.js): what render sent, and a watch score in.
         watchSent: function () { return watchLast ? JSON.parse(watchLast) : null; },
         watchScore: function (ev) { return watchScore(ev); },
@@ -8567,6 +8586,8 @@
         roundScore: roundScore, roundScoreText: roundScoreText,
         // POLISH #17: F / C / B screen offsets when they crowd (pure; polish_map_chrome_test.js).
         pinSpread: pinSpread,
+        // 085b: the My miss label's candidate spots (pure; urgent085b_mymiss_spots_test.js).
+        missLblSpots: missLblSpots,
         // LAYOUT D (012): which layout shows ('d' | 'c' | 'old'), and Tools > Screen layout's switch.
         layout: function () { return layoutNow(); },
         setLayout: function (name) { if (S) setLayout(name === 'c' ? 'c' : 'd'); },

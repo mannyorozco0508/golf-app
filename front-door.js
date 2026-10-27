@@ -484,6 +484,22 @@
         var lk = null; try { var v = JSON.parse(W.localStorage.getItem('hardpan_osm_v1_' + key) || 'null'); lk = v && v.holes && Object.keys(v.holes).length ? v : null; } catch (e) {}
         return G.courseGps({ key: key, name: name || null, loc: loc || null, golfapi: (live() || !!c.golfapiFile) ? gaTable() : null, osmOn: c.osm !== false || (c.osmOnlyCourses !== false && /^osm_[wr]\d+$/.test(String(key || ''))), osmTable: W.HardPanGpsCourses || {}, lookedUp: lk });   // (071: an OSM-only course's own holes)
     }
+    // 086 (Manny, Oct 26): THE GPS MARK - { n, of }: how many of the course's holes have a green in the
+    // record the map draws (gps-geo greensOf). of = the course's card (9 / 18), else the GolfAPI record's
+    // own count, else 18. null = no GPS record (the old "ready" answer stands).
+    function courseHoles(key, rec) {
+        var len = function (d) { return d ? (Array.isArray(d) ? d.filter(Boolean).length : Object.keys(d).length) : 0; };
+        try { if (typeof coursePresets !== 'undefined' && coursePresets[key]) { var a = len(coursePresets[key].data); if (a === 9 || a === 18) return a; } } catch (e) {}   /* global coursePresets */
+        var r = crShared()[key], m = len(r && r.data);
+        if (m === 9 || m === 18) return m;
+        return rec && Number(rec.of) > 0 ? Number(rec.of) : 18;
+    }
+    function courseGpsMark(key, name, loc) {
+        var G = W.HardPanGeo;
+        if (!key || !G || !G.greensOf) return null;
+        var rec = courseGpsRec(key, name, loc);
+        return rec ? G.greensOf(rec, courseHoles(key, rec), loc || null) : null;
+    }
     function teeRows(rec) {
         var out = [], seen = {}, arr = function (v) { return Array.isArray(v) ? v : v && typeof v === 'object' ? Object.keys(v).sort(function (a, b) { return a - b; }).map(function (k) { return v[k]; }) : []; };
         var yards = function (t) { var y = Number(t && (t.totalYards != null ? t.totalYards : t.total_yards)); if (!(y > 0)) y = arr(t && t.holes).reduce(function (s, h) { return s + (Number(h && (h.yardage != null ? h.yardage : h.yards)) || 0); }, 0); return y > 0 ? Math.round(y) : 0; };
@@ -533,7 +549,7 @@
         if (!at.length) return null;
         return (gpsFirst ? at.filter(function (x) { return x.c.ready; })[0] : null) || at[0];
     }
-    W.HardPanCourse = { list: courseList, osmOnly: courseOsmOnly, spot: courseSpot, near: courseNear, resolve: courseResolve, hasCard: courseHasCard, gps: courseGpsRec, teeRows: teeRows,
+    W.HardPanCourse = { list: courseList, osmOnly: courseOsmOnly, spot: courseSpot, near: courseNear, resolve: courseResolve, hasCard: courseHasCard, gps: courseGpsRec, mark: courseGpsMark, teeRows: teeRows,
         atMi: courseAtMi, hereOf: courseHereOf, HERE_MI: HERE_MI, strictName: crStrict,
         refresh: function () { C.list = null; CR.rows = null; } };
     function where(c, dist) {

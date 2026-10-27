@@ -29,6 +29,8 @@ const GC = { ['gapi_' + ID]: { name: 'Talking Stick Golf Club (South - Piipaash)
 const GAPI = { v: 1, built: 'test', links: {}, courses: { [ID]: { id: ID, club: 'Talking Stick Golf Club', course: 'South - Piipaash', city: 'Scottsdale', state: 'AZ', lat: 33.539874, lng: -111.870432, holes: 18,
     // hole 1's tee and green (made-up points on the course): ✓ GPS needs a green within 2 km (URGENT-022)
     h: { 1: { g: { f: [33.5445, -111.8690], c: [33.5444, -111.8691], b: [33.5443, -111.8692] }, t: { b: [33.5467, -111.8663], f: [33.5460, -111.8678] } } } } } };
+// 086 (Manny, Oct 26): "✓ GPS" needs a green on EVERY hole - the made-up hole 1 stands for holes 2-18 too.
+for (let i = 2; i <= 18; i++) GAPI.courses[ID].h[i] = GAPI.courses[ID].h[1];
 // Phone GPS mode: GolfAPI is the GPS (gps-live on), as on the iOS build.
 const PHONE = "Object.defineProperty(window, 'HardPanGpsLive', { configurable: true, get: function () { return { on: function () { return true; } }; }, set: function () {} });"
     + 'window.HardPanGolfApi = ' + JSON.stringify(GAPI) + ';';
