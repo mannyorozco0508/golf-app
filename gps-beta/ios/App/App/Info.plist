@@ -30,9 +30,9 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>HardPan saves your round recap image to Photos when you choose Save Image.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>HardPan GPS only uses your location while the app is open, to show your yardages to the green. It never tracks you in the background.</string>
+	<string>HardPan GPS uses your location to show yardages to the green. In the background it is used only while a round's Lock Screen view is on, stays on your phone, and stops when the round ends.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>HardPan GPS uses your location only while the app is open, to show your yardages to the green. It is not sent anywhere unless you choose to set a green where you are standing.</string>
+	<string>HardPan GPS uses your location to show yardages to the green while the app is open, and while a round's Lock Screen view is on. It stays on your phone unless you choose to set a green where you are standing.</string>
 	<!-- 066 voice scoring: the microphone and Apple's speech recognizer, only while the golfer
 	     holds or taps the voice button. On the phone where the phone supports it; nothing is kept. -->
 	<key>NSMicrophoneUsageDescription</key>
