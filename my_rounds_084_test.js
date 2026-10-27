@@ -125,7 +125,7 @@ test('5 the card: today first, 1 or 3 rows + See all N, Edit setup href, no toke
 
 test('6 remember(): organizers/<uid>/rounds/<CODE>, a server timestamp, and a refusal resolves false', async () => {
     const writes = [];
-    const fakeDb = (fail) => ({ ref: (p) => ({ set: (v) => { writes.push([p, v]); return fail ? Promise.reject(Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' })) : Promise.resolve(); } }) });
+    const fakeDb = (fail) => ({ ref: (p) => ({ update: (v) => { writes.push([p, v]); return fail ? Promise.reject(Object.assign(new Error('PERMISSION_DENIED'), { code: 'PERMISSION_DENIED' })) : Promise.resolve(); } }) });
     assert.equal(await M.remember(fakeDb(false), 'acct', 'tq7m4k', { eventName: 'Tuesday Skins', organizerToken: TOKEN }), true);
     assert.equal(writes[0][0], 'organizers/acct/rounds/TQ7M4K');
     assert.ok(!JSON.stringify(writes[0][1]).includes(TOKEN));
@@ -140,12 +140,12 @@ test('7 wiring: save chain (not returned), heal on open, trip batch, shell lists
     assert.match(admin, /<script src="organizer-gate\.js"><\/script>\n[^\n]*\n\s*<script src="my-rounds\.js"><\/script>/);
     const i = admin.indexOf("localStorage.setItem('lastRoomCode', currentMode);");
     const chunk = admin.slice(i, i + 1200);
-    assert.match(chunk, /window\.HardPanMyRounds\.remember\(db, mrUid, currentMode, payload\)/);
+    assert.match(chunk, /window\.HardPanMyRounds\.remember\(db, mrUid, currentMode, payload, \{ newRound: !loadedExistingRound \}\)/);
     assert.doesNotMatch(chunk.slice(0, chunk.indexOf('remember(')), /return\s+window\.HardPanMyRounds/, 'never returned into the save chain');
-    assert.match(admin, /mrUid === mrData\.ownerUid\) window\.HardPanMyRounds\.remember/);
+    assert.match(admin, /mrUid === mrData\.ownerUid\) window\.HardPanMyRounds\.remember\(db, mrUid, mrCode, mrData, \{ healOnly: true \}\)/);
     const trip = read('trip.html');
     assert.match(trip, /<script src="my-rounds\.js"><\/script>/);
-    assert.match(trip, /window\.HardPanMyRounds\.remember\(db, mrPlanUid, m\[1\], updates\[k\], \{ day: row\.date \}\)/);
+    assert.match(trip, /window\.HardPanMyRounds\.remember\(db, mrPlanUid, m\[1\], updates\[k\], \{ day: row\.date, newRound: true \}\)/);
     assert.match(read('sync-mobile-web.js'), /'my-rounds\.js',/);
     assert.match(read('sw.js'), /'\.\/my-rounds\.js',/);
     const gps = fs.existsSync(path.join(__dirname, 'home.html'));
@@ -163,4 +163,18 @@ test('7 wiring: save chain (not returned), heal on open, trip batch, shell lists
     assert.doesNotMatch(src, /organizerToken/);
     assert.doesNotMatch(src, /remember\(env\./, 'Home reads only - it never writes a pointer');
     assert.doesNotMatch(src, /getItem\(k\)\s*[;)]\s*$/m);
+});
+
+test('8 the day: trip date > createdAt > first audit-log edit; new round = today; heal skips an undated round; re-save keeps the day', async () => {
+    assert.equal(M.firstAudit({ a: { ts: day(26) + 5 }, b: { ts: day(25) + 9 }, c: { x: 1 } }), day(25) + 9);
+    assert.equal(M.pointerFor('UCWZ8T', { courseName: 'Dobson', auditLog: { k: { ts: day(26) + 3600e3 } } }, { at: 1 }).day, day(26));
+    assert.equal(M.pointerFor('UCWZ8T', { courseName: 'Dobson' }, { at: 1 }).day, undefined, 'no date anywhere: no day');
+    const writes = [];
+    const db = { ref: (p) => ({ update: (v) => { writes.push([p, v]); return Promise.resolve(); } }) };
+    assert.equal(await M.remember(db, 'acct', 'NEW001', { courseName: 'Papago' }, { newRound: true }), true);
+    assert.ok(writes[0][1].day > 0, 'a new round gets today');
+    assert.equal(await M.remember(db, 'acct', 'OLD001', { courseName: 'Papago' }, { healOnly: true }), false, 'undated old round: no heal');
+    assert.equal(writes.length, 1);
+    assert.equal(await M.remember(db, 'acct', 'RES001', { courseName: 'Papago' }), true);
+    assert.equal('day' in writes[1][1], false, 'a re-save with no date sends no day, so update() keeps the stored one');
 });

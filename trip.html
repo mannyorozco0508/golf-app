@@ -1880,7 +1880,7 @@ html {
                 if (window.HardPanMyRounds && mrPlanUid) Object.keys(updates).forEach((k) => {
                     const m = /^events\/([^/]+)$/.exec(k); if (!m) return;
                     const row = updates['trips/' + tripCode + '/rounds/' + m[1]] || {};
-                    window.HardPanMyRounds.remember(db, mrPlanUid, m[1], updates[k], { day: row.date });
+                    window.HardPanMyRounds.remember(db, mrPlanUid, m[1], updates[k], { day: row.date, newRound: true });
                 });
             }).then(() => ({ tripCode, tripToken }));
         }).then(({ tripCode, tripToken }) => {

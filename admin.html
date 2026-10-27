@@ -10235,7 +10235,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     Promise.resolve(window.authReady).then((bootUid) => {
                         let mrUid = bootUid;
                         try { const u = window.firebase.auth().currentUser; if (u && u.uid) mrUid = u.uid; } catch (e) {}
-                        if (mrUid && mrUid === mrData.ownerUid) window.HardPanMyRounds.remember(db, mrUid, mrCode, mrData);
+                        if (mrUid && mrUid === mrData.ownerUid) window.HardPanMyRounds.remember(db, mrUid, mrCode, mrData, { healOnly: true });
                     }).catch(() => {});
                 }
             }
@@ -11621,7 +11621,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 try {
                     const mrUser = window.firebase && typeof window.firebase.auth === 'function' ? window.firebase.auth().currentUser : null;
                     const mrUid = (mrUser && mrUser.uid) || (window.authBootState && window.authBootState.uid) || null;
-                    if (mrUid && window.HardPanMyRounds) window.HardPanMyRounds.remember(db, mrUid, currentMode, payload);
+                    if (mrUid && window.HardPanMyRounds) window.HardPanMyRounds.remember(db, mrUid, currentMode, payload, { newRound: !loadedExistingRound });
                 } catch (e) { /* the list is a convenience; the save already landed */ }
                 // v191: a NEW round looks for the unfinished round it replaces
                 // (offerRetire) BEFORE this save is remembered, so the new code
