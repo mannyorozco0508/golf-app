@@ -3003,4 +3003,25 @@
     if (W.document && !/home\.html$/.test(String(W.location.pathname || ''))) {
         if (W.document.readyState === 'loading') W.document.addEventListener('DOMContentLoaded', boot); else setTimeout(boot, 0);
     }
+    // 088 FOLLOW-UP: A DELETE ACCOUNT THAT COULD NOT REACH THE SCAN SERVER left a note
+    // (hp.scanErasePending, account-exit.js). Its retry ran only where account-exit.js is loaded
+    // (admin.html), so on the app it never ran. Now, on any page that loads this file (the app's start
+    // included): ONLY when a note is there and still inside its window (about an hour), after the page
+    // has loaded, account-exit.js is fetched and retries on its own load - never blocking anything.
+    // admin.html loads account-exit.js itself (and retries there), so it is not loaded twice.
+    // A note past its window is dropped (account-exit.js's own 'expired' rule).
+    (function scanEraseRetryOnStart() {
+        try {
+            var KEY = 'hp.scanErasePending', raw = W.localStorage ? W.localStorage.getItem(KEY) : null;
+            if (!raw) return;
+            var rec = null; try { rec = JSON.parse(raw); } catch (e) { rec = null; }
+            if (!rec || typeof rec.token !== 'string' || !(Number(rec.until) > Date.now())) { W.localStorage.removeItem(KEY); return; }
+            var go = function () {
+                if (W.accountExit && typeof W.accountExit.retryScanErase === 'function') return;
+                loadScriptTimed('account-exit.js', function () {});
+            };
+            if (W.document && W.document.readyState === 'complete') setTimeout(go, 0);
+            else W.addEventListener('load', function () { setTimeout(go, 0); });
+        } catch (e) {}
+    })();
 })();
