@@ -11,7 +11,8 @@
 //
 // EXCEPTIONS (each one is Manny's call or another session's job, named here):
 //  - logo-mark.png on the Tournaments pages: the Rattle Golf mark there stays
-//    (Manny, Oct 26 2026: "leave it as Rattle Golf. No change.").
+//    (Manny, Oct 26 2026: "leave it as Rattle Golf. No change."). It is in NO bundle or
+//    offline cache (Manny OK, 6:43 PM); the website serves it from the root to that page only.
 //  - android/: the Android session regenerates its launcher + Play icons (A2).
 //  - ios/ and icon-1024.png on the website line (no gps-beta/): the App Store icon and
 //    launch screen move with the store release line (W7), not with the website.
@@ -76,7 +77,9 @@ const OLD = {
 
 const TOURNAMENT_PAGES = ['tournament.html', 'tournament-scorecard.html'];
 function allowed(file, by) {
-    if (file === 'logo-mark.png' && (!by || TOURNAMENT_PAGES.includes(by) || by === 'shell')) return 'Rattle Golf tournament mark (Manny: leave)';
+    // 087 6:43 PM (Manny OK): no longer for the shell / bundle - only the Tournaments page's own reference
+    // and the root file the website serves to it.
+    if (file === 'logo-mark.png' && (!by || TOURNAMENT_PAGES.includes(by))) return 'Rattle Golf tournament mark (Manny: leave)';
     if (/^android\//.test(file)) return 'Android session (A2)';
     if (!GPS_LINE && (/^ios\//.test(file) || file === 'icon-1024.png')) return 'store release line (W7)';
     return null;
@@ -128,7 +131,8 @@ describe('THE OLD MARK IS NOWHERE', () => {
         const sync = read('sync-mobile-web.js');
         const entries = [...shell.matchAll(/'\.\/([^']+)'/g), ...sync.matchAll(/'([^'\/]+\.(?:png|svg))'/g)].map(m => m[1]);
         assert.ok(entries.length > 10);
-        entries.filter(exists).forEach(f => assert.ok(!OLD[sha(f)] || allowed(f, 'shell'), f + ' ships the old mark'));
+        entries.filter(exists).forEach(f => assert.ok(!OLD[sha(f)], f + ' ships the old mark'));
+        assert.ok(!entries.includes('logo-mark.png'), 'logo-mark.png (the old ball) ships in a bundle or the offline cache again');
         assert.ok(!/hardpan-lockup\.svg'/.test(shell), 'sw.js precaches the old lockup');
         assert.ok(!/'hardpan-lockup\.svg'/.test(sync), 'the native bundle ships the old lockup');
         assert.ok(!exists('hardpan-lockup.svg'), 'the old lockup is back at the root');
