@@ -193,3 +193,26 @@ test('out of free course scans, then offline: plain words + Type them instead; o
     assert.match(off.err, /Scanning needs signal/);
     assert.equal(off.sent.length, 1, 'offline: no second request');
 });
+
+// A TEE WHOSE 18 YARDAGES DON'T ADD UP TO ITS PRINTED TOTAL (Manny, Oct 26): shown AMBER for the
+// golfer to fix - never a block. "Use" stays on and nothing is re-sent. Negative control: on
+// 5f8f3d1d (the button as first built) the same card turned "Use" off.
+test('a tee total that does not add up: amber + named, Use stays ON, one request, Use fills the typed boxes', { timeout: 240000 }, async () => {
+    const TEEBAD = JSON.parse(JSON.stringify(CARD)); TEEBAD.tees[0].written.total += 10;
+    const SOFT = "JSON.stringify({ soft: Array.prototype.map.call(document.querySelectorAll('#hcs-sheet [data-hcs-amber=soft]'), function(i){ return i.getAttribute('data-hcs-cell') || i.textContent; }) })";
+    const r = await open('new', [ok(TEEBAD, 2)], GAMES('Glenn 12\nMarty 4', 'net').concat([
+        { tap: '#sf-pars [data-hcs=scan]' }, { waitFor: "!!document.getElementById('hcs-grid')", timeout: 15000 }, { sleep: 300 }, X(S), X(SOFT),
+        X("(function(){ document.getElementById('hcs-use').scrollIntoView({ block: 'center' }); return 1; })()"), { sleep: 200 },
+        { tap: '#hcs-use' }, { sleep: 400 }, X(S)]));
+    assert.equal(r.ok, true, r.reason);
+    const [grid, soft, filled] = J(r);
+    assert.equal(grid.sent.length, 1, 'one request - the app never re-asks');
+    assert.equal(grid.amberN, 0, 'no box blocks: ' + JSON.stringify(grid.amberCells));
+    assert.ok(soft.soft.length >= 1, 'the tee total is amber: ' + JSON.stringify(soft.soft));
+    assert.match(grid.list, /1 box to check:/);
+    assert.match(grid.list, /Blue TOTAL adds to 6,821 yds but the card says 6,831/);
+    assert.equal(grid.useOff, false, 'Use stays on');
+    assert.match(grid.useText, /Use these pars and indexes/);
+    assert.equal(filled.grid, false);
+    assert.equal(filled.typedPar, PAR.join(',')); assert.equal(filled.typedSi, MEN.join(','));
+});

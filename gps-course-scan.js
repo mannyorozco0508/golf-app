@@ -121,7 +121,7 @@
     }
     function sumOf(a, from, to) { var s = 0; for (var i = from; i < to; i++) { if (!isInt(a[i])) return null; s += a[i]; } return s; }
     function marks(s, v) {
-        var cell = {}, words = [], hard = 0;
+        var cell = {}, words = [], hard = 0, checkN = 0;
         var put = function (k, isHard) { if (!cell[k]) { cell[k] = isHard ? 'hard' : 'soft'; } else if (isHard) cell[k] = 'hard'; };
         var nineName = { out: 'OUT', 'in': 'IN', total: 'TOTAL' };
         var nineSum = function (a, nine) { return nine === 'out' ? (s.n === 18 ? sumOf(a, 0, 9) : sumOf(a, 0, s.n)) : nine === 'in' ? sumOf(a, 9, 18) : sumOf(a, 0, s.n); };
@@ -136,7 +136,10 @@
                 Object.keys(p.bad).forEach(function (i) { put(h.code + ':' + (Number(i) + 1), true); });
                 words.push((h.code === 'hcp_men' ? 'Men’s HCP' : 'Ladies’ HCP') + ': ' + (p.words.join(' — ') || 'each index 1–' + s.n + ' once'));
             }
-            else if (h.code === 'tee_written') { var ti = teeIndex(s, h.row); put('teeW:' + ti + ':' + h.nine, true); words.push(h.row + ' ' + nineName[h.nine] + ' adds to ' + fmt(nineSum(s.tees[ti] ? s.tees[ti].yards : [], h.nine)) + ' yds but the card says ' + fmt(s.tees[ti] ? s.tees[ti].w[h.nine] : null)); }
+            // A TEE'S YARDS THAT DON'T ADD UP TO ITS PRINTED TOTAL (Manny, Oct 26): AMBER for the golfer
+            // to fix, never a block - Save stays on and the app never re-asks for it. The validator still
+            // calls it hard (it is the server's, byte for byte); only this screen softens it.
+            else if (h.code === 'tee_written') { var ti = teeIndex(s, h.row); put('teeW:' + ti + ':' + h.nine, false); checkN++; words.push(h.row + ' ' + nineName[h.nine] + ' adds to ' + fmt(nineSum(s.tees[ti] ? s.tees[ti].yards : [], h.nine)) + ' yds but the card says ' + fmt(s.tees[ti] ? s.tees[ti].w[h.nine] : null)); }
             else if (h.code === 'hole_count') { put('rows', true); words.push(h.row === 'tees' ? 'No tee rows were read' : 'The ' + h.row + ' row is not ' + s.n + ' holes — scan again or type them'); }
             else { put('rows', true); words.push('The card could not be read — scan again or type them'); }
         });
@@ -149,7 +152,7 @@
             }
         });
         var soft = Object.keys(cell).filter(function (k) { return cell[k] === 'soft'; }).length;
-        return { cell: cell, words: words, hard: hard, soft: soft };
+        return { cell: cell, words: words, hard: hard, soft: soft, check: hard + checkN };
     }
     function teeIndex(s, name) { for (var i = 0; i < s.tees.length; i++) if (s.tees[i].name === name) return i; return -1; }
 
@@ -222,7 +225,7 @@
         }
         st.v = check(st); st.m = marks(st, st.v);
         var list = st.m.words.length ? '<div id="hcs-amber" style="' + AMBER + 'border-radius:10px;padding:10px 12px;margin:10px 0;font-weight:700;font-size:14px;line-height:1.4;">'
-            + st.m.hard + ' box' + (st.m.hard === 1 ? '' : 'es') + ' to check:<br>' + st.m.words.map(function (w) { return '• ' + esc(w); }).join('<br>') + '</div>' : '';
+            + st.m.check + ' box' + (st.m.check === 1 ? '' : 'es') + ' to check:<br>' + st.m.words.map(function (w) { return '• ' + esc(w); }).join('<br>') + '</div>' : '';
         var soft = !st.m.words.length && st.m.soft ? '<div class="hcs-note" id="hcs-soft" style="margin:8px 0;">Amber boxes were hard to read — give them a look.</div>' : '';
         var ok = st.m.hard === 0;
         var ladiesNote = st.ladies && !st.v.saveLadies ? '<button type="button" class="hcs-link" data-hcs="dropladies" style="font-size:13px;padding:0;min-height:0;">Don’t keep the Ladies’ HCP</button>' : '';
@@ -269,7 +272,8 @@
     // The checked card, in the shape the screens fill from.
     function cardOut(s) {
         var v = check(s);
-        if (v.hard.length) return null;
+        // tee_written is amber on this screen, not a block (see marks()).
+        if (v.hard.some(function (h) { return h.code !== 'tee_written'; })) return null;
         return {
             holes: s.n,
             par: s.par.slice(),
