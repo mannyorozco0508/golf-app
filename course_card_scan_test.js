@@ -261,3 +261,16 @@ describe('course mode in the handler (fake Gemini: good / bad / retry)', () => {
         assert.equal(fetch.calls.length, 0);
     });
 });
+
+// 088-3: the privacy page says what a COURSE-card scan sends (deployed with the server).
+describe('privacy page: the course-card scan sentence', () => {
+    test('names what is sent and what is not', () => {
+        const html = require('fs').readFileSync(path.join(REPO_ROOT, 'privacy.html'), 'utf8');
+        const li = (/<li><strong>Scanning a course's printed card\.<\/strong>[^<]*<\/li>/.exec(html) || [''])[0];
+        assert.ok(li, 'the course-card sentence is on the page');
+        assert.match(li, /Only that photo, the course name and the number of holes/);
+        assert.match(li, /No player names, scores, handicaps or location are sent/);
+        assert.match(li, /photo is not stored/);
+        assert.match(li, /own free count/);
+    });
+});
