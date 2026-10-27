@@ -1869,17 +1869,18 @@ html {
             // press is refused and that is expected), and EVERY round in the batch
             // stamped with ownerUid - the multi-path update is atomic, so one round
             // without it would refuse the whole batch, the good rounds included.
+            let mrPlanUid = null;   // 084: the uid the batch was stamped with, for the pointers after it lands
             return window.organizerGate.ensureOrganizer(db).then((uid) => {
+                mrPlanUid = uid;
                 Object.keys(updates).forEach((k) => { if (/^events\/[^/]+$/.test(k)) window.organizerGate.stamp(updates[k], uid); });
-                return db.ref().update(updates).then(() => {
-                    // 084: a Rounds I'm running pointer per planned round, with its tee date.
-                    // Fire-and-forget: refused until the rules are published; never awaited.
-                    if (!window.HardPanMyRounds) return;
-                    Object.keys(updates).forEach((k) => {
-                        const m = /^events\/([^/]+)$/.exec(k); if (!m) return;
-                        const row = updates['trips/' + tripCode + '/rounds/' + m[1]] || {};
-                        window.HardPanMyRounds.remember(db, uid, m[1], updates[k], { day: row.date });
-                    });
+                return db.ref().update(updates);
+            }).then(() => {
+                // 084: a Rounds I'm running pointer per planned round, with its tee date.
+                // Fire-and-forget: refused until the rules are published; never awaited.
+                if (window.HardPanMyRounds && mrPlanUid) Object.keys(updates).forEach((k) => {
+                    const m = /^events\/([^/]+)$/.exec(k); if (!m) return;
+                    const row = updates['trips/' + tripCode + '/rounds/' + m[1]] || {};
+                    window.HardPanMyRounds.remember(db, mrPlanUid, m[1], updates[k], { day: row.date });
                 });
             }).then(() => ({ tripCode, tripToken }));
         }).then(({ tripCode, tripToken }) => {

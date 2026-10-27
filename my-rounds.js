@@ -6,9 +6,9 @@
 // TWO SOURCES, ONE LIST.
 //   (a) THE SERVER: organizers/<uid>/rounds/<CODE> = { at, name, course, day }.
 //       Written by remember() after a round is saved by its owner (admin.html's
-//       save chain, trip.html's planner batch) and healed from Home when this
-//       phone holds a round the signed-in account owns but the server has no
-//       pointer for. The rules (database.rules.084-proposed.json) take a
+//       save chain, trip.html's planner batch) and healed when the owner opens
+//       that round's setup (admin.html). HOME WRITES NOTHING (hp_auth_chrome_test,
+//       polish_home_chrome_test): it only reads. The rules (database.rules.084-proposed.json) take a
 //       pointer ONLY for a round whose ownerUid is that uid, or whose trip that
 //       uid owns. Until those rules are published every write here is refused,
 //       silently: nothing on the save path waits for it or reports it.
@@ -237,8 +237,14 @@
         if (!document.getElementById('mr-css')) {
             var s = document.createElement('style'); s.id = 'mr-css'; s.textContent = CSS; document.head.appendChild(s);
         }
+        // env.skip(): codes another card on the same screen already shows (the GPS Home's IN PROGRESS
+        // card - Manny's rule: an unfinished round shows ONCE on Home). Read at every paint.
+        function shown() {
+            var skip = {}; try { (typeof env.skip === 'function' ? env.skip() : []).forEach(function (c) { skip[String(c).toUpperCase()] = true; }); } catch (e) {}
+            return st.rows.filter(function (r) { return !skip[r.code]; });
+        }
         function paint() {
-            var html = cardHtml(st, { show: env.show || 3 });
+            var html = cardHtml({ rows: shown(), signedIn: st.signedIn, email: st.email, expanded: st.expanded }, { show: env.show || 3 });
             box.innerHTML = html;
             box.style.display = html ? '' : 'none';
         }
@@ -283,13 +289,6 @@
                     if (my !== gen) return;
                     var dead = {}; check.forEach(function (r, i) { if (!alive[i]) dead[r.code] = true; });
                     st.rows = list.filter(function (r) { return !dead[r.code]; }); paint();
-                    // HEAL: a round this account owns that the server does not list yet.
-                    if (signedIn) local.forEach(function (r) {
-                        if (!ptrs[r.code] && r.editable) {
-                            var e = ev.filter(function (x) { return x.code === r.code; })[0] || {};
-                            remember(env.db, uid, r.code, { eventName: r.name, courseName: r.course, createdAt: r.day, tripCode: e.tripCode });
-                        }
-                    });
                 });
             }).catch(function () {});
         }
@@ -297,7 +296,7 @@
             if (env.auth && typeof env.auth.onAuthStateChanged === 'function') env.auth.onAuthStateChanged(function (u) { refresh(u); });
             else refresh(env.auth && env.auth.currentUser);
         } catch (e) { refresh(null); }
-        return { refresh: refresh, state: st };
+        return { refresh: refresh, repaint: paint, state: st };
     }
 
     var api = { pointerFor: pointerFor, when: when, dayLabel: dayLabel, rows: rows, localEvidence: localEvidence, localRows: localRows,

@@ -46,7 +46,7 @@ const DEST = path.join(ROOT, 'www', 'app');
 const SHARED_SHELL = [
     'qr-encode.js', 'qr-codes.js',
     'tap-feedback.js',
-    // 084: Rounds I'm running - admin.html, trip.html and (GPS) home.html load it.
+    // 084: the Rounds I am running list - admin.html, trip.html and (GPS) home.html load it.
     'my-rounds.js',
     'trip-recap-image.js',
     'grouping.js', 'handicap.js', 'player-tees.js', 'handicap-labels.js', 'aloha-bet.js', 'payouts.js', 'course-data.js', 'score-marks.js',
