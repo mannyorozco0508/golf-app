@@ -46,7 +46,11 @@
         GREEN_AIM_YD: 30,     // a target ring within 30 yds of the green's center is aiming at the green
         PLAYS_CENTER: true,   // true: the centre sits where that carry lands TODAY (the carry x yards / plays-like,
                               // as the Distance arcs do); false: at the plain carry. The size is always from the carry.
-        TEE_YD: 40            // within 40 yds of the tee = the tee shot (as the tee plan's TEE_SHOT_YD)
+        TEE_YD: 40,           // within 40 yds of the tee = the tee shot (as the tee plan's TEE_SHOT_YD)
+        // 089 (Manny, Oct 27): the note "7-iron lands 8 yds long" and the club chips' "+8 long" say nothing
+        // ("on target" on a chip) within this many yards of the aim; the stepped fade's 6 stacked ovals.
+        NOTE_MIN_YD: 2,
+        FADE: [1, 0.86, 0.72, 0.58, 0.44, 0.30]
     };
     // Irons and wedges only (My bag's club keys).
     var CLUBS = ['4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
@@ -199,7 +203,45 @@
         try { W.localStorage.setItem(KEY, JSON.stringify(o)); return true; } catch (e) { return false; }
     }
 
+    // ---- 089: THE NOTE AND THE CLUB CHIPS (pure) ------------------------------------------
+    // THE TWO CLUBS AROUND THE PLAYS-LIKE: the app's pick (My bag's suggestClub - the shortest club that
+    // gets there) and the next club down (the longest carry under the pick's). bag: { club: { yd } }.
+    // Returns [pick] or [pick, down] (club keys; the caller keeps only those My miss would draw), [] with no pick.
+    function chipPair(bag, pick) {
+        if (!pick) return [];
+        var pv = bag && bag[pick], py = pv && isNum(pv.yd) && pv.yd > 0 ? pv.yd : null;
+        if (py == null) return [pick];
+        var down = null;
+        Object.keys(bag).forEach(function (c) {
+            var v = bag[c];
+            if (c !== pick && v && isNum(v.yd) && v.yd > 0 && v.yd < py && (!down || v.yd > bag[down].yd)) down = c;
+        });
+        return down ? [pick, down] : [pick];
+    }
+    function nearAim(d) { return !isNum(d) || Math.abs(d) <= TUNE.NOTE_MIN_YD; }
+    function shown(d, unit) { return Math.round(Math.abs(d) * (unit === 'm' ? 0.9144 : 1)); }
+    // A CHIP: "7i +8 long" / "8i \u22124 short" / "7i on target" (delta: the oval centre minus the yards to
+    // the aim, + = long).
+    function chipText(short, delta, unit) {
+        var n = shown(delta, unit);
+        return String(short) + ' ' + (nearAim(delta) || n < 1 ? 'on target' : (delta > 0 ? '+' + n + ' long' : '\u2212' + n + ' short'));
+    }
+    // THE NOTE under the My miss label: "7-iron lands 8 yds long" (and "... and 3 yds right" when the
+    // centre sits off the line - side + = right). '' within NOTE_MIN_YD both ways.
+    function landNote(name, delta, side, unit) {
+        var u = unit === 'm' ? ' m' : ' yds', parts = [];
+        if (!nearAim(delta) && shown(delta, unit) >= 1) parts.push(shown(delta, unit) + u + (delta > 0 ? ' long' : ' short'));
+        if (!nearAim(side) && shown(side, unit) >= 1) parts.push(shown(side, unit) + u + (side > 0 ? ' right' : ' left'));
+        return parts.length ? String(name) + ' lands ' + parts.join(' and ') : '';
+    }
+    // THE STEPPED FADE: the oval at each TUNE.FADE size (same centre, tilt, hand) - largest first.
+    function fadeOvals(f) {
+        if (!f) return [];
+        return TUNE.FADE.map(function (k) { var g = {}; Object.keys(f).forEach(function (x) { g[x] = f[x]; }); g.a = Math.max(0.5, f.a * k); g.b = Math.max(0.5, f.b * k); return g; });
+    }
+
     var api = { TUNE: TUNE, CLUBS: CLUBS, KEY: KEY,
+        chipPair: chipPair, chipText: chipText, landNote: landNote, fadeOvals: fadeOvals,
         isClub: isClub, oval: oval, centreAt: centreAt, margin: margin, inRange: inRange, shows: shows, tips: tips, bagLine: bagLine, infoText: infoText,
         outline: outline, inside: inside, isOn: isOn, setOn: setOn,
         AIM_PER_MPH: AIM_PER_MPH, hasMiss: hasMiss, point: point, shotStats: shotStats, statsLine: statsLine };
