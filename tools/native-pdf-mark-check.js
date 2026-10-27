@@ -40,12 +40,12 @@ const { linkedRounds } = require('../helpers/trip-weekly-rounds.js');
 
 const R = linkedRounds()[0].data;
 const PROBE = `(function(){ var captured = null; window.RattleExport.exportOrPrint = function (o) { captured = o; return Promise.resolve({ path: 'captured' }); };
-  var reqBefore = performance.getEntriesByType('resource').filter(e => /logo-mark\\.png/.test(e.name)).length;
+  var reqBefore = performance.getEntriesByType('resource').filter(e => /hardpan-print-mark\\.png/.test(e.name)).length;
   var btn = Array.from(document.querySelectorAll('button')).find(x => /printReceipt/.test(x.getAttribute('onclick') || '')); if (!btn) return JSON.stringify({ error: 'no print button' }); btn.click();
   if (!captured || !captured.roots) return JSON.stringify({ error: 'nothing captured' });
   var lines = RattleExport._linesFrom(captured.roots); var mark = RattleExport._markFrom(captured.roots);
   var withMark = RattleExport._buildPdf(captured.title, lines, mark); var without = RattleExport._buildPdf(captured.title, lines);
-  var reqAfter = performance.getEntriesByType('resource').filter(e => /logo-mark\\.png/.test(e.name)).length;
+  var reqAfter = performance.getEntriesByType('resource').filter(e => /hardpan-print-mark\\.png/.test(e.name)).length;
   var img = document.querySelector('img.receipt-mark');
   return JSON.stringify({ lines: lines.length, mark: mark ? { bytes: mark.data.length, w: mark.w, h: mark.h, soi: mark.data.charCodeAt(0) === 0xFF && mark.data.charCodeAt(1) === 0xD8, eoi: mark.data.charCodeAt(mark.data.length - 2) === 0xFF && mark.data.charCodeAt(mark.data.length - 1) === 0xD9 } : null,
     img: img ? { complete: img.complete, natural: [img.naturalWidth, img.naturalHeight], src: img.getAttribute('src') } : null, markRequestsDuringExport: reqAfter - reqBefore,
@@ -77,7 +77,7 @@ function pngPixels(buf) {
     // THE IMAGE
     if (!v.mark) problems.push('image: _markFrom returned null (img complete ' + v.img.complete + ', natural ' + v.img.natural + ')');
     else { if (!(v.mark.soi && v.mark.eoi)) problems.push('image: not a JPEG (SOI ' + v.mark.soi + ', EOI ' + v.mark.eoi + ')'); if (v.mark.w !== 256 || v.mark.h !== 256) problems.push('image: ' + v.mark.w + 'x' + v.mark.h); if (v.mark.bytes < 5000 || v.mark.bytes > 40000) problems.push('image: ' + v.mark.bytes + ' bytes is not the 10-20 KB a flattened 256 px JPEG of the mark makes'); }
-    if (v.img.src !== 'logo-mark.png') problems.push('image: src is ' + v.img.src);
+    if (v.img.src !== 'hardpan-print-mark.png') problems.push('image: src is ' + v.img.src);
     if (v.markRequestsDuringExport !== 0) problems.push('image: ' + v.markRequestsDuringExport + ' request(s) for logo-mark.png during the export - it must come from the decoded element');
 
     // THE PDF
@@ -108,8 +108,10 @@ function pngPixels(buf) {
     const box = { x: 282, y: 44 };   // the mark's box in page points, y from the top
     const corners = [[box.x + 1, box.y + 1], [box.x + 47, box.y + 1], [box.x + 1, box.y + 47], [box.x + 47, box.y + 47]].map(([x, y]) => pt(x, y));
     corners.forEach((c, i) => { if (c.some(ch => ch < 245)) problems.push('pixels: corner ' + i + ' of the mark box is ' + JSON.stringify(c) + ', not white - the black-under-alpha hazard'); });
-    const stroke = pt(box.x + 18, box.y + 24);   // on the R
-    if (!(stroke[0] < 60 && stroke[1] > 20 && stroke[1] < 90 && stroke[2] < 70 && stroke[1] > stroke[0])) problems.push('pixels: the R is ' + JSON.stringify(stroke) + ', not the mark\'s dark green');
+    // 087: the mark is the new light HardPan mark (hardpan-print-mark.png); the sample sits on
+    // the left stem of its dark-green H (was pt(box.x + 18, box.y + 24), on the old mark).
+    const stroke = pt(box.x + 5.5, box.y + 20);   // on the H
+    if (!(stroke[0] < 60 && stroke[1] > 20 && stroke[1] < 90 && stroke[2] < 70 && stroke[1] > stroke[0])) problems.push('pixels: the H is ' + JSON.stringify(stroke) + ', not the mark\'s dark green');
     const beside = pt(box.x - 20, box.y + 24); if (beside.some(ch => ch < 245)) problems.push('pixels: the page beside the mark is ' + JSON.stringify(beside));
     // something dark below the mark where the header text starts (y 694 - 9.5 .. 694)
     let ink = 0; for (let x = 44; x < 200; x += 2) for (let y = 686; y < 696; y++) { const c = pt(x, y); if (c[0] < 120) ink++; }

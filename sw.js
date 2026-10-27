@@ -4506,7 +4506,9 @@
 // Moved to v360 (016, 2026-10-19): the Hi-Lo 2v2 side bet - hilo-engine.js joins
 // the shell, and New Action, the Bets tab, Matches, the scorecard and the Receipt
 // read it. A device on v359 cannot offer, show or settle a Hi-Lo.
-const CACHE_VERSION = 'golfapp-v360-gps-hilo';
+// Moved to v361 (087): the new HardPan logo - the lobby and legal headers
+// (hardpan-lockup-light.png) and the receipt mark (hardpan-print-mark.png).
+const CACHE_VERSION = 'golfapp-v361-new-logo';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4855,14 +4857,19 @@ const SHELL_FILES = [
     './manifest.json',
     './icon-192.png',
     './icon-512.png',
-    './logo-mark.png',
+    // 087 (Manny OK, Oct 26 2026 6:43 PM): logo-mark.png (the old ball) is no longer precached.
+    // The website still serves it from the root for the Tournaments page (Rattle Golf, Manny: leave);
+    // backup copy in assets/brand/legacy/logo-mark.png.
     // Ball icon, favicon, and the outlined lockup (v205, word opened in v206).
-    // The lobby header is the icon plus HTML text; the lockup file stays
-    // precached so a direct open is the readable outline, not the old bars.
+    // 087 (Manny OK, Oct 26 2026): hardpan-lockup.svg (the old ball + HARDPAN) no
+    // longer ships; its copy is kept at assets/brand/legacy/hardpan-lockup.svg.
     // Flat names: a slash in this list is refused.
-    './hardpan-lockup.svg',
     './hardpan-icon.svg',
-    './favicon-32.png'
+    './favicon-32.png',
+    // 087 THE NEW LOGO (Manny, Oct 26 2026): the lobby + legal-page header lockup and the
+    // receipt mark.
+    './hardpan-lockup-light.png',
+    './hardpan-print-mark.png'
 ];
 
 self.addEventListener('install', (event) => {

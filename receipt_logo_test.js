@@ -33,7 +33,11 @@ const read = f => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
 const stripComments = s => s.replace(/<!--[\s\S]*?-->|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, str) => str !== undefined ? str : '');
 const PAGE = read('settlement.html');
 const code = stripComments(PAGE);
-const IMG = '<img class="receipt-mark" src="logo-mark.png" alt="HardPan" width="64" height="64">';
+// 087 (Manny, Oct 26 2026): the receipt prints the new light mark, hardpan-print-mark.png
+// (the GPS app's 077 light mark). Was logo-mark.png, the old ball, which now stays only as
+// the Rattle Golf tournament mark.
+const MARK = 'hardpan-print-mark.png';
+const IMG = '<img class="receipt-mark" src="' + MARK + '" alt="HardPan" width="64" height="64">';
 
 describe('THE MARKUP: one header, the mark first in it, adjacent to the opening tag', () => {
     test('buildReceiptHeader emits the mark once, as the precached file, with alt text', () => {
@@ -44,9 +48,9 @@ describe('THE MARKUP: one header, the mark first in it, adjacent to the opening 
         assert.equal((code.match(/receipt-mark/g) || []).length, 3, 'one in the builder, one screen rule, one print rule');
     });
     test('the receipt still uses the precached print mark, and the page has exactly one image', () => {
-        // The lobby header is the ball icon plus the HTML word. This page keeps logo-mark.png,
+        // This page's one image is the print mark (087: hardpan-print-mark.png, was logo-mark.png),
         // which is what the print path and the native PDF already decode.
-        assert.match(code, /src="logo-mark\.png"/);
+        assert.match(code, /src="hardpan-print-mark\.png"/);
         assert.equal((code.match(/<img /g) || []).length, 1, 'the receipt has exactly one image');
     });
     test('a rendered header carries the tag, and its tag-stripped text is unchanged by it', () => {
@@ -76,14 +80,14 @@ describe('THE ASSET: precached, shipped natively, sharp at print resolution', ()
     test('src is a bare relative path - no scheme, no host - and that file is in the sw.js precache and the native bundle', () => {
         const m = /<img class="receipt-mark" src="([^"]+)"/.exec(code);
         assert.ok(m, 'the mark is in the source');
-        assert.equal(m[1], 'logo-mark.png');
+        assert.equal(m[1], MARK);
         assert.ok(!/^[a-z]+:|^\/\//i.test(m[1]), 'not a network URL');
-        assert.ok(read('sw.js').includes("'./logo-mark.png'"), 'precached');
-        assert.ok(read('sync-mobile-web.js').includes("'logo-mark.png'"), 'in the native bundle');
-        assert.ok(fs.existsSync(path.join(REPO_ROOT, 'logo-mark.png')));
+        assert.ok(read('sw.js').includes("'./" + MARK + "'"), 'precached');
+        assert.ok(read('sync-mobile-web.js').includes("'" + MARK + "'"), 'in the native bundle');
+        assert.ok(fs.existsSync(path.join(REPO_ROOT, MARK)));
     });
     test('the PNG is at least 300 dpi worth of the printed size: 64 CSS px x 300/96 = 200 px needed, 256 present, and it has alpha (no cream field on white paper)', () => {
-        const buf = fs.readFileSync(path.join(REPO_ROOT, 'logo-mark.png'));
+        const buf = fs.readFileSync(path.join(REPO_ROOT, MARK));
         const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
         const [, css] = /\.receipt-mark \{ display: block; width: (\d+)px/.exec(PAGE);
         const needed = Math.ceil(Number(css) * 300 / 96);

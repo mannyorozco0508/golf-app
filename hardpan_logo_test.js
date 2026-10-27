@@ -35,9 +35,14 @@ const TOURNAMENT_PAGES = ['tournament.html', 'tournament-scorecard.html'];
 
 const NATIVE_ICONS = {
     // THE MERGED APP'S ICON (mailbox 004, Manny 2026-10-17): com.rattlegolf.app takes the GPS
-    // app's HP ball + green location pin, the whole slot set (gps-beta's AppIcon.appiconset).
+    // app's whole slot set (gps-beta's AppIcon.appiconset).
+    // 077b ONE APP, ONE ICON (Manny, Oct 26 2026): that set is now the new HardPan logo (#71,
+    // ~/Desktop/HardPan-Logo/HardPan-AppIcon-1024-square.png, byte for byte). Was the HP ball
+    // + pin, 23cd2d1d823c8e6c…; the old file is kept at assets/brand/legacy/icon-1024.png.
+    // The Android launcher pins below are still the old ball: the Android session regenerates
+    // them from the new icon-1024.png (tools/android-icons.js) and moves these pins with it.
     'ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png':
-        '23cd2d1d823c8e6c6f544ea374c467eb4e7e9d1361e4365419773ae93e673947',
+        '3c615977250b974ed8eaed554215d7191910723291d63e5158c012ef8bf5a866',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher.png':
         '300cf9f2ff551ccd3aa45dc64d933ca9a53a0830d312cd2906cbb1f6ec801ddd',
     'android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png':
@@ -77,7 +82,8 @@ function px(img, x, y) {
 }
 
 describe('THE LOCKUP SVG', () => {
-    const svg = read('hardpan-lockup.svg');
+    // 087 (Manny's OK, Oct 26 2026): the old lockup no longer ships; this is its backup copy.
+    const svg = read('assets/brand/legacy/hardpan-lockup.svg');
 
     test('it is the ball, the firm ground, and an outlined HARDPAN', () => {
         assert.match(svg, /#2E7A4B/);
@@ -118,17 +124,23 @@ describe('THE LOCKUP SVG', () => {
 
     test('the icon svg is the ball only, on near-black', () => {
         const icon = read('hardpan-icon.svg');
-        assert.match(icon, /#0B0F0C/);
-        assert.match(icon, /#2E7A4B/);
+        // 077b: the new logo's night field and pin green (were #0B0F0C / #2E7A4B, the old ball).
+        assert.match(icon, /#0b100d/i);
+        assert.match(icon, /#2e7d4f/i);
         assert.match(icon, /<circle /);
         assert.ok(!/#C43C2C/.test(icon), 'the pin-flag red is back');
         assert.ok(!/HARDPAN/.test(icon), 'the icon must not carry the wordmark');
     });
 
     test('assets/brand holds the same svg bytes the pages load', () => {
-        ['hardpan-lockup.svg', 'hardpan-icon.svg'].forEach(f => {
+        ['hardpan-icon.svg'].forEach(f => {
             assert.equal(sha('assets/brand/' + f), sha(f), f + ' drifted from assets/brand');
         });
+        // 087: hardpan-lockup.svg (the old ball + HARDPAN) left the root and assets/brand;
+        // its one copy is the backup in assets/brand/legacy/.
+        assert.ok(!fs.existsSync(path.join(__dirname, 'hardpan-lockup.svg')), 'the old lockup is back at the root');
+        assert.ok(!fs.existsSync(path.join(__dirname, 'assets/brand/hardpan-lockup.svg')), 'the old lockup is back in assets/brand');
+        assert.ok(fs.existsSync(path.join(__dirname, 'assets/brand/legacy/hardpan-lockup.svg')), 'the backup copy is gone');
     });
 });
 
@@ -140,7 +152,8 @@ describe('THE WEB ICONS', () => {
             const img = readPng(path.join(__dirname, f));
             assert.equal(img.width, img.height);
             const corner = px(img, 0, 0);
-            assert.deepEqual(corner, [0x0B, 0x0F, 0x0C], f + ' corner is ' + corner.join(','));
+            // 077b: the new logo's night field (was [0x0B, 0x0F, 0x0C], the old ball).
+            assert.deepEqual(corner, [0x0B, 0x10, 0x0D], f + ' corner is ' + corner.join(','));
             let green = 0, bone = 0;
             for (let i = 0; i < img.data.length; i += 4) {
                 const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];
@@ -172,7 +185,10 @@ describe('THE WEB ICONS', () => {
         const sync = read('sync-mobile-web.js');
         const consumer = /const CONSUMER_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
         const tournament = /const TOURNAMENT_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
-        ['hardpan-lockup.svg', 'hardpan-icon.svg', 'favicon-32.png'].forEach(f => {
+        // 087: the new lockup + print mark joined; the old hardpan-lockup.svg left (Manny's OK).
+        assert.ok(!sw.includes("'./hardpan-lockup.svg'"), 'the old lockup is precached again');
+        assert.ok(!consumer.includes("'hardpan-lockup.svg'"), 'the old lockup ships natively again');
+        ['hardpan-lockup-light.png', 'hardpan-print-mark.png', 'hardpan-icon.svg', 'favicon-32.png'].forEach(f => {
             assert.ok(sw.includes("'./" + f + "'"), f + ' is not precached');
             assert.ok(consumer.includes("'" + f + "'"), f + ' is not in the consumer shell');
             assert.ok(!tournament.includes("'" + f + "'"), f + ' leaked into Tournament');
@@ -190,7 +206,7 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.equal(master, NATIVE_ICONS['ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png']);
         assert.notEqual(master, STROKE_R_MASTER, 'icon-1024.png is still the Stroke R');
         const img = readPng(path.join(__dirname, 'icon-1024.png'));
-        assert.deepEqual(px(img, 0, 0), [0x0B, 0x0F, 0x0C]);
+        assert.deepEqual(px(img, 0, 0), [0x0B, 0x10, 0x0D]); // 077b: new logo field (was 0B0F0C)
         let green = 0, bone = 0;
         for (let i = 0; i < img.data.length; i += 4) {
             const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];
@@ -230,13 +246,16 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.deepEqual(names, ['HardPan', 'HardPan']);
     });
 
-    test('the launch splash is the ball on the existing cream field', () => {
+    // 087 (Manny, Oct 26 2026: one app, one logo): the live app's launch screen is the GPS app's
+    // 077 splash - cream + the light mark, and black + the night mark in dark mode. Was the
+    // ball on cream (70944081…, kept in assets/brand/legacy/ios-Splash.imageset).
+    test('the launch splash is the new light mark on the cream field, the same set as the GPS app', () => {
         const files = [
             'ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png',
             'ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-1.png',
             'ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-2.png',
         ];
-        const SPLASH_SHA = '70944081a8a6bc200faf20a52de649f3159fe9c84b04a79ad3c9a325eab5da12';
+        const SPLASH_SHA = '25da1c1bb715da66cdb1427fcae5ea6cbdd66edd1dfa39192c8b47902733b7e9';
         const STROKE_R_SPLASH = '5719f2b14f7327b1d55e49410908a65b0e56eae99de2276befe27730b07b60e1';
         files.forEach(f => {
             assert.equal(sha(f), SPLASH_SHA, f + ' is not the cream HardPan splash');
@@ -244,9 +263,13 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         });
         const img = readPng(path.join(__dirname, files[0]));
         assert.equal(img.width, 2732);
-        assert.deepEqual(px(img, 0, 0), [0xFB, 0xF5, 0xEB]);
+        assert.deepEqual(px(img, 0, 0), [245, 242, 234]);
         const mid = px(img, 1366, 1366);
-        assert.deepEqual(mid, [247, 244, 238], 'the centre is not the ball');
+        assert.deepEqual(mid, [234, 234, 226], 'the centre is not the new mark');
+        const gpsSet = 'gps-beta/ios/App/App/Assets.xcassets/Splash.imageset/';
+        fs.readdirSync(path.join(__dirname, gpsSet)).forEach(f => assert.ok(
+            fs.readFileSync(path.join(__dirname, gpsSet, f)).equals(fs.readFileSync(path.join(__dirname, 'ios/App/App/Assets.xcassets/Splash.imageset', f))),
+            'the live app splash ' + f + ' is not the GPS app\'s'));
         let green = 0;
         for (let i = 0; i < img.data.length; i += 4) {
             const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];

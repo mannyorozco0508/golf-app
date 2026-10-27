@@ -139,7 +139,7 @@ test('Consumer source: index.html with its GPS blocks removed IS the pre-GPS ind
 test('CONSUMER WEB BUILD (build-shell.js, flag unset): no GPS files, no GPS code, the pre-GPS scorecard', () => {
     const dir = buildWeb(undefined);
     noGps(dir, 'dist/consumer');
-    assert.ok(/const CACHE_VERSION = 'consumer-v165-gotoround';/.test(fs.readFileSync(path.join(dir, 'sw.js'), 'utf8')),
+    assert.ok(/const CACHE_VERSION = 'consumer-v166-new-logo';/.test(fs.readFileSync(path.join(dir, 'sw.js'), 'utf8')),
         'the Consumer cache key is players-compact\'s (0b5d332, merged in): nothing a Consumer device holds differs from it');
 });
 

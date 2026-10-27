@@ -250,11 +250,15 @@
            negative letter-spacing, never an SVG <text>. The bar stays #0B0F0C
            in both themes so the bone word stays readable on a light card and
            a dark one. The five-tap course tools still open from this element. */
+        /* 087 (Manny, Oct 26 2026: "this logo no longer exists"): the header is the new light
+           lockup (HardPan Golf · GPS & GAMES, hardpan-lockup-light.png) on its own cream field
+           #F5F2EA, in the same 340x84 box with the same corners. Was the ball icon + the HTML
+           word HARDPAN on #0B0F0C. The old rules stay below for .lobby-word (unused now). */
         .lobby-lockup { box-sizing: border-box; width: 340px; max-width: 100%; margin: 0 auto 14px auto;
-            padding: 6px 18px 6px 4px; background: #0B0F0C; border-radius: 18px;
+            padding: 0; background: #F5F2EA; border-radius: 18px; height: 84px; overflow: hidden;
             display: flex; align-items: center; justify-content: center; gap: 4px;
             cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
-        .lobby-lockup img { display: block; width: 72px; height: 72px; flex: 0 0 auto; }
+        .lobby-lockup img { display: block; width: 277px; height: 84px; max-width: 100%; object-fit: contain; flex: 0 0 auto; }
         .lobby-word { flex: 0 0 auto; color: #F2EDE4;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-weight: 800; font-size: 1.55rem; letter-spacing: 0.06em; line-height: 1; }
@@ -1367,7 +1371,7 @@ body::before {
         <button class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Dark mode">🌙</button>
         <button type="button" id="account-link" class="account-link" onclick="openAccountPanel()">Account</button>
     </div>
-    <div class="lobby-lockup" onclick="handleSecretTap()"><img src="hardpan-icon.svg" alt="" width="72" height="72"><span class="lobby-word">HARDPAN</span></div>
+    <div class="lobby-lockup" onclick="handleSecretTap()"><img src="hardpan-lockup-light.png" alt="HardPan Golf" width="277" height="84"></div>
     <p class="lobby-lead">What are you setting up?</p>
 
     <div class="home-widgets">

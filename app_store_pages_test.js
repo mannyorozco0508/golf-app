@@ -289,8 +289,10 @@ describe('THEY LOOK LIKE RATTLE GOLF', () => {
         // Golf Tournaments is named as out of scope rather than silently covered.
         PAGES.forEach(p => {
             const src = read(p);
-            assert.match(src, /<img src="hardpan-icon\.svg" alt=""/);
-            assert.match(src, /<span class="brand-word">HARDPAN<\/span>/);
+            // 087 (Manny, Oct 26 2026): the header is the new light lockup image, its name in alt
+            // (was the ball icon hardpan-icon.svg + the HTML word HARDPAN).
+            assert.match(src, /<img src="hardpan-lockup-light\.png" alt="HardPan Golf"/);
+            assert.match(src, /<div class="brand"><img src="hardpan-lockup-light\.png" alt="HardPan Golf" width="198" height="60"><\/div>/);
             assert.ok(!/hardpan-lockup\.svg/.test(src), `${p} still shows the condensed lockup`);
             assert.match(src, /Rattle Golf/);
             assert.match(src, /support@rattlegolf\.com/);

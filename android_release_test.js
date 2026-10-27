@@ -90,7 +90,8 @@ describe('LAUNCHER ICON', () => {
         // must be the same near-black field or the scaled mark sits in a square of
         // a different colour.
         const c = canvasColour(readPng(path.join(REPO_ROOT, 'icon-1024.png')));
-        assert.deepEqual(c.rgb, [0x0B, 0x0F, 0x0C], 'icon canvas ' + c.hex + ' is not the HardPan field');
+        // 077b ONE APP, ONE ICON (Oct 26 2026): the new logo's night field #0B100D (was #0B0F0C).
+        assert.deepEqual(c.rgb, [0x0B, 0x10, 0x0D], 'icon canvas ' + c.hex + ' is not the HardPan field');
         assert.match(read(RES + 'values/ic_launcher_background.xml'),
             new RegExp('<color name="ic_launcher_background">' + c.hex + '</color>'),
             'ic_launcher_background is not the icon canvas colour ' + c.hex + ' - regenerate with tools/android-icons.js');
