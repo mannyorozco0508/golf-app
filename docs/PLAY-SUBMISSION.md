@@ -98,6 +98,7 @@ Character counts are checked by script; the results are under §8.
 | App info and performance (crash logs, diagnostics) | **No** | — | — | — | No crash or analytics SDK. |
 | Financial info | No | — | — | — | No payments on Android. The app shows who owes whom; no money moves. |
 | Photos and videos / Files and docs | No | — | — | — | The recap image and PDF are made on the phone and shared only through the user's own Share sheet. |
+| **Photos and videos → Photos** (Manny, 2026-10-27: add for 022) | **Yes, once the Android scorecard scan ships** (Saturday doc-scan plugin) | No (processors only: our Cloudflare scan server + Google Gemini API) | Optional | App functionality | Only when the golfer taps a scan (score scan or 080 Scan the scorecard): the one photo the document scanner takes is sent to our server and Gemini to be read, then dropped - not stored, not written to the database or logs (privacy page, "Scorecard scan"). Mark it **ephemeral / processed only**. The row above still holds for the recap image and PDF. |
 | Contacts, Messages, Health, Audio, Calendar, Web browsing | No | — | — | — | — |
 
 **Services the app talks to, and what they receive** (list these on the policy page):
