@@ -111,7 +111,7 @@ describe('URGENT-016: the GPS door', () => {
         assert.equal(r.ok, true, r.reason);
         const [lobby, wiz] = J(r);
         assert.equal(lobby.at, 'admin.html?start=lobby');
-        assert.match(lobby.lobby, /^‹\nHome\nGames & Bets[\s\S]*Game Day[\s\S]*Road Trip/);
+        assert.match(lobby.lobby, /^‹\nHome\nGames[\s\S]*Game Day[\s\S]*Road Trip/);
         assert.equal(lobby.old, 'none', 'the old lobby (HARDPAN banner, What are you setting up?) is not on screen');
         assert.deepEqual([lobby.sf, lobby.mark, lobby.cover], [false, null, false]);
         assert.deepEqual(wiz, { sf: false, admin: 'block' }, 'Game Day opens the original wizard');
