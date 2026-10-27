@@ -134,7 +134,8 @@ describe('RATTLE GOLF — THE INSTALLED PWA IDENTITY', () => {
 describe('RATTLE GOLF — THE GOLFER-FACING SURFACES', () => {
 
     test('the lobby shows HardPan', () => {
-        assert.match(ADMIN, /<span class="lobby-word">HARDPAN<\/span>/);
+        // 087: the new light lockup names it (alt "HardPan Golf"); was the HTML word HARDPAN.
+        assert.match(ADMIN, /<img src="hardpan-lockup-light\.png" alt="HardPan Golf"/);
     });
 
     test('a shared invite says HardPan and no longer says Beta', () => {
@@ -250,7 +251,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v360-gps-hilo';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v361-new-logo';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -342,8 +343,10 @@ describe('APP ICON ASSET SEAM', () => {
         const crypto = require('crypto');
         const sha = f => crypto.createHash('sha256')
             .update(fs.readFileSync(path.join(__dirname, f))).digest('hex');
-        // THE MERGED APP'S ICON (mailbox 004, Manny 2026-10-17): the HP ball + green location pin.
-        const MASTER_SHA = '23cd2d1d823c8e6c6f544ea374c467eb4e7e9d1361e4365419773ae93e673947';
+        // THE MERGED APP'S ICON (mailbox 004, Manny 2026-10-17). 077b ONE APP, ONE ICON (Manny,
+        // Oct 26 2026): the new HardPan logo, Manny's HardPan-AppIcon-1024-square.png byte for byte
+        // (was the HP ball + pin, 23cd2d1d823c8e6c…, kept at assets/brand/legacy/icon-1024.png).
+        const MASTER_SHA = '3c615977250b974ed8eaed554215d7191910723291d63e5158c012ef8bf5a866';
         const STROKE_R_SHA = '01d01bff01c5e497337b6ea0d1f2c68258673728cf9f94476583e3876602a112';
         assert.equal(sha(MASTER), MASTER_SHA, 'icon-1024.png moved');
         assert.equal(sha('ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png'), MASTER_SHA,
@@ -477,10 +480,12 @@ describe('THE HOMEPAGE BRAND MARK', () => {
     const header = ADMIN.slice(ADMIN.indexOf('id="lobby-screen"'), ADMIN.indexOf('class="home-widgets"'));
 
     test('the header shows the ball icon and the HTML word, not the Stroke R', () => {
-        assert.match(header, /<img src="hardpan-icon\.svg" alt="" width="72" height="72">/,
-            'the homepage brand mark must be the ball icon');
-        assert.match(header, /<span class="lobby-word">HARDPAN<\/span>/,
-            'the word must be HTML, so a phone can read it');
+        // 087 (Manny, Oct 26 2026): the brand mark is the new light lockup, named in alt
+        // (was the ball icon + the HTML word HARDPAN).
+        assert.match(header, /<img src="hardpan-lockup-light\.png" alt="HardPan Golf" width="277" height="84">/,
+            'the homepage brand mark must be the new light lockup');
+        assert.ok(!/<span class="lobby-word">HARDPAN<\/span>/.test(header),
+            'the old HARDPAN word banner must not come back');
         assert.ok(!/hardpan-lockup\.svg/.test(header),
             'the outlined lockup is illegible at phone width');
         assert.ok(!/logo-mark\.png/.test(header),
@@ -502,7 +507,7 @@ describe('THE HOMEPAGE BRAND MARK', () => {
             'a second heading under the bar says the name twice');
         const marks = header.match(/hardpan/gi) || [];
         assert.equal(marks.length, 2,
-            'exactly two: the icon filename and the HTML word. A third means the name was stacked again.');
+            'exactly two: the lockup filename and its alt. A third means the name was stacked again.');
     });
 
     test('the two Consumer mode icons are the approved pair', () => {
@@ -518,10 +523,10 @@ describe('THE HOMEPAGE BRAND MARK', () => {
             'that is a different screen and must not inherit the brand mark');
     });
 
-    test('the lockup sits on the near-black field in both themes', () => {
-        // The wordmark is bone. On the light card that colour disappears, so the
-        // chip carries #0B0F0C itself and dark mode does not repaint it.
-        assert.match(ADMIN, /\.lobby-lockup \{[^}]*background:\s*#0B0F0C/);
+    test('the lockup sits on its own cream field in both themes', () => {
+        // 087: the light lockup carries its cream field #F5F2EA (was #0B0F0C behind the
+        // bone word); dark mode does not repaint it.
+        assert.match(ADMIN, /\.lobby-lockup \{[^}]*background:\s*#F5F2EA/);
         const dark = ADMIN.slice(ADMIN.indexOf('html.dark-mode'), ADMIN.indexOf('.lobby-lockup'));
         assert.ok(!/\.lobby-lockup/.test(dark),
             'dark mode must not repaint the lockup off the near-black field');
@@ -576,8 +581,8 @@ describe('THE BRAND MARK ASSET', () => {
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v360-gps-hilo';/);
-        assert.match(BUILD, /cacheName: 'consumer-v165-gotoround'/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v361-new-logo';/);
+        assert.match(BUILD, /cacheName: 'consumer-v166-new-logo'/);
         assert.match(BUILD, /cacheName: 'tournament-v57-remove-team'/,
             'Tournament cache moved because the product name is Rattle Golf again');
     });

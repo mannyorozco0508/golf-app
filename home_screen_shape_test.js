@@ -266,10 +266,13 @@ describe('RESUME IS A CONVENIENCE, NOT A HEADLINE', () => {
 
 describe('THE LOCKUP LEADS THE SCREEN', () => {
 
-    test('the header is the ball icon and an HTML word, on the near-black field', () => {
+    // 087 (Manny, Oct 26 2026: "this logo no longer exists"): the header is the new light lockup
+    // (HardPan Golf · GPS & GAMES) on its own cream field, same 340x84 box. Was the ball icon +
+    // the HTML word HARDPAN on #0B0F0C.
+    test('the header is the new light lockup, on its cream field, in the same box', () => {
         assert.ok(cssNum('.lobby-lockup', 'width').n >= 280, 'the lockup is not a wide bar');
-        assert.match(ADMIN, /\.lobby-lockup \{[^}]*background:\s*#0B0F0C/);
-        assert.match(ADMIN, /<img src="hardpan-icon\.svg" alt="" width="72" height="72"><span class="lobby-word">HARDPAN<\/span>/);
+        assert.match(ADMIN, /\.lobby-lockup \{[^}]*background:\s*#F5F2EA/);
+        assert.match(ADMIN, /<img src="hardpan-lockup-light\.png" alt="HardPan Golf" width="277" height="84">/);
         assert.ok(!/hardpan-lockup\.svg/.test(lobby()),
             'the lobby header must not be the outlined lockup');
     });
@@ -282,11 +285,12 @@ describe('THE LOCKUP LEADS THE SCREEN', () => {
         assert.match(block, /letter-spacing:\s*0\.06em/);
         assert.ok(!/letter-spacing:\s*-/.test(block), 'negative tracking condenses the word');
         assert.match(block, /color:\s*#F2EDE4/);
-        const tag = /<img src="hardpan-icon\.svg"[^>]*>/.exec(ADMIN);
-        assert.ok(tag, 'the ball icon is gone');
+        // 087: the header image is the WIDE new lockup now (was the square ball icon).
+        const tag = /<img src="hardpan-lockup-light\.png"[^>]*>/.exec(ADMIN);
+        assert.ok(tag, 'the new lockup is gone');
         const w = Number(/width="(\d+)"/.exec(tag[0])[1]);
         const h = Number(/height="(\d+)"/.exec(tag[0])[1]);
-        assert.equal(w, h, 'the header icon is the square ball, not the wide lockup');
+        assert.deepEqual([w, h], [277, 84], 'the header is the 1451x440 lockup at 84 px tall');
     });
 
     test('the mark is still tappable for the secret panel', () => {

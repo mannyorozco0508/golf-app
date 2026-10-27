@@ -258,31 +258,19 @@ const PROBE = `
 
   if (!(out.lockup && out.lockup.w >= 240 && out.lockup.h >= 56))
       problems.push('the header is not a wide bar on screen: ' + JSON.stringify(out.lockup));
-  if (!out.lockup || out.lockup.alt !== '' || out.lockup.src !== 'hardpan-icon.svg')
-      problems.push('the header img is not the ball icon: ' + JSON.stringify(out.lockup));
+  // 087 (Manny, Oct 26 2026): the header is the new light lockup image (HardPan Golf ·
+  // GPS & GAMES) on its cream field #F5F2EA. Was the ball icon + the HTML word HARDPAN on
+  // #0B0F0C; those checks moved to the new picture (same wide bar, decoded, green + cream).
+  if (!out.lockup || out.lockup.alt !== 'HardPan Golf' || out.lockup.src !== 'hardpan-lockup-light.png')
+      problems.push('the header img is not the new light lockup: ' + JSON.stringify(out.lockup));
   if (!(out.lockup && out.lockup.natural > 0))
-      problems.push('the ball icon did not decode');
-  if (!(out.lockup && out.lockup.green && out.lockup.bone))
-      problems.push('the ball icon pixels are not green and bone: ' + JSON.stringify(out.lockup));
-  if (!out.lockup || out.lockup.bg !== 'rgb(11, 15, 12)')
-      problems.push('the header field is not near-black #0B0F0C: ' + (out.lockup && out.lockup.bg));
-  if (!out.word || out.word.text !== 'HARDPAN')
-      problems.push('the header word is not the HTML text HARDPAN: ' + JSON.stringify(out.word));
-  if (!(out.word && out.word.w >= 110 && out.word.h >= 18))
-      problems.push('the word is too small to read: ' + JSON.stringify(out.word));
-  const lsPx = out.word && out.word.ls != null ? parseFloat(out.word.ls) : NaN;
-  if (!(out.word && lsPx > 0))
-      problems.push('the word tracking is not open: ' + (out.word && out.word.ls));
-  if (!(out.word && Number(out.word.fw) >= 700))
-      problems.push('the word is not bold: ' + (out.word && out.word.fw));
-  if (!out.word || out.word.color !== 'rgb(242, 237, 228)')
-      problems.push('the word is not bone on the bar: ' + (out.word && out.word.color));
-  if (!out.word || !out.word.sameRow || !out.word.inside)
-      problems.push('the word is not beside the ball, inside the bar: ' + JSON.stringify(out.word));
-  const widths = (out.word && out.word.letters || []).map(l => l.w);
-  const avg = widths.length ? widths.reduce((a, b) => a + b, 0) / widths.length : 0;
-  if (widths.length !== 7 || widths.some(w => w < 8) || !(out.word && avg >= out.word.fs * 0.5))
-      problems.push('the letters are still condensed bars: ' + JSON.stringify(out.word && out.word.letters));
+      problems.push('the lockup did not decode');
+  if (!(out.lockup && out.lockup.bone))
+      problems.push('the lockup pixels are not the cream field: ' + JSON.stringify(out.lockup));
+  if (!out.lockup || out.lockup.bg !== 'rgb(245, 242, 234)')
+      problems.push('the header field is not the lockup cream #F5F2EA: ' + (out.lockup && out.lockup.bg));
+  if (out.word)
+      problems.push('the old HTML word HARDPAN is back in the header: ' + JSON.stringify(out.word));
   for (let i = 1; i < (out.word && out.word.letters || []).length; i++) {
       const prev = out.word.letters[i - 1], cur = out.word.letters[i];
       if (cur.left < prev.right - 0.6)

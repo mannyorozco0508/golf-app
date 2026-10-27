@@ -136,8 +136,11 @@ const CONSUMER_SHELL = [
     // ships exactly what it always shipped; what changed is that Tournament no
     // longer gets it for free.
     'icon-192.png', 'icon-512.png',
-    // The ball-on-firm lockup and the tab icon. Consumer only.
-    'hardpan-lockup.svg', 'hardpan-icon.svg', 'favicon-32.png',
+    // The tab icon. Consumer only. 087 (Manny OK, Oct 26 2026): the old ball lockup
+    // hardpan-lockup.svg no longer ships (kept at assets/brand/legacy/).
+    'hardpan-icon.svg', 'favicon-32.png',
+    // 087 the new logo: the lobby header lockup and the receipt mark. Consumer only.
+    'hardpan-lockup-light.png', 'hardpan-print-mark.png',
     'action-model.js', 'bet-strip.js', 'hole-events.js',
     // side-match-lines.js (v258): the ONE builder for a side match card - a dollar
     // line per bet and the match line under it - read by skins.html, stats.html,

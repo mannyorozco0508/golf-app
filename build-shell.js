@@ -161,7 +161,7 @@ const PRODUCTS = {
         // cards on the page under it, the rest behind one handle.
         // Moved to v151 for the two card guards (admin.html): a round can no longer
         // be saved with no holes. v150 is held by gps-v1. A device on v149 can.
-        cacheName: 'consumer-v165-gotoround',
+        cacheName: 'consumer-v166-new-logo', // 087: the new HardPan logo (headers, receipt mark)
         appName: 'HardPan',
         shortName: 'HardPan',
         description: 'Live-syncing golf scorecard and game tracker',
