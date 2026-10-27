@@ -19,6 +19,8 @@
          Loads the auth SDK itself, asynchronously, so no page waits for it. -->
     <script src="auth-boot.js"></script>
     <script src="organizer-gate.js"></script>
+    <!-- 084: Rounds I'm running (Home list + the owner's pointer after a save). -->
+    <script src="my-rounds.js"></script>
     <script src="my-groups.js"></script>
     <script src="roster-paste.js"></script>
     <!-- GPS:BEGIN -->
@@ -39,6 +41,12 @@
     <!-- Simpler HardPan (017, features.simpleFlow): the 3-step New round over this wizard - it
          fills the wizard's own fields and saves through its own saveSettings. -->
     <script src="simple-flow.js"></script>
+    <!-- GPS:END -->
+    <!-- GPS:BEGIN -->
+    <!-- 088-3 (080): course-card scan on the pars sheet + Add a course - the shared validator, the scan client (course mode), the check grid. -->
+    <script src="course-card-validate.js"></script>
+    <script src="gps-scan-client.js"></script>
+    <script src="gps-course-scan.js"></script>
     <!-- GPS:END -->
     <!-- GPS:BEGIN -->
     <!-- HardPan Index (unofficial): the Account card and the Round Setup chip (HardPan, 008). -->
@@ -1186,9 +1194,9 @@ body::before {
         text-align: center; font-size: 15px; line-height: 1.35; color: var(--gl-muted); }
     #gl-view .gl-foot b { color: var(--gl-green); }
 </style>
-<div id="gl-view" aria-label="Games and Bets">
+<div id="gl-view" aria-label="Games">
     <div class="gl-top"><button type="button" class="gl-back" id="gl-back"><b>&lsaquo;</b>Home</button></div>
-    <div class="gl-h1" role="heading" aria-level="1">Games &amp; Bets</div>
+    <div class="gl-h1" role="heading" aria-level="1">Games</div>
     <button type="button" class="gl-hero g" id="gl-gameday"><span class="em" aria-hidden="true">&#x1F3CC;&#xFE0F;</span><span class="t">Game Day</span><span class="d">One round today &middot; group, games and money</span></button>
     <button type="button" class="gl-hero n" id="gl-trip"><span class="em" aria-hidden="true">&#x1F690;</span><span class="t">Road Trip</span><span class="d">Several rounds &middot; teams, money across days</span></button>
     <div class="gl-tiles one" id="gl-tiles">
@@ -1946,6 +1954,10 @@ body::before {
             </label>
             <div id="custom-course-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px; overflow-x: auto;">
                 <p id="custom-course-warning" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0; margin-bottom: 12px;">Make quick adjustments from your phone if the course isn't mapped accurately.</p>
+                <!-- GPS:BEGIN -->
+                <!-- 088-3 (080): 📷 Scan the scorecard - fills the boxes below from a photo of the printed card (gps-course-scan.js); saved by the normal button, like typing. -->
+                <div id="hcs-admin-slot"></div>
+                <!-- GPS:END -->
 
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <!-- Front 9 -->
@@ -11158,6 +11170,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 deps.appleCode = () => window.oauthSignin.appleAuthorizationCode();
             }
         }
+        // 088: Delete account also erases this account's scorecard-scan counts on the
+        // scan server. Never stops the delete; a miss is retried on the next load.
+        if (step === 'delete2' && typeof fetch === 'function' && typeof window.accountExit.scanEraser === 'function') {
+            deps.scanErase = window.accountExit.scanEraser({ auth: auth, fetch: (u, o) => fetch(u, o) });
+        }
         const run = step === 'signout'
             ? window.accountExit.signOut(deps)
             : window.accountExit.deleteAccount(deps);
@@ -12703,6 +12720,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 loadedExistingRound = true;
                 loadedOrganizerToken = data.organizerToken || null;
                 loadedOwnerUid = data.ownerUid || null;
+                // 084: the owner opening setup heals a missing Rounds I'm running pointer
+                // (a round saved before 084). Fire-and-forget; refused for anyone else.
+                if (data.ownerUid && window.HardPanMyRounds) {
+                    const mrData = data, mrCode = currentMode;
+                    Promise.resolve(window.authReady).then((bootUid) => {
+                        let mrUid = bootUid;
+                        try { const u = window.firebase.auth().currentUser; if (u && u.uid) mrUid = u.uid; } catch (e) {}
+                        if (mrUid && mrUid === mrData.ownerUid) window.HardPanMyRounds.remember(db, mrUid, mrCode, mrData, { healOnly: true });
+                    }).catch(() => {});
+                }
             }
             groupSizeOverrides = data.groupSizeOverrides || {};
             if (data.roundDay) document.getElementById("round-day-select").value = data.roundDay;
@@ -14307,6 +14334,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // THE ROUND NOW EXISTS. Only here is it true that there is
                 // something to resume, so only here is the pointer written.
                 localStorage.setItem('lastRoomCode', currentMode);
+                // 084: the owner's "Rounds I'm running" pointer (organizers/<uid>/rounds/<code>).
+                // NOT RETURNED, NOT AWAITED: refused by the rules until they are published,
+                // and a refusal here must never touch the save, its button or its messages.
+                try {
+                    const mrUser = window.firebase && typeof window.firebase.auth === 'function' ? window.firebase.auth().currentUser : null;
+                    const mrUid = (mrUser && mrUser.uid) || (window.authBootState && window.authBootState.uid) || null;
+                    if (mrUid && window.HardPanMyRounds) window.HardPanMyRounds.remember(db, mrUid, currentMode, payload, { newRound: !loadedExistingRound });
+                } catch (e) { /* the list is a convenience; the save already landed */ }
                 // v191: a NEW round looks for the unfinished round it replaces
                 // (offerRetire) BEFORE this save is remembered, so the new code
                 // never nominates itself; then the save is remembered.

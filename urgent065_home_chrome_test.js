@@ -146,7 +146,7 @@ test('4 tiles open their screens; Resume only with an open round', { timeout: 20
     await until(j, "!!document.querySelector('#v-simple.on')", 10000);
     const t = JSON.parse(await ev(j, "JSON.stringify({ tiles: Array.prototype.map.call(document.querySelectorAll('#v-simple .hs-tile'), function(b){ return [b.getAttribute('data-hp-act'), b.innerText.replace(/\\n+/g,' | ')]; }), slim: document.querySelector('#v-simple .hs-slim').innerText.replace(/\\s+/g,' ').trim(), build: (document.getElementById('hs-build')||{}).textContent || '', order: (function(){ var s=document.querySelector('#v-simple .hs-slim'), b=document.getElementById('hs-build'); return !!(s.compareDocumentPosition(b) & 4); })(), prog: document.querySelectorAll('#hs-progress .hs-prog').length })"));
     assert.deepEqual(t.tiles.map((x) => x[0]), ['snew', 'srange', 'sstats', 'shistory']);
-    assert.match(t.tiles[0][1], /Games & Bets \| group, games, money/);
+    assert.match(t.tiles[0][1], /Games \| group and games/);
     assert.match(t.tiles[1][1], /Range \| dial in your clubs/);
     assert.match(t.tiles[2][1], /My stats \| Strokes Gained/);
     assert.match(t.tiles[3][1], /History \| past rounds/);

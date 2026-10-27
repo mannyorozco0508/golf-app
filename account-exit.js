@@ -516,6 +516,9 @@
                     // account stays - see the header. A soft one is allowed to fail.
                     if (out.failed.length) throw coded('removal-failed',
                         'could not remove ' + out.failed.length + ' of ' + p.removals.length);
+                    // THE SCAN COUNTS (088): asked while the session is still
+                    // good, and never a reason to stop - see scanEraser.
+                    return eraseScanCounts(deps).then(function (scan) {
                     return askServer(deps, apple).then(function (srv) {
                         var finish = function (reauthed) {
                             if (deps && typeof deps.reload === 'function') deps.reload();
@@ -528,7 +531,9 @@
                                 recordRemoved: srv.server || out.done['organizers/' + uid] === 'removed',
                                 server: !!srv.server,
                                 appleRevoked: !!(srv.server && srv.result.appleRevoked),
-                                keeps: srv.server ? [] : p.keeps
+                                keeps: srv.server ? [] : p.keeps,
+                                scanErased: !!scan.erased,
+                                scanErasePending: !!scan.pending
                             };
                         };
                         if (srv.server) {
@@ -547,9 +552,18 @@
                             throw err;
                         });
                     });
+                    });
                 });
             });
         });
+    }
+
+    function eraseScanCounts(deps) {
+        if (!deps || typeof deps.scanErase !== 'function') return Promise.resolve({ erased: false, pending: false });
+        var call;
+        try { call = Promise.resolve(deps.scanErase()); } catch (e) { call = Promise.reject(e); }
+        return call.then(function (r) { return r || { erased: false, pending: false }; },
+            function () { return { erased: false, pending: false }; });
     }
 
     // THE DEFAULT serverDelete: a callable function by plain fetch, the same way
@@ -593,6 +607,125 @@
         };
     }
 
+
+    // ---- THE SCAN COUNTS (088 item 1, a 078 "ADDED Oct 26" must-have) --------------
+    //
+    // The scorecard-scan server keeps a few numbers under the account id (the free
+    // scans used, the course-card scans used, the per-minute and per-day counts:
+    // functions/api/_scan.js). Delete account now asks POST /api/scan-erase to drop
+    // them. The server takes the uid from the ID token, so this can only ever
+    // erase THIS account's counts.
+    //
+    // IT NEVER STOPS A DELETE. No signal, a slow server, a server that is not
+    // deployed yet: the delete carries on and the token is kept on the phone
+    // (PENDING_KEY) so the next time this page loads it tries again, until the
+    // token runs out (about an hour) - after that nothing can prove the counts
+    // are ours, and the pending note is dropped. A refused token is dropped too.
+    var SCAN_ERASE_ROUTE = '/api/scan-erase';
+    var SCAN_FALLBACK_ORIGIN = 'https://golf-app-5a5.pages.dev';   // product-links.js GOLF_WEB_ORIGIN
+    var SCAN_PENDING_KEY = 'hp.scanErasePending';
+    var SCAN_MS = 8000;
+    var W = typeof window !== 'undefined' ? window : globalThis;
+    // The same rule as gps-scan-client.js apiBase(): the native app's pages are
+    // capacitor://localhost, so the route is on the web origin; the web is same-origin.
+    function scanApiBase() {
+        try {
+            var native = W.document && W.document.documentElement && W.document.documentElement.classList
+                && W.document.documentElement.classList.contains('is-native');
+            if (!native && W.Capacitor && typeof W.Capacitor.isNativePlatform === 'function') native = W.Capacitor.isNativePlatform();
+            if (!native) return '';
+            return (typeof GOLF_WEB_ORIGIN === 'string' && GOLF_WEB_ORIGIN) || SCAN_FALLBACK_ORIGIN;   /* global GOLF_WEB_ORIGIN */
+        } catch (e) { return ''; }
+    }
+    function tokenExpiryMs(tok) {
+        try {
+            var part = String(tok).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+            var json = typeof atob === 'function' ? atob(part + '==='.slice((part.length + 3) % 4))
+                : Buffer.from(part, 'base64').toString('utf8');   /* global Buffer */
+            var exp = Number(JSON.parse(json).exp);
+            return exp > 0 ? exp * 1000 : 0;
+        } catch (e) { return 0; }
+    }
+    // One POST. Resolves 'erased' | 'refused' (the token was not accepted) | 'failed'.
+    function postErase(doFetch, base, tok) {
+        var ctl = typeof AbortController === 'function' ? new AbortController() : null;
+        var t = ctl ? setTimeout(function () { ctl.abort(); }, SCAN_MS) : null;
+        var call;
+        try {
+            call = Promise.resolve(doFetch(base + SCAN_ERASE_ROUTE, {
+                method: 'POST', credentials: 'omit', signal: ctl ? ctl.signal : undefined,
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+                body: '{}'
+            }));
+        } catch (e) { call = Promise.reject(e); }
+        return call.then(function (r) {
+            if (t) clearTimeout(t);
+            if (!r) return 'failed';
+            if (r.status === 401) return 'refused';
+            return Promise.resolve(r.json()).then(function (j) {
+                return j && j.status === 'erased' ? 'erased' : 'failed';
+            }, function () { return 'failed'; });
+        }, function () {
+            if (t) clearTimeout(t);
+            return 'failed';
+        });
+    }
+    function storeOf(o) {
+        if (o && o.storage) return o.storage;
+        try { return W.localStorage || null; } catch (e) { return null; }
+    }
+    function stash(store, tok) {
+        var until = tokenExpiryMs(tok);
+        if (!store || !until) return false;
+        try { store.setItem(SCAN_PENDING_KEY, JSON.stringify({ token: tok, until: until })); return true; } catch (e) { return false; }
+    }
+    function unstash(store) { try { if (store) store.removeItem(SCAN_PENDING_KEY); } catch (e) { } }
+    // deps.scanErase for deleteAccount. Resolves { erased, pending } and NEVER rejects.
+    function scanEraser(opts) {
+        var o = opts || {};
+        return function () {
+            var doFetch = o.fetch;
+            var user = o.auth && o.auth.currentUser;
+            if (typeof doFetch !== 'function' || !user || typeof user.getIdToken !== 'function') {
+                return Promise.resolve({ erased: false, pending: false });
+            }
+            var base = String(o.base !== undefined ? o.base : scanApiBase()).replace(/\/+$/, '');
+            var store = storeOf(o);
+            var tok = null;
+            var got;
+            try { got = Promise.resolve(user.getIdToken()); } catch (e) { got = Promise.reject(e); }
+            return got.then(function (t) {
+                tok = t;
+                return postErase(doFetch, base, t);
+            }).then(function (res) {
+                if (res === 'erased') { unstash(store); return { erased: true, pending: false }; }
+                if (res === 'refused') return { erased: false, pending: false };
+                return { erased: false, pending: stash(store, tok) };
+            }, function () {
+                return { erased: false, pending: false };
+            });
+        };
+    }
+    // THE RETRY, on the next page load. Resolves 'none' | 'erased' | 'expired' |
+    // 'refused' | 'failed' (kept for the next load). Never rejects.
+    function retryScanErase(opts) {
+        var o = opts || {};
+        var store = storeOf(o);
+        var raw = null;
+        try { raw = store ? store.getItem(SCAN_PENDING_KEY) : null; } catch (e) { raw = null; }
+        if (!raw) return Promise.resolve('none');
+        var rec = null;
+        try { rec = JSON.parse(raw); } catch (e) { rec = null; }
+        var now = typeof o.now === 'function' ? o.now() : Date.now();
+        if (!rec || typeof rec.token !== 'string' || !(rec.until > now)) { unstash(store); return Promise.resolve('expired'); }
+        if (typeof o.fetch !== 'function') return Promise.resolve('failed');
+        var base = String(o.base !== undefined ? o.base : scanApiBase()).replace(/\/+$/, '');
+        return postErase(o.fetch, base, rec.token).then(function (res) {
+            if (res !== 'failed') unstash(store);
+            return res;
+        });
+    }
+
     window.accountExit = {
         WORDS: WORDS,
         KEEPS: KEEPS,
@@ -610,6 +743,17 @@
         messageFor: messageFor,
         signOut: signOut,
         deleteAccount: deleteAccount,
-        serverDeleter: serverDeleter
+        serverDeleter: serverDeleter,
+        scanEraser: scanEraser,
+        retryScanErase: retryScanErase,
+        SCAN_PENDING_KEY: SCAN_PENDING_KEY
     };
+
+    // A DELETE THAT COULD NOT REACH THE SCAN SERVER left a note; this load tries it
+    // again. Only when there is a note, so a page with nothing pending does nothing.
+    try {
+        if (typeof W.fetch === 'function' && W.localStorage && W.localStorage.getItem(SCAN_PENDING_KEY)) {
+            retryScanErase({ fetch: function (u, o) { return W.fetch(u, o); } });
+        }
+    } catch (e) { }
 })();

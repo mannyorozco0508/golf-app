@@ -163,7 +163,7 @@
     function shell(title, body, foot, n) {
         var bar = '';
         if (n) for (var i = 1; i <= 3; i++) bar += '<i class="' + (i <= n ? 'on' : '') + '"></i>';
-        return '<div class="sf-in"><div class="sf-top">' + (S.step === 4 ? '<span class="sf-kick">Share with your groups</span>' : '<button type="button" class="sf-back" data-sf="back" aria-label="Back">\u2039</button><span class="sf-kick">' + (S.mode === 'same' ? 'Same as last week' : S.mode === 'gps' ? 'GPS' : 'Games & Bets') + '</span>')
+        return '<div class="sf-in"><div class="sf-top">' + (S.step === 4 ? '<span class="sf-kick">Share with your groups</span>' : '<button type="button" class="sf-back" data-sf="back" aria-label="Back">\u2039</button><span class="sf-kick">' + (S.mode === 'same' ? 'Same as last week' : S.mode === 'gps' ? 'GPS' : 'Games') + '</span>')
             + (n ? '<span class="sf-bar" aria-label="Step ' + n + ' of 3">' + bar + '</span>' : '') + '</div>'
             + '<h1>' + title + '</h1>' + body + '<div class="sf-foot">' + foot + '</div></div>';
     }
@@ -1784,6 +1784,8 @@
             + '<div class="sf-card" style="width:100%;max-width:520px;max-height:88vh;overflow:auto;margin:0 12px calc(env(safe-area-inset-bottom) + 12px);padding:16px;" role="dialog" aria-labelledby="sf-pars-t">'
             + '<div id="sf-pars-t" style="font-size:18px;font-weight:800;line-height:1.3;margin-bottom:4px;">' + (a.idx ? 'Pars and stroke indexes' : 'Pars') + ' for ' + nm + '</div>'
             + '<div class="sf-note" style="margin-bottom:10px;">Your game needs the real ' + (a.idx ? 'pars and stroke indexes (net strokes go by the index)' : 'pars') + ' — from the scorecard. Once, for this round.</div>'
+            + (W.HardPanCourseScan ? W.HardPanCourseScan.buttonHtml('pars') : '')   // 088-3: 📷 Scan the scorecard (only add: the typed rows below are unchanged)
+            + (a.scanned ? '<div class="sf-note" id="sf-pars-scanned" style="margin-bottom:8px;font-weight:700;">✓ Filled from your scan — check them, then Save and start.</div>' : '')
             + rows + (a.err ? '<div class="sf-err" id="sf-pars-err">' + esc(a.err) + '</div>' : '')
             + '<button type="button" class="sf-cta lime" data-sf="parssave" style="margin-top:10px;">Save and start</button>'
             + '<button type="button" class="sf-btn" data-sf="parscancel" style="width:100%;min-height:46px;margin-top:8px;">Not now</button></div></div>';
@@ -1801,9 +1803,32 @@
         }
         if (bad) { a.err = bad; render(); return; }
         r.data = data; r.parsSet = true; r.indexSet = !!a.idx;
+        if (a.scanned) scanKeep(a, r, data);   // 088-3: Ladies' HCP + tee yards on this phone (yards only when no tees); shared list only with the switch ON
         try { if (fn('handleCourseChange')) W.handleCourseChange(); } catch (e) {}
         var then = a.then; S.parsAsk = null; render();
         if (typeof then === 'function') then();
+    }
+    // ---- 088-3 (080): 📷 Scan the scorecard on this sheet. The grid's "Use these" only FILLS the typed boxes
+    // above; the golfer's own "Save and start" saves them (parsSave), exactly like typed pars. ----
+    function scanPars() {
+        var a = S.parsAsk, H = W.HardPanCourseScan;
+        if (!a || !H) return;
+        H.start({ name: courseName(), holes: a.n === 9 ? 9 : 18, where: 'pars', onUse: function (card) {
+            var b = S.parsAsk;
+            if (!b || b !== a || card.holes !== (b.n === 9 ? 9 : 18)) return;
+            for (var i = 1; i <= b.n; i++) { b.p[i] = String(card.par[i - 1]); b.si[i] = String(card.hcpMen[i - 1]); }
+            b.idx = true;   // the card's real stroke indexes go in with the pars (Save checks them like typed ones)
+            b.scanned = card; b.err = '';
+            render();
+        } });
+    }
+    function scanKeep(a, r, data) {
+        var H = W.HardPanCourseScan, card = a.scanned;
+        if (!H || !card) return;
+        // what was SAVED (the golfer may have changed a box after the scan) is what the shared copy would carry
+        var saved = { holes: card.holes, par: data.map(function (h) { return h.par; }), hcpMen: data.map(function (h) { return h.hcpIndex; }), hcpLadies: card.hcpLadies, tees: card.tees };
+        try { H.keepOnPhone(a.key, courseName(), saved, r); } catch (e) {}
+        try { var dbh = typeof db !== 'undefined' ? db : null; H.publishShared(dbh, a.key, courseName(), saved, r).catch(function () {}); } catch (e) {}   /* global db */
     }
     function start() {
         S.err3 = '';
@@ -2040,6 +2065,7 @@
     function onClick(ev) {
         var t = ev.target, b;
         if (!t || !t.closest) return;
+        if (S.parsAsk && t.closest('#sf-pars [data-hcs="scan"]')) { scanPars(); return; }   // 088-3: the camera only from this tap
         if ((b = t.closest('[data-sf-osm]'))) {
             // 071: the GPS flow opens GPS (GolfAPI, else OpenStreetMap, else tap the green); Games & Bets keeps
             // the 064 form unless GolfAPI has the course (money needs the real pars).

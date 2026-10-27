@@ -52,8 +52,14 @@ function page(o) {
     };
     sb.oauthSignin = sb.window.oauthSignin;
     const posts = [];
+    const scanPosts = [];   // 088: Delete account also calls /api/scan-erase - kept apart from the accountDelete posts and events
     if (opts.fetch !== false) {
         sb.fetch = (url, init) => {
+            if (/\/api\/scan-erase$/.test(String(url))) {
+                scanPosts.push({ url, init, at: sb.__dbWrites.length, before: events.slice() });
+                if (opts.network) return Promise.reject(new TypeError('Load failed'));
+                return Promise.resolve({ status: 200, ok: true, json: () => Promise.resolve({ status: 'erased', erased: 1 }) });
+            }
             posts.push({ url, init, at: sb.__dbWrites.length });
             events.push('server@' + sb.__dbWrites.length);
             if (opts.network) return Promise.reject(new TypeError('Load failed'));
@@ -64,10 +70,30 @@ function page(o) {
     }
     const go = async () => { sb.exitTap('delete'); sb.exitTap('delete'); await sb.exitGo(); await tick(); };
     const text = id => sb.document.getElementById(id).textContent;
-    return { sb, events, posts, go, text, writes: () => sb.__dbWrites.map(w => w.op + ' ' + w.path) };
+    return { sb, events, posts, scanPosts, go, text, writes: () => sb.__dbWrites.map(w => w.op + ' ' + w.path) };
 }
 
 describe('THE SERVER FINISHES A DELETE', () => {
+
+    test('088: the scan counts are erased after the client removals and before accountDelete, with the same token', async () => {
+        const p = page({ provider: 'google.com' });
+        p.sb.refreshAccountState();
+        await p.go();
+        assert.equal(p.scanPosts.length, 1);
+        assert.match(p.scanPosts[0].url, /\/api\/scan-erase$/);
+        assert.equal(p.scanPosts[0].init.headers.Authorization, 'Bearer id-token-u9');
+        assert.equal(p.scanPosts[0].at, 4, 'after the four client removals');
+        assert.deepEqual(p.scanPosts[0].before, [], 'before accountDelete is asked');
+        assert.deepEqual(p.events, ['server@4', 'signOut', 'reload'], 'and the delete itself is unchanged');
+    });
+
+    test('088: no signal for the scan server and accountDelete still runs (offline: the client delete, as before)', async () => {
+        const p = page({ network: true });
+        p.sb.refreshAccountState();
+        await p.go();
+        assert.equal(p.scanPosts.length, 1);
+        assert.deepEqual(p.events, ['apple-sheet@0', 'server@4', 'user.delete@4', 'reload']);
+    });
 
     test('DEFAULT PATH, an Apple account: the Apple sheet FIRST, then the client removals, then accountDelete, and the client never deletes the user itself', async () => {
         const p = page();

@@ -4557,6 +4557,8 @@ const SHELL_FILES = [
     './qr-codes.js',
     // Every tap shows it registered - admin.html and index.html both load it.
     './tap-feedback.js',
+    // 084: the Rounds I am running list (admin.html, trip.html, home.html).
+    './my-rounds.js',
     // The trip recap drawn as a PNG for the group chat - trip.html loads it.
     './trip-recap-image.js',
     // Every page that can START something loads this: it issues the code and
@@ -4736,6 +4738,9 @@ const SHELL_FILES = [
     './scorecard-validate.js',
     './gps-scan-client.js',
     './gps-scan-grid.js',
+    // 088-3 (080): course-card scan - the shared course validator + the check grid on the pars / Add a course screens.
+    './course-card-validate.js',
+    './gps-course-scan.js',
     // URGENT-066 #4: voice scoring - the grammar (pure) and push-to-talk + Siri (proposes to the score sheet; nothing sent).
     './gps-voice-parse.js',
     './gps-voice.js',

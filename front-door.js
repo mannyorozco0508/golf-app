@@ -1402,8 +1402,8 @@
         var box = $('hp-resume-round');
         var lr = null; try { lr = JSON.parse(ls('hardpan_last_round') || 'null'); } catch (e) { lr = null; }
         if (!lr || !lr.code || Date.now() - (lr.at || 0) > 12 * 3600 * 1000) return;
-        var tile = function (course, thru) {
-            if (simpleOn()) return simpleProgress(lr.code, course || lr.course, thru);
+        var tile = function (course, thru, data) {
+            if (simpleOn()) { PE.code = lr.code; PE.d = data || null; W.setTimeout(progressEditPaint, 0); return simpleProgress(lr.code, course || lr.course, thru) + '<div id="hs-prog-edit">' + progressEditHtml(lr.code, data || null) + '</div>'; }
             return '<button type="button" class="hp-resume" data-hp-open="' + esc(lr.code) + '">\u25B6 Resume ' + esc(String(course || lr.course || 'your round').split(' (')[0]) + (thru ? ' \u00b7 thru ' + thru : '') + '</button>';
         };
         // SAVED ON THIS PHONE, NOT SENT YET (URGENT-009): Resume at once, from this phone's own
@@ -1411,7 +1411,7 @@
         var held = heldFor(lr.code);
         if (held) {
             var hv = held.value || {};
-            box.innerHTML = tile(hv.courseName, 0)
+            box.innerHTML = tile(hv.courseName, 0, hv)
                 + '<div class="hp-note" style="margin:-8px 0 14px;">\uD83D\uDCF4 Saved on this phone \u00b7 it will be sent when you have signal</div>';
         }
         // THE ROUND'S OWN COPY ON THIS PHONE (URGENT-011, sims bug 2): with no signal the read
@@ -1421,7 +1421,7 @@
         // says the round is gone or finished; no answer leaves it standing.
         else {
             var local = localRound(lr.code);
-            if (local && !local.finished) box.innerHTML = tile(local.data.courseName, local.thru);
+            if (local && !local.finished) box.innerHTML = tile(local.data.courseName, local.thru, local.data);
         }
         if (!H.db) return;
         timeout(H.db.ref('events/' + lr.code).once('value'), 6000, 'round').then(function (snap) {
@@ -1435,7 +1435,7 @@
             var pr = progressOf(d);
             H.activeChecked = true; H.active = pr.finished ? null : lr.code;
             if (pr.finished) { if (!heldFor(lr.code)) box.innerHTML = ''; return; }   // finished
-            box.innerHTML = tile(d.courseName, pr.thru);
+            box.innerHTML = tile(d.courseName, pr.thru, d);
         }, function () {});
     }
     // ---- THIS PHONE'S ROUNDS: DATES AND HISTORY (2.0 polish #6, #7) ----------------------------
@@ -1884,6 +1884,30 @@
         if (!H.db) return;
         timeout(H.db.ref('events/' + last).once('value'), 6000, 'round').then(function (s) { var d = withQueued(s && s.val ? s.val() : null, last); if (d || !local) paint(d); }, function () {});
     }
+    // 084 Q1 (Manny, Oct 26): "Edit setup" INSIDE the IN PROGRESS card, under Resume - for the round's
+    // OWNER only (ownerUid = this sign-in's uid; my-rounds.js's own rule), to the same admin.html?game=CODE
+    // as Rounds I'm running. Signed out with this round's organizer link on the phone: "Sign in to edit".
+    // Anyone else: nothing. Repainted when the sign-in changes. Only add: Resume is untouched.
+    var PE = { code: null, d: null, hooked: false };
+    function progressEditHtml(code, d) {
+        if (!code || !d) return '';
+        var A = W.HardPanAuth, s = null; try { s = A && A.state ? A.state() : null; } catch (e) { s = null; }
+        var uid = s && s.uid ? String(s.uid) : '', signedIn = !!(s && s.signedIn);
+        var mine = !!(uid && d.ownerUid && String(d.ownerUid) === uid);
+        var tok = false; try { tok = !!ls('golfapp_organizer_' + String(code).toUpperCase()); } catch (e) { tok = false; }
+        var css = 'display:block;margin:-8px 4px 14px auto;min-height:44px;padding:0 6px;background:none;border:0;font:inherit;font-weight:800;font-size:15px;color:#0f4c3a;text-decoration:none;line-height:44px;text-align:right;cursor:pointer;';
+        if (mine) return '<a class="hs-prog-edit" data-hs-prog-edit="' + esc(code) + '" href="admin.html?game=' + encodeURIComponent(code) + '" style="' + css + '">Edit setup ›</a>';
+        if (!signedIn && tok) return '<button type="button" class="hs-prog-edit" data-hp-act="sprogsignin" data-hs-prog-signin="' + esc(code) + '" style="' + css + '">Sign in to edit</button>';
+        return '';
+    }
+    function progressEditPaint() {
+        var box = $('hs-prog-edit');
+        if (box) box.innerHTML = progressEditHtml(PE.code, PE.d);
+        if (PE.hooked) return;
+        PE.hooked = true;
+        try { if (W.HardPanAuth && W.HardPanAuth.onChange) W.HardPanAuth.onChange(function () { progressEditPaint(); }); } catch (e) {}
+        try { W.addEventListener('hardpan-auth-ready', function () { progressEditPaint(); }); } catch (e) {}
+    }
     function simpleProgress(code, course, thru) {
         return '<button type="button" class="hs-card hs-prog" data-hp-open="' + esc(code) + '" data-hs-prog-course="' + esc(shownName(String(course || '').split(' (')[0])) + '"><span><span class="h">IN PROGRESS</span>'
             + '<span class="n">' + esc(shownName(String(course || 'Your round').split(' (')[0])) + ' \u00b7 ' + (thru ? 'Thru ' + thru : 'Not started') + '</span></span><span class="go">Resume \u203A</span></button>';
@@ -1902,6 +1926,7 @@
         if (a === 'sgame') { homeStartRound((b && b.getAttribute('data-hs-game')) || 'more'); return true; }
         if (a === 'sgpsdoor') { gpsGate(homeCourse(), function () { setDoor('gps'); ss(QUICK, null); ss(SIMPLE, 'gps'); W.location.href = 'admin.html?start=quick'; }); return true; }
         if (a === 'sjoin') { join('hs-code', 'hs-code-msg'); return true; }
+        if (a === 'sprogsignin') { if (W.HardPanAccountUI && typeof W.HardPanAccountUI.openSignIn === 'function') W.HardPanAccountUI.openSignIn(); return true; }   // 084 Q1
         if (a === 'sgps') { gpsGate(homeCourse(), function () { setDoor('gps'); show('gps'); }); return true; }
         if (a === 'shome') { show('simple'); mainDecor(); return true; }
         if (a === 'strip') { var t = myTrips(); W.location.href = t.length ? 'trip.html?trip=' + encodeURIComponent(t[0]) : 'trip.html#build'; return true; }
@@ -3142,4 +3167,25 @@
     if (W.document && !/home\.html$/.test(String(W.location.pathname || ''))) {
         if (W.document.readyState === 'loading') W.document.addEventListener('DOMContentLoaded', boot); else setTimeout(boot, 0);
     }
+    // 088 FOLLOW-UP: A DELETE ACCOUNT THAT COULD NOT REACH THE SCAN SERVER left a note
+    // (hp.scanErasePending, account-exit.js). Its retry ran only where account-exit.js is loaded
+    // (admin.html), so on the app it never ran. Now, on any page that loads this file (the app's start
+    // included): ONLY when a note is there and still inside its window (about an hour), after the page
+    // has loaded, account-exit.js is fetched and retries on its own load - never blocking anything.
+    // admin.html loads account-exit.js itself (and retries there), so it is not loaded twice.
+    // A note past its window is dropped (account-exit.js's own 'expired' rule).
+    (function scanEraseRetryOnStart() {
+        try {
+            var KEY = 'hp.scanErasePending', raw = W.localStorage ? W.localStorage.getItem(KEY) : null;
+            if (!raw) return;
+            var rec = null; try { rec = JSON.parse(raw); } catch (e) { rec = null; }
+            if (!rec || typeof rec.token !== 'string' || !(Number(rec.until) > Date.now())) { W.localStorage.removeItem(KEY); return; }
+            var go = function () {
+                if (W.accountExit && typeof W.accountExit.retryScanErase === 'function') return;
+                loadScriptTimed('account-exit.js', function () {});
+            };
+            if (W.document && W.document.readyState === 'complete') setTimeout(go, 0);
+            else W.addEventListener('load', function () { setTimeout(go, 0); });
+        } catch (e) {}
+    })();
 })();

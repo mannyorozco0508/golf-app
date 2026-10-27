@@ -45,7 +45,7 @@ describe('Polish #29 (option B): Games & Bets as door cards', () => {
             const r = await arriveCold({ url: URL, db: DB(), settleMs: 2000, viewport: vp, preScript: PRE(null), steps: [SETTLE, { expression: READ }] });
             assert.equal(r.ok, true, r.reason);
             const [s] = J(r);
-            assert.equal(s.view, '‹\nHome\nGames & Bets\n🏌️\nGame Day\nOne round today · group, games and money\n🚐\nRoad Trip\nSeveral rounds · teams, money across days\n#️⃣ Have a game code?\nJoin with a code, link or QR');
+            assert.equal(s.view, '‹\nHome\nGames\n🏌️\nGame Day\nOne round today · group, games and money\n🚐\nRoad Trip\nSeveral rounds · teams, money across days\n#️⃣ Have a game code?\nJoin with a code, link or QR');
             assert.equal(s.old, 'none');
             assert.equal(s.oldLead, false, 'no "What are you setting up?" on screen');
             assert.equal(s.same, null);

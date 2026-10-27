@@ -17,6 +17,7 @@
 <!-- URGENT-048: window.HardPanAuth - the Sign in pill / profile; wraps the existing sign-in flows (loaded on first tap). -->
 <script src="hp-auth.js"></script>
 <script src="organizer-gate.js"></script>
+<script src="my-rounds.js"></script>
 <script src="./firebase-database-compat.js"></script>
 <!-- GPS:BEGIN -->
 <!-- 069 C: an offline Game Day round (local L- code) never reaches the database under that code. -->
@@ -45,6 +46,9 @@
   html, body { margin: 0; background: var(--hp-bg); color: var(--hp-text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
   .hp-view { display: none; min-height: 100vh; flex-direction: column; padding: calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 24px); max-width: 520px; margin: 0 auto; }
   .hp-view.on { display: flex; }
+  /* 084: Rounds I'm running on the simple Home (always the light theme). */
+  .hs-mine { margin-top: 12px; --mr-card: var(--hp-card); --mr-line: var(--hp-line); --mr-text: var(--hp-text); --mr-muted: var(--hp-muted); --mr-green: var(--hp-green); --mr-link: var(--hp-navy); --mr-warn-bg: var(--hp-warn-soft); --mr-warn: var(--hp-warn); }
+  .hs-mine .mr-card { border: 0; border-radius: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
   .hp-brand { font-size: 15px; font-weight: 800; letter-spacing: 3px; color: var(--hp-green); }
   .hp-games .hp-brand { color: var(--hp-navy); }
   .hp-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; }
@@ -174,13 +178,16 @@
   </div>
   <!-- Look B's tiles: Games & Bets (the original setup door, as before) and Range; My stats and History. -->
   <div class="hs-tiles">
-    <button type="button" class="hs-tile games" data-hp-act="snew"><span class="hs-ic" aria-hidden="true">&#x1F3B2;</span><span class="n">Games &amp; Bets</span><span class="s">group, games, money</span></button>
+    <button type="button" class="hs-tile games" data-hp-act="snew"><span class="hs-ic" aria-hidden="true">&#x1F3B2;</span><span class="n">Games</span><span class="s">group and games</span></button>
     <button type="button" class="hs-tile range" data-hp-act="srange" data-hs-range><span class="hs-ic" aria-hidden="true">&#x1F3AF;</span><span class="n">Range</span><span class="s">dial in your clubs</span></button>
   </div>
   <div class="hs-tiles">
     <button type="button" class="hs-tile plain" data-hp-act="sstats" data-hs-stats><span class="hs-ic" aria-hidden="true">&#x1F4CA;</span><span class="n">My stats</span><span class="s">Strokes Gained</span></button>
     <button type="button" class="hs-tile plain" data-hp-act="shistory"><span class="hs-ic" aria-hidden="true">&#x1F55D;</span><span class="n">History</span><span class="s">past rounds</span></button>
   </div>
+  <!-- 084: ROUNDS I'M RUNNING (my-rounds.js): 3 rows + "See all N", Edit setup -> admin.html?game=CODE;
+       signed out, "Sign in to edit" + how to get the organizer link. Hidden until there is a row. -->
+  <div id="hs-mine" class="hs-mine" style="display:none;"></div>
   <div id="hs-same" style="display:none;"></div>
   <div id="hs-progress"></div>
   <div class="hs-join" id="hs-join" style="display:none;">
@@ -290,6 +297,31 @@
 <script src="hp-account-ui.js"></script>
 <script>
     if (window.HardPanHome) window.HardPanHome.start(db);
+    // 084: Rounds I'm running. HardPanAuth (hp-auth.js) is the app's one auth source; this adapts it
+    // to the onAuthStateChanged shape my-rounds.js takes. Sign in -> the app's own sign-in sheet.
+    (function () {
+        var box = document.getElementById('hs-mine');
+        if (!box || !window.HardPanMyRounds) return;
+        var A = window.HardPanAuth;
+        var user = function () {
+            var s = A && A.state ? A.state() : null;
+            if (!s || !s.uid) return null;
+            var email = null; try { var u = window.firebase.auth().currentUser; email = u && u.email; } catch (e) {}
+            return { uid: s.uid, isAnonymous: !s.signedIn, email: email };
+        };
+        var auth = { onAuthStateChanged: function (fn) {
+            fn(user());
+            if (A && A.onChange) A.onChange(function () { fn(user()); });
+            window.addEventListener('hardpan-auth-ready', function () { fn(user()); });
+            Promise.resolve(window.authReady).then(function () { fn(user()); }, function () {});
+        } };
+        var mr = window.HardPanMyRounds.mount(box, { db: db, auth: auth, store: (function () { try { return localStorage; } catch (e) { return null; } })(), show: 3,
+            signIn: function () { if (window.HardPanAccountUI && window.HardPanAccountUI.openSignIn) window.HardPanAccountUI.openSignIn(); },
+            // An unfinished round shows ONCE on Home (2.0 polish #7): the IN PROGRESS card keeps it.
+            skip: function () { return Array.prototype.map.call(document.querySelectorAll('#hs-progress [data-hp-open]'), function (b) { return b.getAttribute('data-hp-open'); }); } });
+        var prog = document.getElementById('hs-progress');
+        if (mr && prog && window.MutationObserver) new MutationObserver(function () { mr.repaint(); }).observe(prog, { childList: true, subtree: true });
+    })();
     if (window.HardPanGpsStats) ['hp-mystats-main', 'hp-mystats-gps'].forEach(function (id) { window.HardPanGpsStats.placeHome(document.getElementById(id)); });
 </script>
 </body>
