@@ -8786,6 +8786,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             reauth: accountReauthFn(),
             reload: () => { try { location.reload(); } catch (e) { } }
         };
+        // 088 (website half, tfweb-2): Delete account also erases this account's
+        // scorecard-scan counts on the scan server (POST /api/scan-erase), like the
+        // app. Never stops the delete; a miss keeps a pending note on this browser.
+        if (step === 'delete2' && typeof fetch === 'function' && typeof window.accountExit.scanEraser === 'function') {
+            deps.scanErase = window.accountExit.scanEraser({ auth: auth, fetch: (u, o) => fetch(u, o) });
+        }
         const run = step === 'signout'
             ? window.accountExit.signOut(deps)
             : window.accountExit.deleteAccount(deps);

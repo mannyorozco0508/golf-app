@@ -20,10 +20,12 @@
 //   par_written     the printed par OUT / IN / TOTAL disagrees with the cells
 //   hcp_men         the men's HCP row does not use 1..N exactly once
 //   hcp_ladies      a ladies' HCP row was returned but does not use 1..N once
-//   tee_written     a tee's yardages do not add up to its printed OUT/IN/TOTAL
 //   hole_count      a row is not N long, or no tee / no par row at all
 //   parse_error     the answer did not parse
-// SOFT (amber, Save allowed after a look):
+// SOFT (amber, Save allowed after a look; never earns the Pro retry):
+//   tee_written     a tee's yardages do not add up to its printed OUT/IN/TOTAL
+//                   (tfweb-2, Manny Oct 26: AMBER for the golfer to fix, not
+//                   a block or a retry - a soft warning in the response)
 //   yards_range     a yardage outside 50-700
 //   unsure          a cell the model itself said it was not sure of
 // ============================================================================
@@ -226,7 +228,7 @@
         if (!v.tees.length) hard.push({ code: 'hole_count', row: 'tees' });
         v.tees.forEach(function (t) {
             if (t.yards.length !== n) { hard.push({ code: 'hole_count', row: t.name }); return; }
-            writtenMismatches(t.yards, t.written, n).forEach(function (nine) { hard.push({ code: 'tee_written', row: t.name, nine: nine }); });
+            writtenMismatches(t.yards, t.written, n).forEach(function (nine) { soft.push({ code: 'tee_written', row: t.name, nine: nine }); });
             t.yards.forEach(function (y, i) {
                 if (!isInt(y) || y < YARDS[0] || y > YARDS[1]) soft.push({ code: 'yards_range', row: t.name, hole: i + 1 });
             });

@@ -66,7 +66,6 @@ describe('course-card-validate: good card passes, every mutation fails (negative
         ['men HCP 19', (c) => { c.hcp_men[0] = 19; }, 'hcp_men'],
         ['men HCP missing', (c) => { c.hcp_men = []; }, 'hcp_men'],
         ['ladies HCP duplicate', (c) => { c.hcp_ladies[0] = 5; }, 'hcp_ladies'],
-        ['tee yard misread', (c) => { c.tees[0].yards[3] = 583; }, 'tee_written'],
         ['tee row too short', (c) => { c.tees[1].yards.pop(); }, 'hole_count'],
         ['no tees at all', (c) => { c.tees = []; }, 'hole_count']
     ];
@@ -93,6 +92,39 @@ describe('course-card-validate: good card passes, every mutation fails (negative
         assert.deepEqual(v.hard, []);
         assert.equal(v.suspectCount, 1);
         assert.equal(v.ok, false);
+        assert.equal(C.needsRetry(v), false);
+    });
+    // tfweb-2 (Manny, Oct 26): yardages not adding up to the printed total
+    // are AMBER for the golfer to fix - a soft warning, never the Pro retry.
+    test('tee yard misread -> SOFT tee_written (amber), no hard, no retry', () => {
+        const v = check(card((c) => { c.tees[0].yards[3] = 583; }));
+        assert.deepEqual(v.hard, []);
+        const tw = v.soft.filter((x) => x.code === 'tee_written');
+        assert.deepEqual(tw.map((x) => x.nine).sort(), ['out', 'total']);
+        assert.ok(tw.every((x) => x.row === 'Blue'));
+        assert.equal(v.suspectCount, v.soft.length);
+        assert.equal(v.ok, false, 'amber still shows: ok is false');
+        assert.equal(C.needsRetry(v), false);
+        assert.equal(v.saveLadies, true);
+    });
+    test('printed tee TOTAL alone off -> soft tee_written total only', () => {
+        const v = check(card((c) => { c.tees[1].written.total += 10; }));
+        assert.deepEqual(v.hard, []);
+        assert.deepEqual(v.soft, [{ code: 'tee_written', row: 'White', nine: 'total' }]);
+        assert.equal(C.needsRetry(v), false);
+    });
+    test('a tee mismatch next to a real hard fail still retries (for the hard one)', () => {
+        const v = check(card((c) => { c.tees[0].yards[3] = 583; c.hcp_men[1] = 17; }));
+        assert.deepEqual(codes(v), ['hcp_men']);
+        assert.ok(v.soft.some((x) => x.code === 'tee_written'));
+        assert.equal(C.needsRetry(v), true);
+    });
+    test('a 9-hole tee whose OUT is off is soft too', () => {
+        const nine = { holes: 9, par: PAR.slice(0, 9), par_written: { out: 36, in: null, total: null },
+            hcp_men: [9, 5, 3, 1, 8, 7, 2, 6, 4], hcp_ladies: [], tees: [{ name: 'Blue', yards: BLUE.slice(0, 9), written: { out: 3290 } }] };
+        const v = check(nine, { holes: 9 });
+        assert.deepEqual(v.hard, []);
+        assert.deepEqual(v.soft, [{ code: 'tee_written', row: 'Blue', nine: 'out' }]);
         assert.equal(C.needsRetry(v), false);
     });
     test('a 9-hole card uses 1..9 and 27-38', () => {
@@ -229,6 +261,17 @@ describe('course mode in the handler (fake Gemini: good / bad / retry)', () => {
         const { out, fetch } = await scan({ flash: [gem(card((c) => { c.unsure = [{ row: 'par', hole: 3 }]; }))] });
         assert.equal(out.retried, false);
         assert.equal(fetch.gemini().length, 1);
+    });
+    test('NEGATIVE CONTROL: tee yardages off their printed total -> amber in the response, NO Pro call', async () => {
+        const { out, fetch, logs } = await scan({ flash: [gem(card((c) => { c.tees[0].yards[3] = 583; }))] });
+        assert.equal(out.status, 'ok');
+        assert.equal(out.retried, false);
+        assert.equal(out.model, 'gemini-3.8-flash');
+        assert.equal(fetch.gemini().length, 1);
+        assert.deepEqual(out.validation.hard, []);
+        assert.ok(out.validation.soft.some((x) => x.code === 'tee_written' && x.row === 'Blue'));
+        assert.equal(out.result.tees[0].yards[3], 583, 'the read is returned as read, for the golfer to fix');
+        assert.deepEqual(JSON.parse(logs[0]).hard, []);
     });
     test('unparseable twice -> unavailable, and no course scan is used up', async () => {
         const { out, kv } = await scan({ flash: [gem('not json')], pro: [gem('still not')] });

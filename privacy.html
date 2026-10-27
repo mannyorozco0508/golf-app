@@ -62,7 +62,7 @@
     <tr><td>A green's position, only when you tap "set the green here" on the GPS screen</td><td>To fix that hole's green for your round. The saved point carries no account id and no name.</td></tr>
     <tr><td>Course search queries (the course name or town you type)</td><td>Sent through our server to look up the course and its published scorecard. This is text you type, not your phone's location. Not kept with your account and not sold.</td></tr>
     <tr><td>Imported course reference (course name, par, stroke index by hole, provider course id)</td><td>Saved into the round so everyone scores the same card, and kept in the shared course list so a later round can use it.</td></tr>
-    <tr><td><strong>Scorecard-scan counts</strong> (your account ID, how many scorecard scans you have used, and short-lived per-minute and per-day counts)</td><td>So each account gets its free scans and no one can run up the cost. The count of scans you have used is kept under your account ID to enforce the free limit. Deleting your account in the app erases these counts too. The photo itself is never stored - see Scorecard scan below.</td></tr>
+    <tr><td><strong>Scorecard-scan counts</strong> (your account ID, how many scorecard scans you have used, and short-lived per-minute and per-day counts)</td><td>So each account gets its free scans and no one can run up the cost. The count of scans you have used is kept under your account ID to enforce the free limit. Deleting your account in the app or on the website erases these counts too. The photo itself is never stored - see Scorecard scan below.</td></tr>
 </table>
 
 <h2>Microphone and voice scoring</h2>
@@ -74,7 +74,7 @@
 
 <h2>Scorecard scan</h2>
 <ul>
-    <li><strong>The camera, only when you ask.</strong> HardPan uses the camera only when you tap to scan a paper scorecard. If you pick a photo instead, only the one picture you choose is read; HardPan does not browse your photo library.</li>
+    <li><strong>The camera, only when you ask.</strong> HardPan uses the camera only when you tap to scan a paper scorecard. If you pick a photo instead, only the one picture you choose is read; HardPan does not browse your photo library. The camera is also used when you choose to scan a course's printed scorecard to fill in its pars, handicap (stroke index) rows and tee yardages; that photo goes the same way, to Google's Gemini API through our server, and is not stored (see Scanning a course's printed card, below).</li>
     <li><strong>What is sent.</strong> The photo goes to our server (Cloudflare) together with what the round already knows: the course name, tee, par and stroke index for each hole, and the round's player names (with any initials or nicknames). Handicaps, if the round has them, go to our server only, to check the result; they are not sent on. Our server sends the photo, the course details and the player names to Google's Gemini API, which reads the scores and sends them back. Your sign-in token is sent so the server knows the scan is yours; it is not passed to Google. Your location is never sent.</li>
     <li><strong>What is kept.</strong> HardPan does not store the photo. It is processed in memory and is not written to our database or our logs. Our server's log records only counts, timing, which model was used and whether the result checked out - no photo, no names. Nothing goes on the scorecard until you check the scores and tap to use them; then they are saved exactly as if you had typed them.</li>
     <li><strong>Scanning a course's printed card.</strong> When a course's pars and handicaps are not set up yet, you can scan a blank printed scorecard instead of typing them. Only that photo, the course name and the number of holes go to our server and on to Google's Gemini API, which reads the printed pars, handicap (stroke index) rows and tee yardages and sends them back. No player names, scores, handicaps or location are sent, and the photo is not stored. Nothing is saved until you check the numbers and tap to use them; then they are saved exactly as if you had typed them. Course-card scans have their own free count, kept under your account ID like the scorecard-scan counts.</li>
@@ -85,7 +85,7 @@
 <ul>
     <li>No password or phone number, and an email address only if you choose to sign in</li>
     <li>Your GPS position is never sent to us, and background location is used only while a round's Lock Screen view is on (see Your location)</li>
-    <li>No contacts access, and no browsing of your photo library. The camera is used only when you choose to scan a scorecard (see Scorecard scan above). The microphone is used only for voice scoring, as described above, and never recorded.</li>
+    <li>No contacts access, and no browsing of your photo library. The camera is used only when you choose to scan a scorecard, or a course's printed scorecard (see Scorecard scan above). The microphone is used only for voice scoring, as described above, and never recorded.</li>
     <li>No advertising identifier, and no third-party analytics or tracking SDK</li>
     <li>No payment details of any kind — see Money, below</li>
 </ul>

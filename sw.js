@@ -4464,7 +4464,11 @@
 // Moved to v331 (087): the new HardPan logo - tab/home-screen icons, the lobby and legal
 // headers (hardpan-lockup-light.png) and the receipt mark (hardpan-print-mark.png). An installed
 // PWA keeps its old icons and header until the key moves.
-const CACHE_VERSION = 'golfapp-v331-new-logo';
+// Moved to v332 (tfweb-2): Delete account on the website now also erases this
+// account's scorecard-scan counts (POST /api/scan-erase, account-exit.js +
+// admin.html), and the privacy page gained the course-scan camera sentence. An
+// installed web app keeps the old account-exit.js until the key moves.
+const CACHE_VERSION = 'golfapp-v332-scan-erase';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
