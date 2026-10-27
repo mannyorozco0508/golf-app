@@ -39,8 +39,10 @@
 // ============================================================================
 
 import V from '../../scorecard-validate.js';
+import C from '../../course-card-validate.js';   // 080 course mode
 
 export const SCAN_FREE_LIMIT = V.SCAN_FREE_LIMIT;
+export const COURSE_SCAN_FREE_LIMIT = C.COURSE_SCAN_FREE_LIMIT;   // its own, separate from the score scans
 export const PER_MINUTE = 3;          // burst brake per account
 export const PER_DAY = 30;            // per account per UTC day, paid or not
 export const MONTHLY_CAP = 20000;     // global model calls a month; SCAN_MONTHLY_CAP overrides
@@ -222,6 +224,7 @@ async function bump(kv, key, ttl) {
     return n;
 }
 export const freeKey = (uid) => 'scan:free:' + uid;
+export const courseFreeKey = (uid) => 'scan:course:' + uid;   // 080: never touches scan:free:
 export const minuteKey = (uid, d) => 'scan:min:' + uid + ':' + d.toISOString().slice(0, 16);
 export const dayKey = (uid, d) => 'scan:day:' + uid + ':' + d.toISOString().slice(0, 10);
 export const monthKey = (d) => 'scan:month:' + d.toISOString().slice(0, 7);
@@ -248,13 +251,15 @@ export function geminiRequest(model, image, round) {
     };
 }
 
-export async function callGemini(w, model, image, round) {
+// `spec` (080 course mode) swaps the request and the parser; without it this
+// is exactly the score call.
+export async function callGemini(w, model, image, round, spec) {
     let res;
     try {
         res = await w.doFetch(GEMINI_BASE + encodeURIComponent(model) + ':generateContent', {
             method: 'POST',
             headers: { 'content-type': 'application/json', 'x-goog-api-key': w.key },
-            body: JSON.stringify(geminiRequest(model, image, round)),
+            body: JSON.stringify(spec ? spec.request(model, image, round) : geminiRequest(model, image, round)),
             signal: AbortSignal.timeout(/pro/.test(model) ? 45000 : 25000)
         });
     } catch (e) { return { error: 'network' }; }
@@ -289,7 +294,7 @@ export async function callGemini(w, model, image, round) {
     const text = parts.map((x) => (x && typeof x.text === 'string' ? x.text : '')).join('');
     // A blocked or empty answer is still an ANSWER - it parses to an error and
     // validates as a failure, which is what earns the one retry.
-    return { parsed: V.parseModelOutput(text), tokens };
+    return { parsed: spec ? spec.parse(text) : V.parseModelOutput(text), tokens };
 }
 
 // ---------------------------------------------------------------------------
@@ -297,6 +302,9 @@ export async function handleScan(d) {
     const w = wire(d);
     // INERT FIRST: nothing read, verified or spent.
     if (!w.key || !w.kv) return notConfigured();
+    // 080: { mode: 'course' } is the course-card scan. Anything else is the
+    // score scan below, unchanged.
+    if (d.body && typeof d.body === 'object' && d.body.mode === 'course') return handleCourseScan(w, d);
 
     const body = readBody(d.body);
     if (body.error) return unavailable(body.error);
@@ -369,6 +377,114 @@ export async function handleScan(d) {
         retried,
         paid,
         freeScansLeft,
+        result: pick.parsed.value,
+        validation: pick.validation
+    };
+}
+
+// ============================================================================
+// 080 COURSE MODE: a photo of a blank printed card -> par, men's + ladies'
+// HCP rows, tee names + per-hole yardages (never rating / slope). Same auth,
+// rate limits and monthly cap as the score scan; its OWN free allowance
+// (scan:course:<uid>, COURSE_SCAN_FREE_LIMIT). The body is an allow-list:
+// the image, an optional course name and the hole count - no location.
+// ============================================================================
+export function readCourseBody(body) {
+    const b = body && typeof body === 'object' ? body : null;
+    if (!b) return { error: 'bad_request' };
+    const img = b.image && typeof b.image === 'object' ? b.image : null;
+    if (!img || typeof img.data !== 'string') return { error: 'bad_image' };
+    const data = img.data.replace(/^data:[^;,]+;base64,/, '').replace(/\s+/g, '');
+    const mime = String(img.mimeType || 'image/jpeg').toLowerCase();
+    if (IMAGE_TYPES.indexOf(mime) === -1) return { error: 'bad_image' };
+    if (!data || data.length > MAX_IMAGE_CHARS || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return { error: 'bad_image' };
+    const c = b.course && typeof b.course === 'object' ? b.course : {};
+    const holes = c.holes === undefined ? 18 : c.holes;
+    if (holes !== 9 && holes !== 18) return { error: 'bad_request' };
+    return { image: { mimeType: mime, data }, course: { holes, name: typeof c.name === 'string' ? c.name.trim().slice(0, 120) : '' } };
+}
+
+export function courseGeminiRequest(model, image, course) {
+    const generationConfig = { temperature: 0, responseMimeType: 'application/json', responseSchema: C.responseSchema() };
+    if (/^gemini-2\.5-flash/.test(model)) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+    else if (/^gemini-2\.5-pro/.test(model)) generationConfig.thinkingConfig = { thinkingBudget: 512 };
+    return {
+        contents: [{ role: 'user', parts: [
+            { text: C.buildCoursePrompt(course) },
+            { inline_data: { mime_type: image.mimeType, data: image.data } }
+        ] }],
+        generationConfig
+    };
+}
+export const COURSE_SPEC = { request: courseGeminiRequest, parse: (t) => C.parseCourseOutput(t) };
+
+async function handleCourseScan(w, d) {
+    const body = readCourseBody(d.body);
+    if (body.error) return unavailable(body.error);
+
+    const auth = String(d.authorization || '');
+    const m = /^Bearer\s+(.+)$/i.exec(auth.trim());
+    if (!m) return refused('sign_in');
+    const who = await verifyIdToken(m[1].trim(), w);
+    if (who.error === 'network') return unavailable('network');
+    if (who.error) return refused('sign_in');
+
+    const paid = await hasLivePass(w, who.uid, m[1].trim());
+    if (!paid && await readCount(w.kv, courseFreeKey(who.uid)) >= COURSE_SCAN_FREE_LIMIT) return refused('needs_pass');
+
+    if (await readCount(w.kv, minuteKey(who.uid, w.now)) >= PER_MINUTE) return refused('rate_limited');
+    if (await readCount(w.kv, dayKey(who.uid, w.now)) >= PER_DAY) return refused('daily_limit');
+    const mk = monthKey(w.now);
+    if (await readCount(w.kv, mk) >= w.cap) return refused('monthly_cap');
+    await bump(w.kv, minuteKey(who.uid, w.now), 120);
+    await bump(w.kv, dayKey(who.uid, w.now), 2 * 24 * 3600);
+    await bump(w.kv, mk, 40 * 24 * 3600);
+
+    const started = Date.now();
+    const first = await callGemini(w, w.model, body.image, body.course, COURSE_SPEC);
+    if (first.error) {
+        w.log(JSON.stringify({ ev: 'course_scan', outcome: first.error, model: w.model, ms: Date.now() - started, upstream: first.upstream }));
+        return unavailable(first.error);
+    }
+    let pick = { model: w.model, parsed: first.parsed, validation: C.validateCourse(first.parsed, body.course) };
+    const tokens = [Object.assign({ model: w.model }, first.tokens)];
+    let retried = false;
+
+    // ONE Pro retry, only when a check failed and the cap has room. Never a second.
+    if (C.needsRetry(pick.validation) && await readCount(w.kv, mk) < w.cap) {
+        retried = true;
+        await bump(w.kv, mk, 40 * 24 * 3600);
+        const second = await callGemini(w, w.retryModel, body.image, body.course, COURSE_SPEC);
+        if (!second.error) {
+            tokens.push(Object.assign({ model: w.retryModel }, second.tokens));
+            const v2 = C.validateCourse(second.parsed, body.course);
+            if (C.betterOf(pick.validation, v2) === 'second') pick = { model: w.retryModel, parsed: second.parsed, validation: v2 };
+        }
+    }
+
+    if (!pick.parsed.ok) {
+        w.log(JSON.stringify({ ev: 'course_scan', outcome: 'unreadable', retried, ms: Date.now() - started, tokens }));
+        return unavailable('upstream_error');
+    }
+
+    let courseScansLeft = null;
+    if (!paid) {
+        const used = await bump(w.kv, courseFreeKey(who.uid));   // no TTL, like the score scans
+        courseScansLeft = Math.max(0, COURSE_SCAN_FREE_LIMIT - used);
+    }
+    w.log(JSON.stringify({
+        ev: 'course_scan', outcome: 'ok', model: pick.model, retried, paid,
+        ms: Date.now() - started, tokens,
+        hard: pick.validation.hard.map((x) => x.code), soft: pick.validation.suspectCount,
+        tees: pick.parsed.value.tees.length
+    }));
+    return {
+        status: 'ok',
+        mode: 'course',
+        model: pick.model,
+        retried,
+        paid,
+        courseScansLeft,
         result: pick.parsed.value,
         validation: pick.validation
     };
