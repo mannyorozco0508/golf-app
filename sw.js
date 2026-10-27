@@ -4555,7 +4555,7 @@ const SHELL_FILES = [
     './qr-codes.js',
     // Every tap shows it registered - admin.html and index.html both load it.
     './tap-feedback.js',
-    // 084: Rounds I'm running (admin.html, trip.html, home.html).
+    // 084: the Rounds I am running list (admin.html, trip.html, home.html).
     './my-rounds.js',
     // The trip recap drawn as a PNG for the group chat - trip.html loads it.
     './trip-recap-image.js',

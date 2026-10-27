@@ -145,7 +145,7 @@ test('7 wiring: save chain (not returned), heal on open, trip batch, shell lists
     assert.match(admin, /mrUid === mrData\.ownerUid\) window\.HardPanMyRounds\.remember/);
     const trip = read('trip.html');
     assert.match(trip, /<script src="my-rounds\.js"><\/script>/);
-    assert.match(trip, /window\.HardPanMyRounds\.remember\(db, uid, m\[1\], updates\[k\], \{ day: row\.date \}\)/);
+    assert.match(trip, /window\.HardPanMyRounds\.remember\(db, mrPlanUid, m\[1\], updates\[k\], \{ day: row\.date \}\)/);
     assert.match(read('sync-mobile-web.js'), /'my-rounds\.js',/);
     assert.match(read('sw.js'), /'\.\/my-rounds\.js',/);
     const gps = fs.existsSync(path.join(__dirname, 'home.html'));
@@ -161,5 +161,6 @@ test('7 wiring: save chain (not returned), heal on open, trip batch, shell lists
     // the module never reads or prints a token value
     const src = read('my-rounds.js');
     assert.doesNotMatch(src, /organizerToken/);
+    assert.doesNotMatch(src, /remember\(env\./, 'Home reads only - it never writes a pointer');
     assert.doesNotMatch(src, /getItem\(k\)\s*[;)]\s*$/m);
 });

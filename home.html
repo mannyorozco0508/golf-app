@@ -315,8 +315,12 @@
             window.addEventListener('hardpan-auth-ready', function () { fn(user()); });
             Promise.resolve(window.authReady).then(function () { fn(user()); }, function () {});
         } };
-        window.HardPanMyRounds.mount(box, { db: db, auth: auth, store: (function () { try { return localStorage; } catch (e) { return null; } })(), show: 3,
-            signIn: function () { if (window.HardPanAccountUI && window.HardPanAccountUI.openSignIn) window.HardPanAccountUI.openSignIn(); } });
+        var mr = window.HardPanMyRounds.mount(box, { db: db, auth: auth, store: (function () { try { return localStorage; } catch (e) { return null; } })(), show: 3,
+            signIn: function () { if (window.HardPanAccountUI && window.HardPanAccountUI.openSignIn) window.HardPanAccountUI.openSignIn(); },
+            // An unfinished round shows ONCE on Home (2.0 polish #7): the IN PROGRESS card keeps it.
+            skip: function () { return Array.prototype.map.call(document.querySelectorAll('#hs-progress [data-hp-open]'), function (b) { return b.getAttribute('data-hp-open'); }); } });
+        var prog = document.getElementById('hs-progress');
+        if (mr && prog && window.MutationObserver) new MutationObserver(function () { mr.repaint(); }).observe(prog, { childList: true, subtree: true });
     })();
     if (window.HardPanGpsStats) ['hp-mystats-main', 'hp-mystats-gps'].forEach(function (id) { window.HardPanGpsStats.placeHome(document.getElementById(id)); });
 </script>
