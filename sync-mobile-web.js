@@ -131,7 +131,9 @@ const SHARED_SHELL = [
 const CONSUMER_SHELL = [
     'admin.html', 'index.html', 'leaderboard.html', 'settlement.html',
     'sidematches.html', 'skins.html', 'stats.html', 'game.html', 'trip.html',
-    'instructions.html', 'shared.html', 'logo-mark.png',
+    'instructions.html', 'shared.html',
+    // 087 (Manny OK, Oct 26 2026 6:43 PM): logo-mark.png (the old ball) no longer ships in the app
+    // bundle; backup in assets/brand/legacy/logo-mark.png.
     // The home-screen mark, moved here from SHARED_SHELL in wave 19. Consumer
     // ships exactly what it always shipped; what changed is that Tournament no
     // longer gets it for free.

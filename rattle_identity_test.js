@@ -559,9 +559,13 @@ describe('THE BRAND MARK ASSET', () => {
         assert.equal(buf[25], 6, 'logo-mark.png needs an alpha channel');
     });
 
-    test('the mark ships to Consumer and to the native bundle', () => {
-        assert.ok(read('sw.js').includes("'./logo-mark.png'"), 'must be precached');
-        assert.ok(read('sync-mobile-web.js').includes("'logo-mark.png'"), 'must ship natively');
+    // 087 (Manny OK, Oct 26 2026 6:43 PM): the old ball no longer ships in the app bundle or the
+    // offline cache (was: must be precached, must ship natively). The website still serves it from
+    // the root for the Tournaments page; a backup copy is kept in assets/brand/legacy/.
+    test('the old mark no longer ships to Consumer or to the native bundle; its backup is kept', () => {
+        assert.ok(!read('sw.js').includes("'./logo-mark.png'"), 'the old mark is precached again');
+        assert.ok(!read('sync-mobile-web.js').includes("'logo-mark.png'"), 'the old mark ships natively again');
+        assert.ok(exists('assets/brand/legacy/logo-mark.png'), 'the backup copy is gone');
     });
 
     test('the mark file stays Consumer-owned — Tournament may show it as parent brand, not take it', () => {

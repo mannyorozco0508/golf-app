@@ -4857,7 +4857,9 @@ const SHELL_FILES = [
     './manifest.json',
     './icon-192.png',
     './icon-512.png',
-    './logo-mark.png',
+    // 087 (Manny OK, Oct 26 2026 6:43 PM): logo-mark.png (the old ball) is no longer precached.
+    // The website still serves it from the root for the Tournaments page (Rattle Golf, Manny: leave);
+    // backup copy in assets/brand/legacy/logo-mark.png.
     // Ball icon, favicon, and the outlined lockup (v205, word opened in v206).
     // 087 (Manny OK, Oct 26 2026): hardpan-lockup.svg (the old ball + HARDPAN) no
     // longer ships; its copy is kept at assets/brand/legacy/hardpan-lockup.svg.
@@ -4865,7 +4867,7 @@ const SHELL_FILES = [
     './hardpan-icon.svg',
     './favicon-32.png',
     // 087 THE NEW LOGO (Manny, Oct 26 2026): the lobby + legal-page header lockup and the
-    // receipt mark. logo-mark.png stays precached (the Rattle Golf tournament mark, kept by Manny).
+    // receipt mark.
     './hardpan-lockup-light.png',
     './hardpan-print-mark.png'
 ];
