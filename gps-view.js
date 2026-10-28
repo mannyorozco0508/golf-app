@@ -3024,6 +3024,9 @@
             }
             return [{ x: a.x + t0 * dx, y: a.y + t0 * dy }, { x: a.x + t1 * dx, y: a.y + t1 * dy }];
         };
+        // 089c: My miss's chips column (bottom-left; with "from tee"): a rect on it, moved right just clear of it (else null).
+        var chipsRc = rectOf(S.el.querySelector('.gps-miss-chips'), wrapR), chipsObs = chipsRc ? { l: chipsRc.l - M, t: chipsRc.t - M, r: chipsRc.r + M, b: chipsRc.b + M } : null;
+        var offChips = function (rc) { if (!chipsObs || !hits(rc, chipsObs)) return null; var dx = chipsObs.r - rc.l; return { l: rc.l + dx, t: rc.t, r: rc.r + dx, b: rc.b }; };
         var SIZES = [44, 38, 32], TS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.22, 0.78, 0.12, 0.88];
         // LAYOUT D: round dark bubbles, smaller type.
         if (ldOn()) SIZES = [24, 21, 18];
@@ -3058,14 +3061,31 @@
                 lblEl.style.visibility = 'hidden';
                 return put(pill, a, b, text);
             }
+            // 089c: no clear spot on its line and the line runs past My miss's chips (the held fix / "from tee": the map
+            // is back on the hole view) - the number steps right, just clear of the chips column, where that is clear.
+            if (chipsObs) {
+                for (var i3 = 0; i3 < TS.length; i3++) {
+                    for (var j3 = 0; j3 < SIZES.length; j3++) {
+                        pill.style.fontSize = SIZES[j3] + 'px';
+                        var rc3 = offChips(rectAt(at(TS[i3]), pill.offsetWidth, pill.offsetHeight));
+                        if (!rc3 || !inBounds(rc3) || obstacles.some(function (ob) { return hits(rc3, ob); })) continue;
+                        place(rc3, SIZES[j3], 'beside-chips');
+                        return;
+                    }
+                }
+            }
             // ALWAYS SHOWN, ON ITS LINE: the middle of its visible part, at 32 px,
             // nudged along the line only to stay inside the screen.
+            // 089c: never on top of My miss's chips - stepped right just clear of them (inside the screen) when it would be.
             pill.style.fontSize = SIZES[SIZES.length - 1] + 'px';
             var w2 = pill.offsetWidth, h2 = pill.offsetHeight;
             for (var k = 0; k < TS.length; k++) {
-                var rc2 = rectAt(at(TS[k]), w2, h2);
+                var rc2 = rectAt(at(TS[k]), w2, h2), rcC = inBounds(rc2) ? offChips(rc2) : null;
+                if (rcC && inBounds(rcC)) { place(rcC, SIZES[SIZES.length - 1], 'beside-chips-crowded'); return; }
                 if (inBounds(rc2)) { place(rc2, SIZES[SIZES.length - 1], 'line-crowded'); return; }
             }
+            var rc4 = offChips(rectAt(at(0.5), w2, h2));
+            if (rc4 && inBounds(rc4)) { place(rc4, SIZES[SIZES.length - 1], 'beside-chips-crowded'); return; }
             place(rectAt(at(0.5), w2, h2), SIZES[SIZES.length - 1], 'line-crowded');
         };
         var aim = aimAt(r);
