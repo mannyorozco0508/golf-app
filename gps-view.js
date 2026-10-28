@@ -761,7 +761,9 @@
         var wr = wrap.getBoundingClientRect(), obs = [];
         var box = function (e) { var b = e.getBoundingClientRect(); return { l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top, w: b.width, h: b.height }; };
         // 094 (Manny's shot 6: "5i" under the Hole button): the rail's buttons and the green's size line too.
-        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-right > *, .gps-ld-rail > *, .gps-green-dims'), function (e) {
+        // 093 (spec item 4): never under the club switcher pill / "from tee" tag (or the chips), Recenter, the Plays-like
+        // pill, the zoom button, the top bar or the bottom row either.
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-right > *, .gps-ld-rail > *, .gps-green-dims, .gps-miss-chips > *, .gps-leftrow > *, .gps-ld-plays, .gps-zoom, .gps-ld-top, .gps-ld-bottom'), function (e) {
             if (e.offsetParent === null || e.style.display === 'none' || getComputedStyle(e).visibility === 'hidden') return;
             var b = box(e); if (b.w > 0 && b.h > 0) obs.push(b);
         });
@@ -2672,6 +2674,18 @@
             var x = q.x + 16, y = q.y - h / 2;
             if (on9(keep9, x, y, w, h) && q.x - 16 - w >= 2 && !on9(left9, q.x - 16 - w, y, w, h)) x = q.x - 16 - w;
             placed.forEach(function (b) { if (x < b.r && x + w > b.l && y < b.b && y + h > b.t) y = b.b + 2; });
+            // 093 (spec item 4): never under the club switcher pill, the "from tee" tag, Recenter or another label. Still
+            // covered after the step above: the dot's right, then left, then a label's height up / down along the line
+            // (up to 3); nowhere clear - hidden (the same number stays in the top bar).
+            el.removeAttribute('data-green-hidden');
+            var all9 = left9.concat(placed);
+            if (on9(all9, x, y, w, h)) {
+                var x0 = q.x + 16, x1 = q.x - 16 - w, y0 = q.y - h / 2, got = null, tries = [];
+                for (var st = 0; st <= 3; st++) [x0, x1].forEach(function (xx) { (st ? [y0 - st * (h + 2), y0 + st * (h + 2)] : [y0]).forEach(function (yy) { tries.push([xx, yy]); }); });
+                for (var ti = 0; ti < tries.length && !got; ti++) { var tx = tries[ti][0], ty = tries[ti][1]; if (tx >= 2 && tx + w <= wr9.width - 2 && ty >= 2 && ty + h <= wr9.height - 2 && !on9(all9, tx, ty, w, h)) got = tries[ti]; }
+                if (!got) { el.style.visibility = 'hidden'; el.setAttribute('data-green-hidden', '1'); return; }
+                x = got[0]; y = got[1];
+            }
             el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.style.visibility = '';
             placed.push({ l: x, t: y, r: x + w, b: y + h });
         });
@@ -2989,6 +3003,7 @@
         Object.keys(S.markers || {}).forEach(function (k) { add(rectOf(S.markers[k].getElement(), wrapR), M); });
         // URGENT-052 B: the My miss oval (when it is on) - the distance bubbles keep off it too.
         try { var mr = missRect(); if (mr) add(mr, M); } catch (e) {}
+        var ovalObs = mr ? obstacles[obstacles.length - 1] : null;   // 093: the oval's box (a crowded bubble may sit over it)
         ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-miss-chips', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit', '.gps-lc-left', '.gps-lc-right', '.gps-lc-score', '.gps-panel', '.gps-zoom',
             '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom', '.gps-ld-bottom .gps-mark-shot'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
         // 066 #1: the golfer's extras (only when they turned some on) - the numbers keep off them too.
@@ -3079,6 +3094,29 @@
                         if (!rc3 || !inBounds(rc3) || obstacles.some(function (ob) { return hits(rc3, ob); })) continue;
                         place(rc3, SIZES[j3], 'beside-chips');
                         return;
+                    }
+                }
+            }
+            // 093 (spec item 4: no label under a button, the pill or another label): still no clear spot - a short line
+            // (the target dragged close to the green centre: "14y" on "C 186") - the number tries just BESIDE its line,
+            // either side (perpendicular, one then two bubble-widths), the middle of the line first; the first clear one.
+            var sl = Math.sqrt(Math.pow(seg[1].x - seg[0].x, 2) + Math.pow(seg[1].y - seg[0].y, 2));
+            // A second pass may sit over the see-through My miss oval (never on a label or a button).
+            if (sl > 0.5) for (var pass5 = 0; pass5 < 2; pass5++) {
+                var nx = -(seg[1].y - seg[0].y) / sl, ny = (seg[1].x - seg[0].x) / sl;
+                var obs5 = pass5 ? obstacles.filter(function (ob) { return ob !== ovalObs; }) : obstacles;
+                for (var j5 = 0; j5 < SIZES.length; j5++) {
+                    pill.style.fontSize = SIZES[j5] + 'px';
+                    var w5 = pill.offsetWidth, h5 = pill.offsetHeight, step5 = Math.max(w5, h5) * 0.5 + M + 2;
+                    for (var i5 = 0; i5 < TS.length; i5++) {
+                        for (var d5 = 1; d5 <= 3; d5++) {
+                            for (var sg5 = -1; sg5 <= 1; sg5 += 2) {
+                                var c5 = at(TS[i5]), rc5 = rectAt({ x: c5.x + sg5 * nx * step5 * d5, y: c5.y + sg5 * ny * step5 * d5 }, w5, h5);
+                                if (!inBounds(rc5) || obs5.some(function (ob) { return hits(rc5, ob); })) continue;
+                                place(rc5, SIZES[j5], pass5 ? 'beside-line-oval' : 'beside-line');
+                                return;
+                            }
+                        }
                     }
                 }
             }
@@ -7926,7 +7964,7 @@
         + '#gps-overlay .gps-miss-pill .gps-miss-mid b{font-weight:800;color:#fff;margin-right:2px;}'
         + '@media (max-width:399px){#gps-overlay .gps-miss-pill .gps-miss-mid{font-size:14px;}#gps-overlay .gps-miss-pill .gps-miss-arrow{width:28px;}}'
         + '#gps-overlay .gps-miss-pill-tight .gps-miss-pill .gps-miss-arrow{width:22px;font-size:22px;}#gps-overlay .gps-miss-pill-tight .gps-miss-pill .gps-miss-mid{font-size:13px;padding:0;}'
-        + '#gps-overlay .gps-miss-card{position:absolute;left:0;bottom:60px;pointer-events:none;box-sizing:border-box;max-width:min(300px, calc(100vw - 96px));width:max-content;padding:6px 10px;border-radius:10px;background:rgba(11,15,12,.9);border:1px solid rgba(125,211,252,.45);color:#cbd5e1;font:600 12px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;white-space:normal;}'
+        + '#gps-overlay .gps-miss-card{position:absolute;left:8px;bottom:60px;pointer-events:none;box-sizing:border-box;max-width:min(300px, calc(100vw - 96px));width:max-content;padding:6px 10px;border-radius:10px;background:rgba(11,15,12,.9);border:1px solid rgba(125,211,252,.45);color:#cbd5e1;font:600 12px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;white-space:normal;}'
         + '#gps-overlay .gps-miss-card b{display:block;font:800 12.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#7dd3fc;}#gps-overlay .gps-miss-card span{display:block;}'
         + '#gps-overlay.gps-sun .gps-miss-pill,#gps-overlay.gps-sun .gps-miss-card{background:#000 !important;border-color:#fff !important;}#gps-overlay.gps-sun .gps-miss-pill button{color:#fff !important;}'
         + '#gps-overlay.gps-miss-switch-on .gps-carry-lbl{opacity:.4 !important;}'
