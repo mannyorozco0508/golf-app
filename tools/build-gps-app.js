@@ -90,7 +90,15 @@ if (process.env.GPS_PAYWALL === '1') {
 // and the app's front doors in a browser. (2) No key in the web files: the Esri key is blanked in the built
 // gps-config.js (the map uses USGS imagery, as on any host the key does not list). (3) No GolfAPI data.
 if (process.env.HARDPAN_BUDDY_PREVIEW === '1') {
-    fs.copyFileSync(path.join(ROOT, 'tools', 'buddy-preview', 'buddy-preview.js'), path.join(OUT, 'buddy-preview.js'));
+    // 098: the end instant is per build (HARDPAN_BUDDY_PREVIEW_END = ms since 1970 UTC, the first ENDED instant).
+    // Unset = 096's Nov 4 date (1793862000000), so the gps-buddy build is unchanged.
+    const bpEnd = process.env.HARDPAN_BUDDY_PREVIEW_END || '1793862000000';
+    if (!/^\d{13}$/.test(bpEnd)) { console.error('BUDDY PREVIEW: HARDPAN_BUDDY_PREVIEW_END must be 13-digit ms'); process.exit(1); }
+    const bpSrc = fs.readFileSync(path.join(ROOT, 'tools', 'buddy-preview', 'buddy-preview.js'), 'utf8');
+    const bpOut = bpSrc.replace(/var END = \d+;.*$/m, 'var END = ' + bpEnd + ';   // ' + new Date(Number(bpEnd)).toISOString() + ' = ended from this instant (set per build, 098)');
+    if (!new RegExp('var END = ' + bpEnd + ';').test(bpOut)) { console.error('BUDDY PREVIEW: END not set'); process.exit(1); }
+    fs.writeFileSync(path.join(OUT, 'buddy-preview.js'), bpOut);
+    console.warn('BUDDY PREVIEW END: ' + new Date(Number(bpEnd)).toISOString());
     fs.readdirSync(OUT).filter((f) => f.endsWith('.html')).forEach((page) => {
         const p = path.join(OUT, page), html = fs.readFileSync(p, 'utf8');
         const m = /<head[^>]*>/i.exec(html);
