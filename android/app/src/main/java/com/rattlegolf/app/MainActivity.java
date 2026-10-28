@@ -22,6 +22,8 @@ public class MainActivity extends BridgeActivity {
     // there - the window's cream shows behind the status bar icons.
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // The paper scorecard camera (both scans): the app's own plugin, registered before the bridge starts.
+        registerPlugin(HardPanDocScanPlugin.class);
         super.onCreate(savedInstanceState);
         View frame = (View) getBridge().getWebView().getParent();
         ViewCompat.setOnApplyWindowInsetsListener(frame, (v, insets) -> {
