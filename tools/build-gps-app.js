@@ -83,6 +83,26 @@ if (process.env.GPS_PAYWALL === '1') {
         + '\n// PAYWALL BUILD (GPS_PAYWALL=1): GPS needs the trial or the subscription.\nwindow.HARDPAN_GPS_CONFIG.paywall = true;\n');
     console.warn('PAYWALL BUILD: GPS_PAYWALL=1 - GPS needs the 7-day trial or the subscription (StoreKit).');
 }
+// 096 THE BUDDY PREVIEW (Manny's typed OK, Oct 28 2026): HARDPAN_BUDDY_PREVIEW=1 makes THIS build the
+// one-week Cloudflare Pages preview "gps-buddy" for a phone browser. Branch 096-buddy-preview only, never
+// merged; never set it for the app or production. (1) tools/buddy-preview/buddy-preview.js goes first in
+// every page's <head>: the end-date gate (after Wed Nov 4, 2026 11:59 PM Arizona: "This preview has ended")
+// and the app's front doors in a browser. (2) No key in the web files: the Esri key is blanked in the built
+// gps-config.js (the map uses USGS imagery, as on any host the key does not list). (3) No GolfAPI data.
+if (process.env.HARDPAN_BUDDY_PREVIEW === '1') {
+    fs.copyFileSync(path.join(ROOT, 'tools', 'buddy-preview', 'buddy-preview.js'), path.join(OUT, 'buddy-preview.js'));
+    fs.readdirSync(OUT).filter((f) => f.endsWith('.html')).forEach((page) => {
+        const p = path.join(OUT, page), html = fs.readFileSync(p, 'utf8');
+        const m = /<head[^>]*>/i.exec(html);
+        if (!m) { console.error('BUDDY PREVIEW: no <head> in ' + page); process.exit(1); }
+        fs.writeFileSync(p, html.slice(0, m.index + m[0].length) + '\n<script src="buddy-preview.js"></script>' + html.slice(m.index + m[0].length));
+    });
+    const cf = path.join(OUT, 'gps-config.js'), before = fs.readFileSync(cf, 'utf8');
+    const after = before.replace(/esriKey:\s*'[^']*'/, "esriKey: ''");
+    if (after === before && !/esriKey:\s*''/.test(before)) { console.error('BUDDY PREVIEW: esriKey not found to blank'); process.exit(1); }
+    fs.writeFileSync(cf, after);
+    console.warn('BUDDY PREVIEW BUILD (HARDPAN_BUDDY_PREVIEW=1): end-date gate on every page, Esri key blanked. Pages preview gps-buddy only.');
+}
 const lost = GPS.filter((f) => !fs.existsSync(path.join(OUT, f)));
 if (lost.length) { console.error('GPS files not in the app: ' + lost.join(', ')); process.exit(1); }
 
@@ -118,7 +138,7 @@ try {
 // worker does not list it. The GPS side loads it when it is there; without it
 // the app runs on OpenStreetMap exactly as build 8.
 const GOLFAPI = path.join(ROOT, 'golfapi', 'gps-golfapi.js');
-if (fs.existsSync(GOLFAPI)) {
+if (fs.existsSync(GOLFAPI) && process.env.HARDPAN_BUDDY_PREVIEW !== '1') {
     fs.copyFileSync(GOLFAPI, path.join(OUT, 'gps-golfapi.js'));
     const d = require(GOLFAPI);
     console.log('GolfAPI data: ' + Object.keys(d.courses || {}).length + ' courses, ' + (fs.statSync(GOLFAPI).size / 1024).toFixed(1) + ' KB (app only)');
