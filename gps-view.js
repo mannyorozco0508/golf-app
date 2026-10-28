@@ -5268,21 +5268,25 @@
         // each iron / wedge whose carry lands front..back today (centreAt, as the oval), plus the nearest one
         // within 5 yds short of the front / long of the back; at most 4 (gps-miss-pattern depthChips). The default
         // = the club closest to the target point. A green with no front / back: 089's pair above.
-        var def = club, depth = false;
+        var def = club, depth = false, allC = false;
         if (!mine && chips.length && typeof M.depthChips === 'function') {
             var hn = null; try { hn = G.holeNumbers(o.pt, r); } catch (e) { hn = null; }
             var yd = function (m) { return m != null && isFinite(m) ? m / G.M_PER_YD : null; };
             var dc = hn ? M.depthChips({ bag: bag, front: yd(hn.frontM), middle: yd(hn.middleM), back: yd(hn.backM), aimYd: aimYd, rawYd: rawYd, playsYd: plEx, app: club }) : null;
             if (dc && dc.list.length) { chips = dc.list; def = dc.def; depth = true; }
+            // 095 (Manny, Oct 28): ON A PAR 3 (the switcher), EVERY CLUB IN MY BAG, shortest to longest - not only the
+            // ones landing on the green. The default = the club closest to the target. Approaches: unchanged.
+            var ac = hn && isPar3() && typeof M.allClubs === 'function' ? M.allClubs({ bag: bag, front: yd(hn.frontM), middle: yd(hn.middleM), back: yd(hn.backM), aimYd: aimYd, rawYd: rawYd, playsYd: plEx, app: club, order: B.BAG }) : null;
+            if (ac && ac.list.length) { chips = ac.list; def = ac.def; depth = true; allC = true; }
         }
         // The tapped chip, while it still stands (this hole, this ball, still one of the chips); else the default
         // (089: the app's pick; 089b: the depth chip closest to the target).
         var app = club, sel = def;
         if (pk && chips.some(function (x) { return x.club === pk; })) sel = pk;
         var selCarry = sel === app ? carry : bag[sel].yd;
-        if (chips.length) S.missChips = { app: app, def: def, sel: sel, depth: depth, from: o.from, held: !!o.held, list: chips, pt: o.pt.slice() };
+        if (chips.length) S.missChips = { app: app, def: def, sel: sel, depth: depth, all: allC, from: o.from, held: !!o.held, list: chips, pt: o.pt.slice() };
         var selSpot = null; if (depth) chips.forEach(function (x) { if (x.club === sel) selSpot = x.spot; });
-        return { club: sel, app: app, spot: selSpot, carry: selCarry, along: M.centreAt(selCarry, rawYd, plEx), aim: aim, aimYd: aimYd, hand: SL && SL.hand ? SL.hand(bagGolfer()) : 'R' };
+        return { club: sel, app: app, any: allC, spot: selSpot, carry: selCarry, along: M.centreAt(selCarry, rawYd, plEx), aim: aim, aimYd: aimYd, hand: SL && SL.hand ? SL.hand(bagGolfer()) : 'R' };
     }
     // 089: THE TAPPED CHIP (memory only, this hole, this ball): { hole, club, pt }. Back to the app's pick on
     // the next hole, the next shot (Mark shot, or the golfer more than 40 yds from where he tapped).
@@ -5291,6 +5295,8 @@
         var p = S && S.missPick;
         if (!p) return null;
         if (p.hole !== S.hole || !o || !o.pt || !p.pt || G.haversineMeters(p.pt, o.pt) > MISS_PICK_NEAR_YD * G.M_PER_YD) { S.missPick = null; return null; }
+        // 095: ON A PAR 3 (the switcher), the target dragged = the default re-picks (the club closest to the new target).
+        if (isPar3() && p.tgt !== undefined && p.tgt !== missTgtKey()) { S.missPick = null; return null; }
         return p.club;
     }
     // The club the tapped chip puts on the plays-like pill (null: the pill keeps the app's pick).
@@ -5299,10 +5305,11 @@
         // 089b: the shown chip's club (the tapped one, or the depth default when it is not the app's pick).
         return c && S.missOval && c.sel !== c.app && ((S.missPick && S.missPick.club === c.sel) || (c.depth && c.sel === c.def)) ? c.sel : null;
     }
+    function missTgtKey() { var t = S && S.target; return t && t.length ? Number(t[0]).toFixed(7) + ',' + Number(t[1]).toFixed(7) : ''; }   // 095
     function missChipTap(club) {
         var c = S && S.missChips;
         if (!c || !c.list.some(function (x) { return x.club === club; })) return;
-        S.missPick = club === (c.def || c.app) ? null : { hole: S.hole, club: club, pt: c.pt.slice() };
+        S.missPick = club === (c.def || c.app) ? null : { hole: S.hole, club: club, pt: c.pt.slice(), tgt: missTgtKey() };
         render();
     }
     // THE CHIPS ON THE MAP: stacked bottom-left, above Recenter (longer club on top), the shown one selected.
@@ -5369,6 +5376,7 @@
         list.forEach(function (y, k) { if (y.club === c.sel) { x = y; i = k; } });
         if (!x) { x = list[0]; i = 0; }
         var t = c.depth && x.spot && typeof M.depthText === 'function' ? M.depthText(clubShort(x.club), x.spot, u) : M.chipText(clubShort(x.club), x.delta, u);
+        if (c.all && x.spot && typeof M.switchText === 'function') t = M.switchText(clubShort(x.club), x.spot, u);   // 095: off the green, "9i · 12 past the back"
         var fromTee = c.from === 'tee', lessOff = i <= 0, moreOff = i >= list.length - 1;
         if (!box.classList.contains('gps-miss-switch')) {
             box.textContent = ''; box.removeAttribute('data-miss-chips'); box.classList.add('gps-miss-switch');
@@ -5483,7 +5491,7 @@
             if (ho && ho.from === 'me') o = { from: 'me', pt: hp.slice(), held: true };
         }
         var plan = missPlan(r, o), B = bagApi();
-        var f = plan ? M.oval(plan.club, plan.carry, plan.hand, plan.along) : null;
+        var f = plan ? M.oval(plan.club, plan.carry, plan.hand, plan.along, !!plan.any) : null;   // 095: any club on the par-3 switcher
         if (!f) { missClear(); return; }
         var aim = plan.aim, club = plan.club;
         S.missOval = { club: f.club, carry: f.avg, along: f.carry, a: f.a, b: f.b, tilt: f.tilt, hand: f.hand };

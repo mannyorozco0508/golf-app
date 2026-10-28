@@ -75,8 +75,10 @@
     // centre, yards along the line), avg (My bag's carry), cx, a (half width), b (half depth),
     // tilt } - or null (not an iron / wedge, no carry). along: where the centre sits (centreAt),
     // else the carry. The size always comes from My bag's carry.
-    function oval(club, carry, hand, along) {
-        if (!isClub(club) || !isNum(carry) || !(carry > 0)) return null;
+    // 095: any (optional) - the par-3 club switcher steps through EVERY club in My bag, so its oval may be a
+    // hybrid / wood / driver too (the same size rule from the carry). Without it: irons and wedges only, as before.
+    function oval(club, carry, hand, along, any) {
+        if ((!isClub(club) && !(any && club)) || !isNum(carry) || !(carry > 0)) return null;
         var h = hand === 'L' ? 'L' : 'R';
         return { club: club, hand: h, carry: isNum(along) && along > 0 ? along : carry, avg: carry, cx: 0,
             a: Math.max(MIN_SEMI, TUNE.WIDTH_PCT * carry), b: Math.max(MIN_SEMI, TUNE.DEPTH_PCT * carry),
@@ -311,6 +313,37 @@
         return { list: pick.sort(function (x, y) { return y.carry - x.carry; }), def: def.club };
     }
 
+    // 095 (Manny, Oct 28): THE PAR-3 SWITCHER STEPS THROUGH EVERY CLUB IN MY BAG (not only the ones landing on the
+    // green). q: as depthChips, plus order (My bag's club keys; default CLUBS). Every club with a carry, duplicates
+    // kept (each is a club in the bag). def: the club closest to the target (a tie: the app's pick, then the longer).
+    // Returns null (no front / back) or { list: [{ club, carry, along, delta, spot, on }] longest first, def }.
+    function allClubs(q) {
+        q = q || {};
+        var f = q.front, b = q.back, bag = q.bag || {};
+        if (!isNum(f) || !isNum(b) || !(b > f)) return null;
+        var m = isNum(q.middle) ? q.middle : (f + b) / 2, aim = isNum(q.aimYd) ? q.aimYd : m;
+        var order = q.order && q.order.length ? q.order : CLUBS, all = [];
+        order.forEach(function (c) {
+            var v = bag[c], cy = v && isNum(v.yd) && v.yd > 0 ? v.yd : null;
+            if (cy == null) return;
+            var al = centreAt(cy, q.rawYd, q.playsYd);
+            all.push({ club: c, carry: cy, along: al, delta: al - aim, spot: landSpot(al, f, m, b), on: al >= f && al <= b });
+        });
+        if (!all.length) return { list: [], def: null };
+        var near = function (x, y) { var d = Math.abs(x.delta) - Math.abs(y.delta); if (Math.abs(d) > 1e-9) return d; if (x.club === q.app) return -1; if (y.club === q.app) return 1; return y.carry - x.carry; };
+        var def = all.slice().sort(near)[0];
+        return { list: all.slice().sort(function (x, y) { return y.carry - x.carry; }), def: def.club };
+    }
+    // 095: THE SWITCHER'S TEXT - on the green as depthText ("SW · middle +10"); off the green, where it lands:
+    // "9i · 12 past the back" / "LW · 18 short of the front" (metres with unit 'm'; on the edge: depthText).
+    function switchText(short, spot, unit) {
+        if (!spot) return String(short);
+        var n = shown(spot.off, unit);
+        if (n >= 1 && spot.zone === 'front' && spot.off < 0) return String(short) + ' · ' + n + ' short of the front';
+        if (n >= 1 && spot.zone === 'back' && spot.off > 0) return String(short) + ' · ' + n + ' past the back';
+        return depthText(short, spot, unit);
+    }
+
     // 089b: THE HELD FIX. last: { pt, at } (the phone's last fix, memory only). Its point while it is under
     // TUNE.HOLD_FIX_MS old (59 s: yes; 60 s or more: no), else null.
     function heldFix(last, nowMs, maxMs) {
@@ -338,7 +371,7 @@
     }
 
     var api = { TUNE: TUNE, CLUBS: CLUBS, KEY: KEY,
-        chipPair: chipPair, depthChips: depthChips, heldFix: heldFix, depthNote: depthNote, depthText: depthText, landSpot: landSpot, chipText: chipText, landNote: landNote, fadeOvals: fadeOvals,
+        chipPair: chipPair, depthChips: depthChips, allClubs: allClubs, switchText: switchText, heldFix: heldFix, depthNote: depthNote, depthText: depthText, landSpot: landSpot, chipText: chipText, landNote: landNote, fadeOvals: fadeOvals,
         isClub: isClub, oval: oval, centreAt: centreAt, margin: margin, inRange: inRange, shows: shows, tips: tips, bagLine: bagLine, infoText: infoText,
         outline: outline, inside: inside, isOn: isOn, setOn: setOn,
         AIM_PER_MPH: AIM_PER_MPH, hasMiss: hasMiss, point: point, shotStats: shotStats, statsLine: statsLine };
