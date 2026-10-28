@@ -669,11 +669,19 @@
         if (live && !A && !S.arcsLoad) { S.arcsLoad = true; withArcs(function () { render(); }); }
         if (live && A && r && r.mid && o && o.pt) {
             var inp = arcsInputs();
+            // 094: from the golfer while the last fix is under 60 s old (the My miss chips' rule, 089b), else the tee.
+            var M9 = window.HardPanMissPattern, hp9 = o.from === 'tee' && missLastFix && M9 && M9.heldFix ? M9.heldFix(missLastFix, Date.now()) : null;
+            if (hp9) { var ho9 = G.measureOrigin(hp9, r.tee, r.mid); if (ho9 && ho9.from === 'me') o = { from: 'me', pt: hp9.slice(), held: true }; }
             if (inp) {
                 var nearTee = !!(r.tee && (o.from === 'tee' || G.haversineMeters(o.pt, r.tee) <= TEE_SHOT_YD * G.M_PER_YD));
                 var from = nearTee ? { pt: r.tee, kind: 'tee' } : { pt: o.pt, kind: 'me' };
+                // 094: across the FIXED line (par 3 / Green view: to the green's centre; par 4 / 5 tee shot: the hole's
+                // default line) - dragging the target never moves or turns them (gps-arcs-plan arcAim).
+                var td9 = S.targetDefault && S.targetDefault.hole === S.hole ? S.targetDefault.pt : null;
+                var aim9 = A.arcAim ? A.arcAim({ par: S.par, green: S.view === 'green', nearTee: nearTee, target: S.target, targetDefault: td9, moved: !!S.targetMoved, mid: r.mid })
+                    : (nearTee && S.target ? S.target : r.mid);
                 try {
-                    list = A.arcs({ bag: inp.bag, fits: inp.fits, hand: inp.hand, wind: inp.wind, from: from, mid: r.mid, aim: nearTee && S.target ? S.target : r.mid,
+                    list = A.arcs({ bag: inp.bag, fits: inp.fits, hand: inp.hand, wind: inp.wind, from: from, mid: r.mid, aim: aim9,
                         par: S.par, holeYd: r.tee ? G.haversineMeters(r.tee, r.mid) / G.M_PER_YD : null });
                 } catch (e) { list = []; }
                 S.carryFrom = from.kind;
@@ -752,7 +760,8 @@
         var wrap = S.el.querySelector('.gps-map-wrap'); if (!wrap) return;
         var wr = wrap.getBoundingClientRect(), obs = [];
         var box = function (e) { var b = e.getBoundingClientRect(); return { l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top, w: b.width, h: b.height }; };
-        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl'), function (e) {
+        // 094 (Manny's shot 6: "5i" under the Hole button): the rail's buttons and the green's size line too.
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-right > *, .gps-ld-rail > *, .gps-green-dims'), function (e) {
             if (e.offsetParent === null || e.style.display === 'none' || getComputedStyle(e).visibility === 'hidden') return;
             var b = box(e); if (b.w > 0 && b.h > 0) obs.push(b);
         });
@@ -2338,14 +2347,14 @@
             // fairway's end), in the fairway. NO PATH DATA: the pre-023c default on the straight
             // line, never the driver's distance.
             var ts = G.teeShot({ par: S.par, tee: r.tee, mid: center, line: sh.line, fairway: sh.fairway, hazards: sh.hazards, driverM: driverGroundM(r, dc.yd) });
-            if (ts && ts.pt) { S.target = ts.pt; if (ts.drive) S.teeShot = { carryYd: dc.yd, own: dc.own, t: ts.drive }; return; }
+            if (ts && ts.pt) { S.target = ts.pt; S.targetDefault = { hole: S.hole, pt: ts.pt }; if (ts.drive) S.teeShot = { carryYd: dc.yd, own: dc.own, t: ts.drive }; return; }
         }
         // 009 (switch pathTarget): on the hole's path - at the dogleg when its corner is
         // in the landing zone (gps-geo.pathTarget). Never bent by a dragged target.
         var p = pathTargetOn() && r.tee && G.pathTarget
             ? G.pathTarget(Object.assign(opts, { path: G.holePath({ tee: r.tee, mid: center, line: opts.line, fairway: opts.fairway, hazards: sh.hazards }) }))
             : G.defaultTarget(opts);
-        if (p) S.target = p;
+        if (p) { S.target = p; S.targetDefault = { hole: S.hole, pt: p }; }   // 094: the hole's own line for the arcs
     }
     // ---- "SAVE THIS LINE" (URGENT-026 addition, Manny 12:21 PM) ---------------------------------
     // ONLY on a hole with NO path data (holeShape: no drawn / bundled line, no fairway): once the
@@ -2555,25 +2564,8 @@
     function greenShape(r, axisDeg, extra) {
         if (!r || !r.mid) return null;
         var axis = axisDeg != null ? axisDeg : (r.tee ? G.bearingDeg(r.tee, r.mid) : (S.camera ? S.camera.bearing : 0));
-        var outline = !!(r.green && r.green.length >= 3 && r.useGreenForEdges);
-        var pts = (outline ? r.green : [r.front, r.mid, r.back].filter(Boolean)).concat(extra || []);
-        var al = [], ac = [];
-        pts.forEach(function (p) {
-            var d = G.haversineMeters(r.mid, p);
-            var t = d ? (G.bearingDeg(r.mid, p) - axis) * Math.PI / 180 : 0;
-            al.push(d * Math.cos(t)); ac.push(d * Math.sin(t));
-        });
-        var a0 = Math.min.apply(null, al), a1 = Math.max.apply(null, al), c0 = Math.min.apply(null, ac), c1 = Math.max.apply(null, ac);
-        // Depth and width are the GREEN's own (the carry hazards only widen what the view holds).
-        var gal = al.slice(0, al.length - (extra || []).length), gac = ac.slice(0, ac.length - (extra || []).length);
-        var depthM = (outline || (r.front && r.back)) ? Math.max.apply(null, gal) - Math.min.apply(null, gal) : null;
-        var widthM = outline ? Math.max.apply(null, gac) - Math.min.apply(null, gac) : null;
-        return {
-            axis: axis, depthM: depthM, widthM: widthM,
-            // What the view must hold: the green, or 25 m when it is only a point.
-            spanA: Math.max(a1 - a0, 25), spanC: Math.max(c1 - c0, 25),
-            center: G.destination(G.destination(r.mid, axis, (a0 + a1) / 2), axis + 90, (c0 + c1) / 2)
-        };
+        // 094: the math lives in gps-geo greenSize now (unchanged; tested pure).
+        return G.greenSize(r, axis, extra);
     }
     var GREEN_PAD = { left: 80, right: 80 };
     // ---- THE APPROACH VIEW (022 part 3) ----------------------------------------------
@@ -2586,7 +2578,9 @@
     function apprFrom(r) {
         var o = origin(r);
         if (o && o.from === 'me') return o.pt;
-        return (S && S.target) || (r && r.tee) || null;
+        // 094 (Manny, Oct 28): off the hole, the TEE's line (tee -> green centre) - never the dragged target ring
+        // (it turned the Green view, and the green's depth x width, every time it moved).
+        return G.approachFrom(null, r && r.tee, S && S.target);
     }
     function apprHazards(r) {
         var rec = osmRecord(S.courseKey), h = rec && rec.holes && rec.holes[String(S.hole)];
@@ -2656,6 +2650,19 @@
             { k: 'f', pt: nums && nums.front, text: 'F ' + d(nums && nums.frontM) }
         ];
         var placed = [];
+        // 094 (Manny's shots 4 / 6: "F 156" under Preview, "20 yd" on "C 186"): the rail's buttons and the target's
+        // "20 yd" label are in the way too - a label that would sit on one goes to the dot's other (left) side.
+        var wr9 = box.getBoundingClientRect(), keep9 = [], left9 = [];
+        var rc9 = function (q, into) {
+            Array.prototype.forEach.call(S.el.querySelectorAll(q), function (e) {
+                if (e.offsetParent === null || getComputedStyle(e).visibility === 'hidden') return;
+                var b = e.getBoundingClientRect(); if (b.width > 0 && b.height > 0) into.push({ l: b.left - wr9.left - 3, t: b.top - wr9.top - 3, r: b.right - wr9.left + 3, b: b.bottom - wr9.top + 3 });
+            });
+        };
+        rc9('.gps-right > *, .gps-ld-rail > *, .gps-ring-lbl', keep9);
+        // The left side only when it is clear too (the left column: the chips, Recenter) - else it stays as before.
+        rc9('.gps-leftrow > *, .gps-miss-chips > *', left9); left9 = left9.concat(keep9);
+        var on9 = function (list, x, y, w, h) { return list.some(function (b) { return x < b.r && x + w > b.l && y < b.b && y + h > b.t; }); };
         items.forEach(function (it) {
             var el = box.querySelector('.gps-green-lbl-' + it.k);
             if (!el) { el = document.createElement('span'); el.className = 'gps-green-lbl gps-green-lbl-' + it.k; box.appendChild(el); }
@@ -2663,6 +2670,7 @@
             el.textContent = it.text; el.style.display = ''; el.style.visibility = 'hidden';
             var q = S.map.project(ll(it.pt)), w = el.offsetWidth, h = el.offsetHeight;
             var x = q.x + 16, y = q.y - h / 2;
+            if (on9(keep9, x, y, w, h) && q.x - 16 - w >= 2 && !on9(left9, q.x - 16 - w, y, w, h)) x = q.x - 16 - w;
             placed.forEach(function (b) { if (x < b.r && x + w > b.l && y < b.b && y + h > b.t) y = b.b + 2; });
             el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.style.visibility = '';
             placed.push({ l: x, t: y, r: x + w, b: y + h });
