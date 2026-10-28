@@ -13,7 +13,8 @@
 //   WHAT THIS CANNOT PROVE: the real camera and the live scan. The emulator pass did the camera (course scan);
 //   the live scan is Play internal testing on a real phone (Manny, Oct 27).
 //   COUNTS (final file, on android-2.0-addons 4555d3e9): 2 tests, 2 pass.
-//   Control (code): gps-scan-grid.js pluginHere forced false -> see the CONTROL line at the end of this header.
+//   Control (code), restored by sha 1524abcce36f from a saved copy: gps-scan-grid.js pluginHere forced false ->
+//   1 pass / 1 fail (test 1 red; test 2 passes either way - it asserts the row is absent).
 // ============================================================================
 'use strict';
 const { test, after } = require('node:test');
