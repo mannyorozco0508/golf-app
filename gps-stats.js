@@ -663,6 +663,28 @@
     function ssIsOwn(pid) { var c = ss && ss.ctx; if (!c) return false; var me = ('own' in c) ? c.own : c.pick; return me != null && String(pid) === String(me); }
     function ssStatsFor(pid) { var c = ss && ss.ctx; if (!c) return false; var me = ('own' in c) ? c.own : c.pick; return !!(c.stats && !practiceOn(c.code) && ((me != null && String(pid) === String(me)) || othersOn())); }
     function ssCell(pid) { var c = ss.ctx; return qHole(c.code, pid, c.hole, ssStrokes(pid), c.par); }
+    // 092 (the COMBO card, gps-round.js): the same "tracked" rule as ssStatsFor, for any ctx (no open sheet
+    // needed) - quick stats on (ctx.stats), not a Practice round, and the golfer this phone IS (ctx.own) or
+    // "Track stats for others" on. Read only.
+    function statsForCtx(c, pid) { if (!c) return false; var me = ('own' in c) ? c.own : c.pick; return !!(c.stats && !practiceOn(c.code) && ((me != null && String(pid) === String(me)) || othersOn())); }
+    // 092: the COMBO card's tiles for one golfer - the round summary's own sums (summary(): holes with a
+    // score; putts over holes with putts; fairways over par 4s and 5s answered; greens over holes GIR is
+    // known), worked out from the LIVE scores (holes: [{ n, par, s }]) and this phone's quick-stats record.
+    // Read only: nothing is written, nothing goes to Firebase or a money engine.
+    function cardTiles(code, pid, holes) {
+        var rec = qLoad(code, pid), t = { thru: 0, strokes: 0, par: 0, toPar: 0, putts: 0, puttHoles: 0, fwHit: 0, fwChances: 0, gir: 0, girHoles: 0 };
+        (holes || []).forEach(function (x) {
+            var s = Number(x && x.s) || 0, par = Number(x && x.par) || 0;
+            if (!(s > 0)) return;
+            t.thru++; t.strokes += s; t.par += par;
+            var c = qCell(rec && rec.holes[String(x.n)], s, par);
+            if (c.putts != null) { t.putts += c.putts; t.puttHoles++; }
+            if (fwAsked(par) && c.fw) { t.fwChances++; if (c.fw === 'hit') t.fwHit++; }
+            if (c.gir != null) { t.girHoles++; if (c.gir) t.gir++; }
+        });
+        t.toPar = t.strokes - t.par;
+        return t;
+    }
     function ssIsOpen() { return !!(ss && ss.wrap && ss.wrap.style.display !== 'none'); }
     function ssClose() { if (ss && ss.wrap) { ss.wrap.style.display = 'none'; ss.wrap.querySelector('.hp-ss').style.transform = ''; } if (ss) { ss.pend = {}; ss.ctx = null; } }
     var SS_CSS = '#hp-score-sheet{position:absolute;inset:0;z-index:2147482000;background:rgba(0,0,0,.35);font:600 16px/1.25 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;color:#f4f4ef;color-scheme:dark;}'
@@ -1619,7 +1641,7 @@
     W.HardPanGpsStats = { open: open, close: close, refresh: refresh, isOpen: function () { return !!(sheet && sheet.style.display !== 'none' && cur); },
         girAuto: girAuto, holeView: holeView, summary: summary, season: season, load: load, setHole: setHole, ensure: ensure,
         // Quick stats on the scorecard (008) and My stats.
-        quick: { key: qKey, load: qLoad, hole: qHole, set: qSet, sync: qSync, fwAsked: fwAsked },
+        quick: { key: qKey, load: qLoad, hole: qHole, set: qSet, sync: qSync, fwAsked: fwAsked, tiles: cardTiles },
         aggregate: aggregate, myRounds: myRounds, openMy: openMy, closeMy: closeMy, placeHome: placeHome,
         // 020: Start fresh, Remove one round, the Practice round switch (keyed by the round's code).
         clearAll: clearAll, removeRound: removeRound, historyRounds: historyRounds, practiceOn: practiceOn, setPractice: setPractice, skipped: skipped,
@@ -1637,5 +1659,5 @@
         // 052 C: Strokes Gained (lite) - the engine (pure), the marks store (distances only), the views.
         sg: { expected: sgExpected, hole: sgHole, roundHoles: sgRoundHoles, summary: sgSummary, practice: sgPractice, mark: sgMark, setYards: sgSetYards, load: sgLoad, rounds: sgRounds,
             bench: sgBenchNow, setBench: sgSetBench, benchFor: sgBenchFor, hcpNum: sgHcpNum, myHcp: sgMyHcp, benches: SG_BENCHES, last: sgLastNow, fpChips: SG_FP_CHIPS, fpFeet: SG_FP, bands: SG_BANDS, min: SG_MIN, roundCard: sgRoundCard, info: sgInfo, key: SGKEY },
-        sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? (ss.ctx.home != null ? ss.ctx.home : ss.ctx.hole) : null; }, shownHole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, go: function (h) { return ssGoto(h); }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle } };
+        sheet: { open: ssOpen, close: ssClose, isOpen: ssIsOpen, hole: function () { return ss && ss.ctx ? (ss.ctx.home != null ? ss.ctx.home : ss.ctx.hole) : null; }, shownHole: function () { return ss && ss.ctx ? ss.ctx.hole : null; }, go: function (h) { return ssGoto(h); }, grid: ssGrid, more: ssMore, gir: ssGir, girTap: ssGirTap, othersOn: othersOn, setOthers: setOthers, placeToggle: ssPlaceToggle, statsFor: statsForCtx } };
 })();

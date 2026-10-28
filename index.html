@@ -6615,6 +6615,24 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             host: overlay && document.body.classList.contains('gps-side-gps') ? overlay : document.body
         }));
     }
+    // 092 (the COMBO card, gps-round.js): the same hole context gpsOpenSheet hands the Enter score sheet -
+    // its golfers, par, score, the card's own save (saveScore, the offline queue), Next (gpsStepHole),
+    // last, Finish & settle up (display only) - without opening anything. gpsOpenSheet is unchanged.
+    // `fallback`: the golfers to use for a hole the card has not drawn boxes for (as the sheet's ‹ does).
+    function gpsCardCtx(hole, fallback) {
+        const n = Number(hole), order = gpsHoleList(), here = gpsSheetHole(n, fallback);
+        return Object.assign(here, {
+            code: currentMode, course: (currentData && currentData.courseName) || '', hole: n,
+            pick: qsMeId(), own: qsOwnId(), stats: qsOn(), order: order,
+            next: () => { if (Number(currentViewedHole) === n) gpsStepHole(1); },
+            last: order.indexOf(n) === order.length - 1,
+            finish: () => {
+                const R = window.HardPanRound;
+                if (R && typeof R.openFinish === 'function' && R.openFinish()) return;
+                if (typeof uiToast === 'function') uiToast('🏁 Last hole saved — ☰ Menu › Finish & settle up', 5000);
+            }
+        });
+    }
     // One hole's part of the score sheet: its par / SI / yards, its golfers, its scores and the
     // card's own save for it. 018: also an EARLIER hole's (the sheet's ‹ - the hole the map or
     // the card is on does not move), its golfers those of the hole the sheet opened on when the
