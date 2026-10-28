@@ -334,14 +334,18 @@
         var def = all.slice().sort(near)[0];
         return { list: all.slice().sort(function (x, y) { return y.carry - x.carry; }), def: def.club };
     }
-    // 095: THE SWITCHER'S TEXT - on the green as depthText ("SW · middle +10"); off the green, where it lands:
-    // "9i · 12 past the back" / "LW · 18 short of the front" (metres with unit 'm'; on the edge: depthText).
-    function switchText(short, spot, unit) {
+    // 095: THE SWITCHER'S TEXT. Off the green, where it lands: "9i · 12 past the back" / "LW · 18 short of the front".
+    // On the green (Manny, Oct 28: "zone + yards vs target"): the zone it lands in plus the signed yards past (+) or
+    // short (−) of the TARGET (delta: the centre minus the yards to the target), "SW · middle +10" - it follows a
+    // dragged target. No number within TUNE.MIDDLE_YD in the middle zone, or under 1 anywhere. No delta: depthText.
+    function switchText(short, spot, unit, delta) {
         if (!spot) return String(short);
         var n = shown(spot.off, unit);
         if (n >= 1 && spot.zone === 'front' && spot.off < 0) return String(short) + ' · ' + n + ' short of the front';
         if (n >= 1 && spot.zone === 'back' && spot.off > 0) return String(short) + ' · ' + n + ' past the back';
-        return depthText(short, spot, unit);
+        if (!isNum(delta)) return depthText(short, spot, unit);
+        var k = shown(delta, unit), quiet = k < 1 || (spot.zone === 'middle' && k <= TUNE.MIDDLE_YD);
+        return String(short) + ' · ' + spot.zone + (quiet ? '' : ' ' + (delta > 0 ? '+' : '\u2212') + k);
     }
 
     // 089b: THE HELD FIX. last: { pt, at } (the phone's last fix, memory only). Its point while it is under

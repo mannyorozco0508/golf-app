@@ -71,7 +71,8 @@ for (const vp of [{ width: 430, height: 932 }, { width: 375, height: 667 }]) {
         let chips = async () => JSON.parse(await ev("JSON.stringify(Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-miss-chip'), function (e) { return e.offsetParent !== null; }).map(function (e) { var b = e.getBoundingClientRect(); return { club: e.getAttribute('data-miss-chip'), text: e.textContent.replace(/\\s+/g, ' ').trim(), on: e.classList.contains('gps-miss-chip-on'), t: b.top, b: b.bottom, h: b.height }; }))"));
         // 093: on the switcher, "tapping a chip" = stepping the arrows to that club.
         const sw = async () => JSON.parse(await ev('JSON.stringify(HardPanGps.missSwitch())'));
-        const step = async (c) => { for (let k = 0; k < 6; k++) { const s = await sw(); if (s.sel === c) return true; const i = s.list.indexOf(c), at = s.list.indexOf(s.sel); if (i < 0) return false; await ev("document.querySelector('#gps-overlay " + (i > at ? '.gps-miss-more' : '.gps-miss-less') + "').click()"); await sleep(400); } return (await sw()).sel === c; };
+        const step = async (c) => { for (let k = 0; k < 20; k++) {   // 095: the switcher holds every club in My bag (up to 14)
+            const s = await sw(); if (s.sel === c) return true; const i = s.list.indexOf(c), at = s.list.indexOf(s.sel); if (i < 0) return false; await ev("document.querySelector('#gps-overlay " + (i > at ? '.gps-miss-more' : '.gps-miss-less') + "').click()"); await sleep(400); } return (await sw()).sel === c; };
         const tap = async (c) => (await swOn()) ? step(c) : tap0(c);
         // 093: the chip labels on the switcher - every club's label, longest first, read by stepping through them, then back.
         const chips0 = chips;
@@ -81,7 +82,14 @@ for (const vp of [{ width: 430, height: 932 }, { width: 375, height: 667 }]) {
             const r = JSON.parse(await ev("JSON.stringify(document.querySelector('#gps-overlay .gps-miss-pill').getBoundingClientRect())"));
             for (const c of s0.list.slice().reverse()) { await step(c); const s = await sw(); out.push({ club: c, text: s.text.replace(/^\u2039|\u203a$/g, '').replace(/\s+/g, ' ').trim(), on: c === s0.sel, t: r.top, b: r.bottom, h: r.height }); }
             await step(s0.sel);
-            return out;
+            // 095 (Manny's approved change): the switcher steps through EVERY club in My bag, and its text is now zone + yds
+            // vs the target. 089b's chips (on the green + the nearest within 5 yds of the front / back) and their 089b labels
+            // are read from the same chip data (missNow) with gps-miss-pattern's depthText; the pill itself: 093 / 095 tests.
+            const nn = await now(), MP = require('./gps-miss-pattern.js'), sh = (c) => (c === 'Dr' ? 'Dr' : c.replace(/w$/, 'W'));
+            const offS = (x) => (x.spot.zone === 'front' && x.spot.off < 0 ? -x.spot.off : null), offL = (x) => (x.spot.zone === 'back' && x.spot.off > 0 ? x.spot.off : null);
+            const ss = nn.chips.list.filter((x) => offS(x) != null && offS(x) <= 5).sort((p, q) => offS(p) - offS(q))[0], ll = nn.chips.list.filter((x) => offL(x) != null && offL(x) <= 5).sort((p, q) => offL(p) - offL(q))[0];
+            const keep = nn.chips.list.filter((x) => x.on).concat([ss, ll].filter(Boolean)).map((x) => x.club);
+            return out.filter((x) => keep.includes(x.club)).map((x) => Object.assign({}, x, { text: MP.depthText(sh(x.club), nn.chips.list.find((y) => y.club === x.club).spot, 'yd') }));
         };
         // Anything visible under a chip: 091's bottom row (Card | Enter score | Mark), Recenter, the pill, labels, bubbles, rail, top row.
         const under = async () => JSON.parse(await ev("JSON.stringify((function(){ var vis = function (e) { return e && e.offsetParent !== null && e.getBoundingClientRect().width > 0; };"

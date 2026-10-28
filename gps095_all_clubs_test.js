@@ -32,21 +32,30 @@ test('095: the default stays the club closest to the target (a tie: the app pick
     assert.strictEqual(M.allClubs(Object.assign({}, Q, { aimYd: 88 })).def, 'LW', 'target near the front edge: LW (off the green) is closest');
     assert.strictEqual(M.allClubs(Object.assign({}, Q, { front: null })), null, 'no front / back: null (the caller keeps 089)');
 });
-test('095: the text - on the green as today, off the green "12 past the back" / "18 short of the front"', () => {
+test('095: the text - on the green zone + yds vs the TARGET (Manny: "zone + yards vs target"), off the green "12 past the back" / "18 short of the front"', () => {
     const r = M.allClubs(Q), t = {};
-    r.list.forEach((x) => { t[x.club] = M.switchText(short(x.club), x.spot, 'yd'); });
+    r.list.forEach((x) => { t[x.club] = M.switchText(short(x.club), x.spot, 'yd', x.delta); });
     assert.strictEqual(t.SW, 'SW · middle −7');
     assert.strictEqual(t.GW, 'GW · middle +7');
-    assert.strictEqual(t.PW, 'PW · back −2');
+    assert.strictEqual(t.PW, 'PW · back +19', 'on the green: zone + yds vs the target (133 vs 114)');
     assert.strictEqual(t.LW, 'LW · 8 short of the front');
     assert.strictEqual(t['9i'], '9i · 10 past the back');
     assert.strictEqual(t.Dr, 'Dr · 125 past the back');
     assert.strictEqual(t['3w'], '3W · 100 past the back');
     assert.strictEqual(M.switchText('LW', { zone: 'front', off: -18 }, 'yd'), 'LW · 18 short of the front');
     assert.strictEqual(M.switchText('9i', { zone: 'back', off: 12 }, 'yd'), '9i · 12 past the back');
-    assert.strictEqual(M.switchText('SW', { zone: 'middle', off: 10 }, 'yd'), 'SW · middle +10', 'on the green: as today');
+    assert.strictEqual(M.switchText('SW', { zone: 'middle', off: 4 }, 'yd', 10), 'SW · middle +10', 'on the green: zone + yds vs the target');
+    assert.strictEqual(M.switchText('GW', { zone: 'back', off: -1 }, 'yd', 20), 'GW · back +20');
+    assert.strictEqual(M.switchText('LW', { zone: 'front', off: 5 }, 'yd', -17), 'LW · front −17');
+    assert.strictEqual(M.switchText('SW', { zone: 'middle', off: 4 }, 'yd', 2.6), 'SW · middle', 'the middle: no number within 3');
+    assert.strictEqual(M.switchText('9i', { zone: 'back', off: 12 }, 'yd', 40), '9i · 12 past the back', 'off the green keeps the edge form');
+    // A dragged target: the on-green numbers follow it, the off-green texts keep the edge form.
+    const d = M.allClubs(Object.assign({}, Q, { aimYd: 100 })), t2 = {};
+    d.list.forEach((x) => { t2[x.club] = M.switchText(short(x.club), x.spot, 'yd', x.delta); });
+    assert.strictEqual(t2.SW, 'SW · middle +7'); assert.strictEqual(t2.GW, 'GW · middle +21'); assert.strictEqual(t2.PW, 'PW · back +33');
+    assert.strictEqual(t2.LW, t.LW); assert.strictEqual(t2['9i'], t['9i']); assert.strictEqual(t2.Dr, t.Dr);
     assert.strictEqual(M.switchText('SW', { zone: 'front', off: 4 }, 'yd'), M.depthText('SW', { zone: 'front', off: 4 }, 'yd'));
-    assert.strictEqual(M.switchText('GW', { zone: 'back', off: 0.2 }, 'yd'), 'GW · back', 'on the edge: as today');
+    assert.strictEqual(M.switchText('GW', { zone: 'back', off: 0.2 }, 'yd'), 'GW · back', 'no delta: depthText');
     assert.strictEqual(M.switchText('LW', { zone: 'front', off: -20 }, 'm'), 'LW · 18 short of the front', 'metres');
 });
 test('095: the oval may be any club on the switcher (any = true); irons / wedges only otherwise', () => {
@@ -60,7 +69,7 @@ test('095: wired on the par 3 switcher only; arrows dim only at the ends of the 
     assert.match(plan, /order: B\.BAG/, 'My bag order: every club');
     assert.match(plan, /if \(dc && dc\.list\.length\) \{ chips = dc\.list; def = dc\.def; depth = true; \}/, 'approaches keep the 089b chips');
     assert.match(fnBody('missSync'), /M\.oval\(plan\.club, plan\.carry, plan\.hand, plan\.along, !!plan\.any\)/);
-    assert.match(fnBody('missSwitchSync'), /if \(c\.all && x\.spot && typeof M\.switchText === 'function'\) t = M\.switchText\(/);
+    assert.match(fnBody('missSwitchSync'), /if \(c\.all && x\.spot && typeof M\.switchText === 'function'\) t = M\.switchText\(clubShort\(x\.club\), x\.spot, u, x\.delta\)/);
     assert.match(fnBody('missSwitchSync'), /lessOff = i <= 0, moreOff = i >= list\.length - 1/);
     assert.match(fnBody('missPickClub'), /isPar3\(\) && p\.tgt !== undefined && p\.tgt !== missTgtKey\(\)/);
     assert.match(fnBody('missChipTap'), /tgt: missTgtKey\(\)/);

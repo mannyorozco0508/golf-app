@@ -5376,7 +5376,7 @@
         list.forEach(function (y, k) { if (y.club === c.sel) { x = y; i = k; } });
         if (!x) { x = list[0]; i = 0; }
         var t = c.depth && x.spot && typeof M.depthText === 'function' ? M.depthText(clubShort(x.club), x.spot, u) : M.chipText(clubShort(x.club), x.delta, u);
-        if (c.all && x.spot && typeof M.switchText === 'function') t = M.switchText(clubShort(x.club), x.spot, u);   // 095: off the green, "9i · 12 past the back"
+        if (c.all && x.spot && typeof M.switchText === 'function') t = M.switchText(clubShort(x.club), x.spot, u, x.delta);   // 095: off the green "9i · 12 past the back"; on it, zone + yds vs the target
         var fromTee = c.from === 'tee', lessOff = i <= 0, moreOff = i >= list.length - 1;
         if (!box.classList.contains('gps-miss-switch')) {
             box.textContent = ''; box.removeAttribute('data-miss-chips'); box.classList.add('gps-miss-switch');

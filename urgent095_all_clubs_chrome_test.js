@@ -49,6 +49,7 @@ const GEO = "(function(){ var cur = { lat: " + AT[0] + ", lng: " + AT[1] + " }, 
     + " getCurrentPosition: function (ok) { ok({ coords: { latitude: cur.lat, longitude: cur.lng, accuracy: 3 }, timestamp: Date.now() }); }, clearWatch: function (id) { delete live[id]; } } }); } catch (e) {} })();";
 const MAPS = "(function(){ var real; window.__maps = []; Object.defineProperty(window, 'maplibregl', { configurable: true, get: function () { return real; }, set: function (v) { if (v && v.Map && !v.__w) { var M = v.Map; var Wm = function (o) { var m = new M(o); window.__maps.push(m); return m; }; Wm.prototype = M.prototype; try { v.Map = Wm; } catch (e) {} v.__w = 1; } real = v; } }); })();";
 const MB = { LW: 84, SW: 107, GW: 121, PW: 133, '9i': 145, '8i': 168, '7i': 180, '6i': 192, '5i': 208, Hy: 220, '3w': 235, Dr: 260 };
+const MP = require('./gps-miss-pattern.js');
 const ALL = ['LW', 'SW', 'GW', 'PW', '9i', '8i', '7i', '6i', '5i', 'Hy', '3w', 'Dr'];
 const BAG = { v: 1, golfers: { 'n:test golfer': { shots: {}, set: MB, setupDone: true } } };
 const SEED = "(function(){ var now = Date.now(), w = JSON.stringify({ at: now + 3600e3, src: 'weatherkit', obsAt: now, mph: 0, gustMph: null, toDeg: 180, fromDeg: 0, tempF: 70 });"
@@ -150,9 +151,17 @@ test('095 par 3 switcher steps through every club - Streamsong Red #8 at 114, ' 
         for (const c of ['SW', 'GW', 'PW', '9i', '8i', '7i']) { await click('.gps-miss-more'); await sleep(450); }
         assert.equal((await sw()).sel, '7i');
         const before = (await now()).chips.list.map((x) => x.club + ':' + x.delta.toFixed(1)).join(',');
+        const onTxt = (n) => { const o = {}; n.chips.list.forEach((x) => { o[x.club] = MP.switchText(x.club === 'Dr' ? 'Dr' : x.club.replace(/w$/, 'W'), x.spot, 'yd', x.delta); }); return o; };
+        const t0 = onTxt(await now());
         await drag(G.destination(R8.c, R8.brg + 180, 16 * Y));
         n = await now(); s = await sw();
         check(n.chips.list.map((x) => x.club + ':' + x.delta.toFixed(1)).join(',') !== before, 'every club follows the new target');
+        // Manny: "zone + yards vs target" - the on-green numbers change with the drag; the off-green texts keep the edge form.
+        const t1 = onTxt(n);
+        check(s.text === t1[s.sel], 'the pill shows the new text: ' + s.text + ' vs ' + t1[s.sel]);
+        ['SW', 'GW'].forEach((c) => { check(/^(SW|GW) · (front|middle|back)( [+−]\d+)?$/.test(t1[c]), c + ' on-green form: ' + t1[c]); check(t1[c] !== t0[c], c + ' on-green number follows the drag: ' + t0[c] + ' -> ' + t1[c]); });
+        ['9i', '8i', '7i', 'Dr'].forEach((c) => check(/ past the back$/.test(t1[c]), c + ' keeps the edge form: ' + t1[c]));
+        check(/ short of the front$/.test(t1.LW), 'LW keeps the edge form: ' + t1.LW);
         check(s.sel === closest(n).club, 'front: re-picked to the closest ' + closest(n).club + ', got ' + s.sel);
         check(s.list.join() === ALL.join(), 'still every club after the drag');
         await shot('3-drag-front'); await checkOv('drag front');

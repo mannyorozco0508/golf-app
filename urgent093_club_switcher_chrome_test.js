@@ -106,7 +106,8 @@ for (const vp of [{ width: 375, height: 667 }, { width: 402, height: 874 }, { wi
             assert.deepEqual(dom, { chips: 0, pills: 1, lbl: false }, 'par 3: one pill, no chip stack, the label off the map');
             assert.ok(await until("(function(){ var s = HardPanGps.missSwitch(); return !!(s && s.on); })()", 8000), 'the switcher shows: ' + JSON.stringify(await sw()));
             let s = await sw();
-            assert.deepEqual(s.list, ['LW', 'SW', 'GW'], 'the same clubs as the 089b chips, shortest first');
+            // 095 (Manny, Oct 28): the switcher now steps through EVERY club in My bag, shortest first (was the 089b chips LW / SW / GW).
+            assert.deepEqual(s.list, ['LW', 'SW', 'GW', 'PW', '9i', '8i', '7i', '6i', '5i', 'Hy', '3w', 'Dr'], 'every club in My bag, shortest first');
             assert.equal(s.sel, 'SW', 'default = the club closest to the target');
             assert.equal(s.text, 'SW · middle', 'the chip label');
             assert.equal(s.aria, 'Club Sand wedge, middle. Swipe or tap arrows to change.');
@@ -132,16 +133,21 @@ for (const vp of [{ width: 375, height: 667 }, { width: 402, height: 874 }, { wi
             // › more club: GW (the end: › dimmed); the oval and the Plays-like pill follow.
             await click('.gps-miss-more'); await sleep(700);
             s = await sw(); let m = await now();
-            assert.equal(s.sel, 'GW'); assert.equal(s.text, 'GW · back −1'); assert.equal(s.moreOff, true); assert.equal(s.lessOff, false);
+            assert.equal(s.sel, 'GW'); assert.equal(s.text, 'GW · back +20', '095: zone + yds vs the target (121 vs 101)'); assert.equal(s.moreOff, false, '095: GW is no longer the end'); assert.equal(s.lessOff, false);
             assert.equal(m.oval.club, 'GW', 'the oval follows'); assert.equal(m.pick, 'GW');
             assert.match(await ev("(document.querySelector('#gps-overlay .gps-ld-plays') || {}).textContent || ''"), /GW/, 'the Plays-like pill follows');
+            // 095: the › end is now the bag's longest club (Dr), dimmed there; › at the end does nothing; back to GW.
+            for (let k = 0; k < 9; k++) { await click('.gps-miss-more'); await sleep(350); }
+            s = await sw(); assert.equal(s.sel, 'Dr'); assert.equal(s.moreOff, true, '› dimmed at Dr');
             await click('.gps-miss-more'); await sleep(500);
-            assert.equal((await sw()).sel, 'GW', '› at the end does nothing');
+            assert.equal((await sw()).sel, 'Dr', '› at the end does nothing');
+            for (let k = 0; k < 9; k++) { await click('.gps-miss-less'); await sleep(350); }
+            assert.equal((await sw()).sel, 'GW');
             // ‹ less club twice: LW (‹ dimmed).
             await click('.gps-miss-less'); await sleep(500); await click('.gps-miss-less'); await sleep(700);
             s = await sw(); m = await now();
-            assert.equal(s.sel, 'LW'); assert.equal(s.text, 'LW · front +5'); assert.equal(s.lessOff, true); assert.equal(s.moreOff, false);
-            assert.equal(s.aria, 'Club Lob wedge, front plus 5. Swipe or tap arrows to change.');
+            assert.equal(s.sel, 'LW'); assert.equal(s.text, 'LW · front −17', '095: zone + yds vs the target (84 vs 101)'); assert.equal(s.lessOff, true); assert.equal(s.moreOff, false);
+            assert.equal(s.aria, 'Club Lob wedge, front minus 17. Swipe or tap arrows to change.');
             assert.equal(m.oval.club, 'LW');
             await click('.gps-miss-less'); await sleep(500);
             assert.equal((await sw()).sel, 'LW', '‹ at the end does nothing');
