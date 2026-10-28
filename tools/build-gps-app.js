@@ -100,8 +100,12 @@ if (process.env.HARDPAN_BUDDY_PREVIEW === '1') {
     const cf = path.join(OUT, 'gps-config.js'), before = fs.readFileSync(cf, 'utf8');
     const after = before.replace(/esriKey:\s*'[^']*'/, "esriKey: ''");
     if (after === before && !/esriKey:\s*''/.test(before)) { console.error('BUDDY PREVIEW: esriKey not found to blank'); process.exit(1); }
-    fs.writeFileSync(cf, after);
-    console.warn('BUDDY PREVIEW BUILD (HARDPAN_BUDDY_PREVIEW=1): end-date gate on every page, Esri key blanked. Pages preview gps-buddy only.');
+    // 096 (Manny's typed OK, Oct 28: "OK osm on in 096 preview"): a browser has no GolfAPI data and no live
+    // course lookup, so the greens come from the bundled OpenStreetMap data (gps-courses.js) - osm on, THIS build only.
+    const withOsm = after.replace(/osm:\s*false/, 'osm: true');
+    if (withOsm === after) { console.error('BUDDY PREVIEW: osm: false not found to turn on'); process.exit(1); }
+    fs.writeFileSync(cf, withOsm);
+    console.warn('BUDDY PREVIEW BUILD (HARDPAN_BUDDY_PREVIEW=1): end-date gate on every page, Esri key blanked, osm on. Pages preview gps-buddy only.');
 }
 const lost = GPS.filter((f) => !fs.existsSync(path.join(OUT, f)));
 if (lost.length) { console.error('GPS files not in the app: ' + lost.join(', ')); process.exit(1); }
