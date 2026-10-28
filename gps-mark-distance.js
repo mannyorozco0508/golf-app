@@ -88,7 +88,9 @@
             box.className = 'gps-markd';
             box.setAttribute('role', 'group');
             box.innerHTML = '<button type="button" class="gps-markd-btn gps-float"></button><button type="button" class="gps-markd-list gps-float">≡</button>';
-            var ms = el.querySelector('.gps-ld-bottom .gps-mark-shot') || el.querySelector('.gps-mark-shot');
+            // 091: in layout D Mark shot sits IN the Card row now - this row goes just above that row (never inside it).
+            var row = el.querySelector('.gps-ld-bottom > .gps-bottom');
+            var ms = row ? row : (el.querySelector('.gps-ld-bottom .gps-mark-shot') || el.querySelector('.gps-mark-shot'));
             if (ms && ms.parentNode) ms.parentNode.insertBefore(box, ms); else el.appendChild(box);
             box.addEventListener('click', function (e) {
                 var b = e.target && e.target.closest ? e.target.closest('button') : null; if (!b) return;
@@ -137,7 +139,7 @@
         if (lb.textContent !== lt) lb.textContent = lt;
         lb.setAttribute('aria-label', String(s.listName || 'Results'));
         var ms = el.querySelector('.gps-mark-shot');
-        box.classList.toggle('solo', !(ms && ms.style.display !== 'none'));
+        box.classList.toggle('solo', !(ms && ms.style.display !== 'none' && ms.parentNode === box.parentNode));
         if (st.sheet && typeof s.sheet === 'function') {
             var html = String(call(s.sheet, ctx) || '');
             if (sh.__h !== html) { sh.innerHTML = html; sh.__h = html; }

@@ -206,8 +206,12 @@ async function check(c) {
         const hc = JSON.parse(await ev("JSON.stringify(window.HardPanGps && HardPanGps.holeCheck ? HardPanGps.holeCheck() : null)"));
         const km = (a, b) => { if (!a || !b) return null; const R = 6371, d = (x) => x * Math.PI / 180; const dl = d(b[0] - a[0]), dn = d(b[1] - a[1]); const q = Math.sin(dl / 2) ** 2 + Math.cos(d(a[0])) * Math.cos(d(b[0])) * Math.sin(dn / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(q)); };
         const gkm = hc ? km(hc.green, hc.course) : null;
-        const mapOk = !!(hc && hc.teeIn && hc.greenIn && gkm != null && gkm <= 2);
-        out.map = (mapOk ? 'PASS' : 'FAIL') + (hc ? ` (tee ${hc.teeIn ? 'in view' : 'NOT in view'}, green ${hc.greenIn ? 'in view' : 'NOT in view'}, green ${gkm == null ? '?' : gkm.toFixed(2) + ' km'} from the course; framed: ${hc.framed})` : ' (no hole data)');
+        // 091 (gate change, Manny's OK Oct 27): the hole opens on the 2x view - tee + green are measured on the hole's
+        // FULL frame (holeCheck: the magnifier's "full hole", one tap away), and NEW: the default view's centre lies on
+        // the hole (holeCheck.centerOnHole - inside the full frame, near the tee -> green line).
+        const ctrOk = !hc || hc.centerOnHole === undefined ? true : !!hc.centerOnHole;
+        const mapOk = !!(hc && hc.teeIn && hc.greenIn && gkm != null && gkm <= 2 && ctrOk);
+        out.map = (mapOk ? 'PASS' : 'FAIL') + (hc ? ` (full hole: tee ${hc.teeIn ? 'in view' : 'NOT in view'}, green ${hc.greenIn ? 'in view' : 'NOT in view'}; ${hc.zoomX ? hc.zoomX + 'x ' : ''}view centre ${hc.centerOnHole === undefined ? 'n/a' : hc.centerOnHole ? 'on the hole' : 'NOT on the hole'}; green ${gkm == null ? '?' : gkm.toFixed(2) + ' km'} from the course; framed: ${hc.framed})` : ' (no hole data)');
         if (!mapOk) out.why.push('map: ' + out.map.replace(/^FAIL /, ''));
         if (process.env.SHOTS) { await until("(function(){ var m=document.querySelector('.gps-map'); return !!(m && m.getAttribute('data-ready')); })()", 10000); await sleep(8000); try { await j.shot(path.join(process.env.SHOTS, c.label.replace(/[^A-Za-z0-9]+/g, '-') + '-hole1.png')); } catch (e) {} }
         if (c.noGreens) {

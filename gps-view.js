@@ -2018,7 +2018,7 @@
         var sb = vis('.gps-sub');
         if (sb) top = Math.max(top, sb.bottom - W.top + 12);
         var bottomEdge = W.bottom - attribH();
-        ['.gps-leftrow .gps-recenter', '.gps-bottom', '.gps-actions', '.gps-panel'].forEach(function (sel) { var b = vis(sel); if (b) bottomEdge = Math.min(bottomEdge, b.top); });
+        ['.gps-leftrow .gps-recenter', '.gps-bottom', '.gps-actions', '.gps-panel', '.gps-ld-bottom .gps-mark-shot'].forEach(function (sel) { var b = vis(sel); if (b) bottomEdge = Math.min(bottomEdge, b.top); });
         var bottom = W.bottom - bottomEdge + 14;
         // Always leave the hole at least 160px: a panel measured mid-layout (the
         // first, slow load) must not leave no room at all - the camera then had
@@ -2055,10 +2055,15 @@
         limitToCourse(cam);
         if (cam) {
             S.pad = viewPad();
+            // 091: the hole OPENS on the 2x view (zoomCam - the target, or the golfer, at 2x); S.camera stays
+            // the FULL hole (tee to green), the magnifier's third step and what holeCheck measures.
+            if (zoomInSwitch() && !S.target && S.mode === 'measure' && S.pro) { try { placeTarget(resolved()); } catch (e) {} }
+            var dz = zoomInSwitch() ? zoomCam(cam, zoomFactor(0)) : cam;
             S.framing = true;
-            try { S.map.jumpTo({ center: ll(cam.center), zoom: cam.zoom, bearing: cam.bearing, padding: S.pad }); } finally { S.framing = false; }
+            try { S.map.jumpTo({ center: ll(dz.center), zoom: dz.zoom, bearing: dz.bearing, padding: S.pad }); } finally { S.framing = false; }
             S.framed = 'hole';
             S.camera = cam;
+            S.zoomBase = cam.zoom;
         } else if (first || (S.framed === 'hole' && !resolved())) {
             // No hole to show (not merely a fit that failed - the next frame tries
             // again): the COURSE, from its location (build 5); the world view only
@@ -2689,18 +2694,29 @@
     // Around the target (or the golfer's dot when there is no target), keeping the
     // hole's tee-to-green turn. 1x is the hole's own view; Recenter goes back to it.
     // Never past the imagery's closest zoom (maxZoomNow).
+    // 091 (Manny APPROVED Oct 27: "Default zoom = today's zoomed-in view; the zoom button goes one step
+    // closer, then back to the full hole"): a hole now OPENS on the 2x view (the one the magnifier gave);
+    // the magnifier cycles 2x (the default) -> 4x (one step closer) -> 1x (the full hole, tee to green)
+    // -> 2x again. Recenter, a new hole, a re-fit: the 2x default. zoomStep 0 is still "the default view"
+    // (every "!S.zoomStep" re-fit rule keeps its meaning). Switch gpsZoomIn off: build 5's 1x <-> 2x exactly.
     var ZOOM_STEPS = [1, 2];
+    var ZOOM_CYCLE_091 = [2, 4, 1];
+    function zoomInSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('gpsZoomIn') !== false; } catch (e) { return true; } }
+    function zoomCycle() { return zoomInSwitch() ? ZOOM_CYCLE_091 : ZOOM_STEPS; }
+    function zoomFactor(step) { var c = zoomCycle(); return c[(step || 0) % c.length]; }
     var MAG_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">'
         + '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/><path d="M7.5 10.5h6"/><path class="gps-mag-plus" d="M10.5 7.5v6"/></svg>';
     function syncZoomBtn() {
         var b = S && S.el.querySelector('.gps-zoom');
         if (!b) return;
-        var zoomed = !!S.zoomStep;
+        var f = zoomFactor(S.zoomStep), nextF = zoomFactor((S.zoomStep || 0) + 1);
+        // "zoomed" = the button's next tap goes OUT (the minus sign): 091 at 4x, build 5 at 2x.
+        var zoomed = nextF < f;
         if (!b.querySelector('svg')) b.innerHTML = MAG_SVG;
         b.classList.toggle('gps-zoomed', zoomed);
-        b.setAttribute('data-zoom', ZOOM_STEPS[S.zoomStep || 0] + 'x');
-        b.setAttribute('aria-pressed', zoomed ? 'true' : 'false');
-        b.setAttribute('aria-label', zoomed ? 'Back to the hole view' : 'Zoom in 2x around the target');
+        b.setAttribute('data-zoom', f + 'x');
+        b.setAttribute('aria-pressed', S.zoomStep ? 'true' : 'false');
+        b.setAttribute('aria-label', nextF === 1 ? 'Back to the full hole' : (zoomInSwitch() && nextF === 2 ? 'Zoom in 2x around the target' : (nextF > f ? 'Zoom in ' + nextF + 'x around the target' : 'Back to the hole view')));
     }
     function zoomAround() {
         var o = origin(resolved());
@@ -2708,15 +2724,41 @@
         if (fix && o && o.from === 'me') return fix.pt;
         return null;
     }
+    // 091: the camera for a zoom factor f over the hole's full frame (cam): f x around the target (or the
+    // golfer), the hole's bearing kept, never past the imagery's closest zoom. f 1 = the full hole.
+    function zoomCam(cam, f) {
+        if (!cam || f === 1) return cam ? { center: cam.center, zoom: cam.zoom, bearing: cam.bearing } : null;
+        var c = null; try { c = zoomAround(); } catch (e) { c = null; }
+        return { center: c || cam.center, zoom: Math.min(cam.zoom + Math.log2(f), maxZoomNow()), bearing: cam.bearing };
+    }
+    // 091 (the course check's new step, Manny's OK): the view's centre lies ON the hole - inside the full
+    // hole's frame and within max(100 m, 35% of the hole's length) of the tee -> green line. A view on the
+    // golfer's street, another hole or the wrong course fails. Pure (points [lat, lng]; bounds optional).
+    function viewCenterOnHole(c, tee, green, bounds) {
+        if (!c || !green || !G) return false;
+        if (bounds && typeof bounds.contains === 'function' && !bounds.contains(ll(c))) return false;
+        if (!tee) return G.haversineMeters(c, green) <= 150;
+        var len = G.haversineMeters(tee, green);
+        var lat0 = tee[0] * Math.PI / 180, kx = 111320 * Math.cos(lat0), ky = 110540;
+        var bx = (green[1] - tee[1]) * kx, by = (green[0] - tee[0]) * ky, px = (c[1] - tee[1]) * kx, py = (c[0] - tee[0]) * ky;
+        var L2 = bx * bx + by * by, t = L2 ? Math.max(0, Math.min(1, (px * bx + py * by) / L2)) : 0;
+        var dx = px - t * bx, dy = py - t * by;
+        return Math.sqrt(dx * dx + dy * dy) <= Math.max(100, 0.35 * len);
+    }
     function cycleZoom() {
         if (!S || !S.map || !S.styleReady) return;
-        var next = ((S.zoomStep || 0) + 1) % ZOOM_STEPS.length;
+        var n = zoomCycle().length;
+        var next = ((S.zoomStep || 0) + 1) % n;
         if (next === 0) {
             if (S.camera) { frameHole(false); return; }
             S.map.jumpTo({ zoom: S.zoomBase != null ? S.zoomBase : S.map.getZoom() });
+        } else if (S.camera && zoomInSwitch()) {
+            var zc = zoomCam(S.camera, zoomFactor(next));
+            S.zoomBase = S.camera.zoom;
+            S.map.jumpTo({ center: ll(zc.center), zoom: zc.zoom, bearing: zc.bearing, padding: S.pad || viewPad() });
         } else {
             if (!S.zoomStep) S.zoomBase = S.camera ? S.camera.zoom : S.map.getZoom();
-            var opts = { zoom: Math.min(S.zoomBase + Math.log2(ZOOM_STEPS[next]), maxZoomNow()), padding: S.pad || viewPad() };
+            var opts = { zoom: Math.min(S.zoomBase + Math.log2(zoomFactor(next)), maxZoomNow()), padding: S.pad || viewPad() };
             var c = zoomAround();
             if (c) opts.center = ll(c);
             if (S.camera) opts.bearing = S.camera.bearing;
@@ -2930,7 +2972,7 @@
         // URGENT-052 B: the My miss oval (when it is on) - the distance bubbles keep off it too.
         try { var mr = missRect(); if (mr) add(mr, M); } catch (e) {}
         ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-miss-chips', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit', '.gps-lc-left', '.gps-lc-right', '.gps-lc-score', '.gps-panel', '.gps-zoom',
-            '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
+            '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom', '.gps-ld-bottom .gps-mark-shot'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
         // 066 #1: the golfer's extras (only when they turned some on) - the numbers keep off them too.
         Array.prototype.forEach.call(S.el.querySelectorAll('.hpf-slot'), function (el) { add(rectOf(el, wrapR), M); });
         // F / C / B and their number pills (Green view) are placed FIRST, so the two
@@ -4858,6 +4900,23 @@
         render();
         setTimeout(function () { if (S) render(); }, 4100);
     }
+    // 091 (Manny APPROVED Oct 27: "Card | gap | Enter score | gap | Mark"): in layout D Mark shot is its own
+    // button in the bottom row - the size of Card, a ◎ over "Mark" (while a shot is open: the live yards
+    // instead of "Mark"). The same element, the same tap (markShotHere), the same show / hide rule; the
+    // full label stays its title. The full-width Mark shot bar is gone (Manny's OK).
+    function ldMarkIn() { return !!(S && S.ld && S.el && S.el.querySelector('.gps-ld-bottom .gps-bottom .gps-mark-shot')); }
+    function ldMarkCap() {
+        if (!S || !S.measureFrom) return 'Mark';
+        if (S.measureShot && Date.now() - S.measureShot.at < 4000) return 'Mark';
+        var d = fix ? G.haversineMeters(S.measureFrom, fix.pt) : 0;
+        return G.shownDistance(d, units()) + (units() === 'm' ? ' m' : ' yds');
+    }
+    function ldMarkPaint(mb) {
+        var full = String(measureLabel()).replace(/^\uD83D\uDCCD/, '\u25CE'), cap = ldMarkCap();
+        var html = '<span class="gps-ico" aria-hidden="true">\u25CE</span><span class="gps-cap">' + escapeText(cap) + '</span>';
+        if (mb.__ldm !== html || !mb.querySelector('.gps-cap')) { mb.innerHTML = html; mb.__ldm = html; }
+        if (mb.getAttribute('title') !== full) mb.setAttribute('title', full);
+    }
     function measureLabel() {
         if (!S || !S.measureFrom) return '\uD83D\uDCCD Mark shot';
         if (S.measureShot && Date.now() - S.measureShot.at < 4000) return 'Shot: ' + S.measureShot.text;
@@ -5273,7 +5332,7 @@
             var b = e.getBoundingClientRect(); if (!(b.width > 0 && b.height > 0)) return;
             out.push({ l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top });
         };
-        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-arc-lbl, .gps-right > *, .gps-leftrow .gps-recenter, .gps-green-dims, .gps-banner, .gps-msg, .gps-verify, .gps-target-row, .gps-miss-chips > *'), add);
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-arc-lbl, .gps-right > *, .gps-leftrow .gps-recenter, .gps-green-dims, .gps-banner, .gps-msg, .gps-verify, .gps-target-row, .gps-miss-chips > *, .gps-ld-bottom .gps-mark-shot'), add);
         Object.keys(S.markers || {}).forEach(function (k) { if (k !== 'mymiss') { var m = S.markers[k]; add(m && m.getElement()); } });
         add(S.targetMarker && S.targetMarker.getElement());
         return out;
@@ -5763,7 +5822,7 @@
     function drawShots() {
         var A = shotsApi();
         var mb = S && S.el.querySelector('.gps-mark-shot');
-        if (mb) { mb.style.display = S && S.pro && S.mode === 'measure' && !S.replay ? '' : 'none'; if (S && mb.textContent !== measureLabel()) mb.textContent = measureLabel(); }
+        if (mb) { mb.style.display = S && S.pro && S.mode === 'measure' && !S.replay ? '' : 'none'; if (S && ldMarkIn()) ldMarkPaint(mb); else if (S && mb.textContent !== measureLabel()) mb.textContent = measureLabel(); }
         // Markers whenever this hole has shots; the bar only while marking / replaying / moving.
         var mode = !!(S && (S.shotMode || S.replay || S.shotAdjust));
         var on = !!(S && A && S.mode === 'measure' && (mode || A.shots(S.eventCode, S.hole).length));
@@ -6102,6 +6161,7 @@
             var lb = h.n.querySelector('.gps-lbl'); if (lb && h.lbl != null) lb.textContent = h.lbl;
             if (h.n.matches && h.n.matches('.gps-num-f, .gps-num-b')) h.n.style.display = '';
             if (h.n.matches && h.n.matches('.gps-zoom')) { h.n.style.top = ''; h.n.style.transform = ''; }
+            if (h.n.matches && h.n.matches('.gps-mark-shot') && h.n.classList.contains('gps-ld-mark')) { h.n.classList.remove('gps-ld-mark'); h.n.removeAttribute('title'); h.n.__ldm = null; h.n.textContent = measureLabel(); }
         });
         LAYOUT_BOXES.forEach(function (sel) { Array.prototype.forEach.call(el.querySelectorAll(sel), function (n) { if (n.parentNode) n.parentNode.removeChild(n); }); });
         el.classList.remove('gps-lc'); el.classList.remove('gps-ld');
@@ -6134,9 +6194,13 @@
         // THE PLAYS-LIKE PILL: the raw yards in the dark circle, "Plays like 249y · 3W". Tap = ⓘ.
         var plays = mk('button', 'gps-ld-plays', { type: 'button', style: 'display:none', 'aria-label': 'Plays like - how it works' });
         plays.innerHTML = '<span class="gps-ld-raw"></span><span class="gps-ld-pl"><small>Plays like</small><b class="gps-ld-pltext"></b><small class="gps-ld-elev" style="display:none"></small></span>' + (plInfoSwitch() ? '<span class="gps-ld-i" aria-hidden="true">ⓘ</span>' : '');
-        // THE BOTTOM: Mark shot, wide; under it Card | ‹ Hole 4 / Enter score › | + Game | Tools.
+        // THE BOTTOM (091): Card | ‹ Hole 4 / Enter score › | + Game | Tools | Mark - Mark shot is its own
+        // button at the right end, the size of Card (the full-width Mark shot bar is gone, Manny's OK).
         var bot = mk('div', 'gps-ld-bottom', { role: 'group', 'aria-label': 'Actions' });
-        put(bot, '.gps-mark-shot'); put(bot, '.gps-bottom'); put(bot, '.gps-actions');
+        put(bot, '.gps-bottom'); put(bot, '.gps-actions');
+        var bRow = bot.querySelector('.gps-bottom'), msb = q('.gps-mark-shot');
+        if (bRow && msb) { bRow.appendChild(msb); msb.classList.add('gps-ld-mark'); }
+        else if (msb) bot.insertBefore(msb, bot.firstChild);
         // TWO LINES, however many golfers: "Hole 1 · Manny ▾" (tap the hole = Enter score, the
         // name = whose score), then "Enter score" / the score.
         var col = bot.querySelector('.gps-score-col');
@@ -6307,7 +6371,8 @@
         var edges = !!(r && ((r.useGreenForEdges && r.green) || r.front || r.back));
         show('.gps-num-f', edges); show('.gps-num-b', edges);
         var mb = S.el.querySelector('.gps-mark-shot');
-        if (mb && mb.textContent.indexOf('📍') === 0) mb.textContent = '◎' + mb.textContent.slice(2);
+        if (mb && ldMarkIn()) ldMarkPaint(mb);
+        else if (mb && mb.textContent.indexOf('📍') === 0) mb.textContent = '◎' + mb.textContent.slice(2);
         var u = units() === 'm' ? 'm' : 'y';
         Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on'), function (p) { if (p.getAttribute('data-u') !== u) p.setAttribute('data-u', u); });   // URGENT-025: "283y", no "left" 
         var pill = S.el.querySelector('.gps-ld-plays');
@@ -7517,9 +7582,12 @@
         // 070 part 2: the elevation line, small, one line.
         + '#gps-overlay .gps-ld-pl small.gps-ld-elev{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
         + '#gps-overlay .gps-ld-i{flex:0 0 auto;font-size:18px;color:#6b7280;}'
-        // THE BOTTOM: Mark shot, then Card | Hole N / Enter score | + Game | Tools.
+        // THE BOTTOM (091): Card | Hole N / Enter score | + Game | Tools | Mark.
         + '#gps-overlay .gps-ld-bottom{position:absolute;z-index:7;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-direction:column;gap:8px;}'
-        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-mark-shot{width:100%;min-height:52px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;color:var(--gps-ld-lime);font:800 18px/1 ' + FONT + ';display:flex;align-items:center;justify-content:center;}'
+        // 091: Mark - its own button at the row's right end, Card's size (56 px wide, the row's height, the same 8 px gap).
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom .gps-mark-shot{flex:0 0 auto;width:56px;min-height:0;padding:0;margin:0;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;color:var(--gps-ld-lime);font:800 12px/1 ' + FONT + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;white-space:nowrap;overflow:hidden;box-sizing:border-box;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom .gps-mark-shot .gps-ico{color:inherit;font-size:20px;line-height:1;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom .gps-mark-shot .gps-cap{color:inherit;font-size:12px;max-width:54px;overflow:hidden;text-overflow:ellipsis;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom{position:static;height:62px;gap:8px;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-side-bets,#gps-overlay.gps-ld .gps-ld-bottom .gps-tools,#gps-overlay.gps-ld .gps-ld-bottom .gps-door-add{width:56px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;}'
         // 012 (Manny): Games (top left) and + Game opened the same thing - D has the Games pill only;
@@ -8628,12 +8696,33 @@
                 return out.sort(function (a, b) { return a.n - b.n; });
             } catch (e) { return { err: String(e && e.message || e) }; }
         },
+        // 091: the course check's "view centre on the hole" rule (pure), and the zoom state - for the tests.
+        viewCenterOnHole: function (c, tee, green) { try { return viewCenterOnHole(c, tee, green, null); } catch (e) { return false; } },
+        zoomNow: function () { return S ? { step: S.zoomStep || 0, x: zoomFactor(S.zoomStep), zoom: S.map ? S.map.getZoom() : null, full: S.camera ? S.camera.zoom : null, max: maxZoomNow(), view: S.view || null } : null; },
         holeCheck: function () {
             try {
                 var r = resolved(); if (!S || !S.map || !r) return null;
                 var g = (r.green && r.green.length) ? r.green[Math.floor(r.green.length / 2)] : r.mid, b = S.map.getBounds();
-                var inV = function (p) { return !!(p && b && b.contains(ll(p))); };
-                return { tee: r.tee || null, green: g || null, teeIn: inV(r.tee), greenIn: inV(g), framed: S.framed || null, course: courseCenter() || null, center: S.map.getCenter() };
+                // 091 (gate change, Manny's OK Oct 27): the hole opens on the 2x view, so the tee and the green are
+                // measured on the hole's FULL frame (S.camera - the magnifier's "full hole", one tap away), read by
+                // putting that camera on the map for one moment and back (no golfer move, no re-fit).
+                var fb = b;
+                if (S.framed === 'hole' && S.camera && S.camera.center) {
+                    var c0 = S.map.getCenter(), z0 = S.map.getZoom(), br0 = S.map.getBearing(), p0 = S.map.getPadding ? S.map.getPadding() : null;
+                    S.framing = true;
+                    try {
+                        S.map.jumpTo({ center: ll(S.camera.center), zoom: S.camera.zoom, bearing: S.camera.bearing, padding: S.pad || viewPad() });
+                        fb = S.map.getBounds();
+                    } finally {
+                        var back = { center: c0, zoom: z0, bearing: br0 }; if (p0) back.padding = p0;
+                        S.map.jumpTo(back); S.framing = false;
+                    }
+                }
+                var inV = function (p, bb) { return !!(p && bb && bb.contains(ll(p))); };
+                var ctr = S.map.getCenter(), cp = [ctr.lat, ctr.lng];
+                return { tee: r.tee || null, green: g || null, teeIn: inV(r.tee, fb), greenIn: inV(g, fb), framed: S.framed || null, course: courseCenter() || null, center: ctr,
+                    viewTeeIn: inV(r.tee, b), viewGreenIn: inV(g, b), zoomStep: S.zoomStep || 0, zoomX: zoomFactor(S.zoomStep),
+                    centerOnHole: viewCenterOnHole(cp, r.tee, g, fb) };
             } catch (e) { return { err: String(e && e.message || e) }; }
         },
         side: function () { return S ? S.side : null; },
