@@ -110,7 +110,8 @@ test('089b: gps-view wiring - live spot only, the default, the pill, the tap, 08
     assert.match(v, /G\.holeNumbers\(o\.pt, r\)/, 'front / back from the same numbers as F / C / B');
     assert.match(v, /var app = club, sel = def;/, 'the default = the depth chip closest to the target');
     assert.match(v, /c\.depth && c\.sel === c\.def/, 'the pill / Mark shot follow the shown chip');
-    assert.match(v, /club === \(c\.def \|\| c\.app\) \? null/, 'tapping the default clears the pick');
+    // 095b (Manny: "Keep my tapped club"): on the par 3 switcher a step onto the default is kept; elsewhere it clears.
+    assert.match(v, /club === \(c\.def \|\| c\.app\) && !missSwitchOn\(\) \? null/, 'tapping the default clears the pick (not on the par 3 switcher)');
     assert.match(v, /M\.depthText\(clubShort\(x\.club\), x\.spot, u\)/, 'the depth label on the chip');
     assert.match(v, /M\.chipText\(clubShort\(x\.club\), x\.delta, u\)/, '089\'s "+8 long" kept for the fallback pair');
     assert.match(v, /M\.chipPair\(bag, club\)/, '089\'s pair kept');

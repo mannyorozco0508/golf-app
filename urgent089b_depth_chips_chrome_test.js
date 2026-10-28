@@ -139,7 +139,7 @@ for (const vp of [{ width: 430, height: 932 }, { width: 375, height: 667 }]) {
             assert.ok(await until("/· LW$/.test((document.querySelector('#gps-overlay .gps-ld-pltext') || {}).textContent || '')", 4000), 'pill follows: ' + await pill());
             assert.deepEqual(await under(), [], 'nothing under the chips (LW)');
             // Tap SW (the default) back: the pick clears.
-            await tap('SW'); await sleep(800); n = await now(); assert.equal(n.pick, null); assert.equal(n.oval.club, 'SW');
+            await tap('SW'); await sleep(800); n = await now(); assert.equal(n.pick, (await swOn()) ? 'SW' : null, '095b: a step onto the default is kept on the par 3 switcher'); assert.equal(n.oval.club, 'SW');
             // 2 - deep green: 4 chips (max), the default 9i.
             await tap('LW'); await sleep(500);
             await atTee(2); n = await now(); cs = await chips();
