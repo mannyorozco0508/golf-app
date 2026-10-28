@@ -132,6 +132,18 @@
         return out;
     }
 
+    // 094 (Manny, Oct 28: on the par-3 Green view the arcs moved and turned with the dragged target): THE LINE THE
+    // ARCS LIE ACROSS (arcs' `aim`). A par 3 (the tee shot is the approach), the Green view, or from the golfer: the
+    // fixed line to the green's CENTER. A par 4 / 5's tee shot (hole view): the hole's own line - the smart-default
+    // target (the dogleg / the driver's spot, 052 A's aim), never the ring the golfer dragged (dragged: that default
+    // when known, else the center). o: { par, green (the Green view), nearTee, target, targetDefault, moved, mid }.
+    function arcAim(o) {
+        if (!o || !o.mid) return null;
+        if (Number(o.par) === 3 || o.green || !o.nearTee) return o.mid;
+        if (o.moved) return o.targetDefault || o.mid;
+        return o.target || o.mid;
+    }
+
     // A HAZARD IN PLAY for a club landing `landsYd` from the tee: row is gps-geo.hazardRows'
     // (reachM near edge, carryM far edge or null for one point, behind).
     function inPlay(landsYd, row) {
@@ -173,7 +185,7 @@
     }
 
     var api = {
-        lands: lands, isGeneric: isGeneric, pickTee: pickTee, pickBall: pickBall, arcPts: arcPts, arcs: arcs, inPlay: inPlay, plan: plan,
+        lands: lands, isGeneric: isGeneric, pickTee: pickTee, pickBall: pickBall, arcPts: arcPts, arcs: arcs, arcAim: arcAim, inPlay: inPlay, plan: plan,
         nameOf: nameOf, shortOf: shortOf,
         IN_PLAY_SHORT_YD: IN_PLAY_SHORT_YD, ONE_POINT_YD: ONE_POINT_YD, HALF_WIDTH_YD: HALF_WIDTH_YD, MAX_ARCS: MAX_ARCS, TEE_CLUBS: TEE_CLUBS
     };
