@@ -110,3 +110,9 @@ test('093 + 094 spec item 4: no label under a button, the pill or another label 
     assert.match(pp, /place\(rc5, SIZES\[j5\], pass5 \? 'beside-line-oval' : 'beside-line'\)/, 'a crowded bubble tries just beside its line before the crowded spot');
     assert.ok(pp.indexOf("'beside-line'") < pp.indexOf("'line-crowded'"), 'before the always-shown fallback');
 });
+
+test('093 + 094 spec item 4: the "20 yd" ring label never under a button / the pill / a bar - the other end, else off', { skip }, () => {
+    const st = fnBody('sizeTarget');
+    assert.match(st, /if \(under\(sgn\)\) \{ if \(!under\(-sgn\)\) sgn = -sgn; else \{ lbl\.style\.display = 'none';/);
+    assert.match(st, /\.gps-right > \*, \.gps-ld-rail > \*, \.gps-miss-chips > \*/);
+});

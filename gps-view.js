@@ -2548,6 +2548,18 @@
             var mr = el.getBoundingClientRect(), wr = S.el.getBoundingClientRect(), sgn = 1;
             var reach = d / 2 + 4 + Math.abs(ux) * lw / 2 + Math.abs(uy) * lh / 2;
             if (mr.width && mr.left + box / 2 + ux * reach + lw / 2 > wr.right - 8) sgn = -1;
+            // 093 (spec item 4): never under a button, the club switcher pill, the bars or a panel - the other end when
+            // that one is clear; both covered: no "20 yd" label this time (the ring itself stays).
+            var under = function (sg) {
+                if (!mr.width) return false;
+                var x = mr.left + box / 2 + sg * ux * reach, y = mr.top + box / 2 + sg * uy * reach, L = x - lw / 2, T = y - lh / 2;
+                return Array.prototype.some.call(S.el.querySelectorAll('.gps-right > *, .gps-ld-rail > *, .gps-miss-chips > *, .gps-leftrow > *, .gps-ld-plays, .gps-zoom, .gps-ld-top, .gps-ld-bottom, .gps-top, .gps-bottom'), function (e) {
+                    if (e.offsetParent === null) return false; var q = e.getBoundingClientRect();
+                    return q.width > 0 && L < q.right + 2 && L + lw > q.left - 2 && T < q.bottom + 2 && T + lh > q.top - 2;
+                });
+            };
+            lbl.removeAttribute('data-ring-off');
+            if (under(sgn)) { if (!under(-sgn)) sgn = -sgn; else { lbl.style.display = 'none'; lbl.setAttribute('data-ring-off', '1'); return; } }
             var cx = box / 2 + sgn * ux * reach, cy = box / 2 + sgn * uy * reach;
             lbl.style.left = Math.round(cx - lw / 2) + 'px'; lbl.style.top = Math.round(cy - lh / 2) + 'px';
             lbl.style.transform = 'none';
