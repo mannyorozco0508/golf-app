@@ -54,13 +54,38 @@ for (const vp of [{ width: 430, height: 932 }, { width: 375, height: 667 }]) {
         const until = async (x, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await ev(x)) return true; await sleep(250); } return false; };
         const shot = async (n) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await sleep(1200); await j.shot(path.join(SHOTS, 'chrome089b-' + vp.width + 'x' + vp.height + '-' + n + '.png')); } };
         const now = async () => JSON.parse(await ev('JSON.stringify(HardPanGps.missNow())'));
-        const lbl = async () => JSON.parse(await ev('JSON.stringify(HardPanGps.missLbl())'));
+        // 093 (Manny's approved change): on a par 3 the stacked chips are ONE switcher pill and the My miss label + note
+        // left the map for a card (tap the pill's middle). These helpers read the same things through the switcher.
+        const swOn = async () => !!(await ev("(function(){ var s = HardPanGps.missSwitch && HardPanGps.missSwitch(); return !!(s && s.on); })()"));
+        const lbl = async () => {
+            if (!(await swOn())) return JSON.parse(await ev('JSON.stringify(HardPanGps.missLbl())'));
+            await ev("document.querySelector('#gps-overlay .gps-miss-mid').click()"); await sleep(250);
+            const c = JSON.parse(await ev("JSON.stringify((function(){ var c = document.querySelector('#gps-overlay .gps-miss-card'); if (!c || c.style.display === 'none') return null; var a = c.getBoundingClientRect(), hits = [];"
+                + " Array.prototype.forEach.call(document.querySelectorAll('#gps-overlay .gps-ld-rail > *, #gps-overlay .gps-ld-plays, #gps-overlay .gps-ld-top, #gps-overlay .gps-ld-bottom, #gps-overlay .gps-miss-pill, #gps-overlay .gps-miss-chips-from, #gps-overlay .gps-recenter'), function (e) { if (e.offsetParent === null) return; var q = e.getBoundingClientRect(); if (Math.min(a.right, q.right) - Math.max(a.left, q.left) > 0.5 && Math.min(a.bottom, q.bottom) - Math.max(a.top, q.top) > 0.5) hits.push(String(e.className).split(' ')[0]); });"
+                + " return { text: (c.querySelector('b') || {}).textContent || '', note: (c.querySelector('span') || {}).textContent || '', noteShown: !!c.querySelector('span'), hits: hits, card: true }; })())"));
+            await ev("document.querySelector('#gps-overlay .gps-miss-mid').click()"); await sleep(250);
+            return c;
+        };
         const pill = () => ev("(document.querySelector('#gps-overlay .gps-ld-pltext') || {}).textContent || ''");
-        const tap = (c) => ev("(function(){ var b = document.querySelector('#gps-overlay .gps-miss-chip[data-miss-chip=\"" + c + "\"]'); if (!b) return false; b.click(); return true; })()");
-        const chips = async () => JSON.parse(await ev("JSON.stringify(Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-miss-chip'), function (e) { return e.offsetParent !== null; }).map(function (e) { var b = e.getBoundingClientRect(); return { club: e.getAttribute('data-miss-chip'), text: e.textContent.replace(/\\s+/g, ' ').trim(), on: e.classList.contains('gps-miss-chip-on'), t: b.top, b: b.bottom, h: b.height }; }))"));
+        const tap0 = (c) => ev("(function(){ var b = document.querySelector('#gps-overlay .gps-miss-chip[data-miss-chip=\"" + c + "\"]'); if (!b) return false; b.click(); return true; })()");
+        let chips = async () => JSON.parse(await ev("JSON.stringify(Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-miss-chip'), function (e) { return e.offsetParent !== null; }).map(function (e) { var b = e.getBoundingClientRect(); return { club: e.getAttribute('data-miss-chip'), text: e.textContent.replace(/\\s+/g, ' ').trim(), on: e.classList.contains('gps-miss-chip-on'), t: b.top, b: b.bottom, h: b.height }; }))"));
+        // 093: on the switcher, "tapping a chip" = stepping the arrows to that club.
+        const sw = async () => JSON.parse(await ev('JSON.stringify(HardPanGps.missSwitch())'));
+        const step = async (c) => { for (let k = 0; k < 6; k++) { const s = await sw(); if (s.sel === c) return true; const i = s.list.indexOf(c), at = s.list.indexOf(s.sel); if (i < 0) return false; await ev("document.querySelector('#gps-overlay " + (i > at ? '.gps-miss-more' : '.gps-miss-less') + "').click()"); await sleep(400); } return (await sw()).sel === c; };
+        const tap = async (c) => (await swOn()) ? step(c) : tap0(c);
+        // 093: the chip labels on the switcher - every club's label, longest first, read by stepping through them, then back.
+        const chips0 = chips;
+        chips = async () => {
+            if (!(await swOn())) return chips0();
+            const s0 = await sw(), out = [];
+            const r = JSON.parse(await ev("JSON.stringify(document.querySelector('#gps-overlay .gps-miss-pill').getBoundingClientRect())"));
+            for (const c of s0.list.slice().reverse()) { await step(c); const s = await sw(); out.push({ club: c, text: s.text.replace(/^\u2039|\u203a$/g, '').replace(/\s+/g, ' ').trim(), on: c === s0.sel, t: r.top, b: r.bottom, h: r.height }); }
+            await step(s0.sel);
+            return out;
+        };
         // Anything visible under a chip: 091's bottom row (Card | Enter score | Mark), Recenter, the pill, labels, bubbles, rail, top row.
         const under = async () => JSON.parse(await ev("JSON.stringify((function(){ var vis = function (e) { return e && e.offsetParent !== null && e.getBoundingClientRect().width > 0; };"
-            + " var cs = Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-miss-chip'), vis);"
+            + " var cs = Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-miss-chip, #gps-overlay .gps-miss-pill'), vis);"
             + " var os = Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-ld-bottom button, #gps-overlay .gps-ld-bottom .gps-mark-shot, #gps-overlay .gps-recenter, #gps-overlay .gps-ld-plays, #gps-overlay .gps-pill-to, #gps-overlay .gps-pill-on, #gps-overlay .gps-green-lbl, #gps-overlay .gps-miss-lbl span, #gps-overlay .gps-ring-lbl, #gps-overlay .gps-carry-lbl, #gps-overlay .gps-right > *, #gps-overlay .gps-ld-rail > *, #gps-overlay .gps-ld-top'), vis);"
             + " var out = []; cs.forEach(function (c) { var a = c.getBoundingClientRect(); os.forEach(function (e) { var q = e.getBoundingClientRect(); if (Math.min(a.right, q.right) - Math.max(a.left, q.left) > 0.5 && Math.min(a.bottom, q.bottom) - Math.max(a.top, q.top) > 0.5) out.push(c.textContent + ' x ' + e.className); }); }); return out; })())"));
         const atTee = async (n) => { await ev('HardPanGps.goHole(' + n + ')'); await ev('__moveTo(' + h[n].t.b[0] + ',' + h[n].t.b[1] + ')'); await sleep(3000);
@@ -85,7 +110,7 @@ for (const vp of [{ width: 430, height: 932 }, { width: 375, height: 667 }]) {
             assert.deepEqual(cs.map((c) => c.on), [false, true, false]);
             assert.equal(n.chips.def, 'SW'); assert.equal(n.oval.club, 'SW');
             cs.forEach((c) => assert.equal(Math.round(c.h), 40, '40 px tall'));
-            for (let i = 1; i < cs.length; i++) assert.ok(cs[i - 1].b <= cs[i].t, 'stacked, no overlap');
+            if (!(await swOn())) for (let i = 1; i < cs.length; i++) assert.ok(cs[i - 1].b <= cs[i].t, 'stacked, no overlap');   // 093: one pill on a par 3
             const rc = JSON.parse(await ev("JSON.stringify(document.querySelector('#gps-overlay .gps-recenter').getBoundingClientRect())"));
             assert.ok(cs[cs.length - 1].b <= rc.top - 9, 'above Recenter');
             assert.deepEqual(await under(), [], 'nothing under the chips');

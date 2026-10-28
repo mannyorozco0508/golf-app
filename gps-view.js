@@ -5251,8 +5251,13 @@
     function missChipsSync() {
         var row = S && S.el && S.el.querySelector('.gps-leftrow'); if (!row) return;
         var box = row.querySelector('.gps-miss-chips'), c = S.missChips, M = missApi();
-        if (!c || !S.missOval || !M) { if (box) { box.style.display = 'none'; box.textContent = ''; box.removeAttribute('data-miss-chips'); } return; }
+        var swOn = !!(c && S.missOval && M && missSwitchOn());
+        S.el.classList.toggle('gps-miss-switch-on', swOn);   // 093: the carry arc labels dim while the switcher shows
+        if (!swOn) missCardShow(false);
+        if (!c || !S.missOval || !M) { if (box) { box.style.display = 'none'; box.textContent = ''; box.removeAttribute('data-miss-chips'); box.classList.remove('gps-miss-switch'); } return; }
         if (!box) { box = document.createElement('div'); box.className = 'gps-miss-chips'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'My miss club'); row.insertBefore(box, row.firstChild); }
+        if (swOn) { missSwitchSync(row, box, c, M); return; }
+        if (box.classList.contains('gps-miss-switch')) { box.classList.remove('gps-miss-switch'); box.textContent = ''; box.removeAttribute('data-miss-chips'); }
         var u = units() === 'm' ? 'm' : 'yd', B = bagApi();
         var list = c.list.slice().sort(function (a, b) { return b.carry - a.carry; });
         // 089b: a depth chip reads "LW · front +5" / "SW · middle" / "GW · back −1" (089's pair: "7i +8 long").
@@ -5278,13 +5283,128 @@
         }
         box.style.display = '';
     }
+    // 093 (Manny picked A): ON THE PAR 3 GPS VIEW, ONE CLUB SWITCHER PILL in place of the stacked chips, in the same
+    // lower-left spot: "‹ 7i · middle ›". The same chips (same list, same default = the club closest to the target,
+    // the same labels) - one at a time. › = more club (the next longer one), ‹ = less club; the arrow at either end of
+    // the list is dimmed. A swipe on the pill does the same (left = ›, right = ‹). The "from tee" tag stays above it.
+    // Tapping the middle shows the My miss label + note (off the map on a par 3) as a small card for 4 s; tap again
+    // to hide. Approaches (par 4 / 5) keep the chip stack. Memory only: nothing stored, nothing sent.
+    var MISS_CARD_MS = 4000, MISS_SWIPE_PX = 24;
+    function missSwitchOn() { return !!(S && S.missChips && S.missOval && isPar3()); }
+    function missSwitchList(c) { return c.list.slice().sort(function (a, b) { return a.carry - b.carry; }); }   // shortest first
+    function missSwitchStep(dir) {
+        var c = S && S.missChips; if (!c || !missSwitchOn()) return false;
+        var list = missSwitchList(c), i = -1;
+        list.forEach(function (x, k) { if (x.club === c.sel) i = k; });
+        var j = i + (dir > 0 ? 1 : -1);
+        if (i < 0 || j < 0 || j >= list.length) return false;
+        missChipTap(list[j].club);
+        return true;
+    }
+    function missSpeakClub(club) {
+        var B = bagApi(), nm = (B && B.NAMES && B.NAMES[club]) || club;
+        return String(nm).replace(/-/g, ' ');
+    }
+    function missSwitchSync(row, box, c, M) {
+        var u = units() === 'm' ? 'm' : 'yd';
+        var list = missSwitchList(c), x = null, i = -1;
+        list.forEach(function (y, k) { if (y.club === c.sel) { x = y; i = k; } });
+        if (!x) { x = list[0]; i = 0; }
+        var t = c.depth && x.spot && typeof M.depthText === 'function' ? M.depthText(clubShort(x.club), x.spot, u) : M.chipText(clubShort(x.club), x.delta, u);
+        var fromTee = c.from === 'tee', lessOff = i <= 0, moreOff = i >= list.length - 1;
+        if (!box.classList.contains('gps-miss-switch')) {
+            box.textContent = ''; box.removeAttribute('data-miss-chips'); box.classList.add('gps-miss-switch');
+            var pill = document.createElement('div'); pill.className = 'gps-miss-pill';
+            var mkBtn = function (cls, txt, aria) { var b = document.createElement('button'); b.type = 'button'; b.className = cls; if (txt) b.textContent = txt; if (aria) b.setAttribute('aria-label', aria); pill.appendChild(b); return b; };
+            var less = mkBtn('gps-miss-arrow gps-miss-less', '‹', 'Less club');
+            var mid = mkBtn('gps-miss-mid', '', null);
+            var more = mkBtn('gps-miss-arrow gps-miss-more', '›', 'More club');
+            var sw = { x: 0, y: 0, down: false, at: 0 };
+            var swiped = function () { return Date.now() - sw.at < 450; };
+            less.onclick = function (e) { if (e) e.stopPropagation(); if (swiped()) return; missSwitchStep(-1); };
+            more.onclick = function (e) { if (e) e.stopPropagation(); if (swiped()) return; missSwitchStep(1); };
+            mid.onclick = function (e) { if (e) e.stopPropagation(); if (swiped()) return; missCardShow(!missCardShown()); };
+            // The swipe: from a press on the pill to the release anywhere (a finger often ends off the pill).
+            var up = function (e) {
+                document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', cancel, true);
+                if (!sw.down) return; sw.down = false;
+                var dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+                if (Math.abs(dx) >= MISS_SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.2) { sw.at = Date.now(); missSwitchStep(dx < 0 ? 1 : -1); }
+            };
+            var cancel = function () { sw.down = false; document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', cancel, true); };
+            pill.addEventListener('pointerdown', function (e) {
+                sw.down = true; sw.x = e.clientX; sw.y = e.clientY; e.stopPropagation();
+                document.addEventListener('pointerup', up, true); document.addEventListener('pointercancel', cancel, true);
+            });
+            pill.addEventListener('keydown', function (e) { if (e.key === 'ArrowRight') { missSwitchStep(1); e.preventDefault(); } else if (e.key === 'ArrowLeft') { missSwitchStep(-1); e.preventDefault(); } });
+            box.appendChild(pill);
+        }
+        var sig = (fromTee ? 'tee|' : '') + list.map(function (y) { return y.club; }).join(',') + '|' + x.club + ':' + t;
+        if (box.getAttribute('data-miss-chips') !== sig) {
+            var ftag = box.querySelector('.gps-miss-chips-from');   // the "from tee" tag right above the pill, only from the tee
+            if (fromTee && !ftag) { ftag = document.createElement('div'); ftag.className = 'gps-miss-chips-from'; ftag.textContent = 'from tee'; box.insertBefore(ftag, box.firstChild); }
+            else if (!fromTee && ftag) box.removeChild(ftag);
+            var midB = box.querySelector('.gps-miss-mid'), lb = box.querySelector('.gps-miss-less'), mb = box.querySelector('.gps-miss-more');
+            midB.textContent = '';
+            var sp = t.indexOf(' '), bb = document.createElement('b'); bb.textContent = t.slice(0, sp); midB.appendChild(bb); midB.appendChild(document.createTextNode(' ' + t.slice(sp + 1)));
+            midB.setAttribute('data-miss-chip', x.club);
+            var rest = t.slice(sp + 1).replace(/^· /, '').replace('−', 'minus ').replace('+', 'plus ');
+            midB.setAttribute('aria-label', 'Club ' + missSpeakClub(x.club) + ', ' + rest + '. Swipe or tap arrows to change.');
+            [[lb, lessOff], [mb, moreOff]].forEach(function (p) { p[0].classList.toggle('gps-miss-arrow-off', p[1]); p[0].setAttribute('aria-disabled', p[1] ? 'true' : 'false'); });
+            box.setAttribute('data-miss-chips', sig);
+            try { placePills0(); } catch (e) {}
+        }
+        box.style.display = '';
+        missSwitchFit(box);
+        missCardSync();
+    }
+    // 093: a small phone - the pill's right end can reach the Plays-like pill (bottom right): first a tighter pill
+    // (narrower arrows, 13 px text), then, only if it still touches, lifted just clear of it (same left edge).
+    function missSwitchFit(box) {
+        var pill = box.querySelector('.gps-miss-pill'), pl = S.el.querySelector('.gps-ld-plays');
+        box.classList.remove('gps-miss-pill-tight'); box.style.marginBottom = '';
+        if (!pill || !pl || pl.offsetParent === null || pl.style.display === 'none') return;
+        var touch = function () { var a = pill.getBoundingClientRect(), b = pl.getBoundingClientRect(); return a.right + 4 > b.left && a.left < b.right && a.bottom + 4 > b.top && a.top < b.bottom ? a.bottom + 6 - b.top : 0; };
+        if (!touch()) return;
+        box.classList.add('gps-miss-pill-tight');
+        var up = touch();
+        if (up > 0) box.style.marginBottom = Math.ceil(up) + 'px';
+    }
+    // 093: THE NOTE CARD - the My miss label + note, above the switcher, for 4 s (or until tapped again).
+    function missCardShown() { return !!(S && S.missCardUntil && Date.now() < S.missCardUntil); }
+    function missCardShow(on) {
+        if (!S) return;
+        if (S.missCardTimer) { clearTimeout(S.missCardTimer); S.missCardTimer = null; }
+        S.missCardUntil = on ? Date.now() + MISS_CARD_MS : 0;
+        if (on) S.missCardTimer = setTimeout(function () { if (S) { S.missCardTimer = null; S.missCardUntil = 0; missCardSync(); } }, MISS_CARD_MS);
+        missCardSync();
+    }
+    function missCardSync() {
+        var row = S && S.el && S.el.querySelector('.gps-leftrow'); if (!row) return;
+        var card = row.querySelector('.gps-miss-card'), box = row.querySelector('.gps-miss-chips.gps-miss-switch');
+        var on = missCardShown() && !!box && box.style.display !== 'none' && missSwitchOn() && !!S.missLblText;
+        var mid = box && box.querySelector('.gps-miss-mid');
+        if (mid) mid.setAttribute('aria-expanded', on ? 'true' : 'false');
+        if (!on) { if (card) card.style.display = 'none'; return; }
+        if (!card) { card = document.createElement('div'); card.className = 'gps-miss-card'; card.setAttribute('role', 'status'); row.appendChild(card); }
+        var L = S.missLblText, want = L.lbl + '|' + L.note;
+        if (card.getAttribute('data-l') !== want) {
+            card.textContent = '';
+            var h = document.createElement('b'); h.textContent = L.lbl; card.appendChild(h);
+            if (L.note) { var n = document.createElement('span'); n.textContent = L.note; card.appendChild(n); }
+            card.setAttribute('data-l', want);
+        }
+        card.style.display = '';
+        var rr = row.getBoundingClientRect(), br = box.getBoundingClientRect();
+        card.style.bottom = Math.round(rr.bottom - br.top + 8) + 'px';
+    }
     var MISS_SRC = 'mymiss', MISS_LAYERS = ['mymiss-fill', 'mymiss-line'];
     function missClear() {
         if (S && S.map) {
             try { MISS_LAYERS.forEach(function (id) { if (S.map.getLayer(id)) S.map.removeLayer(id); }); if (S.map.getSource(MISS_SRC)) S.map.removeSource(MISS_SRC); } catch (e) {}
         }
         if (S && S.markers && S.markers.mymiss) marker('mymiss', null);
-        if (S) { S.missRing = null; S.missKey = null; S.missOval = null; S.missChips = null; S.missNote = null; }
+        if (S) { S.missRing = null; S.missKey = null; S.missOval = null; S.missChips = null; S.missNote = null; S.missLblText = null; }
         // 089: no oval - no chips, and the target ring back to full strength.
         try { missChipsSync(); missRingFade(false); } catch (e) {}
     }
@@ -5337,6 +5457,16 @@
         // 089b: a depth chip's note, one line, the target first: "Lob wedge: 17 yds short of the target · 5 yds onto the front".
         if (plan.spot && plan.aimYd != null && typeof M.depthNote === 'function') note = M.depthNote(nm, f.carry - plan.aimYd, plan.spot, units() === 'm' ? 'm' : 'yd');
         S.missNote = note || null;
+        // 093: ON A PAR 3 WITH THE CLUB SWITCHER, the label + note box leaves the map: the same two lines show in a
+        // small card when the golfer taps the middle of the switcher pill (missChipsSync). Elsewhere: unchanged.
+        S.missLblText = { lbl: lbl, note: note || '' };
+        if (missSwitchOn()) {
+            if (S.markers && S.markers.mymiss) marker('mymiss', null);
+            S.missLbl = null;
+            missChipsSync();
+            missKeepClear();
+            return;
+        }
         var mk = marker('mymiss', ring[rI], function () { var e = document.createElement('div'); e.className = 'gps-miss-lbl'; e.style.pointerEvents = 'none'; return e; });
         if (mk) {
             var me = mk.getElement();
@@ -7779,6 +7909,19 @@
         + '#gps-overlay .gps-miss-chips-from{pointer-events:none;padding:2px 8px;border-radius:8px;background:rgba(11,15,12,.82);color:#cbd5e1;font:700 11.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;}'
         + '#gps-overlay .gps-miss-chip.gps-miss-chip-on{background:#0e7490;border-color:#7dd3fc;color:#fff;}'
         + '#gps-overlay.gps-sun .gps-miss-chip{background:#000 !important;border-color:#fff !important;color:#fff !important;}#gps-overlay.gps-sun .gps-miss-chip.gps-miss-chip-on{background:#0e7490 !important;}'
+        // 093: the par-3 club switcher pill ("‹ 7i · middle ›", 40 px tall, same spot as the chips), its note card and the dimmed carry labels.
+        + '#gps-overlay .gps-miss-pill{pointer-events:auto;display:flex;align-items:stretch;height:40px;box-sizing:border-box;border-radius:20px;border:2px solid #7dd3fc;background:rgba(11,15,12,.86);touch-action:none;user-select:none;-webkit-user-select:none;}'
+        + '#gps-overlay .gps-miss-pill button{background:none;border:0;margin:0;color:#e2e8f0;cursor:pointer;-webkit-tap-highlight-color:transparent;}'
+        + '#gps-overlay .gps-miss-pill .gps-miss-arrow{width:32px;padding:0;font:800 24px/1 -apple-system,BlinkMacSystemFont,sans-serif;color:#7dd3fc;}'
+        + '#gps-overlay .gps-miss-pill .gps-miss-arrow.gps-miss-arrow-off{opacity:.28;}'
+        + '#gps-overlay .gps-miss-pill .gps-miss-mid{padding:0 2px;font:700 15px/1 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;color:#e2e8f0;}'
+        + '#gps-overlay .gps-miss-pill .gps-miss-mid b{font-weight:800;color:#fff;margin-right:2px;}'
+        + '@media (max-width:399px){#gps-overlay .gps-miss-pill .gps-miss-mid{font-size:14px;}#gps-overlay .gps-miss-pill .gps-miss-arrow{width:28px;}}'
+        + '#gps-overlay .gps-miss-pill-tight .gps-miss-pill .gps-miss-arrow{width:22px;font-size:22px;}#gps-overlay .gps-miss-pill-tight .gps-miss-pill .gps-miss-mid{font-size:13px;padding:0;}'
+        + '#gps-overlay .gps-miss-card{position:absolute;left:0;bottom:60px;pointer-events:none;box-sizing:border-box;max-width:min(300px, calc(100vw - 96px));width:max-content;padding:6px 10px;border-radius:10px;background:rgba(11,15,12,.9);border:1px solid rgba(125,211,252,.45);color:#cbd5e1;font:600 12px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;white-space:normal;}'
+        + '#gps-overlay .gps-miss-card b{display:block;font:800 12.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#7dd3fc;}#gps-overlay .gps-miss-card span{display:block;}'
+        + '#gps-overlay.gps-sun .gps-miss-pill,#gps-overlay.gps-sun .gps-miss-card{background:#000 !important;border-color:#fff !important;}#gps-overlay.gps-sun .gps-miss-pill button{color:#fff !important;}'
+        + '#gps-overlay.gps-miss-switch-on .gps-carry-lbl{opacity:.4 !important;}'
         + '.gps-target.gps-target-mymiss .gps-ring,.gps-target.gps-target-mymiss .gps-ring-in,.gps-target.gps-target-mymiss .gps-ring-line{opacity:.4;}.gps-target.gps-target-mymiss .gps-ring-dot{opacity:.85;}'
         + '#gps-overlay .gps-ts-sw{flex:0 0 auto;position:relative;width:52px;height:32px;border-radius:16px !important;background:rgba(255,255,255,.22) !important;transition:background .15s;}'
         + '#gps-overlay .gps-ts-sw i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.4);}'
@@ -8854,6 +8997,17 @@
         // 089b (checks): age My miss's held fix by ms (the 60 s rule without a 60 s wait); then render.
         appOrigin: function () { try { dropStaleFix(); var o = origin(resolved()); return o ? o.from : null; } catch (e) { return null; } },   // 089b (checks): the app's own origin (10 s rule)
         missFixAge: function (ms) { if (missLastFix) missLastFix.at -= Number(ms) || 0; if (missHeldGone() || S) render(); return missLastFix ? Date.now() - missLastFix.at : null; },
+        // 093 (checks): the par-3 club switcher - shown?, the clubs shortest first, the shown one, the text, the arrows, the card.
+        missSwitch: function () {
+            if (!S) return null;
+            var box = S.el.querySelector('.gps-miss-chips.gps-miss-switch'), on = !!(box && box.style.display !== 'none' && missSwitchOn());
+            var q = function (sel) { return box ? box.querySelector(sel) : null; }, card = S.el.querySelector('.gps-miss-card');
+            var mid = q('.gps-miss-mid'), lb = q('.gps-miss-less'), mb = q('.gps-miss-more'), ft = q('.gps-miss-chips-from');
+            return { on: on, par3: isPar3(), list: S.missChips ? missSwitchList(S.missChips).map(function (x) { return x.club; }) : [], sel: S.missChips ? S.missChips.sel : null,
+                text: mid ? mid.textContent : '', aria: mid ? mid.getAttribute('aria-label') : '', lessOff: !!(lb && lb.classList.contains('gps-miss-arrow-off')), moreOff: !!(mb && mb.classList.contains('gps-miss-arrow-off')),
+                fromTee: !!ft, card: !!(card && card.style.display !== 'none' && card.offsetParent !== null), cardText: card && card.style.display !== 'none' ? card.textContent : '',
+                lblOnMap: !!(S.markers && S.markers.mymiss), dim: S.el.classList.contains('gps-miss-switch-on') };
+        },
         missNow: function () {
             if (!S) return null;
             var scr = null;
@@ -8895,7 +9049,7 @@
                 if (!sp || !wrap) return null;
                 var wr = wrap.getBoundingClientRect(), b = sp.getBoundingClientRect(), L = { l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top };
                 var hits = [];
-                Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-carry-lbl, .gps-ld-top, .gps-ld-bottom, .gps-green-dims, .gps-banner, .gps-msg, .gps-miss-chip'), function (e) {
+                Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-carry-lbl, .gps-ld-top, .gps-ld-bottom, .gps-green-dims, .gps-banner, .gps-msg, .gps-miss-chip, .gps-miss-pill'), function (e) {
                     if (e.offsetParent === null) return; var q = e.getBoundingClientRect(); if (!(q.width > 0 && q.height > 0)) return;
                     if (Math.min(b.right, q.right) - Math.max(b.left, q.left) > 0.5 && Math.min(b.bottom, q.bottom) - Math.max(b.top, q.top) > 0.5) hits.push(String(e.className).split(' ').slice(0, 2).join('.'));
                 });
