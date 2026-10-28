@@ -5295,8 +5295,8 @@
         var p = S && S.missPick;
         if (!p) return null;
         if (p.hole !== S.hole || !o || !o.pt || !p.pt || G.haversineMeters(p.pt, o.pt) > MISS_PICK_NEAR_YD * G.M_PER_YD) { S.missPick = null; return null; }
-        // 095: ON A PAR 3 (the switcher), the target dragged = the default re-picks (the club closest to the new target).
-        if (isPar3() && p.tgt !== undefined && p.tgt !== missTgtKey()) { S.missPick = null; return null; }
+        // 095b (Manny, Oct 28: "Keep my tapped club"): a dragged target KEEPS the tapped / stepped club (its text and oval
+        // follow the target); with no tapped club the default re-picks the closest. Reset on the next hole / shot (above).
         return p.club;
     }
     // The club the tapped chip puts on the plays-like pill (null: the pill keeps the app's pick).
@@ -5309,7 +5309,8 @@
     function missChipTap(club) {
         var c = S && S.missChips;
         if (!c || !c.list.some(function (x) { return x.club === club; })) return;
-        S.missPick = club === (c.def || c.app) ? null : { hole: S.hole, club: club, pt: c.pt.slice(), tgt: missTgtKey() };
+        // 095b: on the par-3 switcher a step / tap is kept even onto the default club (a later drag keeps it too).
+        S.missPick = club === (c.def || c.app) && !missSwitchOn() ? null : { hole: S.hole, club: club, pt: c.pt.slice(), tgt: missTgtKey() };
         render();
     }
     // THE CHIPS ON THE MAP: stacked bottom-left, above Recenter (longer club on top), the shown one selected.

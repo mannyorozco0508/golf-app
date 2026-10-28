@@ -1,7 +1,7 @@
 // 095 (Manny, Oct 28) - THE PAR 3 CLUB SWITCHER STEPS THROUGH EVERY CLUB IN MY BAG, shortest to longest (not only the
 // clubs landing on the green). The default stays the club closest to the target; the end arrows dim only at the bag's
 // shortest and longest club. The text: on the green as today ("SW · middle +10"); off the green "9i · 12 past the back"
-// / "LW · 18 short of the front". A dragged target re-picks the default. Approaches (par 4 / 5): unchanged.
+// / "LW · 18 short of the front". A dragged target re-picks the default unless a club was tapped (095b). Approaches (par 4 / 5): unchanged.
 'use strict';
 const fs = require('fs'), path = require('path');
 const { test } = require('node:test');
@@ -71,6 +71,9 @@ test('095: wired on the par 3 switcher only; arrows dim only at the ends of the 
     assert.match(fnBody('missSync'), /M\.oval\(plan\.club, plan\.carry, plan\.hand, plan\.along, !!plan\.any\)/);
     assert.match(fnBody('missSwitchSync'), /if \(c\.all && x\.spot && typeof M\.switchText === 'function'\) t = M\.switchText\(clubShort\(x\.club\), x\.spot, u, x\.delta\)/);
     assert.match(fnBody('missSwitchSync'), /lessOff = i <= 0, moreOff = i >= list\.length - 1/);
-    assert.match(fnBody('missPickClub'), /isPar3\(\) && p\.tgt !== undefined && p\.tgt !== missTgtKey\(\)/);
+    // 095b (Manny: "Keep my tapped club"): a drag no longer drops the pick; it still resets on the next hole / shot (089).
+    assert.doesNotMatch(fnBody('missPickClub'), /p\.tgt !== missTgtKey\(\)/, 'a drag keeps the tapped club');
+    assert.match(fnBody('missPickClub'), /p\.hole !== S\.hole \|\| [^\n]*MISS_PICK_NEAR_YD/, 'reset on the next hole / shot');
+    assert.match(fnBody('missChipTap'), /club === \(c\.def \|\| c\.app\) && !missSwitchOn\(\) \? null/, 'a step onto the default is kept on the switcher');
     assert.match(fnBody('missChipTap'), /tgt: missTgtKey\(\)/);
 });

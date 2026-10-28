@@ -3,7 +3,8 @@
 // middle (a live fix). ‹ › step through ALL 12 clubs (LW .. Dr), shortest to longest, both ways; the end arrows dim only
 // at LW and Dr; the oval and the Plays-like pill follow each club; off the green the text says where it lands
 // ("LW · 8 short of the front", "9i · 10 past the back"); on the green as today ("SW · middle −7"). The default = the
-// club closest to the target; a dragged target re-picks it (even after a tap) and every club's numbers follow. The
+// club closest to the target; a dragged target re-picks it, but 095b keeps a tapped / stepped club (reset on the next
+// hole / shot); the on-green numbers follow the target. The
 // middle tap still shows the My miss card. No overlaps (the pill must fit "LW · .. short of the front" on the SE).
 'use strict';
 const fs = require('fs'), path = require('path');
@@ -162,14 +163,40 @@ test('095 par 3 switcher steps through every club - Streamsong Red #8 at 114, ' 
         ['SW', 'GW'].forEach((c) => { check(/^(SW|GW) · (front|middle|back)( [+−]\d+)?$/.test(t1[c]), c + ' on-green form: ' + t1[c]); check(t1[c] !== t0[c], c + ' on-green number follows the drag: ' + t0[c] + ' -> ' + t1[c]); });
         ['9i', '8i', '7i', 'Dr'].forEach((c) => check(/ past the back$/.test(t1[c]), c + ' keeps the edge form: ' + t1[c]));
         check(/ short of the front$/.test(t1.LW), 'LW keeps the edge form: ' + t1.LW);
-        check(s.sel === closest(n).club, 'front: re-picked to the closest ' + closest(n).club + ', got ' + s.sel);
+        // 095b (Manny: "Keep my tapped club"): the tapped 7i STAYS after the drag; its text and oval follow the target.
+        check(s.sel === '7i', 'drag after a tap keeps the tapped club 7i, got ' + s.sel);
+        check(n.oval && n.oval.club === '7i', 'the oval stays 7i: ' + JSON.stringify(n.oval && n.oval.club));
         check(s.list.join() === ALL.join(), 'still every club after the drag');
-        await shot('3-drag-front'); await checkOv('drag front');
-        const selF = s.sel;
+        await shot('3-drag-front-kept-7i'); await checkOv('drag front');
+        // Step to SW (on the green), drag to the back: SW is kept and its number follows the target.
+        for (let k = 0; k < 12 && (await sw()).sel !== 'SW'; k++) { await click('.gps-miss-less'); await sleep(450); }
+        assert.equal((await sw()).sel, 'SW');
+        const swBefore = (await sw()).text;
+        await drag(G.destination(R8.c, R8.brg, 16 * Y));
+        n = await now(); s = await sw(); const t2 = onTxt(n);
+        check(s.sel === 'SW', 'drag after a step keeps SW, got ' + s.sel);
+        check(s.text === t2.SW && s.text !== swBefore, 'SW text follows the drag: ' + swBefore + ' -> ' + s.text);
+        await shot('4-drag-back-kept-SW'); await checkOv('drag back');
+        // The next hole: the tapped choice resets to the closest club (as 089).
+        await ev('HardPanGps.goHole(9)'); await sleep(1500); await ev('HardPanGps.goHole(8)'); await sleep(2500);
+        assert.ok(await until("(function(){ var s = HardPanGps.missSwitch(); return !!(s && s.on); })()", 10000), 'switcher back on #8');
+        n = await now(); s = await sw();
+        check(s.sel === closest(n).club, 'next hole: reset to the closest ' + closest(n).club + ', got ' + s.sel);
+        // No tapped club: a drag re-picks the closest club (front, then back).
+        await drag(G.destination(R8.c, R8.brg + 180, 16 * Y));
+        n = await now(); s = await sw(); const selF = s.sel;
+        check(s.sel === closest(n).club, 'no tap, front: re-picked to the closest ' + closest(n).club + ', got ' + s.sel);
         await drag(G.destination(R8.c, R8.brg, 16 * Y));
         n = await now(); s = await sw();
-        check(s.sel === closest(n).club && s.sel !== selF, 'back: re-picked ' + selF + ' -> ' + s.sel + ' (closest ' + closest(n).club + ')');
-        await shot('4-drag-back'); await checkOv('drag back');
+        check(s.sel === closest(n).club && s.sel !== selF, 'no tap, back: re-picked ' + selF + ' -> ' + s.sel + ' (closest ' + closest(n).club + ')');
+        // The next shot (the golfer moves on more than 40 yds): a tapped club resets to the closest.
+        for (let k = 0; k < 3; k++) { await click('.gps-miss-more'); await sleep(450); }
+        const tapped = (await sw()).sel;
+        const NEXT = P(G.destination(R8.c, R8.brg + 180, 160 * Y));
+        await ev('__moveTo(' + NEXT[0] + ',' + NEXT[1] + ')'); await sleep(2500);
+        assert.ok(await until("(function(){ var s = HardPanGps.missSwitch(); return !!(s && s.on); })()", 10000), 'switcher on at the next shot: ' + JSON.stringify(await now()));
+        n = await now(); s = await sw();
+        check(s.sel === closest(n).club, 'next shot: the tapped ' + tapped + ' reset to the closest ' + closest(n).club + ', got ' + s.sel);
         assert.deepEqual(fails, [], fails.join('\n'));
     } finally { await j.close(); }
 });
