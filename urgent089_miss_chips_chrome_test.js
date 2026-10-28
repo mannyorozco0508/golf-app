@@ -21,7 +21,9 @@ const CODE = 'MIS089', KEY = 'miss089_test', ID = '990000000000000089';
 const TEE = [33.4600, -111.9600], MID = G.destination(TEE, 0, 350);
 const BALL1 = G.destination(TEE, 3, 215), BALL2 = G.destination(MID, 175, 40);
 const P = (p) => [Number(p[0].toFixed(6)), Number(p[1].toFixed(6))];
-const h = { 1: { g: { f: P(G.destination(MID, 180, 12)), c: P(MID), b: P(G.destination(MID, 0, 12)) }, t: { b: P(TEE) } } };
+// 089b: hole 1's green has its MIDDLE only (no front / back), so these checks keep testing 089's pair of chips
+// (089b's chips across the green depth need a front and a back: urgent089b_depth_chips_chrome_test.js).
+const h = { 1: { g: { c: P(MID) }, t: { b: P(TEE) } } };
 for (let n = 2; n <= 18; n++) { const t = G.destination(TEE, 90, 400 * (n - 1)); h[n] = { g: { c: P(G.destination(t, 0, n === 2 ? 168 * G.M_PER_YD : 350)) }, t: { b: P(t) } }; }
 const TEE2 = h[2].t.b;   // 089: hole 2 is a PAR 3, 168 yds
 const GAPI = { v: 1, built: 'test', links: { [KEY]: ID }, courses: { [ID]: { id: ID, club: 'Chips Test Golf Club', course: '', city: 'Phoenix', state: 'AZ', lat: TEE[0], lng: TEE[1], holes: 18, h } } };

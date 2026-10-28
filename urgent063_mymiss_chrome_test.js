@@ -19,7 +19,9 @@ const CODE = 'MIS063', KEY = 'miss063_test', ID = '990000000000000063';
 const TEE = [33.4600, -111.9600], MID = G.destination(TEE, 0, 350);
 const BALL1 = G.destination(TEE, 3, 215), BALL2 = G.destination(MID, 175, 40);
 const P = (p) => [Number(p[0].toFixed(6)), Number(p[1].toFixed(6))];
-const h = { 1: { g: { f: P(G.destination(MID, 180, 12)), c: P(MID), b: P(G.destination(MID, 0, 12)) }, t: { b: P(TEE) } } };
+// 089b: hole 1's green has its MIDDLE only, so the oval here stays the app's pick (the 7-iron) - with a front and
+// a back, 089b's default is the club closest to the target (urgent089b_depth_chips_chrome_test.js).
+const h = { 1: { g: { c: P(MID) }, t: { b: P(TEE) } } };
 for (let n = 2; n <= 18; n++) { const t = G.destination(TEE, 90, 400 * (n - 1)); h[n] = { g: { c: P(G.destination(t, 0, 350)) }, t: { b: P(t) } }; }
 const GAPI = { v: 1, built: 'test', links: { [KEY]: ID }, courses: { [ID]: { id: ID, club: 'Chips Test Golf Club', course: '', city: 'Phoenix', state: 'AZ', lat: TEE[0], lng: TEE[1], holes: 18, h } } };
 const CD = makeCourseData(18).map((x, i) => Object.assign({}, x, i === 0 ? { par: 4 } : {}));

@@ -131,7 +131,7 @@ for (const vp of VPS) {
             await ev("document.querySelector('#gps-overlay [data-ts-sw=mymiss]').click()");
             await ev("document.querySelector('#gps-overlay .gps-tools').click()"); await sleep(1500);
             await moveTo(out(168));
-            assert.ok(await until("(function(){ var n = HardPanGps.missNow(); return !!(n && n.oval && n.chips && n.chips.list.length === 2); })()", 8000), 'two chips');
+            assert.ok(await until("(function(){ var n = HardPanGps.missNow(); return !!(n && n.oval && n.chips && n.chips.list.length >= 2); })()", 8000), 'the chips (089b: 2-4 across the green depth)');
             assert.ok(await until("!!document.querySelector('#gps-overlay .gps-ld-plays') && document.querySelector('#gps-overlay .gps-ld-plays').offsetParent !== null", 6000), 'the plays-like pill');
             await sleep(1200);
             // THE ROW: Card | Enter score | Mark.
@@ -153,7 +153,7 @@ for (const vp of VPS) {
             await shot('4-row-chips-pill');
             // 3 - MARK opens Mark shot, as the bar did: tap the club-down chip (089) -> Mark -> "Which club?" with it on.
             const m = JSON.parse(await ev('JSON.stringify(HardPanGps.missNow())'));
-            const D = m.chips.list.find((c) => c.club !== m.chips.app).club;
+            const D = m.chips.list.find((c) => c.club !== m.chips.sel).club;   // 089b: a chip that is not the shown one
             await ev("document.querySelector('#gps-overlay .gps-miss-chip[data-miss-chip=\"" + D + "\"]').click()"); await sleep(800);
             await ev("document.querySelector('#gps-overlay .gps-ld-bottom .gps-bottom .gps-mark-shot').click()");
             assert.ok(await until("!!document.querySelector('#gps-overlay .gps-bagask [data-bag-club=\"" + D + "\"].on')", 8000), 'Mark opens Mark shot with the tapped club: ' + await ev("(document.querySelector('#gps-overlay .gps-bagask')||{}).innerText"));

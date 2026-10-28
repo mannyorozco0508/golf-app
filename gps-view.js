@@ -229,6 +229,14 @@
     var windTimer = null;  // the wind's 1-minute tick (age on the box, 10-minute refresh)
     var fix = null;        // { pt: [lat, lng], acc: metres, at: ms } - NEVER persisted, NEVER sent
     var FIX_STALE_MS = 10000, staleTimer = null;
+    // 089b: THE LAST FIX for My miss's chips / oval / note only - kept 60 s (HardPanMissPattern.heldFix) so they do
+    // not flicker with the phone in a pocket. Memory only, never stored, never sent. The 10 s rule above is unchanged.
+    var missLastFix = null;
+    function missHeldGone() {
+        var M = window.HardPanMissPattern;
+        if (!missLastFix || fix || !M || typeof M.heldFix !== 'function' || M.heldFix(missLastFix, Date.now())) return false;
+        missLastFix = null; return true;
+    }
     function dropStaleFix() { if (fix && (!fix.at || Date.now() - fix.at > FIX_STALE_MS)) { fix = null; return true; } return false; }
 
     function units() {
@@ -302,12 +310,13 @@
             // never kept with a position, never sent; only while this fix is inside the course area.
             try { phoneAltSample([pos.coords.latitude, pos.coords.longitude], pos.coords.altitude, pos.coords.altitudeAccuracy); } catch (e) {}
             fix = { pt: [pos.coords.latitude, pos.coords.longitude], acc: pos.coords.accuracy, at: Date.now() };
+            missLastFix = { pt: fix.pt.slice(), at: fix.at };   // 089b
             S.geoError = null;
             render();
         };
         // A FIX OLDER THAN 10 s IS NOT WHERE THE GOLFER IS (audit C3): the screen goes back to
         // "Finding you…" (and measures from the tee) until a fresh one arrives.
-        if (!staleTimer) staleTimer = setInterval(function () { if (dropStaleFix() && S) render(); }, 3000);
+        if (!staleTimer) staleTimer = setInterval(function () { var d = dropStaleFix(), h = missHeldGone(); if ((d || h) && S) render(); }, 3000);
         var onErr = function (err) {
             if (gen !== watchGen || !S) return;
             S.geoError = (err && (err.code === 1 || /denied|permission/i.test(String(err.message || '')))) ? 'denied'
@@ -2270,6 +2279,7 @@
     // The golfer when they are on or near the hole; the TEE when they are more
     // than 1,000 yards from the green or have no fix (gps-geo.measureOrigin).
     function origin(r) {
+        if (S && S.missHeldPt) return { from: 'me', pt: S.missHeldPt, held: true };   // 089b: only inside missPlan's plays-like
         if (!r) return fix ? { from: 'me', pt: fix.pt } : null;
         return G.measureOrigin(fix ? fix.pt : null, r.tee, r.mid);
     }
@@ -5142,7 +5152,10 @@
         var mine = !!(op && op.hole === S.hole && opPt && G.haversineMeters(opPt, o.pt) <= nearYd * G.M_PER_YD);
         var teeYd = M.TUNE.TEE_YD * G.M_PER_YD, atTee = function (p) { return !!(r.tee && p && G.haversineMeters(p, r.tee) <= teeYd); };
         var fromTee = o.from === 'tee' || atTee(o.pt) || (mine && atTee(opPt));
-        var pl = null; try { pl = playsTo(null); } catch (e) { pl = null; }
+        var pl = null;
+        // 089b: from the held fix (o.held), the plays-like is worked out from that spot too.
+        if (o.held) S.missHeldPt = o.pt;
+        try { pl = playsTo(null); } catch (e) { pl = null; } finally { S.missHeldPt = null; }
         var greenYd = pl && pl.exact > 0 ? pl.exact : G.haversineMeters(o.pt, r.mid) / G.M_PER_YD;
         var bag = bagNow(B), club = null;
         if (mine && op.club) club = op.club;
@@ -5171,12 +5184,27 @@
                 chips.push({ club: c, carry: cy, along: al, delta: al - aimYd });
             });
         }
-        // The tapped chip, while it still stands (this hole, this ball, still one of the chips); else the app's pick.
-        var app = club, sel = app;
-        if (pk && pk !== app && chips.some(function (x) { return x.club === pk; })) sel = pk;
+        // 089b: THE CHIPS ACROSS THE GREEN'S DEPTH - from the golfer's spot: the live fix, else the last fix under
+        // 60 s old (missSync), else (no fix: planning, Preview) the hole's mapped tee, labelled "from tee" (never the
+        // tee box picked at setup): front / middle / back from that spot (gps-geo holeNumbers, as the F / C / B numbers),
+        // each iron / wedge whose carry lands front..back today (centreAt, as the oval), plus the nearest one
+        // within 5 yds short of the front / long of the back; at most 4 (gps-miss-pattern depthChips). The default
+        // = the club closest to the target point. A green with no front / back: 089's pair above.
+        var def = club, depth = false;
+        if (!mine && chips.length && typeof M.depthChips === 'function') {
+            var hn = null; try { hn = G.holeNumbers(o.pt, r); } catch (e) { hn = null; }
+            var yd = function (m) { return m != null && isFinite(m) ? m / G.M_PER_YD : null; };
+            var dc = hn ? M.depthChips({ bag: bag, front: yd(hn.frontM), middle: yd(hn.middleM), back: yd(hn.backM), aimYd: aimYd, rawYd: rawYd, playsYd: plEx, app: club }) : null;
+            if (dc && dc.list.length) { chips = dc.list; def = dc.def; depth = true; }
+        }
+        // The tapped chip, while it still stands (this hole, this ball, still one of the chips); else the default
+        // (089: the app's pick; 089b: the depth chip closest to the target).
+        var app = club, sel = def;
+        if (pk && chips.some(function (x) { return x.club === pk; })) sel = pk;
         var selCarry = sel === app ? carry : bag[sel].yd;
-        if (chips.length) S.missChips = { app: app, sel: sel, list: chips, pt: o.pt.slice() };
-        return { club: sel, app: app, carry: selCarry, along: M.centreAt(selCarry, rawYd, plEx), aim: aim, aimYd: aimYd, hand: SL && SL.hand ? SL.hand(bagGolfer()) : 'R' };
+        if (chips.length) S.missChips = { app: app, def: def, sel: sel, depth: depth, from: o.from, held: !!o.held, list: chips, pt: o.pt.slice() };
+        var selSpot = null; if (depth) chips.forEach(function (x) { if (x.club === sel) selSpot = x.spot; });
+        return { club: sel, app: app, spot: selSpot, carry: selCarry, along: M.centreAt(selCarry, rawYd, plEx), aim: aim, aimYd: aimYd, hand: SL && SL.hand ? SL.hand(bagGolfer()) : 'R' };
     }
     // 089: THE TAPPED CHIP (memory only, this hole, this ball): { hole, club, pt }. Back to the app's pick on
     // the next hole, the next shot (Mark shot, or the golfer more than 40 yds from where he tapped).
@@ -5190,12 +5218,13 @@
     // The club the tapped chip puts on the plays-like pill (null: the pill keeps the app's pick).
     function missPillClub() {
         var c = S && S.missChips;
-        return c && S.missOval && c.sel !== c.app && S.missPick && S.missPick.club === c.sel ? c.sel : null;
+        // 089b: the shown chip's club (the tapped one, or the depth default when it is not the app's pick).
+        return c && S.missOval && c.sel !== c.app && ((S.missPick && S.missPick.club === c.sel) || (c.depth && c.sel === c.def)) ? c.sel : null;
     }
     function missChipTap(club) {
         var c = S && S.missChips;
         if (!c || !c.list.some(function (x) { return x.club === club; })) return;
-        S.missPick = club === c.app ? null : { hole: S.hole, club: club, pt: c.pt.slice() };
+        S.missPick = club === (c.def || c.app) ? null : { hole: S.hole, club: club, pt: c.pt.slice() };
         render();
     }
     // THE CHIPS ON THE MAP: stacked bottom-left, above Recenter (longer club on top), the shown one selected.
@@ -5206,19 +5235,26 @@
         if (!box) { box = document.createElement('div'); box.className = 'gps-miss-chips'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'My miss club'); row.insertBefore(box, row.firstChild); }
         var u = units() === 'm' ? 'm' : 'yd', B = bagApi();
         var list = c.list.slice().sort(function (a, b) { return b.carry - a.carry; });
-        var sig = list.map(function (x) { return x.club + ':' + M.chipText(clubShort(x.club), x.delta, u) + (x.club === c.sel ? '*' : ''); }).join('|');
+        // 089b: a depth chip reads "LW · front +5" / "SW · middle" / "GW · back −1" (089's pair: "7i +8 long").
+        var txtOf = function (x) { return c.depth && x.spot && typeof M.depthText === 'function' ? M.depthText(clubShort(x.club), x.spot, u) : M.chipText(clubShort(x.club), x.delta, u); };
+        var fromTee = c.from === 'tee';   // 089b: measured from the mapped tee (no fix) - said on the chips
+        var sig = (fromTee ? 'tee|' : '') + list.map(function (x) { return x.club + ':' + txtOf(x) + (x.club === c.sel ? '*' : ''); }).join('|');
         if (box.getAttribute('data-miss-chips') !== sig) {
             box.textContent = '';
+            if (fromTee) { var ft = document.createElement('div'); ft.className = 'gps-miss-chips-from'; ft.textContent = 'from tee'; box.appendChild(ft); }
             list.forEach(function (x) {
                 var b = document.createElement('button'); b.type = 'button'; b.className = 'gps-miss-chip' + (x.club === c.sel ? ' gps-miss-chip-on' : '');
                 b.setAttribute('data-miss-chip', x.club); b.setAttribute('aria-pressed', x.club === c.sel ? 'true' : 'false');
-                var t = M.chipText(clubShort(x.club), x.delta, u), sp = t.indexOf(' ');
+                var t = txtOf(x), sp = t.indexOf(' ');
                 var bb = document.createElement('b'); bb.textContent = t.slice(0, sp); b.appendChild(bb); b.appendChild(document.createTextNode(' ' + t.slice(sp + 1)));
-                b.setAttribute('aria-label', 'My miss with the ' + ((B && B.NAMES && B.NAMES[x.club]) || x.club) + ': ' + t.slice(sp + 1).replace('\u2212', 'minus ').replace('+', 'plus '));
+                b.setAttribute('aria-label', 'My miss with the ' + ((B && B.NAMES && B.NAMES[x.club]) || x.club) + ': ' + t.slice(sp + 1).replace(/^\u00b7 /, 'lands ').replace('\u2212', 'minus ').replace('+', 'plus '));
                 b.onclick = function (e) { if (e) e.stopPropagation(); missChipTap(x.club); };
                 box.appendChild(b);
             });
             box.setAttribute('data-miss-chips', sig);
+            // 089b: the chips changed (3-4 of them, "from tee"): the distance bubbles keep off the new column now,
+            // not on the next fix (with no fix there may be no next render).
+            try { placePills0(); } catch (e) {}
         }
         box.style.display = '';
     }
@@ -5243,6 +5279,11 @@
         var M = missApi();
         if (!M) { if (!S.missLoad) { S.missLoad = true; withShots(function () { if (S && missApi() && missApi().isOn(bagGolfer())) render(); }); } return; }
         if (!M.isOn(bagGolfer()) || !S.map || !S.styleReady) { missClear(); return; }
+        // 089b: no live fix (the 10 s rule dropped it) - the last fix while under 60 s old, for My miss only.
+        if (o && o.from === 'tee' && r && r.mid && missLastFix) {
+            var hp = M.heldFix ? M.heldFix(missLastFix, Date.now()) : null, ho = hp ? G.measureOrigin(hp, r.tee, r.mid) : null;
+            if (ho && ho.from === 'me') o = { from: 'me', pt: hp.slice(), held: true };
+        }
         var plan = missPlan(r, o), B = bagApi();
         var f = plan ? M.oval(plan.club, plan.carry, plan.hand, plan.along) : null;
         if (!f) { missClear(); return; }
@@ -5273,6 +5314,8 @@
         var lbl = 'My miss \u00b7 ' + nm;
         // 089: the note under it - "7-iron lands 8 yds long" (the centre vs the yards to the aim; none within 2 yds).
         var note = typeof M.landNote === 'function' && plan.aimYd != null ? M.landNote(nm, f.carry - plan.aimYd, f.cx || 0, units() === 'm' ? 'm' : 'yd') : '';
+        // 089b: a depth chip's note, one line, the target first: "Lob wedge: 17 yds short of the target · 5 yds onto the front".
+        if (plan.spot && plan.aimYd != null && typeof M.depthNote === 'function') note = M.depthNote(nm, f.carry - plan.aimYd, plan.spot, units() === 'm' ? 'm' : 'yd');
         S.missNote = note || null;
         var mk = marker('mymiss', ring[rI], function () { var e = document.createElement('div'); e.className = 'gps-miss-lbl'; e.style.pointerEvents = 'none'; return e; });
         if (mk) {
@@ -5280,7 +5323,18 @@
             if (me.textContent !== lbl + note) {
                 me.textContent = '';
                 var sp = document.createElement('span'); sp.appendChild(document.createTextNode(lbl));
-                if (note) { var sm = document.createElement('small'); sm.className = 'gps-miss-note'; sm.textContent = note; sp.appendChild(sm); }
+                if (note) {
+                    var sm = document.createElement('small'); sm.className = 'gps-miss-note';
+                    // 089b: the depth note in two parts (one line; broken at the " · " only when it has no room).
+                    var cut = plan.spot ? note.indexOf(' \u00b7 ') : -1;
+                    if (cut > 0) {
+                        var pa = document.createElement('span'); pa.className = 'gps-miss-note-a'; pa.textContent = note.slice(0, cut);
+                        var ps = document.createElement('span'); ps.className = 'gps-miss-note-sep'; ps.textContent = ' \u00b7 ';
+                        var pb = document.createElement('span'); pb.className = 'gps-miss-note-b'; pb.textContent = note.slice(cut + 3);
+                        sm.appendChild(pa); sm.appendChild(ps); sm.appendChild(pb);
+                    } else sm.textContent = note;
+                    sp.appendChild(sm);
+                }
                 me.appendChild(sp);
             }
             me.setAttribute('data-miss-club', club); me.setAttribute('data-miss-carry', String(Math.round(f.avg)));
@@ -5357,6 +5411,11 @@
             [cl(cx - sw / 2), cl(box.l), cl(box.r - sw), B.l, B.r - sw].forEach(function (l) { out.push({ how: 'below', l: l, t: below }, { how: 'above', l: l, t: above }); });
             out.push({ how: 'right', l: box.r + G, t: ct(cy - sh / 2) }, { how: 'left', l: box.l - G - sw, t: ct(cy - sh / 2) });
         });
+        // 089b: a sweep in 6 px steps up and down the clear map (left edge, centred, right edge), still only when every
+        // spot above is covered - so the note "Lob wedge: 17 yds short of the target · 5 yds onto the front" finds the
+        // gap between the green's "B" label and the top row on an SE.
+        for (var st = box.t - 8 - sh; st >= B.t; st -= 6) [B.l, cl(cx - sw / 2), B.r - sw].forEach(function (l) { out.push({ how: 'above', l: l, t: st }); });
+        for (var sb = box.b + 8; sb + sh <= B.b; sb += 6) [B.l, cl(cx - sw / 2), B.r - sw].forEach(function (l) { out.push({ how: 'below', l: l, t: sb }); });
         // No room outside the oval at all (a small phone, close in): the sides clamped onto the screen,
         // or just inside the oval's top / bottom edge.
         out.push({ how: 'above', l: cl(cx - sw / 2), t: ct(box.t - 6 - sh) }, { how: 'below', l: cl(cx - sw / 2), t: ct(box.b + 6) },
@@ -5390,7 +5449,15 @@
         // (a small phone, close in) the label goes back to one line when that covers less.
         var nt = sp.querySelector('.gps-miss-note');
         if (nt) nt.style.display = '';
+        if (nt) nt.classList.remove('gps-miss-note-wrap');
         choose();
+        // 089b: the depth note is one line; on a small phone with no clear spot for it, it breaks at the " · "
+        // (the target part, then where on the green) before the label gives the note up.
+        if (nt && best.cover >= 1 && nt.querySelector('.gps-miss-note-b')) {
+            var one = { sw: sw, sh: sh, spots: spots, best: best };
+            nt.classList.add('gps-miss-note-wrap'); choose();
+            if (!(best.cover < one.best.cover - 0.5)) { nt.classList.remove('gps-miss-note-wrap'); sw = one.sw; sh = one.sh; spots = one.spots; best = one.best; }
+        }
         if (nt && best.cover >= 1) {
             var keep = { sw: sw, sh: sh, spots: spots, best: best };
             nt.style.display = 'none'; choose();
@@ -7683,11 +7750,13 @@
         + '#gps-overlay .gps-ts-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;border-bottom:1px solid rgba(255,255,255,.1);font:700 17px/1.25 ' + FONT + ';}'
         // URGENT-052 B: the My miss label (text only, never a button).
         + '#gps-overlay .gps-miss-lbl{width:0;height:0;overflow:visible;}#gps-overlay .gps-miss-lbl span{position:absolute;left:8px;top:-10px;padding:2px 7px;border-radius:8px;background:rgba(11,15,12,.82);color:#7dd3fc;font:800 11.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;}'
-        + '#gps-overlay .gps-miss-lbl small{display:block;font-weight:600;font-size:10.5px;color:#cbd5e1;}#gps-overlay .gps-miss-lbl.gps-miss-lbl-l span{left:auto;right:8px;}'
+        + '#gps-overlay .gps-miss-lbl small{display:block;font-weight:600;font-size:10.5px;color:#cbd5e1;}#gps-overlay .gps-miss-lbl small span{position:static;padding:0;background:none;border-radius:0;color:inherit;font:inherit;}#gps-overlay .gps-miss-note-wrap .gps-miss-note-sep{display:none;}#gps-overlay .gps-miss-note-wrap .gps-miss-note-b{display:block;}#gps-overlay .gps-miss-lbl.gps-miss-lbl-l span{left:auto;right:8px;}'
         // 089: the My miss club chips (stacked above Recenter, 16 px from the edge; 40 px tall) and the faded target ring.
         + '#gps-overlay .gps-miss-chips{position:absolute;left:8px;bottom:calc(100% + 10px);display:flex;flex-direction:column;align-items:flex-start;gap:8px;pointer-events:none;}'
         + '#gps-overlay .gps-miss-chip{pointer-events:auto;height:40px;box-sizing:border-box;padding:0 14px;border-radius:20px;border:2px solid rgba(125,211,252,.55);background:rgba(11,15,12,.82);color:#e2e8f0;font:700 15px/1 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;cursor:pointer;}'
         + '#gps-overlay .gps-miss-chip b{font-weight:800;color:#fff;margin-right:2px;}'
+        + '@media (max-width:399px){#gps-overlay .gps-miss-chip{padding:0 10px;font-size:14px;}}'   // 089b: an SE - narrower chips, the distance bubble keeps its line clear
+        + '#gps-overlay .gps-miss-chips-from{pointer-events:none;padding:2px 8px;border-radius:8px;background:rgba(11,15,12,.82);color:#cbd5e1;font:700 11.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;}'
         + '#gps-overlay .gps-miss-chip.gps-miss-chip-on{background:#0e7490;border-color:#7dd3fc;color:#fff;}'
         + '#gps-overlay.gps-sun .gps-miss-chip{background:#000 !important;border-color:#fff !important;color:#fff !important;}#gps-overlay.gps-sun .gps-miss-chip.gps-miss-chip-on{background:#0e7490 !important;}'
         + '.gps-target.gps-target-mymiss .gps-ring,.gps-target.gps-target-mymiss .gps-ring-in,.gps-target.gps-target-mymiss .gps-ring-line{opacity:.4;}.gps-target.gps-target-mymiss .gps-ring-dot{opacity:.85;}'
@@ -8613,6 +8682,7 @@
         stopReplayTimer();
         if (S && S.lcRo) { try { S.lcRo.disconnect(); } catch (e) {} S.lcRo = null; }
         fix = null;
+        missLastFix = null;   // 089b
         watchLast = null;   // a new round sends its first hole again
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);
@@ -8761,6 +8831,9 @@
         // URGENT-052 B (checks): the map's own layer / source ids, and the My miss oval's box on screen.
         mapLayers: function () { try { var st = S && S.map && S.map.getStyle(); return st ? { layers: st.layers.map(function (l) { return l.id; }), sources: Object.keys(st.sources || {}) } : null; } catch (e) { return null; } },
         // 063 (checks): the oval drawn now (club, carry, half width a, half depth b, tilt, hand) and why not.
+        // 089b (checks): age My miss's held fix by ms (the 60 s rule without a 60 s wait); then render.
+        appOrigin: function () { try { dropStaleFix(); var o = origin(resolved()); return o ? o.from : null; } catch (e) { return null; } },   // 089b (checks): the app's own origin (10 s rule)
+        missFixAge: function (ms) { if (missLastFix) missLastFix.at -= Number(ms) || 0; if (missHeldGone() || S) render(); return missLastFix ? Date.now() - missLastFix.at : null; },
         missNow: function () {
             if (!S) return null;
             var scr = null;
@@ -8773,7 +8846,7 @@
                 }
             } catch (e) {}
             // 089: the club chips ({ app, sel, list: [{ club, carry, along, delta }] }), the tapped one and the note.
-            return { oval: S.missOval || null, why: S.missWhy || null, screen: scr, chips: S.missOval && S.missChips ? { app: S.missChips.app, sel: S.missChips.sel, list: S.missChips.list } : null,
+            return { oval: S.missOval || null, why: S.missWhy || null, screen: scr, chips: S.missOval && S.missChips ? { app: S.missChips.app, def: S.missChips.def || S.missChips.app, sel: S.missChips.sel, depth: !!S.missChips.depth, from: S.missChips.from || null, held: !!S.missChips.held, list: S.missChips.list } : null,
                 pick: S.missPick ? S.missPick.club : null, note: S.missNote || '', ringFaded: !!(S.targetMarker && S.targetMarker.getElement().classList.contains('gps-target-mymiss')) };
         },
         // int-061 (checks): the My miss label's box on screen and anything it touches (rail, bubbles, "20 yd", pill, labels).
@@ -8807,7 +8880,7 @@
                     if (Math.min(b.right, q.right) - Math.max(b.left, q.left) > 0.5 && Math.min(b.bottom, q.bottom) - Math.max(b.top, q.top) > 0.5) hits.push(String(e.className).split(' ').slice(0, 2).join('.'));
                 });
                 var o = missRect(), onOval = !!(o && Math.min(L.r, o.r) - Math.max(L.l, o.l) > 0.5 && Math.min(L.b, o.b) - Math.max(L.t, o.t) > 0.5);
-                return { at: m.getElement().getAttribute('data-miss-at'), box: { l: Math.round(L.l), t: Math.round(L.t), r: Math.round(L.r), b: Math.round(L.b) }, hits: hits, onOval: onOval, w: Math.round(wr.width), text: sp.firstChild ? sp.firstChild.textContent : sp.textContent, note: (sp.querySelector('.gps-miss-note') || {}).textContent || '', noteShown: !!(sp.querySelector('.gps-miss-note') && sp.querySelector('.gps-miss-note').style.display !== 'none'), placed: S.missLbl || null };
+                return { at: m.getElement().getAttribute('data-miss-at'), box: { l: Math.round(L.l), t: Math.round(L.t), r: Math.round(L.r), b: Math.round(L.b) }, hits: hits, onOval: onOval, w: Math.round(wr.width), text: sp.firstChild ? sp.firstChild.textContent : sp.textContent, note: (sp.querySelector('.gps-miss-note') || {}).textContent || '', noteShown: !!(sp.querySelector('.gps-miss-note') && sp.querySelector('.gps-miss-note').style.display !== 'none'), noteWrap: !!sp.querySelector('.gps-miss-note.gps-miss-note-wrap'), placed: S.missLbl || null };
             } catch (e) { return { err: String(e && e.message || e) }; }
         },
         missRect: function () { try { var r = missRect(); return r ? { l: Math.round(r.l), t: Math.round(r.t), r: Math.round(r.r), b: Math.round(r.b) } : null; } catch (e) { return null; } },

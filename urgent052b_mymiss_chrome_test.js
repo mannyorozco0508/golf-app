@@ -128,7 +128,7 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             assert.deepEqual(onL.sources.filter((s) => s !== 'mymiss').sort(), baseApp.sources.slice().sort());
             assert.match(await label(), /^My miss · [5-9]-iron$/, '063: labelled with the club only (no "default shape")');
             assert.equal(await mapButtons(), baseAppBtns, 'no new button on the map (besides 089\'s club chips)');
-            assert.ok(await missChipBtns() <= 2, '089: at most two club chips');
+            assert.ok(await missChipBtns() <= 4, '089b: at most four club chips (089: two)');
             // 3 - the plays-like pill never covers the oval.
             const geo = JSON.parse(await ev("JSON.stringify({ o: HardPanGps.missRect(), p: (function(){ var p = document.querySelector('#gps-overlay .gps-ld-plays'), w = document.querySelector('#gps-overlay .gps-map-wrap'); if (!p || p.offsetParent === null) return null; var a = p.getBoundingClientRect(), b = w.getBoundingClientRect(); return { l: a.left - b.left, t: a.top - b.top, r: a.right - b.left, b: a.bottom - b.top }; })(), h: innerHeight })"));
             assert.ok(geo.o, 'the oval is on the map');
