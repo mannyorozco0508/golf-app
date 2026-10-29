@@ -247,6 +247,8 @@
         .board-table tr[data-player-id] td.player-name::after { content: '\25BE'; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.7em; }
         .board-table tr[data-player-id]:has(+ tr.board-card-row) td.player-name::after { content: '\25B4'; }
         .board-card-row td { padding: 4px 0 10px 0; background: var(--nav-bg); }
+        /* 100b: "Start a game with Jim" - its own row right after the open card, dressed like it. */
+        .lb-game-row td { padding: 0 0 10px 0; background: var(--nav-bg); }
         /* v212: the full handicap form above the expanded card's scorecard. */
         .board-card-hcp { font-size: 0.78rem; color: var(--text-muted); padding: 2px 8px 6px 8px; }
         .sc-stack { display: flex; flex-direction: column; gap: 6px; }
@@ -1429,7 +1431,7 @@ ${ind.slice(4)}</tr>`;
         // spectator) - its OWN row right after the card, so the card cell stays scorecard-rows.js's layout.
         const gameBtn = (typeof lbGameWithHtml === 'function') ? lbGameWithHtml(player) : '';
         return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${hcpLine}${card}</td></tr>`
-            + (gameBtn ? `<tr class="board-card-row lb-game-row" data-game-for="${escapeHtml(key)}"><td colspan="5">${gameBtn}</td></tr>` : '');
+            + (gameBtn ? `<tr class="lb-game-row" data-game-for="${escapeHtml(key)}"><td colspan="5">${gameBtn}</td></tr>` : '');
     }
     // ONE delegated listener: a tap ANYWHERE ON THE ROW toggles that golfer's card
     // (v201 - it used to need the name cell, so a tap on the score, the to-par or
@@ -1445,6 +1447,7 @@ ${ind.slice(4)}</tr>`;
             while (el && el !== mount) {
                 if (el.tagName === 'TR') {
                     if (/\bboard-card-row\b/.test(el.className || '')) return;   // inside the open card
+                    if (/\blb-game-row\b/.test(el.className || '')) return;   // 100b: the "Start a game with" row under it
                     const id = el.getAttribute && el.getAttribute('data-player-id');
                     if (id) toggleBoardCard(id);
                     return;

@@ -100,7 +100,7 @@ test('093: nothing stored, nothing sent; no money code touched', { skip }, () =>
 
 test('093 + 094 spec item 4: no label under a button, the pill or another label (nudge, else hide)', { skip }, () => {
     const cc = fnBody('clearCarryLbls');
-    assert.match(cc, /\.gps-miss-chips > \*, \.gps-leftrow > \*, \.gps-ld-plays, \.gps-zoom, \.gps-ld-top, \.gps-ld-bottom/, 'carry labels keep off the pill, the "from tee" tag, Recenter, the Plays-like pill, zoom, the bars');
+    assert.match(cc, /\.gps-miss-chips > \*, \.gps-leftrow > \*, \.gps-ld-plays, \.gps-game-pill, \.gps-zoom, \.gps-ld-top, \.gps-ld-bottom/, 'carry labels keep off the pill, the "from tee" tag, Recenter, the Plays-like pill, zoom, the bars');
     assert.match(cc, /data-carry-hidden/, 'nowhere clear: hidden (lowest priority first)');
     const gl = fnBody('placeGreenLabels');
     assert.match(gl, /rc9\('\.gps-leftrow > \*, \.gps-miss-chips > \*', left9\)/);
