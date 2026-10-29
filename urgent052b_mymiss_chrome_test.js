@@ -72,8 +72,10 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
         const until = async (x, ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await ev(x)) return true; await sleep(250); } return false; };
         const shot = async (n) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await sleep(1200); await j.shot(path.join(SHOTS, 'chrome-' + vp.width + 'x' + vp.height + '-' + n + '.png')); } };
         const layers = () => ev('JSON.stringify(HardPanGps.mapLayers())').then(JSON.parse);
-        const mapButtons = () => ev("Array.prototype.filter.call(document.querySelectorAll('#gps-overlay button'), function (b) { return b.offsetParent !== null && !b.closest('.gps-tsheet,.gps-bag,.gps-shist,.gps-tools-menu,.gps-bagask,.gps-elevnote'); }).length");   // 070: the one-time elevation note's OK (12 s, once per golfer) is not a map button
-        const label = () => ev("(function(){ var e = document.querySelector('#gps-overlay .gps-miss-lbl'); return e ? e.textContent : null; })()");
+        const mapButtons = () => ev("Array.prototype.filter.call(document.querySelectorAll('#gps-overlay button'), function (b) { return b.offsetParent !== null && !b.closest('.gps-tsheet,.gps-bag,.gps-shist,.gps-tools-menu,.gps-bagask,.gps-elevnote,.gps-miss-chips'); }).length");   // 070: the one-time elevation note's OK (12 s, once per golfer) is not a map button; 089: My miss's club chips (Manny's add) are counted on their own (missChipBtns)
+        const missChipBtns = () => ev("Array.prototype.filter.call(document.querySelectorAll('#gps-overlay .gps-miss-chips button'), function (b) { return b.offsetParent !== null; }).length");
+        // 089: the label's first line (the second line is the "7-iron lands 8 yds long" note).
+        const label = () => ev("(function(){ var e = document.querySelector('#gps-overlay .gps-miss-lbl'); var t = e && e.firstChild && e.firstChild.firstChild; return e ? (t && t.nodeType === 3 ? t.textContent : e.textContent) : null; })()");
         const sw = () => ev("(function(){ var b = document.querySelector('#gps-overlay [data-ts-sw=mymiss]'); return b ? b.getAttribute('aria-checked') : null; })()");
         const open = async () => {
             await j.goto(fileUrl('index.html', 'game=' + CODE + '&group=1'), 5000);
@@ -125,7 +127,8 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             assert.deepEqual(onL.layers.filter((l) => /^mymiss-/.test(l)), ['mymiss-fill', 'mymiss-line']);
             assert.deepEqual(onL.sources.filter((s) => s !== 'mymiss').sort(), baseApp.sources.slice().sort());
             assert.match(await label(), /^My miss · [5-9]-iron$/, '063: labelled with the club only (no "default shape")');
-            assert.equal(await mapButtons(), baseAppBtns, 'no new button on the map');
+            assert.equal(await mapButtons(), baseAppBtns, 'no new button on the map (besides 089\'s club chips)');
+            assert.ok(await missChipBtns() <= 4, '089b: at most four club chips (089: two)');
             // 3 - the plays-like pill never covers the oval.
             const geo = JSON.parse(await ev("JSON.stringify({ o: HardPanGps.missRect(), p: (function(){ var p = document.querySelector('#gps-overlay .gps-ld-plays'), w = document.querySelector('#gps-overlay .gps-map-wrap'); if (!p || p.offsetParent === null) return null; var a = p.getBoundingClientRect(), b = w.getBoundingClientRect(); return { l: a.left - b.left, t: a.top - b.top, r: a.right - b.left, b: a.bottom - b.top }; })(), h: innerHeight })"));
             assert.ok(geo.o, 'the oval is on the map');

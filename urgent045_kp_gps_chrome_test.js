@@ -56,7 +56,10 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }]) {
             const s1 = JSON.parse(await ev("(function(){ var b = document.querySelector('#gps-overlay .gps-markd-btn'), ms = document.querySelector('#gps-overlay .gps-mark-shot'), rb = b.getBoundingClientRect(), rm = ms ? ms.getBoundingClientRect() : null; return JSON.stringify({ text: b.textContent, row: rm ? Math.abs(rb.top - rm.top) < 4 : null, inBottom: !!b.closest('.gps-ld-bottom'), w: innerWidth, sw: document.documentElement.scrollWidth, btnTop: rb.top, btnBottom: rb.bottom, h: innerHeight }); })()"));
             assert.equal(s1.text, '⛳ Mark my KP');
             assert.equal(s1.inBottom, true, 'in the bottom row (layout D)');
-            if (s1.row !== null) assert.equal(s1.row, true, 'beside Mark shot, one row');
+            // 091 (Manny's OK: the full-width Mark shot bar is gone - Mark is a button in the Card row): the KP button is
+            // its own full-width row just above that row (was: beside the Mark shot bar, one row).
+            const s1b = JSON.parse(await ev("(function(){ var b = document.querySelector('#gps-overlay .gps-markd-btn').getBoundingClientRect(), row = document.querySelector('#gps-overlay .gps-ld-bottom > .gps-bottom').getBoundingClientRect(), box = document.querySelector('#gps-overlay .gps-markd'); return JSON.stringify({ above: b.bottom <= row.top + 1, solo: box.classList.contains('solo'), markInRow: !!document.querySelector('#gps-overlay .gps-ld-bottom .gps-bottom .gps-mark-shot') }); })()"));
+            assert.deepEqual(s1b, { above: true, solo: true, markInRow: true }, 'its own row above Card | Enter score | Mark');
             assert.ok(s1.btnBottom <= s1.h, 'on screen');
             assert.ok(s1.sw <= s1.w, 'no sideways scroll');
             await shot('1-kp-hole-button');

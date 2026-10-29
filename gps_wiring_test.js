@@ -447,7 +447,7 @@ test('build 7: F / B follow the golfer\'s live angle - 100 yds right of the gree
     // The screen asks with the LIVE origin on every fix (render on each position).
     const v = read('gps-view.js');
     assert.ok(/var nums = r \? G\.holeNumbers\(o \? o\.pt : null, r\) : null;\s*marker\('front', nums && nums\.front/.test(v), 'the F / B markers come from the live origin');
-    assert.ok(/fix = \{ pt: \[pos\.coords\.latitude, pos\.coords\.longitude\], acc: pos\.coords\.accuracy, at: Date\.now\(\) \};\s*S\.geoError = null;\s*render\(\);/.test(v), 'every fix redraws them');
+    assert.ok(/fix = \{ pt: \[pos\.coords\.latitude, pos\.coords\.longitude\], acc: pos\.coords\.accuracy, at: Date\.now\(\) \};\s*(?:missLastFix = \{ pt: fix\.pt\.slice\(\), at: fix\.at \};\s*\/\/ 089b\s*)?S\.geoError = null;\s*render\(\);/.test(v), 'every fix redraws them');
 });
 
 test('GPS badge on online course search results: bundled greens and course_gps first, never Overpass per result', { skip }, async () => {

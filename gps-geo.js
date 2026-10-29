@@ -1273,6 +1273,37 @@
         if (!from || !mid || haversineMeters(from, mid) < 1) return null;
         return bearingDeg(from, mid);
     }
+    // 094 (Manny, Oct 28: par-3 Green view, the arcs / the turn / "Green NN deep · NN wide" followed the dragged
+    // target): WHERE THE GREEN VIEW'S LINE STARTS - the golfer (me: on the hole, a live fix) else the TEE. Never the
+    // target ring: dragging it changes only the target dot, its numbers, plays-like, the club pick and the miss note.
+    // The target only on a hole with no tee at all (as before there). Pure.
+    function approachFrom(me, tee, target) {
+        return pinPt(me) || pinPt(tee) || pinPt(target) || null;
+    }
+    // 094: THE GREEN'S DEPTH (along the line of play, axisDeg) and WIDTH (across it), measured on its outline (or
+    // front / back with no outline), plus the span the view must hold (extra: hazard points that only widen the
+    // view). Was gps-view greenShape's own math - unchanged, moved here so it is tested pure. r: a resolved hole.
+    function greenSize(r, axisDeg, extra) {
+        if (!r || !r.mid || typeof axisDeg !== 'number' || !isFinite(axisDeg)) return null;
+        var axis = axisDeg;
+        var outline = !!(r.green && r.green.length >= 3 && r.useGreenForEdges);
+        var pts = (outline ? r.green : [r.front, r.mid, r.back].filter(Boolean)).concat(extra || []);
+        var al = [], ac = [];
+        pts.forEach(function (p) {
+            var d = haversineMeters(r.mid, p);
+            var t = d ? (bearingDeg(r.mid, p) - axis) * Math.PI / 180 : 0;
+            al.push(d * Math.cos(t)); ac.push(d * Math.sin(t));
+        });
+        var a0 = Math.min.apply(null, al), a1 = Math.max.apply(null, al), c0 = Math.min.apply(null, ac), c1 = Math.max.apply(null, ac);
+        var gal = al.slice(0, al.length - (extra || []).length), gac = ac.slice(0, ac.length - (extra || []).length);
+        var depthM = (outline || (r.front && r.back)) ? Math.max.apply(null, gal) - Math.min.apply(null, gal) : null;
+        var widthM = outline ? Math.max.apply(null, gac) - Math.min.apply(null, gac) : null;
+        return {
+            axis: axis, depthM: depthM, widthM: widthM,
+            spanA: Math.max(a1 - a0, 25), spanC: Math.max(c1 - c0, 25),
+            center: destination(destination(r.mid, axis, (a0 + a1) / 2), axis + 90, (c0 + c1) / 2)
+        };
+    }
     // CARRY / CLEAR on the approach (022): the hazards NEAR THE LINE from `me` to the green, ahead of
     // them and not past the green: "carry bunker 142" (a bunker's far edge), "clear water 155" (the
     // water's far edge); one point = that point. A hazard off the line (more than offM, default 35 m,
@@ -2406,7 +2437,7 @@
         defaultTarget: defaultTarget, pointAlongHole: pointAlongHole, snapToFairway: snapToFairway, lengthAlong: lengthAlong, simplifyLine: simplifyLine,
         DEFAULT_SHOT_YD: DEFAULT_SHOT_YD, MIN_LEFT_YD: MIN_LEFT_YD, GREEN_REACH_YD: GREEN_REACH_YD,
         courseHolesQuery: courseHolesQuery, cleanLookupHoles: cleanLookupHoles, pickHoleSet: pickHoleSet, applyHoleSet: applyHoleSet,
-        approachAxis: approachAxis, approachCarries: approachCarries, approachLine: approachLine, APPROACH_OFF_M: APPROACH_OFF_M,
+        approachAxis: approachAxis, approachFrom: approachFrom, greenSize: greenSize, approachCarries: approachCarries, approachLine: approachLine, APPROACH_OFF_M: APPROACH_OFF_M,
         golfapiMatch: golfapiMatch, golfapiRecord: golfapiRecord, golfapiNines: golfapiNines, ellipseRing: ellipseRing,
         osmPathCourse: osmPathCourse, osmPathLine: osmPathLine, osmPathLines: osmPathLines, osmPathFairway: osmPathFairway,
         teeShot: teeShot, hasPathData: hasPathData, savedLine: savedLine, SAVED_LINE_MAX_PTS: SAVED_LINE_MAX_PTS, OSM_PATH_M: OSM_PATH_M,

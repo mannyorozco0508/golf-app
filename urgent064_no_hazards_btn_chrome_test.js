@@ -82,6 +82,9 @@ for (const vp of [{ width: 393, height: 852 }, { width: 375, height: 667 }, { wi
         const carry = () => ev("document.querySelector('#gps-overlay .gps-map').getAttribute('data-carry-arcs')");
         const tapTee = async (yd) => {
             const p = G.destination(TEE, 270, (yd || 0) * YDM);
+            // 091 (Manny's OK): a hole opens on the 2x view (the tee shot's target), so the tee is off screen - the
+            // magnifier's full-hole step first (2x -> 4x -> full hole), as a golfer would, then the tap on the tee.
+            await ev("(function(){ for (var i = 0; i < 3 && HardPanGps.zoomNow && HardPanGps.zoomNow() && HardPanGps.zoomNow().x !== 1; i++) document.querySelector('#gps-overlay .gps-zoom').click(); return 1; })()"); await sleep(400);
             const pt = JSON.parse(await ev("(function(){ var m = window.__maps[window.__maps.length - 1], q = m.project([" + p[1] + "," + p[0] + "]), r = m.getContainer().getBoundingClientRect(); return JSON.stringify({ x: Math.round(r.left + q.x), y: Math.round(r.top + q.y) }); })()"));
             for (const type of ['mousePressed', 'mouseReleased']) await j.cdp('Input.dispatchMouseEvent', { type, x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
             await sleep(600);

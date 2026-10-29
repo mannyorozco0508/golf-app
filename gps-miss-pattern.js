@@ -46,7 +46,21 @@
         GREEN_AIM_YD: 30,     // a target ring within 30 yds of the green's center is aiming at the green
         PLAYS_CENTER: true,   // true: the centre sits where that carry lands TODAY (the carry x yards / plays-like,
                               // as the Distance arcs do); false: at the plain carry. The size is always from the carry.
-        TEE_YD: 40            // within 40 yds of the tee = the tee shot (as the tee plan's TEE_SHOT_YD)
+        TEE_YD: 40,           // within 40 yds of the tee = the tee shot (as the tee plan's TEE_SHOT_YD)
+        // 089 (Manny, Oct 27): the note "7-iron lands 8 yds long" and the club chips' "+8 long" say nothing
+        // ("on target" on a chip) within this many yards of the aim; the stepped fade's 6 stacked ovals.
+        NOTE_MIN_YD: 2,
+        FADE: [1, 0.86, 0.72, 0.58, 0.44, 0.30],
+        // 089b (Manny, Oct 27): the club chips cover the WHOLE green depth - every iron / wedge whose carry lands
+        // between the front and the back (from the golfer's live spot), plus the nearest club short of the front
+        // and long of the back when within EDGE_YD of that edge; at most MAX_CHIPS; "middle" with no number
+        // within MIDDLE_YD of the middle.
+        EDGE_YD: 5,
+        MAX_CHIPS: 4,
+        MIDDLE_YD: 3,
+        // 089b (Manny, Oct 27): My miss's chips / oval / note keep the LAST fix while it is under 60 s old (no
+        // flicker with the phone in a pocket). Nothing else changes: the app's own 10 s rule stays everywhere else.
+        HOLD_FIX_MS: 60000
     };
     // Irons and wedges only (My bag's club keys).
     var CLUBS = ['4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
@@ -61,8 +75,10 @@
     // centre, yards along the line), avg (My bag's carry), cx, a (half width), b (half depth),
     // tilt } - or null (not an iron / wedge, no carry). along: where the centre sits (centreAt),
     // else the carry. The size always comes from My bag's carry.
-    function oval(club, carry, hand, along) {
-        if (!isClub(club) || !isNum(carry) || !(carry > 0)) return null;
+    // 095: any (optional) - the par-3 club switcher steps through EVERY club in My bag, so its oval may be a
+    // hybrid / wood / driver too (the same size rule from the carry). Without it: irons and wedges only, as before.
+    function oval(club, carry, hand, along, any) {
+        if ((!isClub(club) && !(any && club)) || !isNum(carry) || !(carry > 0)) return null;
         var h = hand === 'L' ? 'L' : 'R';
         return { club: club, hand: h, carry: isNum(along) && along > 0 ? along : carry, avg: carry, cx: 0,
             a: Math.max(MIN_SEMI, TUNE.WIDTH_PCT * carry), b: Math.max(MIN_SEMI, TUNE.DEPTH_PCT * carry),
@@ -163,7 +179,8 @@
             + 'It is centred on that carry along your line to the target' + (TUNE.PLAYS_CENTER ? ' (where it lands today, with the plays-like wind, slope and temperature)' : '') + ': ' + pc(TUNE.DEPTH_PCT) + '% of the carry long and short, '
             + pc(TUNE.WIDTH_PCT) + '% of the carry left and right, tilted ' + TUNE.TILT_DEG + '° so your right side sits short and your left side sits long (mirrored if you play left-handed). '
             + 'A 178 7-iron: ±' + (Math.round(ex.b * 10) / 10) + ' deep, ±' + (Math.round(ex.a * 10) / 10) + ' wide. '
-            + 'It shows only on an approach into the green, or a par-3 tee shot, with a 4-iron to a lob wedge - never from the tee on a par 4 or 5, never for driver, woods or hybrids, and not when the green is out of the club’s range.';
+            + 'It shows only on an approach into the green, or a par-3 tee shot - never from the tee on a par 4 or 5. '
+            + 'It always shows there, with every club in My bag: it starts on the club closest to the plays-like number (a club with no number of its own uses a typical carry), and when nothing reaches, on your longest club with how far short of the front it lands.';
     }
 
     // THE OVAL'S OUTLINE, in yards: [[side, along]] - side + right of the aim line, along =
@@ -199,7 +216,222 @@
         try { W.localStorage.setItem(KEY, JSON.stringify(o)); return true; } catch (e) { return false; }
     }
 
+    // ---- 089: THE NOTE AND THE CLUB CHIPS (pure) ------------------------------------------
+    // THE TWO CLUBS AROUND THE PLAYS-LIKE: the app's pick (My bag's suggestClub - the shortest club that
+    // gets there) and the next club down (the longest carry under the pick's). bag: { club: { yd } }.
+    // Returns [pick] or [pick, down] (club keys; the caller keeps only those My miss would draw), [] with no pick.
+    function chipPair(bag, pick) {
+        if (!pick) return [];
+        var pv = bag && bag[pick], py = pv && isNum(pv.yd) && pv.yd > 0 ? pv.yd : null;
+        if (py == null) return [pick];
+        var down = null;
+        Object.keys(bag).forEach(function (c) {
+            var v = bag[c];
+            if (c !== pick && v && isNum(v.yd) && v.yd > 0 && v.yd < py && (!down || v.yd > bag[down].yd)) down = c;
+        });
+        return down ? [pick, down] : [pick];
+    }
+    function nearAim(d) { return !isNum(d) || Math.abs(d) <= TUNE.NOTE_MIN_YD; }
+    function shown(d, unit) { return Math.round(Math.abs(d) * (unit === 'm' ? 0.9144 : 1)); }
+    // A CHIP: "7i +8 long" / "8i \u22124 short" / "7i on target" (delta: the oval centre minus the yards to
+    // the aim, + = long).
+    function chipText(short, delta, unit) {
+        var n = shown(delta, unit);
+        return String(short) + ' ' + (nearAim(delta) || n < 1 ? 'on target' : (delta > 0 ? '+' + n + ' long' : '\u2212' + n + ' short'));
+    }
+    // THE NOTE under the My miss label: "7-iron lands 8 yds long" (and "... and 3 yds right" when the
+    // centre sits off the line - side + = right). '' within NOTE_MIN_YD both ways.
+    function landNote(name, delta, side, unit) {
+        var u = unit === 'm' ? ' m' : ' yds', parts = [];
+        if (!nearAim(delta) && shown(delta, unit) >= 1) parts.push(shown(delta, unit) + u + (delta > 0 ? ' long' : ' short'));
+        if (!nearAim(side) && shown(side, unit) >= 1) parts.push(shown(side, unit) + u + (side > 0 ? ' right' : ' left'));
+        return parts.length ? String(name) + ' lands ' + parts.join(' and ') : '';
+    }
+    // THE STEPPED FADE: the oval at each TUNE.FADE size (same centre, tilt, hand) - largest first.
+    function fadeOvals(f) {
+        if (!f) return [];
+        return TUNE.FADE.map(function (k) { var g = {}; Object.keys(f).forEach(function (x) { g[x] = f[x]; }); g.a = Math.max(0.5, f.a * k); g.b = Math.max(0.5, f.b * k); return g; });
+    }
+
+    // ---- 089b: THE CLUB CHIPS ACROSS THE GREEN'S DEPTH (pure) --------------------------------
+    // WHERE A CLUB LANDS on the green: the nearest of front / middle / back, and how far past it (+) or
+    // short of it (-). Short of the front: 'front' with a minus; past the back: 'back' with a plus.
+    // { zone: 'front' | 'middle' | 'back', off } (yards).
+    function landSpot(along, f, m, b) {
+        if (!isNum(along) || !isNum(f) || !isNum(b)) return null;
+        if (along < f) return { zone: 'front', off: along - f };
+        if (along > b) return { zone: 'back', off: along - b };
+        var mid = isNum(m) ? m : (f + b) / 2, c = [['front', along - f], ['middle', along - mid], ['back', along - b]];
+        c.sort(function (x, y) { return Math.abs(x[1]) - Math.abs(y[1]); });
+        return { zone: c[0][0], off: c[0][1] };
+    }
+    // A DEPTH CHIP: "LW · front +5", "SW · middle", "GW · back −1" (metres with unit 'm'). "middle" says no
+    // number within TUNE.MIDDLE_YD; front / back always do (none at 0).
+    function depthText(short, spot, unit) {
+        if (!spot) return String(short);
+        var n = shown(spot.off, unit), quiet = n < 1 || (spot.zone === 'middle' && n <= TUNE.MIDDLE_YD);
+        return String(short) + ' · ' + spot.zone + (quiet ? '' : ' ' + (spot.off > 0 ? '+' : '−') + n);
+    }
+    // THE CHIPS FOR THE GREEN'S DEPTH. q: { bag ({ club: { yd } }), front, middle, back (yards on the ground
+    // from the golfer's LIVE spot), aimYd (to the target point; else the middle), rawYd + playsYd (the yards
+    // and the plays-like to the aim - where each carry lands today, as the oval's centre: centreAt), app (the
+    // app's pick, wins a tie), edgeYd, max }.
+    // Irons and wedges only. Every club landing front..back; plus the nearest one short of the front and the
+    // nearest one long of the back, each within edgeYd of that edge.
+    // MORE THAN max: (1) the club closest to the target; (2) the shortest and the longest landing ON the green
+    // (so the chips span the depth); (3) the other on-green clubs, closest to the target first; (4) the edge
+    // clubs off the green, the one nearer its edge first (a tie: the short one).
+    // Returns null (no front / back: the caller keeps 089's pair) or { list: [{ club, carry, along, delta,
+    // spot, on }] longest first, def (the club closest to the target) }.
+    function depthChips(q) {
+        q = q || {};
+        var f = q.front, b = q.back, bag = q.bag || {};
+        if (!isNum(f) || !isNum(b) || !(b > f)) return null;
+        var m = isNum(q.middle) ? q.middle : (f + b) / 2, aim = isNum(q.aimYd) ? q.aimYd : m;
+        var edge = isNum(q.edgeYd) ? q.edgeYd : TUNE.EDGE_YD, max = isNum(q.max) && q.max > 0 ? q.max : TUNE.MAX_CHIPS;
+        var all = [];
+        CLUBS.forEach(function (c) {
+            var v = bag[c], cy = v && isNum(v.yd) && v.yd > 0 ? v.yd : null;
+            if (cy == null) return;
+            if (all.some(function (x) { return x.carry === cy; })) return;   // two clubs at one number: the first (longer) one
+            var al = centreAt(cy, q.rawYd, q.playsYd);
+            all.push({ club: c, carry: cy, along: al, delta: al - aim, spot: landSpot(al, f, m, b), on: al >= f && al <= b });
+        });
+        var on = all.filter(function (x) { return x.on; });
+        var shortOne = null, longOne = null;
+        all.forEach(function (x) {
+            if (x.along < f && f - x.along <= edge && (!shortOne || x.along > shortOne.along)) shortOne = x;
+            if (x.along > b && x.along - b <= edge && (!longOne || x.along < longOne.along)) longOne = x;
+        });
+        var cand = on.concat([shortOne, longOne].filter(Boolean));
+        if (!cand.length) return { list: [], def: null };
+        var near = function (x, y) { var d = Math.abs(x.delta) - Math.abs(y.delta); if (Math.abs(d) > 1e-9) return d; if (x.club === q.app) return -1; if (y.club === q.app) return 1; return y.carry - x.carry; };
+        var def = cand.slice().sort(near)[0], pick = [def];
+        var add = function (x) { if (x && pick.length < max && pick.indexOf(x) === -1) pick.push(x); };
+        if (on.length) { add(on.reduce(function (a, x) { return x.along < a.along ? x : a; })); add(on.reduce(function (a, x) { return x.along > a.along ? x : a; })); }
+        on.slice().sort(near).forEach(add);
+        [shortOne, longOne].filter(Boolean).sort(function (x, y) { return (x === shortOne ? f - x.along : x.along - b) - (y === shortOne ? f - y.along : y.along - b) || (x === shortOne ? -1 : 1); }).forEach(add);
+        return { list: pick.sort(function (x, y) { return y.carry - x.carry; }), def: def.club };
+    }
+
+    // 095 (Manny, Oct 28): THE PAR-3 SWITCHER STEPS THROUGH EVERY CLUB IN MY BAG (not only the ones landing on the
+    // green). q: as depthChips, plus order (My bag's club keys; default CLUBS). Every club with a carry, duplicates
+    // kept (each is a club in the bag). def: the club closest to the target (a tie: the app's pick, then the longer).
+    // Returns null (no front / back) or { list: [{ club, carry, along, delta, spot, on }] longest first, def }.
+    function allClubs(q) {
+        q = q || {};
+        var f = q.front, b = q.back, bag = q.bag || {};
+        if (!isNum(f) || !isNum(b) || !(b > f)) return null;
+        var m = isNum(q.middle) ? q.middle : (f + b) / 2, aim = isNum(q.aimYd) ? q.aimYd : m;
+        var order = q.order && q.order.length ? q.order : CLUBS, all = [];
+        order.forEach(function (c) {
+            var v = bag[c], cy = v && isNum(v.yd) && v.yd > 0 ? v.yd : null;
+            if (cy == null) return;
+            var al = centreAt(cy, q.rawYd, q.playsYd);
+            all.push({ club: c, carry: cy, along: al, delta: al - aim, spot: landSpot(al, f, m, b), on: al >= f && al <= b });
+        });
+        if (!all.length) return { list: [], def: null };
+        var near = function (x, y) { var d = Math.abs(x.delta) - Math.abs(y.delta); if (Math.abs(d) > 1e-9) return d; if (x.club === q.app) return -1; if (y.club === q.app) return 1; return y.carry - x.carry; };
+        var def = all.slice().sort(near)[0];
+        return { list: all.slice().sort(function (x, y) { return y.carry - x.carry; }), def: def.club };
+    }
+    // 095: THE SWITCHER'S TEXT. Off the green, where it lands: "9i · 12 past the back" / "LW · 18 short of the front".
+    // On the green (Manny, Oct 28: "zone + yards vs target"): the zone it lands in plus the signed yards past (+) or
+    // short (−) of the TARGET (delta: the centre minus the yards to the target), "SW · middle +10" - it follows a
+    // dragged target. No number within TUNE.MIDDLE_YD in the middle zone, or under 1 anywhere. No delta: depthText.
+    function switchText(short, spot, unit, delta) {
+        if (!spot) return String(short);
+        var n = shown(spot.off, unit);
+        if (n >= 1 && spot.zone === 'front' && spot.off < 0) return String(short) + ' · ' + n + ' short of the front';
+        if (n >= 1 && spot.zone === 'back' && spot.off > 0) return String(short) + ' · ' + n + ' past the back';
+        if (!isNum(delta)) return depthText(short, spot, unit);
+        var k = shown(delta, unit), quiet = k < 1 || (spot.zone === 'middle' && k <= TUNE.MIDDLE_YD);
+        return String(short) + ' · ' + spot.zone + (quiet ? '' : ' ' + (delta > 0 ? '+' : '\u2212') + k);
+    }
+
+    // ---- 101 (Manny's standing rule, Oct 29): MY MISS ALWAYS SHOWS ON EVERY PAR 3 AND EVERY APPROACH -----------
+    // "never hidden for range". shows() above is kept as it was (its 'club' / 'range' / 'carry' answers still say what
+    // 063's checks found); the view then shows the oval + switcher anyway for those three reasons (always(why)), with
+    // the club below ('layup' too - a target dragged off the green: the oval then aims at the green's middle, as before).
+    // Only 'tee' (a par 4 / 5 tee shot - not an approach) still hides it, as do My miss off, Tournament and Mark-open.
+    function always(why) { return why === 'club' || why === 'range' || why === 'carry' || why === 'layup'; }
+    // A CLUB WITH NO NUMBER takes the generic carry (My bag's own first-time table, gps-shots defaultCarries) - the
+    // golfer's numbers always win. 101 gate fix: the generic number is FITTED TO HIS BAG so the club order always holds
+    // (a raw generic 4i of 169 must never sit under his 7i of 180): between two of his own clubs it keeps the table's
+    // spacing between them; past his longest / shortest it scales the table by his nearest club; with no numbers of
+    // his own at all, the table as is. bag: { club: { yd } }; generic: { club: yd }; order: the club keys, longest
+    // first (My bag's BAG). Returns a new bag; filled clubs carry gen: true. Pure.
+    function fillBag(bag, generic, order) {
+        var out = {}, keys = order && order.length ? order : Object.keys(generic || {});
+        var has = function (c) { var v = bag && bag[c]; return !!(v && isNum(v.yd) && v.yd > 0); };
+        var g = function (c) { var x = generic && generic[c]; return isNum(x) && x > 0 ? x : null; };
+        Object.keys(bag || {}).forEach(function (c) { out[c] = bag[c]; });
+        keys.forEach(function (c, i) {
+            if (has(c) || g(c) == null) return;
+            var L = null, S = null, k;
+            for (k = i - 1; k >= 0; k--) if (has(keys[k]) && g(keys[k]) != null) { L = keys[k]; break; }
+            for (k = i + 1; k < keys.length; k++) if (has(keys[k]) && g(keys[k]) != null) { S = keys[k]; break; }
+            var yd = g(c);
+            if (L && S && bag[L].yd > bag[S].yd && g(L) > g(S)) yd = bag[S].yd + (bag[L].yd - bag[S].yd) * (g(c) - g(S)) / (g(L) - g(S));
+            else if (L) yd = g(c) * bag[L].yd / g(L);
+            else if (S) yd = g(c) * bag[S].yd / g(S);
+            out[c] = { yd: Math.round(yd), gen: true };
+        });
+        return out;
+    }
+    // THE DEFAULT CLUB: the one whose carry is closest to the plays-like yards (a tie: the app's pick, then the longer
+    // club). Nothing reaches: that is the longest club. Returns { club, carry, reaches } or null (no carries). Pure.
+    function nearestClub(bag, playsYd, order, app) {
+        var keys = order && order.length ? order : Object.keys(bag || {}), best = null, top = null;
+        keys.forEach(function (c) {
+            var v = bag && bag[c], cy = v && isNum(v.yd) && v.yd > 0 ? v.yd : null;
+            if (cy == null) return;
+            if (!top || cy > top.carry) top = { club: c, carry: cy };
+            if (!isNum(playsYd)) return;
+            var d = Math.abs(cy - playsYd), bd = best ? Math.abs(best.carry - playsYd) : Infinity;
+            if (!best || d < bd - 1e-9 || (Math.abs(d - bd) <= 1e-9 && best.club !== app && (c === app || cy > best.carry))) best = { club: c, carry: cy };
+        });
+        if (!best) return top ? { club: top.club, carry: top.carry, reaches: false } : null;
+        return { club: best.club, carry: best.carry, reaches: top.carry >= playsYd };
+    }
+    // THE APPROACH SWITCHER WHEN NO IRON / WEDGE LANDS NEAR THE GREEN: the default club and the clubs either side of
+    // it (longest first, at most 3) from allClubs' list. Pure.
+    function aroundDef(ac) {
+        if (!ac || !ac.list || !ac.list.length) return [];
+        var L = ac.list, i = 0;
+        L.forEach(function (x, k) { if (x.club === ac.def) i = k; });
+        return L.slice(Math.max(0, i - 1), Math.min(L.length, i + 2));
+    }
+
+    // 089b: THE HELD FIX. last: { pt, at } (the phone's last fix, memory only). Its point while it is under
+    // TUNE.HOLD_FIX_MS old (59 s: yes; 60 s or more: no), else null.
+    function heldFix(last, nowMs, maxMs) {
+        var lim = isNum(maxMs) ? maxMs : TUNE.HOLD_FIX_MS;
+        if (!last || !last.pt || !isNum(last.at) || !isNum(nowMs)) return null;
+        var age = nowMs - last.at;
+        return age >= 0 && age < lim ? last.pt : null;
+    }
+    // 089b: THE NOTE WITH THE GREEN DEPTH, one line, the target first:
+    // "Lob wedge: 17 yds short of the target · 5 yds onto the front". delta: the centre minus the yards to
+    // the target (+ = long); spot: landSpot. "on target" within NOTE_MIN_YD; the middle with no number
+    // within MIDDLE_YD ("the middle").
+    function depthNote(name, delta, spot, unit) {
+        var m = unit === 'm', yds = function (n) { return n + (m ? ' m' : (n === 1 ? ' yd' : ' yds')); };
+        var n = shown(delta, unit), tg = nearAim(delta) || n < 1 ? 'on target' : yds(n) + (delta > 0 ? ' past the target' : ' short of the target');
+        var sp = '';
+        if (spot) {
+            var k = shown(spot.off, unit), z = spot.zone;
+            if (z === 'middle') sp = k <= TUNE.MIDDLE_YD ? 'the middle' : yds(k) + (spot.off > 0 ? ' past the middle' : ' short of the middle');
+            else if (k < 1) sp = 'on the ' + z + ' edge';
+            else if (z === 'front') sp = yds(k) + (spot.off > 0 ? ' onto the front' : ' short of the front');
+            else sp = yds(k) + (spot.off < 0 ? ' inside the back' : ' past the back');
+        }
+        return String(name) + ': ' + tg + (sp ? ' · ' + sp : '');
+    }
+
     var api = { TUNE: TUNE, CLUBS: CLUBS, KEY: KEY,
+        always: always, fillBag: fillBag, nearestClub: nearestClub, aroundDef: aroundDef,
+        chipPair: chipPair, depthChips: depthChips, allClubs: allClubs, switchText: switchText, heldFix: heldFix, depthNote: depthNote, depthText: depthText, landSpot: landSpot, chipText: chipText, landNote: landNote, fadeOvals: fadeOvals,
         isClub: isClub, oval: oval, centreAt: centreAt, margin: margin, inRange: inRange, shows: shows, tips: tips, bagLine: bagLine, infoText: infoText,
         outline: outline, inside: inside, isOn: isOn, setOn: setOn,
         AIM_PER_MPH: AIM_PER_MPH, hasMiss: hasMiss, point: point, shotStats: shotStats, statsLine: statsLine };

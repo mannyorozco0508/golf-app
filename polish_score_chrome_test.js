@@ -276,7 +276,8 @@ test('URGENT-034 bug 3: every score tap saves at once - 3 golfers scored, the sh
         await sleep(700);
         const boxes = JSON.parse(await ev("JSON.stringify([1,2,3].map(function(h){ return ['101','102','103','104'].map(function(p){ var i = document.querySelector('#hp-compact-card [data-cc-hole=\"'+h+'\"][data-cc-player=\"'+p+'\"]'); return i ? i.textContent : null; }); }))"));
         assert.deepEqual(boxes, [['5', '5', '4', ''], ['5', '5', '4', ''], ['5', '5', '4', '']], 'the Card shows holes 1-3');
-        assert.deepEqual(JSON.parse(await ev("JSON.stringify(Array.prototype.slice.call(document.querySelectorAll('#hp-compact-card [data-cc-sum=\"Out\"] td'), 2).map(function(t){ return t.textContent; }))")), ['15', '15', '12', ''], 'Out: the three holes summed');
+        // 092 (the COMBO card): Out is a column now - one cell per golfer.
+        assert.deepEqual(JSON.parse(await ev("JSON.stringify(Array.prototype.map.call(document.querySelectorAll('#hp-compact-card [data-cc-sum=\"Out\"][data-cc-sum-player]'), function(t){ return t.textContent; }))")), ['15', '15', '12', ''], 'Out: the three holes summed');
         await shot(j, '034-bug3-card');
         // ... and the full page behind "Full card ›" too.
         await click('#hp-compact-card [data-cc-full]');
@@ -286,26 +287,34 @@ test('URGENT-034 bug 3: every score tap saves at once - 3 golfers scored, the sh
     } finally { await j.close(); }
 });
 
-test('URGENT-034 fix 4: the map\'s Card is a compact card - half height, the grid only; a box opens the sheet for that golfer and hole; Full card ›; swipe / map tap close it', { timeout: 150000 }, async () => {
+// 092 (the COMBO card, Manny APPROVED Oct 27): the sheet sizes itself to its content (52 px under the top), the
+// golfers are rows (1-9 + OUT, 10-18 + IN + TOT), and a box loads that golfer and hole into quick entry - the
+// full Enter score sheet for them is "More ›". Everything else here is as URGENT-034 had it.
+test('URGENT-034 fix 4 + 092: the map\'s Card is the COMBO card; a box loads quick entry, More › opens the sheet for that golfer and hole; Full card ›; swipe / map tap close it', { timeout: 150000 }, async () => {
     const { j, ev, click } = await start('PS3404', 0, { me: '103', round: round034('PS3404') });
     try {
         await j.cdp('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
         await ev('gpsStepHole(1)'); await sleep(800);
-        const CC = "JSON.stringify((function(){ var w=document.getElementById('hp-compact-card'), c=w&&w.querySelector('.hp-cc'); var open = !!(w && w.parentNode && w.style.display!=='none'); return { open: open, side: HardPanGps.side(), h: c ? Math.round(c.getBoundingClientRect().height) : 0, vh: innerHeight, head: open ? Array.prototype.map.call(w.querySelectorAll('th'), function(t){return t.textContent;}) : [], sums: open ? Array.prototype.map.call(w.querySelectorAll('[data-cc-sum]'), function(r){return r.getAttribute('data-cc-sum');}) : [], text: open ? w.textContent : '' }; })())";
+        const CC = "JSON.stringify((function(){ var w=document.getElementById('hp-compact-card'), c=w&&w.querySelector('.hp-cc'); var open = !!(w && w.parentNode && w.style.display!=='none'); return { open: open, side: HardPanGps.side(), h: c ? Math.round(c.getBoundingClientRect().height) : 0, top: c ? Math.round(c.getBoundingClientRect().top) : 0, vh: innerHeight, head: open ? Array.prototype.map.call(w.querySelectorAll('table[data-cc-half=\"Out\"] [data-cc-golfer]'), function(t){return t.textContent;}) : [], sums: open ? Array.prototype.map.call(w.querySelectorAll('tr.hp-cc-par [data-cc-sum]'), function(r){return r.getAttribute('data-cc-sum');}) : [], text: open ? w.textContent : '', sel: open && w.querySelector('tr.hp-cc-sel') ? w.querySelector('tr.hp-cc-sel').getAttribute('data-cc-row') : null, qhole: open && w.querySelector('[data-cc-qhole]') ? Number(w.querySelector('[data-cc-qhole]').getAttribute('data-cc-qhole')) : null }; })())";
         // The default state: nothing scored, the Card tapped on hole 2.
         await tapAt(j, ...JSON.parse(await ev("JSON.stringify((function(){ var b=document.querySelector('#gps-overlay .gps-side-bets').getBoundingClientRect(); return [b.left+b.width/2, b.top+b.height/2]; })())")));
         let c = JSON.parse(await ev(CC));
         assert.equal(c.open, true, 'Card opens the compact card');
         assert.equal(c.side, 'gps', 'over the map');
-        assert.ok(c.h > c.vh * 0.4 && c.h < c.vh * 0.65, 'half height: ' + c.h + ' of ' + c.vh);
-        assert.deepEqual(c.head, ['Hole', 'Par', 'Skeens', 'Bob', 'Manny', 'Paul'], 'Hole / Par / the golfers');
+        assert.ok(c.h > c.vh * 0.4 && c.top >= 52, '092: sized to its content, 52 px under the top: ' + c.h + ' of ' + c.vh + ', top ' + c.top);
+        assert.deepEqual(c.head, ['Skeens', 'Bob', 'Manny', 'Paul'], '092: one row per golfer');
         assert.deepEqual(c.sums, ['Out', 'In', 'Total'], 'front / back totals');
         assert.doesNotMatch(c.text, /LEADERBOARD|Skins|SKINS/i, 'no leaderboard, no skins');
         await shot(j, '034-compact-card');
-        // A box on an EARLIER hole (1, Manny): the score sheet on Manny, hole 1; the tap saves at once.
+        // A box on an EARLIER hole (1, Manny): 092 - Manny, hole 1 in quick entry (the map stays on 2); More › is
+        // the score sheet on Manny, hole 1; the tap saves at once.
         await tapAt(j, ...JSON.parse(await ev("JSON.stringify((function(){ var b=document.querySelector('#hp-compact-card [data-cc-hole=\"1\"][data-cc-player=\"103\"]'); b.scrollIntoView({block:'center'}); b=b.getBoundingClientRect(); return [b.left+b.width/2, b.top+b.height/2]; })())")));
+        c = JSON.parse(await ev(CC));
+        assert.deepEqual([c.sel, c.qhole], ['103', 1], '092: the box loaded Manny, hole 1 into quick entry');
+        assert.equal(JSON.parse(await ev(SHEET)).open, false, '092: a box no longer opens the sheet by itself');
+        await click('#hp-compact-card [data-cc-moresheet]');
         let s = JSON.parse(await ev(SHEET));
-        assert.equal(s.open, true, 'the box opened the score sheet');
+        assert.equal(s.open, true, 'More › opened the score sheet');
         assert.equal(s.sel, '103', 'on Manny');
         assert.equal(await ev('HardPanGpsStats.sheet.shownHole()'), 1, 'on hole 1');
         assert.equal(await ev('HardPanGps.hole()'), 2, 'the map stays on hole 2');
@@ -318,8 +327,11 @@ test('URGENT-034 fix 4: the map\'s Card is a compact card - half height, the gri
         c = JSON.parse(await ev(CC));
         assert.equal(c.open, true, 'back on the compact card');
         assert.equal(await ev("document.querySelector('#hp-compact-card [data-cc-hole=\"1\"][data-cc-player=\"103\"]').textContent"), '4', 'the box shows the new 4');
-        // The map's hole box (2, Bob): the sheet on Bob, hole 2.
+        // The map's hole box (2, Bob): quick entry on Bob, hole 2; More › - the sheet on Bob, hole 2.
         await click('#hp-compact-card [data-cc-hole="2"][data-cc-player="102"]');
+        c = JSON.parse(await ev(CC));
+        assert.deepEqual([c.sel, c.qhole], ['102', 2], '092: Bob, hole 2 in quick entry');
+        await click('#hp-compact-card [data-cc-moresheet]');
         s = JSON.parse(await ev(SHEET));
         assert.equal(s.sel, '102', 'on Bob'); assert.equal(await ev('HardPanGpsStats.sheet.shownHole()'), 2, 'hole 2');
         await ev('HardPanGpsStats.sheet.close()'); await sleep(300);

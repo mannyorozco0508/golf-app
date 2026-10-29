@@ -229,6 +229,14 @@
     var windTimer = null;  // the wind's 1-minute tick (age on the box, 10-minute refresh)
     var fix = null;        // { pt: [lat, lng], acc: metres, at: ms } - NEVER persisted, NEVER sent
     var FIX_STALE_MS = 10000, staleTimer = null;
+    // 089b: THE LAST FIX for My miss's chips / oval / note only - kept 60 s (HardPanMissPattern.heldFix) so they do
+    // not flicker with the phone in a pocket. Memory only, never stored, never sent. The 10 s rule above is unchanged.
+    var missLastFix = null;
+    function missHeldGone() {
+        var M = window.HardPanMissPattern;
+        if (!missLastFix || fix || !M || typeof M.heldFix !== 'function' || M.heldFix(missLastFix, Date.now())) return false;
+        missLastFix = null; return true;
+    }
     function dropStaleFix() { if (fix && (!fix.at || Date.now() - fix.at > FIX_STALE_MS)) { fix = null; return true; } return false; }
 
     function units() {
@@ -302,12 +310,13 @@
             // never kept with a position, never sent; only while this fix is inside the course area.
             try { phoneAltSample([pos.coords.latitude, pos.coords.longitude], pos.coords.altitude, pos.coords.altitudeAccuracy); } catch (e) {}
             fix = { pt: [pos.coords.latitude, pos.coords.longitude], acc: pos.coords.accuracy, at: Date.now() };
+            missLastFix = { pt: fix.pt.slice(), at: fix.at };   // 089b
             S.geoError = null;
             render();
         };
         // A FIX OLDER THAN 10 s IS NOT WHERE THE GOLFER IS (audit C3): the screen goes back to
         // "Finding you…" (and measures from the tee) until a fresh one arrives.
-        if (!staleTimer) staleTimer = setInterval(function () { if (dropStaleFix() && S) render(); }, 3000);
+        if (!staleTimer) staleTimer = setInterval(function () { var d = dropStaleFix(), h = missHeldGone(); if ((d || h) && S) render(); }, 3000);
         var onErr = function (err) {
             if (gen !== watchGen || !S) return;
             S.geoError = (err && (err.code === 1 || /denied|permission/i.test(String(err.message || '')))) ? 'denied'
@@ -660,11 +669,19 @@
         if (live && !A && !S.arcsLoad) { S.arcsLoad = true; withArcs(function () { render(); }); }
         if (live && A && r && r.mid && o && o.pt) {
             var inp = arcsInputs();
+            // 094: from the golfer while the last fix is under 60 s old (the My miss chips' rule, 089b), else the tee.
+            var M9 = window.HardPanMissPattern, hp9 = o.from === 'tee' && missLastFix && M9 && M9.heldFix ? M9.heldFix(missLastFix, Date.now()) : null;
+            if (hp9) { var ho9 = G.measureOrigin(hp9, r.tee, r.mid); if (ho9 && ho9.from === 'me') o = { from: 'me', pt: hp9.slice(), held: true }; }
             if (inp) {
                 var nearTee = !!(r.tee && (o.from === 'tee' || G.haversineMeters(o.pt, r.tee) <= TEE_SHOT_YD * G.M_PER_YD));
                 var from = nearTee ? { pt: r.tee, kind: 'tee' } : { pt: o.pt, kind: 'me' };
+                // 094: across the FIXED line (par 3 / Green view: to the green's centre; par 4 / 5 tee shot: the hole's
+                // default line) - dragging the target never moves or turns them (gps-arcs-plan arcAim).
+                var td9 = S.targetDefault && S.targetDefault.hole === S.hole ? S.targetDefault.pt : null;
+                var aim9 = A.arcAim ? A.arcAim({ par: S.par, green: S.view === 'green', nearTee: nearTee, target: S.target, targetDefault: td9, moved: !!S.targetMoved, mid: r.mid })
+                    : (nearTee && S.target ? S.target : r.mid);
                 try {
-                    list = A.arcs({ bag: inp.bag, fits: inp.fits, hand: inp.hand, wind: inp.wind, from: from, mid: r.mid, aim: nearTee && S.target ? S.target : r.mid,
+                    list = A.arcs({ bag: inp.bag, fits: inp.fits, hand: inp.hand, wind: inp.wind, from: from, mid: r.mid, aim: aim9,
                         par: S.par, holeYd: r.tee ? G.haversineMeters(r.tee, r.mid) / G.M_PER_YD : null });
                 } catch (e) { list = []; }
                 S.carryFrom = from.kind;
@@ -743,7 +760,10 @@
         var wrap = S.el.querySelector('.gps-map-wrap'); if (!wrap) return;
         var wr = wrap.getBoundingClientRect(), obs = [];
         var box = function (e) { var b = e.getBoundingClientRect(); return { l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top, w: b.width, h: b.height }; };
-        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl'), function (e) {
+        // 094 (Manny's shot 6: "5i" under the Hole button): the rail's buttons and the green's size line too.
+        // 093 (spec item 4): never under the club switcher pill / "from tee" tag (or the chips), Recenter, the Plays-like
+        // pill, the zoom button, the top bar or the bottom row either.
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-right > *, .gps-ld-rail > *, .gps-green-dims, .gps-miss-chips > *, .gps-leftrow > *, .gps-ld-plays, .gps-zoom, .gps-ld-top, .gps-ld-bottom'), function (e) {
             if (e.offsetParent === null || e.style.display === 'none' || getComputedStyle(e).visibility === 'hidden') return;
             var b = box(e); if (b.w > 0 && b.h > 0) obs.push(b);
         });
@@ -2018,7 +2038,7 @@
         var sb = vis('.gps-sub');
         if (sb) top = Math.max(top, sb.bottom - W.top + 12);
         var bottomEdge = W.bottom - attribH();
-        ['.gps-leftrow .gps-recenter', '.gps-bottom', '.gps-actions', '.gps-panel'].forEach(function (sel) { var b = vis(sel); if (b) bottomEdge = Math.min(bottomEdge, b.top); });
+        ['.gps-leftrow .gps-recenter', '.gps-bottom', '.gps-actions', '.gps-panel', '.gps-ld-bottom .gps-mark-shot'].forEach(function (sel) { var b = vis(sel); if (b) bottomEdge = Math.min(bottomEdge, b.top); });
         var bottom = W.bottom - bottomEdge + 14;
         // Always leave the hole at least 160px: a panel measured mid-layout (the
         // first, slow load) must not leave no room at all - the camera then had
@@ -2055,10 +2075,15 @@
         limitToCourse(cam);
         if (cam) {
             S.pad = viewPad();
+            // 091: the hole OPENS on the 2x view (zoomCam - the target, or the golfer, at 2x); S.camera stays
+            // the FULL hole (tee to green), the magnifier's third step and what holeCheck measures.
+            if (zoomInSwitch() && !S.target && S.mode === 'measure' && S.pro) { try { placeTarget(resolved()); } catch (e) {} }
+            var dz = zoomInSwitch() ? zoomCam(cam, zoomFactor(0)) : cam;
             S.framing = true;
-            try { S.map.jumpTo({ center: ll(cam.center), zoom: cam.zoom, bearing: cam.bearing, padding: S.pad }); } finally { S.framing = false; }
+            try { S.map.jumpTo({ center: ll(dz.center), zoom: dz.zoom, bearing: dz.bearing, padding: S.pad }); } finally { S.framing = false; }
             S.framed = 'hole';
             S.camera = cam;
+            S.zoomBase = cam.zoom;
         } else if (first || (S.framed === 'hole' && !resolved())) {
             // No hole to show (not merely a fit that failed - the next frame tries
             // again): the COURSE, from its location (build 5); the world view only
@@ -2265,6 +2290,7 @@
     // The golfer when they are on or near the hole; the TEE when they are more
     // than 1,000 yards from the green or have no fix (gps-geo.measureOrigin).
     function origin(r) {
+        if (S && S.missHeldPt) return { from: 'me', pt: S.missHeldPt, held: true };   // 089b: only inside missPlan's plays-like
         if (!r) return fix ? { from: 'me', pt: fix.pt } : null;
         return G.measureOrigin(fix ? fix.pt : null, r.tee, r.mid);
     }
@@ -2323,14 +2349,14 @@
             // fairway's end), in the fairway. NO PATH DATA: the pre-023c default on the straight
             // line, never the driver's distance.
             var ts = G.teeShot({ par: S.par, tee: r.tee, mid: center, line: sh.line, fairway: sh.fairway, hazards: sh.hazards, driverM: driverGroundM(r, dc.yd) });
-            if (ts && ts.pt) { S.target = ts.pt; if (ts.drive) S.teeShot = { carryYd: dc.yd, own: dc.own, t: ts.drive }; return; }
+            if (ts && ts.pt) { S.target = ts.pt; S.targetDefault = { hole: S.hole, pt: ts.pt }; if (ts.drive) S.teeShot = { carryYd: dc.yd, own: dc.own, t: ts.drive }; return; }
         }
         // 009 (switch pathTarget): on the hole's path - at the dogleg when its corner is
         // in the landing zone (gps-geo.pathTarget). Never bent by a dragged target.
         var p = pathTargetOn() && r.tee && G.pathTarget
             ? G.pathTarget(Object.assign(opts, { path: G.holePath({ tee: r.tee, mid: center, line: opts.line, fairway: opts.fairway, hazards: sh.hazards }) }))
             : G.defaultTarget(opts);
-        if (p) S.target = p;
+        if (p) { S.target = p; S.targetDefault = { hole: S.hole, pt: p }; }   // 094: the hole's own line for the arcs
     }
     // ---- "SAVE THIS LINE" (URGENT-026 addition, Manny 12:21 PM) ---------------------------------
     // ONLY on a hole with NO path data (holeShape: no drawn / bundled line, no fairway): once the
@@ -2522,6 +2548,18 @@
             var mr = el.getBoundingClientRect(), wr = S.el.getBoundingClientRect(), sgn = 1;
             var reach = d / 2 + 4 + Math.abs(ux) * lw / 2 + Math.abs(uy) * lh / 2;
             if (mr.width && mr.left + box / 2 + ux * reach + lw / 2 > wr.right - 8) sgn = -1;
+            // 093 (spec item 4): never under a button, the club switcher pill, the bars or a panel - the other end when
+            // that one is clear; both covered: no "20 yd" label this time (the ring itself stays).
+            var under = function (sg) {
+                if (!mr.width) return false;
+                var x = mr.left + box / 2 + sg * ux * reach, y = mr.top + box / 2 + sg * uy * reach, L = x - lw / 2, T = y - lh / 2;
+                return Array.prototype.some.call(S.el.querySelectorAll('.gps-right > *, .gps-ld-rail > *, .gps-miss-chips > *, .gps-leftrow > *, .gps-ld-plays, .gps-zoom, .gps-ld-top, .gps-ld-bottom, .gps-top, .gps-bottom'), function (e) {
+                    if (e.offsetParent === null) return false; var q = e.getBoundingClientRect();
+                    return q.width > 0 && L < q.right + 2 && L + lw > q.left - 2 && T < q.bottom + 2 && T + lh > q.top - 2;
+                });
+            };
+            lbl.removeAttribute('data-ring-off');
+            if (under(sgn)) { if (!under(-sgn)) sgn = -sgn; else { lbl.style.display = 'none'; lbl.setAttribute('data-ring-off', '1'); return; } }
             var cx = box / 2 + sgn * ux * reach, cy = box / 2 + sgn * uy * reach;
             lbl.style.left = Math.round(cx - lw / 2) + 'px'; lbl.style.top = Math.round(cy - lh / 2) + 'px';
             lbl.style.transform = 'none';
@@ -2540,25 +2578,8 @@
     function greenShape(r, axisDeg, extra) {
         if (!r || !r.mid) return null;
         var axis = axisDeg != null ? axisDeg : (r.tee ? G.bearingDeg(r.tee, r.mid) : (S.camera ? S.camera.bearing : 0));
-        var outline = !!(r.green && r.green.length >= 3 && r.useGreenForEdges);
-        var pts = (outline ? r.green : [r.front, r.mid, r.back].filter(Boolean)).concat(extra || []);
-        var al = [], ac = [];
-        pts.forEach(function (p) {
-            var d = G.haversineMeters(r.mid, p);
-            var t = d ? (G.bearingDeg(r.mid, p) - axis) * Math.PI / 180 : 0;
-            al.push(d * Math.cos(t)); ac.push(d * Math.sin(t));
-        });
-        var a0 = Math.min.apply(null, al), a1 = Math.max.apply(null, al), c0 = Math.min.apply(null, ac), c1 = Math.max.apply(null, ac);
-        // Depth and width are the GREEN's own (the carry hazards only widen what the view holds).
-        var gal = al.slice(0, al.length - (extra || []).length), gac = ac.slice(0, ac.length - (extra || []).length);
-        var depthM = (outline || (r.front && r.back)) ? Math.max.apply(null, gal) - Math.min.apply(null, gal) : null;
-        var widthM = outline ? Math.max.apply(null, gac) - Math.min.apply(null, gac) : null;
-        return {
-            axis: axis, depthM: depthM, widthM: widthM,
-            // What the view must hold: the green, or 25 m when it is only a point.
-            spanA: Math.max(a1 - a0, 25), spanC: Math.max(c1 - c0, 25),
-            center: G.destination(G.destination(r.mid, axis, (a0 + a1) / 2), axis + 90, (c0 + c1) / 2)
-        };
+        // 094: the math lives in gps-geo greenSize now (unchanged; tested pure).
+        return G.greenSize(r, axis, extra);
     }
     var GREEN_PAD = { left: 80, right: 80 };
     // ---- THE APPROACH VIEW (022 part 3) ----------------------------------------------
@@ -2571,7 +2592,9 @@
     function apprFrom(r) {
         var o = origin(r);
         if (o && o.from === 'me') return o.pt;
-        return (S && S.target) || (r && r.tee) || null;
+        // 094 (Manny, Oct 28): off the hole, the TEE's line (tee -> green centre) - never the dragged target ring
+        // (it turned the Green view, and the green's depth x width, every time it moved).
+        return G.approachFrom(null, r && r.tee, S && S.target);
     }
     function apprHazards(r) {
         var rec = osmRecord(S.courseKey), h = rec && rec.holes && rec.holes[String(S.hole)];
@@ -2641,6 +2664,19 @@
             { k: 'f', pt: nums && nums.front, text: 'F ' + d(nums && nums.frontM) }
         ];
         var placed = [];
+        // 094 (Manny's shots 4 / 6: "F 156" under Preview, "20 yd" on "C 186"): the rail's buttons and the target's
+        // "20 yd" label are in the way too - a label that would sit on one goes to the dot's other (left) side.
+        var wr9 = box.getBoundingClientRect(), keep9 = [], left9 = [];
+        var rc9 = function (q, into) {
+            Array.prototype.forEach.call(S.el.querySelectorAll(q), function (e) {
+                if (e.offsetParent === null || getComputedStyle(e).visibility === 'hidden') return;
+                var b = e.getBoundingClientRect(); if (b.width > 0 && b.height > 0) into.push({ l: b.left - wr9.left - 3, t: b.top - wr9.top - 3, r: b.right - wr9.left + 3, b: b.bottom - wr9.top + 3 });
+            });
+        };
+        rc9('.gps-right > *, .gps-ld-rail > *, .gps-ring-lbl', keep9);
+        // The left side only when it is clear too (the left column: the chips, Recenter) - else it stays as before.
+        rc9('.gps-leftrow > *, .gps-miss-chips > *', left9); left9 = left9.concat(keep9);
+        var on9 = function (list, x, y, w, h) { return list.some(function (b) { return x < b.r && x + w > b.l && y < b.b && y + h > b.t; }); };
         items.forEach(function (it) {
             var el = box.querySelector('.gps-green-lbl-' + it.k);
             if (!el) { el = document.createElement('span'); el.className = 'gps-green-lbl gps-green-lbl-' + it.k; box.appendChild(el); }
@@ -2648,7 +2684,20 @@
             el.textContent = it.text; el.style.display = ''; el.style.visibility = 'hidden';
             var q = S.map.project(ll(it.pt)), w = el.offsetWidth, h = el.offsetHeight;
             var x = q.x + 16, y = q.y - h / 2;
+            if (on9(keep9, x, y, w, h) && q.x - 16 - w >= 2 && !on9(left9, q.x - 16 - w, y, w, h)) x = q.x - 16 - w;
             placed.forEach(function (b) { if (x < b.r && x + w > b.l && y < b.b && y + h > b.t) y = b.b + 2; });
+            // 093 (spec item 4): never under the club switcher pill, the "from tee" tag, Recenter or another label. Still
+            // covered after the step above: the dot's right, then left, then a label's height up / down along the line
+            // (up to 3); nowhere clear - hidden (the same number stays in the top bar).
+            el.removeAttribute('data-green-hidden');
+            var all9 = left9.concat(placed);
+            if (on9(all9, x, y, w, h)) {
+                var x0 = q.x + 16, x1 = q.x - 16 - w, y0 = q.y - h / 2, got = null, tries = [];
+                for (var st = 0; st <= 3; st++) [x0, x1].forEach(function (xx) { (st ? [y0 - st * (h + 2), y0 + st * (h + 2)] : [y0]).forEach(function (yy) { tries.push([xx, yy]); }); });
+                for (var ti = 0; ti < tries.length && !got; ti++) { var tx = tries[ti][0], ty = tries[ti][1]; if (tx >= 2 && tx + w <= wr9.width - 2 && ty >= 2 && ty + h <= wr9.height - 2 && !on9(all9, tx, ty, w, h)) got = tries[ti]; }
+                if (!got) { el.style.visibility = 'hidden'; el.setAttribute('data-green-hidden', '1'); return; }
+                x = got[0]; y = got[1];
+            }
             el.style.left = Math.round(x) + 'px'; el.style.top = Math.round(y) + 'px'; el.style.visibility = '';
             placed.push({ l: x, t: y, r: x + w, b: y + h });
         });
@@ -2689,18 +2738,29 @@
     // Around the target (or the golfer's dot when there is no target), keeping the
     // hole's tee-to-green turn. 1x is the hole's own view; Recenter goes back to it.
     // Never past the imagery's closest zoom (maxZoomNow).
+    // 091 (Manny APPROVED Oct 27: "Default zoom = today's zoomed-in view; the zoom button goes one step
+    // closer, then back to the full hole"): a hole now OPENS on the 2x view (the one the magnifier gave);
+    // the magnifier cycles 2x (the default) -> 4x (one step closer) -> 1x (the full hole, tee to green)
+    // -> 2x again. Recenter, a new hole, a re-fit: the 2x default. zoomStep 0 is still "the default view"
+    // (every "!S.zoomStep" re-fit rule keeps its meaning). Switch gpsZoomIn off: build 5's 1x <-> 2x exactly.
     var ZOOM_STEPS = [1, 2];
+    var ZOOM_CYCLE_091 = [2, 4, 1];
+    function zoomInSwitch() { try { return typeof window.HardPanFeature !== 'function' || window.HardPanFeature('gpsZoomIn') !== false; } catch (e) { return true; } }
+    function zoomCycle() { return zoomInSwitch() ? ZOOM_CYCLE_091 : ZOOM_STEPS; }
+    function zoomFactor(step) { var c = zoomCycle(); return c[(step || 0) % c.length]; }
     var MAG_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round">'
         + '<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/><path d="M7.5 10.5h6"/><path class="gps-mag-plus" d="M10.5 7.5v6"/></svg>';
     function syncZoomBtn() {
         var b = S && S.el.querySelector('.gps-zoom');
         if (!b) return;
-        var zoomed = !!S.zoomStep;
+        var f = zoomFactor(S.zoomStep), nextF = zoomFactor((S.zoomStep || 0) + 1);
+        // "zoomed" = the button's next tap goes OUT (the minus sign): 091 at 4x, build 5 at 2x.
+        var zoomed = nextF < f;
         if (!b.querySelector('svg')) b.innerHTML = MAG_SVG;
         b.classList.toggle('gps-zoomed', zoomed);
-        b.setAttribute('data-zoom', ZOOM_STEPS[S.zoomStep || 0] + 'x');
-        b.setAttribute('aria-pressed', zoomed ? 'true' : 'false');
-        b.setAttribute('aria-label', zoomed ? 'Back to the hole view' : 'Zoom in 2x around the target');
+        b.setAttribute('data-zoom', f + 'x');
+        b.setAttribute('aria-pressed', S.zoomStep ? 'true' : 'false');
+        b.setAttribute('aria-label', nextF === 1 ? 'Back to the full hole' : (zoomInSwitch() && nextF === 2 ? 'Zoom in 2x around the target' : (nextF > f ? 'Zoom in ' + nextF + 'x around the target' : 'Back to the hole view')));
     }
     function zoomAround() {
         var o = origin(resolved());
@@ -2708,15 +2768,41 @@
         if (fix && o && o.from === 'me') return fix.pt;
         return null;
     }
+    // 091: the camera for a zoom factor f over the hole's full frame (cam): f x around the target (or the
+    // golfer), the hole's bearing kept, never past the imagery's closest zoom. f 1 = the full hole.
+    function zoomCam(cam, f) {
+        if (!cam || f === 1) return cam ? { center: cam.center, zoom: cam.zoom, bearing: cam.bearing } : null;
+        var c = null; try { c = zoomAround(); } catch (e) { c = null; }
+        return { center: c || cam.center, zoom: Math.min(cam.zoom + Math.log2(f), maxZoomNow()), bearing: cam.bearing };
+    }
+    // 091 (the course check's new step, Manny's OK): the view's centre lies ON the hole - inside the full
+    // hole's frame and within max(100 m, 35% of the hole's length) of the tee -> green line. A view on the
+    // golfer's street, another hole or the wrong course fails. Pure (points [lat, lng]; bounds optional).
+    function viewCenterOnHole(c, tee, green, bounds) {
+        if (!c || !green || !G) return false;
+        if (bounds && typeof bounds.contains === 'function' && !bounds.contains(ll(c))) return false;
+        if (!tee) return G.haversineMeters(c, green) <= 150;
+        var len = G.haversineMeters(tee, green);
+        var lat0 = tee[0] * Math.PI / 180, kx = 111320 * Math.cos(lat0), ky = 110540;
+        var bx = (green[1] - tee[1]) * kx, by = (green[0] - tee[0]) * ky, px = (c[1] - tee[1]) * kx, py = (c[0] - tee[0]) * ky;
+        var L2 = bx * bx + by * by, t = L2 ? Math.max(0, Math.min(1, (px * bx + py * by) / L2)) : 0;
+        var dx = px - t * bx, dy = py - t * by;
+        return Math.sqrt(dx * dx + dy * dy) <= Math.max(100, 0.35 * len);
+    }
     function cycleZoom() {
         if (!S || !S.map || !S.styleReady) return;
-        var next = ((S.zoomStep || 0) + 1) % ZOOM_STEPS.length;
+        var n = zoomCycle().length;
+        var next = ((S.zoomStep || 0) + 1) % n;
         if (next === 0) {
             if (S.camera) { frameHole(false); return; }
             S.map.jumpTo({ zoom: S.zoomBase != null ? S.zoomBase : S.map.getZoom() });
+        } else if (S.camera && zoomInSwitch()) {
+            var zc = zoomCam(S.camera, zoomFactor(next));
+            S.zoomBase = S.camera.zoom;
+            S.map.jumpTo({ center: ll(zc.center), zoom: zc.zoom, bearing: zc.bearing, padding: S.pad || viewPad() });
         } else {
             if (!S.zoomStep) S.zoomBase = S.camera ? S.camera.zoom : S.map.getZoom();
-            var opts = { zoom: Math.min(S.zoomBase + Math.log2(ZOOM_STEPS[next]), maxZoomNow()), padding: S.pad || viewPad() };
+            var opts = { zoom: Math.min(S.zoomBase + Math.log2(zoomFactor(next)), maxZoomNow()), padding: S.pad || viewPad() };
             var c = zoomAround();
             if (c) opts.center = ll(c);
             if (S.camera) opts.bearing = S.camera.bearing;
@@ -2929,8 +3015,9 @@
         Object.keys(S.markers || {}).forEach(function (k) { add(rectOf(S.markers[k].getElement(), wrapR), M); });
         // URGENT-052 B: the My miss oval (when it is on) - the distance bubbles keep off it too.
         try { var mr = missRect(); if (mr) add(mr, M); } catch (e) {}
-        ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit', '.gps-lc-left', '.gps-lc-right', '.gps-lc-score', '.gps-panel', '.gps-zoom',
-            '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
+        var ovalObs = mr ? obstacles[obstacles.length - 1] : null;   // 093: the oval's box (a crowded bubble may sit over it)
+        ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-miss-chips', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit', '.gps-lc-left', '.gps-lc-right', '.gps-lc-score', '.gps-panel', '.gps-zoom',
+            '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom', '.gps-ld-bottom .gps-mark-shot'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
         // 066 #1: the golfer's extras (only when they turned some on) - the numbers keep off them too.
         Array.prototype.forEach.call(S.el.querySelectorAll('.hpf-slot'), function (el) { add(rectOf(el, wrapR), M); });
         // F / C / B and their number pills (Green view) are placed FIRST, so the two
@@ -2972,6 +3059,9 @@
             }
             return [{ x: a.x + t0 * dx, y: a.y + t0 * dy }, { x: a.x + t1 * dx, y: a.y + t1 * dy }];
         };
+        // 089c: My miss's chips column (bottom-left; with "from tee"): a rect on it, moved right just clear of it (else null).
+        var chipsRc = rectOf(S.el.querySelector('.gps-miss-chips'), wrapR), chipsObs = chipsRc ? { l: chipsRc.l - M, t: chipsRc.t - M, r: chipsRc.r + M, b: chipsRc.b + M } : null;
+        var offChips = function (rc) { if (!chipsObs || !hits(rc, chipsObs)) return null; var dx = chipsObs.r - rc.l; return { l: rc.l + dx, t: rc.t, r: rc.r + dx, b: rc.b }; };
         var SIZES = [44, 38, 32], TS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.22, 0.78, 0.12, 0.88];
         // LAYOUT D: round dark bubbles, smaller type.
         if (ldOn()) SIZES = [24, 21, 18];
@@ -3006,14 +3096,54 @@
                 lblEl.style.visibility = 'hidden';
                 return put(pill, a, b, text);
             }
+            // 089c: no clear spot on its line and the line runs past My miss's chips (the held fix / "from tee": the map
+            // is back on the hole view) - the number steps right, just clear of the chips column, where that is clear.
+            if (chipsObs) {
+                for (var i3 = 0; i3 < TS.length; i3++) {
+                    for (var j3 = 0; j3 < SIZES.length; j3++) {
+                        pill.style.fontSize = SIZES[j3] + 'px';
+                        var rc3 = offChips(rectAt(at(TS[i3]), pill.offsetWidth, pill.offsetHeight));
+                        if (!rc3 || !inBounds(rc3) || obstacles.some(function (ob) { return hits(rc3, ob); })) continue;
+                        place(rc3, SIZES[j3], 'beside-chips');
+                        return;
+                    }
+                }
+            }
+            // 093 (spec item 4: no label under a button, the pill or another label): still no clear spot - a short line
+            // (the target dragged close to the green centre: "14y" on "C 186") - the number tries just BESIDE its line,
+            // either side (perpendicular, one then two bubble-widths), the middle of the line first; the first clear one.
+            var sl = Math.sqrt(Math.pow(seg[1].x - seg[0].x, 2) + Math.pow(seg[1].y - seg[0].y, 2));
+            // A second pass may sit over the see-through My miss oval (never on a label or a button).
+            if (sl > 0.5) for (var pass5 = 0; pass5 < 2; pass5++) {
+                var nx = -(seg[1].y - seg[0].y) / sl, ny = (seg[1].x - seg[0].x) / sl;
+                var obs5 = pass5 ? obstacles.filter(function (ob) { return ob !== ovalObs; }) : obstacles;
+                for (var j5 = 0; j5 < SIZES.length; j5++) {
+                    pill.style.fontSize = SIZES[j5] + 'px';
+                    var w5 = pill.offsetWidth, h5 = pill.offsetHeight, step5 = Math.max(w5, h5) * 0.5 + M + 2;
+                    for (var i5 = 0; i5 < TS.length; i5++) {
+                        for (var d5 = 1; d5 <= 3; d5++) {
+                            for (var sg5 = -1; sg5 <= 1; sg5 += 2) {
+                                var c5 = at(TS[i5]), rc5 = rectAt({ x: c5.x + sg5 * nx * step5 * d5, y: c5.y + sg5 * ny * step5 * d5 }, w5, h5);
+                                if (!inBounds(rc5) || obs5.some(function (ob) { return hits(rc5, ob); })) continue;
+                                place(rc5, SIZES[j5], pass5 ? 'beside-line-oval' : 'beside-line');
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
             // ALWAYS SHOWN, ON ITS LINE: the middle of its visible part, at 32 px,
             // nudged along the line only to stay inside the screen.
+            // 089c: never on top of My miss's chips - stepped right just clear of them (inside the screen) when it would be.
             pill.style.fontSize = SIZES[SIZES.length - 1] + 'px';
             var w2 = pill.offsetWidth, h2 = pill.offsetHeight;
             for (var k = 0; k < TS.length; k++) {
-                var rc2 = rectAt(at(TS[k]), w2, h2);
+                var rc2 = rectAt(at(TS[k]), w2, h2), rcC = inBounds(rc2) ? offChips(rc2) : null;
+                if (rcC && inBounds(rcC)) { place(rcC, SIZES[SIZES.length - 1], 'beside-chips-crowded'); return; }
                 if (inBounds(rc2)) { place(rc2, SIZES[SIZES.length - 1], 'line-crowded'); return; }
             }
+            var rc4 = offChips(rectAt(at(0.5), w2, h2));
+            if (rc4 && inBounds(rc4)) { place(rc4, SIZES[SIZES.length - 1], 'beside-chips-crowded'); return; }
             place(rectAt(at(0.5), w2, h2), SIZES[SIZES.length - 1], 'line-crowded');
         };
         var aim = aimAt(r);
@@ -4859,6 +4989,23 @@
         render();
         setTimeout(function () { if (S) render(); }, 4100);
     }
+    // 091 (Manny APPROVED Oct 27: "Card | gap | Enter score | gap | Mark"): in layout D Mark shot is its own
+    // button in the bottom row - the size of Card, a ◎ over "Mark" (while a shot is open: the live yards
+    // instead of "Mark"). The same element, the same tap (markShotHere), the same show / hide rule; the
+    // full label stays its title. The full-width Mark shot bar is gone (Manny's OK).
+    function ldMarkIn() { return !!(S && S.ld && S.el && S.el.querySelector('.gps-ld-bottom .gps-bottom .gps-mark-shot')); }
+    function ldMarkCap() {
+        if (!S || !S.measureFrom) return 'Mark';
+        if (S.measureShot && Date.now() - S.measureShot.at < 4000) return 'Mark';
+        var d = fix ? G.haversineMeters(S.measureFrom, fix.pt) : 0;
+        return G.shownDistance(d, units()) + (units() === 'm' ? ' m' : ' yds');
+    }
+    function ldMarkPaint(mb) {
+        var full = String(measureLabel()).replace(/^\uD83D\uDCCD/, '\u25CE'), cap = ldMarkCap();
+        var html = '<span class="gps-ico" aria-hidden="true">\u25CE</span><span class="gps-cap">' + escapeText(cap) + '</span>';
+        if (mb.__ldm !== html || !mb.querySelector('.gps-cap')) { mb.innerHTML = html; mb.__ldm = html; }
+        if (mb.getAttribute('title') !== full) mb.setAttribute('title', full);
+    }
     function measureLabel() {
         if (!S || !S.measureFrom) return '\uD83D\uDCCD Mark shot';
         if (S.measureShot && Date.now() - S.measureShot.at < 4000) return 'Shot: ' + S.measureShot.text;
@@ -4949,13 +5096,16 @@
         var cft = courseFtForLog();   // 070 part 4: the course's height (a course number), for My bag's baseline
         if (cft) { ctx.courseFt = cft.ft; ctx.courseFtSrc = cft.src; }
         var plYd = pl && isFinite(pl.exact) ? pl.exact : null, mine = S;
+        // 089: Mark shot takes the tapped My miss club chip (if one stands here); the next shot starts on the app's pick.
+        var pickClub = null; try { pickClub = missPillClub(); } catch (e) { pickClub = null; }
+        S.missPick = null;
         sgMarkHere(toYd, !!(nums && nums.onGreen), r);
         withChips(function (C) {
             if (S !== mine) return;
             var T = chipsTracker(C), op = T.open();
             // A shot left open on another hole (the golfer looked ahead, then marked here).
             if (op && op.hole !== ctx.hole) chipsEndOther(T, op);
-            ctx.club = ctx.noOpen ? null : C.likelyClub(bagApi(), ctx.golfer, plYd || toYd);
+            ctx.club = ctx.noOpen ? null : (pickClub || C.likelyClub(bagApi(), ctx.golfer, plYd || toYd));
             var res = T.mark(pt, ctx);
             chipsClosed(res.closed);
             if (res.open) bagAsk(toYd, plYd, ctx.club); else bagHide();
@@ -5081,20 +5231,261 @@
         var mine = !!(op && op.hole === S.hole && opPt && G.haversineMeters(opPt, o.pt) <= nearYd * G.M_PER_YD);
         var teeYd = M.TUNE.TEE_YD * G.M_PER_YD, atTee = function (p) { return !!(r.tee && p && G.haversineMeters(p, r.tee) <= teeYd); };
         var fromTee = o.from === 'tee' || atTee(o.pt) || (mine && atTee(opPt));
-        var pl = null; try { pl = playsTo(null); } catch (e) { pl = null; }
+        var pl = null;
+        // 089b: from the held fix (o.held), the plays-like is worked out from that spot too.
+        if (o.held) S.missHeldPt = o.pt;
+        try { pl = playsTo(null); } catch (e) { pl = null; } finally { S.missHeldPt = null; }
         var greenYd = pl && pl.exact > 0 ? pl.exact : G.haversineMeters(o.pt, r.mid) / G.M_PER_YD;
         var bag = bagNow(B), club = null;
+        // 101: a club with no number of its own takes the generic carry (My bag's first-time table for his handicap).
+        var gen = null; try { gen = typeof B.defaultCarries === 'function' ? B.defaultCarries(bagHcp()) : null; } catch (e) { gen = null; }
+        var bagMy = bag; if (gen && typeof M.fillBag === 'function') bag = M.fillBag(bagMy, gen, B.BAG);
         if (mine && op.club) club = op.club;
-        else { var sg = greenYd >= 10 ? B.suggestClub(bag, greenYd) : null; club = sg ? sg.club : null; }
+        else { var sg = greenYd >= 10 ? B.suggestClub(bagMy, greenYd) : null; club = sg ? sg.club : null; }
         var v = club ? bag[club] : null, carry = v && v.yd > 0 ? v.yd : null;
         var tg = S.target || null, layup = !!(tg && G.haversineMeters(tg, r.mid) > M.TUNE.GREEN_AIM_YD * G.M_PER_YD);
         var ok = M.shows({ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup });
         // 072: a PAR-3 tee shot is the approach - the same checks again, with the hole's par (irons / wedges only).
         if (!ok.ok && ok.why === 'tee' && isPar3()) ok = M.shows({ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup }, { par: 3 });
+        // 101 (Manny's standing rule, Oct 29): EVERY PAR 3 AND EVERY APPROACH - never hidden for "range" (nor for a
+        // hybrid / wood / driver pick, nor a club with no number). The default = the club closest to the plays-like
+        // (the longest when nothing reaches). Still hidden: a par 4 / 5 tee shot ('tee') and a marked shot open at this ball (Mark-open).
+        var always = false;
+        // 101 gate fix: NOT while a marked shot is open at this ball (Mark-open keeps its hides, as before - its own club rules).
+        if (!ok.ok && !mine && typeof M.always === 'function' && M.always(ok.why) && greenYd >= 10) {
+            var nc = M.nearestClub(bag, greenYd, B.BAG, club); club = nc ? nc.club : null;
+            var cv1 = club ? bag[club] : null; carry = cv1 && cv1.yd > 0 ? cv1.yd : null;
+            if (club && carry) { ok = { ok: true, why: null }; always = true; }
+        }
         S.missWhy = ok.ok ? null : ok.why;
+        S.missChips = null;
+        var pk = mine ? null : missPickClub(o);   // 089: a pick from another hole / ball is dropped here, oval or not
+        if (mine) S.missPick = null;
         if (!ok.ok) return null;
-        var rawYd = G.haversineMeters(o.pt, r.mid) / G.M_PER_YD;
-        return { club: club, carry: carry, along: M.centreAt(carry, rawYd, pl && pl.exact > 0 ? pl.exact : null), aim: tg && !layup ? tg : r.mid, hand: SL && SL.hand ? SL.hand(bagGolfer()) : 'R' };
+        var rawYd = G.haversineMeters(o.pt, r.mid) / G.M_PER_YD, plEx = pl && pl.exact > 0 ? pl.exact : null;
+        var aim = tg && !layup ? tg : r.mid, aimYd = G.haversineMeters(o.pt, aim) / G.M_PER_YD;
+        // 089: THE CLUB CHIPS - the app's pick and the next club down, each only if My miss would draw it
+        // (the same checks as above); none while a marked shot is open at this ball (its club rules).
+        var chips = [];
+        if (!mine && typeof M.chipPair === 'function') {
+            M.chipPair(bag, club).forEach(function (c) {
+                var cv = bag[c], cy = cv && cv.yd > 0 ? cv.yd : null, q = { club: c, carry: cy, greenYd: greenYd, fromTee: fromTee, layup: layup };
+                var k = M.shows(q); if (!k.ok && k.why === 'tee' && isPar3()) k = M.shows(q, { par: 3 });
+                if (!k.ok && !(always && cy)) return;   // 101: always-on - any club with a carry
+                var al = M.centreAt(cy, rawYd, plEx);
+                chips.push({ club: c, carry: cy, along: al, delta: al - aimYd });
+            });
+        }
+        // 089b: THE CHIPS ACROSS THE GREEN'S DEPTH - from the golfer's spot: the live fix, else the last fix under
+        // 60 s old (missSync), else (no fix: planning, Preview) the hole's mapped tee, labelled "from tee" (never the
+        // tee box picked at setup): front / middle / back from that spot (gps-geo holeNumbers, as the F / C / B numbers),
+        // each iron / wedge whose carry lands front..back today (centreAt, as the oval), plus the nearest one
+        // within 5 yds short of the front / long of the back; at most 4 (gps-miss-pattern depthChips). The default
+        // = the club closest to the target point. A green with no front / back: 089's pair above.
+        var def = club, depth = false, allC = false;
+        if (!mine && (chips.length || always) && typeof M.depthChips === 'function') {
+            var hn = null; try { hn = G.holeNumbers(o.pt, r); } catch (e) { hn = null; }
+            var yd = function (m) { return m != null && isFinite(m) ? m / G.M_PER_YD : null; };
+            var dc = hn ? M.depthChips({ bag: bag, front: yd(hn.frontM), middle: yd(hn.middleM), back: yd(hn.backM), aimYd: aimYd, rawYd: rawYd, playsYd: plEx, app: club }) : null;
+            if (dc && dc.list.length) { chips = dc.list; def = dc.def; depth = true; }
+            // 095 (Manny, Oct 28): ON A PAR 3 (the switcher), EVERY CLUB IN MY BAG, shortest to longest - not only the
+            // ones landing on the green. The default = the club closest to the target. Approaches: unchanged.
+            var ac = hn && isPar3() && typeof M.allClubs === 'function' ? M.allClubs({ bag: bag, front: yd(hn.frontM), middle: yd(hn.middleM), back: yd(hn.backM), aimYd: aimYd, rawYd: rawYd, playsYd: plEx, app: club, order: B.BAG }) : null;
+            if (ac && ac.list.length) { chips = ac.list; def = ac.def; depth = true; allC = true; }
+            // 101: AN APPROACH WITH NO IRON / WEDGE LANDING NEAR THE GREEN (or none at all): the default club (closest to
+            // the plays-like, any club) and the clubs either side of it, with the 095 text ("3w · 12 short of the front").
+            if (always && !isPar3() && hn && !(dc && dc.list.length) && typeof M.allClubs === 'function') {
+                var ap = M.allClubs({ bag: bag, front: yd(hn.frontM), middle: yd(hn.middleM), back: yd(hn.backM), aimYd: aimYd, rawYd: rawYd, playsYd: plEx, app: club, order: B.BAG });
+                var aw = ap && typeof M.aroundDef === 'function' ? M.aroundDef(ap) : [];
+                if (aw.length) { chips = aw; def = ap.def; depth = true; allC = true; }
+            }
+        }
+        // The tapped chip, while it still stands (this hole, this ball, still one of the chips); else the default
+        // (089: the app's pick; 089b: the depth chip closest to the target).
+        var app = club, sel = def;
+        if (pk && chips.some(function (x) { return x.club === pk; })) sel = pk;
+        var selCarry = sel === app ? carry : bag[sel].yd;
+        if (chips.length) S.missChips = { app: app, def: def, sel: sel, depth: depth, all: allC, from: o.from, held: !!o.held, list: chips, pt: o.pt.slice() };
+        var selSpot = null; if (depth) chips.forEach(function (x) { if (x.club === sel) selSpot = x.spot; });
+        return { club: sel, app: app, any: allC || always, spot: selSpot, carry: selCarry, along: M.centreAt(selCarry, rawYd, plEx), aim: aim, aimYd: aimYd, hand: SL && SL.hand ? SL.hand(bagGolfer()) : 'R' };
+    }
+    // 089: THE TAPPED CHIP (memory only, this hole, this ball): { hole, club, pt }. Back to the app's pick on
+    // the next hole, the next shot (Mark shot, or the golfer more than 40 yds from where he tapped).
+    var MISS_PICK_NEAR_YD = 40;
+    function missPickClub(o) {
+        var p = S && S.missPick;
+        if (!p) return null;
+        if (p.hole !== S.hole || !o || !o.pt || !p.pt || G.haversineMeters(p.pt, o.pt) > MISS_PICK_NEAR_YD * G.M_PER_YD) { S.missPick = null; return null; }
+        // 095b (Manny, Oct 28: "Keep my tapped club"): a dragged target KEEPS the tapped / stepped club (its text and oval
+        // follow the target); with no tapped club the default re-picks the closest. Reset on the next hole / shot (above).
+        return p.club;
+    }
+    // The club the tapped chip puts on the plays-like pill (null: the pill keeps the app's pick).
+    function missPillClub() {
+        var c = S && S.missChips;
+        // 089b: the shown chip's club (the tapped one, or the depth default when it is not the app's pick).
+        return c && S.missOval && c.sel !== c.app && ((S.missPick && S.missPick.club === c.sel) || (c.depth && c.sel === c.def)) ? c.sel : null;
+    }
+    function missTgtKey() { var t = S && S.target; return t && t.length ? Number(t[0]).toFixed(7) + ',' + Number(t[1]).toFixed(7) : ''; }   // 095
+    function missChipTap(club) {
+        var c = S && S.missChips;
+        if (!c || !c.list.some(function (x) { return x.club === club; })) return;
+        // 095b: on the par-3 switcher a step / tap is kept even onto the default club (a later drag keeps it too).
+        S.missPick = club === (c.def || c.app) && !missSwitchOn() ? null : { hole: S.hole, club: club, pt: c.pt.slice(), tgt: missTgtKey() };
+        render();
+    }
+    // THE CHIPS ON THE MAP: stacked bottom-left, above Recenter (longer club on top), the shown one selected.
+    function missChipsSync() {
+        var row = S && S.el && S.el.querySelector('.gps-leftrow'); if (!row) return;
+        var box = row.querySelector('.gps-miss-chips'), c = S.missChips, M = missApi();
+        var swOn = !!(c && S.missOval && M && missSwitchOn());
+        S.el.classList.toggle('gps-miss-switch-on', swOn);   // 093: the carry arc labels dim while the switcher shows
+        if (!swOn) missCardShow(false);
+        if (!c || !S.missOval || !M) { if (box) { box.style.display = 'none'; box.textContent = ''; box.removeAttribute('data-miss-chips'); box.classList.remove('gps-miss-switch'); } return; }
+        if (!box) { box = document.createElement('div'); box.className = 'gps-miss-chips'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'My miss club'); row.insertBefore(box, row.firstChild); }
+        if (swOn) { missSwitchSync(row, box, c, M); return; }
+        if (box.classList.contains('gps-miss-switch')) { box.classList.remove('gps-miss-switch'); box.textContent = ''; box.removeAttribute('data-miss-chips'); }
+        var u = units() === 'm' ? 'm' : 'yd', B = bagApi();
+        var list = c.list.slice().sort(function (a, b) { return b.carry - a.carry; });
+        // 089b: a depth chip reads "LW · front +5" / "SW · middle" / "GW · back −1" (089's pair: "7i +8 long").
+        var txtOf = function (x) { if (c.all && x.spot && typeof M.switchText === 'function') return M.switchText(clubShort(x.club), x.spot, u, x.delta);   // 101: the approach fallback
+            return c.depth && x.spot && typeof M.depthText === 'function' ? M.depthText(clubShort(x.club), x.spot, u) : M.chipText(clubShort(x.club), x.delta, u); };
+        var fromTee = c.from === 'tee';   // 089b: measured from the mapped tee (no fix) - said on the chips
+        var sig = (fromTee ? 'tee|' : '') + list.map(function (x) { return x.club + ':' + txtOf(x) + (x.club === c.sel ? '*' : ''); }).join('|');
+        if (box.getAttribute('data-miss-chips') !== sig) {
+            box.textContent = '';
+            if (fromTee) { var ft = document.createElement('div'); ft.className = 'gps-miss-chips-from'; ft.textContent = 'from tee'; box.appendChild(ft); }
+            list.forEach(function (x) {
+                var b = document.createElement('button'); b.type = 'button'; b.className = 'gps-miss-chip' + (x.club === c.sel ? ' gps-miss-chip-on' : '');
+                b.setAttribute('data-miss-chip', x.club); b.setAttribute('aria-pressed', x.club === c.sel ? 'true' : 'false');
+                var t = txtOf(x), sp = t.indexOf(' ');
+                var bb = document.createElement('b'); bb.textContent = t.slice(0, sp); b.appendChild(bb); b.appendChild(document.createTextNode(' ' + t.slice(sp + 1)));
+                b.setAttribute('aria-label', 'My miss with the ' + ((B && B.NAMES && B.NAMES[x.club]) || x.club) + ': ' + t.slice(sp + 1).replace(/^\u00b7 /, 'lands ').replace('\u2212', 'minus ').replace('+', 'plus '));
+                b.onclick = function (e) { if (e) e.stopPropagation(); missChipTap(x.club); };
+                box.appendChild(b);
+            });
+            box.setAttribute('data-miss-chips', sig);
+            // 089b: the chips changed (3-4 of them, "from tee"): the distance bubbles keep off the new column now,
+            // not on the next fix (with no fix there may be no next render).
+            try { placePills0(); } catch (e) {}
+        }
+        box.style.display = '';
+    }
+    // 093 (Manny picked A): ON THE PAR 3 GPS VIEW, ONE CLUB SWITCHER PILL in place of the stacked chips, in the same
+    // lower-left spot: "‹ 7i · middle ›". The same chips (same list, same default = the club closest to the target,
+    // the same labels) - one at a time. › = more club (the next longer one), ‹ = less club; the arrow at either end of
+    // the list is dimmed. A swipe on the pill does the same (left = ›, right = ‹). The "from tee" tag stays above it.
+    // Tapping the middle shows the My miss label + note (off the map on a par 3) as a small card for 4 s; tap again
+    // to hide. Approaches (par 4 / 5) keep the chip stack. Memory only: nothing stored, nothing sent.
+    var MISS_CARD_MS = 4000, MISS_SWIPE_PX = 24;
+    function missSwitchOn() { return !!(S && S.missChips && S.missOval && isPar3()); }
+    function missSwitchList(c) { return c.list.slice().sort(function (a, b) { return a.carry - b.carry; }); }   // shortest first
+    function missSwitchStep(dir) {
+        var c = S && S.missChips; if (!c || !missSwitchOn()) return false;
+        var list = missSwitchList(c), i = -1;
+        list.forEach(function (x, k) { if (x.club === c.sel) i = k; });
+        var j = i + (dir > 0 ? 1 : -1);
+        if (i < 0 || j < 0 || j >= list.length) return false;
+        missChipTap(list[j].club);
+        return true;
+    }
+    function missSpeakClub(club) {
+        var B = bagApi(), nm = (B && B.NAMES && B.NAMES[club]) || club;
+        return String(nm).replace(/-/g, ' ');
+    }
+    function missSwitchSync(row, box, c, M) {
+        var u = units() === 'm' ? 'm' : 'yd';
+        var list = missSwitchList(c), x = null, i = -1;
+        list.forEach(function (y, k) { if (y.club === c.sel) { x = y; i = k; } });
+        if (!x) { x = list[0]; i = 0; }
+        var t = c.depth && x.spot && typeof M.depthText === 'function' ? M.depthText(clubShort(x.club), x.spot, u) : M.chipText(clubShort(x.club), x.delta, u);
+        if (c.all && x.spot && typeof M.switchText === 'function') t = M.switchText(clubShort(x.club), x.spot, u, x.delta);   // 095: off the green "9i · 12 past the back"; on it, zone + yds vs the target
+        var fromTee = c.from === 'tee', lessOff = i <= 0, moreOff = i >= list.length - 1;
+        if (!box.classList.contains('gps-miss-switch')) {
+            box.textContent = ''; box.removeAttribute('data-miss-chips'); box.classList.add('gps-miss-switch');
+            var pill = document.createElement('div'); pill.className = 'gps-miss-pill';
+            var mkBtn = function (cls, txt, aria) { var b = document.createElement('button'); b.type = 'button'; b.className = cls; if (txt) b.textContent = txt; if (aria) b.setAttribute('aria-label', aria); pill.appendChild(b); return b; };
+            var less = mkBtn('gps-miss-arrow gps-miss-less', '‹', 'Less club');
+            var mid = mkBtn('gps-miss-mid', '', null);
+            var more = mkBtn('gps-miss-arrow gps-miss-more', '›', 'More club');
+            var sw = { x: 0, y: 0, down: false, at: 0 };
+            var swiped = function () { return Date.now() - sw.at < 450; };
+            less.onclick = function (e) { if (e) e.stopPropagation(); if (swiped()) return; missSwitchStep(-1); };
+            more.onclick = function (e) { if (e) e.stopPropagation(); if (swiped()) return; missSwitchStep(1); };
+            mid.onclick = function (e) { if (e) e.stopPropagation(); if (swiped()) return; missCardShow(!missCardShown()); };
+            // The swipe: from a press on the pill to the release anywhere (a finger often ends off the pill).
+            var up = function (e) {
+                document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', cancel, true);
+                if (!sw.down) return; sw.down = false;
+                var dx = e.clientX - sw.x, dy = e.clientY - sw.y;
+                if (Math.abs(dx) >= MISS_SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.2) { sw.at = Date.now(); missSwitchStep(dx < 0 ? 1 : -1); }
+            };
+            var cancel = function () { sw.down = false; document.removeEventListener('pointerup', up, true); document.removeEventListener('pointercancel', cancel, true); };
+            pill.addEventListener('pointerdown', function (e) {
+                sw.down = true; sw.x = e.clientX; sw.y = e.clientY; e.stopPropagation();
+                document.addEventListener('pointerup', up, true); document.addEventListener('pointercancel', cancel, true);
+            });
+            pill.addEventListener('keydown', function (e) { if (e.key === 'ArrowRight') { missSwitchStep(1); e.preventDefault(); } else if (e.key === 'ArrowLeft') { missSwitchStep(-1); e.preventDefault(); } });
+            box.appendChild(pill);
+        }
+        var sig = (fromTee ? 'tee|' : '') + list.map(function (y) { return y.club; }).join(',') + '|' + x.club + ':' + t;
+        if (box.getAttribute('data-miss-chips') !== sig) {
+            var ftag = box.querySelector('.gps-miss-chips-from');   // the "from tee" tag right above the pill, only from the tee
+            if (fromTee && !ftag) { ftag = document.createElement('div'); ftag.className = 'gps-miss-chips-from'; ftag.textContent = 'from tee'; box.insertBefore(ftag, box.firstChild); }
+            else if (!fromTee && ftag) box.removeChild(ftag);
+            var midB = box.querySelector('.gps-miss-mid'), lb = box.querySelector('.gps-miss-less'), mb = box.querySelector('.gps-miss-more');
+            midB.textContent = '';
+            var sp = t.indexOf(' '), bb = document.createElement('b'); bb.textContent = t.slice(0, sp); midB.appendChild(bb); midB.appendChild(document.createTextNode(' ' + t.slice(sp + 1)));
+            midB.setAttribute('data-miss-chip', x.club);
+            var rest = t.slice(sp + 1).replace(/^· /, '').replace('−', 'minus ').replace('+', 'plus ');
+            midB.setAttribute('aria-label', 'Club ' + missSpeakClub(x.club) + ', ' + rest + '. Swipe or tap arrows to change.');
+            [[lb, lessOff], [mb, moreOff]].forEach(function (p) { p[0].classList.toggle('gps-miss-arrow-off', p[1]); p[0].setAttribute('aria-disabled', p[1] ? 'true' : 'false'); });
+            box.setAttribute('data-miss-chips', sig);
+            try { placePills0(); } catch (e) {}
+        }
+        box.style.display = '';
+        missSwitchFit(box);
+        missCardSync();
+    }
+    // 093: a small phone - the pill's right end can reach the Plays-like pill (bottom right): first a tighter pill
+    // (narrower arrows, 13 px text), then, only if it still touches, lifted just clear of it (same left edge).
+    function missSwitchFit(box) {
+        var pill = box.querySelector('.gps-miss-pill'), pl = S.el.querySelector('.gps-ld-plays');
+        box.classList.remove('gps-miss-pill-tight'); box.style.marginBottom = '';
+        if (!pill || !pl || pl.offsetParent === null || pl.style.display === 'none') return;
+        var touch = function () { var a = pill.getBoundingClientRect(), b = pl.getBoundingClientRect(); return a.right + 4 > b.left && a.left < b.right && a.bottom + 4 > b.top && a.top < b.bottom ? a.bottom + 6 - b.top : 0; };
+        if (!touch()) return;
+        box.classList.add('gps-miss-pill-tight');
+        var up = touch();
+        if (up > 0) box.style.marginBottom = Math.ceil(up) + 'px';
+    }
+    // 093: THE NOTE CARD - the My miss label + note, above the switcher, for 4 s (or until tapped again).
+    function missCardShown() { return !!(S && S.missCardUntil && Date.now() < S.missCardUntil); }
+    function missCardShow(on) {
+        if (!S) return;
+        if (S.missCardTimer) { clearTimeout(S.missCardTimer); S.missCardTimer = null; }
+        S.missCardUntil = on ? Date.now() + MISS_CARD_MS : 0;
+        if (on) S.missCardTimer = setTimeout(function () { if (S) { S.missCardTimer = null; S.missCardUntil = 0; missCardSync(); } }, MISS_CARD_MS);
+        missCardSync();
+    }
+    function missCardSync() {
+        var row = S && S.el && S.el.querySelector('.gps-leftrow'); if (!row) return;
+        var card = row.querySelector('.gps-miss-card'), box = row.querySelector('.gps-miss-chips.gps-miss-switch');
+        var on = missCardShown() && !!box && box.style.display !== 'none' && missSwitchOn() && !!S.missLblText;
+        var mid = box && box.querySelector('.gps-miss-mid');
+        if (mid) mid.setAttribute('aria-expanded', on ? 'true' : 'false');
+        if (!on) { if (card) card.style.display = 'none'; return; }
+        if (!card) { card = document.createElement('div'); card.className = 'gps-miss-card'; card.setAttribute('role', 'status'); row.appendChild(card); }
+        var L = S.missLblText, want = L.lbl + '|' + L.note;
+        if (card.getAttribute('data-l') !== want) {
+            card.textContent = '';
+            var h = document.createElement('b'); h.textContent = L.lbl; card.appendChild(h);
+            if (L.note) { var n = document.createElement('span'); n.textContent = L.note; card.appendChild(n); }
+            card.setAttribute('data-l', want);
+        }
+        card.style.display = '';
+        var rr = row.getBoundingClientRect(), br = box.getBoundingClientRect();
+        card.style.bottom = Math.round(rr.bottom - br.top + 8) + 'px';
     }
     var MISS_SRC = 'mymiss', MISS_LAYERS = ['mymiss-fill', 'mymiss-line'];
     function missClear() {
@@ -5102,7 +5493,14 @@
             try { MISS_LAYERS.forEach(function (id) { if (S.map.getLayer(id)) S.map.removeLayer(id); }); if (S.map.getSource(MISS_SRC)) S.map.removeSource(MISS_SRC); } catch (e) {}
         }
         if (S && S.markers && S.markers.mymiss) marker('mymiss', null);
-        if (S) { S.missRing = null; S.missKey = null; S.missOval = null; }
+        if (S) { S.missRing = null; S.missKey = null; S.missOval = null; S.missChips = null; S.missNote = null; S.missLblText = null; }
+        // 089: no oval - no chips, and the target ring back to full strength.
+        try { missChipsSync(); missRingFade(false); } catch (e) {}
+    }
+    // 089: the target ring (both circles + the width line) fades while the oval shows; its centre dot stays strong.
+    function missRingFade(on) {
+        var t = S && S.targetMarker && S.targetMarker.getElement();
+        if (t) t.classList.toggle('gps-target-mymiss', !!on);
     }
     function missSync(r, o) {
         if (!S) return;
@@ -5110,8 +5508,13 @@
         var M = missApi();
         if (!M) { if (!S.missLoad) { S.missLoad = true; withShots(function () { if (S && missApi() && missApi().isOn(bagGolfer())) render(); }); } return; }
         if (!M.isOn(bagGolfer()) || !S.map || !S.styleReady) { missClear(); return; }
+        // 089b: no live fix (the 10 s rule dropped it) - the last fix while under 60 s old, for My miss only.
+        if (o && o.from === 'tee' && r && r.mid && missLastFix) {
+            var hp = M.heldFix ? M.heldFix(missLastFix, Date.now()) : null, ho = hp ? G.measureOrigin(hp, r.tee, r.mid) : null;
+            if (ho && ho.from === 'me') o = { from: 'me', pt: hp.slice(), held: true };
+        }
         var plan = missPlan(r, o), B = bagApi();
-        var f = plan ? M.oval(plan.club, plan.carry, plan.hand, plan.along) : null;
+        var f = plan ? M.oval(plan.club, plan.carry, plan.hand, plan.along, !!plan.any) : null;   // 095: any club on the par-3 switcher
         if (!f) { missClear(); return; }
         var aim = plan.aim, club = plan.club;
         S.missOval = { club: f.club, carry: f.avg, along: f.carry, a: f.a, b: f.b, tilt: f.tilt, hand: f.hand };
@@ -5119,30 +5522,63 @@
         var ring = M.outline(f, 64).map(function (q) { return at(q[0], q[1]); });
         var coords = ring.map(function (p) { return [p[1], p[0]]; });
         var fc = { type: 'FeatureCollection', features: [feature('miss', 'Polygon', [coords])] };
+        // 089: THE STEPPED FADE - the same oval at 86 / 72 / 58 / 44 / 30% stacked inside it, each faint, so the
+        // centre is dark and the edge light (the same two layers; the edge line only on the outer oval).
+        var fades = typeof M.fadeOvals === 'function' ? M.fadeOvals(f).slice(1) : [];
+        fades.forEach(function (g, i) { fc.features.push(feature('miss-fade-' + (i + 1), 'Polygon', [M.outline(g, 64).map(function (q) { var p = at(q[0], q[1]); return [p[1], p[0]]; })])); });
         var map = S.map;
         if (!map.getSource(MISS_SRC)) {
             map.addSource(MISS_SRC, { type: 'geojson', data: fc });
             var before = map.getLayer('line-case') ? 'line-case' : undefined;
-            map.addLayer({ id: 'mymiss-fill', type: 'fill', source: MISS_SRC, paint: { 'fill-color': '#7dd3fc', 'fill-opacity': 0.22 } }, before);
-            map.addLayer({ id: 'mymiss-line', type: 'line', source: MISS_SRC, paint: { 'line-color': '#7dd3fc', 'line-width': 2, 'line-opacity': 0.95 } }, before);
+            map.addLayer({ id: 'mymiss-fill', type: 'fill', source: MISS_SRC, paint: { 'fill-color': '#7dd3fc', 'fill-opacity': fades.length ? 0.11 : 0.22 } }, before);
+            map.addLayer({ id: 'mymiss-line', type: 'line', source: MISS_SRC, filter: ['==', ['get', 'k'], 'miss'], paint: { 'line-color': '#7dd3fc', 'line-width': fades.length ? 1.25 : 2, 'line-opacity': fades.length ? 0.6 : 0.95 } }, before);
         } else setData(MISS_SRC, fc);
         S.missRing = ring;
+        missRingFade(true);
         // Its label (text only, no button - taps go through to the map), beside the oval - on its
         // right, or on its left when the right has no room (the rail) - never on top of it.
         var px = ring.map(function (p) { return S.map.project(ll(p)).x; });
         var rI = px.indexOf(Math.max.apply(null, px)), lI = px.indexOf(Math.min.apply(null, px));
         var nm = (B.NAMES && B.NAMES[club]) || club;
         var lbl = 'My miss \u00b7 ' + nm;
+        // 089: the note under it - "7-iron lands 8 yds long" (the centre vs the yards to the aim; none within 2 yds).
+        var note = typeof M.landNote === 'function' && plan.aimYd != null ? M.landNote(nm, f.carry - plan.aimYd, f.cx || 0, units() === 'm' ? 'm' : 'yd') : '';
+        // 089b: a depth chip's note, one line, the target first: "Lob wedge: 17 yds short of the target · 5 yds onto the front".
+        if (plan.spot && plan.aimYd != null && typeof M.depthNote === 'function') note = M.depthNote(nm, f.carry - plan.aimYd, plan.spot, units() === 'm' ? 'm' : 'yd');
+        S.missNote = note || null;
+        // 093: ON A PAR 3 WITH THE CLUB SWITCHER, the label + note box leaves the map: the same two lines show in a
+        // small card when the golfer taps the middle of the switcher pill (missChipsSync). Elsewhere: unchanged.
+        S.missLblText = { lbl: lbl, note: note || '' };
+        if (missSwitchOn()) {
+            if (S.markers && S.markers.mymiss) marker('mymiss', null);
+            S.missLbl = null;
+            missChipsSync();
+            missKeepClear();
+            return;
+        }
         var mk = marker('mymiss', ring[rI], function () { var e = document.createElement('div'); e.className = 'gps-miss-lbl'; e.style.pointerEvents = 'none'; return e; });
         if (mk) {
             var me = mk.getElement();
-            if (me.textContent !== lbl) {
+            if (me.textContent !== lbl + note) {
                 me.textContent = '';
                 var sp = document.createElement('span'); sp.appendChild(document.createTextNode(lbl));
+                if (note) {
+                    var sm = document.createElement('small'); sm.className = 'gps-miss-note';
+                    // 089b: the depth note in two parts (one line; broken at the " · " only when it has no room).
+                    var cut = plan.spot ? note.indexOf(' \u00b7 ') : -1;
+                    if (cut > 0) {
+                        var pa = document.createElement('span'); pa.className = 'gps-miss-note-a'; pa.textContent = note.slice(0, cut);
+                        var ps = document.createElement('span'); ps.className = 'gps-miss-note-sep'; ps.textContent = ' \u00b7 ';
+                        var pb = document.createElement('span'); pb.className = 'gps-miss-note-b'; pb.textContent = note.slice(cut + 3);
+                        sm.appendChild(pa); sm.appendChild(ps); sm.appendChild(pb);
+                    } else sm.textContent = note;
+                    sp.appendChild(sm);
+                }
                 me.appendChild(sp);
             }
             me.setAttribute('data-miss-club', club); me.setAttribute('data-miss-carry', String(Math.round(f.avg)));
         }
+        missChipsSync();
         missKeepClear();
         missPlaceLbl();
         missMakeRoom();
@@ -5189,7 +5625,7 @@
             var b = e.getBoundingClientRect(); if (!(b.width > 0 && b.height > 0)) return;
             out.push({ l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top });
         };
-        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-arc-lbl, .gps-right > *, .gps-leftrow .gps-recenter, .gps-green-dims, .gps-banner, .gps-msg, .gps-verify, .gps-target-row'), add);
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-arc-lbl, .gps-right > *, .gps-leftrow .gps-recenter, .gps-green-dims, .gps-banner, .gps-msg, .gps-verify, .gps-target-row, .gps-miss-chips > *, .gps-ld-bottom .gps-mark-shot'), add);
         Object.keys(S.markers || {}).forEach(function (k) { if (k !== 'mymiss') { var m = S.markers[k]; add(m && m.getElement()); } });
         add(S.targetMarker && S.targetMarker.getElement());
         return out;
@@ -5214,6 +5650,11 @@
             [cl(cx - sw / 2), cl(box.l), cl(box.r - sw), B.l, B.r - sw].forEach(function (l) { out.push({ how: 'below', l: l, t: below }, { how: 'above', l: l, t: above }); });
             out.push({ how: 'right', l: box.r + G, t: ct(cy - sh / 2) }, { how: 'left', l: box.l - G - sw, t: ct(cy - sh / 2) });
         });
+        // 089b: a sweep in 6 px steps up and down the clear map (left edge, centred, right edge), still only when every
+        // spot above is covered - so the note "Lob wedge: 17 yds short of the target · 5 yds onto the front" finds the
+        // gap between the green's "B" label and the top row on an SE.
+        for (var st = box.t - 8 - sh; st >= B.t; st -= 6) [B.l, cl(cx - sw / 2), B.r - sw].forEach(function (l) { out.push({ how: 'above', l: l, t: st }); });
+        for (var sb = box.b + 8; sb + sh <= B.b; sb += 6) [B.l, cl(cx - sw / 2), B.r - sw].forEach(function (l) { out.push({ how: 'below', l: l, t: sb }); });
         // No room outside the oval at all (a small phone, close in): the sides clamped onto the screen,
         // or just inside the oval's top / bottom edge.
         out.push({ how: 'above', l: cl(cx - sw / 2), t: ct(box.t - 6 - sh) }, { how: 'below', l: cl(cx - sw / 2), t: ct(box.b + 6) },
@@ -5226,7 +5667,7 @@
         var mk = S.markers.mymiss, me = mk.getElement(), sp = me && me.firstChild, wrap = S.el.querySelector('.gps-map-wrap');
         if (!sp || !wrap) return null;
         var wr = wrap.getBoundingClientRect(), box = missRect(); if (!box) return null;
-        var sw = sp.offsetWidth, sh = sp.offsetHeight, cb = ldOn() ? ldClearBox() : null;
+        var cb = ldOn() ? ldClearBox() : null;
         var B = { l: 4, t: (cb ? cb.top : 0) + 4, r: (cb ? cb.right : wr.width) - 4, b: (cb ? cb.bottom : wr.height) - 4 };
         // Weights: off the clear map or on a button / number / label counts 10x; on the oval's own edge 1x
         // (the oval is see-through; the rail and the numbers are not).
@@ -5238,8 +5679,29 @@
             var ow = Math.max(0, B.l - c.l) + Math.max(0, c.r - B.r), oh = Math.max(0, B.t - c.t) + Math.max(0, c.b - B.b);
             return a + over(c, ov, 0) + (ow * sh + oh * sw) * 10;
         };
-        var spots = missLblSpots(box, sw, sh, B), best = null;
-        spots.forEach(function (c) { c.cover = cover(c); if (!best || c.cover < best.cover - 0.5) best = c; });
+        var sw, sh, spots, best;
+        var choose = function () {
+            sw = sp.offsetWidth; sh = sp.offsetHeight; spots = missLblSpots(box, sw, sh, B); best = null;
+            spots.forEach(function (c) { c.cover = cover(c); if (!best || c.cover < best.cover - 0.5) best = c; });
+        };
+        // 089: the note (second line) shows only where the label has a clear spot WITH it; with no clear spot
+        // (a small phone, close in) the label goes back to one line when that covers less.
+        var nt = sp.querySelector('.gps-miss-note');
+        if (nt) nt.style.display = '';
+        if (nt) nt.classList.remove('gps-miss-note-wrap');
+        choose();
+        // 089b: the depth note is one line; on a small phone with no clear spot for it, it breaks at the " · "
+        // (the target part, then where on the green) before the label gives the note up.
+        if (nt && best.cover >= 1 && nt.querySelector('.gps-miss-note-b')) {
+            var one = { sw: sw, sh: sh, spots: spots, best: best };
+            nt.classList.add('gps-miss-note-wrap'); choose();
+            if (!(best.cover < one.best.cover - 0.5)) { nt.classList.remove('gps-miss-note-wrap'); sw = one.sw; sh = one.sh; spots = one.spots; best = one.best; }
+        }
+        if (nt && best.cover >= 1) {
+            var keep = { sw: sw, sh: sh, spots: spots, best: best };
+            nt.style.display = 'none'; choose();
+            if (!(best.cover < keep.best.cover - 0.5)) { nt.style.display = ''; sw = keep.sw; sh = keep.sh; spots = keep.spots; best = keep.best; }
+        }
         var cx = (box.l + box.r) / 2, cy = (box.t + box.b) / 2;
         try { mk.setLngLat(S.map.unproject([cx, cy])); } catch (e) { return null; }
         sp.style.left = Math.round(best.l - cx) + 'px'; sp.style.top = Math.round(best.t - cy) + 'px'; sp.style.right = 'auto';
@@ -5666,7 +6128,7 @@
     function drawShots() {
         var A = shotsApi();
         var mb = S && S.el.querySelector('.gps-mark-shot');
-        if (mb) { mb.style.display = S && S.pro && S.mode === 'measure' && !S.replay ? '' : 'none'; if (S && mb.textContent !== measureLabel()) mb.textContent = measureLabel(); }
+        if (mb) { mb.style.display = S && S.pro && S.mode === 'measure' && !S.replay ? '' : 'none'; if (S && ldMarkIn()) ldMarkPaint(mb); else if (S && mb.textContent !== measureLabel()) mb.textContent = measureLabel(); }
         // Markers whenever this hole has shots; the bar only while marking / replaying / moving.
         var mode = !!(S && (S.shotMode || S.replay || S.shotAdjust));
         var on = !!(S && A && S.mode === 'measure' && (mode || A.shots(S.eventCode, S.hole).length));
@@ -6005,6 +6467,7 @@
             var lb = h.n.querySelector('.gps-lbl'); if (lb && h.lbl != null) lb.textContent = h.lbl;
             if (h.n.matches && h.n.matches('.gps-num-f, .gps-num-b')) h.n.style.display = '';
             if (h.n.matches && h.n.matches('.gps-zoom')) { h.n.style.top = ''; h.n.style.transform = ''; }
+            if (h.n.matches && h.n.matches('.gps-mark-shot') && h.n.classList.contains('gps-ld-mark')) { h.n.classList.remove('gps-ld-mark'); h.n.removeAttribute('title'); h.n.__ldm = null; h.n.textContent = measureLabel(); }
         });
         LAYOUT_BOXES.forEach(function (sel) { Array.prototype.forEach.call(el.querySelectorAll(sel), function (n) { if (n.parentNode) n.parentNode.removeChild(n); }); });
         el.classList.remove('gps-lc'); el.classList.remove('gps-ld');
@@ -6037,9 +6500,13 @@
         // THE PLAYS-LIKE PILL: the raw yards in the dark circle, "Plays like 249y · 3W". Tap = ⓘ.
         var plays = mk('button', 'gps-ld-plays', { type: 'button', style: 'display:none', 'aria-label': 'Plays like - how it works' });
         plays.innerHTML = '<span class="gps-ld-raw"></span><span class="gps-ld-pl"><small>Plays like</small><b class="gps-ld-pltext"></b><small class="gps-ld-elev" style="display:none"></small></span>' + (plInfoSwitch() ? '<span class="gps-ld-i" aria-hidden="true">ⓘ</span>' : '');
-        // THE BOTTOM: Mark shot, wide; under it Card | ‹ Hole 4 / Enter score › | + Game | Tools.
+        // THE BOTTOM (091): Card | ‹ Hole 4 / Enter score › | + Game | Tools | Mark - Mark shot is its own
+        // button at the right end, the size of Card (the full-width Mark shot bar is gone, Manny's OK).
         var bot = mk('div', 'gps-ld-bottom', { role: 'group', 'aria-label': 'Actions' });
-        put(bot, '.gps-mark-shot'); put(bot, '.gps-bottom'); put(bot, '.gps-actions');
+        put(bot, '.gps-bottom'); put(bot, '.gps-actions');
+        var bRow = bot.querySelector('.gps-bottom'), msb = q('.gps-mark-shot');
+        if (bRow && msb) { bRow.appendChild(msb); msb.classList.add('gps-ld-mark'); }
+        else if (msb) bot.insertBefore(msb, bot.firstChild);
         // TWO LINES, however many golfers: "Hole 1 · Manny ▾" (tap the hole = Enter score, the
         // name = whose score), then "Enter score" / the score.
         var col = bot.querySelector('.gps-score-col');
@@ -6072,7 +6539,9 @@
         var B = bagApi();
         if (bagSwitch() && B && o.from === 'me' && !(B.needsSetup && B.needsSetup(bagGolfer()))) {
             var sg = B.suggestClub(bagNow(B), clubYd(pl, S.target || null));
-            if (sg) out.club = clubShort(sg.club);
+            // 089: a tapped My miss club chip puts its club on the pill ("170y · 8i") until the next shot or hole.
+            var mpc = null; try { mpc = missPillClub(); } catch (e) { mpc = null; }
+            if (sg) out.club = clubShort(mpc || sg.club);
         }
         return out;
     }
@@ -6208,7 +6677,8 @@
         var edges = !!(r && ((r.useGreenForEdges && r.green) || r.front || r.back));
         show('.gps-num-f', edges); show('.gps-num-b', edges);
         var mb = S.el.querySelector('.gps-mark-shot');
-        if (mb && mb.textContent.indexOf('📍') === 0) mb.textContent = '◎' + mb.textContent.slice(2);
+        if (mb && ldMarkIn()) ldMarkPaint(mb);
+        else if (mb && mb.textContent.indexOf('📍') === 0) mb.textContent = '◎' + mb.textContent.slice(2);
         var u = units() === 'm' ? 'm' : 'y';
         Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on'), function (p) { if (p.getAttribute('data-u') !== u) p.setAttribute('data-u', u); });   // URGENT-025: "283y", no "left" 
         var pill = S.el.querySelector('.gps-ld-plays');
@@ -7419,9 +7889,12 @@
         // 070 part 2: the elevation line, small, one line.
         + '#gps-overlay .gps-ld-pl small.gps-ld-elev{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
         + '#gps-overlay .gps-ld-i{flex:0 0 auto;font-size:18px;color:#6b7280;}'
-        // THE BOTTOM: Mark shot, then Card | Hole N / Enter score | + Game | Tools.
+        // THE BOTTOM (091): Card | Hole N / Enter score | + Game | Tools | Mark.
         + '#gps-overlay .gps-ld-bottom{position:absolute;z-index:7;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom) + 8px);display:flex;flex-direction:column;gap:8px;}'
-        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-mark-shot{width:100%;min-height:52px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;color:var(--gps-ld-lime);font:800 18px/1 ' + FONT + ';display:flex;align-items:center;justify-content:center;}'
+        // 091: Mark - its own button at the row's right end, Card's size (56 px wide, the row's height, the same 8 px gap).
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom .gps-mark-shot{flex:0 0 auto;width:56px;min-height:0;padding:0;margin:0;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;color:var(--gps-ld-lime);font:800 12px/1 ' + FONT + ';display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;white-space:nowrap;overflow:hidden;box-sizing:border-box;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom .gps-mark-shot .gps-ico{color:inherit;font-size:20px;line-height:1;}'
+        + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom .gps-mark-shot .gps-cap{color:inherit;font-size:12px;max-width:54px;overflow:hidden;text-overflow:ellipsis;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-bottom{position:static;height:62px;gap:8px;}'
         + '#gps-overlay.gps-ld .gps-ld-bottom .gps-side-bets,#gps-overlay.gps-ld .gps-ld-bottom .gps-tools,#gps-overlay.gps-ld .gps-ld-bottom .gps-door-add{width:56px;border-radius:16px;background:rgba(11,15,12,.95);border:0;-webkit-backdrop-filter:none;backdrop-filter:none;}'
         // 012 (Manny): Games (top left) and + Game opened the same thing - D has the Games pill only;
@@ -7517,7 +7990,29 @@
         + '#gps-overlay .gps-ts-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;border-bottom:1px solid rgba(255,255,255,.1);font:700 17px/1.25 ' + FONT + ';}'
         // URGENT-052 B: the My miss label (text only, never a button).
         + '#gps-overlay .gps-miss-lbl{width:0;height:0;overflow:visible;}#gps-overlay .gps-miss-lbl span{position:absolute;left:8px;top:-10px;padding:2px 7px;border-radius:8px;background:rgba(11,15,12,.82);color:#7dd3fc;font:800 11.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;}'
-        + '#gps-overlay .gps-miss-lbl small{display:block;font-weight:600;font-size:10.5px;color:#cbd5e1;}#gps-overlay .gps-miss-lbl.gps-miss-lbl-l span{left:auto;right:8px;}'
+        + '#gps-overlay .gps-miss-lbl small{display:block;font-weight:600;font-size:10.5px;color:#cbd5e1;}#gps-overlay .gps-miss-lbl small span{position:static;padding:0;background:none;border-radius:0;color:inherit;font:inherit;}#gps-overlay .gps-miss-note-wrap .gps-miss-note-sep{display:none;}#gps-overlay .gps-miss-note-wrap .gps-miss-note-b{display:block;}#gps-overlay .gps-miss-lbl.gps-miss-lbl-l span{left:auto;right:8px;}'
+        // 089: the My miss club chips (stacked above Recenter, 16 px from the edge; 40 px tall) and the faded target ring.
+        + '#gps-overlay .gps-miss-chips{position:absolute;left:8px;bottom:calc(100% + 10px);display:flex;flex-direction:column;align-items:flex-start;gap:8px;pointer-events:none;}'
+        + '#gps-overlay .gps-miss-chip{pointer-events:auto;height:40px;box-sizing:border-box;padding:0 14px;border-radius:20px;border:2px solid rgba(125,211,252,.55);background:rgba(11,15,12,.82);color:#e2e8f0;font:700 15px/1 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;cursor:pointer;}'
+        + '#gps-overlay .gps-miss-chip b{font-weight:800;color:#fff;margin-right:2px;}'
+        + '@media (max-width:399px){#gps-overlay .gps-miss-chip{padding:0 10px;font-size:14px;}}'   // 089b: an SE - narrower chips, the distance bubble keeps its line clear
+        + '#gps-overlay .gps-miss-chips-from{pointer-events:none;padding:2px 8px;border-radius:8px;background:rgba(11,15,12,.82);color:#cbd5e1;font:700 11.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;}'
+        + '#gps-overlay .gps-miss-chip.gps-miss-chip-on{background:#0e7490;border-color:#7dd3fc;color:#fff;}'
+        + '#gps-overlay.gps-sun .gps-miss-chip{background:#000 !important;border-color:#fff !important;color:#fff !important;}#gps-overlay.gps-sun .gps-miss-chip.gps-miss-chip-on{background:#0e7490 !important;}'
+        // 093: the par-3 club switcher pill ("‹ 7i · middle ›", 40 px tall, same spot as the chips), its note card and the dimmed carry labels.
+        + '#gps-overlay .gps-miss-pill{pointer-events:auto;display:flex;align-items:stretch;height:40px;box-sizing:border-box;border-radius:20px;border:2px solid #7dd3fc;background:rgba(11,15,12,.86);touch-action:none;user-select:none;-webkit-user-select:none;}'
+        + '#gps-overlay .gps-miss-pill button{background:none;border:0;margin:0;color:#e2e8f0;cursor:pointer;-webkit-tap-highlight-color:transparent;}'
+        + '#gps-overlay .gps-miss-pill .gps-miss-arrow{width:32px;padding:0;font:800 24px/1 -apple-system,BlinkMacSystemFont,sans-serif;color:#7dd3fc;}'
+        + '#gps-overlay .gps-miss-pill .gps-miss-arrow.gps-miss-arrow-off{opacity:.28;}'
+        + '#gps-overlay .gps-miss-pill .gps-miss-mid{padding:0 2px;font:700 15px/1 -apple-system,BlinkMacSystemFont,sans-serif;white-space:nowrap;color:#e2e8f0;}'
+        + '#gps-overlay .gps-miss-pill .gps-miss-mid b{font-weight:800;color:#fff;margin-right:2px;}'
+        + '@media (max-width:399px){#gps-overlay .gps-miss-pill .gps-miss-mid{font-size:14px;}#gps-overlay .gps-miss-pill .gps-miss-arrow{width:28px;}}'
+        + '#gps-overlay .gps-miss-pill-tight .gps-miss-pill .gps-miss-arrow{width:22px;font-size:22px;}#gps-overlay .gps-miss-pill-tight .gps-miss-pill .gps-miss-mid{font-size:13px;padding:0;}'
+        + '#gps-overlay .gps-miss-card{position:absolute;left:8px;bottom:60px;pointer-events:none;box-sizing:border-box;max-width:min(300px, calc(100vw - 96px));width:max-content;padding:6px 10px;border-radius:10px;background:rgba(11,15,12,.9);border:1px solid rgba(125,211,252,.45);color:#cbd5e1;font:600 12px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;white-space:normal;}'
+        + '#gps-overlay .gps-miss-card b{display:block;font:800 12.5px/1.3 -apple-system,BlinkMacSystemFont,sans-serif;color:#7dd3fc;}#gps-overlay .gps-miss-card span{display:block;}'
+        + '#gps-overlay.gps-sun .gps-miss-pill,#gps-overlay.gps-sun .gps-miss-card{background:#000 !important;border-color:#fff !important;}#gps-overlay.gps-sun .gps-miss-pill button{color:#fff !important;}'
+        + '#gps-overlay.gps-miss-switch-on .gps-carry-lbl{opacity:.4 !important;}'
+        + '.gps-target.gps-target-mymiss .gps-ring,.gps-target.gps-target-mymiss .gps-ring-in,.gps-target.gps-target-mymiss .gps-ring-line{opacity:.4;}.gps-target.gps-target-mymiss .gps-ring-dot{opacity:.85;}'
         + '#gps-overlay .gps-ts-sw{flex:0 0 auto;position:relative;width:52px;height:32px;border-radius:16px !important;background:rgba(255,255,255,.22) !important;transition:background .15s;}'
         + '#gps-overlay .gps-ts-sw i{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 3px rgba(0,0,0,.4);}'
         + '#gps-overlay .gps-ts-sw.on{background:#7cc242 !important;}#gps-overlay .gps-ts-sw.on i{left:23px;}'
@@ -8440,6 +8935,7 @@
         stopReplayTimer();
         if (S && S.lcRo) { try { S.lcRo.disconnect(); } catch (e) {} S.lcRo = null; }
         fix = null;
+        missLastFix = null;   // 089b
         watchLast = null;   // a new round sends its first hole again
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('pagehide', onPageHide);
@@ -8555,12 +9051,33 @@
                 return out.sort(function (a, b) { return a.n - b.n; });
             } catch (e) { return { err: String(e && e.message || e) }; }
         },
+        // 091: the course check's "view centre on the hole" rule (pure), and the zoom state - for the tests.
+        viewCenterOnHole: function (c, tee, green) { try { return viewCenterOnHole(c, tee, green, null); } catch (e) { return false; } },
+        zoomNow: function () { return S ? { step: S.zoomStep || 0, x: zoomFactor(S.zoomStep), zoom: S.map ? S.map.getZoom() : null, full: S.camera ? S.camera.zoom : null, max: maxZoomNow(), view: S.view || null } : null; },
         holeCheck: function () {
             try {
                 var r = resolved(); if (!S || !S.map || !r) return null;
                 var g = (r.green && r.green.length) ? r.green[Math.floor(r.green.length / 2)] : r.mid, b = S.map.getBounds();
-                var inV = function (p) { return !!(p && b && b.contains(ll(p))); };
-                return { tee: r.tee || null, green: g || null, teeIn: inV(r.tee), greenIn: inV(g), framed: S.framed || null, course: courseCenter() || null, center: S.map.getCenter() };
+                // 091 (gate change, Manny's OK Oct 27): the hole opens on the 2x view, so the tee and the green are
+                // measured on the hole's FULL frame (S.camera - the magnifier's "full hole", one tap away), read by
+                // putting that camera on the map for one moment and back (no golfer move, no re-fit).
+                var fb = b;
+                if (S.framed === 'hole' && S.camera && S.camera.center) {
+                    var c0 = S.map.getCenter(), z0 = S.map.getZoom(), br0 = S.map.getBearing(), p0 = S.map.getPadding ? S.map.getPadding() : null;
+                    S.framing = true;
+                    try {
+                        S.map.jumpTo({ center: ll(S.camera.center), zoom: S.camera.zoom, bearing: S.camera.bearing, padding: S.pad || viewPad() });
+                        fb = S.map.getBounds();
+                    } finally {
+                        var back = { center: c0, zoom: z0, bearing: br0 }; if (p0) back.padding = p0;
+                        S.map.jumpTo(back); S.framing = false;
+                    }
+                }
+                var inV = function (p, bb) { return !!(p && bb && bb.contains(ll(p))); };
+                var ctr = S.map.getCenter(), cp = [ctr.lat, ctr.lng];
+                return { tee: r.tee || null, green: g || null, teeIn: inV(r.tee, fb), greenIn: inV(g, fb), framed: S.framed || null, course: courseCenter() || null, center: ctr,
+                    viewTeeIn: inV(r.tee, b), viewGreenIn: inV(g, b), zoomStep: S.zoomStep || 0, zoomX: zoomFactor(S.zoomStep),
+                    centerOnHole: viewCenterOnHole(cp, r.tee, g, fb) };
             } catch (e) { return { err: String(e && e.message || e) }; }
         },
         side: function () { return S ? S.side : null; },
@@ -8599,6 +9116,20 @@
         // URGENT-052 B (checks): the map's own layer / source ids, and the My miss oval's box on screen.
         mapLayers: function () { try { var st = S && S.map && S.map.getStyle(); return st ? { layers: st.layers.map(function (l) { return l.id; }), sources: Object.keys(st.sources || {}) } : null; } catch (e) { return null; } },
         // 063 (checks): the oval drawn now (club, carry, half width a, half depth b, tilt, hand) and why not.
+        // 089b (checks): age My miss's held fix by ms (the 60 s rule without a 60 s wait); then render.
+        appOrigin: function () { try { dropStaleFix(); var o = origin(resolved()); return o ? o.from : null; } catch (e) { return null; } },   // 089b (checks): the app's own origin (10 s rule)
+        missFixAge: function (ms) { if (missLastFix) missLastFix.at -= Number(ms) || 0; if (missHeldGone() || S) render(); return missLastFix ? Date.now() - missLastFix.at : null; },
+        // 093 (checks): the par-3 club switcher - shown?, the clubs shortest first, the shown one, the text, the arrows, the card.
+        missSwitch: function () {
+            if (!S) return null;
+            var box = S.el.querySelector('.gps-miss-chips.gps-miss-switch'), on = !!(box && box.style.display !== 'none' && missSwitchOn());
+            var q = function (sel) { return box ? box.querySelector(sel) : null; }, card = S.el.querySelector('.gps-miss-card');
+            var mid = q('.gps-miss-mid'), lb = q('.gps-miss-less'), mb = q('.gps-miss-more'), ft = q('.gps-miss-chips-from');
+            return { on: on, par3: isPar3(), list: S.missChips ? missSwitchList(S.missChips).map(function (x) { return x.club; }) : [], sel: S.missChips ? S.missChips.sel : null,
+                text: mid ? mid.textContent : '', aria: mid ? mid.getAttribute('aria-label') : '', lessOff: !!(lb && lb.classList.contains('gps-miss-arrow-off')), moreOff: !!(mb && mb.classList.contains('gps-miss-arrow-off')),
+                fromTee: !!ft, card: !!(card && card.style.display !== 'none' && card.offsetParent !== null), cardText: card && card.style.display !== 'none' ? card.textContent : '',
+                lblOnMap: !!(S.markers && S.markers.mymiss), dim: S.el.classList.contains('gps-miss-switch-on') };
+        },
         missNow: function () {
             if (!S) return null;
             var scr = null;
@@ -8610,7 +9141,9 @@
                     scr = { rightY: Math.round(rt[1] - cy), leftY: Math.round(lf[1] - cy) };   // screen px from the centre, + = lower (short)
                 }
             } catch (e) {}
-            return { oval: S.missOval || null, why: S.missWhy || null, screen: scr };
+            // 089: the club chips ({ app, sel, list: [{ club, carry, along, delta }] }), the tapped one and the note.
+            return { oval: S.missOval || null, why: S.missWhy || null, screen: scr, chips: S.missOval && S.missChips ? { app: S.missChips.app, def: S.missChips.def || S.missChips.app, sel: S.missChips.sel, depth: !!S.missChips.depth, from: S.missChips.from || null, held: !!S.missChips.held, list: S.missChips.list } : null,
+                pick: S.missPick ? S.missPick.club : null, note: S.missNote || '', ringFaded: !!(S.targetMarker && S.targetMarker.getElement().classList.contains('gps-target-mymiss')) };
         },
         // int-061 (checks): the My miss label's box on screen and anything it touches (rail, bubbles, "20 yd", pill, labels).
         // URGENT-085 (checks): each carry label's box, shown / nudged / hidden, and anything visible it touches.
@@ -8638,12 +9171,12 @@
                 if (!sp || !wrap) return null;
                 var wr = wrap.getBoundingClientRect(), b = sp.getBoundingClientRect(), L = { l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top };
                 var hits = [];
-                Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-carry-lbl, .gps-ld-top, .gps-ld-bottom, .gps-green-dims, .gps-banner, .gps-msg'), function (e) {
+                Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-carry-lbl, .gps-ld-top, .gps-ld-bottom, .gps-green-dims, .gps-banner, .gps-msg, .gps-miss-chip, .gps-miss-pill'), function (e) {
                     if (e.offsetParent === null) return; var q = e.getBoundingClientRect(); if (!(q.width > 0 && q.height > 0)) return;
                     if (Math.min(b.right, q.right) - Math.max(b.left, q.left) > 0.5 && Math.min(b.bottom, q.bottom) - Math.max(b.top, q.top) > 0.5) hits.push(String(e.className).split(' ').slice(0, 2).join('.'));
                 });
                 var o = missRect(), onOval = !!(o && Math.min(L.r, o.r) - Math.max(L.l, o.l) > 0.5 && Math.min(L.b, o.b) - Math.max(L.t, o.t) > 0.5);
-                return { at: m.getElement().getAttribute('data-miss-at'), box: { l: Math.round(L.l), t: Math.round(L.t), r: Math.round(L.r), b: Math.round(L.b) }, hits: hits, onOval: onOval, w: Math.round(wr.width), text: sp.textContent, placed: S.missLbl || null };
+                return { at: m.getElement().getAttribute('data-miss-at'), box: { l: Math.round(L.l), t: Math.round(L.t), r: Math.round(L.r), b: Math.round(L.b) }, hits: hits, onOval: onOval, w: Math.round(wr.width), text: sp.firstChild ? sp.firstChild.textContent : sp.textContent, note: (sp.querySelector('.gps-miss-note') || {}).textContent || '', noteShown: !!(sp.querySelector('.gps-miss-note') && sp.querySelector('.gps-miss-note').style.display !== 'none'), noteWrap: !!sp.querySelector('.gps-miss-note.gps-miss-note-wrap'), placed: S.missLbl || null };
             } catch (e) { return { err: String(e && e.message || e) }; }
         },
         missRect: function () { try { var r = missRect(); return r ? { l: Math.round(r.l), t: Math.round(r.t), r: Math.round(r.r), b: Math.round(r.b) } : null; } catch (e) { return null; } },

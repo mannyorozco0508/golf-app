@@ -46,7 +46,7 @@
     // ---- THE ROUND (index.html's globals, read at call time) -------------------
     /* global validateMoneyPool, moneyPoolRulesLocked, canReachSetup, requireOnlineForMoney */
     /* global currentData, currentMode, db, lockedGroup, hasGroupLock, resolvedMeId, durableWrite, playerGroupMap, sideMatchStartHole,
-       sideMatchPayloadFromTerms, computeCombinedNetTotals, getRoundGames, uiToast, uiRefuse, uiFail, hpSpectating */
+       sideMatchPayloadFromTerms, computeCombinedNetTotals, roundDataForDisplay, getRoundGames, uiToast, uiRefuse, uiFail, hpSpectating */
     function data() { try { return typeof currentData !== 'undefined' && currentData ? currentData : null; } catch (e) { return null; } }
     function code() { try { return typeof currentMode !== 'undefined' ? currentMode : null; } catch (e) { return null; } }
     function locked() { try { return typeof hasGroupLock !== 'undefined' && hasGroupLock && lockedGroup ? Number(lockedGroup) : null; } catch (e) { return null; } }
@@ -522,10 +522,13 @@
             var words = '';
             if (slot === 'sideMatches') {
                 try {
-                    var row = (typeof buildSideActionRows === 'function' ? buildSideActionRows(d2, cd, d2.scores || {}, d2.players || [], meId()) : []).filter(function (r) { return r && r.key === '__preview018'; })[0];
+                    // 100a: words only, off the round's display copy (text-safe.js) so two
+                    // golfers with one first name read "Mike S" / "Test A.", not "Test". Money above is unchanged.
+                    var dw = (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(d2) : d2;
+                    var row = (typeof buildSideActionRows === 'function' ? buildSideActionRows(dw, cd, dw.scores || {}, dw.players || [], meId()) : []).filter(function (r) { return r && r.key === '__preview018'; })[0];
                     words = row ? String(row.status || '').replace(/^Hi-Lo:\s*/, '') : '';
                     if (b.value.format === 'nassau' && typeof buildSideMatchReceipts === 'function') {
-                        var rc = buildSideMatchReceipts(d2, cd, d2.scores || {}).filter(function (r) { return r && r.matchId === '__preview018'; })[0];
+                        var rc = buildSideMatchReceipts(dw, cd, dw.scores || {}).filter(function (r) { return r && r.matchId === '__preview018'; })[0];
                         if (rc && rc.segments && rc.segments.length) words = rc.segments.map(function (sg) { return sg.label + ' ' + (sg.result || 'All square'); }).join(' \u00b7 ');
                     }
                 } catch (e) { words = ''; }

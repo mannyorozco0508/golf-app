@@ -1133,28 +1133,96 @@
         return true;
     }
     function holeView() { cardMode('hole'); return true; }
-    // URGENT-034 FIX 4: THE MAP'S CARD IS A COMPACT CARD (Manny's pick) - a half-height sheet over the map
-    // with only the hole-by-hole grid: Hole / Par / the golfers, Out / In / Total. No leaderboard, no
-    // skins. A box opens the score sheet for that golfer and hole; "Full card ›" is today's full page
-    // (toFullCard, unchanged); a swipe down or a tap on the map closes it. Display only - every score
-    // still goes through the score sheet and the card's own save.
-    var CC_CSS = '#hp-compact-card{position:absolute;inset:0;z-index:2147481000;background:rgba(0,0,0,.25);font:600 16px/1.25 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;color:#f4f4ef;}'
+    // URGENT-034 FIX 4: THE MAP'S CARD IS A COMPACT CARD (Manny's pick) - a sheet over the map. "Full card ›"
+    // is today's full page (toFullCard, unchanged); a swipe down or a tap on the map closes it.
+    // 092 THE COMBO CARD (Manny APPROVED Oct 27 - outbox/092-PREVIEW.md + 092-ANSWERS.md, the pictures in
+    // claude-code-reports/092/): the same sheet, now
+    //   header      "Hole N · Par P" + "Full card ›" (the dialog's aria-label stays "Scorecard")
+    //   tiles       TO PAR (green when even or under) · THRU · PUTTS · FAIRWAYS (x/y, par 4s and 5s) · GREENS
+    //               (x/y) for the selected golfer; PUTTS / FAIRWAYS / GREENS only where stats are tracked
+    //               (the Enter score sheet's own rule: quick stats on, not a Practice round, this phone's
+    //               golfer or "Track stats for others")
+    //   the card    1-9 + OUT and 10-18 + IN + TOT, a Par row, one row per golfer, the 081 marks
+    //               (scoreMark: birdie circle, eagle double circle, bogey box, double box), the map's hole
+    //               outlined lime; a box loads that golfer and hole into quick entry; up to 4 golfers fit,
+    //               more scroll
+    //   quick entry fixed keys 1-6 + 7+ (par lime), putts 0-4+ (no default, tapped BEFORE the score), the
+    //               selected golfer; a name picks the golfer; a score saves, then the next golfer with no
+    //               score on that hole, then the next hole (the card's own Next, gpsStepHole - the KP
+    //               question still gates it); after the last golfer on the last hole the sheet stays and
+    //               shows the existing "Finish & settle up" (ctx.finish: display only). "More ›" opens
+    //               today's full Enter score sheet for that golfer and hole.
+    // SAME DATA, NO NEW KEYS: a score goes only through the card's own save (index.html gpsCardCtx ->
+    // gpsSheetHole.save -> saveScore, the offline queue); putts only through the phone-only quick-stats
+    // record (HardPanGpsStats.quick.set -> hardpan_qstats_v1_<code>_p<id>). Nothing here writes Firebase
+    // itself, and nothing here is read by a money engine.
+    var CC_CSS = '#hp-compact-card{--cc-sheet:#111611;--cc-ink:#f4f4ef;--cc-hi:#fff;--cc-muted:#a7aea4;--cc-key:#262c26;--cc-row:#1b211b;--cc-line:#1f251f;--cc-lime:#c8f07a;--cc-ring:#c8f07a;--cc-on-lime:#0b0f0c;--cc-red:#ff6b76;--cc-navy:#7ea6dc;--cc-sel:rgba(200,240,122,.12);--cc-under:#7fd88a;--cc-full:#c8f07a;--cc-handle:#5b625a;'
+        + 'position:absolute;inset:0;z-index:2147481000;background:rgba(0,0,0,.25);font:600 16px/1.25 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;color:var(--cc-ink);color-scheme:dark;}'
+        // LIGHT follows the app's own switch (html.dark-mode, the same one the full card uses).
+        + 'html:not(.dark-mode) #hp-compact-card{--cc-sheet:#fff;--cc-ink:#1a1a1a;--cc-hi:#0b0f0c;--cc-muted:#666;--cc-key:#eef1ee;--cc-row:#f4f6f8;--cc-line:#e6eae7;--cc-ring:#7cb518;--cc-red:#c1121f;--cc-navy:#1d3557;--cc-sel:rgba(120,170,40,.16);--cc-under:#0f7a3a;--cc-full:#4f7f0f;--cc-handle:#c9cfc9;background:rgba(0,0,0,.18);color-scheme:light;}'
         + 'body > #hp-compact-card{position:fixed;}'
-        + '#hp-compact-card .hp-cc{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;height:52%;display:flex;flex-direction:column;background:#111611;border-radius:24px 24px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.45);transition:transform .18s ease;}'
-        + '#hp-compact-card .hp-cc-handle{width:42px;height:5px;border-radius:3px;background:#5b625a;margin:10px auto 2px;flex:0 0 auto;}'
-        + '#hp-compact-card .hp-cc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 16px 8px;flex:0 0 auto;}'
-        + '#hp-compact-card .hp-cc-title{font-size:20px;font-weight:800;margin:0;color:#fff;}'
-        + '#hp-compact-card .hp-cc-full{min-height:40px;padding:0 14px;border-radius:12px;background:#262c26;color:#c8f07a;font-size:16px;font-weight:800;white-space:nowrap;}'
-        + '#hp-compact-card .hp-cc-body{flex:1 1 auto;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 10px calc(10px + env(safe-area-inset-bottom));}'
-        + '#hp-compact-card table{width:100%;border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;}'
-        + '#hp-compact-card th{position:sticky;top:0;background:#111611;color:#a7aea4;font-size:13px;font-weight:800;padding:6px 2px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px;z-index:1;}'
-        + '#hp-compact-card td{text-align:center;padding:2px;border-top:1px solid #1f251f;}'
-        + '#hp-compact-card td.hp-cc-h{font-weight:800;color:#fff;width:44px;}#hp-compact-card td.hp-cc-p{color:#a7aea4;width:40px;}'
-        + '#hp-compact-card tr.hp-cc-now td.hp-cc-h{color:#c8f07a;}'
-        + '#hp-compact-card tr.hp-cc-sum td{font-weight:800;color:#fff;background:#1b211b;padding:8px 2px;}'
-        + '#hp-compact-card button.hp-cc-box{width:100%;min-width:40px;min-height:40px;border-radius:10px;background:#1b211b;color:#f4f4ef;font-size:18px;font-weight:800;}'
-        + '#hp-compact-card tr.hp-cc-now button.hp-cc-box{box-shadow:inset 0 0 0 2px #c8f07a;}';
-    var cc = null;   // { wrap, sig, timer }
+        + '#hp-compact-card *{box-sizing:border-box;}'
+        + '#hp-compact-card button{font:inherit;border:0;margin:0;cursor:pointer;color:inherit;background:none;-webkit-tap-highlight-color:transparent;}'
+        + '#hp-compact-card .hp-cc{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;max-height:calc(100% - 52px);display:flex;flex-direction:column;background:var(--cc-sheet);border-radius:24px 24px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.45);transition:transform .18s ease;}'
+        + '#hp-compact-card .hp-cc-handle{width:42px;height:5px;border-radius:3px;background:var(--cc-handle);margin:8px auto 0;flex:0 0 auto;}'
+        + '#hp-compact-card .hp-cc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 16px;flex:0 0 auto;}'
+        + '#hp-compact-card .hp-cc-title{font-size:20px;font-weight:800;margin:0;color:var(--cc-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '#hp-compact-card .hp-cc-full{min-height:38px;padding:0 14px;border-radius:12px;background:var(--cc-key);color:var(--cc-full);font-size:16px;font-weight:800;white-space:nowrap;flex:0 0 auto;}'
+        + '#hp-compact-card .hp-cc-who{font-size:12px;color:var(--cc-muted);padding:0 16px 4px;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}#hp-compact-card .hp-cc-who b{color:var(--cc-ink);}'
+        + '#hp-compact-card .hp-cc-tiles{display:flex;gap:6px;padding:0 12px 6px;flex:0 0 auto;}'
+        + '#hp-compact-card .hp-cc-tile{flex:1 1 0;min-width:0;background:var(--cc-row);border-radius:12px;padding:5px 2px 6px;text-align:center;}'
+        + '#hp-compact-card .hp-cc-tile b{display:block;font-size:19px;font-weight:800;color:var(--cc-hi);font-variant-numeric:tabular-nums;line-height:1.1;}'
+        + '#hp-compact-card .hp-cc-tile span{display:block;font-size:10px;font-weight:800;letter-spacing:.04em;color:var(--cc-muted);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '#hp-compact-card .hp-cc-tile.good b{color:var(--cc-under);}'
+        // THE CARD: two rows of 9; the only part that scrolls (6+ golfers).
+        + '#hp-compact-card .hp-cc-body{flex:0 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:0 8px 4px;position:relative;}'
+        + '#hp-compact-card table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;font-variant-numeric:tabular-nums;margin-bottom:6px;}'
+        + '#hp-compact-card col.hp-cc-cnm{width:56px;}#hp-compact-card col.hp-cc-csum{width:32px;}#hp-compact-card col.hp-cc-ctot{width:34px;}'
+        + '#hp-compact-card th,#hp-compact-card td{text-align:center;height:26px;padding:0;font-size:14px;}'
+        + '#hp-compact-card th{font-size:11px;font-weight:800;color:var(--cc-muted);height:20px;}'
+        + '#hp-compact-card td.hp-cc-nm{text-align:left;font-size:13px;font-weight:800;color:var(--cc-ink);}'
+        + '#hp-compact-card td.hp-cc-nm button{display:block;width:100%;height:26px;padding:0 0 0 6px;text-align:left;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}'
+        + '#hp-compact-card tr.hp-cc-par td{color:var(--cc-muted);font-size:12px;font-weight:700;height:20px;border-bottom:1px solid var(--cc-line);}#hp-compact-card tr.hp-cc-par td.hp-cc-nm{font-size:11px;padding-left:6px;color:var(--cc-muted);}'
+        + '#hp-compact-card td.hp-cc-sum{font-weight:800;color:var(--cc-hi);background:var(--cc-row);}'
+        + '#hp-compact-card tr.hp-cc-g td{border-bottom:1px solid var(--cc-line);}'
+        + '#hp-compact-card tr.hp-cc-g.hp-cc-sel td{background:var(--cc-sel);}#hp-compact-card tr.hp-cc-g.hp-cc-sel td.hp-cc-nm{box-shadow:inset 3px 0 0 var(--cc-ring);}'
+        + '#hp-compact-card button.hp-cc-box{display:flex;align-items:center;justify-content:center;width:100%;height:26px;padding:0;font-size:14px;font-weight:800;color:var(--cc-hi);}'
+        + '#hp-compact-card .hp-cc-n{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;}'
+        // THE 081 MARKS (score-marks.js + score-marks-hp.js): red circle birdie, double circle eagle, navy box bogey, double box double+.
+        + '#hp-compact-card .hp-cc-n.mark-birdie{box-shadow:inset 0 0 0 2px var(--cc-red);border-radius:50%;}'
+        + '#hp-compact-card .hp-cc-n.mark-eagle{box-shadow:inset 0 0 0 2px var(--cc-red),inset 0 0 0 4px var(--cc-sheet),inset 0 0 0 6px var(--cc-red);border-radius:50%;}'
+        + '#hp-compact-card .hp-cc-n.mark-bogey{box-shadow:inset 0 0 0 2px var(--cc-navy);border-radius:3px;width:22px;height:22px;}'
+        + '#hp-compact-card .hp-cc-n.mark-double{box-shadow:inset 0 0 0 2px var(--cc-navy),inset 0 0 0 4px var(--cc-sheet),inset 0 0 0 6px var(--cc-navy);border-radius:3px;}'
+        // THE MAP'S HOLE: one lime outline down its column.
+        + '#hp-compact-card .hp-cc-now{box-shadow:inset 2px 0 0 var(--cc-ring),inset -2px 0 0 var(--cc-ring);}'
+        + '#hp-compact-card th.hp-cc-now{box-shadow:inset 2px 0 0 var(--cc-ring),inset -2px 0 0 var(--cc-ring),inset 0 2px 0 var(--cc-ring);border-radius:6px 6px 0 0;color:var(--cc-hi);}'
+        + '#hp-compact-card tr:last-child td.hp-cc-now{box-shadow:inset 2px 0 0 var(--cc-ring),inset -2px 0 0 var(--cc-ring),inset 0 -2px 0 var(--cc-ring);border-radius:0 0 6px 6px;}'
+        + '#hp-compact-card td.hp-cc-now button.hp-cc-box:empty::after{content:"";display:inline-block;width:14px;height:2px;background:var(--cc-muted);opacity:.5;}'
+        // The box quick entry is on: a lime square (empty) or a lime ring round the score.
+        + '#hp-compact-card td.hp-cc-tgt button.hp-cc-box:empty::after{width:16px;height:16px;border-radius:4px;background:none;box-shadow:inset 0 0 0 2px var(--cc-ring);opacity:1;}'
+        + '#hp-compact-card td.hp-cc-tgt button.hp-cc-box:not(:empty){box-shadow:inset 0 0 0 2px var(--cc-ring);border-radius:6px;}'
+        + '#hp-compact-card .hp-cc-hint{position:sticky;bottom:0;text-align:center;font-size:12px;font-weight:800;color:var(--cc-muted);padding:6px 0 2px;background:linear-gradient(transparent,var(--cc-sheet) 45%);}'
+        // QUICK ENTRY: pinned under the card.
+        + '#hp-compact-card .hp-cc-qe{flex:0 0 auto;border-top:1px solid var(--cc-line);padding:8px 12px calc(10px + env(safe-area-inset-bottom));}'
+        + '#hp-compact-card .hp-cc-qh{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--cc-muted);letter-spacing:.04em;text-transform:uppercase;margin:0 2px 6px;white-space:nowrap;}'
+        + '#hp-compact-card .hp-cc-qh b{color:var(--cc-hi);text-transform:none;letter-spacing:0;font-size:15px;}'
+        + '#hp-compact-card .hp-cc-qh .hp-cc-ql{min-width:0;overflow:hidden;text-overflow:ellipsis;}#hp-compact-card .hp-cc-qr{display:flex;align-items:center;gap:10px;flex:0 0 auto;}'
+        + '#hp-compact-card .hp-cc-moresheet{min-height:32px;padding:0 4px;color:var(--cc-full);font-size:14px;font-weight:800;letter-spacing:0;text-transform:none;}'
+        + '#hp-compact-card .hp-cc-keys{display:grid;gap:6px;}#hp-compact-card .hp-cc-k7{grid-template-columns:repeat(7,minmax(0,1fr));}#hp-compact-card .hp-cc-k5{grid-template-columns:repeat(5,minmax(0,1fr));}'
+        + '#hp-compact-card .hp-cc-key{min-height:50px;border-radius:14px;background:var(--cc-key);font-size:22px;font-weight:800;color:var(--cc-hi);display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;min-width:0;padding:0 1px;overflow:hidden;}'
+        + '#hp-compact-card .hp-cc-key small{font-size:9px;font-weight:700;color:var(--cc-muted);margin-top:3px;white-space:nowrap;}'
+        + '#hp-compact-card .hp-cc-key.par{background:var(--cc-lime);color:var(--cc-on-lime);}#hp-compact-card .hp-cc-key.par small{color:#3d4a2a;}'
+        + '#hp-compact-card .hp-cc-key.on{box-shadow:inset 0 0 0 3px var(--cc-hi);}#hp-compact-card .hp-cc-key.par.on{box-shadow:inset 0 0 0 3px var(--cc-on-lime);}'
+        + '#hp-compact-card .hp-cc-key[disabled]{opacity:.4;cursor:default;}'
+        + '#hp-compact-card .hp-cc-seven{margin-top:6px;}'
+        + '#hp-compact-card .hp-cc-putts .hp-cc-key{min-height:40px;font-size:18px;}'
+        + '#hp-compact-card .hp-cc-pl{font-size:11px;font-weight:800;letter-spacing:.06em;color:var(--cc-muted);text-transform:uppercase;margin:8px 2px 4px;}'
+        + '#hp-compact-card .hp-cc-finish{display:block;width:100%;min-height:50px;margin:0 0 8px;border-radius:14px;background:var(--cc-lime);color:var(--cc-on-lime);font-size:18px;font-weight:800;}'
+        + '#hp-compact-card .hp-cc-view{font-size:12px;color:var(--cc-muted);margin:6px 2px 0;}';
+    // cc: { wrap, sig, timer, hole (quick entry's hole), home (the map's hole it follows), sel (golfer id),
+    //       more (the 7+ row open), done (scores saved here, before the round echoes them) }
+    var cc = null;
+    function ccNow() { try { var n = Number(currentViewedHole); return isFinite(n) && n > 0 ? n : null; } catch (e) { return null; } }   /* global currentViewedHole */
     function ccGolfers() {
         var d = data(), ps = (d && d.players) || [];
         var list = [];
@@ -1170,45 +1238,218 @@
         try { if (typeof golferShortName === 'function') return golferShortName(p, ps); } catch (e) {}   /* global golferShortName */
         return String(p.name || ('Player ' + p.id)).trim().split(/\s+/)[0];
     }
-    function ccSig() { var d = data(); return JSON.stringify([(d && d.scores) || {}, (function () { try { return currentViewedHole; } catch (e) { return null; } })()]); }
+    function ccQ() { var S = window.HardPanGpsStats; return S && S.quick ? S.quick : null; }
+    // The hole's context, as the Enter score sheet gets it (index.html gpsCardCtx): golfers this phone
+    // may score, par, score(), the card's own save(), next(), last, finish(). Holes the card has not drawn
+    // boxes for take the map's hole's golfers (the sheet's own ‹ rule).
+    function ccCtx(n) {
+        if (typeof gpsCardCtx !== 'function' || !(n > 0)) return null;   /* global gpsCardCtx */
+        var fb = null; try { if (typeof gpsScoreGolfers === 'function') fb = gpsScoreGolfers(ccNow()); } catch (e) { fb = null; }
+        try { return gpsCardCtx(n, fb && fb.length ? fb : null); } catch (e) { return null; }
+    }
+    function ccVal(pid, n) {
+        var d = data(), v = Number(((d && d.scores) || {})['p' + pid + '_h' + n]);
+        if (v > 0) return v;
+        var k = (function () { try { return currentMode; } catch (e) { return ''; } })() + '|' + pid + '|' + n;   /* global currentMode */
+        return (cc && cc.done && cc.done[k]) || null;
+    }
+    function ccCan(ctx, pid) { return !!(ctx && (ctx.golfers || []).some(function (g) { return String(g.id) === String(pid); })); }
+    function ccTracked(ctx, pid) {
+        var S = window.HardPanGpsStats;
+        try { return !!(ctx && S && S.sheet && typeof S.sheet.statsFor === 'function' && S.quick && S.sheet.statsFor(ctx, pid)); } catch (e) { return false; }
+    }
+    // The golfer quick entry starts on for hole n: this phone's golfer (or the first), or - when they
+    // already have a score there - the next golfer after them with none (wrapping).
+    function ccFirstOpen(n, start) {
+        var gs = ccGolfers(); if (!gs.length) return null;
+        var ids = gs.map(function (p) { return String(p.id); });
+        var ctx = ccCtx(n), from = start != null && ids.indexOf(String(start)) !== -1 ? String(start) : (ctx && ctx.pick != null && ids.indexOf(String(ctx.pick)) !== -1 ? String(ctx.pick) : ids[0]);
+        if (!(ccVal(from, n) > 0)) return from;
+        var i = ids.indexOf(from);
+        for (var s = 1; s < ids.length; s++) { var id = ids[(i + s) % ids.length]; if (!(ccVal(id, n) > 0) && (!ctx || ccCan(ctx, id))) return id; }
+        return from;
+    }
+    // The map moved on its own (its ‹ ›, the picker, the full card): quick entry follows it.
+    function ccFollow() {
+        var now = ccNow();
+        if (!cc || now == null || now === cc.home) return;
+        cc.home = now; cc.hole = now; cc.more = false; cc.sel = ccFirstOpen(now, null);
+    }
+    function ccSig() {
+        var d = data(), q = ccQ(), rec = null;
+        try { rec = q && cc && cc.sel != null ? q.load(currentMode, cc.sel) : null; } catch (e) { rec = null; }   /* global currentMode */
+        var others = false; try { others = window.localStorage.getItem('hardpan_stats_others') === '1'; } catch (e) {}
+        return JSON.stringify([(d && d.scores) || {}, ccNow(), rec, others, document.documentElement.classList.contains('dark-mode')]);
+    }
+    function ccKeyLabel(n, par) {
+        if (n === 1) return 'ACE';
+        var dd = n - par;
+        return dd === -2 ? 'EAGLE' : dd === -1 ? 'BIRDIE' : dd === 0 ? 'PAR' : dd === 1 ? 'BOGEY' : dd === 2 ? 'DOUBLE' : (dd > 0 ? '+' + dd : '−' + (-dd));
+    }
+    function ccMark(v, par) {
+        var f = typeof window.scoreMark === 'function' ? window.scoreMark : null;
+        try { return f && v && par ? f(v, par) || '' : ''; } catch (e) { return ''; }
+    }
     function ccRender() {
         if (!cc || !cc.wrap) return;
         var d = data(); if (!d) return;
-        var ps = d.players || [], gs = ccGolfers(), sc = d.scores || {};
+        ccFollow();
+        var w = cc.wrap, ps = d.players || [], gs = ccGolfers();
         var holes = ((d.courseData) || []).map(function (h) { return { n: parseInt(h.hole, 10), par: Number(h.par) || 0 }; }).filter(function (h) { return h.n > 0; }).sort(function (a, b) { return a.n - b.n; });
-        var now = (function () { try { return Number(currentViewedHole); } catch (e) { return null; } })();
-        var val = function (pid, n) { var v = Number(sc['p' + pid + '_h' + n]); return v > 0 ? v : null; };
-        var h = '<table><thead><tr><th>Hole</th><th>Par</th>' + gs.map(function (p) { return '<th>' + esc(ccName(p, ps)) + '</th>'; }).join('') + '</tr></thead><tbody>';
-        var sum = function (label, part) {
-            var par = 0; part.forEach(function (x) { par += x.par; });
-            return '<tr class="hp-cc-sum" data-cc-sum="' + label + '"><td class="hp-cc-h">' + label + '</td><td class="hp-cc-p">' + (par || '') + '</td>' + gs.map(function (p) {
-                var t = 0, any = false; part.forEach(function (x) { var v = val(p.id, x.n); if (v) { t += v; any = true; } }); return '<td>' + (any ? t : '') + '</td>';
-            }).join('') + '</tr>';
-        };
+        var parOf = {}; holes.forEach(function (x) { parOf[x.n] = x.par; });
+        var now = ccNow();
+        if (cc.hole == null) cc.hole = now;
+        if (cc.sel == null || !gs.some(function (p) { return String(p.id) === String(cc.sel); })) cc.sel = ccFirstOpen(cc.hole, null);
+        var n = cc.hole, sel = cc.sel, ctx = ccCtx(n), par = (ctx && Number(ctx.par)) || parOf[n] || 0;
+        var selP = gs.filter(function (p) { return String(p.id) === String(sel); })[0], selName = selP ? ccName(selP, ps) : '';
+        var tracked = ccTracked(ctx, sel);
+        // HEADER
+        w.querySelector('.hp-cc-title').textContent = n ? 'Hole ' + n + (par ? ' · Par ' + par : '') : 'Scorecard';
+        w.querySelector('.hp-cc-who').innerHTML = selP ? '<b>' + esc(selName) + '</b> · tap a name to switch' + (tracked ? '' : ' · stats not tracked') : '';
+        // TILES (the selected golfer)
+        var Q = ccQ(), code = (function () { try { return currentMode; } catch (e) { return ''; } })();
+        var live = holes.map(function (x) { return { n: x.n, par: x.par, s: sel != null ? ccVal(sel, x.n) || 0 : 0 }; });
+        var t = null;
+        try { t = Q && typeof Q.tiles === 'function' ? Q.tiles(code, sel, live) : null; } catch (e) { t = null; }
+        if (!t) { t = { thru: 0, toPar: 0 }; live.forEach(function (x) { if (x.s > 0) { t.thru++; t.toPar += x.s - x.par; } }); }
+        var tp = !t.thru ? '—' : (t.toPar === 0 ? 'E' : (t.toPar > 0 ? '+' + t.toPar : '−' + (-t.toPar)));
+        var tiles = [['topar', 'To par', tp, t.thru && t.toPar <= 0], ['thru', 'Thru', String(t.thru)]];
+        if (tracked) tiles.push(['putts', 'Putts', t.puttHoles ? String(t.putts) : '—'], ['fw', 'Fairways', t.fwChances ? t.fwHit + '/' + t.fwChances : '—'], ['gir', 'Greens', t.girHoles ? t.gir + '/' + t.girHoles : '—']);
+        w.querySelector('.hp-cc-tiles').innerHTML = tiles.map(function (x) { return '<div class="hp-cc-tile' + (x[3] ? ' good' : '') + '" data-cc-tile="' + x[0] + '"><b>' + esc(x[2]) + '</b><span>' + x[1] + '</span></div>'; }).join('');
+        // THE CARD: 1-9 + OUT, 10-18 + IN + TOT.
         var front = holes.filter(function (x) { return x.n <= 9; }), back = holes.filter(function (x) { return x.n > 9; });
-        var rows = function (part) { return part.map(function (x) {
-            return '<tr' + (x.n === now ? ' class="hp-cc-now"' : '') + '><td class="hp-cc-h">' + x.n + '</td><td class="hp-cc-p">' + (x.par || '') + '</td>' + gs.map(function (p) {
-                var v = val(p.id, x.n);
-                return '<td><button type="button" class="hp-cc-box" data-cc-hole="' + x.n + '" data-cc-player="' + esc(p.id) + '" aria-label="Hole ' + x.n + ', ' + esc(ccName(p, ps)) + (v ? ', ' + v : ', no score') + '">' + (v || '') + '</button></td>';
-            }).join('') + '</tr>'; }).join(''); };
-        if (front.length) h += rows(front) + sum('Out', front);
-        if (back.length) h += rows(back) + sum('In', back);
-        if (front.length && back.length) h += sum('Total', holes);
-        h += '</tbody></table>';
-        cc.wrap.querySelector('.hp-cc-body').innerHTML = h;
+        var halves = [];
+        if (front.length) halves.push({ part: front, label: 'Out', tot: !back.length });
+        if (back.length) halves.push({ part: back, label: 'In', tot: true });
+        var parAll = 0; holes.forEach(function (x) { parAll += x.par; });
+        var half = function (hf) {
+            var part = hf.part, pp = 0; part.forEach(function (x) { pp += x.par; });
+            var cls = function (x, pid) { var c = []; if (x.n === now) c.push('hp-cc-now'); if (pid != null && x.n === n && String(pid) === String(sel)) c.push('hp-cc-tgt'); return c.length ? ' class="' + c.join(' ') + '"' : ''; };
+            var h = '<table data-cc-half="' + hf.label + '"><colgroup><col class="hp-cc-cnm">' + part.map(function () { return '<col>'; }).join('') + '<col class="hp-cc-csum"><col class="hp-cc-ctot"></colgroup>';
+            h += '<thead><tr><th></th>' + part.map(function (x) { return '<th' + cls(x) + '>' + x.n + '</th>'; }).join('') + '<th>' + hf.label.toUpperCase() + '</th><th>' + (hf.tot ? 'TOT' : '') + '</th></tr></thead><tbody>';
+            h += '<tr class="hp-cc-par"><td class="hp-cc-nm">Par</td>' + part.map(function (x) { return '<td' + cls(x) + '>' + (x.par || '') + '</td>'; }).join('')
+                + '<td class="hp-cc-sum" data-cc-sum="' + hf.label + '">' + (pp || '') + '</td>' + (hf.tot ? '<td class="hp-cc-sum" data-cc-sum="Total">' + (parAll || '') + '</td>' : '<td></td>') + '</tr>';
+            gs.forEach(function (p) {
+                var id = String(p.id), nm = ccName(p, ps), sum = 0, any = false, all = 0, anyAll = false, on = id === String(sel);
+                holes.forEach(function (x) { var v = ccVal(id, x.n); if (v) { all += v; anyAll = true; } });
+                h += '<tr class="hp-cc-g' + (on ? ' hp-cc-sel' : '') + '" data-cc-row="' + esc(id) + '"><td class="hp-cc-nm"><button type="button" data-cc-golfer="' + esc(id) + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + esc(nm) + '</button></td>';
+                h += part.map(function (x) {
+                    var v = ccVal(id, x.n); if (v) { sum += v; any = true; }
+                    var m = ccMark(v, x.par);
+                    return '<td' + cls(x, id) + '><button type="button" class="hp-cc-box" data-cc-hole="' + x.n + '" data-cc-player="' + esc(id) + '" aria-label="Hole ' + x.n + ', ' + esc(nm) + (v ? ', ' + v : ', no score') + '">' + (v ? '<span class="hp-cc-n' + (m ? ' mark-' + m : '') + '">' + v + '</span>' : '') + '</button></td>';
+                }).join('');
+                h += '<td class="hp-cc-sum" data-cc-sum="' + hf.label + '" data-cc-sum-player="' + esc(id) + '">' + (any ? sum : '') + '</td>'
+                    + (hf.tot ? '<td class="hp-cc-sum" data-cc-sum="Total" data-cc-sum-player="' + esc(id) + '">' + (anyAll ? all : '') + '</td>' : '<td></td>') + '</tr>';
+            });
+            return h + '</tbody></table>';
+        };
+        var body = w.querySelector('.hp-cc-body'), keep = body.scrollTop;
+        body.innerHTML = halves.map(half).join('') + (gs.length > 4 ? '<div class="hp-cc-hint">' + gs.length + ' golfers · scroll ↕</div>' : '');
+        body.scrollTop = keep;
+        var hint = body.querySelector('.hp-cc-hint');
+        if (hint && body.scrollHeight <= body.clientHeight + 2) hint.remove();
+        // QUICK ENTRY
+        var can = ccCan(ctx, sel), cur = sel != null ? ccVal(sel, n) || 0 : 0, dis = can ? '' : ' disabled';
+        var q = '<div class="hp-cc-qh"><span class="hp-cc-ql">Score · <b>' + esc(selName) + '</b></span><span class="hp-cc-qr"><span data-cc-qhole="' + n + '">Hole ' + n + '</span>'
+            + (can ? '<button type="button" class="hp-cc-moresheet" data-cc-moresheet="1" aria-label="More: the full Enter score sheet for ' + esc(selName) + ', hole ' + n + '">More ›</button>' : '') + '</span></div>';
+        // After the last golfer on the last hole: the existing "Finish & settle up" (display only).
+        var allIn = !!(ctx && ctx.last && n === now && ctx.golfers.length && ctx.golfers.every(function (g) { return ccVal(g.id, n) > 0; }));
+        if (allIn && typeof ctx.finish === 'function') q += '<button type="button" class="hp-cc-finish" data-cc-finish="1">Finish &amp; settle up</button>';
+        var key = function (v, label, extra) {
+            var isOn = v != null && cur === v;
+            return '<button type="button" class="hp-cc-key' + (v === par ? ' par' : '') + (isOn ? ' on' : '') + '"' + extra + ' aria-pressed="' + (isOn ? 'true' : 'false') + '"' + dis + '>' + label + '</button>';
+        };
+        var ks = '';
+        for (var v = 1; v <= 6; v++) ks += key(v, v + '<small>' + ccKeyLabel(v, par) + '</small>', ' data-cc-score="' + v + '" aria-label="' + v + (v === par ? ', par' : '') + '"');
+        var hi = cur >= 7;
+        ks += '<button type="button" class="hp-cc-key' + (hi ? ' on' : '') + '" data-cc-seven="1" aria-expanded="' + (cc.more ? 'true' : 'false') + '" aria-label="7 or more"' + dis + '>' + (hi ? cur : '7+') + '<small>MORE</small></button>';
+        q += '<div class="hp-cc-keys hp-cc-k7" data-cc-keys="1">' + ks + '</div>';
+        if (cc.more && can) {
+            var mk = ''; for (var m2 = 7; m2 <= 15; m2++) mk += key(m2, String(m2), ' data-cc-score="' + m2 + '" aria-label="' + m2 + '"');
+            q += '<div class="hp-cc-keys hp-cc-k5 hp-cc-seven">' + mk + '</div>';
+        }
+        if (tracked && can) {
+            var cell = null; try { cell = Q.hole(code, sel, n, cur, par); } catch (e) { cell = null; }
+            var pv = cell && cell.putts != null ? cell.putts : null;
+            q += '<div class="hp-cc-pl">Putts</div><div class="hp-cc-keys hp-cc-k5 hp-cc-putts" data-cc-puttsrow="1">' + [0, 1, 2, 3, 4].map(function (k) {
+                return '<button type="button" class="hp-cc-key' + (pv === k ? ' on' : '') + '" data-cc-putts="' + k + '" aria-pressed="' + (pv === k ? 'true' : 'false') + '" aria-label="' + (k === 4 ? '4 or more' : k) + ' putts">' + (k === 4 ? '4+' : k) + '</button>';
+            }).join('') + '</div>';
+        }
+        if (!can && selP) q += '<div class="hp-cc-view">This phone can’t score ' + esc(selName) + ' on this hole.</div>';
+        w.querySelector('.hp-cc-qe').innerHTML = q;
         cc.sig = ccSig();
+    }
+    function kpUp() { var k = document.getElementById('kp-force-overlay'); return !!(k && k.style.display === 'flex'); }
+    // A SCORE: saved through the card's own save; then the next golfer with no score on this hole;
+    // everyone in - the next hole (the card's own Next); on an earlier hole, back to the map's hole.
+    function ccScore(v) {
+        var n = cc.hole, ctx = ccCtx(n), pid = cc.sel;
+        if (!ctx || !ccCan(ctx, pid) || !(v > 0)) return false;
+        if (v !== Number(ctx.score(pid))) ctx.save(pid, v);
+        cc.done[ctx.code + '|' + pid + '|' + n] = v;
+        var Q = ccQ();
+        // The Enter score sheet's own step (ssKeepOne): a record already holding this hole gets its GIR worked out again.
+        try { var rec = Q && Q.load(ctx.code, pid); if (rec && rec.holes[String(n)]) Q.set(ctx, pid, n, {}, v, ctx.par); } catch (e) {}
+        cc.more = false;
+        if (!compactOpen()) return true;
+        ccAdvance(ctx);
+        if (compactOpen()) ccRender();
+        return true;
+    }
+    function ccAdvance(ctx) {
+        var gs = (ctx.golfers || []).map(function (g) { return String(g.id); }), i = gs.indexOf(String(cc.sel));
+        for (var s = 1; s < gs.length; s++) { var id = gs[(i + s + gs.length) % gs.length]; if (!(ccVal(id, ctx.hole) > 0)) { cc.sel = id; return 'golfer'; } }
+        var now = ccNow();
+        if (ctx.hole !== now) { cc.hole = now; cc.sel = ccFirstOpen(now, null); return 'home'; }
+        if (ctx.last) return 'last';   // stays: "Finish & settle up" shows
+        if (typeof ctx.next === 'function') ctx.next();
+        if (kpUp()) { closeCompactCard(); return 'kp'; }   // the KP question first, on the card
+        var to = ccNow();
+        if (to !== now) { cc.home = to; cc.hole = to; cc.sel = ccFirstOpen(to, null); }
+        return 'next';
+    }
+    // PUTTS (tapped before the score; optional, no default): the phone-only quick-stats record. Tap again clears.
+    function ccPutts(k) {
+        var n = cc.hole, ctx = ccCtx(n), pid = cc.sel, Q = ccQ();
+        if (!ctx || !Q || !ccCan(ctx, pid) || !ccTracked(ctx, pid)) return false;
+        var s = ccVal(pid, n) || 0, cell = Q.hole(ctx.code, pid, n, s, ctx.par);
+        Q.set(ctx, pid, n, { putts: cell.putts === k ? null : k }, s, ctx.par);
+        ccRender();
+        return true;
+    }
+    // A BOX: that golfer and hole into quick entry. An earlier hole is edited in place; a later hole moves
+    // the round there first (the card's own goToHole, through gpsGotoHole - the KP question gates it).
+    function ccPick(n, pid) {
+        var cur = ccNow(), order = [];
+        try { if (typeof gpsHoleList === 'function') order = gpsHoleList(); } catch (e) {}   /* global gpsHoleList */
+        if (cur != null && n !== cur && order.indexOf(n) > order.indexOf(cur)) {
+            try { if (typeof gpsGotoHole === 'function') gpsGotoHole(n); else if (typeof goToHole === 'function') goToHole(n); } catch (e) {}   /* global gpsGotoHole, goToHole */
+            if (kpUp()) { closeCompactCard(); return false; }
+            cur = ccNow(); cc.home = cur;
+        }
+        cc.hole = (cur != null && order.indexOf(n) > order.indexOf(cur)) ? cur : n;
+        cc.sel = String(pid); cc.more = false;
+        ccRender();
+        return true;
     }
     function ccBuild() {
         var w = document.createElement('div');
         w.id = 'hp-compact-card'; w.className = 'gps-scroll-ok';
         w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true'); w.setAttribute('aria-label', 'Scorecard');
         w.innerHTML = '<style>' + CC_CSS + '</style><div class="hp-cc"><div class="hp-cc-handle"></div><div class="hp-cc-head"><h2 class="hp-cc-title">Scorecard</h2>'
-            + '<button type="button" class="hp-cc-full" data-cc-full="1">Full card ›</button></div><div class="hp-cc-body"></div></div>';
+            + '<button type="button" class="hp-cc-full" data-cc-full="1">Full card ›</button></div><div class="hp-cc-who"></div><div class="hp-cc-tiles"></div><div class="hp-cc-body"></div><div class="hp-cc-qe"></div></div>';
         w.addEventListener('click', function (e) {
             var t = e.target, b;
             if (t === w) { closeCompactCard(); return; }   // the map above the sheet
+            if (!t.closest) return;
             if (t.closest('[data-cc-full]')) { closeCompactCard(); toFullCard(); return; }
-            if ((b = t.closest('[data-cc-hole]'))) ccOpen(Number(b.getAttribute('data-cc-hole')), b.getAttribute('data-cc-player'));
+            if ((b = t.closest('[data-cc-golfer]'))) { cc.sel = b.getAttribute('data-cc-golfer'); cc.more = false; ccRender(); return; }
+            if ((b = t.closest('[data-cc-hole]'))) { ccPick(Number(b.getAttribute('data-cc-hole')), b.getAttribute('data-cc-player')); return; }
+            if ((b = t.closest('[data-cc-score]'))) { if (!b.disabled) ccScore(Number(b.getAttribute('data-cc-score'))); return; }
+            if ((b = t.closest('[data-cc-seven]'))) { if (!b.disabled) { cc.more = !cc.more; ccRender(); } return; }
+            if ((b = t.closest('[data-cc-putts]'))) { ccPutts(Number(b.getAttribute('data-cc-putts'))); return; }
+            if (t.closest('[data-cc-moresheet]')) { ccOpen(cc.hole, cc.sel); return; }
+            if (t.closest('[data-cc-finish]')) { var ctx = ccCtx(cc.hole); closeCompactCard(); if (ctx && typeof ctx.finish === 'function') { try { ctx.finish(); } catch (er) {} } return; }
         });
         // SWIPE DOWN TO CLOSE: from the handle / title, or anywhere once the grid is at its top.
         var card = w.querySelector('.hp-cc'), y0 = null, dy = 0;
@@ -1229,9 +1470,9 @@
         });
         return w;
     }
-    // A box: the score sheet for that golfer, on that hole. The hole on the map, or one played before it
-    // (the sheet's own earlier-hole step - Save goes back to the map's hole); a later hole moves the
-    // round there first (the card's own goToHole), as its ‹ › would.
+    // "More ›" (092; before 092 every box did this): today's full Enter score sheet for that golfer, on that
+    // hole. The hole on the map, or one played before it (the sheet's own earlier-hole step - Save goes back
+    // to the map's hole); a later hole moves the round there first (the card's own goToHole).
     function ccOpen(n, pid) {
         var cur = (function () { try { return Number(currentViewedHole); } catch (e) { return null; } })();
         var order = []; try { if (typeof gpsHoleList === 'function') order = gpsHoleList(); } catch (e) {}   /* global gpsHoleList */
@@ -1246,18 +1487,23 @@
     function openCompactCard() {
         if (!data()) return false;
         closeBets(); closeSheet(true);
-        if (!cc) cc = { wrap: ccBuild() };
+        if (!cc) cc = { wrap: ccBuild(), done: {} };
         var host = document.getElementById('gps-overlay');
         host = host && onGps() ? host : document.body;
         if (cc.wrap.parentNode !== host) host.appendChild(cc.wrap);
         cc.wrap.style.display = '';
         cc.wrap.querySelector('.hp-cc').style.transform = '';
+        // Quick entry opens on the map's hole and this phone's golfer (or the next with no score there).
+        cc.home = cc.hole = ccNow(); cc.more = false; cc.sel = ccFirstOpen(cc.hole, null);
         ccRender();
-        var now = cc.wrap.querySelector('tr.hp-cc-now');
-        if (now) { try { var body = cc.wrap.querySelector('.hp-cc-body'); body.scrollTop = Math.max(0, now.offsetTop - body.clientHeight / 2); } catch (e) {} }
-        // A score saved from the sheet over it shows here at once.
+        // 6+ golfers: opened scrolled to the selected golfer.
+        try {
+            var body = cc.wrap.querySelector('.hp-cc-body'), row = body.querySelector('tr.hp-cc-sel');
+            if (row && body.scrollHeight > body.clientHeight + 2) body.scrollTop = Math.max(0, row.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop - body.clientHeight / 2);
+        } catch (e) {}
+        // A score saved from the Enter score sheet over it (More ›) - or anywhere - shows here at once.
         if (cc.timer) clearInterval(cc.timer);
-        cc.timer = setInterval(function () { if (!compactOpen()) { clearInterval(cc.timer); cc.timer = null; return; } if (ccSig() !== cc.sig) ccRender(); }, 400);
+        cc.timer = setInterval(function () { if (!compactOpen()) { clearInterval(cc.timer); cc.timer = null; return; } if (ccSig() !== cc.sig || ccNow() !== cc.home) ccRender(); }, 400);
         return true;
     }
     function closeCompactCard() {
