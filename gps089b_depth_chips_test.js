@@ -100,7 +100,7 @@ test('089b: labels - nearest of front / middle / back; middle quiet within 3; me
 
 test('089b: gps-view wiring - live spot only, the default, the pill, the tap, 089 kept', { skip }, () => {
     const v = read('gps-view.js');
-    assert.match(v, /if \(!mine && chips\.length && typeof M\.depthChips === 'function'\)/, 'depth chips from the golfer\'s spot (live, held, or the tee)');
+    assert.match(v, /if \(!mine && \(chips\.length \|\| always\) && typeof M\.depthChips === 'function'\)/, 'depth chips from the golfer\'s spot (live, held, or the tee)');
     assert.match(v, /missLastFix = \{ pt: fix\.pt\.slice\(\), at: fix\.at \}/, 'the last fix kept (memory only)');
     assert.match(v, /function dropStaleFix\(\) \{ if \(fix && \(!fix\.at \|\| Date\.now\(\) - fix\.at > FIX_STALE_MS\)\) \{ fix = null;/, 'the 10 s rule unchanged');
     assert.match(v, /var FIX_STALE_MS = 10000/);

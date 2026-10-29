@@ -84,7 +84,7 @@ test('shows for a 7-iron approach (green in range = carry +/- the margin)', { sk
     const v = read('gps-view.js'), plan = v.slice(v.indexOf('    function missPlan(r, o) {'), v.indexOf('    var MISS_SRC'));
     assert.ok(/M\.shows\(\{ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup \}\)/.test(plan));
     assert.ok(/if \(mine && op\.club\) club = op\.club;/.test(plan), 'the club picked at Mark shot');
-    assert.ok(/B\.suggestClub\(bag, greenYd\)/.test(plan), 'else the club My bag suggests for the green');
+    assert.ok(/B\.suggestClub\((bag|bagMy), greenYd\)/.test(plan), 'else the club My bag suggests for the green');
     assert.ok(/var bag = bagNow\(B\)/.test(plan) && /carry = v && v\.yd > 0 \? v\.yd : null/.test(plan), 'the carry is My bag\'s number');
 });
 
@@ -124,7 +124,7 @@ test('the (i): the formula in plain words, from the one tuning block', { skip },
     const { M } = sandbox();
     const t = M.infoText();
     ['average carry', '4.5% of the carry long and short', '6.5% of the carry left and right', 'tilted 25°', 'right side sits short', 'left side sits long',
-        'left-handed', 'A 178 7-iron: ±8 deep, ±11.6 wide', 'never from the tee', 'driver, woods or hybrids'].forEach((w) => assert.ok(t.includes(w), w + ' in: ' + t));
+        'left-handed', 'A 178 7-iron: ±8 deep, ±11.6 wide', 'never from the tee', 'every club in My bag'].forEach((w) => assert.ok(t.includes(w), w + ' in: ' + t));
     // ONE place: the numbers live only in TUNE; changing it changes the shape, the line and the words.
     const src = read('gps-miss-pattern.js');
     assert.equal((src.match(/0\.045/g) || []).length, 1, '4.5% written once');

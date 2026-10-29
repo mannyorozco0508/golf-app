@@ -179,7 +179,8 @@
             + 'It is centred on that carry along your line to the target' + (TUNE.PLAYS_CENTER ? ' (where it lands today, with the plays-like wind, slope and temperature)' : '') + ': ' + pc(TUNE.DEPTH_PCT) + '% of the carry long and short, '
             + pc(TUNE.WIDTH_PCT) + '% of the carry left and right, tilted ' + TUNE.TILT_DEG + '° so your right side sits short and your left side sits long (mirrored if you play left-handed). '
             + 'A 178 7-iron: ±' + (Math.round(ex.b * 10) / 10) + ' deep, ±' + (Math.round(ex.a * 10) / 10) + ' wide. '
-            + 'It shows only on an approach into the green, or a par-3 tee shot, with a 4-iron to a lob wedge - never from the tee on a par 4 or 5, never for driver, woods or hybrids, and not when the green is out of the club’s range.';
+            + 'It shows only on an approach into the green, or a par-3 tee shot - never from the tee on a par 4 or 5. '
+            + 'It always shows there, with every club in My bag: it starts on the club closest to the plays-like number (a club with no number of its own uses a typical carry), and when nothing reaches, on your longest club with how far short of the front it lands.';
     }
 
     // THE OVAL'S OUTLINE, in yards: [[side, along]] - side + right of the aim line, along =
@@ -348,6 +349,48 @@
         return String(short) + ' · ' + spot.zone + (quiet ? '' : ' ' + (delta > 0 ? '+' : '\u2212') + k);
     }
 
+    // ---- 101 (Manny's standing rule, Oct 29): MY MISS ALWAYS SHOWS ON EVERY PAR 3 AND EVERY APPROACH -----------
+    // "never hidden for range". shows() above is kept as it was (its 'club' / 'range' / 'carry' answers still say what
+    // 063's checks found); the view then shows the oval + switcher anyway for those three reasons (always(why)), with
+    // the club below ('layup' too - a target dragged off the green: the oval then aims at the green's middle, as before).
+    // Only 'tee' (a par 4 / 5 tee shot - not an approach) still hides it, as do My miss off, Tournament and Mark-open.
+    function always(why) { return why === 'club' || why === 'range' || why === 'carry' || why === 'layup'; }
+    // A CLUB WITH NO NUMBER takes the generic carry (My bag's own first-time table, gps-shots defaultCarries) - the
+    // golfer's numbers always win. bag: { club: { yd } }; generic: { club: yd }; order: the club keys (My bag's BAG).
+    // Returns a new bag; filled clubs carry gen: true. Pure.
+    function fillBag(bag, generic, order) {
+        var out = {}, keys = order && order.length ? order : Object.keys(generic || {});
+        Object.keys(bag || {}).forEach(function (c) { out[c] = bag[c]; });
+        keys.forEach(function (c) {
+            var v = out[c], g = generic && generic[c];
+            if (!(v && isNum(v.yd) && v.yd > 0) && isNum(g) && g > 0) out[c] = { yd: g, gen: true };
+        });
+        return out;
+    }
+    // THE DEFAULT CLUB: the one whose carry is closest to the plays-like yards (a tie: the app's pick, then the longer
+    // club). Nothing reaches: that is the longest club. Returns { club, carry, reaches } or null (no carries). Pure.
+    function nearestClub(bag, playsYd, order, app) {
+        var keys = order && order.length ? order : Object.keys(bag || {}), best = null, top = null;
+        keys.forEach(function (c) {
+            var v = bag && bag[c], cy = v && isNum(v.yd) && v.yd > 0 ? v.yd : null;
+            if (cy == null) return;
+            if (!top || cy > top.carry) top = { club: c, carry: cy };
+            if (!isNum(playsYd)) return;
+            var d = Math.abs(cy - playsYd), bd = best ? Math.abs(best.carry - playsYd) : Infinity;
+            if (!best || d < bd - 1e-9 || (Math.abs(d - bd) <= 1e-9 && best.club !== app && (c === app || cy > best.carry))) best = { club: c, carry: cy };
+        });
+        if (!best) return top ? { club: top.club, carry: top.carry, reaches: false } : null;
+        return { club: best.club, carry: best.carry, reaches: top.carry >= playsYd };
+    }
+    // THE APPROACH SWITCHER WHEN NO IRON / WEDGE LANDS NEAR THE GREEN: the default club and the clubs either side of
+    // it (longest first, at most 3) from allClubs' list. Pure.
+    function aroundDef(ac) {
+        if (!ac || !ac.list || !ac.list.length) return [];
+        var L = ac.list, i = 0;
+        L.forEach(function (x, k) { if (x.club === ac.def) i = k; });
+        return L.slice(Math.max(0, i - 1), Math.min(L.length, i + 2));
+    }
+
     // 089b: THE HELD FIX. last: { pt, at } (the phone's last fix, memory only). Its point while it is under
     // TUNE.HOLD_FIX_MS old (59 s: yes; 60 s or more: no), else null.
     function heldFix(last, nowMs, maxMs) {
@@ -375,6 +418,7 @@
     }
 
     var api = { TUNE: TUNE, CLUBS: CLUBS, KEY: KEY,
+        always: always, fillBag: fillBag, nearestClub: nearestClub, aroundDef: aroundDef,
         chipPair: chipPair, depthChips: depthChips, allClubs: allClubs, switchText: switchText, heldFix: heldFix, depthNote: depthNote, depthText: depthText, landSpot: landSpot, chipText: chipText, landNote: landNote, fadeOvals: fadeOvals,
         isClub: isClub, oval: oval, centreAt: centreAt, margin: margin, inRange: inRange, shows: shows, tips: tips, bagLine: bagLine, infoText: infoText,
         outline: outline, inside: inside, isOn: isOn, setOn: setOn,

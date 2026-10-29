@@ -77,5 +77,5 @@ test('072: the view passes the hole\'s par (par 3) into shows()', { skip }, () =
 test('072: the (i) words say par-3 tee shots, still never from the tee on a par 4 or 5', { skip }, () => {
     const { M } = sandbox();
     const t = M.infoText();
-    ['par-3 tee shot', 'never from the tee on a par 4 or 5', 'driver, woods or hybrids'].forEach((w) => assert.ok(t.includes(w), w + ' in: ' + t));
+    ['par-3 tee shot', 'never from the tee on a par 4 or 5', 'every club in My bag'].forEach((w) => assert.ok(t.includes(w), w + ' in: ' + t));
 });

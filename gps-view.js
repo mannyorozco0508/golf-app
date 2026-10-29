@@ -5236,13 +5236,25 @@
         try { pl = playsTo(null); } catch (e) { pl = null; } finally { S.missHeldPt = null; }
         var greenYd = pl && pl.exact > 0 ? pl.exact : G.haversineMeters(o.pt, r.mid) / G.M_PER_YD;
         var bag = bagNow(B), club = null;
+        // 101: a club with no number of its own takes the generic carry (My bag's first-time table for his handicap).
+        var gen = null; try { gen = typeof B.defaultCarries === 'function' ? B.defaultCarries(bagHcp()) : null; } catch (e) { gen = null; }
+        var bagMy = bag; if (gen && typeof M.fillBag === 'function') bag = M.fillBag(bagMy, gen, B.BAG);
         if (mine && op.club) club = op.club;
-        else { var sg = greenYd >= 10 ? B.suggestClub(bag, greenYd) : null; club = sg ? sg.club : null; }
+        else { var sg = greenYd >= 10 ? B.suggestClub(bagMy, greenYd) : null; club = sg ? sg.club : null; }
         var v = club ? bag[club] : null, carry = v && v.yd > 0 ? v.yd : null;
         var tg = S.target || null, layup = !!(tg && G.haversineMeters(tg, r.mid) > M.TUNE.GREEN_AIM_YD * G.M_PER_YD);
         var ok = M.shows({ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup });
         // 072: a PAR-3 tee shot is the approach - the same checks again, with the hole's par (irons / wedges only).
         if (!ok.ok && ok.why === 'tee' && isPar3()) ok = M.shows({ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup }, { par: 3 });
+        // 101 (Manny's standing rule, Oct 29): EVERY PAR 3 AND EVERY APPROACH - never hidden for "range" (nor for a
+        // hybrid / wood / driver pick, nor a club with no number). The default = the club closest to the plays-like
+        // (the longest when nothing reaches); a marked shot's own club stays. Only 'tee' (a par 4 / 5 tee shot) still hides.
+        var always = false;
+        if (!ok.ok && typeof M.always === 'function' && M.always(ok.why) && greenYd >= 10) {
+            if (!(mine && op.club && bag[op.club] && bag[op.club].yd > 0)) { var nc = M.nearestClub(bag, greenYd, B.BAG, club); club = nc ? nc.club : null; }
+            var cv1 = club ? bag[club] : null; carry = cv1 && cv1.yd > 0 ? cv1.yd : null;
+            if (club && carry) { ok = { ok: true, why: null }; always = true; }
+        }
         S.missWhy = ok.ok ? null : ok.why;
         S.missChips = null;
         var pk = mine ? null : missPickClub(o);   // 089: a pick from another hole / ball is dropped here, oval or not
@@ -5257,7 +5269,7 @@
             M.chipPair(bag, club).forEach(function (c) {
                 var cv = bag[c], cy = cv && cv.yd > 0 ? cv.yd : null, q = { club: c, carry: cy, greenYd: greenYd, fromTee: fromTee, layup: layup };
                 var k = M.shows(q); if (!k.ok && k.why === 'tee' && isPar3()) k = M.shows(q, { par: 3 });
-                if (!k.ok) return;
+                if (!k.ok && !(always && cy)) return;   // 101: always-on - any club with a carry
                 var al = M.centreAt(cy, rawYd, plEx);
                 chips.push({ club: c, carry: cy, along: al, delta: al - aimYd });
             });
@@ -5269,7 +5281,7 @@
         // within 5 yds short of the front / long of the back; at most 4 (gps-miss-pattern depthChips). The default
         // = the club closest to the target point. A green with no front / back: 089's pair above.
         var def = club, depth = false, allC = false;
-        if (!mine && chips.length && typeof M.depthChips === 'function') {
+        if (!mine && (chips.length || always) && typeof M.depthChips === 'function') {
             var hn = null; try { hn = G.holeNumbers(o.pt, r); } catch (e) { hn = null; }
             var yd = function (m) { return m != null && isFinite(m) ? m / G.M_PER_YD : null; };
             var dc = hn ? M.depthChips({ bag: bag, front: yd(hn.frontM), middle: yd(hn.middleM), back: yd(hn.backM), aimYd: aimYd, rawYd: rawYd, playsYd: plEx, app: club }) : null;
@@ -5278,6 +5290,13 @@
             // ones landing on the green. The default = the club closest to the target. Approaches: unchanged.
             var ac = hn && isPar3() && typeof M.allClubs === 'function' ? M.allClubs({ bag: bag, front: yd(hn.frontM), middle: yd(hn.middleM), back: yd(hn.backM), aimYd: aimYd, rawYd: rawYd, playsYd: plEx, app: club, order: B.BAG }) : null;
             if (ac && ac.list.length) { chips = ac.list; def = ac.def; depth = true; allC = true; }
+            // 101: AN APPROACH WITH NO IRON / WEDGE LANDING NEAR THE GREEN (or none at all): the default club (closest to
+            // the plays-like, any club) and the clubs either side of it, with the 095 text ("3w · 12 short of the front").
+            if (always && !isPar3() && hn && !(dc && dc.list.length) && typeof M.allClubs === 'function') {
+                var ap = M.allClubs({ bag: bag, front: yd(hn.frontM), middle: yd(hn.middleM), back: yd(hn.backM), aimYd: aimYd, rawYd: rawYd, playsYd: plEx, app: club, order: B.BAG });
+                var aw = ap && typeof M.aroundDef === 'function' ? M.aroundDef(ap) : [];
+                if (aw.length) { chips = aw; def = ap.def; depth = true; allC = true; }
+            }
         }
         // The tapped chip, while it still stands (this hole, this ball, still one of the chips); else the default
         // (089: the app's pick; 089b: the depth chip closest to the target).
@@ -5286,7 +5305,7 @@
         var selCarry = sel === app ? carry : bag[sel].yd;
         if (chips.length) S.missChips = { app: app, def: def, sel: sel, depth: depth, all: allC, from: o.from, held: !!o.held, list: chips, pt: o.pt.slice() };
         var selSpot = null; if (depth) chips.forEach(function (x) { if (x.club === sel) selSpot = x.spot; });
-        return { club: sel, app: app, any: allC, spot: selSpot, carry: selCarry, along: M.centreAt(selCarry, rawYd, plEx), aim: aim, aimYd: aimYd, hand: SL && SL.hand ? SL.hand(bagGolfer()) : 'R' };
+        return { club: sel, app: app, any: allC || always, spot: selSpot, carry: selCarry, along: M.centreAt(selCarry, rawYd, plEx), aim: aim, aimYd: aimYd, hand: SL && SL.hand ? SL.hand(bagGolfer()) : 'R' };
     }
     // 089: THE TAPPED CHIP (memory only, this hole, this ball): { hole, club, pt }. Back to the app's pick on
     // the next hole, the next shot (Mark shot, or the golfer more than 40 yds from where he tapped).
@@ -5327,7 +5346,8 @@
         var u = units() === 'm' ? 'm' : 'yd', B = bagApi();
         var list = c.list.slice().sort(function (a, b) { return b.carry - a.carry; });
         // 089b: a depth chip reads "LW · front +5" / "SW · middle" / "GW · back −1" (089's pair: "7i +8 long").
-        var txtOf = function (x) { return c.depth && x.spot && typeof M.depthText === 'function' ? M.depthText(clubShort(x.club), x.spot, u) : M.chipText(clubShort(x.club), x.delta, u); };
+        var txtOf = function (x) { if (c.all && x.spot && typeof M.switchText === 'function') return M.switchText(clubShort(x.club), x.spot, u, x.delta);   // 101: the approach fallback
+            return c.depth && x.spot && typeof M.depthText === 'function' ? M.depthText(clubShort(x.club), x.spot, u) : M.chipText(clubShort(x.club), x.delta, u); };
         var fromTee = c.from === 'tee';   // 089b: measured from the mapped tee (no fix) - said on the chips
         var sig = (fromTee ? 'tee|' : '') + list.map(function (x) { return x.club + ':' + txtOf(x) + (x.club === c.sel ? '*' : ''); }).join('|');
         if (box.getAttribute('data-miss-chips') !== sig) {
