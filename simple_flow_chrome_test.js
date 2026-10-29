@@ -162,7 +162,8 @@ describe('017 Simpler HardPan: Home and the 3-step New round', () => {
         assert.equal(r.ok, true, r.reason);
         const [s] = J(r);
         assert.match(s.prog, /IN PROGRESS\nDobson Ranch Golf Course · Thru 9\nResume ›/);
-        assert.deepEqual(s.forms, ['index.html?game=SALW01', 'index.html?game=SALW01&group=2', 'index.html?game=SALW01&group=2', 'index.html?game=SALW01&group=1&sk=ABCD']);
+        // 100b (Manny's 099 answer 4): a join that names a group also asks "who are you" (&askme=1).
+        assert.deepEqual(s.forms, ['index.html?game=SALW01', 'index.html?game=SALW01&group=2&askme=1', 'index.html?game=SALW01&group=2&askme=1', 'index.html?game=SALW01&group=1&sk=ABCD&askme=1']);
     });
 
     test('Players, Type names: 4 golfers typed one by one with Enter - the keyboard never leaves; the paste box keeps Enter as a new line; a pasted 4', { timeout: 120000 }, async () => {

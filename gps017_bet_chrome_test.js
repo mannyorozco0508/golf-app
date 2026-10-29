@@ -62,7 +62,8 @@ test('URGENT-023: no "+ Bet" and no money chip on the card or the GPS bar - "+ B
     assert.equal(card.on, true, 'simpleFlow is on in dev');
     assert.equal(card.bet, false, 'no + Bet on the card bar');
     assert.equal(card.chip, false, 'no money chip in the DOM');
-    assert.deepEqual(card.bar, ['☰', '📍 GPS', 'Enter score'], 'card bar: [≡] [GPS] [Enter score]');
+    // 100b (Manny OK, 100-PLAN Q6): "+ Game" joined the bar next to Enter score (still no + Bet, no chip).
+    assert.deepEqual(card.bar, ['☰', '📍 GPS', 'Enter score', '＋ Game'], 'card bar: [≡] [GPS] [Enter score] [+ Game]');
     await shot('card');
     await ev("(function(){ var b=(document.querySelector('#hp-card-bet [data-hp-bar=gps]') || document.getElementById('fd-gps-btn')); if(b) b.click(); return 1; })()");
     await sleep(3000);

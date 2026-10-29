@@ -87,13 +87,13 @@ for (const [w, h] of SIZES) {
                 await shot('A1-card-nassau');
                 if (h < 800) { await j.evaluate('(function(){var p=document.querySelector("#hp-game .hb-panel"); p.scrollTop=p.scrollHeight;})()'); await sleep(200); s = await sheetCheck(); assert.deepEqual(s.hits, []); await shot('A1b-card-nassau-scrolled'); }
                 // Wolf with 3 (the A3 picture) - Wolf live for the picture (100c's catalog entry stood in).
-                await j.evaluate(`ADDITIONAL_GAME_CATALOG.wolf = ADDITIONAL_GAME_CATALOG.wolf || { label: 'Wolf', stakeField: 'wolfPointVal', defaults: {} }; window.__wolfStandIn = true;`);
+                assert.equal(await j.evaluate('HardPanGame.ready("wolf")'), true, 'Wolf is live (100c catalog entry)');
                 await j.evaluate(`document.querySelector('#hp-game [data-hg-game="wolf"]').click()`); await sleep(150);
                 await j.evaluate(`document.querySelector('#hp-game [data-hg-pick="${ID[2]}"]').click()`); await sleep(200);
                 s = await sheetCheck();
                 assert.deepEqual(s.hits, [], 'wolf sheet overlaps');
                 await shot('A3-card-wolf-needs4');
-                await j.evaluate('delete ADDITIONAL_GAME_CATALOG.wolf; HardPanGame.close()');
+                await j.evaluate('HardPanGame.close()');
                 // GPS: the pill above Mark, clear of every map control
                 await j.evaluate("(document.querySelector('#hp-card-bet [data-hp-bar=gps]')||{click(){}}).click()"); await sleep(3500);
                 const g = JSON.parse(await j.evaluate(`(function(){ ${OVERLAP} var p=document.querySelector('#gps-overlay .gps-game-pill'); var pb=vis(p)?p.getBoundingClientRect():null;
@@ -177,7 +177,6 @@ test('Nassau from 15 (Pick): "one bet, 15-18" and a one-stake worst case; Pick o
 });
 
 test('Wolf with 3: the reason and a disabled Start; 9 Points with 2: the clear message', { timeout: 60000 }, async () => {
-    await ev(`ADDITIONAL_GAME_CATALOG.wolf = ADDITIONAL_GAME_CATALOG.wolf || { label: 'Wolf', stakeField: 'wolfPointVal', defaults: {} }`);
     await ev('HardPanGame.open({ game: "wolf" })');
     await tapG(`[data-hg-pick="${ID[1]}"]`); await tapG(`[data-hg-pick="${ID[2]}"]`);
     let t = await panel();
@@ -185,7 +184,7 @@ test('Wolf with 3: the reason and a disabled Start; 9 Points with 2: the clear m
     assert.match(t, /Start Wolf · needs 4 golfers/);
     assert.equal(await ev('document.querySelector("#hp-game [data-hg=start]").disabled'), true);
     assert.match(t, /Wolf from 7: holes 7-18, you are Wolf on 7, then in the order picked\./);
-    await ev('delete ADDITIONAL_GAME_CATALOG.wolf; HardPanGame.close()');
+    await ev('HardPanGame.close()');
     await ev('HardPanGame.open({ game: "nines" })');
     await tapG(`[data-hg-pick="${ID[1]}"]`);
     t = await panel();
@@ -194,22 +193,36 @@ test('Wolf with 3: the reason and a disabled Start; 9 Points with 2: the clear m
     await ev('HardPanGame.close()');
 });
 
-test('Vegas / BBB / Wolf / KP wait for 100c (organizer line); with the engines in, their records carry inSettle', { timeout: 60000 }, async () => {
-    await ev('HardPanGame.open({ game: "vegas" })');
-    let t = await panel();
-    assert.match(t, /The organizer sets this up in Round Setup\./);
-    assert.equal(await ev('document.querySelector("#hp-game [data-hg=start]").disabled'), true);
-    await ev('HardPanGame.close()');
-    const rec = JSON.parse(await ev(`(function(){ window.HP_SETTLE_VEGAS_BBB = true; ADDITIONAL_GAME_CATALOG.wolf = { label: 'Wolf', defaults: {} }; ADDITIONAL_GAME_CATALOG.dots.typeFilter = true;
-        var ids = ${JSON.stringify(ID)}; var o = function(g, p){ var r = HardPanGame.build({ game: g, picks: p, stake: 2, from: 7, now: 1 }); return r.refuse ? r : r[0].value; };
-        var out = { vegas: o('vegas', ids), bbb: o('bbb', ids.slice(0,2)), wolf: o('wolf', [ids[2], ids[0], ids[1], ids[3]]), kp: o('kp', ids), birdies: o('birdies', ids) };
-        delete window.HP_SETTLE_VEGAS_BBB; delete ADDITIONAL_GAME_CATALOG.wolf; delete ADDITIONAL_GAME_CATALOG.dots.typeFilter; return JSON.stringify(out); })()`));
+test('Vegas / BBB / Wolf / KP / Birdies are live with 100c in, and their records carry inSettle; without 100c they wait (organizer line)', { timeout: 60000 }, async () => {
+    const live = JSON.parse(await ev('JSON.stringify(["vegas","bbb","wolf","kp","birdies"].map(function(k){ return HardPanGame.ready(k); }))'));
+    assert.deepEqual(live, [true, true, true, true, true], '100c engines are in this build');
+    // Without 100c (its flags off on this page): the organizer line, a disabled Start - today's behavior.
+    const off = JSON.parse(await ev(`(function(){ var f = window.HP_SETTLE_VEGAS_BBB; window.HP_SETTLE_VEGAS_BBB = false; var w = ADDITIONAL_GAME_CATALOG.wolf; delete ADDITIONAL_GAME_CATALOG.wolf; var t = ADDITIONAL_GAME_CATALOG.dots.typeFilter; delete ADDITIONAL_GAME_CATALOG.dots.typeFilter;
+        var cf = window.computeVegasBbbSettle; try { delete window.computeVegasBbbSettle; } catch (e) {}
+        var r = ['vegas','bbb','wolf','kp'].map(function(k){ return HardPanGame.ready(k); });
+        HardPanGame.open({ game: 'vegas' }); var txt = document.querySelector('#hp-game .hb-panel').innerText.replace(/\\s+/g,' '); var dis = document.querySelector('#hp-game [data-hg=start]').disabled; HardPanGame.close();
+        window.HP_SETTLE_VEGAS_BBB = f; ADDITIONAL_GAME_CATALOG.wolf = w; ADDITIONAL_GAME_CATALOG.dots.typeFilter = t; if (cf) window.computeVegasBbbSettle = cf;
+        return JSON.stringify({ r: r, txt: txt, dis: dis }); })()`));
+    assert.deepEqual(off.r, [false, false, false, false]);
+    assert.match(off.txt, /The organizer sets this up in Round Setup\./);
+    assert.equal(off.dis, true);
+    const rec = JSON.parse(await ev(`(function(){ var ids = ${JSON.stringify(ID)}; var o = function(g, p){ var r = HardPanGame.build({ game: g, picks: p, stake: 2, from: 7, now: 1 }); return r.refuse ? r : r[0].value; };
+        return JSON.stringify({ vegas: o('vegas', ids), bbb: o('bbb', ids.slice(0,2)), wolf: o('wolf', [ids[2], ids[0], ids[1], ids[3]]), kp: o('kp', ids), birdies: o('birdies', ids) }); })()`));
     assert.deepEqual(rec.vegas, { format: 'vegas', enabled: true, startHole: 7, createdAt: 1, vegasPointVal: 2, vegasBirdieFlip: false, vegasTeamA: [ID[0], ID[1]], vegasTeamB: [ID[2], ID[3]], participantIds: ID, inSettle: true });
     assert.deepEqual(rec.bbb, { format: 'bbb', enabled: true, startHole: 7, createdAt: 1, bbbPointVal: 2, participantIds: [ID[0], ID[1]], inSettle: true });
     assert.deepEqual(rec.wolf.participantIds, [ID[2], ID[0], ID[1], ID[3]], 'first golfer picked = Wolf on the start hole');
     assert.equal(rec.wolf.inSettle, true); assert.equal(rec.wolf.startHole, 7); assert.equal(rec.wolf.wolfPointVal, 2);
     assert.deepEqual(rec.kp.dotTypes, ['greenie']); assert.equal(rec.kp.format, 'dots');
     assert.deepEqual(rec.birdies.dotTypes, ['birdie', 'eagle']);
+    // Vegas started from the sheet lands in the round (and a live Vegas card is extra-games-ui.js's).
+    await ev('HardPanGame.open({ game: "vegas" })');
+    for (const id of ID.slice(1)) await tapG(`[data-hg-pick="${id}"]`);
+    let t = await panel();
+    assert.match(t, /Vegas from 7: holes 7-18, the first two picked vs the last two\./);
+    assert.match(t, /Start Vegas · Me \+ Jim vs Dave \+ Rob/);
+    await tapG('[data-hg=start]'); await sleep(400);
+    const v = JSON.parse(await ev(lastOf('additionalGameInstances')));
+    assert.equal(v.format, 'vegas'); assert.equal(v.inSettle, true); assert.equal(Number(v.startHole), 7);
     // More: the organizer-only games say so
     await ev('HardPanGame.open({ game: "scramble" })');
     t = await panel();
@@ -292,4 +305,19 @@ test('a spectator: no + Game anywhere, no + Bet tile; the Matches page refuses N
     await ev('openSideMatchModal()'); await sleep(300);
     const body = await j.screenText();
     assert.match(body, /You are watching this round - a scorekeeper starts bets and presses\./);
+});
+
+test('GPS build: the Vegas game started from the sheet is in Settle up on the Bets page (bbb/vegas engines load there, in their GPS block)', { timeout: 90000 }, async () => {
+    await j.goto(fileUrl('index.html', 'game=' + CODE + '&group=1'), 4500);
+    // hole 7: Manny 3, Jim 3 (33) vs Dave 4, Rob 5 (45) -> Manny + Jim +12 points at $1
+    await ev(`(function(){ var s = { '${ID[0]}': 3, '${ID[1]}': 3, '${ID[2]}': 4, '${ID[3]}': 5 }; Object.keys(s).forEach(function(id){ var p = 'events/${CODE}/scores/p' + id + '_h7'; durableWrite(p, 'set', s[id], p); }); return 1; })()`);
+    await sleep(500);
+    await j.goto(fileUrl('skins.html', 'game=' + CODE + '&group=1'), 4000);
+    const r = JSON.parse(await ev(`(function(){ var d = window.__DB.events['${CODE}']; var t = computeCombinedNetTotals(d, d.courseData, d.scores); var n = t.netByName || {}; return JSON.stringify({ eng: typeof window.HardPanVegas !== 'undefined' || typeof calculateVegas === 'function', flag: window.HP_SETTLE_VEGAS_BBB === true, manny: (n['manny o'] || {}).net || 0, rob: (n['rob t'] || {}).net || 0 }); })()`));
+    assert.equal(r.flag, true, 'settlement-engine.js says Vegas/BBB settle here');
+    assert.ok(r.eng, 'vegas-engine.js loaded on the Bets page');
+    assert.ok(r.manny > 0 && r.rob < 0, 'Vegas money in Settle up: ' + JSON.stringify(r));
+    await j.goto(fileUrl('index.html', 'game=' + CODE + '&group=1'), 4000);
+    await ev(`(function(){ ${JSON.stringify(ID)}.forEach(function(id){ var p = 'events/${CODE}/scores/p' + id + '_h7'; durableWrite(p, 'remove', null, p); }); return 1; })()`);
+    await sleep(300);
 });
