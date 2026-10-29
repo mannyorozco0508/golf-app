@@ -10748,7 +10748,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // score correction is allowed to reopen.
         try {
             if (typeof buildSideMatchReceipts === 'function') {
-                buildSideMatchReceipts(data, courseData, savedScores).forEach(rc => {
+                // 100a: display copy so "$10 to Test" reads "$10 to Test A." (text only).
+                buildSideMatchReceipts((typeof roundDataForDisplay === 'function') ? roundDataForDisplay(data) : data, courseData, savedScores).forEach(rc => {
                     (rc.segments || []).forEach(seg => {
                         if (!/press/i.test(seg.label || '')) return;
                         snap.presses[rc.matchId + '|' + seg.label] = {

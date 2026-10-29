@@ -811,7 +811,9 @@ html {
                 // side-match-lines.js - the same sentences the Bets tab and the Receipt
                 // print, so three surfaces cannot disagree about one wager.
                 const smlRc = (typeof buildSideMatchReceipts === 'function')
-                    ? (buildSideMatchReceipts(data, courseData, savedScores) || [])
+                    // 100a: the round's display copy (text-safe.js), so two golfers with one
+                    // first name read "Mike S" / "Test A." in these lines. Text only.
+                    ? (buildSideMatchReceipts((typeof roundDataForDisplay === 'function') ? roundDataForDisplay(data) : data, courseData, savedScores) || [])
                         .find(x => x.matchId === matchId)
                     : null;
                 // Finished is every hole in the bet's range, posted. NOT `closed`:

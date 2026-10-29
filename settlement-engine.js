@@ -854,14 +854,17 @@
                 });
                 const stake = (segStake === undefined || segStake === null) ? config.overallStake : segStake;
                 const roundComplete = holesCompleted === totalHolesInSeg && totalHolesInSeg > 0;
-                let winner = null, money = 0;
+                // 100a: pay by SIDE ('A'/'B'), never by name. When both sides' first words
+                // match (two "Mike"s, "Test Ann"/"Test Cal") the old name compare paid side A
+                // whoever won. `winner` stays the display string; winSide is a new field.
+                let winner = null, winSide = null, money = 0;
                 if (roundComplete) {
-                    if (p1Total < p2Total) { winner = nameA; money = stake; }
-                    else if (p2Total < p1Total) { winner = nameB; money = stake; }
+                    if (p1Total < p2Total) { winSide = 'A'; winner = nameA; money = stake; }
+                    else if (p2Total < p1Total) { winSide = 'B'; winner = nameB; money = stake; }
                 }
-                const segP1Money = winner === nameA ? money : (winner === nameB ? -money : 0);
+                const segP1Money = winSide === 'A' ? money : (winSide === 'B' ? -money : 0);
                 return { startHole, stake, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg,
-                         roundComplete, winner, p1Money: segP1Money, nameA, nameB,
+                         roundComplete, winner, winSide, p1Money: segP1Money, nameA, nameB,
                          endHole: courseData.length ? courseData[courseData.length - 1].hole : startHole };
             }
 
