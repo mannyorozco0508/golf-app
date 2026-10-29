@@ -32,6 +32,20 @@ function calcWolfEngine(data, courseData, savedScores) {
 
     let carry = 0;
     const sortedHoles = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
+    // 100c WOLF SIDE GAME (2026-10-29 Manny typed OK, 100 Q4): an instance carries
+    // wolfOrder = its golfers in pick order. The k-th hole of the list it is handed
+    // (the caller's hole list: play order from its start hole) has Wolf wolfOrder[k % 4], so
+    // the first golfer picked is Wolf on the start hole. Absent (every main-game Wolf
+    // round) - the original players[(hole - 1) % 4] rotation, unchanged.
+    let pickOrder = null, playIndex = null;
+    if (Array.isArray(data.wolfOrder) && data.wolfOrder.length === 4) {
+        const byId = data.wolfOrder.map(id => players.find(p => String(p.id) === String(id)));
+        if (byId.every(Boolean) && new Set(byId.map(p => String(p.id))).size === 4) {
+            pickOrder = byId;
+            playIndex = {};
+            (courseData || []).forEach((h, k) => { if (!(h.hole in playIndex)) playIndex[h.hole] = k; });
+        }
+    }
 
     sortedHoles.forEach(h => {
         const hole = h.hole;
@@ -39,6 +53,8 @@ function calcWolfEngine(data, courseData, savedScores) {
         if (lastPlaceRule && (hole === 17 || hole === 18)) {
             let sorted = players.slice().sort((a, b) => (result.totals[a.id] || 0) - (result.totals[b.id] || 0));
             wolfPlayer = sorted[0];
+        } else if (pickOrder) {
+            wolfPlayer = pickOrder[playIndex[hole] % 4];
         } else {
             wolfPlayer = players[(hole - 1) % 4];
         }
@@ -749,9 +765,15 @@ function buildLiveMatchStates(data, courseData, savedScores, visiblePlayerIds) {
             // A press begins on the hole AFTER the last one everybody has posted, and
             // only while holes remain. pressRule 'none' means the group agreed not to.
             const lastHole = holes.length ? holes[holes.length - 1].hole : 0;
-            const nextHole = (st.thru || start - 1) + 1;
+            // 100c (2b, Manny typed OK): st.thru is a COUNT of holes played, so a match
+            // from 7 with 7-9 in pressed "hole 4". The next hole is the next one in the
+            // match's own play order. A whole-round first-tee match: holes[thru].hole is
+            // thru + 1, exactly the old number.
+            // "Holes remain" is then "there is a next hole in the list" - on a round off
+            // the 10th tee the last hole PLAYED (9) is not the highest number.
+            const nextHole = (st.thru > 0 && holes[st.thru]) ? holes[st.thru].hole : null;
             st.pressRule = sm.pressRule || 'none';
-            st.canPress = st.pressRule !== 'none' && nextHole <= lastHole && st.thru > 0;
+            st.canPress = st.pressRule !== 'none' && nextHole !== null && st.thru > 0;
             st.nextPressHole = st.canPress ? nextHole : null;
             out.push(st);
         }

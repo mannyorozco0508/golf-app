@@ -177,10 +177,10 @@ describe('1. A PENDING CHALLENGE NEVER REACHES A SETTLEMENT', () => {
     test('THE ENGINES ARE UNTOUCHED, by sha', () => {
         // format_first_wizard_test.js freezes these for the same reason: a wave
         // that must not change arithmetic should be checked, not trusted.
-        assert.equal(sha12('money-engine.js'), 'ae0bfcd9805c');   // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)
-        assert.equal(sha12('settlement-engine.js'), '07cea71d44f3');   // 2026-10-29 Manny typed OK (100a): Stroke overall pays by side, was 2b75e349   // 2026-10-19 Manny OK: side matches in play order (was 88c8b8a7)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
+        assert.equal(sha12('money-engine.js'), 'cfd3f365cc3b');   // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)   // 2026-10-29 Manny typed OK (100c): money-engine.js Wolf side-game pick-order rotation + 2b press line, was ae0bfcd9
+        assert.equal(sha12('settlement-engine.js'), '50ca7e5caa85');   // 2026-10-29 Manny typed OK (100a): Stroke overall pays by side, was 2b75e349   // 2026-10-19 Manny OK: side matches in play order (was 88c8b8a7)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.   // 2026-10-29 Manny typed OK (100c): settlement-engine.js Vegas/BBB in Settle up for inSettle games + match-mode receipt lines, was 07cea71d
         assert.equal(sha12('pool-engine.js'), '1530a0b955e2');
-        assert.equal(sha12('action-model.js'), 'bb89aa4c1be8');   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)
+        assert.equal(sha12('action-model.js'), '39d4a40cb81c');   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)   // 2026-10-29 Manny typed OK (100c): action-model.js Wolf side game in the catalog (sideGameOnly), was bb89aa4c
         assert.equal(sha12('handicap.js'), '2d3b2f7fd916');
         assert.equal(sha12('helpers/match-engine-golden.json'), 'aa94f2749f5a',
             'the match-engine goldens moved - this wave changes no arithmetic');

@@ -121,7 +121,10 @@
             return '<div class="settle-card exg-settle"><div class="settle-header">' + f.icon + ' ' + f.label + ' · ' + dollars(r.perPoint) + '/pt</div>'
                 + '<div style="font-size:.78rem;opacity:.8;margin:2px 0 6px;">' + esc(sub) + '</div>' + rows
                 + '<div class="exg-how" style="font-size:.78rem;margin-top:8px;padding:8px;border-radius:10px;background:rgba(127,127,127,.1);"><b>How it adds up</b><br>' + (bbb ? bbbHow(data, r) : vegasHow(data, g.cfg, r)) + '</div>'
-                + '<div style="font-size:.78rem;font-weight:800;margin-top:8px;">Settle this game separately — it is not in Who Pays Who above:</div>' + pays + '</div>';
+                + (g.cfg.inSettle === true && W.HP_SETTLE_VEGAS_BBB
+                    // 100c: a game started after the update is in Who Pays Who; the card stays (only add).
+                    ? '<div style="font-size:.78rem;font-weight:800;margin-top:8px;">Included in Who Pays Who above. This game on its own:</div>'
+                    : '<div style="font-size:.78rem;font-weight:800;margin-top:8px;">Settle this game separately — it is not in Who Pays Who above:</div>') + pays + '</div>';
         }).join('');
     }
     // THE WORKED EXAMPLE on the payout card, from this round's own numbers.
@@ -154,7 +157,8 @@
     function newId() { return 'xg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
     function addGame(map, format, players, perPoint) {
         var ids = (players || []).map(function (p) { return String(p.id); });
-        var e = { format: format, enabled: true, startHole: 1, createdAt: Date.now() };
+        // 100c: inSettle marks a game started after the Vegas/BBB-in-Settle-up update.
+        var e = { format: format, enabled: true, startHole: 1, createdAt: Date.now(), inSettle: true };
         if (format === 'bbb') { e.bbbPointVal = perPoint || 1; if (ids.length) e.participantIds = ids.slice(0, 4); }
         else {
             e.vegasPointVal = perPoint || 1; e.vegasBirdieFlip = false;

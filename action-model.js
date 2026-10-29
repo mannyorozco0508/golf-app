@@ -66,6 +66,7 @@ const ADDITIONAL_GAME_CATALOG = {
         blurb: 'KPs, sandies, birdies, snakes — a dollar a dot.',
         stakeField: 'dotPointVal',
         stakeLabel: 'Per dot',
+        typeFilter: true,   // 100c: an instance may carry dotTypes (only those dots pay)
         defaults: { dotPointVal: 2 }
     },
     // 9 POINTS (Nines / 5-3-1) — UI Wave 11. Nine points every hole between exactly
@@ -108,8 +109,33 @@ const ADDITIONAL_GAME_CATALOG = {
         stakeField: 'stablefordPointVal',
         stakeLabel: 'Per point',
         defaults: { stablefordPointVal: 1, stablefordScoring: 'net' }
+    },
+    // WOLF AS A SIDE GAME (100c, 2026-10-29 Manny typed OK: "OK all money-engine items
+    // (100c)"). sideGameOnly: an additionalGameInstances entry only - written by the
+    // + Game sheet with its own participantIds (exactly 4) and startHole. It is NOT
+    // offered in Round Setup's stacked-game list or Add Action (addableGames and the
+    // admin.html wizard skip sideGameOnly), and the legacy additionalGames slot never
+    // builds it, so every existing list and round is unchanged.
+    // It scores from the start hole only (gameHoles), reads the instance's own
+    // wolfCalls/h<n> (never the round's), and the FIRST golfer picked is Wolf on the
+    // start hole, then the rotation continues in pick order (Manny, 100 Q4): buildGame
+    // hands calcWolfEngine `wolfOrder`; a main-game Wolf round never carries it.
+    wolf: {
+        label: 'Wolf',
+        icon: '🐺',
+        blurb: 'Wolf picks a partner or goes alone. Exactly 4 golfers.',
+        stakeField: 'wolfPointVal',
+        stakeLabel: 'Per point',
+        sideGameOnly: true,
+        defaults: { wolfPointVal: 1 }
     }
 };
+
+// 100c: true for a format that runs only as a side-game instance (Wolf).
+function isSideGameOnlyFormat(format) {
+    const spec = Object.prototype.hasOwnProperty.call(ADDITIONAL_GAME_CATALOG, format) ? ADDITIONAL_GAME_CATALOG[format] : null;
+    return !!(spec && spec.sideGameOnly);
+}
 
 const MAIN_GAME_LABELS = {
     stroke: 'Stroke Play',
@@ -126,7 +152,10 @@ const MAIN_GAME_LABELS = {
 };
 
 function isAdditionalGameFormat(format) {
-    return Object.prototype.hasOwnProperty.call(ADDITIONAL_GAME_CATALOG, format);
+    // 100c: a sideGameOnly entry (Wolf) is NOT stackable - it is a + Game instance only,
+    // so Round Setup validation still says "can only be played as the main game".
+    return Object.prototype.hasOwnProperty.call(ADDITIONAL_GAME_CATALOG, format)
+        && !ADDITIONAL_GAME_CATALOG[format].sideGameOnly;
 }
 
 // The main game's headline stake, in whatever field that format happens to use.
@@ -330,6 +359,24 @@ function scopeDotsToRange(dots, startHole, round) {
     return out;
 }
 
+// 100c: keep only the named dot types ({ h4: { p1: ['greenie', 'sandy'] } } ->
+// { h4: { p1: ['greenie'] } }). Holes and golfers stay; an empty list pays nothing.
+function scopeDotsToTypes(dots, dotTypes) {
+    if (!dots || !Array.isArray(dotTypes)) return dots;
+    const keep = dotTypes.map(String);
+    const out = {};
+    Object.keys(dots).forEach(hKey => {
+        const hole = dots[hKey];
+        if (!hole || typeof hole !== 'object') return;
+        out[hKey] = {};
+        Object.keys(hole).forEach(pKey => {
+            const list = hole[pKey];
+            out[hKey][pKey] = Array.isArray(list) ? list.filter(t => keep.indexOf(String(t)) !== -1) : list;
+        });
+    });
+    return out;
+}
+
 // "H5-18" / "H5-9", or blank for a game that covers the whole round - there is no
 // point labelling every ordinary wager with a range nobody needs to think about.
 function gameRangeText(game, courseData) {
@@ -391,6 +438,7 @@ function addableGames(data) {
     const running = (data && data.additionalGames) || {};
     return Object.keys(ADDITIONAL_GAME_CATALOG).filter(format => {
         if (format === mainFormat) return false;
+        if (isSideGameOnlyFormat(format)) return false;   // 100c: Wolf is + Game only
         const cfg = running[format];
         if (cfg && cfg.enabled !== false) return false;
         return true;
@@ -579,6 +627,12 @@ function getRoundGames(data) {
         const spec = ADDITIONAL_GAME_CATALOG[format];
         if (!spec) return null;
         const merged = Object.assign({}, data, spec.defaults, cfg, { gameFormat: format });
+        // 100c WOLF SIDE GAME: the instance's own calls only (never the round's), and the
+        // pick order (participantIds, first = Wolf on the start hole) for the rotation.
+        if (format === 'wolf') {
+            merged.wolfCalls = (cfg && cfg.wolfCalls) || {};
+            merged.wolfOrder = (cfg && Array.isArray(cfg.participantIds)) ? cfg.participantIds.slice() : null;
+        }
         // additionalGames must never leak into a nested game's own view of the round,
         // or a game could recursively re-add its siblings.
         delete merged.additionalGames;
@@ -591,6 +645,13 @@ function getRoundGames(data) {
         // be applied here rather than by filtering holes downstream.
         if (format === 'dots' && startHole > 1) {
             merged.dots = scopeDotsToRange(merged.dots, startHole, data);
+        }
+        // 100c (2026-10-29 Manny typed OK, relayed: "OK, add it in 100c"): a Dots
+        // instance may name the dots it pays - dotTypes, e.g. ['greenie'] for a KP pot,
+        // ['birdie', 'eagle'] for Birdies. Only those count. Absent (every game saved
+        // before) = every dot, the same object as before, so no money moves.
+        if (format === 'dots' && cfg && Array.isArray(cfg.dotTypes) && merged.dots) {
+            merged.dots = scopeDotsToTypes(merged.dots, cfg.dotTypes);
         }
 
         return {
@@ -612,6 +673,8 @@ function getRoundGames(data) {
         // The legacy slot cannot hold a game the round is already playing as its main
         // format - that would settle the same wager twice.
         if (format === mainFormat) return;
+        // 100c: a side-game-only format (Wolf) is never built from the legacy slot.
+        if (isSideGameOnlyFormat(format)) return;
         const g = buildGame(format, cfg, format, cfg.startHole || 1);
         if (g) games.push(g);
     });
@@ -625,6 +688,12 @@ function getRoundGames(data) {
         const cfg = instances[id];
         if (!cfg || cfg.enabled === false) return;
         const format = cfg.format;
+        // 100c: a side-game-only format (Wolf) is an instance like any other.
+        if (isSideGameOnlyFormat(format)) {
+            const sg = buildGame(format, cfg, id, cfg.startHole || 1);
+            if (sg) games.push(sg);
+            return;
+        }
         if (!isAdditionalGameFormat(format)) return;
         const g = buildGame(format, cfg, id, cfg.startHole || 1);
         if (g) games.push(g);
@@ -694,9 +763,9 @@ function validateRoundGames(data) {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        ADDITIONAL_GAME_CATALOG, MAIN_GAME_LABELS, isAdditionalGameFormat,
+        ADDITIONAL_GAME_CATALOG, MAIN_GAME_LABELS, isAdditionalGameFormat, isSideGameOnlyFormat,
         mainGameStake, getRoundGames, roundHasStackedAction, describeGame, validateRoundGames,
-        gameHoles, scopeDotsToRange, gameRangeText, nextAddActionHole, addableGames,
+        gameHoles, scopeDotsToRange, scopeDotsToTypes, gameRangeText, nextAddActionHole, addableGames,
         fieldParticipants, flightSlices, flightScopeApplies, playerFlight, participantsCompletedHole, gameCoversHole,
         resolveSkinsMode, skinsPotShares,
         sideMatchHoles, sideMatchStartHole, sideMatchRangeText

@@ -161,9 +161,9 @@ describe('2. AND NINE OF THE TEN MONEY FILES DID NOT MOVE', () => {
     // rather than quietly renumbered here, because a golden list that gets
     // edited whenever it goes red is not a golden list.
     const GOLDEN = {
-        'money-engine.js': 'ae0bfcd9805c06d6', 'settlement-engine.js': '07cea71d44f30442',   // 2026-10-29 Manny typed OK (100a): Stroke overall pays by side, was 2b75e349   // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
+        'money-engine.js': 'cfd3f365cc3b3c06', 'settlement-engine.js': '50ca7e5caa85607a',   // 2026-10-29 Manny typed OK (100a): Stroke overall pays by side, was 2b75e349   // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.   // 2026-10-29 Manny typed OK (100c): settlement-engine.js Vegas/BBB in Settle up for inSettle games + match-mode receipt lines, was 07cea71d; money-engine.js Wolf side-game pick-order rotation + 2b press line, was ae0bfcd9
         'payouts.js': 'c35e34f571e564c0', 'pool-engine.js': '1530a0b955e2e870',
-        'handicap.js': '2d3b2f7fd916a4b8', 'action-model.js': 'bb89aa4c1be878fc', /* 2026-10-19 Manny OK: gameHoles play order (was 399ba26f) */   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)
+        'handicap.js': '2d3b2f7fd916a4b8', 'action-model.js': '39d4a40cb81c059a', /* 2026-10-19 Manny OK: gameHoles play order (was 399ba26f) */   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)   // 2026-10-29 Manny typed OK (100c): action-model.js Wolf side game in the catalog (sideGameOnly), was bb89aa4c
         'ryder-cup.js': '0b4e3f9059ad29a8', 'score-marks.js': '02f972d6d2fc7cad',
         'hole-events.js': '6fd7f7edf41e848b'
     };
