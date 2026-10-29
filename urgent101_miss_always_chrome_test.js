@@ -69,6 +69,7 @@ const OVERLAPS = "JSON.stringify((function(){ var vis = function (e) { if (!e ||
     + " return { hits: out, bubbles: bs.length }; })())";
 
 
+const BAGN = require('./gps-shots.js') && (global.HardPanGpsBag || require('./gps-shots.js')).BAG.length;   // 14 (101) / 15 with the 3i (101b)
 const HOLE_TEE = (n) => h[n].t.b, HOLE_C = (n) => h[n].g.c;
 for (const [vp, mph] of [[{ width: 375, height: 667 }, 0], [{ width: 430, height: 932 }, 20]]) {
 test('101 My miss always shows - Papago 4 (234), Streamsong Red 6 + 8, a par 4 approach, nothing reaches - ' + vp.width + 'x' + vp.height + ' wind ' + mph + ' mph', { timeout: 500000 }, async () => {
@@ -97,7 +98,7 @@ test('101 My miss always shows - Papago 4 (234), Streamsong Red 6 + 8, a par 4 a
         if (!on) return null;
         check(!!n.oval && n.oval.club === s.sel, tag + ': the oval on the shown club ' + s.sel + ' / ' + JSON.stringify(n.oval && n.oval.club));
         check(n.why === null, tag + ': no hide reason, got ' + n.why);
-        check(s.list.length === 14, tag + ': every club, generic 4i / 5w filled: ' + s.list.join(','));
+        check(s.list.length === BAGN, tag + ': every club in My bag (' + BAGN + '), generic 4i / 5w filled: ' + s.list.join(','));
         check(s.sel === closest(n).club, tag + ': default = closest ' + closest(n).club + ', got ' + s.sel);
         await checkOv(tag); await shot(tag);
         return { s, n };

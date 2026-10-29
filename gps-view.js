@@ -5846,7 +5846,7 @@
             inp.value = v ? String(bagShown(v.yd)) : ''; inp.placeholder = '\u2014';
             var meta = document.createElement('span'); meta.className = 'gps-bag-meta';
             // "entered" (typed, or the setup's carry) / "learned" (the marked shots' median).
-            meta.textContent = !v ? 'no shots yet' : B.source(v) === 'entered' ? 'entered' + (v.base && v.n ? ' \u00b7 ' + v.n + ' shot' + (v.n === 1 ? '' : 's') : '')
+            meta.textContent = !v ? 'no shots yet' : v.gen ? 'typical \u00b7 until you mark shots' : B.source(v) === 'entered' ? 'entered' + (v.base && v.n ? ' \u00b7 ' + v.n + ' shot' + (v.n === 1 ? '' : 's') : '')
                 : 'learned \u00b7 ' + v.n + ' shot' + (v.n === 1 ? '' : 's');
             meta.setAttribute('data-bag-src', B.source(v));
             var rs = document.createElement('button'); rs.type = 'button'; rs.className = 'gps-bag-reset'; rs.setAttribute('data-bag-reset', c); rs.textContent = 'Reset';

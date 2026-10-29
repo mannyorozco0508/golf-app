@@ -72,11 +72,11 @@
     // the golfer typed in My bag wins over it until reset. Nothing here leaves the phone -
     // except the account sync below (009), which ships switched OFF (clubsSync: false).
     var BAG_KEY = 'hardpan_bag_v1', BAG_LAST = 10;
-    var BAG = ['Dr', '3w', '5w', 'Hy', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
-    var BAG_NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
+    var BAG = ['Dr', '3w', '5w', 'Hy', '3i', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
+    var BAG_NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '3i': '3-iron', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
         '8i': '8-iron', '9i': '9-iron', PW: 'Pitching wedge', GW: 'Gap wedge', SW: 'Sand wedge', LW: 'Lob wedge' };
     // 012: the short name a pill shows ("Plays like 249y · 3W").
-    var BAG_SHORT = { Dr: 'Dr', '3w': '3W', '5w': '5W', Hy: 'Hy', '4i': '4i', '5i': '5i', '6i': '6i', '7i': '7i', '8i': '8i', '9i': '9i', PW: 'PW', GW: 'GW', SW: 'SW', LW: 'LW' };
+    var BAG_SHORT = { Dr: 'Dr', '3w': '3W', '5w': '5W', Hy: 'Hy', '3i': '3i', '4i': '4i', '5i': '5i', '6i': '6i', '7i': '7i', '8i': '8i', '9i': '9i', PW: 'PW', GW: 'GW', SW: 'SW', LW: 'LW' };
     function quantile(sorted, q) {
         var pos = (sorted.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
         return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
@@ -137,10 +137,13 @@
     var DEFAULT_HCPS = [0, 10, 20, 30];
     var DEFAULT_CARRY = {
         Dr: [260, 235, 210, 185], '3w': [235, 212, 190, 170], '5w': [220, 198, 178, 160], Hy: [210, 188, 170, 152],
+        '3i': [205, 183, 165, 147],   // 101b (Manny, Oct 29): the 3-iron - between the hybrid and the 4-iron until he marks shots
         '4i': [200, 178, 160, 142], '5i': [190, 170, 152, 135], '6i': [180, 160, 143, 127], '7i': [170, 150, 134, 118],
         '8i': [160, 140, 125, 110], '9i': [148, 130, 115, 100], PW: [136, 120, 105, 90], GW: [122, 107, 94, 80],
         SW: [105, 92, 80, 68], LW: [85, 75, 65, 55] };
     var MID_HCP = 15, LEARN_MIN = 3;
+    // 101b: clubs added to BAG after bags were saved: { club: [the longer neighbour, the shorter neighbour] }.
+    var ADDED = { '3i': ['Hy', '4i'] };
     // { club: yards } for a handicap (a number, or anything else: the mid default). Pure.
     function defaultCarries(hcp) {
         var h = Number(hcp);
@@ -181,6 +184,15 @@
             if (set) out[c] = { yd: set, n: a ? a.of : 0, set: true };
             else if (a && (!base || a.of >= LEARN_MIN)) out[c] = { yd: a.yd, n: a.of, set: false };
             else if (base) out[c] = { yd: base, n: a ? a.of : 0, set: false, base: true };
+        });
+        // 101b (Manny, Oct 29): A CLUB ADDED TO MY BAG LATER (the 3-iron) in a bag saved before it: until he types a
+        // number or marks LEARN_MIN shots, its carry sits between his own neighbours (the midpoint of his Hybrid and
+        // 4-iron), marked gen (a typical carry, not his). Without both neighbours it is left out here (101's My miss
+        // then uses the generic table). Read-only; nothing is written. A new setup gives it a number like any club.
+        Object.keys(ADDED).forEach(function (c) {
+            if (out[c] || unset.indexOf(c) !== -1) return;
+            var nb = ADDED[c], lo = out[nb[1]], hi = out[nb[0]];
+            if (lo && hi && hi.yd > lo.yd) { var a2 = clubAverage((b.shots || {})[c]); out[c] = { yd: Math.round((lo.yd + hi.yd) / 2), n: a2 ? a2.of : 0, set: false, base: true, gen: true }; }
         });
         return out;
     }
@@ -323,7 +335,7 @@
     }
     W.HardPanGpsBag = { BAG: BAG, NAMES: BAG_NAMES, SHORT: BAG_SHORT, clubAverage: clubAverage, suggestClub: suggestClub, golferKey: golferKey,
         add: addClubShot, set: setClub, reset: resetClub, resetAll: resetBag, bag: bag, KEY: BAG_KEY,
-        DEFAULT_HCPS: DEFAULT_HCPS, DEFAULT_CARRY: DEFAULT_CARRY, MID_HCP: MID_HCP, LEARN_MIN: LEARN_MIN, defaultCarries: defaultCarries,
+        DEFAULT_HCPS: DEFAULT_HCPS, DEFAULT_CARRY: DEFAULT_CARRY, MID_HCP: MID_HCP, LEARN_MIN: LEARN_MIN, defaultCarries: defaultCarries, ADDED: ADDED,
         setup: setup, skipSetup: skipSetup, needsSetup: needsSetup, source: source,
         baseline: baseline, setBaseline: setBaseline, baselineFt: baselineFt, ALT_MODES: ALT_MODES,
         suggestUsesElevation: suggestUsesElevation, setSuggestUsesElevation: setSuggestUsesElevation,

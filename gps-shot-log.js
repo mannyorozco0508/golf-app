@@ -47,7 +47,7 @@
     var W = typeof window !== 'undefined' ? window : {};
     var KEY = 'hardpan_shotlog_v1';
     var MAX_PER_GOLFER = 6000;   // ~3 seasons of every counted shot; the oldest drop first past this
-    var CLUBS = ['Dr', '3w', '5w', 'Hy', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
+    var CLUBS = ['Dr', '3w', '5w', 'Hy', '3i', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
     var HANDS = ['R', 'L'];
     var AIM_KINDS = ['target-ring', 'green-center'];
     var END_KINDS = ['marked', 'green', 'hole-close'];

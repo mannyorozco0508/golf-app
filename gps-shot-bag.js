@@ -22,7 +22,7 @@
     var W = typeof window !== 'undefined' ? window : {};
     var LEARN_MIN = 3, QUALIFY = 8, WINDY_MPH = 5;
     var MINUS = '−';
-    var NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
+    var NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '3i': '3-iron', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
         '8i': '8-iron', '9i': '9-iron', PW: 'Pitching wedge', GW: 'Gap wedge', SW: 'Sand wedge', LW: 'Lob wedge' };
     function nameOf(c) { var B = W.HardPanGpsBag; return (B && B.NAMES && B.NAMES[c]) || NAMES[c] || String(c); }
     function low(c) { var n = nameOf(c); return /wedge|wood|iron|Hybrid|Driver/.test(n) ? n.replace(/^(Driver|Hybrid|Pitching|Gap|Sand|Lob)/, function (x) { return x.toLowerCase(); }) : n; }

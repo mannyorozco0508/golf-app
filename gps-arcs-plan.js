@@ -33,11 +33,11 @@
     var HALF_WIDTH_YD = 24;      // each arc spans this far either side of the line
     var MAX_ARCS = 3;
     var MIN_YD = 40;
-    var TEE_CLUBS = ['Dr', '3w', '5w', 'Hy', '4i'];
-    var ORDER = ['Dr', '3w', '5w', 'Hy', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
-    var NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
+    var TEE_CLUBS = ['Dr', '3w', '5w', 'Hy', '3i', '4i'];
+    var ORDER = ['Dr', '3w', '5w', 'Hy', '3i', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
+    var NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '3i': '3-iron', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
         '8i': '8-iron', '9i': '9-iron', PW: 'Pitching wedge', GW: 'Gap wedge', SW: 'Sand wedge', LW: 'Lob wedge' };
-    var SHORT = { Dr: 'Dr', '3w': '3W', '5w': '5W', Hy: 'Hy', '4i': '4i', '5i': '5i', '6i': '6i', '7i': '7i', '8i': '8i', '9i': '9i', PW: 'PW', GW: 'GW', SW: 'SW', LW: 'LW' };
+    var SHORT = { Dr: 'Dr', '3w': '3W', '5w': '5W', Hy: 'Hy', '3i': '3i', '4i': '4i', '5i': '5i', '6i': '6i', '7i': '7i', '8i': '8i', '9i': '9i', PW: 'PW', GW: 'GW', SW: 'SW', LW: 'LW' };
 
     function isNum(x) { return typeof x === 'number' && isFinite(x); }
     function geo() { return W.HardPanGeo || (typeof require === 'function' ? require('./gps-geo.js') : null); }

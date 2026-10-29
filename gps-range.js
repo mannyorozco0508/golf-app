@@ -50,8 +50,8 @@
     var W = typeof window !== 'undefined' ? window : {};
     var KEY = 'hardpan_range_v1', MAX_SESSIONS = 20, MAX_SHOTS = 300, SESSION_GAP_MS = 6 * 3600 * 1000;
     var M_PER_YD = 0.9144, MIN_YD = 1, MAX_YD = 449;
-    var CLUBS = ['Dr', '3w', '5w', 'Hy', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
-    var NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
+    var CLUBS = ['Dr', '3w', '5w', 'Hy', '3i', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
+    var NAMES = { Dr: 'Driver', '3w': '3-wood', '5w': '5-wood', Hy: 'Hybrid', '3i': '3-iron', '4i': '4-iron', '5i': '5-iron', '6i': '6-iron', '7i': '7-iron',
         '8i': '8-iron', '9i': '9-iron', PW: 'Pitching wedge', GW: 'Gap wedge', SW: 'Sand wedge', LW: 'Lob wedge' };
     function bagApi() { return W.HardPanGpsBag || null; }
     function clubs() { var B = bagApi(); return B && B.BAG ? B.BAG : CLUBS; }
