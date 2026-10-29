@@ -85,7 +85,7 @@ test('Vegas: 10+ leads, both birdie = no flip, a hole counts only with all 4 sco
 // on gps-features - byte for byte. The new games live in their own files only.
 const UNCHANGED = {
     'money-engine.js': 'ae0bfcd9805c06d6d52b819e1933c14fe521e1f9641c867893d246e158691bf6',   // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)
-    'settlement-engine.js': '2b75e349bae775542b0258d5b0dbd559aa81b6590e743f6c5ad21176efd7a8e3',   // 2026-10-19 Manny OK: side matches in play order (was 88c8b8a7)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
+    'settlement-engine.js': '07cea71d44f3044243cc6aa7b9e303f3c0f5e788884bd2f670d1610762e65363',   // 2026-10-29 Manny typed OK (100a): Stroke overall pays by side, was 2b75e349   // 2026-10-19 Manny OK: side matches in play order (was 88c8b8a7)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
     'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     'match-engine.js': '42bb272d11814cafba0d9ad48322b1b14fbbbfab6677268ce231787f347e7fde',
     'pool-engine.js': '1530a0b955e2e8705748808a79a221a4790fe67419de06fb010cb9f59ec7e153',
