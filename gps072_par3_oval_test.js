@@ -38,7 +38,9 @@ test('072: par 3 + 4i, PW, LW (and every iron / wedge 4i-LW) off the tee -> the 
 
 test('072: par 3 + 3-wood, hybrid, 5-wood, driver off the tee -> no oval', { skip }, () => {
     const { M } = sandbox();
-    ['3w', 'Hy', '5w', 'Dr', '4h', '3i'].forEach((c) => assert.deepEqual(M.shows({ club: c, carry: BAG[c] || 215, greenYd: BAG[c] || 215, fromTee: true }, P3), { ok: false, why: 'club' }, c));
+    ['3w', 'Hy', '5w', 'Dr', '4h'].forEach((c) => assert.deepEqual(M.shows({ club: c, carry: BAG[c] || 215, greenYd: BAG[c] || 215, fromTee: true }, P3), { ok: false, why: 'club' }, c));
+    // 101b (Manny, Oct 29: "YES, add the 3i"): the 3-iron is now one of My miss's irons (3i-LW).
+    assert.deepEqual(M.shows({ club: '3i', carry: 215, greenYd: 215, fromTee: true }, P3), { ok: true, why: null }, '3i');
     ['3w', 'Hy', 'Dr'].forEach((c) => assert.equal(M.oval(c, 230, 'R'), null, c));
 });
 

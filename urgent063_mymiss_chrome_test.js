@@ -88,7 +88,7 @@ for (const vp of [{ width: 402, height: 874 }, { width: 375, height: 667 }]) {
             };
             await moveTo(out(280)); await shown('280 out (Driver)', ['Dr']);
             await moveTo(out(250)); await shown('250 out (3-wood)', ['3w', '5w']);   // or the generic 5-wood fitted at 243, if closer to the plays-like
-            await moveTo(out(230)); await shown('230 out (Hybrid)', ['Hy', '5w']);   // the bag has no 5-wood: its generic carry fitted between Hy 235 and 3w 255 (243) may be the closest
+            await moveTo(out(230)); await shown('230 out (Hybrid)', ['Hy', '5w', '3i']);   // 101b: or the new 3-iron (his Hy / 4i midpoint, 227)   // the bag has no 5-wood: its generic carry fitted between Hy 235 and 3w 255 (243) may be the closest
             // 4 - a layup: 300 out, 7-iron picked at Mark shot - the green is out of its range.
             await moveTo(out(300));
             await ev("document.querySelector('#gps-overlay .gps-mark-shot').click()");

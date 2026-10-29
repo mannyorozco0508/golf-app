@@ -53,7 +53,8 @@ const MB = { LW: 84, SW: 107, GW: 121, PW: 133, '9i': 145, '8i': 168, '7i': 180,
 const MP = require('./gps-miss-pattern.js');
 // 101 (Manny's rule: generic distances when a club has no data): the bag has no 4i / 5w, so they join with generic
 // carries fitted between his own clubs (4i between 5i 208 and Hy 220; 5w between Hy 220 and 3w 235) - 14 clubs.
-const ALL = ['LW', 'SW', 'GW', 'PW', '9i', '8i', '7i', '6i', '5i', '4i', 'Hy', '5w', '3w', 'Dr'];
+// 101b: + the 3-iron slot (no number: fitted between the 4i and Hy) - 15 clubs.
+const ALL = ['LW', 'SW', 'GW', 'PW', '9i', '8i', '7i', '6i', '5i', '4i', '3i', 'Hy', '5w', '3w', 'Dr'];
 const BAG = { v: 1, golfers: { 'n:test golfer': { shots: {}, set: MB, setupDone: true } } };
 const SEED = "(function(){ var now = Date.now(), w = JSON.stringify({ at: now + 3600e3, src: 'weatherkit', obsAt: now, mph: 0, gustMph: null, toDeg: 180, fromDeg: 0, tempF: 70 });"
     + " ['" + KEY + "', 'gapi_" + ID + "'].forEach(function (k) { localStorage.setItem('hardpan_wind_v1_' + k, w); });"

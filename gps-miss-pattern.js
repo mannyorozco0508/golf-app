@@ -12,7 +12,7 @@
 // The left/right `offline` field on marked shots (gps-mark-chips.js) is still recorded; it never
 // shapes the oval. It still feeds the 052 B extras, kept (URGENT-067 "only add"): his shots as dots on
 // the club screen's picture and the "70% right, 9 yds avg" line (shotStats / statsLine).
-// THE CLUBS: irons and wedges only - 4i-9i, PW, GW, SW, LW. Never Driver, woods or hybrids.
+// THE CLUBS: irons and wedges only - 3i-9i (101b: 3i added), PW, GW, SW, LW. Never Driver, woods or hybrids.
 // WHEN IT SHOWS (shows()): an APPROACH into the green - never off the tee (the first shot), except
 // on a PAR 3 (072: the tee shot is the approach; same clubs, same checks), and
 // only when the green is in range of the club: the plays-like yards to the green's center
@@ -63,7 +63,8 @@
         HOLD_FIX_MS: 60000
     };
     // Irons and wedges only (My bag's club keys).
-    var CLUBS = ['4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
+    // 101b (Manny, Oct 29: "YES, add the 3i to the approach depth chips"): 3i-LW (was 4i-LW).
+    var CLUBS = ['3i', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW'];
     var MIN_SEMI = 1;                             // yards: never a dot
     var KEY = 'hardpan_mymiss_v1';
 
@@ -98,7 +99,7 @@
     // DOES IT SHOW? q: { club, carry (My bag's), greenYd (plays-like yards to the green's
     // center), fromTee (the tee shot / first shot), layup (the target is off the green) }.
     // ctx (072, optional): { par } - the hole's par. On a PAR 3 the tee shot IS the approach, so
-    // the tee shot shows it too, with the same clubs (4i-LW), range and layup checks below;
+    // the tee shot shows it too, with the same clubs (3i-LW since 101b), range and layup checks below;
     // woods, hybrids and driver stay off. Par 4/5 (or no par): never off the tee, as before.
     // Returns { ok, why }.
     function shows(q, ctx) {

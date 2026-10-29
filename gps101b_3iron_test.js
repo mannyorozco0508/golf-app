@@ -56,3 +56,18 @@ test('101b: setup offers the 3i; My bag labels a typical 3i', () => {
     const V = fs.readFileSync(path.join(__dirname, 'gps-view.js'), 'utf8');
     assert.ok(V.includes("v.gen ? 'typical \\u00b7 until you mark shots'"));
 });
+test('101b (Manny: YES): an approach where the 3i lands on the green shows a 3i depth chip (089b rules kept: up to 4, closest to the target)', () => {
+    assert.ok(M.CLUBS.includes('3i') && M.isClub('3i'), 'the iron list is 3i-LW');
+    assert.deepStrictEqual(M.CLUBS, ['3i', '4i', '5i', '6i', '7i', '8i', '9i', 'PW', 'GW', 'SW', 'LW']);
+    const bag = {}; Object.entries({ Hy: 240, '3i': 226, '4i': 214, '5i': 204, '7i': 180, PW: 133 }).forEach(([k, v]) => { bag[k] = { yd: v }; });
+    const dc = M.depthChips({ bag, front: 218, middle: 226, back: 236, aimYd: 226, rawYd: 226, playsYd: 226, app: '3i' });
+    const cl = dc.list.map((x) => x.club);
+    assert.ok(cl.includes('3i'), '3i chip: ' + cl.join(','));
+    assert.strictEqual(dc.def, '3i', 'closest to the target');
+    assert.ok(!cl.includes('Hy'), 'hybrids still not in the 089b iron chips');
+    assert.ok(dc.list.length <= 4);
+    const x = dc.list.find((y) => y.club === '3i');
+    assert.strictEqual(M.depthText('3i', x.spot, 'yd'), '3i · middle');
+    // The approach shows() now takes the 3i in range like any iron.
+    assert.strictEqual(M.shows({ club: '3i', carry: 226, greenYd: 226 }).ok, true);
+});
