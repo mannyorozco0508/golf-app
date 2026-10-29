@@ -1423,9 +1423,11 @@ ${ind.slice(4)}</tr>`;
         // the same reason a blank handicap says nothing in the row.
         const full = (typeof handicapFullLabel === 'function') ? handicapFullLabel(player) : null;
         const hcpLine = full ? `<div class="board-card-hcp">${escapeHtml(full)}</div>` : '';
-        // 100b (Manny OK, picture B): "Start a game with Jim" on another golfer's card (GPS app, never a spectator).
+        // 100b (Manny OK, picture B): "Start a game with Jim" on another golfer's open card (GPS app, never a
+        // spectator) - its OWN row right after the card, so the card cell stays scorecard-rows.js's layout.
         const gameBtn = (typeof lbGameWithHtml === 'function') ? lbGameWithHtml(player) : '';
-        return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${gameBtn}${hcpLine}${card}</td></tr>`;
+        return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${hcpLine}${card}</td></tr>`
+            + (gameBtn ? `<tr class="board-card-row lb-game-row" data-game-for="${escapeHtml(key)}"><td colspan="5">${gameBtn}</td></tr>` : '');
     }
     // ONE delegated listener: a tap ANYWHERE ON THE ROW toggles that golfer's card
     // (v201 - it used to need the name cell, so a tap on the score, the to-par or
@@ -1849,7 +1851,7 @@ ${ind.slice(4)}</tr>`;
         }
         el.setAttribute('data-with', String(id));
         el.innerHTML = '<div data-lbg-close style="position:absolute;inset:0;background:rgba(5,20,12,.55);"></div>'
-            + '<div style="position:absolute;left:0;right:0;bottom:0;max-height:88vh;overflow:auto;background:#fff;color:#0f1f17;border-radius:22px 22px 0 0;padding:10px 16px calc(env(safe-area-inset-bottom) + 18px);box-shadow:0 -8px 30px rgba(0,0,0,.25);">'
+            + '<div style="position:absolute;left:0;right:0;bottom:0;max-height:88vh;overflow:auto;background:#fff;color:#0f1f17;border-radius:22px 22px 0 0;padding:10px 16px calc(env(safe-area-inset-bottom, 0px) + 18px);box-shadow:0 -8px 30px rgba(0,0,0,.25);">'
             + '<div style="width:44px;height:5px;border-radius:3px;background:#cfd8d3;margin:2px auto 10px;"></div>'
             + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><div style="flex:1;font:800 22px/1.2 -apple-system,system-ui,sans-serif;">Start a game with ' + escapeHtml(nm) + '</div><button type="button" data-lbg-close aria-label="Close" style="border:0;background:#eef2ef;color:#0f3d2e;border-radius:999px;min-width:40px;height:40px;font:800 18px/1 -apple-system,system-ui,sans-serif;cursor:pointer;">\u2715</button></div>'
             + (now == null ? '<div style="font:500 14px/1.4 -apple-system,system-ui,sans-serif;color:#5d6b64;margin:0 0 12px;">Every hole is in - there are no holes left to start a game on.</div>'
