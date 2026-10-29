@@ -5248,10 +5248,11 @@
         if (!ok.ok && ok.why === 'tee' && isPar3()) ok = M.shows({ club: club, carry: carry, greenYd: greenYd, fromTee: fromTee, layup: layup }, { par: 3 });
         // 101 (Manny's standing rule, Oct 29): EVERY PAR 3 AND EVERY APPROACH - never hidden for "range" (nor for a
         // hybrid / wood / driver pick, nor a club with no number). The default = the club closest to the plays-like
-        // (the longest when nothing reaches); a marked shot's own club stays. Only 'tee' (a par 4 / 5 tee shot) still hides.
+        // (the longest when nothing reaches). Still hidden: a par 4 / 5 tee shot ('tee') and a marked shot open at this ball (Mark-open).
         var always = false;
-        if (!ok.ok && typeof M.always === 'function' && M.always(ok.why) && greenYd >= 10) {
-            if (!(mine && op.club && bag[op.club] && bag[op.club].yd > 0)) { var nc = M.nearestClub(bag, greenYd, B.BAG, club); club = nc ? nc.club : null; }
+        // 101 gate fix: NOT while a marked shot is open at this ball (Mark-open keeps its hides, as before - its own club rules).
+        if (!ok.ok && !mine && typeof M.always === 'function' && M.always(ok.why) && greenYd >= 10) {
+            var nc = M.nearestClub(bag, greenYd, B.BAG, club); club = nc ? nc.club : null;
             var cv1 = club ? bag[club] : null; carry = cv1 && cv1.yd > 0 ? cv1.yd : null;
             if (club && carry) { ok = { ok: true, why: null }; always = true; }
         }

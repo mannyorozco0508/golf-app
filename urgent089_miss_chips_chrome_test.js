@@ -137,11 +137,14 @@ for (const vp of [{ width: 402, height: 874 }, { width: 375, height: 667 }]) {
             n = await now();
             assert.equal(n.pick, null, 'the pick resets on the next shot ' + JSON.stringify(n) + ' ' + await pill());
             if (n.oval) assert.equal(n.chips.sel, n.chips.app);
-            // 130 out: PW (140) is the pick and nothing in the bag is shorter: ONE chip, selected.
+            // 130 out: PW (140) is the pick and nothing in his bag is shorter. 101 (Manny's rule: generic distances when a
+            // club has no data): the gap wedge takes its generic carry fitted under his PW (~125), in range, so it is the
+            // next club down - TWO chips, PW selected (was one chip).
             await moveTo(out(130));
             n = await now();
             assert.ok(n.oval && n.oval.club === 'PW', JSON.stringify(n));
-            cs = await chips(); assert.deepEqual(cs.map((c) => c.club), ['PW'], 'one chip'); assert.equal(cs[0].on, true);
+            cs = await chips(); assert.deepEqual(cs.map((c) => c.club), ['PW', 'GW'], 'PW + the generic GW'); assert.equal(cs[0].on, true); assert.equal(cs[1].on, false);
+            const gw = n.chips.list.find((x) => x.club === 'GW'); assert.ok(gw && gw.carry < 140 && gw.carry > 110, 'GW generic, under PW: ' + JSON.stringify(gw));
             await moveTo(out(168)); n = await now(); assert.ok(n.oval && n.chips && n.chips.sel === n.chips.app && n.pick === null, 'back at 168: the app\'s pick ' + JSON.stringify(n));
             // 6 - Mark shot uses the tapped club; the chips hide while that shot is open at the ball.
             const downNow = async () => { const m = await now(); const x = m && m.chips && m.chips.list.find((c) => c.club !== m.chips.app); return x ? x.club : null; };
@@ -154,9 +157,13 @@ for (const vp of [{ width: 402, height: 874 }, { width: 375, height: 667 }]) {
             assert.equal(n.oval.club, D6, 'the open shot\'s club'); assert.equal(n.chips, null, 'no chips while Mark shot is open'); assert.equal(n.pick, null);
             assert.deepEqual(await chips(), []);
             await shot('3-mark-open');
-            // 7 - no chips where there is no oval: 250 out (3-wood).
-            await moveTo(out(250)); n = await now();
-            assert.equal(n.oval, null); assert.deepEqual(await chips(), [], 'no oval: no chips');
+            // 7 - 250 out (3-wood). 101 (Manny's standing rule: My miss on EVERY approach, the club closest to the plays-like;
+            // was no oval and no chips): the oval on the 3-wood (or the generic 5-wood fitted at 243) and its chips.
+            await moveTo(out(250));
+            assert.ok(await until("(function(){ var n = HardPanGps.missNow(); return !!(n && n.oval && ['3w', '5w'].indexOf(n.oval.club) !== -1); })()", 8000), '250 out: the 3w / 5w oval ' + JSON.stringify(await now()));
+            n = await now(); cs = await chips();
+            assert.ok(cs.length >= 1 && cs.some((c) => c.club === n.oval.club && c.on), 'its chip, selected: ' + JSON.stringify(cs));
+            // No oval: no chips - still checked under tournament mode (8) and the par-4 tee (below).
             // 8 - tournament mode: no chips (My miss itself is hidden).
             // (215 out: more than 40 yds from the shot marked at 168, so that shot is no longer open at this ball.)
             await moveTo(out(215)); assert.ok((await chips()).length >= 1, 'chips at 215: ' + JSON.stringify(await now()));

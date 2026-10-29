@@ -356,14 +356,26 @@
     // Only 'tee' (a par 4 / 5 tee shot - not an approach) still hides it, as do My miss off, Tournament and Mark-open.
     function always(why) { return why === 'club' || why === 'range' || why === 'carry' || why === 'layup'; }
     // A CLUB WITH NO NUMBER takes the generic carry (My bag's own first-time table, gps-shots defaultCarries) - the
-    // golfer's numbers always win. bag: { club: { yd } }; generic: { club: yd }; order: the club keys (My bag's BAG).
-    // Returns a new bag; filled clubs carry gen: true. Pure.
+    // golfer's numbers always win. 101 gate fix: the generic number is FITTED TO HIS BAG so the club order always holds
+    // (a raw generic 4i of 169 must never sit under his 7i of 180): between two of his own clubs it keeps the table's
+    // spacing between them; past his longest / shortest it scales the table by his nearest club; with no numbers of
+    // his own at all, the table as is. bag: { club: { yd } }; generic: { club: yd }; order: the club keys, longest
+    // first (My bag's BAG). Returns a new bag; filled clubs carry gen: true. Pure.
     function fillBag(bag, generic, order) {
         var out = {}, keys = order && order.length ? order : Object.keys(generic || {});
+        var has = function (c) { var v = bag && bag[c]; return !!(v && isNum(v.yd) && v.yd > 0); };
+        var g = function (c) { var x = generic && generic[c]; return isNum(x) && x > 0 ? x : null; };
         Object.keys(bag || {}).forEach(function (c) { out[c] = bag[c]; });
-        keys.forEach(function (c) {
-            var v = out[c], g = generic && generic[c];
-            if (!(v && isNum(v.yd) && v.yd > 0) && isNum(g) && g > 0) out[c] = { yd: g, gen: true };
+        keys.forEach(function (c, i) {
+            if (has(c) || g(c) == null) return;
+            var L = null, S = null, k;
+            for (k = i - 1; k >= 0; k--) if (has(keys[k]) && g(keys[k]) != null) { L = keys[k]; break; }
+            for (k = i + 1; k < keys.length; k++) if (has(keys[k]) && g(keys[k]) != null) { S = keys[k]; break; }
+            var yd = g(c);
+            if (L && S && bag[L].yd > bag[S].yd && g(L) > g(S)) yd = bag[S].yd + (bag[L].yd - bag[S].yd) * (g(c) - g(S)) / (g(L) - g(S));
+            else if (L) yd = g(c) * bag[L].yd / g(L);
+            else if (S) yd = g(c) * bag[S].yd / g(S);
+            out[c] = { yd: Math.round(yd), gen: true };
         });
         return out;
     }
