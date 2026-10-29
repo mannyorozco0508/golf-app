@@ -407,6 +407,35 @@
         var show = on() && !!data() && (data().players || []).length > 0 && !!(B() && B().code()) && !spectating();
         var want = show ? '' : 'none';
         if (pill.style.display !== want) pill.style.display = want;
+        watchPlays(host);
+        placeGps(host);
+    }
+
+    // CLEAR OF THE PLAYS-LIKE PILL AND THE RAIL (gps022, Sun layout D): the pill sits above Mark; when the
+    // Plays-like pill (or a rail button) is in that spot, it steps up above it, 10 px clear. Called by
+    // gps-view.js ldPlace and whenever the Plays-like pill shows, hides or changes.
+    function placeGps(el) {
+        var host = el || document.getElementById('gps-overlay'); if (!host) return;
+        var bot = host.querySelector('.gps-ld-bottom'), pill = bot && bot.querySelector('.gps-game-pill');
+        if (!pill || pill.style.display === 'none') return;
+        pill.style.bottom = '';
+        var vis = function (e) { if (!e || e.offsetParent === null || e.style.display === 'none') return null; var r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 ? r : null; };
+        var others = [host.querySelector('.gps-ld-plays')].concat(Array.prototype.slice.call(host.querySelectorAll('.gps-ld-rail > *')));
+        for (var n = 0; n < 6; n++) {
+            var p = pill.getBoundingClientRect(), br = bot.getBoundingClientRect(), hit = null;
+            others.forEach(function (e) { var r = vis(e); if (r && Math.min(p.right, r.right) - Math.max(p.left, r.left) > 0 && Math.min(p.bottom, r.bottom) - Math.max(p.top, r.top) > -10) { if (!hit || r.top < hit.top) hit = r; } });
+            if (!hit) return;
+            pill.style.bottom = Math.round(br.bottom - hit.top + 10) + 'px';
+        }
+    }
+    var watched = null;
+    function watchPlays(host) {
+        var pl = host && host.querySelector('.gps-ld-plays');
+        if (!pl || pl === watched || typeof MutationObserver === 'undefined') return;
+        watched = pl;
+        var queued = false;
+        new MutationObserver(function () { if (queued) return; queued = true; requestAnimationFrame(function () { queued = false; placeGps(host); }); })
+            .observe(pl, { attributes: true, attributeFilter: ['style', 'class'], childList: true, subtree: true, characterData: true });
     }
 
     // FROM ANOTHER PAGE (the Leaderboard's "Start a game with Jim"): index.html?hpgame=1&with=<id>&hpg=<game>.
@@ -422,7 +451,7 @@
         setTimeout(function () { open({ game: gm, with: w, returnTo: ret }); }, 0);
     }
 
-    var api = { open: open, close: close, isOpen: isOpen, redraw: function () { if (isOpen()) draw(); }, mountGps: mountGps, fromUrl: fromUrl,
+    var api = { open: open, close: close, isOpen: isOpen, redraw: function () { if (isOpen()) draw(); }, mountGps: mountGps, placeGps: placeGps, fromUrl: fromUrl,
         // Pure-ish pieces for the tests.
         build: build, needWhy: needWhy, saysWhat: saysWhat, rangeLine: rangeLine, ready: ready, GAMES: G, GRID: GRID, MORE: MORE,
         state: function () { return st ? JSON.parse(JSON.stringify(st)) : null; } };

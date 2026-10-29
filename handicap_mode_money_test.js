@@ -218,7 +218,7 @@ describe('1. WHAT WAS ALREADY TRUE ON MAIN', () => {
         // Pinned by CONTENT, measured on main 976f9af. If a later wave edits one of
         // these with Manny's approval, re-pin it here and say why in the commit.
         assert.equal(shas['handicap.js'].slice(0, 12), '73b03f002cf9', 'handicap.js changed');
-        assert.equal(shas['money-engine.js'].slice(0, 12), 'a8226348772d', 'money-engine.js changed');   // 2026-10-19 Manny OK: side matches in play order (was 0e8a5c1756a2)
+        assert.equal(shas['money-engine.js'].slice(0, 12), 'b61ac343e5ba', 'money-engine.js changed');   // 2026-10-29 Manny typed OK (100c money engines): re-pinned, was a8226348772d   // 2026-10-19 Manny OK: side matches in play order (was 0e8a5c1756a2)
         assert.equal(shas['pool-engine.js'].slice(0, 12), '67d487bc8f22', 'pool-engine.js changed');
         PROTECTED.forEach(f => assert.ok(fs.existsSync(path.join(REPO_ROOT, f)), f + ' is gone'));
     });

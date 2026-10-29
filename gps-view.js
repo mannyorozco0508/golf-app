@@ -763,7 +763,7 @@
         // 094 (Manny's shot 6: "5i" under the Hole button): the rail's buttons and the green's size line too.
         // 093 (spec item 4): never under the club switcher pill / "from tee" tag (or the chips), Recenter, the Plays-like
         // pill, the zoom button, the top bar or the bottom row either.
-        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-right > *, .gps-ld-rail > *, .gps-green-dims, .gps-miss-chips > *, .gps-leftrow > *, .gps-ld-plays, .gps-zoom, .gps-ld-top, .gps-ld-bottom'), function (e) {
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-right > *, .gps-ld-rail > *, .gps-green-dims, .gps-miss-chips > *, .gps-leftrow > *, .gps-ld-plays, .gps-game-pill, .gps-zoom, .gps-ld-top, .gps-ld-bottom'), function (e) {
             if (e.offsetParent === null || e.style.display === 'none' || getComputedStyle(e).visibility === 'hidden') return;
             var b = box(e); if (b.w > 0 && b.h > 0) obs.push(b);
         });
@@ -1848,6 +1848,8 @@
             Array.prototype.forEach.call(rail.children, function (c) { if (c.offsetParent === null) return; var b = c.getBoundingClientRect(); if (b.height && b.bottom + 6 > pb.top && b.top < pb.bottom) left = left == null ? b.left : Math.min(left, b.left); });
             if (left != null && pb.right > left) { pill.classList.add('gps-ld-plays-in'); pill.style.right = Math.round(W.right - left + 8) + 'px'; }
         }
+        // 100b: the + Game pill (gps-game.js) steps above the Plays-like pill and the rail when they meet.
+        if (window.HardPanGame && typeof window.HardPanGame.placeGps === 'function') { try { window.HardPanGame.placeGps(S.el); } catch (e) {} }
         // MIDDLE never runs into B / F: a long number (or a big text size) steps its size
         // down to fit its column (never under 28px), and back up when there is room.
         var big = S.el.querySelector('.gps-ld-top .gps-m'), col = big && big.parentNode;
@@ -2553,7 +2555,7 @@
             var under = function (sg) {
                 if (!mr.width) return false;
                 var x = mr.left + box / 2 + sg * ux * reach, y = mr.top + box / 2 + sg * uy * reach, L = x - lw / 2, T = y - lh / 2;
-                return Array.prototype.some.call(S.el.querySelectorAll('.gps-right > *, .gps-ld-rail > *, .gps-miss-chips > *, .gps-leftrow > *, .gps-ld-plays, .gps-zoom, .gps-ld-top, .gps-ld-bottom, .gps-top, .gps-bottom'), function (e) {
+                return Array.prototype.some.call(S.el.querySelectorAll('.gps-right > *, .gps-ld-rail > *, .gps-miss-chips > *, .gps-leftrow > *, .gps-ld-plays, .gps-game-pill, .gps-zoom, .gps-ld-top, .gps-ld-bottom, .gps-top, .gps-bottom'), function (e) {
                     if (e.offsetParent === null) return false; var q = e.getBoundingClientRect();
                     return q.width > 0 && L < q.right + 2 && L + lw > q.left - 2 && T < q.bottom + 2 && T + lh > q.top - 2;
                 });
@@ -3017,7 +3019,7 @@
         try { var mr = missRect(); if (mr) add(mr, M); } catch (e) {}
         var ovalObs = mr ? obstacles[obstacles.length - 1] : null;   // 093: the oval's box (a crowded bubble may sit over it)
         ['.gps-top', '.gps-sub', '.gps-green-dims', '.gps-msg', '.gps-verify', '.gps-right', '.gps-leftrow .gps-recenter', '.gps-miss-chips', '.gps-target-row', '.gps-banner', '.gps-bottom', '.gps-actions', '.gps-credit', '.gps-lc-left', '.gps-lc-right', '.gps-lc-score', '.gps-panel', '.gps-zoom',
-            '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-ld-bottom', '.gps-ld-bottom .gps-mark-shot'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
+            '.gps-ld-top', '.gps-ld-row2', '.gps-ld-rail', '.gps-ld-plays', '.gps-game-pill', '.gps-ld-bottom', '.gps-ld-bottom .gps-mark-shot'].forEach(function (sel) { add(rectOf(S.el.querySelector(sel), wrapR), M); });
         // 066 #1: the golfer's extras (only when they turned some on) - the numbers keep off them too.
         Array.prototype.forEach.call(S.el.querySelectorAll('.hpf-slot'), function (el) { add(rectOf(el, wrapR), M); });
         // F / C / B and their number pills (Green view) are placed FIRST, so the two
@@ -5624,7 +5626,7 @@
             var b = e.getBoundingClientRect(); if (!(b.width > 0 && b.height > 0)) return;
             out.push({ l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top });
         };
-        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-arc-lbl, .gps-right > *, .gps-leftrow .gps-recenter, .gps-green-dims, .gps-banner, .gps-msg, .gps-verify, .gps-target-row, .gps-miss-chips > *, .gps-ld-bottom .gps-mark-shot'), add);
+        Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-game-pill, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-arc-lbl, .gps-right > *, .gps-leftrow .gps-recenter, .gps-green-dims, .gps-banner, .gps-msg, .gps-verify, .gps-target-row, .gps-miss-chips > *, .gps-ld-bottom .gps-mark-shot'), add);
         Object.keys(S.markers || {}).forEach(function (k) { if (k !== 'mymiss') { var m = S.markers[k]; add(m && m.getElement()); } });
         add(S.targetMarker && S.targetMarker.getElement());
         return out;
@@ -6824,7 +6826,7 @@
         ['.gps-ld-top', '.gps-ld-row2'].forEach(function (s) { var b = rc(s); if (b) top = Math.max(top, b.bottom); });
         // 066 #1: the golfer's extras at the top (only when some are on): the hole is framed below them.
         Array.prototype.forEach.call(S.el.querySelectorAll('.gps-under > .hpf-host'), function (h) { if (h.offsetParent === null) return; var b = h.getBoundingClientRect(); if (b.height) top = Math.max(top, b.bottom); });
-        ['.gps-ld-bottom', '.gps-ld-plays', '.gps-credit', '.gps-leftrow .gps-recenter'].forEach(function (s) { var b = rc(s); if (b) bot = Math.min(bot, b.top); });
+        ['.gps-ld-bottom', '.gps-ld-plays', '.gps-game-pill', '.gps-credit', '.gps-leftrow .gps-recenter'].forEach(function (s) { var b = rc(s); if (b) bot = Math.min(bot, b.top); });
         var rl = rc('.gps-ld-rail'); if (rl) right = Math.min(right, rl.left);
         return { top: top - W.top, bottom: bot - W.top, left: 0, right: right - W.left, W: W };
     }
@@ -9139,7 +9141,7 @@
                 if (!sp || !wrap) return null;
                 var wr = wrap.getBoundingClientRect(), b = sp.getBoundingClientRect(), L = { l: b.left - wr.left, t: b.top - wr.top, r: b.right - wr.left, b: b.bottom - wr.top };
                 var hits = [];
-                Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-carry-lbl, .gps-ld-top, .gps-ld-bottom, .gps-green-dims, .gps-banner, .gps-msg, .gps-miss-chip, .gps-miss-pill'), function (e) {
+                Array.prototype.forEach.call(S.el.querySelectorAll('.gps-ld-rail > *, .gps-ld-plays, .gps-game-pill, .gps-pill-to, .gps-pill-on, .gps-ring-lbl, .gps-green-lbl, .gps-carry-lbl, .gps-ld-top, .gps-ld-bottom, .gps-green-dims, .gps-banner, .gps-msg, .gps-miss-chip, .gps-miss-pill'), function (e) {
                     if (e.offsetParent === null) return; var q = e.getBoundingClientRect(); if (!(q.width > 0 && q.height > 0)) return;
                     if (Math.min(b.right, q.right) - Math.max(b.left, q.left) > 0.5 && Math.min(b.bottom, q.bottom) - Math.max(b.top, q.top) > 0.5) hits.push(String(e.className).split(' ').slice(0, 2).join('.'));
                 });

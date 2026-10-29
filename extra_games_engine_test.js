@@ -92,7 +92,7 @@ const UNCHANGED = {
     'aloha-bet.js': '3a2ec9e85d2f07aa4826734ba52bd91d9bbe687f34c3364bbeda0c29388be700',
     'ryder-cup.js': '0b4e3f9059ad29a86af23f8a3b814f0393da396e87dae0fc6ccaa66848060433',
     'side-match-lines.js': 'b555fbf54b3714e746a90c02eb75d49cf32a1e73822ea7dc28e57c6ac1179c88',   // 2026-10-19 Manny OK: side matches in play order (was eaf067c7)
-    'live-skins.js': '632bbb1a1dd3078a9ba79755581c0f44e46acca8bac94c37ea29f3b156ac4e1b',
+    'live-skins.js': '2c0a2566889b06274a5186a4573f87e8766b20ce16dbc91246044664a9c4b35d',   // 2026-10-29 Manny typed OK (100b): a mid-round skins wager lists its own holes (gameHoles), was 632bbb1a
     'trip-pots.js': '3d1b2506d3a716ced0f086996043e8f6736ff766db16e732eba60f80167e08a0',
     'tournament-engine.js': '3626301cf0c2a61438c5d8e566ffbc0094f8b980968f9c45d2e11fc2a426996c',
     'action-model.js': '39d4a40cb81c059a9b634dc90c9e7e68d97053c4be26f0e7cd0d56fb7f0d000e',   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)   // 2026-10-29 Manny typed OK (100c): action-model.js Wolf side game in the catalog (sideGameOnly), was bb89aa4c
