@@ -195,7 +195,7 @@ describe('2. AND NINE OF THE TEN MONEY FILES DID NOT MOVE', () => {
     // line that nothing else in the file moved with it.
     // ------------------------------------------------------------------------
     test('bet-strip.js moved, and only for the Matches tab fix', () => {
-        assert.equal(shaOf('bet-strip.js'), 'e2fcf72d5a9d1b19',   // 2026-10-19 Manny OK: side matches in play order (was bca47bb8)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 3b2dd5fb): two ADDITIVE branches, sm.format === 'hilo' only - its own row in buildSideActionRows (the Hi-Lo line) and a null from sideMatchRoundConfig so the recap never calls it match play. 0 lines changed.
+        assert.equal(shaOf('bet-strip.js'), '5dfba72f62c759df',   // 2026-10-19 Manny OK: side matches in play order (was bca47bb8)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 3b2dd5fb): two ADDITIVE branches, sm.format === 'hilo' only - its own row in buildSideActionRows (the Hi-Lo line) and a null from sideMatchRoundConfig so the recap never calls it match play. 0 lines changed.
             'bet-strip.js is not the version this wave reviewed - re-pin it and say why.');
         const code = fs.readFileSync(path.join(__dirname, 'bet-strip.js'), 'utf8');
         // The fix is present and reads the receipt rather than re-deriving.

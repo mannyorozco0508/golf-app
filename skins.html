@@ -1193,7 +1193,8 @@ html.hp-in-sheet { padding: 0 !important; }
                 gamesCard.style.display = 'block';
                 document.getElementById('bets-games').innerHTML = rows.map(r => {
                     const game = games.find(x => x.key === r.key);
-                    const label = (game && typeof describeGame === 'function') ? describeGame(game) : (r.label + (r.stakeText ? ' · ' + r.stakeText : ''));
+                    // 100b: a KP / Birdies pot keeps its own name (bet-strip.js row label) in the description.
+                    const label = (game && typeof describeGame === 'function') ? describeGame(r.label && r.label !== game.label ? Object.assign({}, game, { label: r.label }) : game) : (r.label + (r.stakeText ? ' · ' + r.stakeText : ''));
                     return `<div class="bets-game" data-game-key="${escapeHtml(String(r.key))}">
                         <span>${r.icon ? r.icon + ' ' : ''}${escapeHtml(label)}${r.rangeText ? ` <span class="bets-game-range">${escapeHtml(r.rangeText)}</span>` : ''}</span>
                         <span class="bets-game-status tone-${escapeHtml(r.tone || 'idle')}">${escapeHtml(r.status || '')}</span>

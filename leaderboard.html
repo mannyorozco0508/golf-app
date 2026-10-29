@@ -1815,8 +1815,14 @@ ${ind.slice(4)}</tr>`;
     }
     function lbGameWithHtml(player) {
         if (!player || lbSpectating() || String(player.id) === String(lbMeId() || '')) return '';
-        const nm = (String(player.name || '').trim().split(/\s+/)[0]) || 'them';
+        const nm = lbShortName(player) || 'them';
         return '<button type="button" class="lb-game-with" data-lb-game-with="' + escapeHtml(String(player.id)) + '" style="display:block;width:calc(100% - 16px);margin:4px 8px 8px;min-height:44px;border:0;border-radius:12px;background:#ffd60a;color:#0b0f0c;font-weight:800;font-size:0.95rem;cursor:pointer;">\u2694\uFE0F Start a game with ' + escapeHtml(nm) + ' \u203A</button>';
+    }
+    // The app's own short name (text-safe.js golferShortName): "Test J." when two golfers share "Test".
+    function lbShortName(p) {
+        const all = (currentBoardData && currentBoardData.players) || [];
+        try { if (typeof golferShortName === 'function') return golferShortName(p, all); } catch (e) {}
+        return String((p && p.name) || '').trim().split(/\s+/)[0];
     }
     function lbNowHole(ids) {
         const d = currentBoardData || {}, cd = (d.courseData || []).slice().sort((a, b) => a.hole - b.hole);
@@ -1831,7 +1837,7 @@ ${ind.slice(4)}</tr>`;
     function lbOpenGameWith(id) {
         const d = currentBoardData || {}, p = (d.players || []).find(x => String(x.id) === String(id));
         if (!p) return;
-        const nm = String(p.name || '').trim().split(/\s+/)[0];
+        const nm = lbShortName(p);
         const me = lbMeId(), ids = [String(id)].concat(me ? [String(me)] : []);
         const now = lbNowHole(ids);
         const cd = (d.courseData || []).slice().sort((a, b) => a.hole - b.hole);

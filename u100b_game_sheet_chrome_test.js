@@ -93,6 +93,16 @@ for (const [w, h] of SIZES) {
                 s = await sheetCheck();
                 assert.deepEqual(s.hits, [], 'wolf sheet overlaps');
                 await shot('A3-card-wolf-needs4');
+                // + Game › More: the grid fits the screen (Build E Simulator, SE: the 3rd column ran to 424 px).
+                await j.evaluate(`document.querySelector('#hp-game [data-hg="more"]').click()`); await sleep(200);
+                const mg = JSON.parse(await j.evaluate(`(function(){ ${OVERLAP} var t = boxes('#hp-game .hb-tiles > *'); var p = document.querySelector('#hp-game .hb-panel');
+                    return JSON.stringify({ n: t.length, hits: hits(t), off: t.filter(function(x){ return x.r > innerWidth + 0.5 || x.l < -0.5; }).map(function(x){ return x.t + ' ' + Math.round(x.r); }), wide: p.scrollWidth <= innerWidth + 1, docWide: document.documentElement.scrollWidth <= innerWidth + 1 }); })()`));
+                assert.equal(mg.n, 9, 'More: 8 games + Back');
+                assert.deepEqual(mg.off, [], `More grid fits ${w} px`);
+                assert.deepEqual(mg.hits, []);
+                assert.ok(mg.wide && mg.docWide, 'no sideways scroll on More');
+                await shot('A4-more-grid');
+                await j.evaluate(`document.querySelector('#hp-game [data-hg="less"]').click()`); await sleep(150);
                 await j.evaluate('HardPanGame.close()');
                 // GPS: the pill above Mark, clear of every map control
                 await j.evaluate("(document.querySelector('#hp-card-bet [data-hp-bar=gps]')||{click(){}}).click()"); await sleep(3500);
@@ -317,7 +327,29 @@ test('GPS build: the Vegas game started from the sheet is in Settle up on the Be
     assert.equal(r.flag, true, 'settlement-engine.js says Vegas/BBB settle here');
     assert.ok(r.eng, 'vegas-engine.js loaded on the Bets page');
     assert.ok(r.manny > 0 && r.rob < 0, 'Vegas money in Settle up: ' + JSON.stringify(r));
+    // ... and on the Bets list (Build E Simulator: Settle up had it, Bets did not), with the KP pot by name.
+    const bets = await j.text('#bets-games');
+    assert.match(bets, /Vegas/, bets);
+    assert.match(bets, /Me \+ Jim|Manny \+ Jim/, bets);
     await j.goto(fileUrl('index.html', 'game=' + CODE + '&group=1'), 4000);
     await ev(`(function(){ ${JSON.stringify(ID)}.forEach(function(id){ var p = 'events/${CODE}/scores/p' + id + '_h7'; durableWrite(p, 'remove', null, p); }); return 1; })()`);
     await sleep(300);
+});
+
+test('join by code: ONE "Who are you?" - the card\'s ask over the GPS, it saves the pick, and the GPS does not ask again', { timeout: 90000 }, async () => {
+    const j2 = await openJourney({ db: JSON.parse(JSON.stringify(DB)), viewport: { width: 402, height: 874 }, webgl: true,
+        preScript: 'window.__hardpanDoors = true;' + iapStub({ active: true }) + "try{sessionStorage.setItem('groupPickDismissed:" + CODE + "','1');}catch(e){}" });
+    try {
+        await j2.goto(fileUrl('index.html', 'game=' + CODE + '&group=1&askme=1'), 5000);
+        const a = JSON.parse(await j2.evaluate(`JSON.stringify({ me: resolvedMeId(), ask: getComputedStyle(document.getElementById('playing-pick-overlay')).display, z: document.getElementById('playing-pick-overlay').style.zIndex, title: document.getElementById('playing-pick-title').textContent, gps: (function(){ var w = document.querySelector('#gps-overlay .gps-who-sheet'); return !!(w && w.offsetParent !== null && w.style.display !== 'none'); })(), url: location.search })`));
+        assert.equal(a.me, null); assert.equal(a.ask, 'flex'); assert.equal(a.title, 'Who are you?'); assert.equal(a.z, '10300');
+        assert.equal(a.gps, false, 'no second (GPS) ask');
+        assert.doesNotMatch(a.url, /askme/);
+        await j2.evaluate(`document.querySelector('#playing-pick-body [data-askme-id="${ID[1]}"]').click()`); await sleep(500);
+        const b = JSON.parse(await j2.evaluate(`JSON.stringify({ me: resolvedMeId(), tag: localStorage.getItem('hardpan_gps_golfer_${CODE}'), ask: getComputedStyle(document.getElementById('playing-pick-overlay')).display })`));
+        assert.deepEqual(b, { me: ID[1], tag: ID[1], ask: 'none' });
+        await j2.evaluate("(document.querySelector('#hp-card-bet [data-hp-bar=gps]')||{click(){}}).click()"); await sleep(3500);
+        const g = await j2.evaluate(`(function(){ var w = document.querySelector('#gps-overlay .gps-who-sheet'); return !!(w && w.offsetParent !== null && w.style.display !== 'none'); })()`);
+        assert.equal(g, false, 'the GPS screen does not ask again');
+    } finally { await j2.close(); }
 });

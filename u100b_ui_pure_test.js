@@ -133,3 +133,71 @@ test('spectators: no + Bet tile, no + Game, the Matches page refuses New Action 
         assert.ok(/if \(smSpectating\(\)\) \{ smRefuseSpectator\(\); return; \}/.test(SM.slice(i, i + 200)), fn + ' refuses a spectator');
     }
 });
+
+// ---- Build E Simulator findings (100b) ----------------------------------------------------------
+function stripSandbox() {
+    const { loadJsFile } = require('./helpers/load-script.js');
+    const sb = loadJsFile('money-engine.js');
+    ['play-order.js', 'action-model.js', 'match-engine.js', 'bet-strip.js'].forEach((f) => {
+        if (f !== 'bet-strip.js' && vm.runInContext(`typeof ${f === 'play-order.js' ? 'playOrder' : (f === 'action-model.js' ? 'sideMatchHoles' : 'calculateMatchEngine')} === 'function'`, sb)) return;
+        vm.runInContext(read(f), sb, { filename: f });
+    });
+    return sb;
+}
+const CD18 = Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
+const P2 = [{ id: 101, name: 'Sam Rivera', hcp: 0 }, { id: 102, name: 'Test Jim', hcp: 0 }];
+
+test('My Round: a Nassau from 7 reads from hole 7 - "Not started" before it, no press before 7 (display only)', () => {
+    const sb = stripSandbox();
+    const scores = {};
+    // Jim loses holes 1-6 badly (that would have pressed on 3 and 5); 7-8 halved.
+    for (let h = 1; h <= 8; h++) { scores['p101_h' + h] = 4; scores['p102_h' + h] = h <= 6 ? 6 : 4; }
+    const sm = { format: 'nassau', startHole: 7, teamAIds: ['101'], teamBIds: ['102'], stake: 5, frontStake: 5, backStake: 5, overallStake: 5, pressRule: '2down', scoring: 'gross', createdAt: 1 };
+    const d = { players: P2, courseData: CD18, scores, sideMatches: { n7: sm } };
+    sb.__d = d;
+    const row = vm.runInContext('buildSideActionRows(__d, __d.courseData, __d.scores, __d.players, "101")[0]', sb);
+    assert.equal(row.thruShort, 'Thru 8', 'thru from the bet\'s own holes');
+    assert.ok(row.presses.every((p) => !p.startedText || Number(p.startedText.replace(/\D/g, '')) >= 7), JSON.stringify(row.presses));
+    assert.match(row.status, /ALL SQUARE|All square|AS/i, row.status);
+    // before hole 7 is played: Not started
+    const s6 = {}; for (let h = 1; h <= 6; h++) { s6['p101_h' + h] = 4; s6['p102_h' + h] = 6; }
+    sb.__d6 = Object.assign({}, d, { scores: s6 });
+    assert.equal(vm.runInContext('buildSideActionRows(__d6, __d6.courseData, __d6.scores, __d6.players, "101")[0].thruShort', sb), 'Not started');
+});
+
+test('Bets list: a Vegas / BBB game has its own row; a KP / Birdies pot is named, not "Dots / Junk"', () => {
+    const sb = stripSandbox();
+    vm.runInContext(read('vegas-engine.js') + '\n' + read('bbb-engine.js'), sb);
+    const players = [101, 102, 103, 104].map((id, i) => ({ id, name: ['Sam Rivera', 'Test Jim', 'Test Dave', 'Test Rob'][i], hcp: 0 }));
+    const scores = { p101_h7: 3, p102_h7: 3, p103_h7: 4, p104_h7: 5 };
+    sb.__d = { players, courseData: CD18, scores, gameFormat: 'stroke',
+        additionalGameInstances: {
+            v1: { format: 'vegas', enabled: true, startHole: 7, createdAt: 1, vegasPointVal: 1, vegasBirdieFlip: false, vegasTeamA: ['101', '102'], vegasTeamB: ['103', '104'], participantIds: ['101', '102', '103', '104'], inSettle: true },
+            b1: { format: 'bbb', enabled: true, startHole: 7, createdAt: 2, bbbPointVal: 1, participantIds: ['101', '102'], inSettle: true, points: { h7: { bingo: '101' } } },
+            k1: { format: 'dots', enabled: true, startHole: 7, createdAt: 3, dotPointVal: 2, dotTypes: ['greenie'], inSettle: true }
+        } };
+    const rows = JSON.parse(vm.runInContext('JSON.stringify(buildActionRows(__d, __d.courseData, __d.scores, __d.players))', sb));
+    const by = (k) => rows.find((r) => r.key === k);
+    assert.ok(by('v1'), 'Vegas row: ' + JSON.stringify(rows.map((r) => r.key)));
+    assert.equal(by('v1').label, 'Vegas'); assert.match(by('v1').status, /\+12 pts/);
+    assert.ok(by('b1')); assert.match(by('b1').status, /1 pt/);
+    assert.equal(by('k1').label, 'KP pot');
+});
+
+test('Join by code: ONE "who are you" ask - the GPS sheet stands down for askme and the card\'s pick sets the GPS name tag', () => {
+    const gv = read('gps-view.js'), ix = read('index.html');
+    assert.match(gv, /window\.__hpAskMeOpen === true \|\| \/\[\?&\]askme=1\(&\|\$\)\/\.test/);
+    assert.match(gv, /if \(first\) \{ try \{ if \(typeof window\.setMe === 'function'/);
+    assert.match(ix, /localStorage\.setItem\('hardpan_gps_golfer_' \+ currentMode, String\(id\)\)/);
+    assert.match(ix, /overlay\.style\.zIndex = '10300'/);
+});
+
+test('Leaderboard shortcut names the golfer by the app\'s short name (golferShortName: "Test J.")', () => {
+    const lb = read('leaderboard.html');
+    assert.match(lb, /if \(typeof golferShortName === 'function'\) return golferShortName\(p, all\);/);
+    const ctx = { console };
+    vm.createContext(ctx);
+    vm.runInContext(read('text-safe.js') + '\n;this.golferShortName = golferShortName;', ctx);
+    const all = [{ id: 1, name: 'Test Jim' }, { id: 2, name: 'Test Dave' }];
+    assert.equal(ctx.golferShortName(all[0], all), 'Test J.');
+});

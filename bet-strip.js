@@ -378,7 +378,8 @@ function buildActionRows(data, courseData, savedScores, scopedPlayers) {
         const rangeText = (typeof gameRangeText === 'function') ? gameRangeText(game, holes) : '';
         const row = {
             key: game.key,
-            label: game.label,
+            // 100b: a Dots game limited to KPs or birdies (dotTypes) says which pot it is.
+            label: dotsPotLabel(game) || game.label,
             icon: game.icon || '',
             role: game.role,
             stake: game.stake,
@@ -400,6 +401,11 @@ function buildActionRows(data, courseData, savedScores, scopedPlayers) {
         }
         if (row.status) rows.push(row);
     });
+
+    // 100b: VEGAS AND BBB GAMES (additionalGameInstances, extra-games-ui.js) are not in getRoundGames,
+    // so they had no row here - a + Game Vegas was in Settle up but missing from Bets. Status only,
+    // from their own engines (vegas-engine.js / bbb-engine.js); nothing here prices them.
+    sideGameRows(data, holes, scores).forEach(r => rows.push(r));
 
     // Extras: wagers that run alongside every format rather than being a format.
     // Birdie previously appeared ONLY in the standings panel, bolted onto Current Group
@@ -434,6 +440,46 @@ function buildActionRows(data, courseData, savedScores, scopedPlayers) {
     }
 
     return rows;
+}
+
+// 100b: "KP pot" / "Birdies" for a Dots game limited to those dots (dotTypes, the + Game sheet's pots).
+function dotsPotLabel(game) {
+    const t = game && game.format === 'dots' && game.config && Array.isArray(game.config.dotTypes) ? game.config.dotTypes.join(',') : '';
+    return t === 'greenie' ? 'KP pot' : (t === 'birdie,eagle' ? 'Birdies' : '');
+}
+// 100b: a row per Vegas / BBB game - its label, stake, range and a live status line.
+function sideGameRows(data, holes, scores) {
+    const out = [];
+    const inst = (data && data.additionalGameInstances) || {};
+    const players = (data && data.players) || [];
+    const W = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : {});
+    const nm = id => { const p = players.find(x => String(x.id) === String(id)); return p ? shortName(p.name) : ''; };
+    Object.keys(inst).filter(k => inst[k] && (inst[k].format === 'vegas' || inst[k].format === 'bbb') && inst[k].enabled !== false)
+        .sort((a, b) => (inst[a].createdAt || 0) - (inst[b].createdAt || 0)).forEach(k => {
+            const cfg = inst[k], vegas = cfg.format === 'vegas';
+            const stake = Number(vegas ? cfg.vegasPointVal : cfg.bbbPointVal) || 0;
+            const start = Number(cfg.startHole) || 1;
+            const row = { key: k, label: vegas ? 'Vegas' : 'Bingo Bango Bongo', icon: vegas ? '\uD83D\uDD22' : '\uD83D\uDFE2', role: 'additional',
+                stake: stake, rangeText: (typeof gameRangeText === 'function') ? gameRangeText({ startHole: start }, holes) : '',
+                stakeText: stake > 0 ? `$${stake}/pt` : '', status: '', tone: 'idle', playerIds: (cfg.participantIds || []).map(String) };
+            try {
+                if (vegas && W.HardPanVegas && typeof W.HardPanVegas.calculateVegas === 'function') {
+                    const c = W.HardPanVegas.calculateVegas(cfg, holes, scores);
+                    const a = (cfg.vegasTeamA || []).map(nm).join(' + '), b = (cfg.vegasTeamB || []).map(nm).join(' + ');
+                    if (!c || !c.valid) row.status = 'Needs two teams of two';
+                    else if (!(c.holes || []).length) row.status = 'Not started';
+                    else if (c.pointsA === 0) { row.status = 'All square'; row.tone = 'even'; }
+                    else { row.status = `${c.pointsA > 0 ? a : b} +${Math.abs(c.pointsA)} pts`; row.tone = 'up'; }
+                } else if (!vegas && W.HardPanBBB && typeof W.HardPanBBB.calculateBBB === 'function') {
+                    const c = W.HardPanBBB.calculateBBB(cfg, players);
+                    const best = (c.players || []).map(p => ({ p, v: (c.points || {})[String(p.id)] || 0 })).sort((x, y) => y.v - x.v)[0];
+                    if (!best || best.v === 0) row.status = 'No points yet';
+                    else { row.status = `${shortName(best.p.name)} ${best.v} pt${best.v === 1 ? '' : 's'}`; row.tone = 'up'; }
+                } else row.status = 'In progress';
+            } catch (e) { row.status = 'In progress'; }
+            out.push(row);
+        });
+    return out;
 }
 
 // One short, human status per format. Golf language only — Stroke Play never says
@@ -801,7 +847,10 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
         else if (!isTeam && iAmInB) label = `vs ${sideAName}`;
         else label = `${sideAName} vs ${sideBName}`;
 
-        const progress = matchProgress(matchPlayers, courseData, savedScores);
+        // 100b: A SIDE MATCH IS READ OVER ITS OWN HOLES (sideMatchHoles - the range settlement pays
+        // it over): a Nassau from 7 is not "thru 6", and its presses start on 7 or later. Display only.
+        const smHoles = (typeof sideMatchHoles === 'function') ? sideMatchHoles(sm, courseData, data) : courseData;
+        const progress = matchProgress(matchPlayers, smHoles, savedScores);
 
         // HI-LO (016, ADDITIVE). Its own row, from hilo-engine.js: two contests a
         // hole, read as points - "Hi-Lo: Bob + Manny +3 (Low 5-3, High 4-3)". No
@@ -887,7 +936,7 @@ function buildSideActionRows(data, courseData, savedScores, scopedPlayers, meId)
             const cfg = sideMatchRoundConfig(sm, matchPlayers);
             if (cfg) {
                 try {
-                    const strip = buildBetStrip(cfg, courseData, savedScores, cfg.players);
+                    const strip = buildBetStrip(cfg, smHoles, savedScores, cfg.players);
                     if (strip && strip.eligible && strip.chips.length > 0) {
                         const live = strip.chips.find(c => !c.closed) || strip.chips[0];
                         status = live.statusText;

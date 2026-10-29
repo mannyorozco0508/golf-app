@@ -157,7 +157,7 @@ describe('2. THE ENGINE IS UNCHANGED, AND STILL ANSWERS WHAT IT ANSWERED', () =>
             'payouts.js': 'c35e34f571e564c0', 'pool-engine.js': '1530a0b955e2e870',
             'handicap.js': '2d3b2f7fd916a4b8', 'action-model.js': '39d4a40cb81c059a', /* 2026-10-19 Manny OK: gameHoles play order (was 399ba26f) */   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)   // 2026-10-29 Manny typed OK (100c): action-model.js Wolf side game in the catalog (sideGameOnly), was bb89aa4c
             'ryder-cup.js': '0b4e3f9059ad29a8', 'score-marks.js': '02f972d6d2fc7cad',
-            'hole-events.js': '6fd7f7edf41e848b', 'bet-strip.js': 'e2fcf72d5a9d1b19'   // 2026-10-19 Manny OK: side matches in play order (was bca47bb8)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 3b2dd5fb): two ADDITIVE branches, sm.format === 'hilo' only - its own row in buildSideActionRows (the Hi-Lo line) and a null from sideMatchRoundConfig so the recap never calls it match play. 0 lines changed.
+            'hole-events.js': '6fd7f7edf41e848b', 'bet-strip.js': '5dfba72f62c759df'   // 2026-10-19 Manny OK: side matches in play order (was bca47bb8)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 3b2dd5fb): two ADDITIVE branches, sm.format === 'hilo' only - its own row in buildSideActionRows (the Hi-Lo line) and a null from sideMatchRoundConfig so the recap never calls it match play. 0 lines changed.
         };
         const moved = Object.keys(GOLDEN).filter((f) => crypto.createHash('sha256')
             .update(fs.readFileSync(path.join(__dirname, f))).digest('hex').slice(0, 16) !== GOLDEN[f]);

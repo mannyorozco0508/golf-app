@@ -4585,6 +4585,9 @@
         var d = roundData();
         if (!S || S.side !== 'gps' || !doorsOn() || !d || !d.players || d.players.length < 2 || whoAsked()) return;
         if (picked(d) != null || (typeof resolvedMeId === 'function' && resolvedMeId() != null)) return;
+        // 100b: ONE ASK after a join by code - the card's "Who are you?" (index.html hpAskMeOnJoin, askme)
+        // is that ask, and it sets this name tag too; this sheet does not ask a second time.
+        try { if (window.__hpAskMeOpen === true || /[?&]askme=1(&|$)/.test(window.location.search)) return; } catch (e) {}
         try { localStorage.setItem('hardpan_gps_whoasked_' + String(S.eventCode || ''), '1'); } catch (e) {}
         // THE ROUND'S CREATOR IS NOT ASKED (URGENT-009, 013-17): this phone made the round, and its
         // golfer 1 is the organizer (Round Setup's first row, "Me" on a GPS-door round) - in the
@@ -8488,7 +8491,9 @@
             if ((b = t.closest('[data-who-group]'))) { openWho(sh.getAttribute('data-who-first') === '1', Number(b.getAttribute('data-who-group'))); return; }
             // URGENT-034: a golfer picked from \u25BE ("Whose score?") opens the score sheet for them. The
             // first "Who are you?" ask only sets the name tag.
-            if ((b = t.closest('[data-who-id]'))) { var first = sh.getAttribute('data-who-first') === '1', id = b.getAttribute('data-who-id'); closeWho(); setPick(id); if (!first && S && S.openScoreHere) S.openScoreHere(id); return; }
+            if ((b = t.closest('[data-who-id]'))) { var first = sh.getAttribute('data-who-first') === '1', id = b.getAttribute('data-who-id'); closeWho(); setPick(id);
+                // 100b: the first "Who are you?" answer is also who this phone is (the card's "This is me").
+                if (first) { try { if (typeof window.setMe === 'function' && typeof resolvedMeId === 'function' && resolvedMeId() == null) window.setMe(id); } catch (e) {} } if (!first && S && S.openScoreHere) S.openScoreHere(id); return; }
             if (t.closest('.gps-who-skip')) {
                 var d = roundData(), g = Number(sh.getAttribute('data-who-g')) || lockedG() || (d ? groupsOf(d)[0] : 1), f = d ? inGroup(d, g)[0] : null;
                 closeWho(); if (f) setPick(f.id); return;

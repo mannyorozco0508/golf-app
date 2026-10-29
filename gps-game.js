@@ -235,7 +235,9 @@
     var st = null;
     var CSS_X = ''
         + '#hp-game{z-index:10205;}'
-        + '#hp-game .hb-tiles.g3{grid-template-columns:repeat(3,1fr);gap:8px;}'
+        + '#hp-game .hb-tiles.g3{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}'   // minmax(0,..): a long name ("Team match") never pushes a column off a 375 screen
+        + '#hp-game .g3.more .hb-tile b{white-space:normal;overflow-wrap:anywhere;}'   // More: whole names ("Long Drive"), two lines when narrow
+        + '#hp-game .g3 .hb-tile{min-width:0;overflow:hidden;}#hp-game .g3 .hb-tile span{overflow-wrap:anywhere;}'
         + '#hp-game .g3 .hb-tile{min-height:58px;padding:9px 10px;}'
         + '#hp-game .g3 .hb-tile b{font-size:clamp(13px,3.9vw,15px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}#hp-game .g3 .hb-tile span{font-size:12px;}'
         + '#hp-game .g3 .hb-tile b i{font-style:normal;margin-right:4px;}'
@@ -308,7 +310,7 @@
         var g = G[st.game], now = nowHole(st.picks), from = fromHole(), n9 = now != null ? nextNine(now) : null;
         var h = '<div class="hb-grab"></div><div class="hb-head"><div class="hb-title">＋ Game</div><button type="button" class="hb-x" data-hg="close" aria-label="Close">✕</button></div>';
         h += '<div class="hb-h" style="margin-top:0">' + (st.more ? 'More games' : 'Game · golfers it takes') + '</div>';
-        h += '<div class="hb-tiles g3">' + (st.more
+        h += '<div class="hb-tiles g3' + (st.more ? ' more' : '') + '">' + (st.more
             ? MORE.map(tile).join('') + '<button type="button" class="hb-tile" data-hg="less"><b><i>‹</i>Back</b><span>Nassau, Match…</span></button>'
             : GRID.map(tile).join('') + '<button type="button" class="hb-tile" data-hg="more"><b><i>＋</i>More</b><span>Team, Ryder, KP…</span></button>') + '</div>';
         var mine = groupGolfers(), others = players().filter(function (p) { return mine.indexOf(p) === -1; });

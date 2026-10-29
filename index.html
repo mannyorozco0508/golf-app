@@ -12289,14 +12289,24 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const title = document.getElementById('playing-pick-title'); if (title) title.textContent = 'Who are you?';
         body.innerHTML = mine.map(p => '<button type="button" class="btn-primary group-pick-btn" style="margin-top:8px;" data-askme-id="' + escapeHtml(String(p.id)) + '">' + escapeHtml(golferLabel(p)) + '</button>').join('')
             + '<button type="button" class="btn-outline" style="margin-top:10px;" data-askme-id="">I\u2019m only keeping score</button>';
+        // ONE ASK (100b): the GPS screen's own "Who are you?" stands down for this one, and gets its answer.
+        window.__hpAskMeOpen = true;
+        try { localStorage.setItem('hardpan_gps_whoasked_' + currentMode, '1'); } catch (e) {}
+        try { const gw = document.querySelector('#gps-overlay .gps-who-sheet'); if (gw && gw.getAttribute('data-who-first') === '1') gw.style.display = 'none'; } catch (e) {}
         body.onclick = function (e) {
             const b = e.target && e.target.closest ? e.target.closest('[data-askme-id]') : null;
             if (!b) return;
             body.onclick = null;
+            window.__hpAskMeOpen = false;
             const id = b.getAttribute('data-askme-id');
-            if (id) { storeRoundRole('playing'); pickPlayingMe(id); }
+            if (id) {
+                try { localStorage.setItem('hardpan_gps_golfer_' + currentMode, String(id)); } catch (e) {}   // the GPS name tag: the same golfer
+                storeRoundRole('playing'); pickPlayingMe(id);
+            }
             else { overlay.style.display = 'none'; renderScorecard(); }
+            overlay.style.zIndex = '';
         };
+        overlay.style.zIndex = '10300';   // over the GPS screen (10050), so it is the one ask either side shows
         overlay.style.display = 'flex';
     }
     // GPS:END
