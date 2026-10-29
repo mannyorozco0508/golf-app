@@ -42,8 +42,8 @@ test('no money engine, settlement or side-bet file differs from gps-live (acfe6c
     // 2026-10-19 Manny OK: gameHoles play order - action-model.js accepted at exactly these contents.
     // 2026-10-19 Manny OK: "side matches use play order (sideMatchHoles), hole-1 rounds unchanged" -
     // action-model.js, settlement-engine.js, money-engine.js and side-match-lines.js accepted at exactly these contents.
-    const APPROVED = { 'settlement-engine.js': '07cea71d', 'pool-engine.js': '1530a0b9', 'action-model.js': 'bb89aa4c',
-        'money-engine.js': 'ae0bfcd9', 'side-match-lines.js': 'b555fbf5' };
+    const APPROVED = { 'settlement-engine.js': '50ca7e5c', 'pool-engine.js': '1530a0b9', 'action-model.js': '39d4a40c',   // 2026-10-29 Manny typed OK (100c): settlement-engine.js Vegas/BBB in Settle up for inSettle games + match-mode receipt lines, was 07cea71d; action-model.js Wolf side game in the catalog (sideGameOnly), was bb89aa4c
+        'money-engine.js': 'cfd3f365', 'side-match-lines.js': 'b555fbf5' };   // 2026-10-29 Manny typed OK (100c): money-engine.js Wolf side-game pick-order rotation + 2b press line, was ae0bfcd9
     const sha8 = (f) => require('crypto').createHash('sha256').update(read(f)).digest('hex').slice(0, 8);
     changed = changed.split('\n').filter(f => f && !(APPROVED[f] && sha8(f) === APPROVED[f])).join('\n');
     assert.equal(changed, '', 'engine files untouched');

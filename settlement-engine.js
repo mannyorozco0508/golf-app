@@ -1213,9 +1213,27 @@
                     };
                 };
 
+                if (calc.mode === 'stroke') {
                 receipt.segments.push(describe(calc.base, 'Overall'));
                 (calc.pressSegs || []).forEach((seg, i) =>
                     receipt.segments.push(describe(seg, `Overall Press ${i + 1}`)));
+                } else {
+                    // 100c (2026-10-29 Manny typed OK): overallMode 'match' has no `base`
+                    // (calculateOverallBetEngine returns baseStatus / pressResults), so the
+                    // stroke describe() threw here. RECEIPT TEXT ONLY: each line reads the
+                    // engine's own status and pays exactly what p1Money already holds.
+                    const ovStake = cfg.overallStake || 0;
+                    const matchSeg = (label, startHole, status) => ({
+                        label, startHole, endHole: lastHole, stake: ovStake,
+                        result: status === 0 ? 'All square' : `${status > 0 ? nameA : nameB} ${Math.abs(status)} up`,
+                        winner: status > 0 ? nameA : (status < 0 ? nameB : null),
+                        money: status === 0 ? 0 : ovStake,
+                        toSideA: status > 0
+                    });
+                    receipt.segments.push(matchSeg('Overall match', firstHole, calc.baseStatus || 0));
+                    (calc.pressResults || []).forEach((pr, i) =>
+                        receipt.segments.push(matchSeg(`Overall Press ${i + 1}`, pr.startHole, pr.status || 0)));
+                }
                 // The one number a golfer argues about. Hole money and overall money
                 // together - the SAME sum settlement pays, or the receipt is a lie.
                 receipt.net = holeNet + calc.p1Money;
@@ -1327,6 +1345,40 @@
         return receipts;
     }
 
+    // 100c: one Vegas / BBB instance -> { label, net: { id: $ } }, or null when the
+    // engine is not loaded on this page or the game is not valid. Pure pass-through to
+    // HardPanVegas.calculateVegas / HardPanBBB.calculateBBB (each zero-sum).
+    function vegasBbbEngines() {
+        const g = (typeof globalThis !== 'undefined') ? globalThis : {};
+        let vegas = (typeof HardPanVegas !== 'undefined') ? HardPanVegas : (g.HardPanVegas || (typeof window !== 'undefined' && window.HardPanVegas) || null);
+        let bbb = (typeof HardPanBBB !== 'undefined') ? HardPanBBB : (g.HardPanBBB || (typeof window !== 'undefined' && window.HardPanBBB) || null);
+        if ((!vegas || !bbb) && typeof module !== 'undefined' && module.exports && typeof require === 'function') {
+            try { vegas = vegas || require('./vegas-engine.js'); } catch (e) { /* not in this build */ }
+            try { bbb = bbb || require('./bbb-engine.js'); } catch (e) { /* not in this build */ }
+        }
+        return { vegas, bbb };
+    }
+    function settleVegasOrBbb(g, players, courseData, savedScores) {
+        const eng = vegasBbbEngines();
+        const nameOf = id => { const p = (players || []).find(x => String(x.id) === String(id)); return p ? p.name : String(id); };
+        if (g.format === 'vegas') {
+            if (!eng.vegas) return null;
+            const r = eng.vegas.calculateVegas(g, courseData || [], savedScores || {});
+            if (!r || !r.valid) return null;
+            const team = t => t.map(nameOf).join('/');
+            return { label: `Vegas \u00B7 ${team(g.vegasTeamA)} vs ${team(g.vegasTeamB)}`, net: r.net };
+        }
+        if (g.format === 'bbb') {
+            if (!eng.bbb) return null;
+            const r = eng.bbb.calculateBBB(g, players || []);
+            if (!r || r.players.length < 2) return null;
+            return { label: 'Bingo Bango Bongo', net: r.net };
+        }
+        return null;
+    }
+    // Pages and the + Game sheet (100b) key the Vegas / BBB tiles on this.
+    if (typeof window !== 'undefined') window.HP_SETTLE_VEGAS_BBB = true;
+
     function computeCombinedNetTotals(data, courseData, savedScores) {
         const netByName = {}; // lowercased key -> { name, net }
 
@@ -1402,6 +1454,31 @@
             Object.keys(gameNet).forEach(pid => {
                 const p = allPlayers.find(pl => String(pl.id) === String(pid));
                 addAmount(p, gameNet[pid], label);
+            });
+        });
+
+        // 100c (2026-10-29 Manny typed OK, 100 Q3): VEGAS + BINGO BANGO BONGO IN SETTLE UP,
+        // ONLY for a game started after this update. getRoundGames skips both formats (they
+        // are not in the catalog), so until now they were "settle separately" cards. A game
+        // the new code writes carries inSettle: true (the + Game sheet and Round Setup);
+        // every game saved before has no such field and is left out exactly as before, so
+        // nothing already settled moves. The money is the engines' own zero-sum net
+        // (vegas-engine.js / bbb-engine.js), booked as it comes back - no golf math here.
+        // A page without the two engines loaded books nothing (the old behavior).
+        const vbInstances = data.additionalGameInstances || {};
+        const vbLabelSeen = {};
+        Object.keys(vbInstances).forEach(id => {
+            const g = vbInstances[id];
+            if (!g || g.enabled === false || g.inSettle !== true) return;
+            if (g.format !== 'vegas' && g.format !== 'bbb') return;
+            const res = settleVegasOrBbb(g, allPlayers, courseData, savedScores);
+            if (!res) return;
+            const base = res.label;
+            vbLabelSeen[base] = (vbLabelSeen[base] || 0) + 1;
+            const label = vbLabelSeen[base] > 1 ? `${base} (${vbLabelSeen[base]})` : base;
+            Object.keys(res.net).forEach(pid => {
+                const p = allPlayers.find(pl => String(pl.id) === String(pid));
+                addAmount(p, res.net[pid], label);
             });
         });
 

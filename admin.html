@@ -5265,7 +5265,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!list || typeof ADDITIONAL_GAME_CATALOG === 'undefined') return;
         const mainFormat = document.getElementById('game-format-select').value || 'stroke';
 
-        const available = Object.keys(ADDITIONAL_GAME_CATALOG).filter(f => f !== mainFormat);
+        const available = Object.keys(ADDITIONAL_GAME_CATALOG).filter(f => f !== mainFormat && !ADDITIONAL_GAME_CATALOG[f].sideGameOnly);   // 100c: Wolf is a + Game side game only, never stacked here
         const sub = document.getElementById('stacked-games-sub');
 
         if (available.length === 0) {

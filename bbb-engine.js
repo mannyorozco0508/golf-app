@@ -54,9 +54,15 @@
         var pts = {}, holes = {}, total = 0, played = 0;
         ids.forEach(function (id) { pts[id] = 0; });
         var raw = (cfg && cfg.points) || {};
+        // 100c (2026-10-29 Manny typed OK): a game started mid-round scores from its
+        // start hole only. Points only exist from taps, so this is defensive: a tap on
+        // a hole before the start (a stray or a re-used key) never counts. No startHole
+        // (every game saved before) means 1: nothing filtered, same numbers.
+        var startHole = Number(cfg && cfg.startHole) || 1;
         Object.keys(raw).forEach(function (k) {
             var m = /^h(\d+)$/.exec(k);
             if (!m || !raw[k]) return;
+            if (Number(m[1]) < startHole) return;
             var h = {}, any = false;
             KINDS.forEach(function (kind) {
                 var who = raw[k][kind];

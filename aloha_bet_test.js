@@ -88,7 +88,7 @@ const offerInput = (extra) => Object.assign({
 // ---------------------------------------------------------------------------
 describe('1. NO ENGINE MATH MOVED', () => {
     test('money-engine.js is byte-for-byte unchanged', () => {
-        assert.equal(sha('money-engine.js'), 'ae0bfcd9805c06d6', 'money-engine.js changed: ' + sha('money-engine.js'));  // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)   // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.
+        assert.equal(sha('money-engine.js'), 'cfd3f365cc3b3c06', 'money-engine.js changed: ' + sha('money-engine.js'));  // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)   // v218: calculateMatchEngine moved OUT to match-engine.js. Deletion plus a pointer comment; no arithmetic moved, and match_engine_parity_test.js pins the 13-fixture corpus the three old copies agreed on.   // 2026-10-29 Manny typed OK (100c): money-engine.js Wolf side-game pick-order rotation + 2b press line, was ae0bfcd9
     });
     test('aloha-bet.js computes no strokes and reads no scores except "is this hole blank"', () => {
         const src = read('aloha-bet.js');

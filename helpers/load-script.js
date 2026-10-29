@@ -201,7 +201,7 @@ const MODULE_PREREQS = {
     // order the card carries - which is the SILENT failure this map exists to
     // prevent, because a test without it would settle a 10th-tee round in number
     // order and report a pass.
-    'settlement-engine.js': ['handicap.js', 'match-engine.js', 'action-model.js', 'play-order.js'],
+    'settlement-engine.js': ['handicap.js', 'match-engine.js', 'action-model.js', 'play-order.js', 'bbb-engine.js', 'vegas-engine.js'],   // 100c: Vegas/BBB in Settle up, as index.html / settlement.html load them
     // computeTournamentPayouts() calls allocatePlacePayouts() as a global, exactly
     // as it does in the browser where both tournament pages load payouts.js first.
     // tournament-engine.js calls allocatePlacePayouts() for prize money and

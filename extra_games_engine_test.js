@@ -84,8 +84,8 @@ test('Vegas: 10+ leads, both birdie = no flip, a hole counts only with all 4 sco
 // NO EXISTING MONEY FILE CHANGED. Each hash is the file on main (387cf89) - and
 // on gps-features - byte for byte. The new games live in their own files only.
 const UNCHANGED = {
-    'money-engine.js': 'ae0bfcd9805c06d6d52b819e1933c14fe521e1f9641c867893d246e158691bf6',   // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)
-    'settlement-engine.js': '07cea71d44f3044243cc6aa7b9e303f3c0f5e788884bd2f670d1610762e65363',   // 2026-10-29 Manny typed OK (100a): Stroke overall pays by side, was 2b75e349   // 2026-10-19 Manny OK: side matches in play order (was 88c8b8a7)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.
+    'money-engine.js': 'cfd3f365cc3b3c0634038491d28fca4b2cb16cfaf8d83c8fd684c20d3102bc27',   // 2026-10-19 Manny OK: side matches in play order (was 12bfa41c)   // 2026-10-29 Manny typed OK (100c): money-engine.js Wolf side-game pick-order rotation + 2b press line, was ae0bfcd9
+    'settlement-engine.js': '50ca7e5caa85607a48be82e2d97466af1be1dc217eb906d9b14283801248495d',   // 2026-10-29 Manny typed OK (100a): Stroke overall pays by side, was 2b75e349   // 2026-10-19 Manny OK: side matches in play order (was 88c8b8a7)   // RE-PINNED 016 (Hi-Lo 2v2 side bet, was 9f6a4fa7): two ADDITIVE branches, sm.format === 'hilo' only - the receipt in buildSideMatchReceipts and the ledger line in computeCombinedNetTotals; hilo-engine.js owns every rule and number. 23 lines added, 0 changed; hilo_sidebet_test.js holds every other wager byte-identical.   // 2026-10-29 Manny typed OK (100c): settlement-engine.js Vegas/BBB in Settle up for inSettle games + match-mode receipt lines, was 07cea71d
     'payouts.js': 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8',
     'match-engine.js': '42bb272d11814cafba0d9ad48322b1b14fbbbfab6677268ce231787f347e7fde',
     'pool-engine.js': '1530a0b955e2e8705748808a79a221a4790fe67419de06fb010cb9f59ec7e153',
@@ -95,7 +95,7 @@ const UNCHANGED = {
     'live-skins.js': '632bbb1a1dd3078a9ba79755581c0f44e46acca8bac94c37ea29f3b156ac4e1b',
     'trip-pots.js': '3d1b2506d3a716ced0f086996043e8f6736ff766db16e732eba60f80167e08a0',
     'tournament-engine.js': '3626301cf0c2a61438c5d8e566ffbc0094f8b980968f9c45d2e11fc2a426996c',
-    'action-model.js': 'bb89aa4c1be878fce9b4d9906653c6078f048027407c16e00895fb47e455b887',   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)
+    'action-model.js': '39d4a40cb81c059a9b634dc90c9e7e68d97053c4be26f0e7cd0d56fb7f0d000e',   // 2026-10-19 Manny OK: side matches in play order (was f67a7b43)   // 2026-10-19 Manny OK: gameHoles play order (was 399ba26f)   // 2026-10-29 Manny typed OK (100c): action-model.js Wolf side game in the catalog (sideGameOnly), was bb89aa4c
     'helpers/side-match-cards.js': 'dd02985ef9a151b72c28554b525eebc01cfe33e6402f31a03c3ddace1df106f8'
 };
 test('the existing money engines, settlement, side bets and game catalog are byte-identical to main', () => {
