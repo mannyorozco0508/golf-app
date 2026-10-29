@@ -49,6 +49,7 @@
        sideMatchPayloadFromTerms, computeCombinedNetTotals, roundDataForDisplay, getRoundGames, uiToast, uiRefuse, uiFail, hpSpectating */
     function data() { try { return typeof currentData !== 'undefined' && currentData ? currentData : null; } catch (e) { return null; } }
     function code() { try { return typeof currentMode !== 'undefined' ? currentMode : null; } catch (e) { return null; } }
+    function spectating() { try { return typeof hpSpectating === 'function' && !!hpSpectating(); } catch (e) { return false; } }
     function locked() { try { return typeof hasGroupLock !== 'undefined' && hasGroupLock && lockedGroup ? Number(lockedGroup) : null; } catch (e) { return null; } }
     function meId() { try { return typeof resolvedMeId === 'function' ? resolvedMeId() : null; } catch (e) { return null; } }
     function players() { var d = data(); return (d && d.players) || []; }
@@ -164,11 +165,21 @@
         var o = ordered(), fi = at(o, from), left = fi < 0 ? o.length : o.length - fi;
         var amt;
         if (game === 'skins') amt = stake;
-        else if (game === 'nassau') amt = stake * 3 / per;
+        // 100b: a Nassau whose holes are all in one nine (started on 10 or later) is ONE
+        // bet over the holes left (match-engine.js), so its worst case is one stake, not three.
+        else if (game === 'nassau') amt = stake * (nassauBets(from) === 1 ? 1 : 3) / per;
         else if (game === 'hilo') amt = 2 * left * stake / per;
         else amt = stake / per;
         var mine = game === 'skins' ? (sh.all || []).indexOf(me) > -1 : !!side;
         return { amount: Math.round(amt), mine: mine, presses: !!(GAMES[game] && GAMES[game].presses) };
+    }
+
+    // 100b: how many bets a Nassau from this hole really is - 3 (front, back, total) when its
+    // holes reach both nines, 1 when they are all front or all back (match-engine.js:121-140).
+    function nassauBets(from) {
+        var o = ordered(), fi = at(o, from), list = fi < 0 ? o : o.slice(fi);
+        var f = list.some(function (h) { return Number(h.hole) <= 9; }), b = list.some(function (h) { return Number(h.hole) > 9; });
+        return f && b ? 3 : 1;
     }
 
     // ---- PERMISSIONS, the same as New Action ----------------------------------
@@ -192,6 +203,9 @@
         var same = ids.every(function (id) { return String(m[id]) === String(g0); });
         return same ? { scope: 'group', ownerGroup: Number(g0) } : { scope: 'cross', ownerGroup: null };
     }
+
+    // The press rules a Match / Nassau may carry - New Action's own values (sidematches.html).
+    var PRESS_RULES = ['none', '2down', '1down', 'anytime'];
 
     // ---- THE WRITE --------------------------------------------------------------
     // Returns { path, value } - the exact record New Action would write - or { refuse }.
@@ -223,7 +237,8 @@
         }
         if (typeof sideMatchPayloadFromTerms !== 'function') return { refuse: 'Bets are still loading - try again in a moment.' };
         // PRESSES (Match / Nassau only): Off = 'none', or New Action's own "Auto @ 2 Down".
-        var press = (GAMES[game].presses && o.press === '2down') ? '2down' : 'none';
+        // 100b (Manny's 099 answer 5): also the Matches page's "Auto @ 1 Down" and "Press Any Hole".
+        var press = (GAMES[game].presses && PRESS_RULES.indexOf(o.press) > 0) ? o.press : 'none';
         var terms = { format: game, scoring: o.scoring === 'gross' ? 'gross' : 'net', startHole: from, stake: stake, pressRule: press };
         if (game === 'nassau') { terms.frontStake = stake; terms.backStake = stake; terms.overallStake = stake; terms.autoPressStake = null; }
         // STROKE PLAY: the stake is the overall bet; New Action's own defaults for the rest
@@ -322,6 +337,8 @@
         // 022 SUN MODE (body.hp-sun): the card bar black with white outlines, Enter score white.
         + 'body.hp-sun #hp-card-bet .hp-bar-btn{background:#000 !important;color:#fff !important;border:2px solid #fff !important;}'
         + 'body.hp-sun #hp-card-bet .hp-bar-score{background:#fff !important;color:#000 !important;border-color:#000 !important;}'
+        + '#hp-card-bet .hp-game-btn{flex:0 0 auto;min-height:50px;border:0;border-radius:14px;background:#ffd60a;color:#0b0f0c;padding:0 14px;font:800 16px/1 ' + FONT + ';cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.18);}'
+        + 'body.hp-sun #hp-card-bet .hp-game-btn{background:#ffe600 !important;color:#000 !important;border:2px solid #000 !important;}'
         + '.hp-bet-btn{border:0;border-radius:16px;background:#ffd60a;color:#0b0f0c;min-height:48px;padding:0 18px;font:800 17px/1 -apple-system,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);white-space:nowrap;}';
     function ensureCss() {
         if (document.getElementById('hp-bet-css')) return;
@@ -390,7 +407,7 @@
         var a = (sm.teamAIds || []).map(String), b = (sm.teamBIds || []).map(String);
         st.editId = id; st.game = sm.format; st.mode = a.length === 2 ? '2v2' : '1v1';
         st.picks = a.concat(b); st.field = true; st.scoring = sm.scoring === 'gross' ? 'gross' : 'net';
-        st.from = Number(sm.startHole) || null; st.press = sm.pressRule === '2down' ? '2down' : 'none';
+        st.from = Number(sm.startHole) || null; st.press = PRESS_RULES.indexOf(sm.pressRule) > 0 ? sm.pressRule : 'none';
         var stake = sm.format === 'stroke' ? Number(sm.overallStake) : (sm.format === 'nassau' ? Number(sm.frontStake || sm.stake) : Number(sm.stake));
         st.stake = stake || null; st.custom = GAMES[sm.format].chips.indexOf(st.stake) === -1;
         st.step = 2;
@@ -475,7 +492,10 @@
                     return '<option value="' + h.hole + '"' + (h.hole === st.from ? ' selected' : '') + '>Hole ' + h.hole + (h.hole === nowHole ? ' (now)' : '') + '</option>';
                 }).join('') + '</select></div>'
                 // PRESSES, one row (Match / Nassau only), default Off.
-                + (g.presses ? '<div class="hb-row"><span>Presses</span><span class="hb-seg"><button type="button" data-hb-press="none" class="' + (st.press !== '2down' ? 'on' : '') + '">Off</button><button type="button" data-hb-press="2down" class="' + (st.press === '2down' ? 'on' : '') + '">Auto @ 2 down</button></span></div>' : '')
+                // 100b: + Auto @ 1 down and Any hole (the Matches page's press options).
+                + (g.presses ? '<div class="hb-row"><span>Presses</span><span class="hb-seg">' + [['none', 'Off'], ['2down', 'Auto @2'], ['1down', '@1'], ['anytime', 'Any']].map(function (pr) {
+                    return '<button type="button" data-hb-press="' + pr[0] + '" class="' + (st.press === pr[0] ? 'on' : '') + '">' + pr[1] + '</button>';
+                }).join('') + '</span></div>' : '')
                 + '</div>';
             html += '<div class="hb-worst" aria-live="polite">' + outlookHtml() + '</div>';
             html += '<div class="hb-why"></div>';
@@ -605,7 +625,7 @@
             draw(); return;
         }
         if (b.hasAttribute('data-hb-game')) { var g = b.getAttribute('data-hb-game'); if (g !== st.game) { st.game = g; if (g === 'hilo') st.mode = '2v2'; } draw(); return; }
-        if (b.hasAttribute('data-hb-press')) { st.press = b.getAttribute('data-hb-press') === '2down' ? '2down' : 'none'; draw(); return; }
+        if (b.hasAttribute('data-hb-press')) { var pv0 = b.getAttribute('data-hb-press'); st.press = PRESS_RULES.indexOf(pv0) > -1 ? pv0 : 'none'; draw(); return; }
         if (b.hasAttribute('data-hb-pick')) {
             var id = String(b.getAttribute('data-hb-pick')), i = st.picks.indexOf(id);
             if (i > -1) st.picks.splice(i, 1); else st.picks.push(id);
@@ -1000,11 +1020,14 @@
         bar.innerHTML = '<button type="button" class="hp-bar-btn hp-bar-icon" data-hp-bar="menu" style="display:none" aria-label="Round Menu">☰</button>'
             + '<button type="button" class="hp-bar-btn" data-hp-bar="card" style="display:none" aria-label="Scorecard">Card</button>'
             + '<button type="button" class="hp-bar-btn" data-hp-bar="gps" style="display:none" aria-label="Back to the map">📍 GPS</button>'
-            + '<button type="button" class="hp-bar-btn hp-bar-score" data-hp-bar="score" style="display:none" aria-label="Enter score">Enter score</button>';
+            + '<button type="button" class="hp-bar-btn hp-bar-score" data-hp-bar="score" style="display:none" aria-label="Enter score">Enter score</button>'
+            // 100b (Manny OK, 100-PLAN Q6): "+ Game" next to Enter score - the + Game sheet (gps-game.js).
+            + '<button type="button" class="hp-game-btn" data-hp-bar="game" style="display:none" aria-label="Start a game">\uFF0B Game</button>';
         bar.addEventListener('click', function (e) {
             var b = e.target && e.target.closest ? e.target.closest('button') : null;
             if (!b) return;
             e.preventDefault();
+            if (b.getAttribute('data-hp-bar') === 'game') { if (window.HardPanGame) window.HardPanGame.open({ returnTo: document.body.classList.contains('hp-bets-open') ? 'bets' : null }); return; }
             if (b.classList.contains('hp-bet-btn')) { open(null, { returnTo: document.body.classList.contains('hp-bets-open') ? 'bets' : null }); return; }
             if (b.classList.contains('hp-money-chip')) { openBets(); return; }
             var R = window.HardPanRound, k = b.getAttribute('data-hp-bar');
@@ -1044,6 +1067,7 @@
         document.body.classList.toggle('hp-sf-card', live);
         if (!live) return null;
         fromUrl();
+        if (window.HardPanGame && typeof window.HardPanGame.fromUrl === 'function') { try { window.HardPanGame.fromUrl(); } catch (e) {} }   // 100b: the Leaderboard's "Start a game with ..."
         var m = moneyNow();
         last = m;
         var bar = cardBar();
@@ -1052,6 +1076,9 @@
             var want = R.barFor();   // { menu, gps, card }
             ['menu', 'gps', 'card', 'score'].forEach(function (k) { var e = bar.querySelector('[data-hp-bar="' + k + '"]'); if (e) e.style.display = want[k] ? '' : 'none'; });
         }
+        // 100b: + Game - any golfer, never a spectator (Manny's 099 answer 3), not over Bets (five buttons there already).
+        var gb = bar.querySelector('[data-hp-bar="game"]');
+        if (gb) gb.style.display = (window.HardPanGame && !spectating() && !document.body.classList.contains('hp-bets-open')) ? '' : 'none';
         Array.prototype.forEach.call(document.querySelectorAll('#gps-overlay .gps-money'), function (el) { el.style.display = 'none'; });   // URGENT-023
         // Part D: the Bets / Leaderboard frames get this round at once too (gps-round.js feed).
         if (R && typeof R.feed === 'function') { try { R.feed(); } catch (e) {} }
@@ -1065,6 +1092,11 @@
         hiloHere: hiloHere, tiles: tiles, preview: preview, playedRange: playedRange,
         // Pure-ish pieces for the tests.
         shapeOf: shapeOf, buildBet: buildBet, worstCase: worstCase, moneyNow: moneyNow,
+        // 100b: the pieces the + Game sheet (gps-game.js) shares - read-only helpers and the one write.
+        ordered: ordered, startHole: startHole, holesText: holesText, first: first, byId: byId, players: players,
+        groupMap: groupMap, myGroup: myGroup, meId: meId, code: code, refuseWhy: refuseWhy, scopeOf: scopeOf,
+        write: write, toastBet: toastBet, afterSave: afterSave, nassauBets: nassauBets, spectating: spectating,
+        standInCard: standInCard, esc: esc, PRESS_RULES: PRESS_RULES, ensureCss: ensureCss, askPars: askPars, strokesAmong: strokesAmong,
         money: function () { return last; },
         paintChip: paintChip
     };

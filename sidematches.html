@@ -25,6 +25,8 @@
          nothing. Now it asks the same question index.html asks. -->
     <script src="organizer-gate.js"></script>
     <script src="./firebase-database-compat.js"></script>
+    <!-- 100b: the durable queue (the scorecard's), so a bet made here with no signal is kept and sent. -->
+    <script src="offline-queue.js"></script>
     <!-- GPS:BEGIN -->
     <!-- 069 C: an offline Game Day round (local L- code) never reaches the database under that code. -->
     <script src="offline-round.js"></script>
@@ -1340,7 +1342,16 @@ html {
         if (b.press) set('sm-press-rule', b.press === 'auto' ? '2down' : 'anytime');
     }
     // GPS:END
+    // 100b (Manny's 099 answer 3 + 100-PLAN Q7): A SPECTATOR STARTS NOTHING HERE - no New Action,
+    // no press. A bare ?spectate=1 link, a read-only round, or the round frame's own spectator.
+    function smSpectating() {
+        try { if (window.__hpReadOnly === true) return true; } catch (e) {}
+        try { if (window.parent && window.parent !== window && typeof window.parent.hpSpectating === 'function' && window.parent.hpSpectating()) return true; } catch (e) {}
+        try { return urlParams.get('spectate') === '1' && !hasGroupLock; } catch (e) { return false; }
+    }
+    function smRefuseSpectator() { uiRefuse('\u26A0\uFE0F You are watching this round - a scorekeeper starts bets and presses.'); }
     function openSideMatchModal() {
+        if (smSpectating()) { smRefuseSpectator(); return; }
         // A plain "+ SIDE BETS" tap leaves challenge mode behind, so the button
         // cannot be stuck on Send from a previous visit.
         if (!challengeMode) syncChallengeMode();
@@ -1738,7 +1749,9 @@ html {
     function npCommit(players) {
         const chosen = npChosen(players);
         if (chosen.length !== 3) {
-            uiRefuse(`\u26A0\uFE0F 9 Points is played by exactly three golfers \u2014 you have picked ${chosen.length}.`);
+            // 100b (099 list): a clear message at 2 golfers.
+            uiRefuse(chosen.length === 2 ? '\u26A0\uFE0F 9 Points is for exactly 3 golfers. You have 2: try Match or Skins.'
+                : `\u26A0\uFE0F 9 Points is played by exactly three golfers \u2014 you have picked ${chosen.length}.`);
             return false;
         }
         if (typeof canCreateWagerWith === 'function' && !canCreateWagerWith(chosen)) {
@@ -1805,9 +1818,12 @@ html {
                 : chosenIds.length;
             note.textContent = format === 'dots'
                 ? `$${buyIn} per dot \u00B7 ${n} golfers`
-                : (n >= 2
+                : (format === 'nines' && n !== 3
+                    // 100b: 9 Points says its own count (it said "Pick at least two golfers." with 2 picked).
+                    ? (n === 2 ? '9 Points is for exactly 3 golfers. You have 2: try Match or Skins.' : '9 Points is for exactly 3 golfers. You have ' + n + '.')
+                    : (n >= 2
                     ? `$${buyIn} buy-in each \u00B7 ${n} golfers \u00B7 $${buyIn * n} pot`
-                    : 'Pick at least two golfers.');
+                    : 'Pick at least two golfers.'));
         }
     }
 
@@ -2489,7 +2505,10 @@ html {
         }
 
         const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;
-        db.ref(`events/${currentMode}/additionalGameInstances/${key}`).set(entry)
+        // 100b: THROUGH THE OFFLINE QUEUE (the + Bet sheet's path): with no signal the game is kept on
+        // this phone and sent when the signal returns - the sheet closes now and says so.
+        if (smOfflineNow()) { smDurableSet(`events/${currentMode}/additionalGameInstances/${key}`, entry); smSavedOffline(); return; }
+        smDurableSet(`events/${currentMode}/additionalGameInstances/${key}`, entry)
             .then(() => {
                 closeSideMatchModal();
                 // GPS:BEGIN
@@ -2500,6 +2519,7 @@ html {
     }
 
     function saveSideMatch() {
+        if (smSpectating()) { smRefuseSpectator(); return; }
         const chosenFormat = document.getElementById("sm-format").value;
         if (isFieldAction(chosenFormat)) { saveFieldAction(chosenFormat); return; }
 
@@ -2650,7 +2670,9 @@ html {
         });
 
         const pushKey = db.ref(`events/${currentMode}/sideMatches`).push().key;
-        db.ref(`events/${currentMode}/sideMatches/${pushKey}`).set(payload)
+        // 100b: through the offline queue, as above.
+        if (smOfflineNow()) { smDurableSet(`events/${currentMode}/sideMatches/${pushKey}`, payload); smSavedOffline(); return; }
+        smDurableSet(`events/${currentMode}/sideMatches/${pushKey}`, payload)
             .then(() => {
                 closeSideMatchModal();
                 // GPS:BEGIN
@@ -2662,6 +2684,45 @@ html {
             })
             .catch(err => uiFail(`Failed to save: ${err.message}`));
     }
+
+    // ---- 100b: MATCHES-PAGE BETS QUEUE OFFLINE ------------------------------------------------
+    // The same durable queue the scorecard and the + Bet sheet use (offline-queue.js, the phone's
+    // localStorage): enqueue FIRST, then the write; the op leaves the queue only when the server
+    // confirms it. Killed with no signal, the bet is still on the phone, and this page (on the
+    // online event, and on arrival) or the scorecard (its own drain) sends it when signal returns.
+    function smStore() { try { return localStorage; } catch (e) { return null; } }
+    function smOfflineNow() { try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch (e) { return false; } }
+    function smDurableSet(path, value) {
+        const q = window.OfflineQueue, store = smStore();
+        let op = null;
+        if (q && store) { try { op = q.enqueue(store, { path: path, type: 'set', value: value, coalesceKey: path }); } catch (e) { op = null; } }
+        const p = db.ref(path).set(value);
+        p.then(() => { if (op && q && store) { try { q.confirm(store, op.id, op.v); } catch (e) {} } }, () => {});
+        return p;
+    }
+    function smSavedOffline() {
+        closeSideMatchModal();
+        uiToast('\u2705 Saved. Sends when you have signal.');
+        // GPS:BEGIN
+        if (hpBackWanted()) hpBackToRound();
+        // GPS:END
+    }
+    let smDraining = false;
+    function smDrainQueue() {
+        const q = window.OfflineQueue, store = smStore();
+        if (!q || !store || smDraining || smOfflineNow() || !currentMode || /^L-/.test(String(currentMode))) return Promise.resolve(null);
+        const pre = 'events/' + currentMode + '/', cutoff = Date.now() - (q.STALE_MS || 6 * 3600 * 1000);
+        smDraining = true;
+        return q.drain(store, op => {
+            const ref = db.ref(op.path);
+            if (op.type === 'remove' || op.value === null) return ref.remove();
+            if (op.type === 'update') return ref.update(op.value);
+            return ref.set(op.value);
+        }, { timeoutMs: 12000, only: op => !!(op && typeof op.path === 'string' && op.path.indexOf(pre) === 0 && !(Number(op.ts) < cutoff)) })
+            .then(r => { smDraining = false; return r; }, () => { smDraining = false; return null; });
+    }
+    try { window.addEventListener('online', () => { smDrainQueue(); }); } catch (e) {}
+    setTimeout(() => { smDrainQueue(); }, 1500);
 
     let pendingDeleteMatchId = null;
 
@@ -3147,6 +3208,7 @@ html {
     // ASYNC because the amount is now a sheet, not prompt(). Called only from an
     // onclick, so nothing awaits this function itself and nothing needs to.
     async function pressSideMatch(matchId, baseId, nextHole) {
+        if (smSpectating()) { smRefuseSpectator(); return; }
         const sm = sideMatchById(matchId);
         if (!canPressSideMatch(sm)) return refuseGroupWrite('press that match');
         // CUSTOM PRESS AMOUNTS. "Press you for $78" is a different bet from "press
@@ -3238,6 +3300,7 @@ html {
     }
 
     function showSideHolePressInput(matchId, p1Id, p2Id) {
+        if (smSpectating()) { smRefuseSpectator(); return; }
         if (!canPressSideMatch(sideMatchById(matchId))) return refuseGroupWrite('press that match');
         const players = currentData.players || [];
         const p1 = players.find(p => String(p.id) === String(p1Id));
@@ -3288,6 +3351,7 @@ html {
 
     // ASYNC for the same reason as pressSideMatch above.
     async function pressSideMatchOverall(matchId, p1Id, p2Id) {
+        if (smSpectating()) { smRefuseSpectator(); return; }
         if (!canPressSideMatch(sideMatchById(matchId))) return refuseGroupWrite('press that match');
         const players = currentData.players || [];
         const p1 = players.find(p => String(p.id) === String(p1Id));
@@ -4451,9 +4515,13 @@ html {
                 const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses, nassauStakeConfig(sm));
                 if (calc) {
                     const lastHole = courseData.length > 0 ? Math.max(...courseData.map(h => h.hole)) : 18;
-                    const nextPressHole = Math.min(calc.maxThru + 1, lastHole);
+                    // 100b: THE PRESS STARTS ON A HOLE, NOT A COUNT. calc.maxThru is how many holes of this
+                    // match are played (match-engine.js), so a match from 7 with 7-9 in pressed "hole 4" - a
+                    // hole outside the match, which never counted. The next hole is the one after those, in
+                    // the match's own play order (smCourse); none left = no Press button.
+                    const nextPressHole = smCourse[calc.maxThru] ? Number(smCourse[calc.maxThru].hole) : null;
                     const anyOpenPressable = calc.activeMatches.some(m => !m.closed);
-                    if (sm.pressRule === 'anytime' && anyOpenPressable && calc.maxThru > 0 && calc.maxThru < lastHole) {
+                    if (sm.pressRule === 'anytime' && anyOpenPressable && calc.maxThru > 0 && nextPressHole != null && !smSpectating()) {
                         const openBase = calc.activeMatches.find(m => !m.closed && m.pressNum === 0) || calc.activeMatches.find(m => !m.closed);
                         if (openBase && canPressSideMatch(sm)) html += `<button class="btn-outline-sm" onclick="pressSideMatch('${matchId}', '${openBase.baseId}', ${nextPressHole})">➕ Press</button>`;
                     }

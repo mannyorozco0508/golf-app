@@ -472,6 +472,9 @@ html {
     <!-- Hi-Lo: two contests per hole, shown as its own game state rather than
          letting NET TO PAR stand in for a result it does not describe. -->
     <div id="live-hilo-mount"></div>
+    <!-- 100b (099): the games added mid-round - Dots, Stableford, 9 Points games and Hi-Lo side
+         bets - each from ITS start hole, for its own golfers. -->
+    <div id="live-sidegames-mount"></div>
     <!-- Stroke side matches: $/hole and $/overall, shown as the wager rather than
          letting the round's NET TO PAR stand in for a bet it does not describe. -->
     <div id="live-strokebet-mount"></div>
@@ -889,6 +892,10 @@ html {
     function buildLivePointsHtml(data, courseData, savedScores) {
         if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLivePointsState !== 'function') return '';
+        // 100b (099): when the round's own game is not a points game, a Dots card here came from a
+        // Dots GAME added to the round - and counted every hole of the card. That game has its own
+        // card now, from its start hole and for its golfers (live-sidegames-mount), so this one steps aside.
+        if (['stableford', 'wolf', 'dots'].indexOf(data.gameFormat) === -1 && lbHasDotsGame(data)) return '';
         const st = buildLivePointsState(data, courseData, savedScores);
         if (!st) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
@@ -1040,6 +1047,86 @@ html {
             (currentBoardData && currentBoardData.courseData) || [],
             (currentBoardData && currentBoardData.scores) || {},
             ((currentBoardData && currentBoardData.players) || []).map(p => String(p.id)));
+    }
+
+    // ---- 100b (099): THE GAMES ADDED MID-ROUND, EACH FROM ITS START HOLE ----------------------
+    // Hi-Lo side bets and the Dots / Stableford / 9 Points games were missing here, or (Dots) counted
+    // the holes before they started. NO NEW MATH: each game's own engine (calcDotsEngine /
+    // calcStablefordEngine, the 9 Points hole table, hilo-engine.js) on the game's own holes
+    // (gameHoles / sideMatchHoles - the range settlement pays it over) and its own golfers
+    // (fieldParticipants). Points, never money: what a game is worth is settled in Results.
+    function lbHasDotsGame(data) {
+        try { return (typeof getRoundGames === 'function' ? getRoundGames(data) : []).some(g => g && g.role === 'additional' && g.format === 'dots'); } catch (e) { return false; }
+    }
+    function buildLiveSideGamesHtml(raw) {
+        if (!raw || !(raw.players || []).length) return '';
+        const data = (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(raw) : raw;
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const cd = (data.courseData || []).slice().sort((a, b) => a.hole - b.hole), sc = data.scores || {}, players = data.players || [];
+        if (!cd.length) return '';
+        const groupOf = (typeof playerGroupMap === 'function') ? playerGroupMap(players, data.groupSizeOverrides || {}) : {};
+        const maySee = ids => (typeof canLinkSeeWager === 'function') ? canLinkSeeWager(ids, lockedGroup, groupOf) : true;
+        const thruOf = (holes, ids) => { let t = 0; holes.forEach(h => { if (ids.some(id => Number(sc['p' + id + '_h' + h.hole]) > 0)) t = h.hole; }); return t; };
+        const card = (icon, label, sub, body) => '<div class="lg-card" style="margin-top:8px;"><div class="lg-head"><span class="lg-title">' + icon + ' LIVE GAME \u00B7 ' + esc(label) + '</span><span class="lg-sub">' + esc(sub) + '</span></div>' + body + '</div>';
+        let html = '';
+        const games = (typeof getRoundGames === 'function') ? getRoundGames(data) : [];
+        games.forEach(g => {
+            if (!g || g.role !== 'additional' || ['dots', 'stableford', 'nines'].indexOf(g.format) === -1 || !g.config) return;
+            const field = (typeof fieldParticipants === 'function') ? fieldParticipants(g.config) : players;
+            const ids = field.map(p => String(p.id));
+            if (!ids.length || !maySee(ids)) return;
+            const holes = (typeof gameHoles === 'function') ? gameHoles(g, cd) : cd;
+            const cfg = Object.assign({}, g.config, { players: field });
+            let totals = {};
+            try {
+                if (g.format === 'dots' && typeof calcDotsEngine === 'function') totals = calcDotsEngine(cfg, holes, sc).totals || {};
+                else if (g.format === 'stableford' && typeof calcStablefordEngine === 'function') totals = calcStablefordEngine(cfg, holes, sc).totals || {};
+                else if (g.format === 'nines' && field.length === 3 && typeof computeNinePointsNet === 'function') {
+                    // THE SETTLER ITSELF at $1 a point: each golfer's points against even (the field's
+                    // average) - its own allocation and options, no second count on this page.
+                    totals = computeNinePointsNet(Object.assign({}, cfg, { ninePointsRate: 1, settlement: undefined, ninePointsBuyIn: undefined }), holes, sc) || {};
+                    Object.keys(totals).forEach(k => { totals[k] = Math.round(totals[k] * 10) / 10; });
+                } else return;
+            } catch (e) { return; }
+            // A Dots game limited to some dots (100c dotTypes, the + Game sheet's KP pot / Birdies) says which.
+            const dt = Array.isArray(g.config.dotTypes) ? g.config.dotTypes.join(',') : '';
+            const label = g.format === 'nines' ? '9 POINTS' : (g.format === 'dots' ? (dt === 'greenie' ? 'KP POT' : (dt === 'birdie,eagle' ? 'BIRDIES' : 'DOTS')) : 'STABLEFORD');
+            const from = Number(g.startHole) > 1 ? 'from ' + g.startHole : '';
+            const thru = thruOf(holes, ids);
+            const sub = [from, thru ? 'thru ' + thru : ''].filter(Boolean).join(' \u00B7 ');
+            const rows = field.map(p => ({ name: p.name, v: Number(totals[p.id]) || 0 })).sort((a, b) => b.v - a.v);
+            const any = rows.some(r => r.v !== 0);
+            const unit = g.format === 'dots' ? '' : ' pts';
+            const signed = g.format === 'nines';   // points against even
+            html += card(g.format === 'dots' ? '\uD83C\uDFAF' : (g.format === 'nines' ? '9\uFE0F\u20E3' : '\uD83C\uDFC1'), label, sub,
+                any ? rows.map(r => '<div class="lg-row"><span class="lg-name">' + esc(r.name) + '</span><span class="lg-val">' + (signed && r.v > 0 ? '+' : '') + r.v + unit + '</span></div>').join('') + (signed ? '<div class="lg-quiet">Points against even.</div>' : '') : '<div class="lg-quiet">No scoring yet.</div>');
+        });
+        // HI-LO SIDE BETS (the round-format Hi-Lo keeps its own card above).
+        const sms = data.sideMatches || {};
+        Object.keys(sms).forEach(id => {
+            const sm = sms[id];
+            if (!sm || sm.format !== 'hilo' || !boardLinkMaySee(id) || typeof hiloSides !== 'function' || typeof hiloForSideMatch !== 'function') return;
+            const s = hiloSides(sm, players);
+            if (!s.teamA.length || !s.teamB.length) return;
+            const holes = (typeof sideMatchHoles === 'function') ? sideMatchHoles(sm, cd, data) : cd;
+            let calc = null; try { calc = hiloForSideMatch(sm, s.teamA, s.teamB, holes, sc); } catch (e) { calc = null; }
+            if (!calc) return;
+            const nm = side => side.map(p => String(p.name || '').split(' ')[0]).join(' + ');
+            const nA = nm(s.teamA), nB = nm(s.teamB);
+            const from = Number(sm.startHole) > 1 ? 'from ' + sm.startHole : '';
+            const sub = [from, calc.played ? 'thru ' + thruOf(holes, s.teamA.concat(s.teamB).map(p => String(p.id))) : ''].filter(Boolean).join(' \u00B7 ');
+            html += card('\u2696\uFE0F', 'HI-LO', sub, calc.played
+                ? '<div class="lg-row"><span class="lg-name">' + esc(nA) + '</span><span class="lg-val">' + calc.pointsA + '</span></div>'
+                  + '<div class="lg-row"><span class="lg-name">' + esc(nB) + '</span><span class="lg-val">' + calc.pointsB + '</span></div>'
+                  + '<div class="lg-row"><span class="hl-lead">' + esc(typeof hiloLine === 'function' ? hiloLine(calc, nA, nB) : '') + '</span></div>'
+                : '<div class="lg-quiet">No scoring yet.</div>');
+        });
+        return html;
+    }
+    function renderLiveSideGamesBoard() {
+        const mount = document.getElementById('live-sidegames-mount');
+        if (!mount) return;
+        try { mount.innerHTML = buildLiveSideGamesHtml(currentBoardData || {}); } catch (e) { mount.innerHTML = ''; }
     }
 
     function renderLiveHiLoBoard() {
@@ -1332,7 +1419,9 @@ ${ind.slice(4)}</tr>`;
         // the same reason a blank handicap says nothing in the row.
         const full = (typeof handicapFullLabel === 'function') ? handicapFullLabel(player) : null;
         const hcpLine = full ? `<div class="board-card-hcp">${escapeHtml(full)}</div>` : '';
-        return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${hcpLine}${card}</td></tr>`;
+        // 100b (Manny OK, picture B): "Start a game with Jim" on another golfer's card (GPS app, never a spectator).
+        const gameBtn = (typeof lbGameWithHtml === 'function') ? lbGameWithHtml(player) : '';
+        return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${gameBtn}${hcpLine}${card}</td></tr>`;
     }
     // ONE delegated listener: a tap ANYWHERE ON THE ROW toggles that golfer's card
     // (v201 - it used to need the name cell, so a tap on the score, the to-par or
@@ -1526,6 +1615,7 @@ ${ind.slice(4)}</tr>`;
         renderLiveMatchesBoard();
         renderLivePointsBoard();
         renderLiveHiLoBoard();
+        renderLiveSideGamesBoard();
         renderLiveStrokeBetBoard();
         renderLiveSkinsBoard();
 
@@ -1700,6 +1790,96 @@ ${ind.slice(4)}</tr>`;
     }
 
 </script>
+<!-- GPS:BEGIN -->
+<script>
+    // ---- 100b (Manny OK, picture B): THE LEADERBOARD SHORTCUT, "START A GAME WITH JIM" ----------------
+    // Open a golfer's card (tap the row, as always) -> "Start a game with Jim ›" -> Match / Nassau / Skins
+    // just us two / BBB, all from the current hole, + "All games ›". Each opens the + Game sheet (gps-game.js)
+    // on the round with Jim (and me) already in - in the round's own frame when the board is shown over
+    // the round, else on the scorecard. Nothing is written here. Not on a spectator's link.
+    function lbMeId() { try { return localStorage.getItem('golfapp_me_' + currentMode) || null; } catch (e) { return null; } }
+    function lbSpectating() {
+        try { if (window.parent && window.parent !== window && typeof window.parent.hpSpectating === 'function') return !!window.parent.hpSpectating(); } catch (e) {}
+        return urlParams.get('spectate') === '1' && !lockedGroup;
+    }
+    function lbGameWithHtml(player) {
+        if (!player || lbSpectating() || String(player.id) === String(lbMeId() || '')) return '';
+        const nm = (String(player.name || '').trim().split(/\s+/)[0]) || 'them';
+        return '<button type="button" class="lb-game-with" data-lb-game-with="' + escapeHtml(String(player.id)) + '" style="display:block;width:calc(100% - 16px);margin:4px 8px 8px;min-height:44px;border:0;border-radius:12px;background:#ffd60a;color:#0b0f0c;font-weight:800;font-size:0.95rem;cursor:pointer;">\u2694\uFE0F Start a game with ' + escapeHtml(nm) + ' \u203A</button>';
+    }
+    function lbNowHole(ids) {
+        const d = currentBoardData || {}, cd = (d.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const ps = (d.players || []).filter(p => ids.indexOf(String(p.id)) > -1);
+        return (typeof sideMatchStartHole === 'function') ? sideMatchStartHole(ps.length ? ps : (d.players || []), cd, d.scores || {}, d) : 1;
+    }
+    function lbRun(list) {
+        const runs = []; let cur = null;
+        list.forEach(h => { h = Number(h); if (cur && h === cur.b + 1) cur.b = h; else { cur = { a: h, b: h }; runs.push(cur); } });
+        return runs.map(r => r.a === r.b ? String(r.a) : r.a + '-' + r.b).join(', ');
+    }
+    function lbOpenGameWith(id) {
+        const d = currentBoardData || {}, p = (d.players || []).find(x => String(x.id) === String(id));
+        if (!p) return;
+        const nm = String(p.name || '').trim().split(/\s+/)[0];
+        const me = lbMeId(), ids = [String(id)].concat(me ? [String(me)] : []);
+        const now = lbNowHole(ids);
+        const cd = (d.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const holes = now == null ? [] : ((typeof sideMatchHoles === 'function') ? sideMatchHoles({ startHole: now }, cd, d) : cd.filter(h => h.hole >= now)).map(h => Number(h.hole));
+        const before = now == null ? [] : cd.map(h => Number(h.hole)).filter(h => holes.indexOf(h) === -1);
+        const all = lbRun(holes), f = holes.filter(h => h <= 9), b = holes.filter(h => h > 9);
+        const nassau = (f.length && b.length) ? lbRun(f) + ' \u00B7 ' + lbRun(b) + ' \u00B7 ' + all : 'One bet, ' + all;
+        const tile = (g, ico, label, sub) => '<button type="button" data-lbg="' + g + '" style="text-align:left;border:1.5px solid #dfe6e2;background:#fff;border-radius:14px;padding:12px;min-height:76px;cursor:pointer;color:#0f1f17;"><b style="display:block;font:800 16px/1.2 -apple-system,system-ui,sans-serif;">' + ico + ' ' + label + '</b><span style="display:block;font:500 13px/1.3 -apple-system,system-ui,sans-serif;color:#5d6b64;margin-top:3px;">' + escapeHtml(sub) + '</span></button>';
+        let el = document.getElementById('lb-game-with-sheet');
+        if (!el) {
+            el = document.createElement('div'); el.id = 'lb-game-with-sheet'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
+            el.style.cssText = 'position:fixed;inset:0;z-index:10300;display:none;font-family:-apple-system,system-ui,sans-serif;';
+            document.body.appendChild(el);
+            el.addEventListener('click', e => {
+                const t = e.target;
+                if (t && t.getAttribute && t.getAttribute('data-lbg-close') !== null) { el.style.display = 'none'; return; }
+                const btn = t && t.closest ? t.closest('[data-lbg]') : null;
+                if (!btn) return;
+                el.style.display = 'none';
+                lbGoGame(btn.getAttribute('data-lbg'), el.getAttribute('data-with'));
+            });
+        }
+        el.setAttribute('data-with', String(id));
+        el.innerHTML = '<div data-lbg-close style="position:absolute;inset:0;background:rgba(5,20,12,.55);"></div>'
+            + '<div style="position:absolute;left:0;right:0;bottom:0;max-height:88vh;overflow:auto;background:#fff;color:#0f1f17;border-radius:22px 22px 0 0;padding:10px 16px calc(env(safe-area-inset-bottom) + 18px);box-shadow:0 -8px 30px rgba(0,0,0,.25);">'
+            + '<div style="width:44px;height:5px;border-radius:3px;background:#cfd8d3;margin:2px auto 10px;"></div>'
+            + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><div style="flex:1;font:800 22px/1.2 -apple-system,system-ui,sans-serif;">Start a game with ' + escapeHtml(nm) + '</div><button type="button" data-lbg-close aria-label="Close" style="border:0;background:#eef2ef;color:#0f3d2e;border-radius:999px;min-width:40px;height:40px;font:800 18px/1 -apple-system,system-ui,sans-serif;cursor:pointer;">\u2715</button></div>'
+            + (now == null ? '<div style="font:500 14px/1.4 -apple-system,system-ui,sans-serif;color:#5d6b64;margin:0 0 12px;">Every hole is in - there are no holes left to start a game on.</div>'
+                : '<div style="font:500 14px/1.3 -apple-system,system-ui,sans-serif;color:#5d6b64;margin:0 0 12px;">Just you two \u00B7 from hole ' + now + ' (now)' + (before.length ? ' \u00B7 holes ' + lbRun(before) + ' don\u2019t count' : '') + '</div>'
+                + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' + tile('match', '\u2694\uFE0F', 'Match', '1 v 1, holes ' + all) + tile('nassau', '\uD83D\uDCB5', 'Nassau', nassau)
+                + tile('skins', '\uD83D\uDCB0', 'Skins', 'Just us two, ' + all) + tile('bbb', '\uD83D\uDFE2', 'BBB', 'Points from ' + now) + '</div>')
+            + '<button type="button" data-lbg="" style="display:block;width:100%;border-radius:16px;min-height:56px;margin-top:14px;font:800 19px/1 -apple-system,system-ui,sans-serif;cursor:pointer;background:#fff;border:1.5px solid #0f4d3a;color:#0f4d3a;">All games \u203A</button>'
+            + '<div style="font:500 13px/1.4 -apple-system,system-ui,sans-serif;color:#5d6b64;margin-top:12px;">All games opens the \uFF0B Game sheet with ' + escapeHtml(nm) + ' already in.</div></div>';
+        el.style.display = 'block';
+    }
+    // In the round's own frame (the board over the round): its + Game sheet, over Bets. Else the scorecard
+    // opens with the sheet (index.html?hpgame=1&with=<id>&hpg=<game>), and goes back to the board after.
+    function lbGoGame(game, withId) {
+        try {
+            const P = window.parent;
+            if (P && P !== window && P.HardPanGame && typeof P.HardPanGame.open === 'function') { P.HardPanGame.open({ game: game || null, with: withId, returnTo: 'bets' }); return; }
+        } catch (e) {}
+        const page = 'leaderboard.html' + location.search;
+        location.href = 'index.html?game=' + encodeURIComponent(currentMode) + (lockedGroup ? '&group=' + lockedGroup : '')
+            + '&hpgame=1&with=' + encodeURIComponent(withId) + (game ? '&hpg=' + encodeURIComponent(game) : '') + '&hpret=' + encodeURIComponent(page);
+    }
+    (function () {
+        const mount = document.getElementById('board-content');
+        if (!mount) return;
+        // Before the row's own listener (capture): the button lives in the open card row, which that listener ignores anyway.
+        mount.addEventListener('click', e => {
+            const b = e.target && e.target.closest ? e.target.closest('[data-lb-game-with]') : null;
+            if (!b) return;
+            e.stopPropagation();
+            lbOpenGameWith(b.getAttribute('data-lb-game-with'));
+        }, true);
+    })();
+</script>
+<!-- GPS:END -->
 
 </body>
 </html>

@@ -6772,6 +6772,8 @@
         show('.gps-bet-btn', false);
         // The mockup's bar: Card | Enter score | + Bet. Tools moves to Round Menu > Round settings
         // (HardPanGps.openTools); the Games pill opens the Round Menu.
+        // 100b (Manny OK): "+ Game" above Mark - the + Game sheet's pill (gps-game.js), any golfer, never a spectator.
+        if (window.HardPanGame && typeof window.HardPanGame.mountGps === 'function') { try { window.HardPanGame.mountGps(S.el); } catch (e) {} }
         var gp = S.el.querySelector('.gps-door-games');
         if (gp) { var want = sf && S.eventCode && window.HardPanRound ? '\u2630 Menu' : 'Games'; if (gp.textContent !== want) gp.textContent = want; gp.setAttribute('aria-label', want === 'Games' ? 'Games home' : 'Round Menu'); }
         var chip = S.el.querySelector('.gps-money');

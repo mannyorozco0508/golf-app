@@ -46,6 +46,7 @@
     function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     function whole(n) { return String(Math.round(Math.abs(Number(n) || 0))); }
     function onGps() { return document.body.classList.contains('gps-side-gps'); }
+    function spectating() { try { return typeof window.hpSpectating === 'function' && !!window.hpSpectating(); } catch (e) { return false; } }
     function gpsUp() { var g = G(); return !!(g && g.isMounted && g.isMounted()); }
     function base() { try { return typeof shareBaseUrl === 'function' ? shareBaseUrl() : ''; } catch (e) { return ''; } }
     function roundUrl() { return base() + 'index.html?game=' + encodeURIComponent(code() || ''); }
@@ -192,7 +193,8 @@
         // was cut to "Papago Golf Club (P…") and a "(Papago)" that repeats it is dropped.
         var html = '<div class="hs-head"><div class="hs-title hs-mtitle"><span class="hs-course">' + esc(tidyCourse(d.courseName || d.eventName || 'This round')) + '</span>'
             + '<span class="hs-codechip">' + esc(code()) + '</span></div><button type="button" class="hs-x" data-hs="close" aria-label="Close">✕</button></div>'
-            + '<div class="hs-tiles">' + TILES.filter(function (t) { return t.k !== 'gps' || gpsUp(); }).map(function (t) {
+            // 100b (Manny's 099 answer 3): a spectator has no "+ Bet" tile - a scorekeeper starts bets.
+            + '<div class="hs-tiles">' + TILES.filter(function (t) { return (t.k !== 'gps' || gpsUp()) && !(t.k === 'bet' && spectating()); }).map(function (t) {
                 return '<button type="button" class="hs-tile" data-hs-tile="' + t.k + '"><b>' + t.ico + ' ' + esc(t.t) + '</b><span>' + esc(t.s) + '</span></button>';
             }).join('') + '</div>'
             + '<button type="button" class="hs-finish" data-hs="finish">Finish &amp; settle up</button>'
@@ -302,7 +304,7 @@
         }
         html += '<button type="button" class="hs-btn lime" data-hs="share-pay">Share who pays who</button>'
             // 018: a bet on holes already played, still possible once the round is over.
-            + '<button type="button" class="hs-btn alt" data-hs="add-bet">+ Add a bet on this round</button>'
+            + (spectating() ? '' : '<button type="button" class="hs-btn alt" data-hs="add-bet">+ Add a bet on this round</button>')   // 100b: not for a spectator
             + '<button type="button" class="hs-btn alt" data-hs="review">Review scores · Receipt</button>';
         return show('finish', html, 'Settle up');
     }

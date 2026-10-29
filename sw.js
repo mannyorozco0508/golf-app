@@ -4770,6 +4770,8 @@ const SHELL_FILES = [
     './hp-index.js',
     // 017: the + Bet sheet and the money chip (simpleFlow).
     './gps-bet.js',
+    // 100b: the + Game sheet (every game, any golfer, from any hole).
+    './gps-game.js',
     // 017: the Round Menu, Settle up, Bets and the Card as sheets (simpleFlow).
     './gps-round.js',
     // URGENT-017: Add golfer, one sheet in place (simpleFlow).

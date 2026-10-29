@@ -54,11 +54,12 @@ test('still a spectator: a one-group round, a leaderboard link, an explicit spec
     assert.strictEqual(D.joinHref(D.joinTarget('https://x.dev/index.html?game=YW75Z5&spectate=1'), round(20)), 'index.html?game=YW75Z5&spectate=1');
 });
 
-test('group forms are unchanged: CODE 2, CODE-G-KEY, a group link', { skip }, () => {
+// 100b (Manny's 099 answer 4): a join that names a group now also asks "who are you" on the card (&askme=1).
+test('group forms are unchanged: CODE 2, CODE-G-KEY, a group link (+ askme, 100b)', { skip }, () => {
     const D = doors();
-    assert.strictEqual(D.joinHref(D.joinTarget('YW75Z5 2'), round(20)), 'index.html?game=YW75Z5&group=2');
-    assert.strictEqual(D.joinHref(D.joinTarget('YW75Z5-3-K7Q9XM'), round(20)), 'index.html?game=YW75Z5&group=3&sk=K7Q9XM');
-    assert.strictEqual(D.joinHref(D.joinTarget('https://x.dev/index.html?game=YW75Z5&group=4'), round(20)), 'index.html?game=YW75Z5&group=4');
+    assert.strictEqual(D.joinHref(D.joinTarget('YW75Z5 2'), round(20)), 'index.html?game=YW75Z5&group=2&askme=1');
+    assert.strictEqual(D.joinHref(D.joinTarget('YW75Z5-3-K7Q9XM'), round(20)), 'index.html?game=YW75Z5&group=3&sk=K7Q9XM&askme=1');
+    assert.strictEqual(D.joinHref(D.joinTarget('https://x.dev/index.html?game=YW75Z5&group=4'), round(20)), 'index.html?game=YW75Z5&group=4&askme=1');
 });
 
 test('the groups come from the round (groupSizeOverrides): six golfers in threes is two groups', { skip }, () => {

@@ -1191,6 +1191,8 @@
     // a one-group round still opens as a spectator (its scorekeeper is the phone that made it).
     function joinHref(j, d) {
         if (j && j.bare && groupCount(d) > 1) return 'index.html?game=' + j.code;
+        // 100b: a code that names a group (CODE-2, CODE-2-KEY, a group link) asks "who are you" on the card.
+        if (j && j.group && j.href && !/[?&]askme=/.test(j.href)) return j.href + '&askme=1';
         return j.href;
     }
     // JOIN NEVER OPENS A ROUND IT HAS NOT CHECKED (URGENT-002, 2026-10-17). Manny pasted
@@ -1588,7 +1590,8 @@
                 if (m) m.textContent = 'Group ' + v + ' keeps score with its own code. Type ' + j.code + '-' + v + '-<code> in Join, or open the Group ' + v + ' link from whoever set it up.';
                 return;
             }
-            W.location.href = 'index.html?game=' + encodeURIComponent(j.code) + '&group=' + encodeURIComponent(v);
+            // 100b (Manny's 099 answer 4): the card asks "who are you" (askme) - the money chip needs a name.
+            W.location.href = 'index.html?game=' + encodeURIComponent(j.code) + '&group=' + encodeURIComponent(v) + '&askme=1';
         };
         return el;
     }

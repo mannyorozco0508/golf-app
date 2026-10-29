@@ -1475,10 +1475,16 @@ html.hp-in-sheet { padding: 0 !important; }
         cards.forEach(function (c, i) { c.setAttribute('data-sm-id', ids[i]); c.style.cursor = 'pointer'; c.setAttribute('role', 'button'); c.setAttribute('aria-label', 'Change or remove this bet'); });
         if (!box.__hpTap) { box.__hpTap = true; box.addEventListener('click', function (e) { var c = e.target.closest && e.target.closest('[data-sm-id]'); if (c && !e.target.closest('a,button,input,select')) hpOpenBet(c.getAttribute('data-sm-id')); }); }
     }
+    function hpWatchingOnly() {
+        try { if (window.parent && window.parent !== window && typeof window.parent.hpSpectating === 'function' && window.parent.hpSpectating()) return true; } catch (e) {}
+        try { var q0 = new URLSearchParams(location.search); return q0.get('spectate') === '1' && !q0.get('group'); } catch (e) { return false; }
+    }
     (function () {
         if (!hpSimpleFlow()) return;
         var host = document.getElementById('bets-matches-card'); if (!host || !host.parentNode) return;
         var b = document.createElement('button');
+        // 100b (Manny's 099 answer 3): no "+ Add a bet" for a spectator (a bare ?spectate=1 link, or the round frame's own spectator).
+        if (hpWatchingOnly()) return;
         b.type = 'button'; b.id = 'hp-add-bet'; b.textContent = '+ Add a bet';
         b.style.cssText = 'display:block;width:100%;min-height:48px;margin:0 0 12px;border:0;border-radius:14px;background:#ffd60a;color:#0b0f0c;font-weight:800;font-size:1rem;cursor:pointer;';
         b.addEventListener('click', function () { hpOpenBet(); });

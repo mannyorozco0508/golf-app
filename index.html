@@ -124,6 +124,8 @@
          challenges.js sideMatchPayloadFromTerms - the builder New Action already uses. -->
     <script src="challenges.js"></script>
     <script src="gps-bet.js"></script>
+    <!-- 100b: the + Game sheet (card bar + GPS) - every game, any golfer, from any hole. Reads gps-bet.js. -->
+    <script src="gps-game.js"></script>
     <!-- 017 (simpleFlow): the 6-tile Round Menu, Share, Settle up, Bets as a sheet, the Card as a sheet over the map. -->
     <script src="gps-round.js"></script>
     <!-- URGENT-017 (simpleFlow): "+ Add a player" in a round = one Add golfer sheet in place (the Players sheet's own save). -->
@@ -12187,6 +12189,118 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             .catch(err => uiFail(`Failed to clear: ${err.message}`));
     }
 
+    // GPS:BEGIN
+    // ---- 100b: WOLF AS A SIDE GAME (an additionalGameInstances entry from the + Game sheet) -----------
+    // The SAME call choices as the round's own Wolf box below (a partner, Lone Wolf, Blind Wolf), written
+    // to the game's own calls: additionalGameInstances/<id>/wolfCalls/h<n> - through durableWrite, so a
+    // call made with no signal is queued and sent when it comes back. The rotation: the game's holes in
+    // play order from its start hole (gameHoles), the k-th hole's Wolf = participantIds[k % 4] - the
+    // first golfer picked is Wolf on the start hole (Manny's 100-PLAN answer 4). Shown only to a golfer
+    // in that game (or the scorekeeper link of their group when no golfer is picked on this phone).
+    function wolfInstHoles(cfg, data, courseData) {
+        const cd = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        return (typeof gameHoles === 'function') ? gameHoles({ startHole: Number(cfg.startHole) || 1, config: data }, cd) : cd.filter(h => h.hole >= (Number(cfg.startHole) || 1));
+    }
+    function wolfInstMine(cfg) {
+        const ids = (cfg.participantIds || []).map(String), me = resolvedMeId();
+        if (me) return ids.indexOf(String(me)) > -1;
+        if (hasGroupLock && lockedGroup && typeof playerGroupMap === 'function') {
+            const m = playerGroupMap(currentData.players || [], currentData.groupSizeOverrides || {});
+            return ids.some(id => String(m[id]) === String(lockedGroup));
+        }
+        return false;
+    }
+    function renderWolfInstanceBoxes(data, courseData, savedScores) {
+        const anchor = document.getElementById('wolfcall-payout-container');
+        if (!anchor || !anchor.parentNode) return;
+        let mount = document.getElementById('wolf-inst-mount');
+        const inst = (data && data.additionalGameInstances) || {};
+        const keys = Object.keys(inst).filter(k => { const g = inst[k]; return g && g.format === 'wolf' && g.enabled !== false && Array.isArray(g.participantIds) && g.participantIds.length === 4 && wolfInstMine(g); })
+            .sort((a, b) => (inst[a].createdAt || 0) - (inst[b].createdAt || 0));
+        if (!keys.length) { if (mount) mount.innerHTML = ''; return; }
+        if (!mount) { mount = document.createElement('div'); mount.id = 'wolf-inst-mount'; anchor.parentNode.insertBefore(mount, anchor.nextSibling); }
+        const players = data.players || [];
+        const byId = id => players.find(p => String(p.id) === String(id));
+        const btn = 'padding:6px 10px; border-radius:14px; background:var(--bg-card); font-size:0.72rem; font-weight:bold; cursor:pointer;';
+        mount.innerHTML = keys.map(k => {
+            const cfg = inst[k], ids = cfg.participantIds.map(String), calls = cfg.wolfCalls || {};
+            const holes = wolfInstHoles(cfg, data, courseData);
+            const wolfAt = i => byId(ids[i % 4]);
+            const ti = holes.findIndex(h => !calls['h' + h.hole]);
+            let html = '<div class="nassau-payout-box" data-wolf-inst="' + escapeHtml(k) + '" style="display:block;"><div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:4px;">\uD83D\uDC3A Wolf side game \u00B7 from hole ' + escapeHtml(String(cfg.startHole || 1)) + '</div>';
+            if (ti > -1) {
+                const hole = holes[ti].hole, wolf = wolfAt(ti);
+                const others = ids.filter(id => id !== String(wolf && wolf.id)).map(byId).filter(Boolean);
+                html += '<div style="font-size:0.85rem; font-weight:bold; margin-bottom:6px;">Hole ' + hole + ' Wolf: \uD83D\uDC3A ' + escapeHtml(wolf ? golferLabel(wolf) : '?') + '</div>'
+                    + '<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">' + others.map(p => '<button type="button" data-wolf-call="partner" data-wolf-hole="' + hole + '" data-wolf-partner="' + escapeHtml(String(p.id)) + '" style="' + btn + ' border:1px solid var(--accent-teal); color:var(--text-main);">\uD83E\uDD1D ' + escapeHtml(golferLabel(p)) + '</button>').join('') + '</div>'
+                    + '<div style="display:flex; gap:6px;"><button type="button" data-wolf-call="lone" data-wolf-hole="' + hole + '" style="flex:1; ' + btn + ' border:1px solid var(--brand-green); color:var(--brand-green);">\uD83D\uDC3A Lone Wolf</button>'
+                    + '<button type="button" data-wolf-call="blind" data-wolf-hole="' + hole + '" style="flex:1; ' + btn + ' border:1px solid var(--accent-red); color:var(--accent-red);">\uD83D\uDE48 Blind Wolf</button></div>';
+            } else {
+                html += '<div style="font-size:0.85rem; padding:4px 0;">Every hole has its call.</div>';
+            }
+            const up = holes.map((h, i) => ({ h, i })).filter(x => !calls['h' + x.h.hole]).slice(0, 4);
+            if (up.length) html += '<div style="font-size:0.68rem; color:var(--text-muted); margin-top:8px; padding-top:6px; border-top:1px solid var(--border-faint); display:flex; gap:6px; flex-wrap:wrap;">\uD83D\uDD04 ' + up.map(x => '<span style="white-space:nowrap;">H' + x.h.hole + ': ' + escapeHtml(wolfAt(x.i) ? golferLabel(wolfAt(x.i)) : '?') + '</span>').join(' <span style="opacity:0.4;">\u2192</span> ') + '</div>';
+            return html + '</div>';
+        }).join('');
+        if (!mount.__wolfWired) {
+            mount.__wolfWired = true;
+            mount.addEventListener('click', e => {
+                const b = e.target && e.target.closest ? e.target.closest('[data-wolf-call]') : null;
+                const box = b && b.closest('[data-wolf-inst]');
+                if (!b || !box) return;
+                saveWolfInstCall(box.getAttribute('data-wolf-inst'), Number(b.getAttribute('data-wolf-hole')), b.getAttribute('data-wolf-call'), b.getAttribute('data-wolf-partner'));
+            });
+        }
+    }
+    function saveWolfInstCall(id, hole, call, partnerId) {
+        const g = ((currentData && currentData.additionalGameInstances) || {})[id];
+        if (!g || !hole || ['partner', 'lone', 'blind'].indexOf(call) === -1) return;
+        if (typeof hpSpectating === 'function' && hpSpectating()) { uiRefuse('\u26A0\uFE0F You are watching this round - a scorekeeper makes the Wolf call.'); return; }
+        const payload = { call: call };
+        if (call === 'partner' && partnerId) payload.partnerId = String(partnerId);
+        const path = 'events/' + currentMode + '/additionalGameInstances/' + id + '/wolfCalls/h' + hole;
+        // On this phone at once (a call with no signal shows as made; the queue sends it).
+        g.wolfCalls = Object.assign({}, g.wolfCalls || {}, { ['h' + hole]: payload });
+        const p = durableWrite(path, 'set', payload, path);
+        if (p && typeof p.catch === 'function') p.catch(err => uiFail('Failed to save the Wolf call: ' + (err && err.message)));
+        renderScorecard();
+    }
+    // ---- 100b: "WHO ARE YOU?" AFTER A JOIN BY CODE (Manny's 099 answer 4) ----------------------------
+    // front-door.js sends a code join here with &askme=1. With no golfer picked on this phone, the
+    // playing picker opens once, limited to this link's group, plus "I'm only keeping score".
+    let hpAskMeDone = false;
+    function hpAskMeOnJoin() {
+        if (hpAskMeDone) return;
+        let q; try { q = new URLSearchParams(window.location.search); } catch (e) { hpAskMeDone = true; return; }
+        if (q.get('askme') !== '1') { hpAskMeDone = true; return; }
+        const players = (currentData && currentData.players) || [];
+        if (!players.length) return;   // the round is not in yet - asked on the next paint
+        hpAskMeDone = true;
+        try { q.delete('askme'); history.replaceState(history.state, '', window.location.pathname + '?' + q.toString()); } catch (e) {}
+        if (resolvedMeId() || (typeof hpSpectating === 'function' && hpSpectating())) return;
+        const overlay = document.getElementById('playing-pick-overlay'), body = document.getElementById('playing-pick-body');
+        if (!overlay || !body) return;
+        let mine = players;
+        if (hasGroupLock && lockedGroup && typeof playerGroupMap === 'function') {
+            const m = playerGroupMap(players, currentData.groupSizeOverrides || {});
+            const g = players.filter(p => String(m[String(p.id)]) === String(lockedGroup));
+            if (g.length) mine = g;
+        }
+        const title = document.getElementById('playing-pick-title'); if (title) title.textContent = 'Who are you?';
+        body.innerHTML = mine.map(p => '<button type="button" class="btn-primary group-pick-btn" style="margin-top:8px;" data-askme-id="' + escapeHtml(String(p.id)) + '">' + escapeHtml(golferLabel(p)) + '</button>').join('')
+            + '<button type="button" class="btn-outline" style="margin-top:10px;" data-askme-id="">I\u2019m only keeping score</button>';
+        body.onclick = function (e) {
+            const b = e.target && e.target.closest ? e.target.closest('[data-askme-id]') : null;
+            if (!b) return;
+            body.onclick = null;
+            const id = b.getAttribute('data-askme-id');
+            if (id) { storeRoundRole('playing'); pickPlayingMe(id); }
+            else { overlay.style.display = 'none'; renderScorecard(); }
+        };
+        overlay.style.display = 'flex';
+    }
+    // GPS:END
+
     function renderWolfCallBox(data, courseData, savedScores) {
         const box = document.getElementById('wolfcall-payout-container');
         const wrapper = document.getElementById('wolfcall-rows-wrapper');
@@ -13477,6 +13591,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
 
         renderWolfCallBox(currentData, courseData, savedScores);
+        // GPS:BEGIN
+        // 100b: Wolf as a side game (the + Game sheet) - the call buttons for each Wolf game in it,
+        // and "who are you" once after a join by code (askme).
+        try { renderWolfInstanceBoxes(currentData, courseData, savedScores); } catch (e) { console.error('Wolf game box failed', e); }
+        try { hpAskMeOnJoin(); } catch (e) {}
+        // GPS:END
 
         // On first load, land on the first hole that's missing a score - not always hole 1,
         // so picking back up mid-round drops you right where scoring left off.
