@@ -1559,6 +1559,11 @@
         GB.register({ name: 'hp-round-sheet', priority: 1, isOpen: function () { return on() && sheetOpen(); }, close: function () { closeSheet(false); } });
         GB.register({ name: 'hp-bets', priority: 1, isOpen: function () { return on() && betsOpen(); }, close: closeBets });
         GB.register({ name: 'hp-settings', priority: 1, isOpen: function () { return on() && settingsOpen(); }, close: function () { (origToggle || window.toggleRoundSheet)(false); } });
+        // ANDROID 102 (092 combo card): Back closes the map's Card sheet - the same as a tap
+        // on the map above it - after any sheet/modal over it (More › Enter score) and before
+        // the map's own Back (priority 4). Android only: iOS and the web have no back button.
+        var andr = false; try { andr = !!(window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'android'); } catch (e) {}
+        if (andr) GB.register({ name: 'hp-compact-card', priority: 3, isOpen: function () { return compactOpen(); }, close: closeCompactCard });
         GB.register({ name: 'hp-previous', priority: 4, isOpen: function () { track(); return on() && inRound() && trail.length > 0; },
             close: function () { var s = trail.pop(); backTo(s); } });
         GB.register({ name: 'hp-round-root', priority: 5, isOpen: function () { return on() && inRound() && !joinShown(); }, close: function () { openMenu(); } });
