@@ -107,7 +107,8 @@ for (const vp of [{ width: 375, height: 667 }, { width: 402, height: 874 }, { wi
             assert.ok(await until("(function(){ var s = HardPanGps.missSwitch(); return !!(s && s.on); })()", 8000), 'the switcher shows: ' + JSON.stringify(await sw()));
             let s = await sw();
             // 095 (Manny, Oct 28): the switcher now steps through EVERY club in My bag, shortest first (was the 089b chips LW / SW / GW).
-            assert.deepEqual(s.list, ['LW', 'SW', 'GW', 'PW', '9i', '8i', '7i', '6i', '5i', 'Hy', '3w', 'Dr'], 'every club in My bag, shortest first');
+            // 101: plus the 4i / 5w with no number, generic carries fitted between his own clubs (Manny's rule).
+            assert.deepEqual(s.list, ['LW', 'SW', 'GW', 'PW', '9i', '8i', '7i', '6i', '5i', '4i', 'Hy', '5w', '3w', 'Dr'], 'every club in My bag, shortest first');
             assert.equal(s.sel, 'SW', 'default = the club closest to the target');
             assert.equal(s.text, 'SW · middle', 'the chip label');
             assert.equal(s.aria, 'Club Sand wedge, middle. Swipe or tap arrows to change.');
@@ -137,11 +138,12 @@ for (const vp of [{ width: 375, height: 667 }, { width: 402, height: 874 }, { wi
             assert.equal(m.oval.club, 'GW', 'the oval follows'); assert.equal(m.pick, 'GW');
             assert.match(await ev("(document.querySelector('#gps-overlay .gps-ld-plays') || {}).textContent || ''"), /GW/, 'the Plays-like pill follows');
             // 095: the › end is now the bag's longest club (Dr), dimmed there; › at the end does nothing; back to GW.
-            for (let k = 0; k < 9; k++) { await click('.gps-miss-more'); await sleep(350); }
+            // 101: 14 clubs (the generic 4i / 5w joined) - GW to Dr is 11 steps (was 9).
+            for (let k = 0; k < 11; k++) { await click('.gps-miss-more'); await sleep(350); }
             s = await sw(); assert.equal(s.sel, 'Dr'); assert.equal(s.moreOff, true, '› dimmed at Dr');
             await click('.gps-miss-more'); await sleep(500);
             assert.equal((await sw()).sel, 'Dr', '› at the end does nothing');
-            for (let k = 0; k < 9; k++) { await click('.gps-miss-less'); await sleep(350); }
+            for (let k = 0; k < 11; k++) { await click('.gps-miss-less'); await sleep(350); }
             assert.equal((await sw()).sel, 'GW');
             // ‹ less club twice: LW (‹ dimmed).
             await click('.gps-miss-less'); await sleep(500); await click('.gps-miss-less'); await sleep(700);

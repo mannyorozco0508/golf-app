@@ -80,10 +80,15 @@ for (const vp of [{ width: 402, height: 874 }, { width: 375, height: 667 }]) {
             // 2 - on, from the tee: no oval.
             await none('the tee', ['tee']);
             await shot('1-tee-none');
-            // 3 - Driver / 3W / Hybrid approaches: no oval.
-            await moveTo(out(280)); await none('280 out (Driver)', ['club']);
-            await moveTo(out(250)); await none('250 out (3-wood)', ['club']);
-            await moveTo(out(230)); await none('230 out (Hybrid)', ['club']);
+            // 3 - Driver / 3W / Hybrid approaches. 101 (Manny's standing rule, Oct 29: My miss shows on EVERY approach, the
+            // club closest to the plays-like): was no oval (why 'club'); now the oval on that club, no hide reason.
+            const shown = async (what, clubs) => {
+                assert.ok(await until("(function(){ var n = HardPanGps.missNow(); return !!(n && n.oval && " + JSON.stringify(clubs) + ".indexOf(n.oval.club) !== -1); })()", 8000), what + ': the ' + clubs.join(' / ') + ' oval ' + JSON.stringify(await now()));
+                assert.equal((await now()).why, null, what + ': no hide reason');
+            };
+            await moveTo(out(280)); await shown('280 out (Driver)', ['Dr']);
+            await moveTo(out(250)); await shown('250 out (3-wood)', ['3w', '5w']);   // or the generic 5-wood fitted at 243, if closer to the plays-like
+            await moveTo(out(230)); await shown('230 out (Hybrid)', ['Hy', '5w']);   // the bag has no 5-wood: its generic carry fitted between Hy 235 and 3w 255 (243) may be the closest
             // 4 - a layup: 300 out, 7-iron picked at Mark shot - the green is out of its range.
             await moveTo(out(300));
             await ev("document.querySelector('#gps-overlay .gps-mark-shot').click()");

@@ -162,6 +162,9 @@ for (const vp of [{ width: 430, height: 932 }, { width: 375, height: 667 }]) {
             // keeps the last fix while under 60 s old: still the depth chips from the golfer's spot.
             await atTee(4);
             await ev('window.__gpsStop = true'); await sleep(12500);
+            // 101 gate: the app redraws on its 3 s stale tick (10-13 s after the last fix); wait for that tick BEFORE
+            // appOrigin() (a test hook that drops the stale fix itself, without a redraw). Every assertion below is kept.
+            await until("(function(){ var n = HardPanGps.missNow(); return !!(n && n.chips && n.chips.held); })()", 4000);
             assert.equal(await ev('HardPanGps.appOrigin()'), 'tee', 'the 10 s rule unchanged: the app measures from the tee');
             n = await now();
             assert.ok(n.chips && n.chips.depth && n.chips.from === 'me' && n.chips.held === true, '12 s: held ' + JSON.stringify(n.chips));

@@ -60,9 +60,17 @@ test('101 a club with no data uses the generic carry (My bag first-time table); 
     const mine = mk({ '7i': 180, PW: 133 });
     const f = M.fillBag(mine, gen, ORDER);
     assert.strictEqual(f['7i'].yd, 180); assert.ok(!f['7i'].gen);
-    assert.strictEqual(f['4i'].yd, gen['4i']); assert.strictEqual(f['4i'].gen, true);
+    assert.strictEqual(f['4i'].gen, true); assert.ok(f['4i'].yd > 180, 'fitted above his 7i: ' + f['4i'].yd);
+    assert.strictEqual(f.GW.gen, true); assert.ok(f.GW.yd < 133, 'fitted under his PW');
     assert.strictEqual(Object.keys(f).length, 14);
-    assert.strictEqual(M.nearestClub(f, gen.Hy, ORDER).club, 'Hy', 'the generic hybrid is picked at its own number');
+    // The order always holds (a raw generic 4i of 169 must never sit under his 7i of 180).
+    const ys = ORDER.map((c) => f[c].yd); ys.forEach((y, k) => { if (k) assert.ok(ys[k - 1] > y, ORDER[k - 1] + ' ' + ys[k - 1] + ' > ' + ORDER[k] + ' ' + y); });
+    // Between two of his clubs: the table's spacing. 095's bag: 4i between 5i 208 and Hy 220.
+    const f2 = M.fillBag(mk({ '5i': 208, Hy: 220 }), gen, ORDER);
+    assert.ok(f2['4i'].yd > 208 && f2['4i'].yd < 220, '4i ' + f2['4i'].yd);
+    // No numbers at all: the table as is.
+    assert.strictEqual(M.fillBag({}, gen, ORDER)['4i'].yd, gen['4i']);
+    assert.strictEqual(M.nearestClub(M.fillBag({}, gen, ORDER), gen.Hy, ORDER).club, 'Hy', 'the generic hybrid is picked at its own number');
     assert.strictEqual(mine['4i'], undefined, 'the input bag is not changed');
 });
 test('101 wiring: missPlan shows anyway for club / range / carry, before the old return; the generic fill; the approach fallback', () => {
@@ -74,6 +82,7 @@ test('101 wiring: missPlan shows anyway for club / range / carry, before the old
     assert.match(body, /B\.suggestClub\(bagMy, greenYd\)/, 'the app pick still from his own numbers');
     assert.match(body, /\(chips\.length \|\| always\)/);
     assert.match(body, /M\.aroundDef\(ap\)/);
+    assert.match(body, /if \(!ok\.ok && !mine && typeof M\.always === 'function'/, 'Mark-open keeps its hides');
     assert.match(body, /any: allC \|\| always/);
     // Kept: tournament / read-only / My miss off hide before missPlan.
     assert.match(V, /function missShown\(\) \{ return !!\(S && bagSwitch\(\) && !tournament\(\) && !readOnlyHere\(\)\); \}/);

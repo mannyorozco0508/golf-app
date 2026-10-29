@@ -51,7 +51,9 @@ const GEO = "(function(){ var cur = { lat: " + AT[0] + ", lng: " + AT[1] + " }, 
 const MAPS = "(function(){ var real; window.__maps = []; Object.defineProperty(window, 'maplibregl', { configurable: true, get: function () { return real; }, set: function (v) { if (v && v.Map && !v.__w) { var M = v.Map; var Wm = function (o) { var m = new M(o); window.__maps.push(m); return m; }; Wm.prototype = M.prototype; try { v.Map = Wm; } catch (e) {} v.__w = 1; } real = v; } }); })();";
 const MB = { LW: 84, SW: 107, GW: 121, PW: 133, '9i': 145, '8i': 168, '7i': 180, '6i': 192, '5i': 208, Hy: 220, '3w': 235, Dr: 260 };
 const MP = require('./gps-miss-pattern.js');
-const ALL = ['LW', 'SW', 'GW', 'PW', '9i', '8i', '7i', '6i', '5i', 'Hy', '3w', 'Dr'];
+// 101 (Manny's rule: generic distances when a club has no data): the bag has no 4i / 5w, so they join with generic
+// carries fitted between his own clubs (4i between 5i 208 and Hy 220; 5w between Hy 220 and 3w 235) - 14 clubs.
+const ALL = ['LW', 'SW', 'GW', 'PW', '9i', '8i', '7i', '6i', '5i', '4i', 'Hy', '5w', '3w', 'Dr'];
 const BAG = { v: 1, golfers: { 'n:test golfer': { shots: {}, set: MB, setupDone: true } } };
 const SEED = "(function(){ var now = Date.now(), w = JSON.stringify({ at: now + 3600e3, src: 'weatherkit', obsAt: now, mph: 0, gustMph: null, toDeg: 180, fromDeg: 0, tempF: 70 });"
     + " ['" + KEY + "', 'gapi_" + ID + "'].forEach(function (k) { localStorage.setItem('hardpan_wind_v1_' + k, w); });"
@@ -121,7 +123,7 @@ test('095 par 3 switcher steps through every club - Streamsong Red #8 at 114, ' 
         await shot('0-default'); await checkOv('default');
         // ‹ down to LW: the ‹ end dims only there.
         const texts = {};
-        for (let k = 0; k < 12 && s.sel !== 'LW'; k++) { check(!s.lessOff, '‹ dimmed before LW at ' + s.sel); await click('.gps-miss-less'); await sleep(600); s = await sw(); }
+        for (let k = 0; k < ALL.length && s.sel !== 'LW'; k++) { check(!s.lessOff, '‹ dimmed before LW at ' + s.sel); await click('.gps-miss-less'); await sleep(600); s = await sw(); }
         assert.equal(s.sel, 'LW'); assert.equal(s.lessOff, true, '‹ dimmed at LW'); assert.equal(s.moreOff, false);
         await click('.gps-miss-less'); await sleep(400); assert.equal((await sw()).sel, 'LW', '‹ at LW does nothing');
         // › through EVERY club to Dr: the oval and the Plays-like pill follow each one.
@@ -169,7 +171,7 @@ test('095 par 3 switcher steps through every club - Streamsong Red #8 at 114, ' 
         check(s.list.join() === ALL.join(), 'still every club after the drag');
         await shot('3-drag-front-kept-7i'); await checkOv('drag front');
         // Step to SW (on the green), drag to the back: SW is kept and its number follows the target.
-        for (let k = 0; k < 12 && (await sw()).sel !== 'SW'; k++) { await click('.gps-miss-less'); await sleep(450); }
+        for (let k = 0; k < ALL.length && (await sw()).sel !== 'SW'; k++) { await click('.gps-miss-less'); await sleep(450); }
         assert.equal((await sw()).sel, 'SW');
         const swBefore = (await sw()).text;
         await drag(G.destination(R8.c, R8.brg, 16 * Y));
