@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f4c3a">
+<meta name="color-scheme" content="light only">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>In or Out? · HardPan Golf</title>
+<!-- 106 B: the link preview in a group text (the game's own name and day are in the message itself). -->
+<meta property="og:title" content="HardPan Golf · Tap to say In or Out">
+<meta property="og:description" content="This week's game. Tap your name, then In or Out. No account needed.">
+<meta property="og:image" content="https://hardpangolf.com/icon-512.png">
+<!-- 106 B: THE FRIEND'S IN/OUT PAGE (weekly-rsvp.js page()). Opened from the organizer's group text in
+     Safari - no app, no account. auth-boot.js signs the visitor in anonymously in the background, which
+     is all the weeklyRsvp rule asks for. Reads and writes only weeklyRsvp/<id> (the id is in the link). -->
+<script src="./firebase-app-compat.js"></script>
+<script src="auth-boot.js"></script>
+<script src="./firebase-database-compat.js"></script>
+<style>
+  :root { --g: #0f4c3a; --n: #1d3557; --lime: #d4f46a; --bg: #f0f4f2; --line: #d0e1db; --muted: #555; }
+  html, body { margin: 0; background: var(--bg); color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-text-size-adjust: 100%; }
+  #rv-app { max-width: 520px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 24px); box-sizing: border-box; }
+  .rv-card { background: var(--n); color: #fff; border-radius: 20px; padding: 16px; border: 3px solid #f2b705; }
+  .rv-card h1 { font-size: 22px; margin: 4px 0 6px; line-height: 1.2; }
+  .rv-k { font-size: 12px; font-weight: 800; letter-spacing: .06em; color: #f2d36b; }
+  .rv-so { font-size: 15px; font-weight: 700; }
+  .rv-sec { font-size: 12px; font-weight: 800; letter-spacing: .08em; color: var(--muted); margin: 18px 0 8px; text-transform: uppercase; }
+  .rv-names { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rv-names button { min-height: 48px; padding: 0 16px; border: 1px solid var(--line); background: #fff; border-radius: 14px; font: inherit; font-size: 17px; font-weight: 700; color: #1a1a1a; cursor: pointer; }
+  .rv-names .rv-new { color: var(--g); border-style: dashed; }
+  .rv-add { display: flex; gap: 8px; margin-top: 10px; }
+  .rv-add input { flex: 1; min-width: 0; min-height: 48px; border: 2px solid var(--g); border-radius: 14px; padding: 0 12px; font-size: 17px; }
+  .rv-add button { min-height: 48px; padding: 0 18px; border: 0; border-radius: 14px; background: var(--g); color: #fff; font-weight: 800; font-size: 17px; }
+  .rv-hi { font-size: 20px; font-weight: 800; margin: 18px 0 10px; }
+  .rv-link { border: 0; background: none; color: var(--g); font: inherit; font-size: 15px; font-weight: 700; min-height: 44px; cursor: pointer; }
+  .rv-big { display: flex; gap: 10px; }
+  .rv-big button { flex: 1; min-height: 76px; border-radius: 18px; font: inherit; font-size: 24px; font-weight: 800; cursor: pointer; border: 3px solid transparent; }
+  .rv-in { background: var(--lime); color: var(--g); }
+  .rv-out { background: #fff; color: #8a1c1c; border-color: #f0c9c9 !important; }
+  .rv-big button[aria-pressed="true"] { border-color: var(--g) !important; box-shadow: 0 0 0 3px rgba(15,76,58,.25); }
+  .rv-msg { min-height: 22px; margin-top: 10px; font-weight: 700; color: var(--g); text-align: center; }
+  .rv-who { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 12px; font-size: 16px; line-height: 1.5; }
+  .rv-foot { text-align: center; font-size: 13px; color: var(--muted); margin-top: 18px; }
+</style>
+</head>
+<body>
+<div id="rv-app" data-rv-state="loading"><div class="rv-card"><h1>Loading&hellip;</h1></div></div>
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+</script>
+<script src="weekly-rsvp.js"></script>
+</body>
+</html>
