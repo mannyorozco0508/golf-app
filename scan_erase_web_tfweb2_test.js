@@ -255,7 +255,18 @@ describe('tfweb-2 privacy page: the course-scan camera sentence, every old sente
         const now = text(html);
         const changed = [
             'The camera is used only when you choose to scan a scorecard (see Scorecard scan above).',
-            'Deleting your account in the app erases these counts too.'
+            'Deleting your account in the app erases these counts too.',
+            // 114 (Oct 31 2026), intentional rewrites for 2.0 (subscription, Apple-safe words, accurate search log):
+            'Last updated: 26 October 2026',
+            'Your email address, only if you choose to sign in with an email link (on iPhone you may also use Sign in with Apple or Google) So you',
+            'Not kept with your account and not sold.',
+            'No payment details of any kind — see Money, below',
+            'The app does not accept wagers, hold funds, process payments, or pay winnings.',
+            'the "who owes whom" summary is information for your group.',
+            'Google Firebase (Authentication, Realtime Database, Cloud Functions): your account, round data and course searches.',
+            'Sign in with Apple if you use it, and push notifications if you allow them',
+            'in the app, open Account and tap Delete account',
+            'Questions about privacy, or a deletion request: support@rattlegolf.com Privacy'
         ];
         const sentences = text(before).split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter((x) => x.length > 20);
         const missing = sentences.filter((x) => !now.includes(x) && !changed.some((c) => x.includes(c)));

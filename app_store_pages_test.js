@@ -77,24 +77,43 @@ describe('THE POSITIONING IS STATED, NOT IMPLIED', () => {
 
     test('the privacy policy says the app never handles money', () => {
         const src = read('privacy.html');
-        assert.match(src, /does not accept wagers, hold funds, process payments, or pay winnings/i);
+        // RE-PINNED (114, Oct 31 2026): 2.0 legal rewrite drops the word "wagers" (Apple-safe words).
+        // Was: /does not accept wagers, hold funds, process payments, or pay winnings/i
+        assert.match(src, /does not hold funds, move money, process payments, or pay anyone/i);
         assert.match(src, /takes no share of it/i);
     });
 
     test('the terms say the same thing, in the terms', () => {
         const src = read('terms.html');
         assert.match(src, /not a gambling service, a sportsbook, a payment processor/i);
-        assert.match(src, /does not accept wagers, hold funds, process payments, or pay out winnings/i);
+        // RE-PINNED (114, Oct 31 2026). Was: /does not accept wagers, hold funds, process payments, or pay out winnings/i
+        assert.match(src, /does not hold funds, move money, process payments, or pay anyone/i);
     });
 
     test('the support page describes settlement as arithmetic, not a transaction', () => {
         assert.match(read('support.html'), /never takes payment and never takes a cut/i);
     });
 
-    test('no page promises in-app purchases that do not exist', () => {
-        // The app ships with no IAP. Claiming otherwise in the terms would be a
-        // straightforward rejection.
-        assert.match(read('terms.html'), /currently offers no in-app purchases or subscriptions/i);
+    // RE-PINNED (114, Oct 31 2026): 2.0 ships the HardPan Pro subscription (3.1.2), so the
+    // terms must now DESCRIBE it. Was: /currently offers no in-app purchases or subscriptions/i
+    test('the terms describe the HardPan Pro subscription the 2.0 app sells (3.1.2)', () => {
+        const t = read('terms.html');
+        assert.doesNotMatch(t, /currently offers no in-app purchases or subscriptions/i);
+        assert.match(t, /auto-renewing subscription/i);
+        assert.match(t, /\$24\.99 per year/); assert.match(t, /\$49\.99 per year/); assert.match(t, /\$7\.99 per month/);
+        assert.match(t, /7-day free trial/);
+        assert.match(t, /at least 24 hours before the end of the current period/);
+        assert.match(t, /charged to your Apple ID account when you confirm/);
+        assert.match(t, /manage or cancel your subscription in your Apple ID settings/i);
+        assert.match(t, /href="https:\/\/www\.apple\.com\/legal\/internet-services\/itunes\/dev\/stdeula\/"/);
+        assert.match(t, /Games and scoring are free/);
+    });
+
+    test('the legal pages use no money-game words (5.3)', () => {
+        ['terms.html', 'privacy.html'].forEach(p => {
+            const prose = read(p).replace(/<[^>]+>/g, ' ');
+            assert.doesNotMatch(prose, /money games?|\bbets?\b|betting|\bpool\b|wager|settle up|settling up|payout|pay out|who owes/i, p);
+        });
     });
 });
 
@@ -151,7 +170,8 @@ describe('THE PRIVACY POLICY IS ACCURATE ABOUT THIS APP', () => {
         // Scores and names never go on that request.
         // RE-PINNED (privacy-scan-mic, Oct 26): the 26 October 2026 policy adds voice + scan. Was (job 019): the 17 October 2026 policy (anonymous accounts, GPS,
         // services list). was: Last updated: 23 September 2026
-        assert.match(P, /Last updated: 26 October 2026/);
+        // RE-PINNED (114, Oct 31 2026): subscriptions, Venmo/Cash App usernames, 097c USGS slope, search log. Was: 26 October 2026
+        assert.match(P, /Last updated: 31 October 2026/);
         assert.match(P, /Course search queries/);
         assert.match(P, /golfcourseapi\.com/);
         assert.match(P, /Cloudflare Worker/);
