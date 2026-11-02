@@ -27,6 +27,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="play-order.js"></script>
     <script src="match-engine.js"></script>
     <!-- v212: what a golfer READS about their handicap - the compact "Index 18 ·
          Course 12" label, the full form, and the one basis sentence. Display
@@ -48,6 +49,7 @@
          Aloha - two pages showing two different totals, which is the one failure
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <script src="settlement-engine.js"></script>
     <!-- The one builder for a side match's sentences, shared with the scorecard,
          the Bets tab, Final Results and the Receipt. The LIVE MATCHES & PRESSES
@@ -234,6 +236,8 @@
         .board-table tr[data-player-id] td.player-name::after { content: '\25BE'; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.7em; }
         .board-table tr[data-player-id]:has(+ tr.board-card-row) td.player-name::after { content: '\25B4'; }
         .board-card-row td { padding: 4px 0 10px 0; background: var(--nav-bg); }
+        /* 100b: "Start a game with Jim" - its own row right after the open card, dressed like it. */
+        .lb-game-row td { padding: 0 0 10px 0; background: var(--nav-bg); }
         /* v212: the full handicap form above the expanded card's scorecard. */
         .board-card-hcp { font-size: 0.78rem; color: var(--text-muted); padding: 2px 8px 6px 8px; }
         .sc-stack { display: flex; flex-direction: column; gap: 6px; }
@@ -245,11 +249,6 @@
         .sc-stack .receipt-table tr.rt-net td { color: var(--text-muted); font-style: italic; }
         .sc-stack .receipt-table td.mark-birdie { box-shadow: inset 0 0 0 2px var(--accent-red); border-radius: 50%; }
         .sc-stack .receipt-table td.mark-eagle { box-shadow: inset 0 0 0 2px var(--accent-red), inset 0 0 0 3px var(--bg-card), inset 0 0 0 5px var(--accent-red); border-radius: 50%; }
-        /* URGENT-081: a square for a bogey, a double square for a double bogey or worse -
-           the circles' line weight, in the site's own square colour (--brand-navy, the Card
-           view's bogey box; #4a7bb5 in dark mode), square corners. Manny, 2026-10-26. */
-        .sc-stack .receipt-table td.mark-bogey { box-shadow: inset 0 0 0 2px var(--brand-navy); border-radius: 3px; }
-        .sc-stack .receipt-table td.mark-double { box-shadow: inset 0 0 0 2px var(--brand-navy), inset 0 0 0 3px var(--bg-card), inset 0 0 0 5px var(--brand-navy); border-radius: 3px; }
         /* LIVE MATCHES & PRESSES. The widget whose absence sent a caddie hunting
            through tabs during a real Nassau. Segments stack; presses indent under the
            segment they belong to so a press can never be mistaken for a base match. */
@@ -374,6 +373,14 @@ html {
     padding-right: env(safe-area-inset-right, 0px);
     background-color: var(--bg-page, transparent);
 }
+/* 2.0 (25) SAFE-TOP BAND (ADVISOR-0725 7:35 b): the page scrolls under the status bar and the
+   Dynamic Island - a solid band there in the page colour, so nothing reads under the clock. The same
+   band admin.html has had since POLISH #13, on ::after (front-door.js uses body::before for its
+   "Where are you playing?" label). 0px on the web. safe_top_25_chrome_test.js holds every page to it. */
+body::after {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f3);
+}
 </style>
 </head>
 <body>
@@ -387,10 +394,10 @@ html {
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
         <a href="leaderboard.html" class="top-nav-item active nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
-        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">💰</span><span class="tni-label">Bets</span></a>
+        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">⛳</span><span class="tni-label">Games</span></a>
         <a href="settlement.html" class="top-nav-item nav-link"><span class="tni-glyph">🤝</span><span class="tni-label">Results</span></a>
         <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link"><span class="tni-glyph">⚔️</span><span class="tni-label">Matches</span></a>
-        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Game</span></a>
+        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Format</span></a>
         <a href="trip.html" class="top-nav-item"><span class="tni-glyph">🚐</span><span class="tni-label">Trip</span></a>
         <a href="admin.html" class="top-nav-item nav-link"><span class="tni-glyph">🏠</span><span class="tni-label">Home</span></a>
         <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">🧭</span><span class="tni-label">How it works</span></a>
@@ -464,6 +471,9 @@ html {
     <!-- Hi-Lo: two contests per hole, shown as its own game state rather than
          letting NET TO PAR stand in for a result it does not describe. -->
     <div id="live-hilo-mount"></div>
+    <!-- 100b (099): the games added mid-round - Dots, Stableford, 9 Points games and Hi-Lo side
+         bets - each from ITS start hole, for its own golfers. -->
+    <div id="live-sidegames-mount"></div>
     <!-- Stroke side matches: $/hole and $/overall, shown as the wager rather than
          letting the round's NET TO PAR stand in for a bet it does not describe. -->
     <div id="live-strokebet-mount"></div>
@@ -806,7 +816,7 @@ html {
     function shareResults() {
         const sharedUrl = shareBaseUrl() + `shared.html?game=${currentMode}`;
         
-        const courseName = currentBoardData.courseName || "Live Round";
+        const courseName = (typeof hpCourseNameText === 'function' ? hpCourseNameText(currentBoardData.courseName || "Live Round") : (currentBoardData.courseName || "Live Round"));   // 2.0 (25) 7:51 f
         const dateObj = new Date();
         const dateString = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         
@@ -879,7 +889,12 @@ html {
     // Points and dots only. No projected payout: what a game is worth is settled
     // in Results, and a running dollar figure mid-round is not final.
     function buildLivePointsHtml(data, courseData, savedScores) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLivePointsState !== 'function') return '';
+        // 100b (099): when the round's own game is not a points game, a Dots card here came from a
+        // Dots GAME added to the round - and counted every hole of the card. That game has its own
+        // card now, from its start hole and for its golfers (live-sidegames-mount), so this one steps aside.
+        if (['stableford', 'wolf', 'dots'].indexOf(data.gameFormat) === -1 && lbHasDotsGame(data)) return '';
         const st = buildLivePointsState(data, courseData, savedScores);
         if (!st) return '';
         const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
@@ -912,6 +927,7 @@ html {
     // NO MONEY. Settlement is (t1Points - t2Points) x holeBetStake and belongs in
     // Results; a running figure mid-round is not final.
     function buildLiveHiLoHtml(data, courseData, savedScores) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLiveHiLoState !== 'function') return '';
         const st = buildLiveHiLoState(data, courseData, savedScores);
         if (!st) return '';
@@ -952,6 +968,7 @@ html {
     // NO MONEY TOTALS. What the next hole is worth is game state - a running
     // payout is settlement's, and is not final mid-round.
     function buildLiveStrokeBetHtml(data, courseData, savedScores, visibleIds) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLiveStrokeBetStates !== 'function') return '';
         // Scoped to the link's group AFTER the engine builds every state over the
         // whole field (visibleIds), so a group link sees only the bets its golfers
@@ -1004,8 +1021,13 @@ html {
     // its press link is never offered either.
     function buildLiveMatchHtml(data, courseData, savedScores, visibleIds) {
         if (typeof buildLiveMatchCardHtml !== 'function') return '';
-        return buildLiveMatchCardHtml(data, courseData, savedScores, visibleIds,
-            { pressHref: sideMatchPressHref, maySee: boardLinkMaySee });
+        const lmOpts = { pressHref: sideMatchPressHref, maySee: boardLinkMaySee };
+        const lmHtml = buildLiveMatchCardHtml(data, courseData, savedScores, visibleIds,
+            lmOpts);
+        // ZERO-STAKE (2.0 (24) ADVISOR-2245, text-safe.js): a game played for nothing is re-worded with no $; a priced one is handed back as is.
+        const zsHtml = (typeof hpZeroStakeLiveCard === 'function') ? hpZeroStakeLiveCard(lmHtml, data, courseData, savedScores, visibleIds, lmOpts) : lmHtml;
+        // 2.0 (25) ADVISOR-0725 7:44 (text-safe.js, the scorecard's twin): a game added mid-round says "Starts hole 5", not "Not Started".
+        return (typeof hpStartsHoleLiveCard === 'function') ? hpStartsHoleLiveCard(zsHtml, data, courseData, savedScores, visibleIds, lmOpts) : zsHtml;
     }
     function lbSkinsGroupOf(playerId) {
         const players = (currentBoardData.players || []);
@@ -1029,6 +1051,88 @@ html {
             (currentBoardData && currentBoardData.courseData) || [],
             (currentBoardData && currentBoardData.scores) || {},
             ((currentBoardData && currentBoardData.players) || []).map(p => String(p.id)));
+    }
+
+    // ---- 100b (099): THE GAMES ADDED MID-ROUND, EACH FROM ITS START HOLE ----------------------
+    // Hi-Lo side bets and the Dots / Stableford / 9 Points games were missing here, or (Dots) counted
+    // the holes before they started. NO NEW MATH: each game's own engine (calcDotsEngine /
+    // calcStablefordEngine, the 9 Points hole table, hilo-engine.js) on the game's own holes
+    // (gameHoles / sideMatchHoles - the range settlement pays it over) and its own golfers
+    // (fieldParticipants). Points, never money: what a game is worth is settled in Results.
+    function lbHasDotsGame(data) {
+        try { return (typeof getRoundGames === 'function' ? getRoundGames(data) : []).some(g => g && g.role === 'additional' && g.format === 'dots'); } catch (e) { return false; }
+    }
+    function buildLiveSideGamesHtml(raw) {
+        if (!raw || !(raw.players || []).length) return '';
+        const data = (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(raw) : raw;
+        const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+        const cd = (data.courseData || []).slice().sort((a, b) => a.hole - b.hole), sc = data.scores || {}, players = data.players || [];
+        if (!cd.length) return '';
+        const groupOf = (typeof playerGroupMap === 'function') ? playerGroupMap(players, data.groupSizeOverrides || {}) : {};
+        const maySee = ids => (typeof canLinkSeeWager === 'function') ? canLinkSeeWager(ids, lockedGroup, groupOf) : true;
+        const thruOf = (holes, ids) => { let t = 0; holes.forEach(h => { if (ids.some(id => Number(sc['p' + id + '_h' + h.hole]) > 0)) t = h.hole; }); return t; };
+        const card = (icon, label, sub, body) => '<div class="lg-card" style="margin-top:8px;"><div class="lg-head"><span class="lg-title">' + icon + ' LIVE GAME \u00B7 ' + esc(label) + '</span><span class="lg-sub">' + esc(sub) + '</span></div>' + body + '</div>';
+        let html = '';
+        const games = (typeof getRoundGames === 'function') ? getRoundGames(data) : [];
+        games.forEach(g => {
+            if (!g || g.role !== 'additional' || ['dots', 'stableford', 'nines'].indexOf(g.format) === -1 || !g.config) return;
+            const field = (typeof fieldParticipants === 'function') ? fieldParticipants(g.config) : players;
+            const ids = field.map(p => String(p.id));
+            if (!ids.length || !maySee(ids)) return;
+            const holes = (typeof gameHoles === 'function') ? gameHoles(g, cd) : cd;
+            const cfg = Object.assign({}, g.config, { players: field });
+            let totals = {};
+            try {
+                if (g.format === 'dots' && typeof calcDotsEngine === 'function') totals = calcDotsEngine(cfg, holes, sc).totals || {};
+                else if (g.format === 'stableford' && typeof calcStablefordEngine === 'function') totals = calcStablefordEngine(cfg, holes, sc).totals || {};
+                else if (g.format === 'nines' && field.length === 3 && typeof computeNinePointsNet === 'function') {
+                    // THE SETTLER ITSELF at $1 a point: each golfer's points against even (the field's
+                    // average) - its own allocation and options, no second count on this page.
+                    totals = computeNinePointsNet(Object.assign({}, cfg, { ninePointsRate: 1, settlement: undefined, ninePointsBuyIn: undefined }), holes, sc) || {};
+                    Object.keys(totals).forEach(k => { totals[k] = Math.round(totals[k] * 10) / 10; });
+                } else return;
+            } catch (e) { return; }
+            // A Dots game limited to some dots (100c dotTypes, the + Game sheet's KP pot / Birdies) says which.
+            const dt = Array.isArray(g.config.dotTypes) ? g.config.dotTypes.join(',') : '';
+            const label = g.format === 'nines' ? '9 POINTS' : (g.format === 'dots' ? (dt === 'greenie' ? 'KP POT' : (dt === 'birdie,eagle' ? 'BIRDIES' : 'DOTS')) : 'STABLEFORD');
+            const from = Number(g.startHole) > 1 ? 'from ' + g.startHole : '';
+            const thru = thruOf(holes, ids);
+            const sub = [from, thru ? 'thru ' + thru : ''].filter(Boolean).join(' \u00B7 ');
+            const rows = field.map(p => ({ name: p.name, v: Number(totals[p.id]) || 0 })).sort((a, b) => b.v - a.v);
+            const any = rows.some(r => r.v !== 0);
+            const unit = g.format === 'dots' ? '' : ' pts';
+            const signed = g.format === 'nines';   // points against even
+            // The app's icon system (rattle_icon_system_test): a KP pot ⛳, Birdies 🐦, 9 Points 9️⃣, and 🔘 Dots.
+            const icon = g.format === 'nines' ? '9\uFE0F\u20E3' : (g.format !== 'dots' ? '\uD83C\uDFC1' : (dt === 'greenie' ? '\u26F3' : (dt === 'birdie,eagle' ? '\uD83D\uDC26' : '\uD83D\uDD18' /* Dots */)));
+            html += card(icon, label, sub,
+                any ? rows.map(r => '<div class="lg-row"><span class="lg-name">' + esc(r.name) + '</span><span class="lg-val">' + (signed && r.v > 0 ? '+' : '') + r.v + unit + '</span></div>').join('') + (signed ? '<div class="lg-quiet">Points against even.</div>' : '') : '<div class="lg-quiet">No scoring yet.</div>');
+        });
+        // HI-LO SIDE BETS (the round-format Hi-Lo keeps its own card above).
+        const sms = data.sideMatches || {};
+        Object.keys(sms).forEach(id => {
+            const sm = sms[id];
+            if (!sm || sm.format !== 'hilo' || !boardLinkMaySee(id) || typeof hiloSides !== 'function' || typeof hiloForSideMatch !== 'function') return;
+            const s = hiloSides(sm, players);
+            if (!s.teamA.length || !s.teamB.length) return;
+            const holes = (typeof sideMatchHoles === 'function') ? sideMatchHoles(sm, cd, data) : cd;
+            let calc = null; try { calc = hiloForSideMatch(sm, s.teamA, s.teamB, holes, sc); } catch (e) { calc = null; }
+            if (!calc) return;
+            const nm = side => side.map(p => String(p.name || '').split(' ')[0]).join(' + ');
+            const nA = nm(s.teamA), nB = nm(s.teamB);
+            const from = Number(sm.startHole) > 1 ? 'from ' + sm.startHole : '';
+            const sub = [from, calc.played ? 'thru ' + thruOf(holes, s.teamA.concat(s.teamB).map(p => String(p.id))) : ''].filter(Boolean).join(' \u00B7 ');
+            html += card('\u2696\uFE0F', 'HI-LO', sub, calc.played
+                ? '<div class="lg-row"><span class="lg-name">' + esc(nA) + '</span><span class="lg-val">' + calc.pointsA + '</span></div>'
+                  + '<div class="lg-row"><span class="lg-name">' + esc(nB) + '</span><span class="lg-val">' + calc.pointsB + '</span></div>'
+                  + '<div class="lg-row"><span class="hl-lead">' + esc(typeof hiloLine === 'function' ? hiloLine(calc, nA, nB) : '') + '</span></div>'
+                : '<div class="lg-quiet">No scoring yet.</div>');
+        });
+        return html;
+    }
+    function renderLiveSideGamesBoard() {
+        const mount = document.getElementById('live-sidegames-mount');
+        if (!mount) return;
+        try { mount.innerHTML = buildLiveSideGamesHtml(currentBoardData || {}); } catch (e) { mount.innerHTML = ''; }
     }
 
     function renderLiveHiLoBoard() {
@@ -1310,8 +1414,7 @@ ${ind.slice(4)}</tr>`;
         const data = currentBoardData || {};
         const player = (data.players || []).find(p => String(p.id) === key);
         if (!player || typeof ScorecardRows === 'undefined') return '';
-        const ringOf = ScorecardRows.markWithBoxes   // URGENT-081: the circles (score-marks.js) + squares above par
-            || ((typeof scoreMarkClass === 'function') ? (s, par) => scoreMarkClass(s, par).trim() : () => '');
+        const ringOf = (typeof scoreMarkClass === 'function') ? (s, par) => scoreMarkClass(s, par).trim() : () => '';
         const card = ScorecardRows.scorecardStackedHtml({
             courseData: data.courseData || [], scores: data.scores || {}, players: [player],
             showNet: ScorecardRows.netMattersOn(data), ringOf: ringOf
@@ -1322,7 +1425,11 @@ ${ind.slice(4)}</tr>`;
         // the same reason a blank handicap says nothing in the row.
         const full = (typeof handicapFullLabel === 'function') ? handicapFullLabel(player) : null;
         const hcpLine = full ? `<div class="board-card-hcp">${escapeHtml(full)}</div>` : '';
-        return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${hcpLine}${card}</td></tr>`;
+        // 100b (Manny OK, picture B): "Start a game with Jim" on another golfer's open card (GPS app, never a
+        // spectator) - its OWN row right after the card, so the card cell stays scorecard-rows.js's layout.
+        const gameBtn = (typeof lbGameWithHtml === 'function') ? lbGameWithHtml(player) : '';
+        return `<tr class="board-card-row" data-card-for="${escapeHtml(key)}"><td colspan="5">${hcpLine}${card}</td></tr>`
+            + (gameBtn ? `<tr class="lb-game-row" data-game-for="${escapeHtml(key)}"><td colspan="5">${gameBtn}</td></tr>` : '');
     }
     // ONE delegated listener: a tap ANYWHERE ON THE ROW toggles that golfer's card
     // (v201 - it used to need the name cell, so a tap on the score, the to-par or
@@ -1338,6 +1445,7 @@ ${ind.slice(4)}</tr>`;
             while (el && el !== mount) {
                 if (el.tagName === 'TR') {
                     if (/\bboard-card-row\b/.test(el.className || '')) return;   // inside the open card
+                    if (/\blb-game-row\b/.test(el.className || '')) return;   // 100b: the "Start a game with" row under it
                     const id = el.getAttribute && el.getAttribute('data-player-id');
                     if (id) toggleBoardCard(id);
                     return;
@@ -1516,6 +1624,7 @@ ${ind.slice(4)}</tr>`;
         renderLiveMatchesBoard();
         renderLivePointsBoard();
         renderLiveHiLoBoard();
+        renderLiveSideGamesBoard();
         renderLiveStrokeBetBoard();
         renderLiveSkinsBoard();
 

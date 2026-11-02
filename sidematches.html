@@ -25,6 +25,8 @@
          nothing. Now it asks the same question index.html asks. -->
     <script src="organizer-gate.js"></script>
     <script src="./firebase-database-compat.js"></script>
+    <!-- 100b: the durable queue (the scorecard's), so a bet made here with no signal is kept and sent. -->
+    <script src="offline-queue.js"></script>
     <!-- sideMatchHoles / sideMatchStartHole live here, so this page and settlement
          cannot drift on what a side match's hole range means. -->
     <!-- Handicap. Every stroke a golfer receives, and every relative-handicap
@@ -53,6 +55,7 @@
          same file - so the offer a golfer sees and the money that settles cannot
          come from two different readings. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <!-- THE CANONICAL STROKE ENGINES. This page used to carry its own copies of
          calculateHoleBetEngine / calculateOverallBetEngine, and those copies read
          p1/p2 only - they ignored config.sideA/sideB entirely. So a 2v2 Stroke Play
@@ -220,7 +223,16 @@
         .ledger-table th { background: var(--brand-navy); color: white; }
         .val-pos { color: var(--accent-teal); font-weight: bold; }
         .val-neg { color: var(--accent-red); font-weight: bold; }
-        .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
+        /* box-sizing MEASURED, NOT ASSUMED (2026-10-09). "Final Results & Receipt"
+           stuck 23px out of the card on an iPhone, at 390 AND at 320. It is the
+           only <a> among four .btn-primary controls in that card, and a <button>
+           gets box-sizing:border-box from the UA stylesheet while an <a> does
+           not - so width:100% plus 12px of padding each side made the anchor
+           exactly 24px wider than its siblings (324 against 300 at 390px; 254
+           against 230 at 320px). Saying it here makes every .btn-primary one
+           box, whatever element it is written on.
+           tools/matches-card-layout-check.js measures it. */
+        .btn-primary { width: 100%; box-sizing: border-box; background-color: var(--brand-green); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; margin-top: 10px;}
         .btn-danger-sm { background-color: var(--bg-card); color: var(--accent-red); border: 1px solid var(--accent-red); padding: 5px 10px; font-size: 0.72rem; font-weight: bold; border-radius: 14px; cursor: pointer; }
         .btn-outline-sm { background-color: var(--bg-card); color: var(--brand-green); border: 1px solid var(--brand-green); padding: 5px 10px; font-size: 0.72rem; font-weight: bold; border-radius: 14px; cursor: pointer; }
         /* THE CUP, FOLDED (UI Wave 10). On a plain arrival at the Matches tab the whole
@@ -383,6 +395,14 @@ html {
     padding-top: max(12px, env(safe-area-inset-top, 0px));
     padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
 }
+/* 2.0 (25) SAFE-TOP BAND (ADVISOR-0725 7:35 b): the page scrolls under the status bar and the
+   Dynamic Island - a solid band there in the page colour, so nothing reads under the clock. The same
+   band admin.html has had since POLISH #13, on ::after (front-door.js uses body::before for its
+   "Where are you playing?" label). 0px on the web. safe_top_25_chrome_test.js holds every page to it. */
+body::after {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f3);
+}
 </style>
 </head>
 <body>
@@ -394,10 +414,10 @@ html {
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
         <a href="leaderboard.html" class="top-nav-item nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
-        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">💰</span><span class="tni-label">Bets</span></a>
+        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">⛳</span><span class="tni-label">Games</span></a>
         <a href="settlement.html" class="top-nav-item nav-link"><span class="tni-glyph">🤝</span><span class="tni-label">Results</span></a>
         <a href="sidematches.html" class="top-nav-item active nav-link matches-nav-link"><span class="tni-glyph">⚔️</span><span class="tni-label">Matches</span></a>
-        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Game</span></a>
+        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Format</span></a>
         <a href="trip.html" class="top-nav-item"><span class="tni-glyph">🚐</span><span class="tni-label">Trip</span></a>
         <a href="admin.html" class="top-nav-item nav-link"><span class="tni-glyph">🏠</span><span class="tni-label">Home</span></a>
         <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">🧭</span><span class="tni-label">How it works</span></a>
@@ -407,10 +427,10 @@ html {
     <a class="back-btn" onclick="goBack()">← Back</a>
 
     <div id="sm-bets-pointer" style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
-        Matches are built and pressed here. Live results are on <a href="skins.html" class="nav-link" style="color: var(--brand-green); font-weight: bold;">💰 Bets</a>.
+        Matches are built and pressed here. Live results are on <a href="skins.html" class="nav-link" style="color: var(--brand-green); font-weight: bold;">⛳ Games</a>.
     </div>
 
-    <h2 class="event-title" id="main-title">💰 Today's Action</h2>
+    <h2 class="event-title" id="main-title">⛳ Today's Action</h2>
 
     <!-- THE CUP IS ITS OWN JOB, so it is its own surface. It used to be nested inside
          the card headed "Side Matches (Any Group)", under a paragraph about $/hole
@@ -436,7 +456,7 @@ html {
              which group this link is still comes first. Empty until there is one. -->
         <div id="challenges-list"></div>
         <div id="sidematches-list"></div>
-        <button class="btn-primary" onclick="openSideMatchModal()">➕ SIDE BETS</button>
+        <button class="btn-primary" onclick="openSideMatchModal()">➕ SIDE GAMES</button>
         <!-- CHALLENGE opens the SAME form, in challenge mode: the side-match
              creator with one side fixed to you and Save replaced by Send. Any
              golfer in the round can tap it, which is the point - a following
@@ -446,6 +466,17 @@ html {
             <!-- Was window.print(), which printed this page's own side-match maths as if it were
                  an authoritative payout. There is ONE settlement document, and this opens it. -->
         <a class="btn-primary nav-link" href="settlement.html" style="background:var(--brand-navy); margin-top:8px; display:block; text-align:center; text-decoration:none;">📄 Final Results &amp; Receipt</a>
+        <!-- THE WAY BACK INTO THE ROUND (2026-10-09). Once a side bet is set up
+             this page is the last setup step, and the biggest button on the card
+             used to send a golfer to Final Results - the END of a round, not the
+             start of one. This is the one that goes and plays.
+             NOT .nav-link, deliberately: that rewriter carries ?group= from this
+             URL and nothing else, and an ORGANIZER arrives here with no group in
+             the URL and a "Score for: Group N" pick in localStorage. The href is
+             built in smSyncGoToRound() so both cases land on the right card.
+             The HardPan GPS build sends this same link to the GPS screen through
+             its own landing rule, so there is no GPS branch here to drift. -->
+        <a class="btn-primary" id="sm-go-round" href="index.html" style="margin-top:8px; display:block; text-align:center; text-decoration:none;">▶ Start Round</a>
     </div>
 </div>
 
@@ -461,7 +492,7 @@ html {
              Shown only when the round genuinely has more than one group. A single
              foursome has nothing to choose, so a single-group round never sees this. -->
         <div id="sm-scope-step" style="display:none;">
-            <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 12px 0;">Who's this bet between?</p>
+            <p style="font-size:0.82rem; color:var(--text-muted); margin:0 0 12px 0;">Who's this game between?</p>
             <button type="button" class="sm-scope-choice" onclick="pickActionScope('group')">
                 <strong id="sm-scope-group-title">This Group</strong>
                 <small id="sm-scope-group-blurb">Play something with the golfers in this foursome</small>
@@ -484,14 +515,16 @@ html {
         <div class="control-group" style="margin-bottom:10px;">
             <label>Format</label>
             <select id="sm-format" onchange="onSideMatchFormatChange()">
-                <option value="match">Match Play Bet (Overall)</option>
-                <option value="nassau">Nassau Bet (F9 / B9 / 18)</option>
-                <option value="stroke">Stroke Play Bet ($/Hole + $/Overall)</option>
+                <option value="match">Match Play Game (Overall)</option>
+                <option value="nassau">Nassau Game (F9 / B9 / 18)</option>
+                <option value="stroke">Stroke Play Game ($/Hole + $/Overall)</option>
+                <option value="hilo">Hi-Lo (2v2 &middot; low ball + high ball, $ a point)</option>
                 <option value="skins">Skins (pick who's in)</option>
                 <option value="dots">Dots / Junk (everyone playing)</option>
                 <option value="nines">9 Points (three golfers, 5-3-1)</option>
             </select>
             <p id="sm-format-note" style="display:none; font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;"></p>
+            <p id="sm-hilo-note" style="display:none; font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;">Tap four golfers. Every hole is two points: low ball (each side&rsquo;s best score) and high ball (each side&rsquo;s worse score). A tie is a wash. The side behind pays the point difference &times; the amount, split between its two golfers.</p>
         </div>
         <div class="control-grid" style="margin-bottom:10px;">
             <div class="control-group" id="sm-scoring-group">
@@ -507,7 +540,7 @@ html {
                 <input type="hidden" id="sm-scoring" value="net">
             </div>
             <div class="control-group" id="sm-stake-group">
-                <label>Stake ($)</label>
+                <label id="sm-stake-label">Stake ($)</label>
                 <div class="grid-4col" id="sm-stake-presets" style="margin-bottom:4px;">
                     <button type="button" class="preset-btn" onclick="setSmStakePreset(5)" style="padding:6px 2px; font-size:0.75rem;">$5</button>
                     <button type="button" class="preset-btn active" onclick="setSmStakePreset(20)" style="padding:6px 2px; font-size:0.75rem;">$20</button>
@@ -522,7 +555,7 @@ html {
                  above fill all three at once; after that each stands alone. -->
             <div class="control-group" id="sm-nassau-stake-group" style="display:none;">
                 <label>Nassau — Match Play</label>
-                <div style="font-size:0.7rem; color:var(--text-muted); font-weight:normal; margin:-2px 0 6px 0;">Three separate bets. Scoring basis (Net/Gross) is set above.</div>
+                <div style="font-size:0.7rem; color:var(--text-muted); font-weight:normal; margin:-2px 0 6px 0;">Three separate games. Scoring basis (Net/Gross) is set above.</div>
                 <div class="sm-nassau-stakes">
                     <div>
                         <label>Front 9</label>
@@ -558,7 +591,7 @@ html {
                      in action-model.js - the same builder the setup wizard uses. It ships
                      unpriced so the markup holds no second copy of the sentence. -->
                 <select id="sm-autopress-mode" onchange="toggleSmAutoPressAmount()">
-                    <option value="same">Same as each bet</option>
+                    <option value="same">Same as each game</option>
                     <option value="custom">Custom Amount</option>
                 </select>
                 <div id="sm-autopress-hint" style="display:none; font-size:0.68rem; color:var(--text-muted); margin-top:4px; line-height:1.35;"></div>
@@ -567,7 +600,7 @@ html {
         </div>
 
         <div id="sm-stroke-fields" style="display:none;">
-            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Stroke play, 1v1 or 2v2 (best ball). Leave a field at 0 to skip that bet.</div>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Stroke play, 1v1 or 2v2 (best ball). Leave a field at 0 to skip that game.</div>
             <div class="control-grid" style="margin-bottom:10px;">
                 <div class="control-group">
                     <label>$ Per Hole</label>
@@ -701,7 +734,7 @@ html {
         </div>
 
         <!-- A golfer should never have to wonder which holes their money is riding on. -->
-        <div class="control-group" style="margin-bottom:12px;">
+        <div class="control-group" id="sm-start-hole-group" style="margin-bottom:12px;">
             <label>Starts on</label>
             <select id="sm-start-hole" onchange="renderStartHoleNote()"></select>
             <p id="sm-start-hole-note" style="font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;"></p>
@@ -719,11 +752,11 @@ html {
 <div class="modal-overlay" id="sidematch-delete-modal">
     <div class="modal-content">
         <div class="modal-header">
-            <span>🗑️ Delete this side bet?</span>
+            <span>🗑️ Delete this side game?</span>
             <button class="close-modal" onclick="closeSideMatchDeleteModal()">&times;</button>
         </div>
         <div id="sm-delete-details" style="background:var(--bg-page); border-radius:8px; padding:12px; margin-bottom:14px; font-size:0.9rem; text-align:center;"></div>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:0;">This removes the bet and its result. This can't be undone.</p>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:0;">This removes the game and its result. This can't be undone.</p>
         <div style="display:flex; gap:8px;">
             <button class="btn-outline" style="flex:1;" onclick="closeSideMatchDeleteModal()">Cancel</button>
             <button class="btn-danger-sm" style="flex:1; padding:12px;" onclick="confirmDeleteSideMatch()">Delete</button>
@@ -737,9 +770,9 @@ html {
             <span>✅ Side Match Created!</span>
             <button class="close-modal" onclick="closeSideMatchLinksModal()">&times;</button>
         </div>
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0;">Send each player their own group's scorecard link — that's what lets them actually enter scores.</p>
+        <p id="sm-links-intro" style="font-size:0.85rem; color:var(--text-muted); margin-top:0;">Send each player their own group's scorecard link — that's what lets them actually enter scores.</p>
         <div id="sm-links-list"></div>
-        <button class="btn-primary" style="margin-top:14px;" onclick="closeSideMatchLinksModal()">Got It</button>
+        <button class="btn-primary" id="sm-links-done" style="margin-top:14px;" onclick="closeSideMatchLinksModal()">Got It</button>
     </div>
 </div>
 
@@ -750,7 +783,7 @@ html {
             <span>🏌️ Auto-Pair Whole Field</span>
             <button class="close-modal" onclick="closeAutoPairModal()">&times;</button>
         </div>
-        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Every group against another, 2v2. One shared bet covers all of them.</div>
+        <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Every group against another, 2v2. One shared game covers all of them.</div>
 
         <div class="control-group" style="margin-bottom:10px;">
             <label>Format</label>
@@ -937,6 +970,46 @@ html {
             guides.forEach(a => { a.href = href; });
         })();
 
+        // THE WAY BACK INTO THE ROUND (2026-10-09).
+        //
+        // "Has this round started" is settlement-engine's own question and this
+        // page already loads that file, so it is ASKED rather than re-derived:
+        // computeRoundFinish().started is "at least one golfer with at least one
+        // hole", the same predicate the Receipt uses to decide whether it may
+        // say Final. No money file changes for this - it is read.
+        //
+        // WHICH GROUP, in order: the group on THIS page's URL (a group
+        // scorekeeper's link, explicit), then the organizer's "Score for: Group
+        // N" pick that index.html stores under golfapp_org_group_<CODE>, then
+        // nothing. Getting that order wrong sends a golfer to somebody else's
+        // card.
+        function smSyncGoToRound() {
+            const el = document.getElementById('sm-go-round');
+            if (!el) return;
+            let started = false;
+            try {
+                if (typeof computeRoundFinish === 'function') {
+                    started = !!computeRoundFinish(currentData,
+                        (currentData && currentData.courseData) || [],
+                        (currentData && currentData.scores) || {}).started;
+                }
+            } catch (e) { started = false; }
+            el.innerHTML = started ? 'Go to Round' : '\u25B6 Start Round';
+            let href = 'index.html?game=' + currentMode;
+            let g = urlParams.get('group');
+            if (!g) {
+                // EVERY localStorage TOUCH IS WRAPPED: a private window throws on
+                // access, and a button that cannot be built is worse than one
+                // that forgets a group.
+                try { g = localStorage.getItem('golfapp_org_group_' + currentMode) || null; } catch (e) { g = null; }
+            }
+            if (g) href += '&group=' + g;
+            // setAttribute, not el.href: the property does not write the
+            // attribute back in the suite's DOM, so a test reading the link the
+            // way the markup carries it saw an empty string on a working page.
+            el.setAttribute('href', href);
+        }
+
         db.ref(`events/${currentMode}`).on('value', (snapshot) => {
             currentData = snapshot.val() || {};
             // THE TRIP'S OWNER, when this round belongs to a trip. Does nothing
@@ -948,6 +1021,9 @@ html {
             // not be re-shown. Hiding is applied by the arrival and nothing here
             // touches display.
             renderSideMatches();
+            // ON EVERY SNAPSHOT, so the label follows the round: the first score
+            // posted turns "Start Round" into "Go to Round" without a reload.
+            smSyncGoToRound();
             // THE CUP SURFACE RENDERS ON DATA, like everything else on this page.
             //
             // It did not. Every renderRyderCupSetup() call sat inside an rc* handler -
@@ -1190,7 +1266,16 @@ html {
         };
     }
 
+    // 100b (Manny's 099 answer 3 + 100-PLAN Q7): A SPECTATOR STARTS NOTHING HERE - no New Action,
+    // no press. A bare ?spectate=1 link, a read-only round, or the round frame's own spectator.
+    function smSpectating() {
+        try { if (window.__hpReadOnly === true) return true; } catch (e) {}
+        try { if (window.parent && window.parent !== window && typeof window.parent.hpSpectating === 'function' && window.parent.hpSpectating()) return true; } catch (e) {}
+        try { return urlParams.get('spectate') === '1' && !hasGroupLock; } catch (e) { return false; }
+    }
+    function smRefuseSpectator() { uiRefuse('\u26A0\uFE0F You are watching this round - a scorekeeper starts games and presses.'); }
     function openSideMatchModal() {
+        if (smSpectating()) { smRefuseSpectator(); return; }
         // A plain "+ SIDE BETS" tap leaves challenge mode behind, so the button
         // cannot be stuck on Send from a previous visit.
         if (!challengeMode) syncChallengeMode();
@@ -1238,7 +1323,7 @@ html {
         if (owner) owner.style.display = step === 'owner' ? 'block' : 'none';
         if (form) form.style.display = step === 'form' ? 'block' : 'none';
         const title = document.getElementById('sm-modal-title');
-        if (title) title.textContent = step === 'form' ? '\u2694\uFE0F New Action' : '\u2694\uFE0F Side Bets';
+        if (title) title.textContent = step === 'form' ? '\u2694\uFE0F New Action' : '\u2694\uFE0F Side Games';
     }
 
     function pickActionScope(scope) {
@@ -1258,7 +1343,7 @@ html {
         const map = buildPlayerGroupMap();
         wrap.innerHTML = groups.map(g => {
             const names = players.filter(p => String(map[String(p.id)]) === String(g))
-                .map(p => p.name.split(' ')[0]).join(', ');
+                .map(p => shortOf(p)).join(', ');
             return `<button type="button" class="sm-scope-choice" onclick="pickOwnerGroup(${g})">`
                 + `<strong>Group ${g}</strong><small>${names || 'No golfers'}</small></button>`;
         }).join('');
@@ -1437,6 +1522,13 @@ html {
         document.getElementById("sm-stake-group").style.display = (!isStroke && !fieldGame && !isNassau) ? "block" : "none";
         document.getElementById("sm-nassau-stake-group").style.display = (isNassau && !fieldGame) ? "block" : "none";
         document.getElementById("sm-press-rule-group").style.display = (!isStroke && !fieldGame) ? "block" : "none";
+        // HI-LO (016): one amount, $ a point; no presses; 2v2 only - said up front.
+        const isHilo = format === 'hilo';
+        if (isHilo) document.getElementById("sm-press-rule-group").style.display = "none";
+        const stakeLbl = document.getElementById("sm-stake-label");
+        if (stakeLbl) stakeLbl.textContent = isHilo ? '$ per point' : 'Stake ($)';
+        const hiloNote = document.getElementById("sm-hilo-note");
+        if (hiloNote) hiloNote.style.display = isHilo ? 'block' : 'none';
         const apg = document.getElementById("sm-autopress-group");
         if (apg) apg.style.display = (isNassau && !fieldGame) ? "block" : "none";
         // PRICED AS IT IS REVEALED. Choosing Nassau is what makes this control
@@ -1458,6 +1550,10 @@ html {
 
         const fieldBox = document.getElementById('sm-field-fields');
         if (fieldBox) fieldBox.style.display = fieldGame ? 'block' : 'none';
+        // ONE "Starts on" (013-15): a field game (Dots, Skins, 9 Points) has its own picker in
+        // sm-field-fields - the one saveFieldAction reads - so the match's picker is hidden.
+        const startBox = document.getElementById('sm-start-hole-group');
+        if (startBox) startBox.style.display = fieldGame ? 'none' : 'block';
         const skinsOnly = document.getElementById('sm-skins-only');
         if (skinsOnly) skinsOnly.style.display = (format === 'skins') ? 'block' : 'none';
         // Skins takes a buy-in per golfer; Dots is priced per dot. Naming the amount
@@ -1577,7 +1673,9 @@ html {
     function npCommit(players) {
         const chosen = npChosen(players);
         if (chosen.length !== 3) {
-            uiRefuse(`\u26A0\uFE0F 9 Points is played by exactly three golfers \u2014 you have picked ${chosen.length}.`);
+            // 100b (099 list): a clear message at 2 golfers.
+            uiRefuse(chosen.length === 2 ? '\u26A0\uFE0F 9 Points is for exactly 3 golfers. You have 2: try Match or Skins.'
+                : `\u26A0\uFE0F 9 Points is played by exactly three golfers \u2014 you have picked ${chosen.length}.`);
             return false;
         }
         if (typeof canCreateWagerWith === 'function' && !canCreateWagerWith(chosen)) {
@@ -1620,7 +1718,7 @@ html {
         const leftOut = players.filter(pl => !chosenIds.includes(String(pl.id)));
         if (leftOut.length > 0) {
             wrap.innerHTML += `<p style="flex-basis:100%; font-size:0.74rem; color:var(--text-muted); margin:6px 0 0 0;">`
-                + `${leftOut.map(pl => pl.name.split(' ')[0]).join(', ')} `
+                + `${leftOut.map(pl => shortOf(pl)).join(', ')} `
                 + `${leftOut.length === 1 ? 'is' : 'are'} out of this game only \u2014 still scoring, still in every whole-field game.</p>`;
         }
 
@@ -1629,7 +1727,7 @@ html {
             const holes = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
             const parts = players.filter(p => chosenIds.includes(String(p.id)));
             const auto = (typeof sideMatchStartHole === 'function')
-                ? sideMatchStartHole(parts.length ? parts : players, holes, currentData.scores || {})
+                ? sideMatchStartHole(parts.length ? parts : players, holes, currentData.scores || {}, currentData)
                 : 1;
             startSel.innerHTML = holes.map(h =>
                 `<option value="${h.hole}" ${h.hole === auto ? 'selected' : ''}>Hole ${h.hole}</option>`).join('');
@@ -1644,9 +1742,12 @@ html {
                 : chosenIds.length;
             note.textContent = format === 'dots'
                 ? `$${buyIn} per dot \u00B7 ${n} golfers`
-                : (n >= 2
+                : (format === 'nines' && n !== 3
+                    // 100b: 9 Points says its own count (it said "Pick at least two golfers." with 2 picked).
+                    ? (n === 2 ? '9 Points is for exactly 3 golfers. You have 2: try Match or Skins.' : '9 Points is for exactly 3 golfers. You have ' + n + '.')
+                    : (n >= 2
                     ? `$${buyIn} buy-in each \u00B7 ${n} golfers \u00B7 $${buyIn * n} pot`
-                    : 'Pick at least two golfers.');
+                    : 'Pick at least two golfers.'));
         }
     }
 
@@ -1702,7 +1803,7 @@ html {
                 // Inside a group game every name is in the same group, so the tag is noise.
                 const groupTag = (!showHeads && distinctGroups > 1 && actionScope !== 'group')
                     ? `<span style="display:block; font-size:0.62rem; opacity:0.7; font-weight:normal;">Group ${grp || '?'}</span>` : '';
-                html += `<div class="player-pick-badge ${cls}" onclick="pickPlayerForSide('${p.id}')">${order}${p.name.split(' ')[0]}${tag}${groupTag}</div>`;
+                html += `<div class="player-pick-badge ${cls}" onclick="pickPlayerForSide('${p.id}')">${order}${shortOf(p)}${tag}${groupTag}</div>`;
             });
             wrapper.innerHTML = html || `<div style="font-size:0.8rem; color:var(--text-muted);">No players found — set up players on the Home page first.</div>`;
         }
@@ -1776,7 +1877,7 @@ html {
         // stored cannot disagree.
         const firstName = id => {
             const p = players.find(x => String(x.id) === String(id));
-            return p ? p.name.split(' ')[0] : id;
+            return p ? shortOf(p) : id;
         };
         const nameList = ids => ids.map(firstName).join(' & ');
 
@@ -1802,6 +1903,12 @@ html {
         }
         // 2v2 Stroke Play is supported: the engine takes the whole side and scores it
         // best ball, and settlement splits the stake evenly between teammates.
+        // HI-LO (016) is 2v2 only: a 1v1 is not a pairing it can play.
+        if (format === 'hilo' && teamAIds.length !== 2) {
+            indicator.innerHTML = `<span style="color:var(--accent-red);">⚠️ Hi-Lo is two against two — tap two more golfers.</span>`;
+            preview.style.display = 'none';
+            return;
+        }
 
         // THE ANCHOR RULE, SHOWN BEFORE SAVE.
         //
@@ -1826,8 +1933,8 @@ html {
 
         const teamAPlayers = players.filter(p => teamAIds.includes(String(p.id)));
         const teamBPlayers = players.filter(p => teamBIds.includes(String(p.id)));
-        const namesA = teamAPlayers.map(p => p.name.split(' ')[0]).join(' + ');
-        const namesB = teamBPlayers.map(p => p.name.split(' ')[0]).join(' + ');
+        const namesA = teamAPlayers.map(p => shortOf(p)).join(' + ');
+        const namesB = teamBPlayers.map(p => shortOf(p)).join(' + ');
 
         // Stroke-index handicap preview — only meaningful for a genuine 1v1, matching exactly
         // how getStrokes/parseHcp are already used everywhere else in this file, nothing new.
@@ -1842,7 +1949,7 @@ html {
                     strokesTotal += Math.abs(sA - sB) > 0 ? Math.max(sA, sB) - Math.min(sA, sB) : 0;
                 });
                 const higherHcpPlayer = hcpA > hcpB ? teamAPlayers[0] : teamBPlayers[0];
-                if (strokesTotal > 0) strokeNote = `<div style="margin-top:4px; font-size:0.78rem; color:var(--text-muted);">${higherHcpPlayer.name.split(' ')[0]} receives ${strokesTotal} stroke${strokesTotal === 1 ? '' : 's'}</div>`;
+                if (strokesTotal > 0) strokeNote = `<div style="margin-top:4px; font-size:0.78rem; color:var(--text-muted);">${shortOf(higherHcpPlayer)} receives ${strokesTotal} stroke${strokesTotal === 1 ? '' : 's'}</div>`;
             }
         }
 
@@ -2078,7 +2185,7 @@ html {
         const ids = (selectedIds || []).map(String);
         if (ids.length === 0) return '';
         if (crossGroupWagerIsAnchored(ids)) return '';
-        return 'This is Group ' + lockedGroup + '\u2019s link, so an Any Group wager needs at least one Group '
+        return 'This is Group ' + lockedGroup + '\u2019s link, so an Any Group match needs at least one Group '
             + lockedGroup + ' golfer in it.';
     }
 
@@ -2118,6 +2225,9 @@ html {
         const involvedIds = teamAIds.concat(teamBIds);
 
         let html = '';
+        // One group: the "send each player their own group's link" line is not true here (013-12).
+        const intro = document.getElementById('sm-links-intro');
+        if (intro) intro.style.display = isMultiGroup ? '' : 'none';
         if (!isMultiGroup) {
             html = `<div style="font-size:0.85rem; color:var(--text-muted); text-align:center; padding:10px 0;">Only one group in this round — everyone already has score access via the main link.</div>`;
         } else {
@@ -2128,7 +2238,7 @@ html {
                 seenGroups.add(group);
                 const namesInGroup = involvedIds
                     .filter(pid => groupMap[String(pid)] === group)
-                    .map(pid => { const p = players.find(pl => String(pl.id) === String(pid)); return p ? p.name.split(' ')[0] : '?'; })
+                    .map(pid => { const p = players.find(pl => String(pl.id) === String(pid)); return p ? shortOf(p) : '?'; })
                     .join(' & ');
                 const url = `${scorecardBaseUrl()}?game=${currentMode}&group=${group}`;
                 html += `<div class="team-link-row">
@@ -2173,7 +2283,7 @@ html {
         const parts = (currentData.players || [])
             .filter(p => teamAIds.includes(String(p.id)) || teamBIds.includes(String(p.id)));
         const auto = (typeof sideMatchStartHole === 'function')
-            ? sideMatchStartHole(parts, holes, currentData.scores || {})
+            ? sideMatchStartHole(parts, holes, currentData.scores || {}, currentData)
             : (holes.length ? holes[0].hole : 1);
 
         sel.innerHTML = holes.map(h =>
@@ -2190,7 +2300,7 @@ html {
         const last = holes.length ? Math.max.apply(null, holes) : 18;
         note.textContent = start <= 1
             ? `The whole round counts \u2014 Holes 1\u2013${last}.`
-            : `Only Holes ${start}\u2013${last} count for this bet. Earlier holes are already played and don't count.`;
+            : `Only Holes ${start}\u2013${last} count for this game. Earlier holes are already played and don't count.`;
     }
 
     // Skins and Dots are saved as ADDITIONAL GAME INSTANCES, not side matches.
@@ -2316,12 +2426,18 @@ html {
         }
 
         const key = db.ref(`events/${currentMode}/additionalGameInstances`).push().key;
-        db.ref(`events/${currentMode}/additionalGameInstances/${key}`).set(entry)
-            .then(() => { closeSideMatchModal(); })
+        // 100b: THROUGH THE OFFLINE QUEUE (the + Bet sheet's path): with no signal the game is kept on
+        // this phone and sent when the signal returns - the sheet closes now and says so.
+        if (smOfflineNow()) { smDurableSet(`events/${currentMode}/additionalGameInstances/${key}`, entry); smSavedOffline(); return; }
+        smDurableSet(`events/${currentMode}/additionalGameInstances/${key}`, entry)
+            .then(() => {
+                closeSideMatchModal();
+            })
             .catch(err => uiFail('\u26A0\uFE0F Could not save: ' + err.message));
     }
 
     function saveSideMatch() {
+        if (smSpectating()) { smRefuseSpectator(); return; }
         const chosenFormat = document.getElementById("sm-format").value;
         if (isFieldAction(chosenFormat)) { saveFieldAction(chosenFormat); return; }
 
@@ -2368,7 +2484,7 @@ html {
         // The anchor rule. Under Across Groups this now permits a genuine
         // cross-group match, provided this foursome is actually in it.
         if (!canCreateWagerWith(teamAIds.concat(teamBIds))) {
-            console.warn('Blocked: wager not anchored to Group ' + lockedGroup + '.');
+            console.warn('Blocked: game not anchored to Group ' + lockedGroup + '.');
             uiRefuse(actionScope === 'cross'
                 ? '\u26A0\uFE0F This is Group ' + lockedGroup + '\u2019s scorekeeper link, so an Any Group match needs '
                     + 'at least one Group ' + lockedGroup + ' golfer in it. Ask the organizer to set up a match '
@@ -2398,7 +2514,7 @@ html {
         const smParticipants = (currentData.players || [])
             .filter(p => teamAIds.includes(String(p.id)) || teamBIds.includes(String(p.id)));
         const autoStart = (typeof sideMatchStartHole === 'function')
-            ? sideMatchStartHole(smParticipants, currentData.courseData || [], currentData.scores || {})
+            ? sideMatchStartHole(smParticipants, currentData.courseData || [], currentData.scores || {}, currentData)
             : 1;
         const chosenEl = document.getElementById('sm-start-hole');
         const chosen = chosenEl ? parseInt(chosenEl.value, 10) : NaN;
@@ -2436,6 +2552,19 @@ html {
                 ? document.getElementById("sm-autopress-stake").value : null
         };
 
+        // HI-LO (016): four golfers, an amount, no presses.
+        if (format === 'hilo') {
+            if (!(typeof hiloShapeOk === 'function' && hiloShapeOk(teamAIds, teamBIds))) {
+                uiRefuse('\u26A0\uFE0F Hi-Lo is two against two \u2014 tap four golfers.');
+                return;
+            }
+            if (!((parseFloat(terms.stake) || 0) > 0)) {
+                uiRefuse('\u26A0\uFE0F Set the $ per point above 0, or this game won\u2019t track any money.');
+                return;
+            }
+            terms.pressRule = 'none';
+        }
+
         // THE STROKE REFUSAL STAYS ON THIS SURFACE, because it is a sentence about
         // this form. challenges.js has the same rule for a challenge's terms; both
         // exist because a bet with neither amount tracks no money, and a golfer who
@@ -2459,13 +2588,51 @@ html {
         });
 
         const pushKey = db.ref(`events/${currentMode}/sideMatches`).push().key;
-        db.ref(`events/${currentMode}/sideMatches/${pushKey}`).set(payload)
+        // 100b: through the offline queue, as above.
+        if (smOfflineNow()) { smDurableSet(`events/${currentMode}/sideMatches/${pushKey}`, payload); smSavedOffline(); return; }
+        smDurableSet(`events/${currentMode}/sideMatches/${pushKey}`, payload)
             .then(() => {
                 closeSideMatchModal();
                 openSideMatchLinksModal(teamAIds, teamBIds);
             })
             .catch(err => uiFail(`Failed to save: ${err.message}`));
     }
+
+    // ---- 100b: MATCHES-PAGE BETS QUEUE OFFLINE ------------------------------------------------
+    // The same durable queue the scorecard and the + Bet sheet use (offline-queue.js, the phone's
+    // localStorage): enqueue FIRST, then the write; the op leaves the queue only when the server
+    // confirms it. Killed with no signal, the bet is still on the phone, and this page (on the
+    // online event, and on arrival) or the scorecard (its own drain) sends it when signal returns.
+    function smStore() { try { return localStorage; } catch (e) { return null; } }
+    function smOfflineNow() { try { return typeof navigator !== 'undefined' && navigator.onLine === false; } catch (e) { return false; } }
+    function smDurableSet(path, value) {
+        const q = window.OfflineQueue, store = smStore();
+        let op = null;
+        if (q && store) { try { op = q.enqueue(store, { path: path, type: 'set', value: value, coalesceKey: path }); } catch (e) { op = null; } }
+        const p = db.ref(path).set(value);
+        p.then(() => { if (op && q && store) { try { q.confirm(store, op.id, op.v); } catch (e) {} } }, () => {});
+        return p;
+    }
+    function smSavedOffline() {
+        closeSideMatchModal();
+        uiToast('\u2705 Saved. Sends when you have signal.');
+    }
+    let smDraining = false;
+    function smDrainQueue() {
+        const q = window.OfflineQueue, store = smStore();
+        if (!q || !store || smDraining || smOfflineNow() || !currentMode || /^L-/.test(String(currentMode))) return Promise.resolve(null);
+        const pre = 'events/' + currentMode + '/', cutoff = Date.now() - (q.STALE_MS || 6 * 3600 * 1000);
+        smDraining = true;
+        return q.drain(store, op => {
+            const ref = db.ref(op.path);
+            if (op.type === 'remove' || op.value === null) return ref.remove();
+            if (op.type === 'update') return ref.update(op.value);
+            return ref.set(op.value);
+        }, { timeoutMs: 12000, only: op => !!(op && typeof op.path === 'string' && op.path.indexOf(pre) === 0 && !(Number(op.ts) < cutoff)) })
+            .then(r => { smDraining = false; return r; }, () => { smDraining = false; return null; });
+    }
+    try { window.addEventListener('online', () => { smDrainQueue(); }); } catch (e) {}
+    setTimeout(() => { smDrainQueue(); }, 1500);
 
     let pendingDeleteMatchId = null;
 
@@ -2478,13 +2645,13 @@ html {
         const players = currentData.players || [];
         pendingDeleteMatchId = matchId;
 
-        let detailsHtml = 'This side bet';
+        let detailsHtml = 'This side game';
         if (sm) {
             const teamAIds = (sm.teamAIds || []).map(String);
             const teamBIds = (sm.teamBIds || []).map(String);
-            const namesA = players.filter(p => teamAIds.includes(String(p.id))).map(p => p.name.split(' ')[0]).join(' + ');
-            const namesB = players.filter(p => teamBIds.includes(String(p.id))).map(p => p.name.split(' ')[0]).join(' + ');
-            const formatLabel = sm.format === 'nassau' ? 'Nassau' : (sm.format === 'stroke' ? 'Stroke Play' : 'Match Play');
+            const namesA = players.filter(p => teamAIds.includes(String(p.id))).map(p => shortOf(p)).join(' + ');
+            const namesB = players.filter(p => teamBIds.includes(String(p.id))).map(p => shortOf(p)).join(' + ');
+            const formatLabel = sm.format === 'nassau' ? 'Nassau' : (sm.format === 'stroke' ? 'Stroke Play' : (sm.format === 'hilo' ? 'Hi-Lo' : 'Match Play'));
             const stakeText = sm.format === 'stroke'
                 ? `$${sm.holeStake || 0}/hole, $${sm.overallStake || 0} overall`
                 : `$${sm.stake || 0}`;
@@ -2637,8 +2804,8 @@ html {
         }
         let html = "";
         autoPairPreview.forEach(m => {
-            const aNames = m.teamA.map(p => p.name.split(' ')[0]).join(' / ');
-            const bNames = m.teamB.map(p => p.name.split(' ')[0]).join(' / ');
+            const aNames = m.teamA.map(p => shortOf(p)).join(' / ');
+            const bNames = m.teamB.map(p => shortOf(p)).join(' / ');
             html += `<div style="display:flex; justify-content:space-between; padding:6px 10px; background:var(--nav-bg); border-radius:6px; margin-bottom:4px; font-size:0.85rem;">
                 <span>${aNames}</span><span style="color:var(--text-muted);">vs</span><span>${bNames}</span>
             </div>`;
@@ -2692,7 +2859,7 @@ html {
     // spot on the 14th tee invent a wager that exists on one phone and nowhere else.
     function pressMatchNames(sm) {
         const players = currentData.players || [];
-        const nm = id => { const p = players.find(x => String(x.id) === String(id)); return p ? p.name.split(' ')[0] : '?'; };
+        const nm = id => { const p = players.find(x => String(x.id) === String(id)); return p ? shortOf(p) : '?'; };
         return `${(sm.teamAIds || []).map(nm).join(' / ')} vs ${(sm.teamBIds || []).map(nm).join(' / ')}`;
     }
 
@@ -2710,6 +2877,17 @@ html {
         if (typeof alohaMainGameMatch !== 'function') return null;
         return alohaMainGameMatch(currentData);
     }
+    // POLISH #2 (2026-10-20): a golfer's short name is the round's, not the first word -
+    // "Test A" / "Test B" when two share a first name (text-safe.js golferShortName).
+    // shownRound / shownList hand the presenters the display copy; labels only, never saved.
+    function shortOf(p) {
+        if (!p) return '';
+        const ps = (typeof currentData !== 'undefined' && currentData && currentData.players) || [];
+        return (typeof golferShortName === 'function' && typeof p.name === 'string' && p.name.trim())
+            ? golferShortName(p, ps) : String(p.name || '').split(' ')[0];
+    }
+    function shownRound() { return (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(currentData) : currentData; }
+    function shownList(list) { return (list && typeof playersForDisplay === 'function') ? playersForDisplay(list, currentData.players) : list; }
     function mainGameAlohaRowHtml() {
         const sm = mainGameAloha();
         if (!sm) return '';
@@ -2724,7 +2902,7 @@ html {
         const virtual = players.map(p => Object.assign({}, p, { team: idsA.indexOf(String(p.id)) > -1 ? 'Team 1' : 'Team 2' }));
         const presses = sm.presses ? Object.values(sm.presses) : [];
         try {
-            return calculateMatchEngine(virtual, currentData.courseData || [], currentData.scores || {},
+            return calculateMatchEngine(shownList(virtual), currentData.courseData || [], currentData.scores || {},
                 sm.scoring, sm.format, sm.pressRule, sm.stake, 0, presses,
                 (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(currentData) : undefined));
         } catch (e) { return null; }
@@ -2922,7 +3100,7 @@ html {
     }
     function alohaCourseFor(sm) {
         return (typeof sideMatchHoles === 'function')
-            ? sideMatchHoles(sm, currentData.courseData || [])
+            ? sideMatchHoles(sm, currentData.courseData || [], currentData)
             : (currentData.courseData || []);
     }
     function alohaCalcFor(sm) {
@@ -2931,7 +3109,7 @@ html {
         const virtual = ps.map(p => Object.assign({}, p, { team: idsA.indexOf(String(p.id)) > -1 ? 'Team 1' : 'Team 2' }));
         const presses = sm.presses ? Object.values(sm.presses) : [];
         try {
-            return calculateMatchEngine(virtual, alohaCourseFor(sm), currentData.scores || {},
+            return calculateMatchEngine(shownList(virtual), alohaCourseFor(sm), currentData.scores || {},
                 sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, presses,
                 (typeof nassauStakeConfig === 'function' ? nassauStakeConfig(sm) : undefined));
         } catch (e) { return null; }
@@ -2940,6 +3118,7 @@ html {
     // ASYNC because the amount is now a sheet, not prompt(). Called only from an
     // onclick, so nothing awaits this function itself and nothing needs to.
     async function pressSideMatch(matchId, baseId, nextHole) {
+        if (smSpectating()) { smRefuseSpectator(); return; }
         const sm = sideMatchById(matchId);
         if (!canPressSideMatch(sm)) return refuseGroupWrite('press that match');
         // CUSTOM PRESS AMOUNTS. "Press you for $78" is a different bet from "press
@@ -2962,7 +3141,9 @@ html {
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/presses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/presses/${pushKey}`).set({ baseId, startHole: nextHole, stake: amt })
-            .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${pressMatchNames(sm)}\n$${amt}\nStarts Hole ${nextHole}`))
+            .then(() => {
+                uiToast(`\u2705 PRESS CONFIRMED\n${pressMatchNames(sm)}\n$${amt}\nStarts Hole ${nextHole}`);
+            })
             .catch(err => uiFail(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
@@ -3025,6 +3206,7 @@ html {
     }
 
     function showSideHolePressInput(matchId, p1Id, p2Id) {
+        if (smSpectating()) { smRefuseSpectator(); return; }
         if (!canPressSideMatch(sideMatchById(matchId))) return refuseGroupWrite('press that match');
         const players = currentData.players || [];
         const p1 = players.find(p => String(p.id) === String(p1Id));
@@ -3075,6 +3257,7 @@ html {
 
     // ASYNC for the same reason as pressSideMatch above.
     async function pressSideMatchOverall(matchId, p1Id, p2Id) {
+        if (smSpectating()) { smRefuseSpectator(); return; }
         if (!canPressSideMatch(sideMatchById(matchId))) return refuseGroupWrite('press that match');
         const players = currentData.players || [];
         const p1 = players.find(p => String(p.id) === String(p1Id));
@@ -3090,7 +3273,7 @@ html {
         const origO = smO && smO.overallStake ? smO.overallStake : 0;
         const rawO = await uiAmount({
             title: `Press amount ($) \u2014 starts hole ${nextHole}`,
-            body: 'This press runs from that hole to the end of the bet.',
+            body: 'This press runs from that hole to the end of the game.',
             value: origO || '', confirmText: 'Start press'
         });
         if (rawO === null) return;
@@ -3099,7 +3282,7 @@ html {
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) return;
         const pushKey = db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses`).push().key;
         db.ref(`events/${currentMode}/sideMatches/${matchId}/overallPresses/${pushKey}`).set({ startHole: nextHole, stake: amtO })
-            .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${p1.name.split(' ')[0]} vs ${p2.name.split(' ')[0]}\n$${amtO}\nStarts Hole ${nextHole}`))
+            .then(() => uiToast(`\u2705 PRESS CONFIRMED\n${shortOf(p1)} vs ${shortOf(p2)}\n$${amtO}\nStarts Hole ${nextHole}`))
             .catch(err => uiFail(`\u26A0\uFE0F PRESS NOT SAVED\n${err.message}\nNothing was created \u2014 try again.`));
     }
 
@@ -3134,7 +3317,7 @@ html {
         let playerRows = '';
         virtualPlayers.forEach(p => {
             let outScore = 0, inScore = 0;
-            let row = `<td class="sm-row-label">${p.name.split(' ')[0]}</td>`;
+            let row = `<td class="sm-row-label">${shortOf(p)}</td>`;
 
             function scoreCell(h) {
                 const v = savedScores[`p${p.id}_h${h.hole}`];
@@ -3728,7 +3911,7 @@ html {
                           + '<label class="rcs-lab">Scoring</label>'
                           + '<select class="rcs-in" onchange="rcSetSessionScoring(\'' + s.id + '\', this.value)">'
                           + '<option value="scratch"' + (rcSessionScoring(s.id) === 'handicap' ? '' : ' selected') + '>Scratch</option>'
-                          + '<option value="handicap"' + (rcSessionScoring(s.id) === 'handicap' ? ' selected' : '') + '>Handicap \u2014 WHS Foursomes allowance</option>'
+                          + '<option value="handicap"' + (rcSessionScoring(s.id) === 'handicap' ? ' selected' : '') + '>Handicap \u2014 foursomes allowance</option>'
                           + '</select>'
                         : '')
                     + '<button type="button" class="rcs-add" style="width:100%"'
@@ -3998,7 +4181,7 @@ html {
 
     function challengeNameOf(id) {
         const p = (currentData.players || []).find(x => String(x.id) === String(id));
-        return p ? p.name.split(' ')[0] : '?';
+        return p ? shortOf(p) : '?';
     }
 
     // The viewer, as a roster id - the same storage the scorecard writes.
@@ -4072,7 +4255,7 @@ html {
         const parts = (currentData.players || [])
             .filter(p => String(p.id) === String(ch.from) || String(p.id) === String(ch.to));
         const auto = (typeof sideMatchStartHole === 'function')
-            ? sideMatchStartHole(parts, currentData.courseData || [], currentData.scores || {}) : 1;
+            ? sideMatchStartHole(parts, currentData.courseData || [], currentData.scores || {}, currentData) : 1;
         const startHole = Math.max(Number(ch.terms.startHole) || 1, auto || 1);
 
         const payload = sideMatchPayloadFromTerms(ch.terms, {
@@ -4089,7 +4272,7 @@ html {
         updates[`events/${currentMode}/challenges/${id}/matchId`] = matchKey;
         try {
             await db.ref().update(updates);
-            uiToast('\u2705 BET ON\n' + challengePendingLine(ch, challengeNameOf).replace(/^Pending: /, ''));
+            uiToast('\u2705 GAME ON\n' + challengePendingLine(ch, challengeNameOf).replace(/^Pending: /, ''));
         } catch (err) {
             uiFail('\u26A0\uFE0F NOT ACCEPTED\n' + err.message + '\nNothing was created \u2014 try again.');
         }
@@ -4108,7 +4291,7 @@ html {
         try {
             await db.ref(`events/${currentMode}/challenges/${id}`)
                 .update({ status: next, answeredAt: Date.now() });
-            uiToast(next === 'declined' ? '\u2716 DECLINED\nNo bet was created.' : 'Withdrawn.');
+            uiToast(next === 'declined' ? '\u2716 DECLINED\nNo game was created.' : 'Withdrawn.');
         } catch (err) {
             uiFail('\u26A0\uFE0F NOT SAVED\n' + err.message);
         }
@@ -4120,7 +4303,7 @@ html {
         const list = document.getElementById("sidematches-list");
         if (!list) return;
 
-        const players = currentData.players || [];
+        const players = shownList(currentData.players || []);   // polish #2: "Test A" / "Test B" on every card; ids unchanged
         const courseData = currentData.courseData || [];
         const savedScores = currentData.scores || {};
         const sideMatches = currentData.sideMatches || {};
@@ -4148,7 +4331,7 @@ html {
             const othersExist = Object.keys(sideMatches).length > 0 && hasGroupLock;
             list.innerHTML = roundGamesLine + mainAlohaLine + (othersExist
                 ? `<div style="text-align:center; padding:14px; color:var(--text-muted); font-size:0.85rem;">No matches with a Group ${lockedGroup} golfer in them yet — tap below to add one.</div>`
-                : `<div style="text-align:center; padding:14px; color:var(--text-muted); font-size:0.85rem;">No action yet — tap below to add a bet between any players in the field.</div>`);
+                : `<div style="text-align:center; padding:14px; color:var(--text-muted); font-size:0.85rem;">No action yet — tap below to add a game between any players in the field.</div>`);
             return;
         }
 
@@ -4156,7 +4339,7 @@ html {
         // like the engines, and a missing presenter must break this card loudly
         // rather than render every match with a blank line.
         const rowsById = {};
-        buildSideActionRows(currentData, courseData, savedScores, players).forEach(r => { rowsById[r.key] = r; });
+        buildSideActionRows(shownRound(), courseData, savedScores, shownList(players)).forEach(r => { rowsById[r.key] = r; });
 
         let html = "";
         visibleIds.sort((a, b) => (sideMatches[a].createdAt || 0) - (sideMatches[b].createdAt || 0)).forEach(matchId => {
@@ -4174,14 +4357,17 @@ html {
             // Only holes from this match's own start hole forward. A match with no
             // startHole covers the whole round, exactly as before.
             const smCourse = (typeof sideMatchHoles === 'function')
-                ? sideMatchHoles(sm, courseData)
+                ? sideMatchHoles(sm, courseData, currentData)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
 
-            const sideName = (side) => side.map(pl => pl.name.split(' ')[0]).join(' / ');
+            const sideName = (side) => side.map(pl => shortOf(pl)).join(' / ');
             const sideAName = sideName(teamAPlayers);
             const sideBName = sideName(teamBPlayers);
             const rangeText = (typeof sideMatchRangeText === 'function') ? sideMatchRangeText(sm, courseData) : '';
-            const resultLine = sideMatchResultLine(rowsById[matchId]);
+            // 2.0 (25) ADVISOR-0725 (7:51 e): a match set to count from a later hole nobody has reached says
+            // when it starts - not "FINAL · All square" (text-safe.js).
+            const startsHole = (typeof hpSideMatchStartsHole === 'function') ? hpSideMatchStartsHole(sm, smCourse, savedScores) : 0;
+            const resultLine = startsHole ? escapeHtml(hpSideMatchStartsText(startsHole)) : sideMatchResultLine(rowsById[matchId]);
 
             let formatLine;
             if (sm.format === 'stroke') {
@@ -4198,13 +4384,17 @@ html {
                 }
                 if ((sm.overallStake || 0) > 0) stakes.push(`$${sm.overallStake} overall`);
                 if (stakes.length) formatLine += ` • ${stakes.join(' + ')}`;
+            } else if (sm.format === 'hilo') {
+                formatLine = `Hi-Lo • ${(sm.scoring || 'net').toUpperCase()}${Number(sm.stake) > 0 ? ' • $' + sm.stake + '/point' : ''}`;   // 2.0 (25): no amount = no $
             } else {
                 // NASSAU GETS THE SHARED LABEL. A Step-6 Nassau keeps its price in
                 // frontStake/backStake/overallStake and leaves `stake` at 0, so a
                 // generic "$0/match" would misprice a real bet.
                 const label = (sm.format === 'nassau' && typeof nassauStakeLabel === 'function') ? nassauStakeLabel(sm) : '';
-                const price = label || (`$${sm.stake || 0}/match` + (sm.pressRule && sm.pressRule !== 'none' ? ' • Press: ' + sm.pressRule : ''));
-                formatLine = `${sm.format === 'nassau' ? 'Nassau' : 'Match Play'} • ${(sm.scoring || 'net').toUpperCase()} • ${price}`;
+                // ZERO-STAKE (2.0 (24) ADVISOR-2245): a Match / Nassau played for nothing shows its terms with no $.
+                const stakeFree = (typeof sideMatchStakeFree === 'function') && sideMatchStakeFree(sm);
+                const price = stakeFree ? sideMatchStakeFreeTerms(sm) : (label || (`$${sm.stake || 0}/match` + (sm.pressRule && sm.pressRule !== 'none' ? ' • Press: ' + sm.pressRule : '')));
+                formatLine = `${sm.format === 'nassau' ? 'Nassau' : 'Match Play'} • ${(sm.scoring || 'net').toUpperCase()}${price ? ' • ' + price : ''}`;
             }
             if (rangeText) formatLine += ` • ${rangeText}`;
 
@@ -4225,6 +4415,8 @@ html {
                         html += `<button class="btn-outline-sm" onclick="pressSideMatchOverall('${matchId}', '${p1.id}', '${p2.id}')">➕ Press Overall</button>`;
                     }
                 }
+            } else if (sm.format === 'hilo') {
+                // Hi-Lo has no presses and no Aloha (016).
             } else {
                 // Press eligibility reads the engine's segment state - which base is
                 // still open, how far the match has gone - so the rule that decides
@@ -4234,9 +4426,13 @@ html {
                 const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses, nassauStakeConfig(sm));
                 if (calc) {
                     const lastHole = courseData.length > 0 ? Math.max(...courseData.map(h => h.hole)) : 18;
-                    const nextPressHole = Math.min(calc.maxThru + 1, lastHole);
+                    // 100b: THE PRESS STARTS ON A HOLE, NOT A COUNT. calc.maxThru is how many holes of this
+                    // match are played (match-engine.js), so a match from 7 with 7-9 in pressed "hole 4" - a
+                    // hole outside the match, which never counted. The next hole is the one after those, in
+                    // the match's own play order (smCourse); none left = no Press button.
+                    const nextPressHole = smCourse[calc.maxThru] ? Number(smCourse[calc.maxThru].hole) : null;
                     const anyOpenPressable = calc.activeMatches.some(m => !m.closed);
-                    if (sm.pressRule === 'anytime' && anyOpenPressable && calc.maxThru > 0 && calc.maxThru < lastHole) {
+                    if (sm.pressRule === 'anytime' && anyOpenPressable && calc.maxThru > 0 && nextPressHole != null && !smSpectating()) {
                         const openBase = calc.activeMatches.find(m => !m.closed && m.pressNum === 0) || calc.activeMatches.find(m => !m.closed);
                         if (openBase && canPressSideMatch(sm)) html += `<button class="btn-outline-sm" onclick="pressSideMatch('${matchId}', '${openBase.baseId}', ${nextPressHole})">➕ Press</button>`;
                     }
@@ -4295,7 +4491,7 @@ html {
         }
         if (labels.length === 0) return '';
         return `<div id="sm-round-games" style="font-size:0.78rem; color:var(--text-muted); padding:6px 2px 10px 2px;">
-            Round games: ${labels.map(escapeHtml).join(' · ')} — live on <a href="skins.html" class="nav-link" style="color:var(--brand-green); font-weight:bold;">💰 Bets</a>
+            Round games: ${labels.map(escapeHtml).join(' · ')} — live on <a href="skins.html" class="nav-link" style="color:var(--brand-green); font-weight:bold;">⛳ Games</a>
         </div>`;
     }
 

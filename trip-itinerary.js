@@ -65,6 +65,8 @@ var TRIP_ITIN_SKIP = /^\s*$|^\s*(itinerary|confirmation|booking|total|notes?|gol
 var TRIP_ITIN_MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7,
                          aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
 
+var TRIP_ITIN_MONTH_NAMES = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+
 function tripItinPad(n) { return (n < 10 ? '0' : '') + n; }
 
 function tripItinDate(text, defaultYear) {
@@ -92,6 +94,10 @@ function tripItinDate(text, defaultYear) {
         var mo = TRIP_ITIN_MONTHS[String(m[1]).toLowerCase().slice(0, 4)]
               || TRIP_ITIN_MONTHS[String(m[1]).toLowerCase().slice(0, 3)];
         if (!mo) return null;
+        // THE WORD MUST BE THE MONTH, not just start like one (013): "Marty 9.0/B" read
+        // as March 9 and a pasted pairing became a new day. "Mar", "March", "Sept",
+        // "Sept." stay months; "Marty", "Junior", "Augie", "Decker", "Janet" are names.
+        if (TRIP_ITIN_MONTH_NAMES[mo - 1].indexOf(String(m[1]).toLowerCase()) !== 0) return null;
         var y2 = m[3] ? Number(m[3]) : year;
         if (!y2) return null;
         return { iso: y2 + '-' + tripItinPad(mo) + '-' + tripItinPad(Number(m[2])),

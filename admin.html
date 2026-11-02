@@ -45,7 +45,9 @@
     <!-- v215: the Aloha bet's rules and its two sentences. The wizard uses the
          sentences; the Matches tab uses the rules. One definition of both. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <script src="text-safe.js"></script>
+    <script src="hcp-plus.js"></script>   <!-- 2.0 (23): the "+ Plus" chip under every handicap box (the decimal pad has no + key) -->
     <!-- UI Wave 3: the telling, asking and typing this page does. 38 alerts,
          five decisions and the last prompt() in the app became uiRefuse / uiFail /
          uiToast / uiConfirm / uiPrompt. Loaded before the inline block so
@@ -563,6 +565,56 @@
         }
         .p-group-input { width: auto; min-width: 92px; margin: 0 0 0 auto; padding: 6px 4px; font-size: 0.76rem; }
 
+        /* THE COMPACT PLAYER LIST (players-compact, 2026-10-09). One row per golfer,
+           like a table: drag handle | name | HCP | tee | x. Team, squad and flight
+           (when the format has them) sit on a slim second line, so a foursome fits
+           in about a third of an iPhone screen and nothing scrolls sideways at
+           320 px. The order controls (Move up / Move down / Move to Group) are a
+           small menu behind the handle; dragging the handle reorders. Every control
+           keeps its old class, so everything that reads the rows is unchanged. */
+        .player-row.p-compact, #player-header-row.p-compact {
+            grid-template-columns: 30px minmax(0, 1fr) 50px 76px 34px !important;
+            column-gap: 6px; row-gap: 4px;
+        }
+        .player-row.p-compact { position: relative; margin-bottom: 5px; align-items: center; row-gap: 2px; }
+        .player-row.p-compact > input, .player-row.p-compact select { margin: 0; }
+        .p-compact .p-drag { grid-column: 1; grid-row: 1; width: 30px; height: 38px; padding: 0; margin: 0;
+            border: 0; background: transparent; color: var(--text-muted); font-size: 1.25rem; line-height: 1;
+            cursor: grab; touch-action: none; border-radius: 6px; }
+        .p-compact .p-drag:focus-visible { outline: 2px solid var(--brand-green); }
+        .p-compact .p-name-input { grid-column: 2; grid-row: 1; min-width: 0; height: 38px; }
+        .p-compact .p-hcp-input { grid-column: 3; grid-row: 1; min-width: 0; height: 38px; text-align: center; padding-left: 2px; padding-right: 2px; }
+        .p-compact .p-tee-line { grid-column: 4; grid-row: 1; margin: 0 !important; min-width: 0; }
+        .p-compact .btn-del { grid-column: 5; grid-row: 1; height: 36px; }
+        .p-compact .p-extra-line { grid-column: 2 / -1; grid-row: 2; display: flex; align-items: center; gap: 6px;
+            flex-wrap: wrap; font-size: 0.72rem; color: var(--text-muted); }
+        .p-compact .p-extra-line select { width: auto; min-width: 64px; padding: 2px 6px; font-size: 0.76rem; height: 26px; }
+        /* A slim chip line, so a foursome with flights on still fits in a third of the screen. */
+        .p-compact .p-extra-line { min-height: 22px; line-height: 1; }
+        .p-compact .p-extra-line .p-flight-input { min-height: 22px !important; min-width: 28px !important; height: 22px;
+            padding: 0 6px !important; font-size: 0.72rem !important; line-height: 1 !important; border-radius: 6px !important; }
+        .p-compact .p-flight-line { display: contents !important; }
+        .p-tee-pick { position: relative; display: block; height: 38px; border: 1px solid var(--border-mid);
+            border-radius: 6px; background: var(--bg-card); }
+        .p-tee-short { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+            padding: 0 14px 0 4px; font-size: 0.82rem; font-weight: 600; color: var(--text-main, inherit);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+        .p-tee-short::after { content: '\25BE'; position: absolute; right: 4px; font-size: 0.7rem; color: var(--text-muted); }
+        .p-tee-pick .p-tee-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .p-sr { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        .p-compact .p-order-wrap { position: absolute; top: calc(100% - 2px); left: 0; z-index: 30; display: none;
+            flex-direction: column; align-items: stretch; gap: 4px; margin: 0; padding: 8px; min-width: 170px;
+            background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 10px;
+            box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+        .p-compact.p-menu-open .p-order-wrap { display: flex; }
+        .p-compact .p-order-wrap .p-order-btn { width: auto; min-height: 38px; padding: 0 10px; text-align: left; font-size: 0.85rem; }
+        .p-compact .p-order-wrap .p-group-input { margin: 0; width: 100%; }
+        .p-compact .p-order-label { font-weight: 600; }
+        .player-row.p-dragging { opacity: .9; z-index: 40; box-shadow: 0 8px 20px rgba(0,0,0,.2); background: var(--bg-card); border-radius: 8px; }
+        #tee-everyone-row { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 0.82rem; }
+        #tee-everyone-row label { font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+        #tee-everyone { width: auto; min-width: 0; flex: 1 1 auto; margin: 0; }
+
         .btn-add { background-color: var(--accent-teal); color: white; border: none; padding: 10px; font-size: 0.9rem; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; margin-bottom: 16px; }
         .btn-del { background-color: var(--accent-red); color: white; border: none; border-radius: 6px; height: 38px; font-weight: bold; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;}
         .btn-primary { width: 100%; background-color: var(--brand-green); color: white; border: none; padding: 14px; font-size: 1.05rem; font-weight: bold; border-radius: 10px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 8px rgba(15,76,58,0.2); }
@@ -852,8 +904,6 @@
         /* A CONTROL GROUP IS A CARD. The heading carries the sentence, the control
            sits under it, and the helper line sits under the control sharing its left
            edge - which is the whole of "words not lined up". */
-        /* 084: Rounds I'm running - the card takes the page's own colours (light + dark). */
-        .my-rounds { margin-top: var(--widget-gap, 12px); --mr-card: var(--bg-card); --mr-line: var(--border-mid); --mr-text: var(--text-main); --mr-muted: var(--text-muted); --mr-green: var(--brand-green); --mr-link: var(--brand-navy); --mr-warn-bg: var(--warn-bg); --mr-warn: var(--warn-text); }
         .w-card {
             box-sizing: border-box;
             padding: var(--widget-pad);
@@ -1049,6 +1099,13 @@ html {
     padding-top: max(20px, env(safe-area-inset-top, 0px));
     padding-bottom: max(20px, env(safe-area-inset-bottom, 0px));
 }
+/* POLISH #13 (map helper, SHARED): the page scrolls under the status bar and the Dynamic Island -
+   a solid band there, and the wizard's step dots scroll in BELOW it, not under it. 0px on the web. */
+body::before {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f3);
+}
+.wizard-progress { scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 8px); }
 </style>
 </head>
 <body>
@@ -1079,7 +1136,7 @@ html {
                  Not held on one line by nowrap and an ellipsis - that would satisfy
                  "one line" while hiding the words, which is what guard 6 in
                  widget_system_test.js exists to forbid. -->
-            <div class="hw-desc">Rounds, teams, money</div>
+            <div class="hw-desc">Rounds, teams, totals</div>
         </button>
         <!-- CLUB ROUND LIVES IN THE OTHER PRODUCT NOW.
              The tile was removed at the Consumer/Club product separation, not deleted:
@@ -1111,10 +1168,6 @@ html {
         <a class="resume-link coach-link" id="coach-link" onclick="startSetupCoach(this)">&#129517; Help me set this up</a>
     </div>
 
-    <!-- 084: ROUNDS I'M RUNNING (my-rounds.js). Hidden until there is a row; 1 row + "See all N"
-         so the one-screen Home stays one screen. Never shows an organizer link. -->
-    <div id="my-rounds" class="my-rounds" style="display:none;"></div>
-
     <div id="event-type-framing" class="lobby-framing" style="display:none;"></div>
 
     <div id="trip-context-banner" class="lobby-context-banner" style="display:none;">
@@ -1134,7 +1187,7 @@ html {
         <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border-mid);">
             <div style="font-size:0.78rem; font-weight:bold; margin-bottom:4px;">Settlement</div>
             <div id="settlement-mode-state" style="font-size:0.76rem; color:var(--text-muted); margin-bottom:8px;">Enter a game code to check this round.</div>
-            <button class="btn-primary" style="background-color: var(--brand-green);" onclick="enableWholeDollarSettlement()">💵 Settle this round in whole dollars</button>
+            <button class="btn-primary" style="background-color: var(--brand-green);" onclick="enableWholeDollarSettlement()">📊 Settle this round in whole dollars</button>
         </div>
 
         <!-- THE MY GROUPS SWITCH MOVED OUT OF HERE (2026-09-30). It could never be
@@ -1263,16 +1316,20 @@ html {
          would save a preference nothing could ever act on. -->
     <section id="notify-card" class="email-link-card" aria-labelledby="notify-title" style="display:none;">
         <h2 id="notify-title">Notifications</h2>
-        <p id="notify-lead">You're asked for permission when you open a round, not before.</p>
+        <p id="notify-lead">Nothing is sent until you turn one on. Your phone asks for permission when you do.</p>
         <!-- THE COPY NAMES WHAT IS ACTUALLY SENT (2026-10-04). It promised a tee
              time and a 30-minute reminder, both of which were removed before they
              shipped, and a press offer, which has no record to answer - a press is
              a thing you do, not a thing you ask. Five notifications exist: you're
              in, final results, a bet challenge, an Aloha offer, and hype. -->
-        <p id="notify-essentials" style="font-weight:bold;">⛳ Essentials &mdash; always on. You&rsquo;re in a round, and the final results.</p>
+        <!-- 066 #1 (Manny approved 2026-10-24): Essentials is a switch now, OFF until turned on, like the other two. -->
+        <label id="notify-essentials" style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px; font-weight:bold;">
+            <input type="checkbox" id="notify-ess" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">
+            <span>⛳ Round results &mdash; you&rsquo;re in a round, and the final results</span>
+        </label>
         <label style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px;">
             <input type="checkbox" id="notify-bets" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">
-            <span>💰 Bets &mdash; somebody challenges you to a side bet, or offers you an Aloha</span>
+            <span>⛳ Games &mdash; somebody challenges you to a side game, or offers you an Aloha</span>
         </label>
         <label style="display:flex; align-items:center; gap:10px; margin:10px 0; min-height:44px;">
             <input type="checkbox" id="notify-hype" onchange="notifyPrefsChanged()" style="width:22px; height:22px;">
@@ -1314,6 +1371,20 @@ html {
         <button type="button" id="account-exit-cancel" class="btn-outline" style="display:none;" onclick="exitTap('cancel')">Keep my account</button>
         <p id="account-exit-status" role="status"></p>
     </section>
+    <!-- PRIVACY, TERMS, SUPPORT, ACKNOWLEDGEMENTS (store-legal, App Review 5.1.1).
+         The policy has to be reachable from inside the app, not only from the
+         listing. These pages are web pages, not part of either bundle
+         (app_store_pages_test.js), so inside the iOS shell a relative link would
+         point at capacitor://localhost and find nothing: syncLegalLinks() points
+         each one at shareBaseUrl() (product-links.js owns the origin), and
+         Capacitor hands that off-origin link to Safari. On the web the relative
+         href is already right. Shown to everybody, signed in or not. -->
+    <nav id="account-legal" class="account-legal" aria-label="About this app" style="margin-top:14px; padding-top:10px; border-top:1px solid var(--border-light); font-size:0.85rem; text-align:center; line-height:2;">
+        <a id="legal-privacy" href="privacy.html" data-legal="privacy.html" target="_blank" rel="noopener">Privacy</a> &middot;
+        <a id="legal-terms" href="terms.html" data-legal="terms.html" target="_blank" rel="noopener">Terms</a> &middot;
+        <a id="legal-support" href="support.html" data-legal="support.html" target="_blank" rel="noopener">Support</a> &middot;
+        <a id="legal-acknowledgements" href="acknowledgements.html" data-legal="acknowledgements.html" target="_blank" rel="noopener">Acknowledgements</a>
+    </nav>
       </div>
     </div>
 
@@ -1415,7 +1486,7 @@ html {
          must not be offered a button that cannot work - syncSameAsLastWeek() shows
          it only when the code exists. -->
     <button type="button" class="btn-primary salw-btn" id="same-as-last-week" style="display:none;"
-            onclick="sameAsLastWeek(this)">🔁 Same as last week</button>
+            onclick="sameAsLastWeek(this)">🔁 Play it again</button>
     <div id="same-as-last-week-note" class="salw-note" style="display:none;"></div>
     <h3 class="w-card-title">Start from a previous round</h3>
     <div id="copy-code-row">
@@ -1424,7 +1495,7 @@ html {
         <button class="btn-outline join-code-btn" id="copy-code-btn" onclick="startFromPreviousRound(this)">🔁 Start from it</button>
     </div>
     <p id="copy-code-note" class="w-card-note">
-        Same golfers, handicaps, flights and money.
+        Same golfers, handicaps, flights and games.
     </p>
     </div>
     <!-- SEASON. The ledger itself is season.html. This row is how Game Day
@@ -1433,7 +1504,7 @@ html {
          season.html, which is the page that owns the write. -->
     <div class="w-card" id="season-lobby">
         <h3 class="w-card-title">Season</h3>
-        <p class="w-card-note">Running money and skins across the rounds this crew plays.</p>
+        <p class="w-card-note">Running totals and skins across the rounds this crew plays.</p>
         <div id="season-list"></div>
         <!-- NO INLINE display HERE ANY MORE. It was display:inline-block, which beat
              the button system's inline-flex, so align-items never applied and the
@@ -1465,10 +1536,10 @@ html {
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
         <a href="leaderboard.html" class="top-nav-item nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
-        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">💰</span><span class="tni-label">Bets</span></a>
+        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">⛳</span><span class="tni-label">Games</span></a>
         <a href="settlement.html" class="top-nav-item nav-link"><span class="tni-glyph">🤝</span><span class="tni-label">Results</span></a>
         <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link"><span class="tni-glyph">⚔️</span><span class="tni-label">Matches</span></a>
-        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Game</span></a>
+        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Format</span></a>
         <a href="trip.html" class="top-nav-item"><span class="tni-glyph">🚐</span><span class="tni-label">Trip</span></a>
         <a href="admin.html" class="top-nav-item active nav-link"><span class="tni-glyph">🏠</span><span class="tni-label">Home</span></a>
         <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">🧭</span><span class="tni-label">How it works</span></a>
@@ -1695,7 +1766,7 @@ html {
     </div>
 
     <div class="wizard-step" id="wizard-step-3" data-step="3">
-        <div class="wizard-step-title">📝 Games · <span class="wiz-step-n" id="wiz-n-format">Step 3</span></div>
+        <div class="wizard-step-title">📝 Format · <span class="wiz-step-n" id="wiz-n-format">Step 3</span></div>
         <div class="wizard-step-sub" id="step3-sub">Pick how you&#39;re scoring today.</div>
     <div class="form-group">
         <label id="format-question-label">What are you playing today?</label>
@@ -1769,7 +1840,7 @@ html {
                 role="radio" aria-checked="false" onclick="selectFormatCard('ryder')">
                 <span class="fmt-icon">🛡️</span>
                 <span class="fmt-name">Team Match</span>
-                <span class="fmt-desc">Team vs. team, one bet</span>
+                <span class="fmt-desc">Team vs. team, one game</span>
             </button>
 
             <!-- THE REAL RYDER CUP. Its own token, never the legacy 'ryder' value.
@@ -1835,13 +1906,13 @@ html {
              can see exactly who is in it. -->
         <div id="multigroup-action-note" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px; margin-top:10px;">
             <div style="font-size:0.82rem; font-weight:bold; color:var(--accent-teal); margin-bottom:4px;">⛳ Multi-group round</div>
-            <div style="font-size:0.78rem; color:var(--text-muted);">Players and groups here. You'll add each bet from <strong>Action</strong> once the round exists.</div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">Players and groups here. You'll add each game from <strong>Action</strong> once the round exists.</div>
         </div>
 
         <div id="hole-bet-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 0; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-hole-bet" onchange="toggleHoleBet()" style="width: 18px; height: 18px; margin: 0;">
-                <strong>💵 Pay by the hole instead</strong>
+                <strong>⛳ Play it by the hole instead</strong>
             </label>
             <p style="font-size: 0.72rem; color: var(--text-muted); margin: 6px 0 0 26px;">Off: a set amount for the win. On: that amount per hole you finish ahead.</p>
             <div id="hole-bet-stake-container" style="display: none; margin-top: 12px; border-top: 1px solid var(--border-mid); padding-top: 12px;">
@@ -1905,7 +1976,7 @@ html {
                     <input type="hidden" id="match-scoring" value="net">
                 </div>
                 <div>
-                    <label style="font-size: 0.75rem;" id="match-stake-label">Match Bet ($)</label>
+                    <label style="font-size: 0.75rem;" id="match-stake-label">Match Game ($)</label>
                     <div class="grid-4col" id="match-stake-presets" style="margin-bottom:4px;">
                         <button type="button" class="preset-btn" onclick="setStakePreset('match-stake', 5, 'match-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$5</button>
                         <button type="button" class="preset-btn" onclick="setStakePreset('match-stake', 10, 'match-stake-presets')" style="padding:6px 2px; font-size:0.75rem;">$10</button>
@@ -1924,7 +1995,7 @@ html {
                         <option value="1down">Auto @ 1 Down</option>
                     </select>
                 </div>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A press is a new bet at the same stake, from the hole it starts on.</p>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin: 6px 0 0 0;">A press is a new game at the same stake, from the hole it starts on.</p>
                 <p style="font-size: 0.7rem; color: var(--brand-green); margin: 6px 0 0 0;">🔥 A Press button is always on the scorecard, whatever rule you pick.</p>
                 <p style="font-size: 0.72rem; color: var(--brand-navy); margin: 6px 0 0 0;" id="match-bet-explainer"></p>
             </div>
@@ -2025,7 +2096,7 @@ html {
 
         <div id="dot-settings" class="extra-settings-box">
             <label style="color:var(--brand-green); margin-bottom: 6px;">🔴 Dot Game Options</label>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -2px 0 8px 0;">Everyone pays whoever earns a dot. A Snake is paid the other way round.</p>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin: -2px 0 8px 0;">Every dot scores against everyone else. A Snake counts the other way round.</p>
             <div class="grid-2col">
                 <div><label style="font-size: 0.8rem;">Value Per Dot ($)</label><input type="number" id="dot-point-value" value="" min="0" placeholder="0"></div>
             </div>
@@ -2049,13 +2120,13 @@ html {
             </div>
             <input type="number" id="skins-buyin" value="0" min="0" style="margin-top:6px;" placeholder="Custom $ per skin" oninput="clearSkinsPresetHighlight()">
 
-            <label style="font-size: 0.75rem; margin-top:10px; display:block;">Pot — which scores win the money?</label>
+            <label style="font-size: 0.75rem; margin-top:10px; display:block;">Which scores win the skins?</label>
             <select id="skins-pot-format">
-                <option value="split">Gross &amp; Net (Split Pot)</option>
+                <option value="split">Gross &amp; Net (Split)</option>
                 <option value="gross">Gross Skins Only</option>
                 <option value="net">Net Skins Only</option>
             </select>
-            <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;">Split Pot: half the pot on gross, half on net.</p>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 0 0;">Split: half the skins on gross, half on net.</p>
 
             <label style="font-size: 0.75rem; margin-top:10px; display:block;">Ties — what happens when nobody wins a hole outright?</label>
             <div class="toggle-row">
@@ -2088,7 +2159,7 @@ html {
         <div class="wizard-step-sub">Add everyone playing today, with the number beside each name.</div>
     <p id="handicap-index-note" style="font-size:0.78rem; color:var(--text-muted); margin:0 0 12px 0; line-height:1.45;"></p>
     <div style="background:var(--nassau-box-bg); border:1px solid var(--accent-teal); border-radius:8px; padding:10px 12px; margin-bottom:12px; font-size:0.8rem; line-height:1.45;">
-        ⛳ <strong>Groups here.</strong> Each group picks its own games and who's in them, from that group&rsquo;s link. Anyone left out still plays every whole-field game, including the Weekly Game.
+        ⛳ <strong>Groups here.</strong> Each group picks its own games and who's in them, from that group&rsquo;s link. Anyone left out still plays every whole-field game (the Weekly Game too, if you set one up).
     </div>
     <!-- DIFFERENT TEES, ON A STROKES ROUND. Hidden on a GHIN round, where the
          tee is already inside the course-handicap formula and adjusting again
@@ -2104,6 +2175,15 @@ html {
         <p id="tee-adjust-note" style="margin:4px 0 0 26px; color:var(--text-muted); font-size:0.72rem;">Off: the number you type is the number. On: the official course-rating difference is added.</p>
     </div>
     <h3>👥 Active Players (<span id="player-count">0</span>)</h3>
+    <!-- 2.0 (25) (ADVISOR-0725 8:38, Manny): THE ORGANIZER IS NOT A GOLFER BY DEFAULT. Only "this is me" here makes
+         this phone a golfer in the round (its "This is me", saved on this phone only, nothing written to the round);
+         "No - I'm not playing" (the default) = this phone watches. The profile's name only OFFERS a row ("(you?)"). -->
+    <div id="hp-me-row" style="margin:0 0 12px 0; font-size:0.85rem; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+        <label for="hp-me-pick" style="font-weight:700;">Are you playing?</label>
+        <select id="hp-me-pick" onfocus="hpMeRefresh()" onpointerdown="hpMeRefresh()" onchange="hpMePicked(this.value)" style="min-height:40px; border:1px solid var(--border-mid); border-radius:10px; font-size:15px; padding:0 8px; max-width:70%;">
+            <option value="" selected>No &mdash; I&rsquo;m not playing</option>
+        </select>
+    </div>
     <!-- FLIGHTS (A/B). Optional; OFF by default. A property of the roster, so it
          lives here beside the rows it tags, not on a game's card. The two scope
          switches decide which games run per flight; the games' own cards only
@@ -2122,6 +2202,23 @@ html {
         <input type="hidden" id="flights-enabled" value="false">
         <div id="flights-detail" style="display:none; margin-top:8px;">
             <div id="flights-count" style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px;"></div>
+            <!-- SPLIT BY HANDICAP (URGENT-009, 013-3). Flights switched on over a roster
+                 with NO letters put the whole field in A. Asked ONCE, here, beside the
+                 count it changes: the cutoff defaults to the median handicap (a plus
+                 handicap counts below scratch) and is editable; Split applies it in one
+                 tap and never moves a golfer whose A/B was tapped by hand. -->
+            <div id="flights-split-ask" role="group" aria-label="Split flights by handicap" style="display:none; border:1px solid var(--brand-green); border-radius:8px; padding:8px 10px; margin-bottom:8px; font-size:0.85rem;">
+                <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;">
+                    <span>Split by handicap? A = up to</span>
+                    <input type="text" id="flights-split-cutoff" inputmode="decimal" aria-label="Flight A cutoff handicap" oninput="refreshFlightSplitPreview()" style="width:4.5em; min-height:36px; text-align:center;">
+                    <span>, B = above</span>
+                </div>
+                <div id="flights-split-preview" style="font-size:0.75rem; color:var(--text-muted); margin:4px 0 6px 0;"></div>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" class="btn-primary" id="flights-split-yes" onclick="applyFlightSplit()" style="min-height:40px; padding:6px 14px; width:auto;">Split</button>
+                    <button type="button" class="btn-outline" id="flights-split-no" onclick="declineFlightSplit()" style="min-height:40px; padding:6px 14px; width:auto;">No thanks</button>
+                </div>
+            </div>
             <div id="flights-scopes">
                 <div class="toggle-row" style="margin:0 0 6px 0;">
                     <span style="font-size:0.75rem; min-width:52px;">Skins</span>
@@ -2146,7 +2243,7 @@ html {
                      Evenly is the default for a new round; a round saved before this
                      choice existed loads as By headcount, which is what it was paid by. -->
                 <div class="toggle-row" id="flights-split-row" style="margin:6px 0 0 0;">
-                    <span style="font-size:0.75rem; min-width:52px;">Skins pot</span>
+                    <span style="font-size:0.75rem; min-width:52px;">Skins</span>
                     <span class="toggle-label-sm active" id="flights-split-label-even" onclick="setFlightsSkinsSplit('even')">Evenly</span>
                     <label class="toggle-switch">
                         <input type="checkbox" id="flights-split-switch" onchange="setFlightsSkinsSplit(this.checked ? 'headcount' : 'even')">
@@ -2158,11 +2255,12 @@ html {
                 <input type="hidden" id="flights-scope-birdies" value="flight">
                 <input type="hidden" id="flights-skins-split" value="even">
             </div>
-            <p style="font-size:0.7rem; color:var(--text-muted); margin:6px 0 0 0;">Tap a golfer&rsquo;s A/B to move them. Side matches and the Weekly Game never use flights.</p>
+            <p style="font-size:0.7rem; color:var(--text-muted); margin:6px 0 0 0;">Tap a golfer&rsquo;s A/B to move them. Side matches never use flights. The Weekly Game&rsquo;s skins are played within each flight.</p>
         </div>
     </div>
     <div id="one-v-one-warning" style="display:none; background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:10px 12px; margin-bottom:10px; font-size:0.8rem; color:var(--warn-text);"></div>
-    <div id="player-header-row" style="font-weight:bold; font-size:0.8rem; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
+    <div id="tee-everyone-row" style="display:none;"><label for="tee-everyone">Tee for everyone</label><select id="tee-everyone" onchange="setTeeForEveryone(this.value)"></select></div>
+    <div id="player-header-row" class="p-compact" style="font-weight:bold; font-size:0.72rem; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:6px; color:var(--text-muted); display:grid;"></div>
     <div id="player-list"></div>
     <button class="btn-add" onclick="addNewPlayerAndRefresh()">➕ Add New Player</button>
     <button class="btn-outline" onclick="openPastePlayersModal()">📋 Paste Player List</button>
@@ -2207,13 +2305,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     <div id="strokes-preview-container" style="display:none; margin-top:12px; background:var(--nav-bg); border:1px solid var(--border-mid); border-radius:8px; padding:12px;"></div>
         <div class="wizard-nav-row">
             <button class="wizard-btn-back" id="wizard-back-5" onclick="wizardBack(5)">◀ Back</button>
-            <button class="wizard-btn-next" id="wizard-next-5" onclick="wizardNext(5)">Next: Money ▶</button>
+            <button class="wizard-btn-next" id="wizard-next-5" onclick="wizardNext(5)">Next: Games ▶</button>
         </div>
     </div>
 
     <div class="wizard-step" id="wizard-step-6" data-step="6">
-        <div class="wizard-step-title">💰 Money · <span class="wiz-step-n" id="wiz-n-action">Step 6</span><button type="button" class="tip-btn" id="tip-money" aria-label="How the money options work" onclick="tipMoney()">?</button></div>
-        <div class="wizard-step-sub">Choose the games and bets you're playing. Everything here is optional.</div>
+        <div class="wizard-step-title">📊 Games · <span class="wiz-step-n" id="wiz-n-action">Step 6</span><button type="button" class="tip-btn" id="tip-money" aria-label="How the game options work" onclick="tipMoney()">?</button></div>
+        <div class="wizard-step-sub">Choose the games you're playing. Everything here is optional.</div>
         <!-- Three sections, in the order a group actually decides: the main match
              first, then anything stacked on top, then field-wide pools. -->
         <div class="wizard-section-head">PRIMARY GAME / MATCHES</div>
@@ -2231,24 +2329,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 <input type="checkbox" id="setup-nassau-enabled" onchange="toggleSetupNassau()" style="width:18px; height:18px; margin:0;">
                 <strong>⚔️ Nassau</strong>
             </label>
-            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 26px;">Match Play · Front / Back / Overall — three separate bets.</p>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 26px;">Match Play · Front / Back / Overall — three separate games.</p>
             <!-- Shown only when the round already carries a legacy main-game wager.
                  Explains rather than simply going dead. -->
             <div id="setup-nassau-legacy-note" style="display:none; font-size:0.72rem; color:var(--warn-text); background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:8px; padding:8px 10px; margin:0 0 10px 26px; line-height:1.45;"></div>
             <div id="setup-nassau-panel" style="display:none;">
-                <label style="font-size:0.75rem;">Nassau Bets ($)</label>
+                <label style="font-size:0.75rem;">Nassau Games ($)</label>
                 <div class="sm-nassau-stakes">
                     <div>
                         <label>Front 9</label>
-                        <input type="number" id="setup-nassau-front" value="10" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
+                        <input type="number" id="setup-nassau-front" value="5" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
                     </div>
                     <div>
                         <label>Back 9</label>
-                        <input type="number" id="setup-nassau-back" value="10" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
+                        <input type="number" id="setup-nassau-back" value="5" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
                     </div>
                     <div>
                         <label>Overall 18</label>
-                        <input type="number" id="setup-nassau-overall" value="20" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
+                        <input type="number" id="setup-nassau-overall" value="5" min="0" inputmode="numeric" oninput="syncSetupNassauAutoPressLabel()">
                     </div>
                 </div>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;">
@@ -2261,11 +2359,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     </div>
                     <div>
                         <label style="font-size:0.75rem;">Press Rule</label>
+                        <!-- URGENT-038 #27: ONE NASSAU DEFAULT EVERYWHERE (Manny's pick): $5 / $5 / $5,
+                             presses off - what + Bet starts at. Only where a NEW Nassau starts;
+                             a saved bet keeps its own pressRule and amounts. -->
                         <select id="setup-nassau-press">
                             <option value="2down">Auto @ 2 Down</option>
                             <option value="1down">Auto @ 1 Down</option>
                             <option value="anytime">Press Any Hole</option>
-                            <option value="none">No Press</option>
+                            <option value="none" selected>No Press</option>
                         </select>
                     </div>
                 </div>
@@ -2276,7 +2377,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                          side-match form uses. It ships unpriced so the markup carries no
                          second copy of the sentence to drift. -->
                     <select id="setup-nassau-autopress-mode" onchange="toggleSetupNassauAutoAmount()">
-                        <option value="same">Same as each bet</option>
+                        <option value="same">Same as each game</option>
                         <option value="custom">Custom Amount</option>
                     </select>
                     <div id="setup-nassau-autopress-hint" style="display:none; font-size:0.68rem; color:var(--text-muted); margin-top:4px; line-height:1.35;"></div>
@@ -2293,21 +2394,21 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         <div class="wizard-section-head" id="also-playing-head">ALSO PLAYING</div>
         <div id="stacked-games-box" class="extra-settings-box" style="display:block; border-color: var(--brand-green); margin-bottom: 14px;">
             <label style="color:var(--brand-green); margin-bottom: 4px; font-size: 0.9rem;"><strong>⛳ Also Playing</strong></label>
-            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Money games that run right alongside your scoring format.</p>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;" id="stacked-games-sub">Side games that run right alongside your scoring format.</p>
             <div id="stacked-games-list"></div>
             <div id="skins-instances-list"></div>
         </div>
         <div id="sidegames-settings" class="extra-settings-box" style="display: block; border-color: var(--brand-navy);">
             <label style="color:var(--brand-navy); margin-bottom: 4px; font-size: 0.9rem;"><strong>✨ Extras</strong></label>
-            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;">Per-hole side pots. Set up who's in on the Action tab.</p>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin: 0 0 10px 0;">Per-hole side games, read from the scores.</p>
             <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem;">
                 <input type="checkbox" id="enable-birdiegame" style="width: 18px; height: 18px; margin: 0;">
                 <strong>🐦 Birdie Game</strong>
             </label>
-            <p id="birdie-blurb" style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 8px 26px;">Birdies and eagles are read from scores. Everyone pays the achiever; an eagle counts double.</p>
+            <p id="birdie-blurb" style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 8px 26px;">Birdies and eagles are read from scores. Each birdie scores against everyone else; an eagle counts double.</p>
             <p id="birdie-flight-note" style="display:none; font-size:0.72rem; color:var(--brand-green); margin:-4px 0 8px 26px;"></p>
             <div style="margin: 0 0 12px 26px; max-width: 200px;">
-                <label style="font-size: 0.75rem;">$ per Birdie (Eagle = 2x)</label>
+                <label style="font-size: 0.75rem;">Per birdie (eagle = 2x)</label>
                 <input type="number" id="birdie-unit-val-admin" value="" min="0" step="0.5" placeholder="0">
             </div>
 
@@ -2321,7 +2422,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                  the one thing the app cannot enforce: who is tapping. -->
             <label style="color:var(--brand-green); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; border-top: 1px solid var(--border-faint); padding-top: 10px;">
                 <input type="checkbox" id="enable-aloha" style="width: 18px; height: 18px; margin: 0;">
-                <strong>🌴 Allow the Aloha bet on 18</strong>
+                <strong>🌴 Allow the Aloha game on 18</strong>
             </label>
             <p id="aloha-blurb" style="font-size: 0.7rem; color: var(--text-muted); margin: -4px 0 12px 26px;"></p>
 
@@ -2334,22 +2435,22 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
              written as real characters - \uXXXX escapes only resolve inside JS
              string literals, and pasting them here printed the escape text itself
              on the organizer's screen. mp_setup_ux_test.js now fails if any come back. -->
-        <div class="wizard-section-head">POOLS &amp; EXTRAS</div>
+        <div class="wizard-section-head">WEEKLY GAME &amp; EXTRAS</div>
         <div class="extra-settings-box" style="display:block; border-color:#b8860b;">
             <label style="color:#b8860b; margin-bottom:4px; font-size:0.95rem; display:flex; align-items:center; gap:8px; cursor:pointer;">
                 <input type="checkbox" id="mp-enabled" onchange="mpToggle()"> <strong>🏆 Weekly Game</strong>
             </label>
-            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">One buy-in each. You split it between KPs and net finishers; Skins takes the rest.</p>
+            <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 8px 0;">One entry each. Split it between KPs and net finishers; Skins gets the rest.</p>
             <div id="mp-panel" style="display:none;">
 
                 <div class="mp-section">
-                    <div class="mp-section-title">Buy-in per player</div>
+                    <div class="mp-section-title">Entry per player</div>
                     <input type="tel" inputmode="decimal" id="mp-buyin" value="40" oninput="mpRecalc()">
                     <div class="mp-hint" id="mp-pot-line"></div>
                 </div>
 
                 <div class="mp-section">
-                    <div class="mp-section-title">📍 KP Pool</div>
+                    <div class="mp-section-title">📍 KP total in</div>
                     <input type="tel" inputmode="decimal" id="mp-kp-amount" value="100" oninput="mpRecalc()" placeholder="0 for no KP">
                     <div class="mp-sub-label">KP Holes</div>
                     <!-- inputmode MUST NOT be numeric here.
@@ -2368,16 +2469,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 </div>
 
                 <div class="mp-section">
-                    <div class="mp-section-title">🥇 Net Finish Pool</div>
-                    <div class="mp-sub-label">Net Payout</div>
+                    <div class="mp-section-title">🥇 Net Finish total in</div>
+                    <div class="mp-sub-label">Net Result</div>
                     <select id="mp-net-mode" onchange="mpRecalc()">
-                        <option value="preset" selected>Split a pool by percentage</option>
-                        <option value="custom">Exact dollar amounts</option>
+                        <option value="preset" selected>Split the total in by percentage</option>
+                        <option value="custom">Exact amounts</option>
                     </select>
 
                     <!-- PRESET: one pool, divided by percentages. -->
                     <div id="mp-net-preset-wrap">
-                        <div class="mp-sub-label">Net Finish Pool</div>
+                        <div class="mp-sub-label">Net Finish total in</div>
                         <input type="tel" inputmode="decimal" id="mp-net-amount" value="100" oninput="mpRecalc()" placeholder="0 for no net prize">
                         <select id="mp-net-places" onchange="mpRecalc()" style="margin-top:6px;">
                             <option value="100">Winner Take All — 100%</option>
@@ -2412,7 +2513,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     <select id="mp-skins-mode" onchange="mpRecalc(); refreshFlightScopeNotes();">
                         <option value="remainder" selected>Everything left over</option>
                         <option value="fixed">Fixed amount</option>
-                        <option value="none">No skins pot</option>
+                        <option value="none">No skins</option>
                     </select>
                     <input type="tel" inputmode="decimal" id="mp-skins-amount" value="280" oninput="mpRecalc()" placeholder="Fixed $" style="margin-top:6px; display:none;">
                     <div style="display:flex; gap:10px; margin-top:6px;">
@@ -2581,7 +2682,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     <div id="rr-noaction-box" style="display:none; margin-bottom:18px;">
         <div class="wr-label" style="margin-bottom:4px;">Action</div>
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-            <span style="font-size:0.9rem; color:var(--text-muted);">Just keeping score — no money games</span>
+            <span style="font-size:0.9rem; color:var(--text-muted);">Just keeping score — no side games</span>
             <span class="wizard-edit-link" style="white-space:nowrap;" onclick="goToSideBets()">Add</span>
         </div>
     </div>
@@ -2590,14 +2691,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
          Action" is the single entrance to every money game - there is no longer a
          separate betting setup buried in the wizard. -->
     <button class="btn-primary" onclick="startScoring()" style="font-size:1.1rem; padding:16px;">▶️ START SCORING</button>
-    <button class="btn-outline" onclick="goToSideBets()" style="margin-top:10px;" id="rr-add-action-btn">💰 SIDE BETS</button>
+    <button class="btn-outline" onclick="goToSideBets()" style="margin-top:10px;" id="rr-add-action-btn">⛳ SIDE GAMES</button>
 
     <div class="lobby-divider"><span>OR</span></div>
     <button class="btn-outline" onclick="editRoundFromReady()" style="margin-bottom:8px;">✏️ Edit Round Setup</button>
     <!-- THE supersededBy GUARD (v191). Filled by offerRetire() after a NEW round is
-         saved when this device saved an unfinished round with the same golfers in
-         the last 7 days: "Retire OLD — anyone who opens it is sent here.", checked
-         by default (the write fires on render; unticking clears it). Empty otherwise. -->
+         saved when this device saved an unfinished round with the same golfers, on the
+         same course, the same day: "Retire OLD — anyone who opens it is sent here.",
+         UNCHECKED (polish 029 #3: nothing is written until the organizer ticks it;
+         unticking clears it). Empty otherwise. -->
     <div id="rr-retire"></div>
     <div id="rr-links-box" style="margin-top:12px;"></div>
 </div>
@@ -2642,11 +2744,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // THREE STEPS AND A SAVE (2026-10-05). 'length', 'format' and 'settings' keep
     // their entries because the DOM panels still exist and are still addressed by
     // number - they are simply no longer screens the workflow visits.
-    const WIZARD_STEP_LABELS = { course: 'Course', length: 'Length', format: 'Games', settings: 'Settings', players: 'Players', action: 'Money', review: 'Review' };
+    const WIZARD_STEP_LABELS = { course: 'Course', length: 'Length', format: 'Format', settings: 'Settings', players: 'Players', action: 'Games', review: 'Review' };
     // WHAT A NEXT BUTTON PRINTS. These are STEP NAMES, so they must read the way the
     // progress dots read - "Next: Games & Money" survived two reshuffles of the thing
     // it was naming before Manny caught it on the phone.
-    const WIZARD_NEXT_LABELS = { course: 'Course', length: 'Round Length', format: 'Games', settings: 'Format Settings', players: 'Players', action: 'Money', review: 'Review' };
+    const WIZARD_NEXT_LABELS = { course: 'Course', length: 'Round Length', format: 'Format', settings: 'Format Settings', players: 'Players', action: 'Games', review: 'Review' };
     // DOM step ids only. NEVER the length of a workflow.
     const WIZARD_TOTAL_STEPS = 7;
 
@@ -2693,6 +2795,22 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!q || !offline) { box.style.display = 'none'; box.innerHTML = ''; return; }
         var rounds = [];
         try { rounds = q.localRounds(localStorage) || []; } catch (e) { rounds = []; }
+        // POLISH 029 #5: EACH ROUND ONCE, AND NEVER A FINISHED ONE. The walk listed "Resume Dobson"
+        // twice (the Resume line above AND this row) and "Resume Papago", a finished round.
+        var D = window.HardPanDoors, seenCodes = {};
+        rounds = rounds.filter(function (r) {
+            var c = String(r && r.code || '').toUpperCase();
+            if (!c || seenCodes[c]) return false;
+            seenCodes[c] = 1;
+            var lr = null;
+            try { lr = D && typeof D.localRound === 'function' ? D.localRound(c) : null; } catch (e) { lr = null; }
+            return !(lr && lr.finished);
+        });
+        var lastRoomNow = '';
+        try { lastRoomNow = String(localStorage.getItem('lastRoomCode') || '').toUpperCase(); } catch (e) { lastRoomNow = ''; }
+        var resumeBox = document.getElementById('resume-container');
+        // The Resume line above is the same round as a row here (or a finished one): shown once.
+        if (resumeBox && lastRoomNow && seenCodes[lastRoomNow]) resumeBox.style.display = 'none';
         if (!rounds.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
         // NEWEST FIRST AND CAPPED AT FOUR: a phone that has opened thirty rounds
         // does not need thirty rows on a screen with no signal, it needs the one
@@ -2886,10 +3004,25 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         const saveBtn = document.getElementById('main-save-btn');
         if (saveBtn) {
+            // A ROUND THAT ALREADY EXISTS IS NOT STARTED AGAIN (URGENT-009, 013-20): reopened
+            // to add a game or a golfer, Save says what it does. (try: loadedPlayerCount is
+            // declared further down this script.)
+            let saved = false;
+            try { saved = loadedPlayerCount > 0; } catch (e) { saved = false; }
             saveBtn.textContent = isNewRyderCupChoice()
                 ? '\uD83C\uDFC6 Create Round \u0026 Set Up Cup'
-                : '\uD83D\uDCBE Save \u0026 Start Round';
+                : (saved ? '\uD83D\uDCBE Save changes' : '\uD83D\uDCBE Save \u0026 Start Round');
         }
+        // 2.0 (24) ADVISOR-0110: a setup that was never saved is DISCARDED, not deleted (endAndClearRound).
+        // Only once this code's record has been read and found absent; until then the words stay as they were.
+        try {
+            const unsaved = setupKnownUnsaved();
+            const eb = document.querySelector('.end-round-btn'), en = eb ? eb.nextElementSibling : null;
+            if (eb) eb.textContent = unsaved ? '\uD83D\uDDD1\uFE0F Discard this setup' : '\uD83D\uDDD1\uFE0F Delete this round';
+            if (en) en.textContent = unsaved
+                ? 'This round isn\u2019t saved yet. Discarding clears this setup from this phone; nothing else changes.'
+                : 'Erases every score for everyone in this round. You do not need to do this when you finish \u2014 scores save as you enter them.';
+        } catch (e) { /* the words follow on the next sync */ }
     }
 
     function syncFormatCards() {
@@ -3078,9 +3211,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const scores = (data && data.scores) || {};
         return players.some(p => holes.some(h => !(scores['p' + p.id + '_h' + h.hole] > 0)));
     }
+    // POLISH 029 #3: ONLY THE SAME COURSE AND THE SAME DAY. The walk offered (and
+    // wrote) "Retire TC47A7" - a Dobson round in progress - on a new Papago round,
+    // so anyone opening the Dobson round was sent to Papago. A replaced round is
+    // today's round at today's course; anything else is a different round.
+    const courseIdOf = (d) => String((d && d.courseName) || '').split(' (')[0].trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    function sameCourseRound(a, b) {
+        const ka = a && a.activeCourseKey, kb = b && b.activeCourseKey;
+        if (ka && kb && ka === kb) return true;
+        const na = courseIdOf(a), nb = courseIdOf(b);
+        return !!(na && nb && na === nb);
+    }
+    function sameLocalDay(t1, t2) {
+        const a = new Date(t1), b = new Date(t2);
+        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
     // The one code to offer, or null: this uid's, unfinished, not already
-    // retired, saved within the window, sharing at least half the NEW roster's
-    // names; the most recently saved such round wins.
+    // retired, saved today on this device, on the same course, sharing at least
+    // half the NEW roster's names; the most recently saved such round wins.
     function supersedeCandidate(newData, newCode, uid, entries, records, now) {
         const need = Math.ceil(((newData && newData.players) || []).length / 2);
         if (need === 0) return null;
@@ -3092,6 +3240,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (!rec) continue;
             if (!uid || rec.ownerUid !== uid) continue;
             if (rec.supersededBy) continue;
+            if (!sameLocalDay(e.at || 0, now)) continue;
+            if (!sameCourseRound(newData, rec)) continue;
             if (!roundUnfinished(rec)) continue;
             if (rosterOverlap(newData.players, rec.players) < need) continue;
             return e.code;
@@ -3099,7 +3249,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         return null;
     }
     // After a NEW round's save: read the remembered rounds, pick one, render the
-    // row, and - checked by default - write. Never for an edit of an existing round.
+    // row UNCHECKED, and write nothing - the organizer's tick is the write
+    // (polish 029 #3). Never for an edit of an existing round.
     function offerRetire(newCode, newData, uid) {
         const mount = document.getElementById('rr-retire');
         if (!mount) return Promise.resolve(null);
@@ -3111,9 +3262,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const records = {}; pairs.forEach(([c, v]) => { if (v) records[c] = v; });
             const code = supersedeCandidate(newData, newCode, uid, entries, records, Date.now());
             if (!code) return null;
-            mount.innerHTML = '<label class="rr-retire-row"><input type="checkbox" id="rr-retire-box" checked onchange="retireRound(\'' + code + '\', this.checked)"> '
+            mount.innerHTML = '<label class="rr-retire-row"><input type="checkbox" id="rr-retire-box" onchange="retireRound(\'' + code + '\', this.checked)"> '
                 + '<span>Retire ' + code + ' \u2014 anyone who opens it is sent here.</span></label>';
-            retireRound(code, true);
             return code;
         });
     }
@@ -3123,7 +3273,32 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             .catch(err => uiFail('\u26A0\uFE0F NOT RETIRED\n' + oldCode + ': ' + err.message));
     }
 
+    // 2.0 (25): "Are you playing?" (Players step). Rebuilt from the rows each time it is opened, so it always lists
+    // today's names; the answer is the row's player id, kept until the save.
+    let hpMeChosenId = '';
+    function hpMeProfileName() {
+        try { const D = window.HardPanDoors; const n = D && typeof D.meName === 'function' ? D.meName() : (localStorage.getItem('hardpan_my_name') || ''); const t = String(n || '').trim().toLowerCase(); return t === 'me' ? '' : t; } catch (e) { return ''; }
+    }
+    function hpMeRefresh() {
+        const sel = document.getElementById('hp-me-pick'); if (!sel) return;
+        const ps = captureCurrentPlayerInputs().filter(p => String(p.name || '').trim());
+        if (hpMeChosenId && !ps.some(p => String(p.id) === String(hpMeChosenId))) hpMeChosenId = '';
+        const you = hpMeProfileName();
+        const firstName = (n) => String(n || '').trim().split(/\s+/)[0].toLowerCase();
+        sel.innerHTML = '<option value=""' + (hpMeChosenId ? '' : ' selected') + '>No \u2014 I\u2019m not playing</option>'
+            + ps.map(p => '<option value="' + escapeHtml(String(p.id)) + '"' + (String(p.id) === String(hpMeChosenId) ? ' selected' : '') + '>'
+                + escapeHtml(String(p.name).trim()) + ' \u2014 this is me' + (!hpMeChosenId && you && firstName(p.name) === firstName(you) ? ' (you?)' : '') + '</option>').join('');
+    }
+    function hpMePicked(v) { hpMeChosenId = String(v || ''); }
+    // On save: only an explicit pick is written, and only on this phone (the same golfapp_me_<code> the round's own
+    // "This is me" writes). No pick = nothing written = this phone watches.
+    function hpMeApply(code) {
+        if (!hpMeChosenId || !code) return;
+        try { localStorage.setItem('golfapp_me_' + code, String(hpMeChosenId)); localStorage.setItem('golfapp_role_' + code, 'playing'); } catch (e) {}
+    }
+    window.hpMeRefresh = hpMeRefresh; window.hpMePicked = hpMePicked;
     function showRoundReadyScreen(modeKey) {
+        hpMeApply(modeKey);
         document.getElementById('lobby-screen').style.display = 'none';
         document.getElementById('admin-screen').style.display = 'none';
         document.getElementById('round-ready-screen').style.display = 'block';
@@ -3209,6 +3384,20 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     
 
     let currentSavedRound = null;   // the round Round Ready is showing - the share reads its token
+    // URGENT-038 #28: THE SCORING LINE WHEN NASSAU WAS PICKED. Step 1's Nassau saves a stroke
+    // round plus a Nassau side bet, so the line read "Stroke Play" - not what the organizer
+    // picked. A stroke round carrying a Nassau side bet says so. WORDS ONLY: gameFormat, the
+    // side bet and every engine are untouched; any other format reads exactly as before.
+    function roundReadyScoringLabel(data) {
+        const d = data || {};
+        const format = d.gameFormat || 'stroke';
+        if (format === 'stroke') {
+            const sm = d.sideMatches || {};
+            const nassau = Object.keys(sm).some(k => sm[k] && sm[k].format === 'nassau');
+            if (nassau) return 'Nassau (side game) \u00B7 scores kept as stroke play';
+        }
+        return (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[format]) || 'Stroke Play';
+    }
     function renderRoundReady(data) {
         currentSavedRound = data || null;
         renderOrganizerStanding();
@@ -3226,7 +3415,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // at once: they organise the scoring AND carry the wager, so they honestly appear
         // in both lists rather than being forced into one.
         const format = data.gameFormat || 'stroke';
-        const scoringLabel = (typeof MAIN_GAME_LABELS !== 'undefined' && MAIN_GAME_LABELS[format]) || 'Stroke Play';
+        const scoringLabel = roundReadyScoringLabel(data);
         document.getElementById('rr-scoring-text').textContent = scoringLabel;
 
         const actionLines = [];
@@ -3261,9 +3450,23 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         if (data.birdieGameEnabled) actionLines.push('Birdie Game');
 
+        // THE WEEKLY GAME IS ACTION (URGENT-009, 013-7). A money pool is a pot, not
+        // a game in getRoundGames()'s model, so a round whose only money was the
+        // Weekly Game read "Just keeping score — no side games". DISPLAY ONLY: the
+        // line reads the saved moneyPool; nothing here computes or moves money.
+        const roundPool = data.moneyPool;
+        if (roundPool && roundPool.enabled) {
+            const buyIn = Number(roundPool.buyIn) || 0;
+            const parts = [];
+            if (roundPool.kp && (Number(roundPool.kp.amount) || 0) > 0) parts.push('KP');
+            if (roundPool.net) parts.push('Net');
+            if (roundPool.skins && roundPool.skins.mode && roundPool.skins.mode !== 'none') parts.push('Skins');
+            actionLines.push('\uD83C\uDFC6 ' + (buyIn > 0 ? '$' + buyIn + ' ' : '') + 'Weekly Game' + (parts.length ? ' \u2014 ' + parts.join(' \u00B7 ') : ''));
+        }
+
         const sideMatchCount = Object.keys(data.sideMatches || {}).length;
         if (sideMatchCount > 0) {
-            actionLines.push(`${sideMatchCount} Side Bet${sideMatchCount === 1 ? '' : 's'}`);
+            actionLines.push(`${sideMatchCount} Side Game${sideMatchCount === 1 ? '' : 's'}`);
         }
 
         document.getElementById('rr-action-box').style.display = actionLines.length > 0 ? 'block' : 'none';
@@ -3271,8 +3474,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const addBtn = document.getElementById('rr-add-action-btn');
         if (addBtn) {
             addBtn.innerHTML = actionLines.length > 0
-                ? `\uD83D\uDCB0 MANAGE ACTION \u00B7 ${actionLines.length} active`
-                : '\uD83D\uDCB0 SIDE BETS';
+                ? `\u26F3 MANAGE ACTION \u00B7 ${actionLines.length} active`
+                : '\u26F3 SIDE GAMES';
         }
         document.getElementById('rr-action-text').innerHTML = actionLines.map(l => `<div>${l}</div>`).join('');
 
@@ -3345,7 +3548,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 + '</div>'
                 + '<div style="font-size:0.78rem; color:var(--text-muted); margin-top:6px;">'
                 + 'One link for the whole round \u2014 each golfer picks their group when they open it. '
-                + 'Or tell them the code ' + escapeHtml(currentMode) + ': in the app, tap Open and pick your group.</div>'
+                + 'Or tell them the code ' + escapeHtml(currentMode) + ': in the app, type it in and tap Join, then pick your group.</div>'
                 + '</div>';
         }
         html += '<div class="wr-label" style="margin-bottom:4px;">' + (boundaries.length > 1 ? 'Or send each group its own link' : 'Scorekeeper Links') + '</div>'
@@ -3459,12 +3662,77 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             const formatVal = document.getElementById('game-format-select').value;
             if (!formatVal) { uiRefuse('⚠️ Please select a game format before continuing.'); return; }
         }
-        goToWizardStep(wizardNeighbourStep(fromStep, 1));
+        wizardGoOrSay(wizardNeighbourStep(fromStep, 1));
     }
 
     function wizardBack(fromStep) {
-        goToWizardStep(wizardNeighbourStep(fromStep, -1));
+        wizardGoOrSay(wizardNeighbourStep(fromStep, -1));
     }
+
+    // ONE TAP ON NEXT IS ONE STEP, OR A REASON ON SCREEN (mailbox 015).
+    //
+    // Manny, Round Setup on a 20-golfer Weekly Game: his first tap on "Review & Save"
+    // left him on Money with the page jumped, and the second tap went through.
+    // Measured in Chrome with a real tap: a field on Money still had the keyboard up;
+    // the press took focus from it, the keyboard closed, the taller screen clamped the
+    // scroll (the button sits near the bottom of a long page) and the button moved
+    // ~300px out from under the finger before it lifted. The release landed on
+    // something else, so no click - only the jump.
+    //
+    // Two parts. A press on a wizard Back/Next no longer takes focus from the field
+    // (no keyboard close mid-tap); the step change blurs it instead, after the tap.
+    // And a press that STARTED on the button and lifted without the finger moving is
+    // a tap on that button even if the page moved under it - whatever moved it.
+    // If the step still does not change, the reason is said beside the button.
+    function wizardGoOrSay(target) {
+        const ae = document.activeElement;
+        if (ae && ae !== document.body && typeof ae.blur === 'function') ae.blur();
+        const before = currentWizardStep;
+        try {
+            goToWizardStep(target);
+        } catch (e) {
+            try { console.error('[wizard] step change', e); } catch (x) {}
+            if (currentWizardStep === before) {
+                uiRefuse('⚠️ Could not open the next step: ' + String((e && e.message) || e));
+                return;
+            }
+        }
+        if (currentWizardStep === before && target !== before) {
+            uiRefuse('⚠️ Could not open the next step. Tap it again; if it still stays here, go back a step and forward.');
+        }
+    }
+    (function wizardNavTapGuard() {
+        if (typeof document === 'undefined' || !document.addEventListener) return;
+        const NAV = '.wizard-btn-next, .wizard-btn-back';
+        const navOf = (t) => (t && t.closest ? t.closest(NAV) : null);
+        let press = null;
+        try {
+            document.addEventListener('mousedown', (e) => { if (navOf(e.target)) e.preventDefault(); }, true);
+            document.addEventListener('pointerdown', (e) => {
+                const btn = navOf(e.target);
+                press = (btn && e.isPrimary !== false) ? { btn, x: e.clientX, y: e.clientY, t: Date.now(), clicked: false } : null;
+            }, true);
+            document.addEventListener('click', (e) => {
+                if (press && press.btn.contains(e.target)) press.clicked = true;
+            }, true);
+            document.addEventListener('pointerup', (e) => {
+                const p = press;
+                if (!p) return;
+                if (Math.abs(e.clientX - p.x) > 12 || Math.abs(e.clientY - p.y) > 12 || Date.now() - p.t > 1500) { press = null; return; }
+                const under = document.elementFromPoint(e.clientX, e.clientY);
+                if (under && p.btn.contains(under)) return;   // still under the finger: the browser's own click follows
+                // Moved away: the click (if any) goes to whatever is there now - not wanted.
+                const stray = (ev) => { if (!p.btn.contains(ev.target)) { ev.preventDefault(); ev.stopPropagation(); } };
+                document.addEventListener('click', stray, true);
+                setTimeout(() => {
+                    document.removeEventListener('click', stray, true);
+                    if (press === p) press = null;
+                    if (!p.clicked && !p.btn.disabled && p.btn.isConnected) p.btn.click();
+                }, 0);
+            }, true);
+            document.addEventListener('pointercancel', () => { press = null; }, true);
+        } catch (e) { /* no document events in a bare realm */ }
+    })();
 
     // HARDWARE BACK on the wizard: a step after the first goes to the previous
     // one through the same neighbour rule as the on-screen Back. Nothing on the
@@ -3543,13 +3811,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // course" is caught on the review rather than at the save. Absent, an empty
         // list skips only that check - the same allowance mpRecalc makes.
         const v = validateMoneyPool(draft, loadedCourseData || []);
-        const $ = x => '$' + (Number(x) || 0).toFixed(0);
+        // 2.0 (24) ADVISOR-0110: whole dollars WITH a thousands comma ($2,880), the same rounding as before.
+        const $ = x => '$' + (Number(x) || 0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
         if (!v.valid) {
             const why = (typeof mpFriendlyError === 'function' && v.errors && v.errors.length)
-                ? mpFriendlyError(v.errors[0], v) : (v.errors || ['Something is wrong with the pot.'])[0];
-            return '\u26A0\uFE0F ' + $(v.totalPool) + ' pot \u2014 ' + why + ' \u2014 fix before saving';
+                ? mpFriendlyError(v.errors[0], v) : (v.errors || ['Something is wrong with the amounts.'])[0];
+            return '\u26A0\uFE0F ' + $(v.totalPool) + ' total \u2014 ' + why + ' \u2014 fix before saving';
         }
-        const bits = [$(pool.buyIn) + ' in', $(v.totalPool) + ' pot'];
+        const bits = [$(pool.buyIn) + ' each', $(v.totalPool) + ' total'];
         if (pool.kp && (Number(pool.kp.amount) || 0) > 0) bits.push('KP ' + $(pool.kp.amount));
         const net = (typeof moneyPoolNetTotal === 'function') ? moneyPoolNetTotal(pool.net) : 0;
         if (net > 0) bits.push('Net ' + $(net));
@@ -3560,6 +3829,37 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             : ((pool.skins && pool.skins.mode === 'fixed') ? (Number(pool.skins.amount) || 0) : 0);
         if (skins > 0) bits.push('Skins ' + $(skins));
         return bits.join(' \u00B7 ');
+    }
+
+    // [label, value] lines for the Review's PLAYERS section: groups ("5 × 4", or
+    // the sizes when they differ), flights ("A 10 · B 10") when on, and the tee
+    // (with how many golfers play another tee). Nothing here writes.
+    function reviewPlayerLines(n) {
+        const out = [];
+        if (n > 0 && typeof computeGroupSizes === 'function') {
+            const sizes = computeGroupSizes(n, groupSizeOverrides || {});
+            if (sizes.length > 1) {
+                const same = sizes.every((x) => x === sizes[0]);
+                out.push(['Groups', same ? sizes.length + ' \u00D7 ' + sizes[0] : sizes.length + ' groups (' + sizes.join(', ') + ')']);
+            } else if (sizes.length === 1) {
+                out.push(['Groups', '1 group of ' + sizes[0]]);
+            }
+        }
+        if (flightsEnabledNow()) {
+            const list = captureCurrentPlayerInputs().filter((p) => String(p.name || '').trim() || String(p.hcp || '').trim());
+            const a = list.filter((p) => p.flight !== 'B').length;
+            out.push(['Flights', 'A ' + a + ' \u00B7 B ' + (list.length - a)]);
+        }
+        const tee = (typeof readTeeRatingFromDom === 'function') ? readTeeRatingFromDom() : null;
+        if (tee && tee.teeKey && String(tee.teeName || '').trim()) {
+            let other = 0;
+            document.querySelectorAll('.player-row').forEach((row) => {
+                const k = row.getAttribute('data-tee-key') || (row.querySelector('.p-tee-input') ? row.querySelector('.p-tee-input').value : '');
+                if (k && k !== tee.teeKey) other++;
+            });
+            out.push(['Tee', escapeHtml(String(tee.teeName).trim()) + (other ? ' (' + other + ' golfer' + (other === 1 ? '' : 's') + ' on another tee)' : '')]);
+        }
+        return out;
     }
 
     function renderWizardReview() {
@@ -3594,7 +3894,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 : 'Older Nassau round — settings preserved';
         } else if (currentFormat === 'match') {
             const stake = document.getElementById('match-stake') ? (document.getElementById('match-stake').value || '0') : '0';
-            stakeText = `$${stake} flat bet`;
+            stakeText = `$${stake} flat game`;
         } else if (currentFormat === 'wolf') {
             const val = document.getElementById('wolf-point-value') ? (document.getElementById('wolf-point-value').value || '0') : '0';
             stakeText = `$${val} per point`;
@@ -3611,7 +3911,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // wizard now makes between Steps 1-5 and Step 6.
         const SEC_SCORING = 'SCORING';
         const SEC_PLAYERS = 'PLAYERS';
-        const SEC_ACTION = 'GAMES & MONEY';
+        const SEC_ACTION = 'GAMES';
         const rows = [
             ['Round', roundDay, 1, SEC_SCORING],
             ['Course', courseName, 1, SEC_SCORING],
@@ -3624,7 +3924,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             rows.push(['Legacy game', 'Legacy ' + LEGACY_MAIN[currentFormat]
                 + ' \u2014 stored as the round format', 3, SEC_SCORING]);
         }
-        if (stakeText) rows.push(['The Bet', stakeText, 4, SEC_ACTION]);
+        if (stakeText) rows.push(['The Game', stakeText, 4, SEC_ACTION]);
         // FIRST in GAMES & MONEY, because it is the biggest number on the screen and
         // the one every other figure is a slice of.
         const poolLine = wizardPoolLine();
@@ -3638,7 +3938,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // wager that is genuinely running.
         Object.entries(captureAdditionalGames()).forEach(([format, cfg]) => {
             const spec = ADDITIONAL_GAME_CATALOG[format];
-            rows.push([`${spec.icon} ${spec.label}`, `$${cfg[spec.stakeField] || 0}`, 6, SEC_ACTION]);
+            const skinsBits = format === 'skins'
+                ? ` · ${cfg.skinsPotFormat === 'split' ? 'Gross & Net' : (cfg.skinsPotFormat === 'net' ? 'Net' : 'Gross')} · ${skinsCarriesOver(cfg.skinsCarryOver) ? 'Carry Over' : 'No Carry'}`
+                : '';
+            rows.push([`${spec.icon} ${spec.label}`, `$${cfg[spec.stakeField] || 0}${skinsBits}`, 6, SEC_ACTION]);
         });
         Object.values(captureSkinsInstances()).forEach(cfg => {
             const n = (cfg.participantIds || collectWizardPlayers().map(p => p.id)).length;
@@ -3648,6 +3951,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
         rows.push(['Tee rating', handicapReviewLine(), 1, SEC_SCORING]);
         rows.push(['Players', `${playerCount} added`, 5, SEC_PLAYERS]);
+        // GROUPS, FLIGHTS AND THE TEE (URGENT-009, 013-8). After a paste the Review
+        // said "20 added" and nothing else - not the five foursomes, not A 10 / B 10,
+        // not which tee. DISPLAY ONLY, each read the way the save reads it.
+        reviewPlayerLines(parseInt(playerCount, 10) || 0).forEach((r) => rows.push(r.concat([5, SEC_PLAYERS])));
         rows.push(['Extras', sideGamesText, 6, SEC_ACTION]);
         // A side match set up in the Games step is written by this same Save, so it
         // belongs on the last screen before playing. Read from what will be written -
@@ -3722,29 +4029,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // and nothing more - the panel it opens is the same one the Account button
         // opens.
         if (urlParams.get('account') === '1' && typeof openAccountPanel === 'function') openAccountPanel();
-        // 088 (website half, tfweb-2): a Delete account whose scan-count erase missed
-        // left a pending note on this browser; try it once more now.
-        retryPendingScanErase();
     });
-    // THE SCAN-ERASE RETRY (088 / tfweb-2). Only when the pending note exists
-    // (hp.scanErasePending); retryScanErase itself drops a note past its ~1 h
-    // token window without calling anything. Once per page load, never awaited,
-    // never throws - the page does not wait on it.
-    let scanEraseRetried = false;
-    function retryPendingScanErase() {
-        if (scanEraseRetried) return;
-        scanEraseRetried = true;
-        try {
-            const X = window.accountExit;
-            if (!X || typeof X.retryScanErase !== 'function' || typeof fetch !== 'function') return;
-            let pending = null;
-            try { pending = window.localStorage ? window.localStorage.getItem(X.SCAN_PENDING_KEY) : null; } catch (e) { pending = null; }
-            if (!pending) return;
-            setTimeout(() => {
-                try { Promise.resolve(X.retryScanErase({ fetch: (u, o) => fetch(u, o) })).catch(() => { }); } catch (e) { }
-            }, 0);
-        } catch (e) { }
-    }
     // ------------------
 
     // ========================================================================
@@ -4036,8 +4321,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // been shown, so the organizer is told exactly what it does.
             const ok = await uiConfirm({
                 title: 'Settle ' + code + ' in whole dollars?',
-                body: 'Every payout becomes a whole dollar with no cents. '
-                    + 'Do this before you settle up, not after.',
+                body: 'Every result becomes a whole dollar with no cents. '
+                    + 'Do this before the final results, not after.',
                 confirmText: 'Switch it',
                 cancelText: 'Leave it as it is',
                 danger: false
@@ -4275,7 +4560,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // what's cached in that device's localStorage — a friend testing this for the first
         // time shouldn't see "Resume Game" pointing at a round that isn't theirs.
         const baseUrl = shareBaseUrl() + 'admin.html?fresh=1';
-        const textMsg = "Check out this live golf scoring & betting app I'm building! Start a game, test it out on the course, and let me know if you find any bugs.";
+        const textMsg = "Check out this live golf scoring & games app I'm building! Start a game, test it out on the course, and let me know if you find any bugs.";
         
         if (navigator.share) {
             navigator.share({ title: `HardPan`, text: textMsg, url: baseUrl }).catch(console.error);
@@ -4349,7 +4634,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!list || typeof ADDITIONAL_GAME_CATALOG === 'undefined') return;
         const mainFormat = document.getElementById('game-format-select').value || 'stroke';
 
-        const available = Object.keys(ADDITIONAL_GAME_CATALOG).filter(f => f !== mainFormat);
+        const available = Object.keys(ADDITIONAL_GAME_CATALOG).filter(f => f !== mainFormat && !ADDITIONAL_GAME_CATALOG[f].sideGameOnly);   // 100c: Wolf is a + Game side game only, never stacked here
         const sub = document.getElementById('stacked-games-sub');
 
         if (available.length === 0) {
@@ -4358,8 +4643,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         if (sub) {
             sub.textContent = mainFormat && MAIN_GAME_LABELS[mainFormat]
-                ? `Money games that run right alongside your ${MAIN_GAME_LABELS[mainFormat]}.`
-                : 'Money games that run right alongside your scoring format.';
+                ? `Side games that run right alongside your ${MAIN_GAME_LABELS[mainFormat]}.`
+                : 'Side games that run right alongside your scoring format.';
         }
 
         const instList = document.getElementById('skins-instances-list');
@@ -4378,7 +4663,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleStackedGame('${format}', this.checked)" style="width:18px; height:18px; margin:0;">
                     <strong>${spec.icon} ${spec.label}</strong>
                 </label>
-                <p style="font-size:0.7rem; color:var(--text-muted); margin:-2px 0 0 26px;">${spec.blurb}</p>
+                <p style="font-size:0.7rem; color:var(--text-muted); margin:-2px 0 0 26px;"${format === 'skins' ? ' id="stacked-skins-blurb"' : ''}>${format === 'skins' ? stackedSkinsBlurb() : spec.blurb}</p>
                 <div style="margin:8px 0 0 26px; display:${on ? 'block' : 'none'};">
                     <label style="font-size:0.75rem;">${spec.stakeLabel}</label>
                     <div style="display:grid; grid-template-columns:repeat(6, 1fr); gap:4px; margin-bottom:4px;">${presetHtml}</div>
@@ -4401,13 +4686,56 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function flightScopeLineHtml(twice) {
         if (!(typeof flightsEnabledNow === 'function' && flightsEnabledNow() && flightScopeNow('skins') === 'flight')) return '';
         const text = twice
-            ? 'Per flight \u2014 set in Players. Narrowed twice: within the golfers named here, then by flight \u2014 two pots, A pays A, B pays B.'
-            : 'Per flight \u2014 set in Players. Two pots: A pays A, B pays B.';
+            ? 'Per flight \u2014 set in Players. Narrowed twice: within the golfers named here, then by flight \u2014 two games, A plays A, B plays B.'
+            : 'Per flight \u2014 set in Players. Two games: A plays A, B plays B.';
         return `<p class="flight-scope-line" style="font-size:0.72rem; color:var(--brand-green); margin:8px 0 0 0;">${text}</p>`;
+    }
+
+    // THE STACKED SKINS CARD'S ONE-LINE RULE (URGENT-011). The catalog blurb used
+    // to end "Ties carry over." while the card's default - and what the engine
+    // pays on an untouched game - is NO CARRY. The line is now written from the
+    // same state the save writes: which scores decide a skin, and what a tie does.
+    function stackedSkinsPotFormat() {
+        const st = stackedGameState.skins || {};
+        return (st.potFormat === 'net' || st.potFormat === 'split') ? st.potFormat : 'gross';
+    }
+    function stackedSkinsBlurb() {
+        const st = stackedGameState.skins || {};
+        const pf = stackedSkinsPotFormat();
+        const who = pf === 'net' ? 'Low net score on a hole wins the skin.'
+            : pf === 'split' ? 'Half the skins on gross, half on net.'
+            : 'Low gross score on a hole wins the skin.';
+        return who + ' ' + (skinsCarriesOver(st.carryOver)
+            ? 'Ties carry over to the next hole.'
+            : 'No carry: a tied hole has no winner.');
+    }
+
+    function setSkinsScoring(val) {
+        if (!stackedGameState.skins) stackedGameState.skins = { enabled: true, amount: '' };
+        stackedGameState.skins.potFormat = (val === 'net' || val === 'split') ? val : 'gross';
+        renderStackedGames();
+        updateWizardReview();
     }
 
     function renderSkinsExtras() {
         const st = stackedGameState.skins || {};
+        const pf = stackedSkinsPotFormat();
+        // Gross / Net: the engine reads skinsPotFormat off the stacked game's
+        // config (resolveSkinsMode -> computeSkinsSettlementNet), so this is a
+        // choice it already pays. 'Gross & Net' is shown ONLY for a reopened game
+        // that was saved split - offered nowhere new, never lost on a re-save.
+        const scoreBtn = (val, label) => `<button type="button" onclick="setSkinsScoring('${val}')"
+                        style="flex:1; min-height:44px; border-radius:8px; font-size:0.8rem; cursor:pointer;
+                               border:1px solid ${pf === val ? 'var(--brand-green)' : 'var(--border-mid)'};
+                               background:${pf === val ? 'var(--brand-green)' : 'transparent'};
+                               color:${pf === val ? '#fff' : 'var(--text-muted)'};">${label}</button>`;
+        const scoringHtml = `
+            <div style="margin-top:12px;">
+                <label style="font-size:0.75rem;">Scoring</label>
+                <div style="display:flex; gap:6px;">
+                    ${scoreBtn('gross', 'Gross')}${scoreBtn('net', 'Net')}${pf === 'split' ? scoreBtn('split', 'Gross &amp; Net') : ''}
+                </div>
+            </div>`;
         // skinsCarriesOver() decides what an untouched or absent flag means - NO
         // CARRY, the same answer the engine pays. `!== false` here painted Carry
         // Over on a state nobody had set, and the save below wrote it.
@@ -4417,7 +4745,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         const pot = (parseFloat(st.amount) || 0) * (chosen.length || players.length);
         const potLine = pot > 0
-            ? `$${pot % 1 === 0 ? pot : pot.toFixed(2)} total pot`
+            ? `$${pot % 1 === 0 ? pot : pot.toFixed(2)} total`
             : '';
 
         const chips = players.map(pl => {
@@ -4430,7 +4758,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 ${on ? '\u2713 ' : ''}${escapeHtml(pl.name)}</button>`;
         }).join('');
 
-        return `
+        return `${scoringHtml}
             <div style="margin-top:12px;">
                 <label style="font-size:0.75rem;">Ties</label>
                 <div style="display:flex; gap:6px;">
@@ -4599,14 +4927,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             return `<div style="border:1px solid var(--border-mid); border-radius:10px; padding:12px; margin-bottom:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <strong style="font-size:0.9rem; color:var(--brand-green);">\uD83E\uDD69 Skins</strong>
-                    <p id="mp-skins-note">Weekly Game already includes its own Skins pot \u2014 only add this if you want a second, separate skins game.</p>
+                    <p id="mp-skins-note">Weekly Game already includes its own Skins \u2014 only add this if you want a second, separate skins game.</p>
                     <button type="button" onclick="removeSkinsInstance('${inst.id}')"
                         style="background:none; border:none; color:var(--text-muted); font-size:0.8rem; cursor:pointer; min-height:44px;">Remove</button>
                 </div>
-                <label style="font-size:0.74rem;">Buy-in per golfer</label>
+                <label style="font-size:0.74rem;">Entry per golfer</label>
                 <input type="number" min="0" step="1" value="${inst.skinsBuyIn}" style="max-width:120px;"
                        oninput="setInstanceFieldQuiet('${inst.id}','skinsBuyIn', this.value)">
-                <div style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 10px 0;">${pot > 0 ? `$${pot} total pot` : ''}</div>
+                <div style="font-size:0.7rem; color:var(--text-muted); margin:4px 0 10px 0;">${pot > 0 ? `$${pot} total` : ''}</div>
 
                 <label style="font-size:0.74rem;">Scoring</label>
                 <div style="display:flex; gap:6px; margin-bottom:10px;">
@@ -4891,16 +5219,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
         if (/over budget/.test(msg)) {
             const over = (v.fixedAllocated - v.totalPool);
-            return 'Over by $' + over.toFixed(0) + ' — the pot is $' + v.totalPool.toFixed(0) + '.';
+            return 'Over by $' + over.toFixed(0) + ' — the total is $' + v.totalPool.toFixed(0) + '.';
         }
         if (/unallocated/.test(msg)) {
-            return '$' + (v.totalPool - v.fixedAllocated).toFixed(0) + ' still unassigned — give it to Skins or raise a pool.';
+            return '$' + (v.totalPool - v.fixedAllocated).toFixed(0) + ' still unassigned — give it to Skins or raise a share.';
         }
-        if (/total 100%/.test(msg)) return 'Net payout percentages must add up to 100%.';
-        if (/net payout must be/.test(msg)) return 'Net payouts must be $0 or more.';
-        if (/at least one net payout/.test(msg)) return 'Enter a dollar amount for at least one place.';
+        if (/total 100%/.test(msg)) return 'Net result percentages must add up to 100%.';
+        if (/net payout must be/.test(msg)) return 'Net results must be $0 or more.';
+        if (/at least one net payout/.test(msg)) return 'Enter an amount for at least one place.';
         if (/at least two golfers/.test(msg)) return 'Add players in Step 5 first.';
-        if (/Buy-in must be/.test(msg)) return 'Enter a buy-in above $0.';
+        if (/Buy-in must be/.test(msg)) return 'Enter an entry above $0.';
         if (/not on this course/.test(msg)) return msg.replace('KP hole', 'Hole') + ' Check the KP holes.';
         return msg;
     }
@@ -4979,8 +5307,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         // Per-section hints, so nobody has to do arithmetic in their head.
         mpSetHint('mp-pot-line', n > 0
-            ? n + ' player' + (n === 1 ? '' : 's') + ' × ' + $0(pool.buyIn) + ' = ' + $0(v.totalPool) + ' total pool'
-            : 'Add players in Step 5 to see the pot.');
+            ? n + ' player' + (n === 1 ? '' : 's') + ' × ' + $0(pool.buyIn) + ' = ' + $0(v.totalPool) + ' total in'
+            : 'Add players to see the total.');
         const holes = (pool.kp && pool.kp.holes) ? pool.kp.holes : [];
         const kpSplit = document.getElementById('mp-kp-split');
         if (kpSplit) kpSplit.textContent = (pool.kp && holes.length)
@@ -5000,8 +5328,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 + (custom ? '   |   Net Finish Total: ' + $0(netTotal) : '')
             : '');
         mpSetHint('mp-skins-line', pool.skins && pool.skins.mode === 'remainder'
-            ? (v.valid ? 'Skins pot: ' + $0(v.remainder) : '')
-            : (pool.skins && pool.skins.mode === 'fixed' ? 'Skins pot: ' + $0(pool.skins.amount) : 'No skins pot'));
+            ? (v.valid ? 'Skins: ' + $0(v.remainder) : '')
+            : (pool.skins && pool.skins.mode === 'fixed' ? 'Skins: ' + $0(pool.skins.amount) : 'No skins'));
 
         // THE ALLOCATION SUMMARY. Where every dollar of the pot is going, in one
         // glance, ending in a single line the organizer can trust before saving.
@@ -5026,7 +5354,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // bucket and reported a balanced $320 pot as "Allocated $440 of $320 ✓".
         const allocated = v.fixedAllocated + (isRemainder ? skinsAmt : 0);
 
-        let rows = '<div class="mp-row"><span>Total pool</span><span>' + $0(v.totalPool) + '</span></div>';
+        let rows = '<div class="mp-row"><span>Total in</span><span>' + $0(v.totalPool) + '</span></div>';
         if (pool.kp) rows += '<div class="mp-row"><span>KP</span><span>' + $0(pool.kp.amount) + '</span></div>';
         if (pool.net && netTotal > 0) rows += '<div class="mp-row"><span>Net finish</span><span>' + $0(netTotal) + '</span></div>';
         // Naming the remainder answers "where does the rest go" on screen, instead of
@@ -5168,6 +5496,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // The catalog default (SKINS_CARRY_DEFAULT, false) is in `entry`
                 // already; `!== false` overwrote it with TRUE on an untouched state.
                 entry.skinsCarryOver = skinsCarriesOver(st.carryOver);
+                // Gross / Net (URGENT-011). Both fields, agreeing - resolveSkinsMode
+                // reads skinsPotFormat first. Untouched = the catalog's gross.
+                entry.skinsPotFormat = stackedSkinsPotFormat();
+                entry.skinsScoring = entry.skinsPotFormat === 'net' ? 'net' : 'gross';
                 // participantIds is written ONLY when the organizer actually narrowed the
                 // field. A whole-group game saves nothing, so it stays byte-identical to
                 // every skins game saved before this feature existed.
@@ -5181,6 +5513,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         });
         return out;
     }
+
 
     // Restores the toggles when an existing round is reopened.
     function loadAdditionalGames(data) {
@@ -5198,6 +5531,13 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 // A legacy game with no flag was PAID no-carry; reopening it as
                 // Carry Over and re-saving would have restated that money.
                 stackedGameState.skins.carryOver = skinsCarriesOver(saved.skins.skinsCarryOver);
+                // Reopen on the scoring the engine pays for this saved game -
+                // getRoundGames merges the catalog defaults under it, so resolve the
+                // same merge - and a re-save writes that mode back (a net or split
+                // game is never quietly turned gross).
+                const paidAs = Object.assign({}, spec.defaults, saved.skins);
+                stackedGameState.skins.potFormat = (typeof resolveSkinsMode === 'function')
+                    ? resolveSkinsMode(paidAs) : (paidAs.skinsPotFormat || 'gross');
                 if (Array.isArray(saved.skins.participantIds)) {
                     stackedGameState.skins.participantIds = saved.skins.participantIds.map(String);
                 }
@@ -5218,16 +5558,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (nEl) {
             const nStake = parseFloat((document.getElementById('nassau-stake') || {}).value) || 0;
             nEl.innerHTML = (perHoleOn && perHole > 0)
-                ? `<strong>💵 $${perHole} per hole Nassau.</strong> Three bets — front 9, back 9, and all 18. Each pays $${perHole} for every hole you finish ahead, so a 3-up win on the front is $${perHole * 3}.`
-                : `<strong>💵 $${nStake} Nassau.</strong> Three bets — front 9, back 9, and all 18. Win all three and you win $${nStake * 3}. Margin doesn't matter: 1 up pays the same as 5 up.`;
+                ? `<strong>⛳ $${perHole} per hole Nassau.</strong> Three games — front 9, back 9, and all 18. Each is worth $${perHole} for every hole you finish ahead, so a 3-up win on the front is $${perHole * 3}.`
+                : `<strong>⛳ $${nStake} Nassau.</strong> Three games — front 9, back 9, and all 18. Win all three and you win $${nStake * 3}. Margin doesn't matter: 1 up counts the same as 5 up.`;
         }
 
         const mEl = document.getElementById('match-bet-explainer');
         if (mEl) {
             const mStake = parseFloat((document.getElementById('match-stake') || {}).value) || 0;
             mEl.innerHTML = (perHoleOn && perHole > 0)
-                ? `<strong>💵 $${perHole} per hole.</strong> You win $${perHole} for every hole you finish ahead — win by 3 and that's $${perHole * 3}.`
-                : `<strong>💵 $${mStake} match.</strong> Win the match and you win $${mStake}, whether it's 1 up or 6 up.`;
+                ? `<strong>⛳ $${perHole} per hole.</strong> You win $${perHole} for every hole you finish ahead — win by 3 and that's $${perHole * 3}.`
+                : `<strong>⛳ $${mStake} match.</strong> Win the match and you win $${mStake}, whether it's 1 up or 6 up.`;
         }
     }
 
@@ -5265,16 +5605,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (typeof uiTip !== 'function') return;
         const groups = (typeof currentGroupCount === 'function') ? currentGroupCount() : 1;
         const bullets = [
-            'One pot (Weekly Game): a single buy-in split between closest-to-the-pin, net finishing places and a skins bucket.',
+            'Weekly Game: a single entry split between closest-to-the-pin, net finishing places and a skins bucket.',
             'Skins, the Birdie game and the Dot game run alongside whatever the main format is \u2014 they are not instead of it.',
-            'Side matches are separate: any two or four golfers, even in different groups, settled on their own.'
+            'Side matches are separate: any two or four golfers, even in different groups, scored on their own.'
         ];
         if (groups > 1) {
-            bullets.push('With ' + groups + ' groups the app pays the pot and the side games, '
-                + 'not a single wager on the main game \u2014 so that option is not offered.');
+            bullets.push('With ' + groups + ' groups the app scores the Weekly Game and the side games, '
+                + 'not an amount on the main game \u2014 so that option is not offered.');
         }
         bullets.push('A press, a KP or a new side match is refused outright while you are offline. Scores are not.');
-        uiTip({ title: '\uD83D\uDCB0 Games & Money', bullets: bullets });
+        uiTip({ title: '\u26F3 Games', bullets: bullets });
     }
 
     // ==== SETUP COACH (UI Wave 10) ====================================
@@ -5320,14 +5660,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             sub: 'Two flights let the low handicaps and the high handicaps win separately. '
                + 'Most big games do; a foursome does not.',
             options: [
-                { value: 'no', name: 'No flights', sub: 'Everybody in one pool.' },
+                { value: 'no', name: 'No flights', sub: 'Everybody in one field.' },
                 { value: 'yes', name: 'A and B flights', sub: 'Skins run per flight; everything else is the whole field.' }
             ]
         },
         {
             key: 'format',
             q: 'What are you playing?',
-            sub: 'The main game. You can add side bets on top of any of these.',
+            sub: 'The main game. You can add side games on top of any of these.',
             options: [
                 { value: 'stroke', name: 'Stroke Play', sub: 'Low total wins. The one most rounds start from.' },
                 { value: 'stableford', name: 'Stableford', sub: 'Points per hole.' },
@@ -5348,7 +5688,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             q: 'Handicaps?',
             sub: 'How the strokes come out. Either way you type one number per golfer.',
             options: [
-                { value: 'ghin-index', name: 'GHIN index', sub: 'Type each index; the app works out course handicaps from the tee.' },
+                { value: 'ghin-index', name: 'GHIN index', sub: 'Type each index; the app works out each playing handicap (est.) from the tee.' },
                 { value: 'as-entered', name: 'Straight handicaps', sub: 'Type the number you already play off.' },
                 { value: 'scratch', name: 'No handicaps', sub: 'Gross scores only.' }
             ]
@@ -5381,14 +5721,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             || (typeof multiGroupMoneySuppressed === 'function' && multiGroupMoneySuppressed());
         const out = [{ value: 'none', name: 'Nothing', sub: 'Just keeping score.' }];
         if (!multi) {
-            out.push({ value: 'match', name: 'A bet on the round',
-                sub: 'The main game for money, plus presses.' });
+            out.push({ value: 'match', name: 'A game on the round',
+                sub: 'The main game, plus presses.' });
         }
         out.push({ value: 'skins', name: 'Skins', sub: 'Low score on a hole wins that hole.' });
-        out.push({ value: 'pot', name: 'One pot',
+        out.push({ value: 'pot', name: 'Weekly Game',
             sub: multi
-                ? 'A buy-in split between closest-to-the-pin, net finishing places and skins.'
-                : 'A buy-in split between KP, net places and skins.' });
+                ? 'One entry split between closest-to-the-pin, net finishing places and skins.'
+                : 'One entry split between KP, net places and skins.' });
         return out;
     }
 
@@ -5400,9 +5740,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             return Object.assign({}, def, {
                 options: coachMoneyOptions(),
                 sub: multi
-                    ? 'With more than one group the app pays the side games and the pot, not a '
-                      + 'single bet on the main game - so those are what it offers.'
-                    : 'Any of these can be changed on the money screen afterwards.'
+                    ? 'With more than one group the app scores the side games and the Weekly Game, not an '
+                      + 'amount on the main game - so those are what it offers.'
+                    : 'Any of these can be changed on the Games step afterwards.'
             });
         }
         return def;
@@ -5871,7 +6211,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         btn.style.display = code ? 'block' : 'none';
         if (note) {
             note.style.display = code ? 'block' : 'none';
-            note.textContent = code ? 'Copies round ' + code + ' \u2014 same course, games and money. Pick who is playing.' : '';
+            note.textContent = code ? 'Copies round ' + code + ' \u2014 same course and games. Pick who is playing.' : '';
         }
     }
     async function sameAsLastWeek(pressedEl) {
@@ -6028,7 +6368,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             return;
         }
         restore();
-        if (!round) { sayJoinRefusal(JOIN_REFUSAL.missing(code)); return; }
+        if (!round) {
+            sayJoinRefusal(JOIN_REFUSAL.missing(code));
+            return;
+        }
         // A group the round does not have: the picker on the scorecard shows the
         // groups that do exist, which is more use than a fail-closed card.
         if (group) {
@@ -6733,6 +7076,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         handleCourseChange();
     }
 
+
     function populateCourseDropdown(filterText = "") {
         courseDropdown.innerHTML = "";
         let hasResults = false;
@@ -6746,8 +7090,23 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (nearestGroup) orderedGroups = [nearestGroup, ...rest];
         }
 
+        // POLISH #30 (029, Game Day > Course: "Papago Golf Club" AND "Papago Golf Club (Papago)"): ONE ROW
+        // PER COURSE, by the course resolver every other screen uses (front-door.js HardPanCourse - the GPS
+        // door's search and NEAR YOU). The directory's az_papago (no record of its own) is the twin of the
+        // shared gapi_ record the GPS uses, so the resolver answers gapi_ for it: a row whose resolver key
+        // is ANOTHER row on this list, AND that has no card of its own (no preset, no record), is not drawn
+        // again. A twin WITH its own card (Prestwick, Talking Stick, Lewis River, Grassy Hill - saved rounds
+        // use those cards) is left as it was. The directory entry itself stays (getCourseNameById still names
+        // az_papago); only the second ROW goes. No resolver: every row, as before.
+        const HCr = window.HardPanCourse;
+        const oneKey = (id) => { try { const r = HCr && HCr.resolve && HCr.hasCard && !HCr.hasCard(id) ? HCr.resolve(id) : null; return r && r.key ? r.key : id; } catch (e) { return id; } };
+        const listedIds = {};
+        courseDirectory.forEach(g => g.items.forEach(i => { if (courseNameMatches(filterText, i.name)) listedIds[i.id] = 1; }));
+        Object.keys(globalCourses).forEach(k => { if ((k.startsWith('gca_') || k.startsWith('gapi_') || (!isNativeApp() && k.startsWith('comm_'))) && globalCourses[k] && courseNameMatches(filterText, globalCourses[k].name)) listedIds[k] = 1; });
+        const twinOfListed = (id) => { const k = oneKey(id); return k !== id && !!listedIds[k]; };
+
         orderedGroups.forEach(group => {
-            const filteredItems = group.items.filter(item => courseNameMatches(filterText, item.name));
+            const filteredItems = group.items.filter(item => courseNameMatches(filterText, item.name) && !twinOfListed(item.id));
             if (filteredItems.length > 0) {
                 hasResults = true;
                 if (filterText === "") {
@@ -6783,7 +7142,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // separate decision.
         const globalKeys = Object.keys(globalCourses).filter(k => k.startsWith("gca_") || (!isNativeApp() && k.startsWith("comm_")));
         if (globalKeys.length > 0) {
-            const filteredGlobals = globalKeys.filter(k => courseNameMatches(filterText, globalCourses[k].name));
+            const filteredGlobals = globalKeys.filter(k => courseNameMatches(filterText, globalCourses[k].name) && !twinOfListed(k));
             if (filteredGlobals.length > 0) {
                 hasResults = true;
                 if (filterText === "") {
@@ -7225,9 +7584,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
 
     function notifyPrefsApply(raw) {
-        var p = (typeof pushPrefsNormalise === 'function') ? pushPrefsNormalise(raw) : { bets: true, hype: true };
+        if (typeof pushPrefsWithLocal === 'function') raw = pushPrefsWithLocal(raw);
+        var p = (typeof pushPrefsNormalise === 'function') ? pushPrefsNormalise(raw) : { essentials: false, bets: false, hype: false };
+        var ess = document.getElementById('notify-ess');
         var bets = document.getElementById('notify-bets');
         var hype = document.getElementById('notify-hype');
+        if (ess) ess.checked = !!p.essentials;
         if (bets) bets.checked = !!p.bets;
         if (hype) hype.checked = !!p.hype;
     }
@@ -7247,11 +7609,17 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // makes a true claim look false. The guard is right; the name was mine to
         // change. And this comment does not spell the call out, because doing so
         // trips the same search.
+        var ess = document.getElementById('notify-ess');
         var prefsPayload = (typeof pushPrefsForSave === 'function')
-            ? pushPrefsForSave({ bets: bets && bets.checked, hype: hype && hype.checked })
-            : { bets: !!(bets && bets.checked), hype: !!(hype && hype.checked) };
+            ? pushPrefsForSave({ essentials: ess && ess.checked, bets: bets && bets.checked, hype: hype && hype.checked })
+            : { essentials: !!(ess && ess.checked), bets: !!(bets && bets.checked), hype: !!(hype && hype.checked) };
+        // 066 #1: the FIRST switch turned on is the moment iOS is asked (never before).
+        var optIn = !!(prefsPayload.essentials || prefsPayload.bets || prefsPayload.hype);
+        if (typeof pushSetOptinHere === 'function') pushSetOptinHere(optIn);
+        if (optIn && typeof registerThisPhone === 'function') { try { registerThisPhone(); } catch (e) {} }
         try {
-            await db.ref(notifyPrefsPath(uid)).update(prefsPayload);
+            if (typeof pushPrefsSave === 'function') await pushPrefsSave(db.ref(notifyPrefsPath(uid)), prefsPayload);
+            else await db.ref(notifyPrefsPath(uid)).update(prefsPayload);
             if (note) note.textContent = 'Saved.';
         } catch (e) {
             // THE RULES ARE NOT PUBLISHED YET, so this is the expected answer
@@ -7431,6 +7799,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (rating) rating.value = opt.getAttribute('data-rating') || '';
         if (par) par.value = opt.getAttribute('data-par') || '';
         syncTeeAdjustRow();
+        // POLISH #1: the golfers who have no tee of their own are on the round's tee.
+        if (typeof rowTeesFollowRound === 'function') rowTeesFollowRound();
         refreshHandicapNote();
     }
 
@@ -7520,6 +7890,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // Help me set this up, Edit Round Setup, a trip round and a paste -
         // rather than six call sites each remembering to do it.
         if (typeof refreshRowTeeControls === 'function') refreshRowTeeControls();
+        if (typeof rowTeesFollowRound === 'function') rowTeesFollowRound();
     }
 
     function handicapReviewLine() {
@@ -7974,7 +8345,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function refreshFlightsCount() {
         const el = document.getElementById('flights-count');
         if (!el) return;
-        if (!flightsEnabledNow()) { el.textContent = ''; return; }
+        if (!flightsEnabledNow()) { el.textContent = ''; maybeOfferFlightSplit(); return; }
         const list = captureCurrentPlayerInputs();
         const a = list.filter(p => p.flight !== 'B').length;
         const b = list.length - a;
@@ -7983,13 +8354,86 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // the switches are noise there. Hidden, not removed - the hidden inputs
         // still hold a value and the payload still writes it.
         const scopes = document.getElementById('flights-scopes');
-        if (scopes && typeof wizardWorkflow === 'function') scopes.style.display = wizardWorkflow().indexOf('action') === -1 ? 'none' : '';
+        if (scopes && typeof wizardWorkflow === 'function') scopes.style.display = wizardWorkflow().indexOf('action') === -1 ? 'none' : '';        maybeOfferFlightSplit();
     }
     function toggleRowFlight(btn) {
         const next = btn.getAttribute('data-flight') === 'B' ? 'A' : 'B';
         btn.setAttribute('data-flight', next);
         btn.textContent = next;
+        // SET BY HAND: the split-by-handicap question never moves this golfer.
+        const row = btn.closest ? btn.closest('.player-row') : null;
+        if (row) flightHandSet.add(String(playerIdOfRow(row)));
         refreshFlightsCount();
+    }
+
+    // ---- SPLIT BY HANDICAP (URGENT-009, 013-3) -------------------------------
+    // ASKED ONCE. Not asked at all when the roster brought its own letters (a
+    // paste, a typed "Glenn 12/B", My Groups, a saved or copied round with
+    // flights) - those are the organizer's flights already. flightHandSet holds
+    // the player ids whose A/B was tapped by hand; Split never moves them.
+    let flightSplitAsked = false;
+    const flightHandSet = new Set();
+    function noteFlightLetters() {
+        flightSplitAsked = true;
+        const box = document.getElementById('flights-split-ask');
+        if (box) box.style.display = 'none';
+    }
+    function flightSplitRoster() {
+        return captureCurrentPlayerInputs().filter(p => String(p.name || '').trim() || String(p.hcp || '').trim());
+    }
+    function maybeOfferFlightSplit() {
+        const box = document.getElementById('flights-split-ask');
+        if (!box) return;
+        const hide = () => { box.style.display = 'none'; box.removeAttribute('data-shown'); };
+        if (flightSplitAsked || !flightsEnabledNow() || typeof flightSplitSuggestion !== 'function') return hide();
+        const list = flightSplitRoster();
+        // A B that nobody tapped is a letter the roster brought: nothing to ask.
+        if (list.some(p => p.flight === 'B' && !flightHandSet.has(String(p.id)))) return hide();
+        const s = flightSplitSuggestion(list.filter(p => !flightHandSet.has(String(p.id))));
+        if (!s) return hide();
+        const input = document.getElementById('flights-split-cutoff');
+        if (input && (!box.getAttribute('data-shown') || !String(input.value || '').trim())) input.value = formatFlightCutoff(s.cutoff);
+        box.setAttribute('data-shown', '1');
+        box.style.display = 'block';
+        refreshFlightSplitPreview();
+    }
+    function flightSplitCutoffNow() {
+        const input = document.getElementById('flights-split-cutoff');
+        return flightHcpNumber(input ? input.value : '');
+    }
+    function refreshFlightSplitPreview() {
+        const el = document.getElementById('flights-split-preview');
+        if (!el) return;
+        const cut = flightSplitCutoffNow();
+        if (cut == null) { el.textContent = 'Type a handicap for the cutoff (+2 is a plus handicap).'; return; }
+        const list = flightSplitRoster();
+        const f = flightSplitAssign(list, cut, p => flightHandSet.has(String(p.id)));
+        const a = f.filter(x => x === 'A').length;
+        el.textContent = 'A ' + a + ' \u00B7 B ' + (f.length - a);
+    }
+    function applyFlightSplit() {
+        const cut = flightSplitCutoffNow();
+        // SAID INLINE, under the box (the preview line), not in a dialog.
+        if (cut == null) { refreshFlightSplitPreview(); const i = document.getElementById('flights-split-cutoff'); if (i && i.focus) i.focus(); return; }
+        document.querySelectorAll('.player-row').forEach(row => {
+            const btn = row.querySelector('.p-flight-input');
+            if (!btn || flightHandSet.has(String(playerIdOfRow(row)))) return;
+            const box = row.querySelector('.p-hcp-input');
+            const n = flightHcpNumber(box ? box.value : '');
+            if (n == null) return;
+            const f = n <= cut ? 'A' : 'B';
+            btn.setAttribute('data-flight', f);
+            btn.textContent = f;
+        });
+        flightSplitAsked = true;
+        const box = document.getElementById('flights-split-ask');
+        if (box) box.style.display = 'none';
+        refreshFlightsCount();
+    }
+    function declineFlightSplit() {
+        flightSplitAsked = true;
+        const box = document.getElementById('flights-split-ask');
+        if (box) box.style.display = 'none';
     }
     // The control, one element for both placements: a sixth column on a plain
     // row (explicit grid column 3, so the auto-placed delete button moves to
@@ -8033,7 +8477,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // box. gridColumn 1 / -1 gives the controls their own line instead.
         const wrap = document.createElement('div');
         wrap.className = 'p-order-wrap';
-        wrap.style.gridColumn = '1 / -1';
+        wrap.setAttribute('role', 'menu');
         const btn = (glyph, label, fn) => {
             const b = document.createElement('button');
             b.type = 'button';
@@ -8045,10 +8489,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         };
         const label = document.createElement('span');
         label.className = 'p-order-label';
-        label.textContent = 'Order';
+        label.textContent = 'Move';
         wrap.appendChild(label);
-        wrap.appendChild(btn('\u25B2', 'Move this golfer up', function () { moveRowBy(row, -1); }));
-        wrap.appendChild(btn('\u25BC', 'Move this golfer down', function () { moveRowBy(row, 1); }));
+        // In the compact list these sit in the handle's menu, so they say what they do.
+        wrap.appendChild(btn('\u25B2 Move up', 'Move this golfer up', function () { moveRowBy(row, -1); row.classList.remove('p-menu-open'); }));
+        wrap.appendChild(btn('\u25BC Move down', 'Move this golfer down', function () { moveRowBy(row, 1); row.classList.remove('p-menu-open'); }));
         // MOVE TO GROUP N, as a select rather than a menu: on a phone the native
         // picker is one tap and needs no layout of ours, and it reads out the
         // group names to a screen reader for free.
@@ -8131,15 +8576,32 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (row.querySelector('.p-tee-input')) return;
             const line = row.querySelector('.p-tee-line');
             if (line) line.remove();
-            appendTeeControl(row, row.getAttribute('data-tee-key') || undefined);
+            // POLISH #1: only a golfer's OWN tee is put back; everyone else takes the round's.
+            const own = row.getAttribute('data-tee-own') === '1';
+            appendTeeControl(row, own ? (row.getAttribute('data-tee-key') || undefined) : undefined,
+                own ? (row.getAttribute('data-tee-name') || undefined) : undefined);
         });
     }
 
-    function appendTeeControl(row, teeKey) {
-        const src = document.getElementById('tee-rating-select');
-        if (!src || !src.options || src.options.length < 2) return;
-        const sel = document.createElement('select');
-        sel.className = 'p-tee-input';
+    // POLISH #1 (029: the golfer was saved on Black at Papago with White picked, and on
+    // Papago's "Men · Black 75/130" at Dobson, which has no Black tee).
+    //
+    // THE CAUSE. A row's tee dropdown is a COPY of the round select, taken when the row is
+    // built - and nothing ever touched it again: a tee tapped afterwards, or a different
+    // course picked, left the row on the old value (the first option, the tips) and the old
+    // course's options. The save reads the ROW, so the golfer was stored on that tee.
+    //
+    // THE RULE NOW. A row FOLLOWS the round tee unless the golfer was given a tee of their
+    // own (picked on the row, "Tee for everyone", "Name 6 Blue", or a saved round's own
+    // tee): data-tee-own. A new course rebuilds every row's options from the round select
+    // and puts everyone on the round's tee - tee keys are positions ("male:0"), so a tee
+    // from another course is never carried over. Display / setup only: the save and every
+    // handicap formula are unchanged; they simply read the right tee.
+    function teeOptionsSig(sel) {
+        return Array.prototype.map.call((sel && sel.options) || [], o => o.value + '|' + o.textContent).join('\n');
+    }
+    function fillRowTeeOptions(sel, src) {
+        sel.innerHTML = '';
         for (let i = 0; i < src.options.length; i++) {
             const o = src.options[i];
             const opt = document.createElement('option');
@@ -8151,24 +8613,234 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             });
             sel.appendChild(opt);
         }
-        const want = (teeKey && Array.prototype.some.call(sel.options, o => o.value === teeKey))
-            ? teeKey : (src.value || '');
+    }
+    function teeCourseNow() {
+        const c = document.getElementById('course-select');
+        return c ? String(c.value || '') : '';
+    }
+    // A golfer's own tee, on THIS course's options: the key when that option still carries
+    // the tee's name (a copied round from another course carries Papago's "Men · Black"
+    // under a key that means something else here), else the option with that name, else none.
+    function ownTeeKeyHere(sel, teeKey, teeName) {
+        if (!teeKey && !teeName) return '';
+        const opts = Array.prototype.slice.call(sel.options || []);
+        const byKey = teeKey ? opts.filter(o => o.value === teeKey)[0] : null;
+        const nm = String(teeName || '').trim();
+        if (byKey && (!nm || String(byKey.textContent || '').trim() === nm)) return byKey.value;
+        const byName = nm ? opts.filter(o => String(o.textContent || '').trim() === nm)[0] : null;
+        return byName ? byName.value : '';
+    }
+    function rowTeesFollowRound() {
+        const src = document.getElementById('tee-rating-select');
+        const list = document.getElementById('player-list');
+        if (!src || !list || !src.options || src.options.length < 2) return;
+        const sig = teeOptionsSig(src), course = teeCourseNow();
+        Array.from(list.querySelectorAll('.player-row')).forEach((row) => {
+            const sel = row.querySelector('.p-tee-input');
+            if (!sel) return;
+            let own = row.getAttribute('data-tee-own') === '1';
+            if (teeOptionsSig(sel) !== sig) {
+                const sameCourse = course && row.getAttribute('data-tee-course') === course;
+                const cur = Array.prototype.filter.call(sel.options, o => o.value === sel.value)[0];
+                const keep = own && sameCourse && cur ? ownTeeKeyHere(sel, sel.value, cur.textContent) : '';
+                fillRowTeeOptions(sel, src);
+                const k = keep ? ownTeeKeyHere(sel, keep, '') : '';
+                own = !!k;
+                sel.value = k || src.value || '';
+                row.setAttribute('data-tee-course', course);
+                if (own) row.setAttribute('data-tee-own', '1');
+                else { row.removeAttribute('data-tee-own'); row.removeAttribute('data-tee-name'); }
+                row.setAttribute('data-tee-key', sel.value || '');
+                syncTeeShort(sel);
+                return;
+            }
+            if (own) return;
+            if (src.value && sel.value !== src.value) {
+                sel.value = src.value;
+                row.setAttribute('data-tee-key', src.value);
+                syncTeeShort(sel);
+            }
+        });
+    }
+
+    function appendTeeControl(row, teeKey, teeName) {
+        // A tee handed over before the tees are here stays on the row, marked as the golfer's own.
+        if (teeKey) {
+            row.setAttribute('data-tee-key', teeKey);
+            row.setAttribute('data-tee-own', '1');
+            if (teeName) row.setAttribute('data-tee-name', String(teeName));
+        }
+        const src = document.getElementById('tee-rating-select');
+        if (!src || !src.options || src.options.length < 2) return;
+        const sel = document.createElement('select');
+        sel.className = 'p-tee-input';
+        fillRowTeeOptions(sel, src);
+        // A new golfer takes "Tee for everyone" when it has been set; otherwise the round's tee.
+        const everyone = document.getElementById('tee-everyone');
+        const everyoneKey = (everyone && everyone.value && Array.prototype.some.call(sel.options, o => o.value === everyone.value)) ? everyone.value : '';
+        const ownKey = ownTeeKeyHere(sel, teeKey, teeName);
+        const want = ownKey || everyoneKey || src.value || '';
         sel.value = want;
         // ON THE ROW, so refreshRowTeeControls can put the same tee back when it
         // builds a control for a row that had none.
         row.setAttribute('data-tee-key', want || '');
-        sel.addEventListener('change', function () { row.setAttribute('data-tee-key', sel.value || ''); });
-        sel.onchange = function () { if (typeof refreshHandicapNote === 'function') refreshHandicapNote(); };
+        row.setAttribute('data-tee-course', teeCourseNow());
+        if (ownKey || everyoneKey) row.setAttribute('data-tee-own', '1');
+        else { row.removeAttribute('data-tee-own'); row.removeAttribute('data-tee-name'); }
+        sel.addEventListener('change', function () {
+            row.setAttribute('data-tee-key', sel.value || '');
+            row.setAttribute('data-tee-own', '1');
+            row.removeAttribute('data-tee-name');
+        });
+        sel.onchange = function () { syncTeeShort(sel); if (typeof refreshHandicapNote === 'function') refreshHandicapNote(); };
+        sel.setAttribute('aria-label', 'Tee');
+        // COMPACT: the tee is the 4th column of the row. The closed control shows a
+        // SHORT name ("Blue"); the native picker still lists the full names, and the
+        // option text (what the save reads) is unchanged.
         const line = document.createElement('div');
         line.className = 'p-tee-line';
-        line.style.cssText = 'display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--text-muted); margin-top:4px;';
-        line.style.gridColumn = '1 / -1';
         const label = document.createElement('span');
+        label.className = 'p-sr';
         label.textContent = 'Tee';
         line.appendChild(label);
-        line.appendChild(sel);
+        const pick = document.createElement('span');
+        pick.className = 'p-tee-pick';
+        const short = document.createElement('span');
+        short.className = 'p-tee-short';
+        short.setAttribute('aria-hidden', 'true');
+        pick.appendChild(short);
+        pick.appendChild(sel);
+        line.appendChild(pick);
+        row.appendChild(line);
+        syncTeeShort(sel);
+    }
+
+    // "Men · Pintail Blue" -> "Blue"; the last word unless two tees share it, then
+    // the whole tee name; a women's tee gets a W in front.
+    function shortTeeLabel(optText, allTexts) {
+        const seg = (t) => { const parts = String(t || '').split('\u00b7'); return parts[parts.length - 1].trim(); };
+        const name = seg(optText);
+        const last = name.split(/\s+/).pop();
+        const clash = (allTexts || []).filter((t) => seg(t) !== name && seg(t).split(/\s+/).pop().toLowerCase() === last.toLowerCase()).length > 0;
+        const women = /^\s*(women|ladies|female)/i.test(String(optText || ''));
+        return (women ? 'W ' : '') + (clash ? name : last);
+    }
+    function syncTeeShort(sel) {
+        if (!sel) return;
+        const pick = sel.parentNode, short = pick && pick.querySelector ? pick.querySelector('.p-tee-short') : null;
+        if (!short) return;
+        const all = Array.prototype.map.call(sel.options, o => o.textContent);
+        const opt = sel.options[sel.selectedIndex];
+        short.textContent = opt ? shortTeeLabel(opt.textContent, all) : '';
+    }
+
+    // TEE FOR EVERYONE: one picker above the list sets every golfer's tee at once;
+    // any golfer's own tee can still differ afterwards. Shown only when the course
+    // has more than one rated tee, like the per-golfer control.
+    function syncTeeEveryone() {
+        const wrap = document.getElementById('tee-everyone-row');
+        const ev = document.getElementById('tee-everyone');
+        const src = document.getElementById('tee-rating-select');
+        if (!wrap || !ev) return;
+        if (!src || !src.options || src.options.length < 2) { wrap.style.display = 'none'; return; }
+        wrap.style.display = '';
+        const want = Array.prototype.map.call(src.options, o => o.value + '|' + o.textContent).join('\n');
+        if (ev.getAttribute('data-filled') !== want) {
+            const keep = ev.value;
+            ev.innerHTML = '<option value="">Set all…</option>' + Array.prototype.map.call(src.options, o =>
+                '<option value="' + escapeHtml(o.value) + '">' + escapeHtml(o.textContent) + '</option>').join('');
+            ev.setAttribute('data-filled', want);
+            if (keep) ev.value = keep;
+        }
+    }
+    function setTeeForEveryone(key) {
+        if (!key) return;
+        const list = document.getElementById('player-list');
+        if (!list) return;
+        list.querySelectorAll('.player-row').forEach((row) => {
+            const sel = row.querySelector('.p-tee-input');
+            if (!sel || !Array.prototype.some.call(sel.options, o => o.value === key)) return;
+            sel.value = key;
+            row.setAttribute('data-tee-key', key);
+            row.setAttribute('data-tee-own', '1');
+            row.removeAttribute('data-tee-name');
+            syncTeeShort(sel);
+        });
+        if (typeof refreshHandicapNote === 'function') refreshHandicapNote();
+    }
+
+    // TEAM / SQUAD / FLIGHT on a slim second line, so the first line stays
+    // handle | name | HCP | tee | x at any phone width.
+    function compactExtraLine(row) {
+        const items = [];
+        ['.p-team-input', '.p-squad-input'].forEach((sel) => { const el = row.querySelector(sel); if (el) items.push([el, sel === '.p-team-input' ? 'Team' : 'Squad']); });
+        const fl = row.querySelector('.p-flight-line');
+        if (!items.length && !fl) return;
+        const line = document.createElement('div');
+        line.className = 'p-extra-line';
+        items.forEach(([el, lbl]) => {
+            const l = document.createElement('span');
+            l.textContent = lbl;
+            line.appendChild(l);
+            el.style.gridColumn = ''; el.style.gridRow = '';
+            line.appendChild(el);
+        });
+        if (fl) line.appendChild(fl);
         row.appendChild(line);
     }
+
+    // DRAG THE HANDLE TO REORDER; TAP IT FOR THE MENU (Move up / Move down / Move
+    // to group). The move itself is grouping.js's rosterMove, the same one the
+    // arrows use, so a drag can never lose or duplicate a golfer.
+    function closeRowMenus(except) {
+        document.querySelectorAll('.player-row.p-menu-open').forEach((r) => { if (r !== except) r.classList.remove('p-menu-open'); });
+    }
+    function attachRowDrag(row) {
+        const h = row.querySelector('.p-drag');
+        if (!h) return;
+        let start = null;
+        h.addEventListener('pointerdown', function (e) {
+            if (e.button !== undefined && e.button !== 0) return;
+            start = { y: e.clientY, moved: false, id: e.pointerId };
+            try { h.setPointerCapture(e.pointerId); } catch (x) {}
+        });
+        h.addEventListener('pointermove', function (e) {
+            if (!start || e.pointerId !== start.id) return;
+            const dy = e.clientY - start.y;
+            if (!start.moved && Math.abs(dy) < 6) return;
+            if (!start.moved) { start.moved = true; closeRowMenus(); row.classList.add('p-dragging'); }
+            row.style.transform = 'translateY(' + dy + 'px)';
+            e.preventDefault();
+        });
+        const end = function (e) {
+            if (!start || (e && e.pointerId !== start.id)) return;
+            const moved = start.moved, y = e ? e.clientY : start.y;
+            start = null;
+            row.classList.remove('p-dragging');
+            row.style.transform = '';
+            if (!moved) return;
+            const rows = playerRowsNow();
+            const from = rows.indexOf(row);
+            let to = rows.length - 1;
+            for (let i = 0; i < rows.length; i++) {
+                const r = rows[i].getBoundingClientRect();
+                if (y < r.top + r.height / 2) { to = i > from ? i - 1 : i; break; }
+            }
+            if (from !== -1 && to !== from) applyRowOrder(rosterMove(rows, from, to));
+        };
+        h.addEventListener('pointerup', end);
+        h.addEventListener('pointercancel', end);
+        h.addEventListener('click', function (e) {
+            e.preventDefault();
+            const open = !row.classList.contains('p-menu-open');
+            closeRowMenus(row);
+            row.classList.toggle('p-menu-open', open);
+        });
+    }
+    document.addEventListener('click', function (e) {
+        if (!e.target || !e.target.closest || e.target.closest('.p-drag') || e.target.closest('.p-order-wrap')) return;
+        closeRowMenus();
+    });
 
     // The tee one row is set to, as the shape handicap.js and player-tees.js read.
     // The tee names THIS course offers, for the paste parser. Nothing else is a
@@ -8299,8 +8971,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const note = (id, text) => { const el = document.getElementById(id); if (!el) return; el.style.display = (on && text) ? 'block' : 'none'; if (text) el.textContent = text; };
         const skinsPer = on && flightScopeNow('skins') === 'flight';
         const birdiesPer = on && flightScopeNow('birdies') === 'flight';
-        note('skins-flight-note', skinsPer ? 'Per flight \u2014 set in Players. Two pots: A pays A, B pays B.' : '');
-        note('birdie-flight-note', birdiesPer ? 'Per flight \u2014 set in Players. A birdie in A is paid by A only.' : '');
+        note('skins-flight-note', skinsPer ? 'Per flight \u2014 set in Players. Two games: A plays A, B plays B.' : '');
+        note('birdie-flight-note', birdiesPer ? 'Per flight \u2014 set in Players. A birdie in A counts against A only.' : '');
         // THE MAIN POOL'S SKINS BUCKET follows the round's skins scope since
         // 2026-09-13: one pot when the scope is whole-field, an A pot and a B pot
         // (by headcount, remainder to A) when it is per flight - pool-engine.js
@@ -8311,18 +8983,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // describes behaviour is behaviour.
         const mpMode = document.getElementById('mp-skins-mode');
         const poolSkinsOn = !!(mpMode && mpMode.value !== 'none');
-        const ONE_POT_NOTE = 'Weekly Game skins are ONE pot for the whole field \u2014 A and B play each other here. For A-only and B-only skins pots, use a Skins wager (Step 4 or Also Playing) instead of this bucket.';
+        const ONE_POT_NOTE = 'Weekly Game skins are ONE game for the whole field \u2014 A and B play each other here. For A-only and B-only skins, use a Skins game (Step 4 or Also Playing) instead of this bucket.';
         // Two split sentences since 2026-09-20, chosen by the Skins pot switch in
         // Players (flightsSkinsSplitNow, the value pool-engine's skinsSplitMode reads).
-        const SPLIT_NOTE = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two pots by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
-        const SPLIT_EVEN_NOTE = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two equal pots \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
+        const SPLIT_NOTE = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two shares by headcount \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
+        const SPLIT_EVEN_NOTE = 'With Skins per flight, the Weekly Game\'s skins bucket splits into two equal shares \u2014 Flight A and Flight B each play their own. KP and Net Finish stay whole-field.';
         note('mp-skins-flight-note', (on && poolSkinsOn)
             ? (skinsPer ? (flightsSkinsSplitNow() === 'even' ? SPLIT_EVEN_NOTE : SPLIT_NOTE) : ONE_POT_NOTE)
             : '');
         const blurb = document.getElementById('birdie-blurb');
         if (blurb) blurb.textContent = birdiesPer
-            ? 'Automatic \u2014 birdies/eagles are read from scores. Every other player in the same flight pays the achiever per birdie (eagle counts double).'
-            : 'Automatic \u2014 birdies/eagles are read from scores. Every other player pays the achiever per birdie (eagle counts double).';
+            ? 'Automatic \u2014 birdies/eagles are read from scores. Each birdie scores against every other player in the same flight (eagle counts double).'
+            : 'Automatic \u2014 birdies/eagles are read from scores. Each birdie scores against every other player (eagle counts double).';
         // the stacked-skins extras and each instance card are rendered from
         // state and read the scope when drawn
         if (typeof renderStackedGames === 'function' && document.getElementById('stacked-games-list')) renderStackedGames();
@@ -8357,9 +9029,16 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // off the attribute rather than the select because
             // refreshRowTeeControls uses that attribute to restore a tee when it
             // builds a control for a row that had none.
-            const teeKeyOnRow = row.getAttribute('data-tee-key')
-                || (row.querySelector('.p-tee-input') ? row.querySelector('.p-tee-input').value : '');
-            if (teeKeyOnRow) entry.tee = { teeKey: teeKeyOnRow };
+            // POLISH #1: only a golfer's OWN tee rides along; a row that follows the round
+            // tee is rebuilt on the round tee, which is the same tee - and stays current.
+            const teeSelOnRow = row.querySelector('.p-tee-input');
+            const teeKeyOnRow = row.getAttribute('data-tee-own') === '1'
+                ? (row.getAttribute('data-tee-key') || (teeSelOnRow ? teeSelOnRow.value : '')) : '';
+            if (teeKeyOnRow) {
+                const teeOpt = teeSelOnRow ? Array.prototype.filter.call(teeSelOnRow.options, o => o.value === teeKeyOnRow)[0] : null;
+                const teeNameOnRow = teeOpt ? String(teeOpt.textContent || '') : (row.getAttribute('data-tee-name') || '');
+                entry.tee = teeNameOnRow ? { teeKey: teeKeyOnRow, teeName: teeNameOnRow } : { teeKey: teeKeyOnRow };
+            }
             list.push(entry);
         });
         return list;
@@ -8392,22 +9071,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
         if (oneVOneOverflow) {
             warningBox.style.display = 'block';
-            warningBox.innerHTML = `⚠️ <strong>1v1 only supports exactly 2 players</strong> for this round's main bet — only the first two will actually be matched here, the rest will just score normally with no bet attached. For everyone else betting individually, use <strong>⚔️ Side Matches</strong> instead (set this round's format to Stroke Play, then set up each 1v1 from the Matches tab).`;
+            warningBox.innerHTML = `⚠️ <strong>1v1 only supports exactly 2 players</strong> for this round's main game — only the first two will actually be matched here, the rest will just score normally with no game attached. For everyone else playing their own games, use <strong>⚔️ Side Matches</strong> instead (set this round's format to Stroke Play, then set up each 1v1 from the Matches tab).`;
         } else {
             warningBox.style.display = 'none';
         }
 
-        if (format === 'ryder') {
-            headerRow.style.gridTemplateColumns = "1.5fr 0.7fr 1fr 1fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span><span>Team</span><span>Squad</span>${moneyHeaderHtml}<span></span>`;
-        } else if (['bestball', 'scramble', 'hilo'].includes(format) || (format === 'nassau' && nassauType === 'team') || oneVOneOverflow) {
-            headerRow.style.gridTemplateColumns = "1.8fr 0.8fr 1.2fr" + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span><span>Team</span>${moneyHeaderHtml}<span></span>`;
-        } else {
-            const flt = flightsEnabledNow();
-            headerRow.style.gridTemplateColumns = "2fr 1fr" + (flt ? " 0.7fr" : "") + (showMoneyCheckbox ? " 46px" : "") + " 38px";
-            headerRow.innerHTML = `<span>Name</span><span>${hcpHead}</span>${flt ? '<span>Flt</span>' : ''}${moneyHeaderHtml}<span></span>`;
-        }
+        // THE COMPACT LIST: one header for every format - NAME · HCP · TEE. Team,
+        // squad and flight are labelled on each golfer's second line.
+        void format; void moneyHeaderHtml; void showMoneyCheckbox;
+        headerRow.classList.add('p-compact');
+        headerRow.style.gridTemplateColumns = '';
+        const teeHead = (document.getElementById('tee-rating-select') && document.getElementById('tee-rating-select').options.length > 1) ? 'Tee' : '';
+        headerRow.innerHTML = `<span></span><span>Name</span><span style="text-align:center">${hcpHead}</span><span style="text-align:center">${teeHead}</span><span></span>`;
         // Driven by the FORMAT, not by showMoneyCheckbox - that flag is now permanently
         // false because the checkbox is gone, and reusing it here would silently kill
         // the hint too. The hint is about where group games are chosen, which is worth
@@ -8437,6 +9112,122 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             + 'still plays every whole-field game, and Side Matches pick their own players separately.';
     }
 
+    // ROWS THAT HOLD A WHOLE PASTED LINE AS THEIR NAME (URGENT-004). A list pasted
+    // before roster-paste.js read "Glenn 12.0/B" left that whole string in the name
+    // box, the handicap empty and no flight. Every redraw of the roster (Flights
+    // switched on, the step reopened, a format change) now splits such a row into
+    // name / handicap / flight - only when its handicap box is empty - turns Flights
+    // on if a flight was read, and says how many golfers it fixed. Nothing is saved
+    // until the organizer saves, as with any edit on this step.
+    let fixingPastedRows = false;
+    function fixPastedRowsOnRoster(list) {
+        if (fixingPastedRows || typeof fixPastedRows !== 'function') return list;
+        const r = fixPastedRows(list);
+        if (!r.fixed) return list;
+        if (r.anyFlight) noteFlightLetters();
+        if (r.anyFlight && !flightsEnabledNow()) {
+            // setFlightsEnabled redraws the roster from the rows on screen; the
+            // guard keeps that inner redraw from fixing (and noting) a second time.
+            fixingPastedRows = true;
+            try { setFlightsEnabled(true); } finally { fixingPastedRows = false; }
+        }
+        showRosterFixNote('Fixed ' + r.fixed + ' golfer' + (r.fixed === 1 ? "'s handicap" : "s' handicaps") + (r.anyFlight ? ' and flights' : '') + '.');
+        return r.list;
+    }
+    // A TYPED ROW READS LIKE A PASTED ONE (URGENT-009, 013-3). "Glenn 12/B" typed
+    // into a name box used to sit there whole until something redrew the roster;
+    // leaving the box now redraws it, which runs the same fix as a paste - name,
+    // handicap and flight split, Flights switched on for a letter. Only when the
+    // handicap box is empty, so a typed number is never replaced.
+    function typedRowChanged(input) {
+        const row = input && input.closest ? input.closest('.player-row') : null;
+        const hcp = row ? row.querySelector('.p-hcp-input') : null;
+        if (hcp && String(hcp.value || '').trim() !== '') return;
+        if (typeof splitTrailingHcpFlight !== 'function' || !splitTrailingHcpFlight(input.value)) return;
+        renderPlayerList();
+    }
+    // One line above the roster: the fix count and, when two golfers share a name,
+    // the ask for a last initial. Replaced on every redraw.
+    function showRosterFixNote(fixText) {
+        const list = document.getElementById('player-list');
+        if (!list || !list.parentNode) return;
+        let el = document.getElementById('roster-fix-note');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'roster-fix-note';
+            el.className = 'paste-flagged-line';
+            el.setAttribute('role', 'status');
+            list.parentNode.insertBefore(el, list);
+        }
+        if (fixText != null) el.setAttribute('data-fix', fixText);
+        const fix = el.getAttribute('data-fix') || '';
+        el.textContent = fix;
+        el.style.display = el.textContent ? '' : 'none';
+        renderDuplicateNamesBlock();
+    }
+
+    // SAME NAME TWICE IS SETTLED HERE, NOT AT RESULTS (URGENT-011).
+    //
+    // URGENT-004 kept two pasted "Matt"s as two golfers and asked for a last
+    // initial - and nothing made anyone add one, so the round saved and the
+    // Receipt (duplicatePlayerNames in action-model.js, keyed the way every money
+    // total is keyed: trimmed + lowercased) refused to name who pays whom at the
+    // END. The ask now has a button on each golfer, and Save waits until the names
+    // differ. UI only: no golfer is merged, renamed or dropped by the app.
+    function rosterSameNames() {
+        const players = (typeof captureCurrentPlayerInputs === 'function') ? captureCurrentPlayerInputs() : [];
+        if (typeof duplicatePlayerNames === 'function') return duplicatePlayerNames(players);
+        const seen = {};
+        players.forEach((p) => {
+            const k = String((p && p.name) || '').trim().toLowerCase();
+            if (!k) return;
+            (seen[k] = seen[k] || { key: k, name: String(p.name).trim(), count: 0, ids: [] }).count++;
+            seen[k].ids.push(String(p.id));
+        });
+        return Object.keys(seen).map((k) => seen[k]).filter((x) => x.count > 1);
+    }
+    function sameNameLine(d) {
+        const words = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+        return (words[d.count] || d.count) + ' golfers named ' + d.name + ': add a last initial';
+    }
+    function renderDuplicateNamesBlock() {
+        const list = document.getElementById('player-list');
+        if (!list || !list.parentNode) return;
+        let el = document.getElementById('roster-dup-names');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'roster-dup-names';
+            el.className = 'paste-flagged-line';
+            el.setAttribute('role', 'status');
+            list.parentNode.insertBefore(el, list);
+        }
+        const same = rosterSameNames();
+        if (!same.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+        const rows = Array.prototype.slice.call(document.querySelectorAll('#player-list .player-row'));
+        const hcpOf = (id) => {
+            const r = rows.find((x) => x.getAttribute('data-player-id') === String(id));
+            const h = r && r.querySelector('.p-hcp-input');
+            return h && String(h.value || '').trim() ? ' (' + String(h.value).trim() + ')' : '';
+        };
+        el.innerHTML = same.map((d) => `<div class="dup-name-group" style="margin:2px 0 6px 0;"><b>${escapeHtml(sameNameLine(d))}</b>
+            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">${d.ids.map((id) =>
+                `<button type="button" class="btn-outline dup-add-initial" data-player-id="${escapeHtml(String(id))}" onclick="addInitialFor('${escapeHtml(String(id))}')"
+                    style="min-height:44px; padding:6px 12px; font-size:0.8rem; width:auto;">Add initial · ${escapeHtml(d.name)}${escapeHtml(hcpOf(id))}</button>`).join('')}</div></div>`).join('')
+            + '<div style="font-size:0.75rem;">They stay separate golfers. Save waits until the names differ, so the card and who-pays-who can tell them apart.</div>';
+        el.style.display = '';
+    }
+    // ONE TAP: the golfer's own name box, focused, with a space after the name and
+    // the cursor at the end - the next key typed IS the initial ("Matt S").
+    function addInitialFor(id) {
+        const row = Array.prototype.find.call(document.querySelectorAll('#player-list .player-row'),
+            (r) => r.getAttribute('data-player-id') === String(id));
+        const input = row && row.querySelector('.p-name-input');
+        if (!input) return;
+        input.value = String(input.value || '').trim() + ' ';
+        try { input.focus(); } catch (e) { /* no layout */ }
+        try { const end = input.value.length; input.setSelectionRange(end, end); } catch (e) { /* not supported */ }
+        try { if (input.scrollIntoView) input.scrollIntoView({ block: 'center' }); } catch (e) { /* no layout */ }
+    }
     function renderPlayerList(forceLoad = false) {
         const listContainer = document.getElementById("player-list");
         
@@ -8446,12 +9237,14 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         } else {
             existingData = captureCurrentPlayerInputs(); 
         }
+        existingData = fixPastedRowsOnRoster(existingData);
 
         listContainer.innerHTML = "";
         renderPlayerListHeaderAndWarning(existingData.length);
 
         existingData.forEach((p) => appendPlayerFrom(p, !!forceLoad, existingData.length));
         updateCount();
+        showRosterFixNote();
     }
 
     // The box shows the Handicap Index. A round saved before conversion has no
@@ -8460,7 +9253,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     function appendPlayerFrom(p, fromSaved, total) {
         const shown = (fromSaved && p.handicapIndex != null && String(p.handicapIndex).trim() !== '')
             ? String(p.handicapIndex) : (p.hcp || '');
-        addPlayerRow(p.name, shown, p.team, p.squad, false, p.playingForMoney !== false, total, true, p.id, p.flight, p.tee && p.tee.teeKey);
+        addPlayerRow(p.name, shown, p.team, p.squad, false, p.playingForMoney !== false, total, true, p.id, p.flight, p.tee && p.tee.teeKey, p.tee && p.tee.teeName);
         const list = document.getElementById('player-list');
         const row = list ? list.lastElementChild : null;
         if (!row) return;
@@ -8511,6 +9304,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
 
     function openPastePlayersModal() {
+        pasteReplaceMeChoice = null;
         document.getElementById('paste-players-modal').classList.add('open');
         document.getElementById('paste-players-textarea').focus();
     }
@@ -8564,6 +9358,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         var btn = document.getElementById(which === 'apple' ? 'oauth-link-apple' : 'oauth-link-google');
         tapBusy(btn, '\u23F3 Opening\u2026');
         window.oauthSignin.signIn(which, { deliberateLink: true }).then(function (r) {
+            clearSignInFailures();
             tapDone(btn, '\u2713 ' + (which === 'apple' ? 'Apple' : 'Google')
                 + ' linked \u2014 next time it is one tap on this account.');
             refreshAccountState();
@@ -8571,6 +9366,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }, function (err) {
             tapFail(btn, window.oauthSignin.messageFor(err, { deliberateLink: true }));
         });
+    }
+
+    // A SIGN-IN THAT WORKED CLEARS EVERY SIGN-IN FAILURE ON THE SHEET (2026-10-09):
+    // after Google signed Manny in, Apple's red "token was rejected" note was still
+    // above "Signed in as...", saying the opposite of what had just happened.
+    function clearSignInFailures() {
+        var sheet = document.getElementById('account-modal') || document;
+        var notes = sheet.querySelectorAll ? sheet.querySelectorAll('.tap-note-fail') : [];
+        Array.prototype.forEach.call(notes, function (n) { if (n && n.parentNode) n.parentNode.removeChild(n); });
     }
 
     function oauthTap(which) {
@@ -8584,6 +9388,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // every time Manny reported a button as doing nothing.
         tapBusy(btn, '\u23F3 Opening\u2026');
         window.oauthSignin.signIn(which).then(function (r) {
+            clearSignInFailures();
             tapDone(btn, '\u2713 Signed in' + (r && r.email ? ' as ' + r.email : '')
                 + (r && r.preserved ? ' \u2014 your rounds and trial stay on this account.' : ''));
             refreshAccountState();
@@ -8626,10 +9431,23 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         }
     }
 
+    // The Account panel's Privacy / Terms / Support / Acknowledgements links, made
+    // absolute from the one origin product-links.js declares (see #account-legal).
+    function syncLegalLinks() {
+        if (typeof shareBaseUrl !== 'function') return;
+        let base = '';
+        try { base = shareBaseUrl(); } catch (e) { return; }
+        ['privacy', 'terms', 'support', 'acknowledgements'].forEach(name => {
+            const a = document.getElementById('legal-' + name);
+            const want = base + name + '.html';
+            if (a && a.getAttribute('href') !== want) a.setAttribute('href', want);
+        });
+    }
     function openAccountPanel() {
         const el = document.getElementById('account-modal');
         if (!el) return;
         refreshAccountState();
+        try { syncLegalLinks(); } catch (e) { }
         el.classList.add('open');
         // NOTHING IS FOCUSED ON ARRIVAL ANY MORE. The email box is behind "Use email
         // instead", so focusing it would open the keyboard over the two buttons a
@@ -8808,9 +9626,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             reauth: accountReauthFn(),
             reload: () => { try { location.reload(); } catch (e) { } }
         };
-        // 088 (website half, tfweb-2): Delete account also erases this account's
-        // scorecard-scan counts on the scan server (POST /api/scan-erase), like the
-        // app. Never stops the delete; a miss keeps a pending note on this browser.
+        // THE SERVER FINISHES A DELETE (accountDelete): it revokes Sign in with Apple
+        // and removes what the rules will not let this page remove. No fetch, no
+        // server - and account-exit.js falls back to the client delete, as it does
+        // while the function is not deployed.
+        if (step === 'delete2' && typeof fetch === 'function' && typeof window.accountExit.serverDeleter === 'function') {
+            deps.serverDelete = window.accountExit.serverDeleter({ auth: auth, fetch: (u, o) => fetch(u, o) });
+            if (window.oauthSignin && typeof window.oauthSignin.appleAuthorizationCode === 'function') {
+                deps.appleCode = () => window.oauthSignin.appleAuthorizationCode();
+            }
+        }
+        // 088: Delete account also erases this account's scorecard-scan counts on the
+        // scan server. Never stops the delete; a miss is retried on the next load.
         if (step === 'delete2' && typeof fetch === 'function' && typeof window.accountExit.scanEraser === 'function') {
             deps.scanErase = window.accountExit.scanEraser({ auth: auth, fetch: (u, o) => fetch(u, o) });
         }
@@ -8919,6 +9746,9 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function refreshAccountState() {
         const linked = accountIsLinked();
+        // Signed in by any way (Apple, Google, the email link): no failure note from
+        // an earlier attempt stays on the sheet.
+        if (linked && typeof clearSignInFailures === 'function') clearSignInFailures();
         if (typeof syncOauthCard === 'function') syncOauthCard();
         // The beta switch lives in this panel now, so it repaints with the panel -
         // including the moment a sign-in completes without the panel closing (v214's
@@ -8950,7 +9780,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     function previewPastedPlayers() {
         const text = document.getElementById('paste-players-textarea').value;
-        const { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights } = parsePlayerPasteText(text, roundTeeNames());
+        const { validPlayers, flaggedLines, flaggedFlights, notedLines, groups, flights, checkLines } = parsePlayerPasteText(text, roundTeeNames());
         const summaryEl = document.getElementById('paste-preview-summary');
         const commitBtn = document.getElementById('paste-players-commit-btn');
 
@@ -8973,16 +9803,67 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             if (flights.unlettered > 0) html += `. ${flights.unlettered} ${flights.unlettered === 1 ? 'golfer has' : 'golfers have'} no letter and ${flights.unlettered === 1 ? 'goes' : 'go'} in A \u2014 tap a golfer's A/B to move them.`;
             html += `</div>`;
         }
+        // SAME NAME TWICE (URGENT-004): kept as two golfers, never merged - said here.
+        if (typeof duplicateNamesNote === 'function') {
+            const dupNote = duplicateNamesNote(validPlayers);
+            // ...and leads into what the roster then asks (URGENT-011): a button per
+            // golfer, and Save waiting until the names differ.
+            if (dupNote) html += `<div class="paste-flagged-line">\u2139\uFE0F ${escapeHtml(dupNote)} After adding, tap \u201CAdd initial\u201D beside each one \u2014 the round won\u2019t save until the names differ.</div>`;
+        }
         if (flaggedFlights.length > 0) {
             const lineList = flaggedFlights.map(f => `Line ${f.lineNumber}: "${escapeHtml(f.text)}"`).join('<br>');
             html += `<div class="paste-flagged-line">\u26A0\uFE0F Only A and B are flights \u2014 ${flaggedFlights.length === 1 ? 'this line was' : 'these lines were'} added as typed, so fix the name after adding:<br>${lineList}</div>`;
         }
+        // CHECK THESE LINES (URGENT-008): a line that still holds a handicap-looking
+        // number, the word hcp/flight, or a lone A/B where flights are in use, after
+        // it was read. Added as read - said here, BEFORE saving, so it is fixed first.
+        if (checkLines && checkLines.length > 0) {
+            const lineList = checkLines.map(c => `Line ${c.lineNumber}: "${escapeHtml(c.text)}" \u2192 ${escapeHtml(c.name)}${c.hcp ? ' / ' + escapeHtml(c.hcp) : ''} \u2014 ${escapeHtml(c.why)}`).join('<br>');
+            html += `<div class="paste-flagged-line paste-check-line">\u26A0\uFE0F Check ${checkLines.length === 1 ? 'this line' : 'these ' + checkLines.length + ' lines'} before adding \u2014 ${checkLines.length === 1 ? 'it was' : 'they were'} read as shown; fix the name or handicap after adding if it is wrong:<br>${lineList}</div>`;
+        }
+        // NOTES TAKEN OFF THE LINES ("(captain)", "[sub]"): said, not swallowed - the
+        // same line trip.html's review has always shown (URGENT-008).
+        if (notedLines && notedLines.length > 0) {
+            html += `<div class="paste-noted-line" style="margin-top:4px; color:var(--text-muted);">\u2139\uFE0F Notes left off the names: ${notedLines.map(n => `"${escapeHtml(n.note)}" (line ${n.lineNumber})`).join(', ')}</div>`;
+        }
         if (flaggedLines.length > 0) {
-            const lineList = flaggedLines.map(f => `Line ${f.lineNumber}: "${f.text}"`).join('<br>');
+            const lineList = flaggedLines.map(f => `Line ${f.lineNumber}: "${escapeHtml(f.text)}"`).join('<br>');
             html += `<div class="paste-flagged-line">⚠️ ${flaggedLines.length} line${flaggedLines.length === 1 ? '' : 's'} need${flaggedLines.length === 1 ? 's' : ''} attention — missing a name:<br>${lineList}</div>`;
+        }
+        // THE LONE "Me" OF A GPS-FIRST ROUND (mailbox 013, 2026-10-18). A round started from the GPS
+        // door has one golfer, the phone's owner, named "Me" (or a first name) at HCP 0. An organizer
+        // who then pastes the whole field - himself in it under his real name - got that golfer TWICE:
+        // 21 for a 20-golfer weekly game, "Me" alone in a group of one, and an extra buy-in in the
+        // pot. Said here, with a choice; ticked when the list plainly includes him.
+        const me = pasteLoneMeRow(validPlayers);
+        if (me) {
+            const on = pasteReplaceMeChoice === null ? me.likely : pasteReplaceMeChoice;
+            html += `<label class="paste-replace-me" style="display:flex; gap:8px; align-items:flex-start; margin-top:8px; font-weight:600; color:var(--text-main);">`
+                + `<input type="checkbox" id="paste-replace-me"${on ? ' checked' : ''} onchange="pasteReplaceMeChoice = this.checked" style="width:20px; height:20px; flex:0 0 auto;">`
+                + `<span>I\u2019m in this list \u2014 replace \u201C${escapeHtml(me.name)}\u201D with it (${validPlayers.length} golfers, not ${validPlayers.length + 1})</span></label>`;
         }
         summaryEl.innerHTML = html;
         commitBtn.disabled = validPlayers.length === 0;
+    }
+    // null = not chosen yet (the default above decides); true / false = the organizer's tick.
+    let pasteReplaceMeChoice = null;
+    // The roster's ONLY golfer, when it is the GPS-first placeholder: one row, no handicap or 0,
+    // no score posted. { row, name, likely } - likely when the name is "Me" and the paste is a whole
+    // group or more, or the paste has a golfer with that first name ("Manny" / "Manny Orozco").
+    function pasteLoneMeRow(validPlayers) {
+        const rows = document.querySelectorAll('#player-list .player-row');
+        if (rows.length !== 1 || !validPlayers || validPlayers.length < 2) return null;
+        const row = rows[0];
+        const name = ((row.querySelector('.p-name-input') || {}).value || '').trim();
+        const hcp = ((row.querySelector('.p-hcp-input') || {}).value || '').trim();
+        if (!name || (hcp !== '' && hcp !== '0')) return null;
+        const id = row.getAttribute('data-player-id');
+        if (id && holesScoredFor(id) > 0) return null;
+        const first = name.split(/\s+/)[0].toLowerCase();
+        const named = validPlayers.some(p => String(p.name || '').trim().split(/\s+/)[0].toLowerCase() === first);
+        const isMe = /^me$/i.test(name);
+        if (!isMe && !named) return null;
+        return { row, name, likely: named || (isMe && validPlayers.length >= 4) };
     }
 
     // ===== MY GROUPS (v260, extended v261) ================================
@@ -9294,7 +10175,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (rows.length === 0) return uiRefuse('Tick at least one golfer.');
         const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
         const existing = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p));
-        if (rows.some(r => r.flight) && !flightsEnabledNow()) setFlightsEnabled(true);
+        if (rows.some(r => r.flight)) { noteFlightLetters(); if (!flightsEnabledNow()) setFlightsEnabled(true); }
         rows.forEach(r => existing.push({
             name: r.name, hcp: r.hcp, team: '',
             squad: existing.length % 2 === 0 ? 'red' : 'blue',
@@ -9510,13 +10391,18 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // name is left exactly as it was (the save names it "Player N", as before).
         // Only the paste path does this.
         const isEmptyRow = p => String(p.name || '').trim() === '' && String(p.hcp || '').trim() === '';
+        // "I'm in this list" (the lone GPS-first "Me", above): that row is replaced by the paste, so
+        // the field is exactly the list and its groups start at the first pasted golfer.
+        const replaceMe = !!(pasteLoneMeRow(validPlayers) && document.getElementById('paste-replace-me') && document.getElementById('paste-replace-me').checked);
+        pasteReplaceMeChoice = null;
+        if (replaceMe) { groupSizeOverrides = {}; document.getElementById('player-list').innerHTML = ''; }
         const existingData = captureCurrentPlayerInputs().filter(p => !isEmptyRow(p));
 
         // FLIGHT LETTERS IN THE PASTE turn flights on for the round (if they were
         // off). Captured BEFORE the switch, so the golfers already on the roster
         // keep their names and handicaps; they get A on the rebuild below, the same
         // as switching flights on by hand. The pasted golfers carry their letter.
-        if (validPlayers.some(p => p.flight) && !flightsEnabledNow()) setFlightsEnabled(true);
+        if (validPlayers.some(p => p.flight)) { noteFlightLetters(); if (!flightsEnabledNow()) setFlightsEnabled(true); }
 
         // GROUPS FROM THE PASTE, only when the paste drew a boundary. The golfers
         // already on the roster keep the groups they are in - each of those is
@@ -9545,6 +10431,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         existingData.forEach(p => appendPlayerFrom(p, false, existingData.length));
         updateCount();
 
+        showRosterFixNote();
         document.getElementById('paste-players-textarea').value = '';
         document.getElementById('paste-preview-summary').innerHTML = '';
         closePastePlayersModal();
@@ -9579,6 +10466,19 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                 danger: true
             });
             if (!ok) return;
+        }
+        // THE GROUPS ARE POSITIONAL (grouping.js), so a removed golfer must take one seat out of
+        // HIS group (mailbox 013): left alone, the overrides kept their sizes and every golfer after
+        // him slid one seat up - deleting the first of 21 ({0:1, 1:4, ...}) re-cut five foursomes
+        // as 1 / 4 / 4 / 4 / 4 / 3, every group wrong.
+        const allRows = Array.prototype.slice.call(document.querySelectorAll('#player-list .player-row'));
+        const at = allRows.indexOf(row);
+        if (at !== -1 && groupSizeOverrides && Object.keys(groupSizeOverrides).length) {
+            const sizes = computeGroupSizes(allRows.length, groupSizeOverrides);
+            let seen = 0;
+            for (let g = 0; g < sizes.length; g++) { if (at < seen + sizes[g]) { sizes[g]--; break; } seen += sizes[g]; }
+            groupSizeOverrides = {};
+            sizes.filter(n => n > 0).forEach((n, i) => { groupSizeOverrides[i] = n; });
         }
         row.remove();
         const existingData = captureCurrentPlayerInputs();
@@ -9681,8 +10581,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         dots: "Earn dots for birdies, KPs, and other in-round moments.",
         bestball: "Partner up — the better of your team's two scores counts.",
         scramble: "Everyone tees off, pick the best shot, play from there — as a team.",
-        ryder: "Team vs. team match play for a set bet \u2014 the classic team money match.",
-        'ryder-cup': "Two sides, points not money. Foursomes, Four-Ball and Singles. Teams are picked right after the round is created.",
+        ryder: "Team vs. team match play for a set game \u2014 the classic team match.",
+        'ryder-cup': "Two sides, played for points. Foursomes, Four-Ball and Singles. Teams are picked right after the round is created.",
         hilo: "Teams battle for both the low score and the high score on every hole."
     };
 
@@ -9706,7 +10606,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!el) return;
         el.innerHTML = '<strong>Round setup copied.</strong> '
             + (names[sourceFormat] || 'That game') + ' is now added from <strong>Action</strong>, '
-            + 'where you can set separate amounts per bet.';
+            + 'where you can set separate amounts per game.';
         el.style.display = 'block';
     }
 
@@ -9720,7 +10620,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         if (!el) return;
         el.innerHTML = '<strong>Legacy ' + (names[format] || '') + ' round.</strong> '
             + 'This round uses the older single-stake setup and still works exactly as it did. '
-            + 'New wagers are created from <strong>Action</strong>'
+            + 'New games are created from <strong>Action</strong>'
             + (format === 'nassau' ? ', with separate Front, Back and Overall amounts.' : '.');
         el.style.display = 'block';
     }
@@ -9842,7 +10742,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     + 'newer Front / Back / Overall setup.'
                 : existing.length > 0
                     ? 'This round already has a Nassau: ' + existing.map(describeExistingNassau).join('; ') + '. '
-                        + 'Edit it, or add another, on the Bets tab.'
+                        + 'Edit it, or add another, on the Games tab.'
                     : '';
             note.style.display = blocked ? 'block' : 'none';
         }
@@ -9856,7 +10756,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             renderSetupNassauPlayers();
             // PRICE THE AUTO-PRESS OPTION AS THE PANEL APPEARS.
             //
-            // The stake boxes ship at 10/10/20, which is already what most groups
+            // The stake boxes ship at 5/5/5 (URGENT-038 #27), which is already what most groups
             // want, so most golfers never type in one - and the label was wired only
             // to oninput. That left the control showing the bare "Same as Segment"
             // fallback for exactly the people who accepted the defaults. The reveal
@@ -10150,6 +11050,10 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // The saved round's roster size, for the delete confirm's "all N golfers" -
     // the golfers whose scores would go, not the rows being edited on the form.
     let loadedPlayerCount = 0;
+    // 2.0 (24) ADVISOR-0110: true once loadModeData has read THIS code's record (present or absent).
+    let loadedRecordChecked = false;
+    // ...and true once THIS page has sent the round's save write (it lands now or when the signal is back).
+    let saveIssuedThisPage = false;
     function holesScoredFor(playerId) {
         const prefix = 'p' + String(playerId) + '_h';
         return Object.keys(loadedScores || {}).filter(k => k.indexOf(prefix) === 0 && loadedScores[k] > 0).length;
@@ -10379,6 +11283,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
             loadedScores = (isThisRound && snapshot.exists() && data.scores) ? JSON.parse(JSON.stringify(data.scores)) : {};
             loadedPlayerCount = (isThisRound && snapshot.exists() && Array.isArray(data.players)) ? data.players.length : 0;
+            if (isThisRound) loadedRecordChecked = true;   // 2.0 (24) ADVISOR-0110: this code's record was read (it may be absent)
+            try { syncWizardNavLabels(); } catch (e) { /* the label follows on the next step change */ }
             loadedSideMatches = (isThisRound && snapshot.exists() && data.sideMatches) ? JSON.parse(JSON.stringify(data.sideMatches)) : {};
             loadedCourseKey = isThisRound && snapshot.exists() ? (data.activeCourseKey || null) : null;
             loadedCourseData = isThisRound && snapshot.exists() && Array.isArray(data.courseData) && data.courseData.length > 0
@@ -10557,6 +11463,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // resetting it to headcount here is exactly the default-state slip
             // skins_even_split_test.js's first setup test exists to catch.
             setFlightsSkinsSplit(!flOn ? 'even' : (fl.skinsSplit === 'even' ? 'even' : 'headcount'));
+            // A saved (or copied) round with flights brings its own A/B: not asked.
+            if (flOn) noteFlightLetters();
             setFlightsEnabled(flOn);
 
             } catch (err) {
@@ -10687,7 +11595,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     html += `<div style="padding:4px 0; font-size:0.8rem;"><strong>${escapeHtml(p.name)}</strong> plays scratch (lowest handicap in this group).</div>`;
                 }
             });
-            html += `<div style="font-size:0.7rem; color:var(--text-muted); margin-top:8px;"><em>This is a suggestion based on entered handicaps — adjust your bet/press rules as your group sees fit.</em></div>`;
+            html += `<div style="font-size:0.7rem; color:var(--text-muted); margin-top:8px;"><em>This is a suggestion based on entered handicaps — adjust your game/press rules as your group sees fit.</em></div>`;
         }
 
         container.style.display = "block";
@@ -10696,7 +11604,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
     const moneyFormats = ['stroke', 'nassau', 'skins', 'wolf', 'dots', 'match', 'stableford'];
 
-    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined, teeKey = undefined) {
+    function addPlayerRow(name = "", hcp = "", team = "", squad = "red", isNewBtnClick = true, playingForMoney = true, knownTotalCount = null, deferRefresh = false, playerId = undefined, flight = undefined, teeKey = undefined, teeName = undefined) {
         const listContainer = document.getElementById("player-list");
         const currentCount = document.querySelectorAll('.player-row').length + 1;
         // When rebuilding the whole list at once (renderPlayerList's loop), currentCount only
@@ -10777,7 +11685,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         let moneyCheckboxHtml = "";
 
         const row = document.createElement("div");
-        row.className = "player-row";
+        row.className = "player-row p-compact";
         // Stamped at creation and never recomputed. An id passed in comes from a
         // saved round or from the row this one is replacing during a rebuild; only a
         // genuinely new row mints one.
@@ -10794,18 +11702,26 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const flightsOn = flightsEnabledNow();
         const flightAsLine = !!(teamFieldHtml || squadFieldHtml);
         const flightColumn = (flightsOn && !flightAsLine) ? " 0.7fr" : "";
-        row.style.gridTemplateColumns = baseColumns + flightColumn + (showMoneyCheckbox ? " 46px" : "") + " 38px";
+        // THE COMPACT LIST: the columns come from .p-compact (handle | name | HCP |
+        // tee | x); baseColumns / flightColumn are kept for the record but no longer
+        // set inline. Team, squad and flight move to a second line below.
+        void baseColumns; void flightColumn;
         row.innerHTML = `
-            <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}">
+            <button type="button" class="p-drag" aria-label="Move ${escapeHtml(name || 'this golfer')}: drag, or tap for Move up, Move down and Move to group" title="Drag to reorder - tap for more">&#8801;</button>
+            <input type="text" class="p-name-input" placeholder="Player Name" value="${escapeHtml(name)}" onchange="typedRowChanged(this)" oninput="renderDuplicateNamesBlock()">
             <input type="text" class="p-hcp-input" placeholder="${handicapSetupBoxLabel()}" value="${hcp}" oninput="refreshHandicapNote()">
             ${teamFieldHtml}
             ${squadFieldHtml}
             ${moneyCheckboxHtml}
             <button class="btn-del" onclick="removePlayerRowAndRefresh(this)">✕</button>
         `;
-        if (flightsOn) appendFlightControl(row, flight, flightAsLine);
-        appendTeeControl(row, teeKey);
+        // Always on the second line in the compact list (asLine = true).
+        if (flightsOn) appendFlightControl(row, flight, true);
+        void flightAsLine;
+        appendTeeControl(row, teeKey, teeName);
         appendOrderControl(row);
+        compactExtraLine(row);
+        attachRowDrag(row);
         listContainer.appendChild(row);
         if (!deferRefresh) updateCount();
     }
@@ -10857,11 +11773,12 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const basis = (el && el.value === 'ghin-index') ? 'ghin-index' : 'as-entered';
         return (typeof handicapBoxPlaceholder === 'function')
             ? handicapBoxPlaceholder({ handicapBasis: basis })
-            : (basis === 'as-entered' ? 'Strokes' : 'Index');
+            : (basis === 'as-entered' ? 'HCP' : 'Index');
     }
 
     function updateCount() { 
         document.getElementById("player-count").textContent = document.querySelectorAll('.player-row').length; 
+        syncTeeEveryone();
         renderGroupDividers();
         refreshMultiGroupMoneyRule();
         refreshFlightsCount();
@@ -11072,6 +11989,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // golfer watching the button is told the truth before they start tapping.
     const SAVE_SLOW_MS = 3000;
 
+
     // ASYNC SINCE UI WAVE 3, for the unnamed-golfer warning below. Nothing
     // awaits saveSettings' return value - it is only ever reached from
     // onclick="saveSettings()" - and with named golfers no await executes, so the
@@ -11116,6 +12034,21 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                         coachGateState(), coachGateSteps()));
                     if (typeof goToWizardStep === 'function') goToWizardStep(Number(unmet[0].step));
                     if (typeof syncCoachGateNote === 'function') syncCoachGateNote(unmet[0]);
+                    return;
+                }
+            }
+
+            // SAME NAME TWICE (URGENT-011): refused here, with the Players step's
+            // own "Add initial" buttons waiting, rather than saved and refused at
+            // Results. Not in the draft dry run (hpDraftRecord), which must keep
+            // the whole round while the organizer is still fixing a name.
+            let refuseSameNames = true;
+            if (refuseSameNames) {
+                const same = rosterSameNames();
+                if (same.length) {
+                    uiRefuse('\u26A0\uFE0F ' + same.map(sameNameLine).join('. ') + '. Save waits until the names differ.');
+                    if (typeof goToWizardStep === 'function') goToWizardStep(WIZARD_STEP_OF.players);
+                    renderDuplicateNamesBlock();
                     return;
                 }
             }
@@ -11595,7 +12528,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
                     title: '\u26A0\uFE0F ' + n + (n === 1 ? ' golfer has' : ' golfers have') + ' no name.',
                     body: 'They will be saved as ' + placeholderNames.slice(0, 2).join(', ')
                         + (n > 2 ? ' and so on' : '') + '.\n\n'
-                        + 'This round and its money work normally. But a placeholder cannot be '
+                        + 'This round and its games work normally. But a placeholder cannot be '
                         + 'matched to the same golfer in another round, so this round will not be '
                         + 'able to join a trip or a Ryder Cup later.',
                     confirmText: 'Start it anyway',
@@ -11640,6 +12573,7 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             // evaluates the merged newData, so the write's shape does not change.
             // Inside the window nothing is shown; the gate is invisible until it
             // refuses, and then the wall below says why in words.
+            saveIssuedThisPage = true;   // 2.0 (24) ADVISOR-0110: from here the round is (or will be) on the server - Delete, not Discard
             const saveChain = window.organizerGate.ensureOrganizer(db).then((uid) => {
                 window.organizerGate.stamp(payload, uid, { exists: loadedExistingRound, ownerUid: loadedOwnerUid });
                 return db.ref(`events/${currentMode}`).update(payload);
@@ -11741,10 +12675,66 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     const SCORED_ROUND_SENTENCE = 'This round has scores in it, so it cannot be deleted.\n\n'
         + 'That is deliberate \u2014 it stops a round being wiped by accident once anyone has started playing.\n\n'
         + 'To play again, start a new round from Home \u2014 \uD83D\uDD01 Start from it copies this round\u2019s golfers and setup into a new code.';
+    // 2.0 (23) SETUP BUG 2 (ADVISOR-1556, round NEN88S): A REFUSAL ON A ROUND WITH NO STROKES IS NOT
+    // "HAS SCORES". The LIVE rule (read Nov 1) lets only the round's ownerUid (or its trip's owner) delete
+    // it, whatever is on the card - so a PERMISSION_DENIED on an unplayed round means "this phone is not
+    // signed in as the account that made it", and saying "it has scores" there was false. Byte-identical
+    // to index.html's copy (setup_bugs_23_test.js holds the two together, like SCORED_ROUND_SENTENCE).
+    const NOT_OWNER_DELETE_SENTENCE = 'This round cannot be deleted from this phone.\n\n'
+        + 'No hole has been played, but only the account that created the round can delete it, and this phone is not signed in as that account. Nothing was deleted.\n\n'
+        + 'To delete it, open it on the phone it was set up on (signed in the same way).';
+    // ONLY REAL STROKES COUNT: p<id>_h<hole> with a value above 0, from THIS round's own record. A blank,
+    // a 0, a null or any other key is not a hole played (index.html scoredGolferCount reads the same way).
+    function realStrokeCount(scores) {
+        return Object.keys(scores || {}).filter(function (k) { return /^p\d+_h\d+$/.test(k) && Number(scores[k]) > 0; }).length;
+    }
+    // 2.0 (24) ADVISOR-0110 (Manny, TestFlight 23): A SETUP THAT WAS NEVER SAVED IS DISCARDED, NOT DELETED.
+    // The lobby mints a code and opens this page BEFORE anything is written (code-issuer.js), so a round
+    // on its Review step that was never saved has NO record on the server. "Delete this round" sent
+    // events/<code>.remove() anyway; the LIVE rule (read Nov 2) only lets a write through when
+    // data.exists() or newData.exists(), so removing nothing is PERMISSION_DENIED for everyone, the
+    // fresh read found no strokes, and the phone said "only the account that created the round can
+    // delete it" to the account that created it. Now: no record -> "Discard this setup", which clears
+    // this phone's kept draft and sends NOTHING.
+    // A saved round (a record exists) goes down the delete path below exactly as before.
+    // A round SAVED ON THIS PHONE and waiting for signal (or an offline L- round) is a saved round, never
+    // discarded: its scores live in that held copy.
+    function setupHeldOnPhone() {
+        try { const D = window.HardPanDoors; return !!(D && typeof D.heldFor === 'function' && currentMode && D.heldFor(currentMode)); } catch (e) { return false; }
+    }
+    function setupKnownUnsaved() {
+        try { return loadedRecordChecked === true && loadedExistingRound !== true && saveIssuedThisPage !== true && !setupHeldOnPhone(); } catch (e) { return false; }
+    }
+    function setupIsUnsaved() {
+        if (loadedExistingRound || saveIssuedThisPage || setupHeldOnPhone()) return Promise.resolve(false);
+        if (loadedRecordChecked) return Promise.resolve(true);
+        // The record was never read on this page (a resumed draft skips the load): ask once. A read that
+        // does not answer is treated as unsaved - discarding only touches this phone.
+        if (!currentMode || typeof readWithTimeout !== 'function') return Promise.resolve(true);
+        return readWithTimeout(db.ref(`events/${currentMode}`).once('value'), { what: 'round ' + currentMode, timeoutMs: 5000 })
+            .then((snap) => !(snap && typeof snap.exists === 'function' && snap.exists()), () => true);
+    }
+    async function discardUnsavedSetup() {
+        const ok = await uiConfirm({
+            title: 'Discard this setup?',
+            body: 'This round isn\u2019t saved yet, so nobody else has it. Discarding clears the course, golfers and games you set up here from this phone.\n\nNothing on your account changes.',
+            confirmText: 'Discard it',
+            cancelText: 'Keep setting up',
+            danger: true
+        });
+        if (!ok) return;
+        try { if (typeof hpDraftTimer !== 'undefined' && hpDraftTimer) { clearTimeout(hpDraftTimer); hpDraftTimer = null; } } catch (e) {}
+        try { if (typeof hpDraftDirty !== 'undefined') hpDraftDirty = false; } catch (e) {}
+        const D = window.HardPanDoors;
+        try { if (D && typeof D.draftClear === 'function') D.draftClear(currentMode); } catch (e) {}
+        uiToast('Setup discarded. Nothing was saved.');
+        window.location.href = 'admin.html';
+    }
     async function endAndClearRound() {
-        if (Object.keys(loadedScores || {}).length > 0) { uiRefuse(SCORED_ROUND_SENTENCE); return; }
+        if (await setupIsUnsaved()) { await discardUnsavedSetup(); return; }
+        if (realStrokeCount(loadedScores) > 0) { uiRefuse(SCORED_ROUND_SENTENCE); return; }
         const golferCount = loadedPlayerCount;
-        const msg = `This erases all scores for all ${golferCount} golfers, and every bet, press and side match with them. `
+        const msg = `This erases all scores for all ${golferCount} golfers, and every game, press and side match with them. `
             + `It cannot be undone.\n\n`
             + `You do not need to delete a round when you finish playing.`;
         // THE DESTRUCTIVE BUTTON IS NOT THE DEFAULT. uiConfirm renders Cancel
@@ -11767,8 +12757,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             window.location.href = 'admin.html';
         }).catch((err) => {
             const m = String((err && err.message) || err || '');
-            if (/PERMISSION_DENIED/i.test(m)) uiRefuse(SCORED_ROUND_SENTENCE);
-            else uiFail('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.');
+            if (!/PERMISSION_DENIED/i.test(m)) { uiFail('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.'); return; }
+            // REFUSED. Which sentence is true is read off THIS round's own record, fresh (a score can
+            // have landed after this page loaded): real strokes - the scores sentence; none - not the owner.
+            readWithTimeout(db.ref(`events/${currentMode}`).once('value'), { what: 'round ' + currentMode }).then((snap) => {
+                const d = (snap && snap.val && snap.val()) || {};
+                uiRefuse(realStrokeCount(d.scores) > 0 ? SCORED_ROUND_SENTENCE : NOT_OWNER_DELETE_SENTENCE);
+            }, () => {
+                uiRefuse(realStrokeCount(loadedScores) > 0 ? SCORED_ROUND_SENTENCE : NOT_OWNER_DELETE_SENTENCE);
+            });
         });
     }
 
@@ -11780,6 +12777,8 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     renderWizardProgress();
     // Game Day lands here. The first thing a golfer sees is the format gallery.
     goToWizardStep(wizardFirstStep());
+    // POLISH #13: and it opens AT THE TOP (the step's own scroll to the dots is for moving between steps).
+    try { window.scrollTo(0, 0); } catch (e) {}
 
     // THE COACH ARRIVAL (UI Wave 10). ?coach=1 is set by createRoom when the entry
     // on the lobby minted this round, so the coach opens on the same page load as
@@ -11885,18 +12884,5 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     }
 </script>
 
-<script>
-    // 084: Rounds I'm running on Home. Mounted once auth-boot has an answer (signed in,
-    // anonymous, or none when offline); it re-draws on every sign-in change.
-    (function () {
-        var box = document.getElementById('my-rounds');
-        if (!box || !window.HardPanMyRounds) return;
-        var go = function (auth) {
-            window.HardPanMyRounds.mount(box, { db: (typeof db !== 'undefined') ? db : null, auth: auth, store: (function () { try { return localStorage; } catch (e) { return null; } })(), show: 1,
-                signIn: function () { if (typeof openAccountPanel === 'function') openAccountPanel(); } });
-        };
-        Promise.resolve(window.authReady).then(function () { go(window.firebase.auth()); }, function () { go(null); });
-    })();
-</script>
 </body>
 </html>

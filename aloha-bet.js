@@ -317,7 +317,7 @@
         var a = aloha || {};
         return String(a.mode) === MODE_HALF ? 'Aloha (half)' : 'Aloha (double or nothing)';
     }
-    var EXPLAINER = 'Double or nothing on the last hole — the side that’s down offers, '
+    var EXPLAINER = 'Double the last hole — the side that’s down offers, '
         + 'the side that’s up has to accept.';
     // SAID OUT LOUD, because the app cannot tell who is tapping. There is no
     // per-golfer identity here - only the round code and the group links - so

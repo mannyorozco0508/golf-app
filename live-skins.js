@@ -50,8 +50,9 @@ function liveSkinsLedgerConfigs(data) {
     const games = (typeof getRoundGames === 'function') ? getRoundGames(data) : [];
     games.forEach(g => {
         if (!g || g.format !== 'skins' || g.enabled === false || !g.config) return;
+        // 100b: the wager itself rides along (game), so its ledger is built over ITS holes.
         out.push({ key: 'wager:' + g.key, kind: 'wager',
-                   label: g.stake > 0 ? '$' + g.stake + ' Skins' : 'Skins', cfg: g.config });
+                   label: g.stake > 0 ? 'Skins · $' + g.stake + '' : 'Skins', cfg: g.config, game: g });
     });
 
     const mp = data.moneyPool;
@@ -67,7 +68,7 @@ function liveSkinsLedgerConfigs(data) {
         // resolver says the scope applies, and stripped otherwise, so a field-wide
         // bucket keeps its one ledger and a split one draws A and B.
         const perFlight = (typeof flightScopeApplies === 'function') && flightScopeApplies(data, 'skins');
-        out.push({ key: 'pool', kind: 'pool', label: 'Main Pool Skins',
+        out.push({ key: 'pool', kind: 'pool', label: 'Skins · Weekly Game',
                    cfg: Object.assign({}, data, {
                        participantIds: ids,
                        skinsPotFormat: mp.skins.scoring === 'gross' ? 'gross' : 'net',
@@ -104,7 +105,12 @@ function liveSkinsLedgerEntries(data, courseData, savedScores, opts) {
     const entries = [];
     configs.forEach((c, index) => {
         let bundle;
-        try { bundle = computeSkinsHoleLedger(c.cfg, courseData, savedScores, opts); }
+        // 100b (099): A WAGER STARTED MID-ROUND LISTS ITS OWN HOLES ONLY - gameHoles, the range
+        // settlement already pays it over (settlement-engine.js) - so a skins game from 7 never shows
+        // a skin on 1-6. A whole-round wager (startHole 1) and the pool keep the whole card.
+        const holesFor = (c.game && Number(c.game.startHole) > 1 && typeof gameHoles === 'function')
+            ? gameHoles(c.game, courseData) : courseData;
+        try { bundle = computeSkinsHoleLedger(c.cfg, holesFor, savedScores, opts); }
         catch (e) { return; }
         const flights = bundle.flights || [bundle];
         const flighted = flights.length > 1;

@@ -137,7 +137,7 @@ function roundRoleChoices(input) {
         rows.push({
             role: ROUND_ROLE_PLAYING,
             title: "I'm playing (not keeping score)",
-            sub: 'Pick your name next. You get your own bets and your final result.'
+            sub: 'Pick your name next. You get your own games and your final result.'
         });
     }
     rows.push({
@@ -207,7 +207,7 @@ function roundRoleNote(role, name) {
     if (role === ROUND_ROLE_PLAYING) {
         return name
             ? 'Following along as ' + name + '. ' + ROUND_ROLE_WHO_KEEPS
-            : 'Following along. Pick your name to get your own bets and result.';
+            : 'Following along. Pick your name to get your own games and result.';
     }
     if (role === ROUND_ROLE_WATCHING) return 'Just watching. ' + ROUND_ROLE_WHO_KEEPS;
     return '';

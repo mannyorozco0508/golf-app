@@ -46,7 +46,7 @@ const ADDITIONAL_GAME_CATALOG = {
         icon: '\uD83E\uDD69',
         blurb: 'Low score on a hole wins the skin. Ties carry over.',
         stakeField: 'skinsBuyIn',
-        stakeLabel: 'Buy-in per player',
+        stakeLabel: 'Entry per player',
         // These two defaults used to DISAGREE: skinsScoring said gross while
         // skinsPotFormat said split. bet-strip read the first, settlement read the
         // second, and a stacked skins game therefore showed gross-only counts on the
@@ -63,9 +63,10 @@ const ADDITIONAL_GAME_CATALOG = {
     dots: {
         label: 'Dots / Junk',
         icon: '\uD83D\uDD34',
-        blurb: 'KPs, sandies, birdies, snakes — a dollar a dot.',
+        blurb: 'KPs, sandies, birdies, snakes — one point a dot.',
         stakeField: 'dotPointVal',
         stakeLabel: 'Per dot',
+        typeFilter: true,   // 100c: an instance may carry dotTypes (only those dots pay)
         defaults: { dotPointVal: 2 }
     },
     // 9 POINTS (Nines / 5-3-1) — UI Wave 11. Nine points every hole between exactly
@@ -104,12 +105,37 @@ const ADDITIONAL_GAME_CATALOG = {
     stableford: {
         label: 'Stableford',
         icon: '\uD83C\uDFAF',
-        blurb: 'Points per hole. Aggressive play pays.',
+        blurb: 'Points per hole. Aggressive play is rewarded.',
         stakeField: 'stablefordPointVal',
         stakeLabel: 'Per point',
         defaults: { stablefordPointVal: 1, stablefordScoring: 'net' }
+    },
+    // WOLF AS A SIDE GAME (100c, 2026-10-29 Manny typed OK: "OK all money-engine items
+    // (100c)"). sideGameOnly: an additionalGameInstances entry only - written by the
+    // + Game sheet with its own participantIds (exactly 4) and startHole. It is NOT
+    // offered in Round Setup's stacked-game list or Add Action (addableGames and the
+    // admin.html wizard skip sideGameOnly), and the legacy additionalGames slot never
+    // builds it, so every existing list and round is unchanged.
+    // It scores from the start hole only (gameHoles), reads the instance's own
+    // wolfCalls/h<n> (never the round's), and the FIRST golfer picked is Wolf on the
+    // start hole, then the rotation continues in pick order (Manny, 100 Q4): buildGame
+    // hands calcWolfEngine `wolfOrder`; a main-game Wolf round never carries it.
+    wolf: {
+        label: 'Wolf',
+        icon: '🐺',
+        blurb: 'Wolf picks a partner or goes alone. Exactly 4 golfers.',
+        stakeField: 'wolfPointVal',
+        stakeLabel: 'Per point',
+        sideGameOnly: true,
+        defaults: { wolfPointVal: 1 }
     }
 };
+
+// 100c: true for a format that runs only as a side-game instance (Wolf).
+function isSideGameOnlyFormat(format) {
+    const spec = Object.prototype.hasOwnProperty.call(ADDITIONAL_GAME_CATALOG, format) ? ADDITIONAL_GAME_CATALOG[format] : null;
+    return !!(spec && spec.sideGameOnly);
+}
 
 const MAIN_GAME_LABELS = {
     stroke: 'Stroke Play',
@@ -126,7 +152,10 @@ const MAIN_GAME_LABELS = {
 };
 
 function isAdditionalGameFormat(format) {
-    return Object.prototype.hasOwnProperty.call(ADDITIONAL_GAME_CATALOG, format);
+    // 100c: a sideGameOnly entry (Wolf) is NOT stackable - it is a + Game instance only,
+    // so Round Setup validation still says "can only be played as the main game".
+    return Object.prototype.hasOwnProperty.call(ADDITIONAL_GAME_CATALOG, format)
+        && !ADDITIONAL_GAME_CATALOG[format].sideGameOnly;
 }
 
 // The main game's headline stake, in whatever field that format happens to use.
@@ -164,11 +193,50 @@ function mainGameStake(data) {
 // The holes a given game actually covers. Uses the round's OWN configured hole
 // list, so a front-nine round yields H5-9 and a back-nine round yields H14-18 -
 // never an assumed H5-18.
+//
+// IN PLAY ORDER, NOT BY NUMBER (2026-10-19 Manny OK: gameHoles play order). A game
+// added "from H3" on a round off the 10th tee covers 3..9 - the holes still to PLAY
+// - and not 10..18, which were played before it existed. The round's tee comes from
+// game.config (getRoundGames copies the round into every game's config), read with
+// play-order.js teeStartHole exactly as settlement-engine.js playOrderOf does; a
+// two-tee start follows the round's own startingHole. A round off its first hole -
+// or a game with no config, or a page without play-order.js - takes the original
+// number filter, so every such round covers exactly the holes it always did.
+function amPlayOrderFns() {
+    /* global playOrder, teeStartHole */
+    if (typeof playOrder === 'function' && typeof teeStartHole === 'function') return { playOrder, teeStartHole };
+    if (typeof module !== 'undefined' && module.exports && typeof require === 'function') {
+        try { return require('./play-order.js'); } catch (e) { return null; }
+    }
+    return null;
+}
+
+// The holes (sorted by number) in PLAY order when the round goes off another tee than its
+// first hole; null otherwise (no round, a first-tee round, no play-order.js) - the caller
+// then keeps its original by-number walk.
+function amPlayedOrder(round, sortedHoles) {
+    if (!round || !sortedHoles || !sortedHoles.length) return null;
+    const po = amPlayOrderFns();
+    if (!po) return null;
+    const tee = po.teeStartHole(round, sortedHoles);
+    if (Number(tee) === Number(sortedHoles[0].hole)) return null;
+    return po.playOrder(sortedHoles, tee);
+}
+
 function gameHoles(game, courseData) {
     const holes = courseData || [];
     const start = (game && game.startHole) || 1;
     if (start <= 1) return holes;
-    return holes.filter(h => h.hole >= start);
+    const byNumber = holes.filter(h => h.hole >= start);
+    const round = game && game.config;
+    const po = round ? amPlayOrderFns() : null;
+    if (!po || holes.length === 0) return byNumber;
+    const sorted = holes.slice().sort((a, b) => Number(a.hole) - Number(b.hole));
+    const tee = po.teeStartHole(round, sorted);
+    if (Number(tee) === Number(sorted[0].hole)) return byNumber;
+    const ordered = po.playOrder(sorted, tee);
+    const at = ordered.findIndex(h => Number(h.hole) === Number(start));
+    return at === -1 ? byNumber : ordered.slice(at);
 }
 
 // THE HOLES A SIDE MATCH IS PLAYED OVER.
@@ -177,8 +245,32 @@ function gameHoles(game, courseData) {
 // gameHoles() rather than growing a second range implementation. A match with no
 // startHole - every side match saved before this existed - covers the whole round, so
 // nothing already settled moves.
-function sideMatchHoles(sm, courseData) {
-    return gameHoles({ startHole: (sm && sm.startHole) || 1 }, courseData);
+//
+// IN PLAY ORDER, NOT BY NUMBER (2026-10-19 Manny OK: "side matches use play order
+// (sideMatchHoles), hole-1 rounds unchanged"). `round` (optional) is the round record.
+// On a round off another tee (play-order.js teeStartHole - the round's startingHole) the
+// holes come back in the order they are PLAYED: a whole-round match (startHole absent, or
+// the card's first hole - the record every whole-round bet has) is 10..18 then 1..9, so a
+// match closes out ("3&2") and presses on the holes as they were played, never on 10..18
+// first-by-number with 1..9 still to come; a match "from H13" covers 13..18 then 1..9 (the
+// holes still to PLAY), not 13..18 alone. A round off its first hole - or a caller that
+// passes no round, or a page without play-order.js - takes exactly the original path, so
+// every such round's range, order and money are byte-identical.
+function sideMatchHoles(sm, courseData, round) {
+    const start = (sm && sm.startHole) || 1;
+    const holes = courseData || [];
+    const po = (round && holes.length) ? amPlayOrderFns() : null;
+    if (po) {
+        const sorted = holes.slice().sort((a, b) => Number(a.hole) - Number(b.hole));
+        const tee = po.teeStartHole(round, sorted);
+        if (Number(tee) !== Number(sorted[0].hole)) {
+            const ordered = po.playOrder(sorted, tee);
+            if (Number(start) <= Number(sorted[0].hole)) return ordered;
+            const at = ordered.findIndex(h => Number(h.hole) === Number(start));
+            if (at !== -1) return ordered.slice(at);
+        }
+    }
+    return gameHoles({ startHole: start }, courseData);
 }
 
 // WHERE A NEW SIDE MATCH SHOULD BEGIN.
@@ -195,12 +287,27 @@ function sideMatchHoles(sm, courseData) {
 // Before anybody tees off this returns the first hole, so a bet made in the car park
 // covers the whole round exactly as it always has. Returns null once no holes remain -
 // there is nothing left to bet on, and the caller should say so rather than invent one.
-function sideMatchStartHole(participants, courseData, savedScores) {
+//
+// `round` (optional): on a round off another tee the holes are walked in PLAY order (the
+// same rule as sideMatchHoles) - after 10..12 are in, the bet starts on 13 and covers
+// 13..18, 1..9. Once the walk wraps past the last hole by number onto the card's first
+// hole, that start would be read as "the whole round" (the record a whole-round bet has),
+// so it returns null there - nothing changes from before for that one case (it was null:
+// "no holes left" by number). Without a round, or off the first tee: as before, exactly.
+function sideMatchStartHole(participants, courseData, savedScores, round) {
     const holes = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
     if (holes.length === 0) return 1;
     const players = participants || [];
     if (players.length === 0) return holes[0].hole;
     const scores = savedScores || {};
+    const ordered = amPlayedOrder(round, holes);
+    if (ordered) {
+        let last = -1;
+        ordered.forEach((h, i) => { if (players.some(p => { const v = scores[`p${p.id}_h${h.hole}`]; return v && v > 0; })) last = i; });
+        if (last === -1) return holes[0].hole;
+        const nx = ordered[last + 1];
+        return nx && Number(nx.hole) !== Number(holes[0].hole) ? nx.hole : null;
+    }
 
     let highestPosted = null;
     holes.forEach(h => {
@@ -228,12 +335,44 @@ function sideMatchRangeText(sm, courseData) {
 
 // Dot events are keyed "h4", "h11". Anything earned before the game existed is
 // dropped, so junk added on hole 5 cannot pay out for a greenie on hole 2.
-function scopeDotsToRange(dots, startHole) {
+// `round` (optional): on a round off another tee the range is the play-order one
+// from gameHoles (a dot on 12 is BEFORE a game "from H3" on a 10th-tee round).
+function scopeDotsToRange(dots, startHole, round) {
     if (!dots || !startHole || startHole <= 1) return dots;
+    const po = (round && Array.isArray(round.courseData) && round.courseData.length) ? amPlayOrderFns() : null;
+    const sorted = po ? round.courseData.slice().sort((a, b) => Number(a.hole) - Number(b.hole)) : [];
+    if (po && Number(po.teeStartHole(round, sorted)) !== Number(sorted[0].hole)) {
+        const covered = {};
+        gameHoles({ startHole: startHole, config: round }, round.courseData).forEach(h => { covered[Number(h.hole)] = true; });
+        const scoped = {};
+        Object.keys(dots).forEach(key => {
+            const holeNum = parseInt(String(key).replace(/^h/i, ''), 10);
+            if (!isNaN(holeNum) && covered[holeNum]) scoped[key] = dots[key];
+        });
+        return scoped;
+    }
     const out = {};
     Object.keys(dots).forEach(key => {
         const holeNum = parseInt(String(key).replace(/^h/i, ''), 10);
         if (!isNaN(holeNum) && holeNum >= startHole) out[key] = dots[key];
+    });
+    return out;
+}
+
+// 100c: keep only the named dot types ({ h4: { p1: ['greenie', 'sandy'] } } ->
+// { h4: { p1: ['greenie'] } }). Holes and golfers stay; an empty list pays nothing.
+function scopeDotsToTypes(dots, dotTypes) {
+    if (!dots || !Array.isArray(dotTypes)) return dots;
+    const keep = dotTypes.map(String);
+    const out = {};
+    Object.keys(dots).forEach(hKey => {
+        const hole = dots[hKey];
+        if (!hole || typeof hole !== 'object') return;
+        out[hKey] = {};
+        Object.keys(hole).forEach(pKey => {
+            const list = hole[pKey];
+            out[hKey][pKey] = Array.isArray(list) ? list.filter(t => keep.indexOf(String(t)) !== -1) : list;
+        });
     });
     return out;
 }
@@ -246,7 +385,7 @@ function gameRangeText(game, courseData) {
     const start = holes[0].hole;
     const end = holes[holes.length - 1].hole;
     const full = (courseData || []);
-    if (full.length > 0 && start === full[0].hole) return '';
+    if (full.length > 0 && (start === full[0].hole || holes.length === full.length)) return '';
     return `H${start}\u2013${end}`;
 }
 
@@ -257,12 +396,25 @@ function gameRangeText(game, courseData) {
 // completed. Derived from the highest such hole, never from a count, so out-of-order
 // entry and non-standard starts stay correct. Returns null when the round has no
 // future hole left, which is what disables Add Action at the end.
+//
+// IN PLAY ORDER on a round off another tee (2026-10-19, with sideMatchHoles): the hole after
+// the last one everybody has finished, as the holes are PLAYED - and null where the walk
+// would wrap onto the card's first hole (that number is read as "the whole round"). Off the
+// first tee: exactly as before.
 function nextAddActionHole(data, courseData, savedScores) {
     const holes = (courseData || []).slice().sort((a, b) => a.hole - b.hole);
     if (holes.length === 0) return null;
     const players = (data.players || []);
     if (players.length === 0) return holes[0].hole;
     const scores = savedScores || {};
+    const ordered = amPlayedOrder(data, holes);
+    if (ordered) {
+        let last = -1;
+        ordered.forEach((h, i) => { if (players.every(p => { const v = scores[`p${p.id}_h${h.hole}`]; return v && v > 0; })) last = i; });
+        if (last === -1) return holes[0].hole;
+        const nx = ordered[last + 1];
+        return nx && Number(nx.hole) !== Number(holes[0].hole) ? nx.hole : null;
+    }
 
     let lastComplete = null;
     holes.forEach(h => {
@@ -286,6 +438,7 @@ function addableGames(data) {
     const running = (data && data.additionalGames) || {};
     return Object.keys(ADDITIONAL_GAME_CATALOG).filter(format => {
         if (format === mainFormat) return false;
+        if (isSideGameOnlyFormat(format)) return false;   // 100c: Wolf is + Game only
         const cfg = running[format];
         if (cfg && cfg.enabled !== false) return false;
         return true;
@@ -474,6 +627,12 @@ function getRoundGames(data) {
         const spec = ADDITIONAL_GAME_CATALOG[format];
         if (!spec) return null;
         const merged = Object.assign({}, data, spec.defaults, cfg, { gameFormat: format });
+        // 100c WOLF SIDE GAME: the instance's own calls only (never the round's), and the
+        // pick order (participantIds, first = Wolf on the start hole) for the rotation.
+        if (format === 'wolf') {
+            merged.wolfCalls = (cfg && cfg.wolfCalls) || {};
+            merged.wolfOrder = (cfg && Array.isArray(cfg.participantIds)) ? cfg.participantIds.slice() : null;
+        }
         // additionalGames must never leak into a nested game's own view of the round,
         // or a game could recursively re-add its siblings.
         delete merged.additionalGames;
@@ -485,7 +644,14 @@ function getRoundGames(data) {
         // Dots reads its events from config, not from courseData, so its range has to
         // be applied here rather than by filtering holes downstream.
         if (format === 'dots' && startHole > 1) {
-            merged.dots = scopeDotsToRange(merged.dots, startHole);
+            merged.dots = scopeDotsToRange(merged.dots, startHole, data);
+        }
+        // 100c (2026-10-29 Manny typed OK, relayed: "OK, add it in 100c"): a Dots
+        // instance may name the dots it pays - dotTypes, e.g. ['greenie'] for a KP pot,
+        // ['birdie', 'eagle'] for Birdies. Only those count. Absent (every game saved
+        // before) = every dot, the same object as before, so no money moves.
+        if (format === 'dots' && cfg && Array.isArray(cfg.dotTypes) && merged.dots) {
+            merged.dots = scopeDotsToTypes(merged.dots, cfg.dotTypes);
         }
 
         return {
@@ -507,6 +673,8 @@ function getRoundGames(data) {
         // The legacy slot cannot hold a game the round is already playing as its main
         // format - that would settle the same wager twice.
         if (format === mainFormat) return;
+        // 100c: a side-game-only format (Wolf) is never built from the legacy slot.
+        if (isSideGameOnlyFormat(format)) return;
         const g = buildGame(format, cfg, format, cfg.startHole || 1);
         if (g) games.push(g);
     });
@@ -520,6 +688,12 @@ function getRoundGames(data) {
         const cfg = instances[id];
         if (!cfg || cfg.enabled === false) return;
         const format = cfg.format;
+        // 100c: a side-game-only format (Wolf) is an instance like any other.
+        if (isSideGameOnlyFormat(format)) {
+            const sg = buildGame(format, cfg, id, cfg.startHole || 1);
+            if (sg) games.push(sg);
+            return;
+        }
         if (!isAdditionalGameFormat(format)) return;
         const g = buildGame(format, cfg, id, cfg.startHole || 1);
         if (g) games.push(g);
@@ -580,7 +754,7 @@ function validateRoundGames(data) {
         const spec = ADDITIONAL_GAME_CATALOG[format];
         const stake = cfg[spec.stakeField];
         if (stake !== undefined && (isNaN(parseFloat(stake)) || parseFloat(stake) < 0)) {
-            problems.push(`${spec.label} needs a dollar amount of $0 or more.`);
+            problems.push(`${spec.label} needs an amount of $0 or more.`);
         }
     });
 
@@ -589,9 +763,9 @@ function validateRoundGames(data) {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        ADDITIONAL_GAME_CATALOG, MAIN_GAME_LABELS, isAdditionalGameFormat,
+        ADDITIONAL_GAME_CATALOG, MAIN_GAME_LABELS, isAdditionalGameFormat, isSideGameOnlyFormat,
         mainGameStake, getRoundGames, roundHasStackedAction, describeGame, validateRoundGames,
-        gameHoles, scopeDotsToRange, gameRangeText, nextAddActionHole, addableGames,
+        gameHoles, scopeDotsToRange, scopeDotsToTypes, gameRangeText, nextAddActionHole, addableGames,
         fieldParticipants, flightSlices, flightScopeApplies, playerFlight, participantsCompletedHole, gameCoversHole,
         resolveSkinsMode, skinsPotShares,
         sideMatchHoles, sideMatchStartHole, sideMatchRangeText
@@ -799,7 +973,7 @@ function nassauAutoPressLabel(input) {
     // plainly wrong.
     const isNassau = !blank(i.front) || !blank(i.back) || !blank(i.overall);
     const legacySingle = !isNassau && !blank(i.stake);
-    const BASE = legacySingle ? 'Same as the bet' : 'Same as each bet';
+    const BASE = legacySingle ? 'Same as the game' : 'Same as each game';
 
     // Nothing to report is reported as nothing. Inventing a number here would be
     // the same failure as naming Front 9's.
@@ -814,7 +988,7 @@ function nassauAutoPressLabel(input) {
         option: allSame
             ? BASE + ' (' + cash(front) + ')'
             : BASE + ' (' + cash(front) + ' / ' + cash(back) + ' / ' + cash(overall) + ')',
-        hint: 'Each press matches its own bet — Front 9 ' + cash(front)
+        hint: 'Each press matches its own game — Front 9 ' + cash(front)
             + ' · Back 9 ' + cash(back) + ' · Total ' + cash(overall) + '.',
         amounts: [front, back, overall],
     };

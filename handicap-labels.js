@@ -53,8 +53,12 @@
     // STROKES IS NOT A SYNONYM FOR "as entered". It is what Manny's group actually
     // means - "Jimmy 11" is eleven strokes - and naming the mode after the number
     // rather than after the storage is the whole point of the wording.
+    // HCP (players-compact, 2026-10-09; was "Strokes"): Manny's call. The box holds
+    // the golfer's handicap - on this basis their Playing Handicap, spread over the
+    // holes by stroke index - so HCP is what golfers call it. A GHIN round's box is
+    // still the Index.
     function handicapBoxPlaceholder(data) {
-        return handicapBasisOf(data) === 'as-entered' ? 'Strokes' : 'Index';
+        return handicapBasisOf(data) === 'as-entered' ? 'HCP' : 'Index';
     }
     // The column head on a list. Same answer, said as a heading.
     function handicapColumnLabel(data) {
@@ -108,7 +112,7 @@
         var head = teeName ? (teeName + ' tee') : 'The selected tee';
         return head + DOT + 'Slope ' + status.slope + DOT + 'Course Rating ' + status.courseRating
             + DOT + 'Par ' + status.par + '. '
-            + 'Course Handicaps are converted from GHIN Handicap Indexes: '
+            + 'Playing handicaps (est.) are worked out from each golfer’s index: '
             + 'Index × (Slope / 113) + (Course Rating − Par)'
             + (status.allowance === 100 ? '' : ', then ' + status.allowance + '% allowance')
             + ', rounded (.5 up).';

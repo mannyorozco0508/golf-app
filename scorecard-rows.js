@@ -224,26 +224,8 @@
         return html + '</div>';
     }
 
-    // BOXES ABOVE PAR (URGENT-081, Manny, 2026-10-26). A square for a bogey, a
-    // double square for a double bogey or worse, beside the circles. score-marks.js
-    // is a protected file and is NOT edited: its scoreMarkClass still answers only
-    // birdie / eagle. markWithBoxes asks it first and only adds a box where it
-    // returned nothing. GROSS vs par, DISPLAY ONLY: two numbers in, a class out.
-    // Blank / 0 / no par / par -> ''. The net row never asks (it passes no class).
-    function boxMarkClass(score, par) {
-        const s = parseInt(score, 10), p = parseInt(par, 10);
-        if (!s || !p || s <= 0 || p <= 0) return '';
-        const over = s - p;
-        return over === 1 ? 'mark-bogey' : (over >= 2 ? 'mark-double' : '');
-    }
-    function markWithBoxes(score, par) {
-        const ring = (typeof scoreMarkClass === 'function') ? String(scoreMarkClass(score, par) || '').trim() : '';
-        return ring || boxMarkClass(score, par);
-    }
-
     const api = { scorecardCells: scorecardCells, scorecardRowsHtml: scorecardRowsHtml,
-                  scorecardStackedHtml: scorecardStackedHtml, netMattersOn: netMattersOn,
-                  boxMarkClass: boxMarkClass, markWithBoxes: markWithBoxes };
+                  scorecardStackedHtml: scorecardStackedHtml, netMattersOn: netMattersOn };
     if (typeof window !== 'undefined') window.ScorecardRows = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(this);

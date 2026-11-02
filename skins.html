@@ -24,6 +24,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="play-order.js"></script>
     <script src="match-engine.js"></script>
     <script src="text-safe.js"></script>
     <!-- UI Wave 4: the telling this page does. The browser dialogs are gone -
@@ -44,6 +45,7 @@
          Aloha - two pages showing two different totals, which is the one failure
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="side-match-lines.js"></script>
     <!-- THE BETS TAB WATCHES A GROUP'S OWN ACTION. Three more shared files since the
@@ -251,7 +253,22 @@ html {
     padding-right: env(safe-area-inset-right, 0px);
     background-color: var(--bg-page, transparent);
 }
+/* URGENT-038 #24: INSIDE THE ROUND'S BETS SHEET (gps-round.js loads this page in a frame with
+   &hpsheet=1) the sheet already sits below the status bar, so the root inset above is a second
+   one - on an iPhone 15 a 59pt empty band under "You: +$X · N bets". No inset in the sheet. */
+html.hp-in-sheet { padding: 0 !important; }
+/* 2.0 (25): in the sheet's frame there is no status bar above this page - no band either. */
+html.hp-in-sheet body::after { display: none !important; }
+/* 2.0 (25) SAFE-TOP BAND (ADVISOR-0725 7:35 b): the page scrolls under the status bar and the
+   Dynamic Island - a solid band there in the page colour, so nothing reads under the clock. The same
+   band admin.html has had since POLISH #13, on ::after (front-door.js uses body::before for its
+   "Where are you playing?" label). 0px on the web. safe_top_25_chrome_test.js holds every page to it. */
+body::after {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f3);
+}
 </style>
+<script>try { if (/[?&]hpsheet=1(&|$)/.test(location.search)) document.documentElement.classList.add('hp-in-sheet'); } catch (e) {}</script>
 </head>
 <body>
 
@@ -262,23 +279,23 @@ html {
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
         <a href="leaderboard.html" class="top-nav-item nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
-        <a href="skins.html" class="top-nav-item active nav-link"><span class="tni-glyph">💰</span><span class="tni-label">Bets</span></a>
+        <a href="skins.html" class="top-nav-item active nav-link"><span class="tni-glyph">⛳</span><span class="tni-label">Games</span></a>
         <a href="settlement.html" class="top-nav-item nav-link"><span class="tni-glyph">🤝</span><span class="tni-label">Results</span></a>
         <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link"><span class="tni-glyph">⚔️</span><span class="tni-label">Matches</span></a>
-        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Game</span></a>
+        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Format</span></a>
         <a href="trip.html" class="top-nav-item"><span class="tni-glyph">🚐</span><span class="tni-label">Trip</span></a>
         <a href="admin.html" class="top-nav-item nav-link"><span class="tni-glyph">🏠</span><span class="tni-label">Home</span></a>
         <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">🧭</span><span class="tni-label">How it works</span></a>
     </div>
     </div>
 
-    <div style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
+    <div id="bets-matches-note" style="background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 8px 12px; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 12px; text-align: center;">
         Your group's action. Build or press a match on <a href="sidematches.html" class="nav-link" style="color: var(--brand-navy); font-weight: bold;">⚔️ Matches</a>.
     </div>
 
     <a class="back-btn" onclick="goBack()">← Back</a>
 
-    <h2 class="event-title" id="main-title">💰 Bets</h2>
+    <h2 class="event-title" id="main-title">⛳ Games</h2>
         <p class="sync-caveat" id="sync-caveat" role="status" aria-live="polite"></p>
 
     <div id="bets-lock-badge" class="bets-lock" style="display:none;"></div>
@@ -521,7 +538,7 @@ html {
             if (window.OfflineQueue && currentData.players) {
                 try { window.OfflineQueue.saveSnapshot(localStorage, currentMode, snapshot.val() || currentData); } catch (e) {}
             }
-            document.getElementById("main-title").textContent = `💰 Bets (${currentData.eventName || "Live Round"})`;
+            document.getElementById("main-title").textContent = `⛳ Games (${currentData.eventName || "Live Round"})`;
             renderSyncCaveat(lr);
             renderBets();
             renderSkinsEngine();
@@ -810,7 +827,7 @@ html {
                             <div style="font-weight:bold; color:var(--text-main); margin-bottom:6px;">Skins is running \u2014 see Round Games above</div>
                             This round has <strong>${elsewhereCount} Skins game${plural(elsewhereCount)}</strong> that ${elsewhereCount === 1 ? 'is' : 'are'} not the round's main format.
                             ${elsewhereCount === 1 ? 'Its' : 'Their'} live standing is under Round Games; this ledger only follows a round whose main game is Skins.
-                            The Receipt itemises every one, with who is in it and what it paid.
+                            The Receipt itemises every one, with who is in it and how it finished.
                         </div>
                         <a class="btn-primary" href="${linkWithRound('settlement.html')}" style="display:block; text-align:center; text-decoration:none;">\uD83D\uDCC4 Final Results &amp; Receipt</a>`;
                 } else {
@@ -1023,7 +1040,7 @@ html {
             // Render Financial Ledger
             let sortedPlayers = Object.values(playerStats).sort((a, b) => b.payout - a.payout);
         
-            html += `<h3>💵 ${f.flight ? 'Flight ' + f.flight + ' ' : ''}Final Payout Ledger</h3>
+            html += `<h3>🏆 ${f.flight ? 'Flight ' + f.flight + ' ' : ''}Final Results Ledger</h3>
             <table class="skin-table ledger-table">
                 <thead><tr>
                     <th style="text-align:left;">Player</th>
@@ -1094,6 +1111,13 @@ html {
             `<div class="bets-row bets-sub"><span>${prefix}${i + 1} · ${fmt(pr)}</span></div>`).join('');
     }
 
+    // How many groups the round has (grouping.js's own slicing): true for one (or none).
+    function betsRoundHasOneGroup(players, groupOf) {
+        const seen = {};
+        (players || []).forEach(p => { const g = (groupOf || {})[String(p && p.id)]; if (g != null) seen[g] = true; });
+        return Object.keys(seen).length <= 1;
+    }
+
     function renderBets() {
         const matchesCard = document.getElementById('bets-matches-card');
         const gamesCard = document.getElementById('bets-games-card');
@@ -1107,9 +1131,15 @@ html {
         // The same "who may see it" question the Matches tab asks, through the same
         // grouping.js function. lockedGroup is null on the bare link: it sees everything.
         const lock = hasGroupLock ? lockedGroup : null;
+        // URGENT-038 #24: ONE GROUP = NO GROUP NOTES. On a round with a single group the lock
+        // badge, the "Build or press a match on Matches" note and "Group 1's" say nothing the
+        // golfer needs. Words only: which matches show (canLinkSeeWager below) is unchanged.
+        const oneGroup = betsRoundHasOneGroup(players, groupOf);
+        const matchesNote = document.getElementById('bets-matches-note');
+        if (matchesNote) matchesNote.style.display = oneGroup ? 'none' : '';
 
         if (badge) {
-            if (hasGroupLock) {
+            if (hasGroupLock && !oneGroup) {
                 badge.textContent = `🔒 Group ${lockedGroup} — your group's matches and games. Round-wide games show for everyone.`;
                 badge.style.display = 'block';
             } else {
@@ -1131,10 +1161,10 @@ html {
             } else {
                 matchesCard.style.display = 'block';
                 const head = document.getElementById('bets-matches-head');
-                if (head) head.textContent = hasGroupLock ? `⚔️ Group ${lockedGroup}’s Matches` : '⚔️ Matches';
+                if (head) head.textContent = hasGroupLock && !oneGroup ? `⚔️ Group ${lockedGroup}’s Matches` : '⚔️ Matches';
                 // Progress and waiting-on text from the presenter, one row per match.
                 const rowsById = {};
-                buildSideActionRows(currentData, courseData, savedScores, players).forEach(r => { rowsById[r.key] = r; });
+                buildSideActionRows(shownRound(), courseData, savedScores, shownList(players)).forEach(r => { rowsById[r.key] = r; });
                 document.getElementById('bets-matches').innerHTML =
                     visible.map(id => buildBetsMatchCard(id, sideMatches[id], rowsById[id], players, courseData, savedScores)).join('');
             }
@@ -1152,7 +1182,7 @@ html {
                 const g = games.find(x => x.key === key);
                 return (g && g.config && Array.isArray(g.config.participantIds)) ? g.config.participantIds : [];
             };
-            const rows = buildActionRows(currentData, courseData, savedScores, players)
+            const rows = buildActionRows(shownRound(), courseData, savedScores, shownList(players))
                 .filter(r => !(r.role === 'main' && !(r.stake > 0)))
                 .filter(r => r.key === 'birdie' ? true : canLinkSeeWager(participantsOf(r.key), lock, groupOf));
             if (rows.length === 0) {
@@ -1162,10 +1192,11 @@ html {
                 gamesCard.style.display = 'block';
                 document.getElementById('bets-games').innerHTML = rows.map(r => {
                     const game = games.find(x => x.key === r.key);
-                    const label = (game && typeof describeGame === 'function') ? describeGame(game) : (r.label + (r.stakeText ? ' · ' + r.stakeText : ''));
+                    // 100b: a KP / Birdies pot keeps its own name (bet-strip.js row label) in the description.
+                    const label = (game && typeof describeGame === 'function') ? describeGame(r.label && r.label !== game.label ? Object.assign({}, game, { label: r.label }) : game) : (r.label + (r.stakeText ? ' · ' + r.stakeText : ''));
                     return `<div class="bets-game" data-game-key="${escapeHtml(String(r.key))}">
                         <span>${r.icon ? r.icon + ' ' : ''}${escapeHtml(label)}${r.rangeText ? ` <span class="bets-game-range">${escapeHtml(r.rangeText)}</span>` : ''}</span>
-                        <span class="bets-game-status tone-${escapeHtml(r.tone || 'idle')}">${escapeHtml(r.status || '')}</span>
+                        <span class="bets-game-status tone-${escapeHtml(r.tone || 'idle')}">${typeof hpMeMarkText === 'function' ? hpMeMarkText(escapeHtml(r.status || '')) : escapeHtml(r.status || '')}</span>
                     </div>`;
                 }).join('');
             }
@@ -1175,7 +1206,16 @@ html {
     // ONE MATCH, IN FULL: the segment rows, the presses, the money position - what
     // the Matches tab used to draw beside its buttons. No buttons here: pressing and
     // removing are the Matches tab's job.
+    // POLISH #2: the round's display copy for the presenters - "Test A" / "Test B" when two
+    // golfers share a first name (text-safe.js). Labels only; never saved.
+    function shownRound() { return (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(currentData) : currentData; }
+    function shownList(list) { return (list && typeof playersForDisplay === 'function') ? playersForDisplay(list, currentData.players) : list; }
     function buildBetsMatchCard(matchId, sm, row, players, courseData, savedScores) {
+        // TWO GOLFERS, ONE FIRST NAME (polish #2): every line on this card is cut from
+        // a name's first word, so the card reads the round's display copy - "Test A v
+        // Test B", never "Test v Test". Labels only: same ids, same scores, same money.
+        const shownData = (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(currentData) : currentData;
+        if (typeof playersForDisplay === 'function') players = playersForDisplay(players, currentData.players);
         const teamAPlayers = players.filter(p => (sm.teamAIds || []).includes(String(p.id)) || (sm.teamAIds || []).includes(p.id)).map(p => ({ ...p, team: "Team 1" }));
         const teamBPlayers = players.filter(p => (sm.teamBIds || []).includes(String(p.id)) || (sm.teamBIds || []).includes(p.id)).map(p => ({ ...p, team: "Team 2" }));
         const virtualPlayers = teamAPlayers.concat(teamBPlayers);
@@ -1185,7 +1225,7 @@ html {
 
         // Only holes from this match's own start hole forward.
         const smCourse = (typeof sideMatchHoles === 'function')
-            ? sideMatchHoles(sm, courseData)
+            ? sideMatchHoles(sm, courseData, currentData)
             : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
         const rangeText = (typeof sideMatchRangeText === 'function') ? sideMatchRangeText(sm, courseData) : '';
         const sideName = (side) => side.map(pl => pl.name.split(' ')[0]).join(' / ');
@@ -1215,7 +1255,7 @@ html {
 
             if (holeCalc) {
                 const carryText = holeCalc.currentCarry > 0 ? ` <span style="color:var(--accent-red); font-weight:bold;">🔥 $${holeCalc.currentCarry} carrying</span>` : '';
-                body += `<div class="bets-row"><span>💵 $${holeCalc.currentStake}/hole${carryText}</span></div>
+                body += `<div class="bets-row"><span>⛳ $${holeCalc.currentStake}/hole${carryText}</span></div>
                     <div class="bets-row"><span style="font-weight:bold;">${escapeHtml(sideAName)}: ${fmtSideM(holeCalc.p1Money)}</span><span style="font-weight:bold;">${escapeHtml(sideBName)}: ${fmtSideM(-holeCalc.p1Money)}</span></div>`;
                 // THE HOLE-PRESS LEDGER: each press somebody made, straight from storage.
                 body += strokePressHistory(sm.holePresses, 'HP', pr => `H${pr.fromHole} · $${pr.newStake}/hole`, (a, b) => a.fromHole - b.fromHole);
@@ -1226,7 +1266,7 @@ html {
                     const b = overallCalc.base;
                     isFinal = !!b.roundComplete;
                     statusText = b.roundComplete
-                        ? (b.winner ? `${b.winner} won the base bet` : 'Base bet tied')
+                        ? (b.winner ? `${b.winner} won the base game` : 'Base game tied')
                         : (() => {
                             const leader = b.p1Total < b.p2Total ? b.nameA : (b.p2Total < b.p1Total ? b.nameB : null);
                             return leader ? `${leader} leading thru ${b.holesCompleted}` : `Tied thru ${b.holesCompleted}`;
@@ -1243,7 +1283,8 @@ html {
                     (a, b) => a.startHole - b.startHole);
             }
             if (!holeCalc && !overallCalc) {
-                body += `<div class="bets-row"><span style="color:var(--text-muted);">No $/hole or $/overall amount set for this match.</span></div>`;
+                // 2.0 (25): a stroke game played for no amount - the words carry no $.
+                body += `<div class="bets-row"><span style="color:var(--text-muted);">${(typeof hpSimpleFlow === 'function' && hpSimpleFlow()) ? 'Played for no amount.' : 'No $/hole or $/overall amount set for this match.'}</span></div>`;
             }
             // WHAT EACH GOLFER ACTUALLY PAYS, on a team match: the Receipt pays people,
             // not sides - the side total divided by the golfers on that side, exactly
@@ -1259,6 +1300,35 @@ html {
             if ((sm.holeStake || 0) > 0) stakes.push(`$${sm.holeStake}/hole`);
             if ((sm.overallStake || 0) > 0) stakes.push(`$${sm.overallStake} overall`);
             formatLine = `Stroke Play • ${(sm.scoring || 'net').toUpperCase()}${stakes.length ? ' • ' + stakes.join(' + ') : ''}`;
+        } else if (sm.format === 'hilo') {
+            // HI-LO (016): the live line from bet-strip's row (hilo-engine.js), then the
+            // Low Ball / High Ball money from the receipt - the same lines the Receipt
+            // prints, gated the same way, so nothing here computes money.
+            body += `<div class="bets-row"><span class="status-pill pill-main">${escapeHtml(row ? row.status : '')}</span></div>`;
+            const hlRc = (typeof buildSideMatchReceipts === 'function')
+                ? (buildSideMatchReceipts(shownData, courseData, savedScores) || []).find(x => x.matchId === matchId)
+                : null;
+            const hlFinished = (typeof computeRoundFinish === 'function')
+                && !!computeRoundFinish(currentData, courseData, savedScores).finished;
+            const hlDone = (typeof sideMatchRangeComplete === 'function')
+                && sideMatchRangeComplete(sm, players, courseData, savedScores, { roundFinished: hlFinished, round: currentData });
+            if (hlRc && typeof sideMatchBetLines === 'function') {
+                sideMatchBetLines(hlRc, { complete: hlDone }).forEach(l => {
+                    if (!l.moneyText) return;
+                    body += `<div class="bets-row bets-sub"><span>${escapeHtml(l.label)} \u00B7 ${escapeHtml(l.result)}</span><span style="font-weight:bold;">${escapeHtml(l.moneyText)}</span></div>`;
+                });
+                const hlNet = hlDone && typeof sideMatchDecidedNet === 'function' ? sideMatchDecidedNet(hlRc) : 0;
+                if (Number(sm.stake) > 0) body += `<div class="bets-row"><span>Ledger:</span><span>${escapeHtml(sideAName)}: ${fmtSideM(hlNet)} | ${escapeHtml(sideBName)}: ${fmtSideM(-hlNet)}</span></div>`;   // 2.0 (25): no amount = no $ ledger
+                if (hlNet !== 0) {
+                    const hlEach = (side, share) => side.map(pl => `${escapeHtml(pl.name.split(' ')[0])} ${fmtSideM(share)}`).join(' · ');
+                    body += `<div class="bets-row bets-sub"><span>Per golfer: ${hlEach(teamAPlayers, hlNet / teamAPlayers.length)}</span><span>${hlEach(teamBPlayers, -hlNet / teamBPlayers.length)}</span></div>`;
+                }
+                if (typeof sideMatchNetLine === 'function') {
+                    body += `<div class="bets-row bets-sub"><span>${escapeHtml(sideMatchNetLine(hlRc, { complete: hlDone }))}</span></div>`;
+                }
+            }
+            isFinal = hlDone;
+            formatLine = `Hi-Lo • ${(sm.scoring || 'net').toUpperCase()}${Number(sm.stake) > 0 ? ' • $' + sm.stake + '/point' : ''}`;   // 2.0 (25): no amount = no $
         } else {
             const manualPresses = sm.presses ? Object.values(sm.presses) : [];
             const calc = calculateMatchEngine(virtualPlayers, smCourse, savedScores, sm.scoring || 'net', sm.format, sm.pressRule || 'none', sm.stake || 0, 0, manualPresses, nassauStakeConfig(sm));
@@ -1290,7 +1360,7 @@ html {
             // into sentences. Nothing here computes money, and the pills above are
             // untouched - they are match STATE, this is what it is worth.
             const smlRc = (typeof buildSideMatchReceipts === 'function')
-                ? (buildSideMatchReceipts(currentData, courseData, savedScores) || [])
+                ? (buildSideMatchReceipts(shownData, courseData, savedScores) || [])
                     .find(x => x.matchId === matchId)
                 : null;
             // FINISHED MEANS EVERY HOLE IN RANGE IS POSTED, not `closed`. A segment
@@ -1301,9 +1371,11 @@ html {
                 && !!computeRoundFinish(currentData, courseData, savedScores).finished;
             const smlDone = (typeof sideMatchRangeComplete === 'function')
                 && sideMatchRangeComplete(sm, players, courseData, savedScores,
-                    { roundFinished: smlFinished });
+                    { roundFinished: smlFinished, round: currentData });
             if (smlRc && typeof sideMatchBetLines === 'function') {
-                sideMatchBetLines(smlRc, { complete: smlDone }).forEach(l => {
+                // ZERO-STAKE (2.0 (24) ADVISOR-2245, text-safe.js): a game played for nothing is re-worded with no $; a priced one is handed back as is.
+                const smlLines = sideMatchBetLines(smlRc, { complete: smlDone });
+                ((typeof hpZeroStakeBetLines === 'function') ? hpZeroStakeBetLines(smlRc, smlLines, { complete: smlDone }) : smlLines).forEach(l => {
                     if (!l.moneyText) return;
                     body += `<div class="bets-row bets-sub"><span>${escapeHtml(l.label)} \u00B7 ${escapeHtml(l.result)}</span><span style="font-weight:bold;">${escapeHtml(l.moneyText)}</span></div>`;
                 });
@@ -1321,15 +1393,29 @@ html {
                 if (smlRc && typeof sideMatchNetLine === 'function') {
                     body += `<div class="bets-row bets-sub"><span>${escapeHtml(sideMatchNetLine(smlRc, { complete: smlDone }))}</span></div>`;
                 }
+            } else if (smlRc && typeof sideMatchReceiptStakeFree === 'function' && sideMatchReceiptStakeFree(smlRc) && typeof sideMatchNetLine === 'function') {
+                // ZERO-STAKE (2.0 (24) ADVISOR-2245): no ledger, but the match line - who took what.
+                body += `<div class="bets-row bets-sub"><span>${escapeHtml(hpZeroStakeNetLine(smlRc, sideMatchNetLine(smlRc, { complete: smlDone }), { complete: smlDone }))}</span></div>`;
             }
             isFinal = smlDone;
             const label = (sm.format === 'nassau' && typeof nassauStakeLabel === 'function') ? nassauStakeLabel(sm) : '';
-            const price = label || (`$${sm.stake || 0}/match` + (sm.pressRule && sm.pressRule !== 'none' ? ' • Press: ' + sm.pressRule : ''));
-            formatLine = `${sm.format === 'nassau' ? 'Nassau' : 'Match Play'} • ${(sm.scoring || 'net').toUpperCase()} • ${price}`;
+            // ZERO-STAKE (2.0 (24) ADVISOR-2245): a Match / Nassau played for nothing shows its terms with no $.
+            const stakeFree = (typeof sideMatchStakeFree === 'function') && sideMatchStakeFree(sm);
+            const price = stakeFree ? sideMatchStakeFreeTerms(sm) : (label || (`$${sm.stake || 0}/match` + (sm.pressRule && sm.pressRule !== 'none' ? ' • Press: ' + sm.pressRule : '')));
+            formatLine = `${sm.format === 'nassau' ? 'Nassau' : 'Match Play'} • ${(sm.scoring || 'net').toUpperCase()}${price ? ' • ' + price : ''}`;
         }
         if (rangeText) formatLine += ` • ${rangeText}`;
+        // 2.0 (25) ADVISOR-0725 (7:51 e): a match set to count from a later hole that nobody has reached
+        // yet says when it starts - not "All square", "$0 · halved" or a FINAL lock (text-safe.js).
+        const startsHole = (typeof hpSideMatchStartsHole === 'function') ? hpSideMatchStartsHole(sm, smCourse, savedScores) : 0;
+        if (startsHole) {
+            body = `<div class="bets-row"><span>${escapeHtml(hpSideMatchStartsText(startsHole))}</span></div>`;
+            isFinal = false;
+        }
 
-        const state = isFinal
+        const state = startsHole
+            ? `<span class="bets-state live">\u23F3 Starts hole ${startsHole}</span>`
+            : isFinal
             ? '<span class="bets-state final">🔒 FINAL</span>'
             : `<span class="bets-state live">🟢 LIVE${thru ? ' · ' + escapeHtml(thru) : ''}</span>`;
 

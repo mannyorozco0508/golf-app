@@ -27,6 +27,7 @@
          settlement will be made of. Load order: handicap before the engines, the
          engines before the inline block, so nothing below can shadow them. -->
     <script src="handicap.js"></script>
+    <script src="play-order.js"></script>
     <script src="match-engine.js"></script>
     <!-- v212: what a golfer READS about their handicap - the compact "Index 18 ·
          Course 12" label, the full form, and the one basis sentence. Display
@@ -42,6 +43,7 @@
          Aloha - two pages showing two different totals, which is the one failure
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="pool-engine.js"></script>
     <!-- net-finish-line.js: the Net Finish split, shared with the scorecard since
@@ -181,6 +183,14 @@ html {
     padding-right: env(safe-area-inset-right, 0px);
     background-color: var(--bg-page, transparent);
 }
+/* 2.0 (25) SAFE-TOP BAND (ADVISOR-0725 7:35 b): the page scrolls under the status bar and the
+   Dynamic Island - a solid band there in the page colour, so nothing reads under the clock. The same
+   band admin.html has had since POLISH #13, on ::after (front-door.js uses body::before for its
+   "Where are you playing?" label). 0px on the web. safe_top_25_chrome_test.js holds every page to it. */
+body::after {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f3);
+}
 </style>
 </head>
 <body>
@@ -191,10 +201,10 @@ html {
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
         <a href="leaderboard.html" class="top-nav-item nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
-        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">💰</span><span class="tni-label">Bets</span></a>
+        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">⛳</span><span class="tni-label">Games</span></a>
         <a href="settlement.html" class="top-nav-item nav-link"><span class="tni-glyph">🤝</span><span class="tni-label">Results</span></a>
         <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link"><span class="tni-glyph">⚔️</span><span class="tni-label">Matches</span></a>
-        <a href="game.html" class="top-nav-item active nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Game</span></a>
+        <a href="game.html" class="top-nav-item active nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Format</span></a>
         <a href="trip.html" class="top-nav-item"><span class="tni-glyph">🚐</span><span class="tni-label">Trip</span></a>
         <a href="admin.html" class="top-nav-item nav-link"><span class="tni-glyph">🏠</span><span class="tni-label">Home</span></a>
         <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">🧭</span><span class="tni-label">How it works</span></a>
@@ -397,7 +407,8 @@ html {
                 if (sm.holeStake > 0) parts.push(money(sm.holeStake) + ' a hole');
                 if (sm.overallStake > 0) parts.push(money(sm.overallStake) + ' overall');
                 what = 'Stroke play' + (parts.length ? ', ' + parts.join(' and ') : '');
-            } else what = 'Match play' + (sm.stake > 0 ? ', ' + money(sm.stake) : '');
+            } else if (sm.format === 'hilo') what = 'Hi-Lo' + (sm.stake > 0 ? ', ' + money(sm.stake) + ' a point' : '');
+            else what = 'Match play' + (sm.stake > 0 ? ', ' + money(sm.stake) : '');
             lines.push('<div class="game-sub">⚔️ <strong>' + who + '</strong> — ' + what + ', ' + scoring + (sm.startHole > 1 ? ', from hole ' + sm.startHole : '') + '</div>');
         });
         if (typeof getRoundGames === 'function') {

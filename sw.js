@@ -4461,14 +4461,51 @@
 // that carry the tees stay (14 sets and 20 sets). Their CARDS stay in
 // coursePresets, because 37 saved rounds point at those keys.
 // A device on v329 still lists both courses twice.
-// Moved to v331 (087): the new HardPan logo - tab/home-screen icons, the lobby and legal
-// headers (hardpan-lockup-light.png) and the receipt mark (hardpan-print-mark.png). An installed
-// PWA keeps its old icons and header until the key moves.
-// Moved to v332 (tfweb-2): Delete account on the website now also erases this
-// account's scorecard-scan counts (POST /api/scan-erase, account-exit.js +
-// admin.html), and the privacy page gained the course-scan camera sentence. An
-// installed web app keeps the old account-exit.js until the key moves.
-const CACHE_VERSION = 'golfapp-v332-scan-erase';
+// Moved to v360 (016, 2026-10-19): the Hi-Lo 2v2 side bet - hilo-engine.js joins
+// the shell, and New Action, the Bets tab, Matches, the scorecard and the Receipt
+// read it. A device on v359 cannot offer, show or settle a Hi-Lo.
+// Moved to v361 (087): the new HardPan logo - the lobby and legal headers
+// (hardpan-lockup-light.png) and the receipt mark (hardpan-print-mark.png).
+// Moved to v362 (106): the Weekly Game - weekly-game.js joins the shell and home.html,
+// admin.html, settlement.html, front-door.js and gps-config.js load / call it. A device
+// on v361 keeps serving pages with no Home card and no "Play this again every week?".
+// Moved to v363 (106b): "Set up a weekly game" on Home and the Games page, and the weekly game card
+// all week (one line on the other days). A device on v362 keeps the card on two days only.
+// Moved to v364 (106c, B): weekly-rsvp.js joins the shell (Who's in, the In/Out link). A device on
+// v363 keeps serving a Home with no Who's in and a group text with no link.
+// Moved to v365 (108): index.html - an offline cold start draws the card from this phone's copy of the
+// round (it stayed on "Connecting to game..."). A device on v364 keeps the stuck page.
+// Moved to v366 (111): gps-config.js, gps-miss-pattern.js, gps-slope-live.js, gps-view.js and feature-registry.js -
+// "Show my miss" / "Show green slope" (Tools > Customize > GPS), both off by default and reset off once. A device on
+// v365 keeps the old files: the oval / slope on as before and the USGS slope fetch running with no switch.
+// Also in v366 (106d, one install with 111): weekly-game.js / weekly-rsvp.js / home.html - the weekly card below GPS,
+// Skip / Pause / Delete in Edit, and "Sign in to add this to a season" / "Not in a season". v365 keeps the old card.
+// Moved to v367 (112): Delete account in the Profile sheet (hp-account-ui.js, hp-auth.js,
+// account-exit.js deleteDeps / deleteCheck). A device on v366 keeps a Profile with Sign out only.
+// Moved to v369 (106e): weekly-game.js / weekly-rsvp.js - "✏️ Edit" on every weekly card state (Change something opened
+// Start), Delete with only a name + time, "Send the In/Out link" instead of "0 of 0 said In". v367 keeps the old card.
+// Moved to v370 (110 + 110b, words and icons only; v369 is 106e's): Bets -> Games (⛳ Games tab, Format tab),
+// the group-B money words (pool, settle up, who pays who, payout, wager) and no 💰/💵/🎲 on screen. A device on
+// v369 keeps serving the old "💰 Bets" tab, "+ Bet" and "Finish & settle up".
+// Moved to v372-2.0 (build 22): gps-view.js, feature-registry.js, gps-round.js, gps-scan-client.js, gps-stats.js - paywall and
+// sheets below the status bar, Tools > GPS (Show my miss / Show green slope), Customize Scan row "3 free scans" (no Host
+// lock), iPad-size layout (full hole, 720 pt bottom row, green zoom by screen), Mark far from the hole = no shot + miles.
+// A device on v371-2.0 keeps the old files: title under the Dynamic Island, Host lock, Mark recording far-away shots.
+// Moved to v373-2.0 (build 23): gps-view.js, gps-entitlement.js, feature-registry.js - the paywall with no product from the
+// store says "HardPan Pro isn't available in your region yet" or "Couldn't load prices, try again" (+ Try again) with no
+// plan cards, no price and no Start trial; Customize > NOTIFICATIONS in the app points to iPhone Settings > HardPan.
+// A device on v372-2.0 keeps the old files: blank or fallback prices and a dead Start trial when the store has no product.
+// Also in v373-2.0 (build 23, ADVISOR-1306): hcp-plus.js (new) + home.html, index.html, admin.html, trip.html,
+// hp-account-ui.js - a + Plus chip under every handicap box (the decimal pad has no + key). A device on v372-2.0
+// keeps no + Plus chip (no way to type a plus handicap on the decimal pad).
+// Moved to v376-2.0 (build 25): live games tile, No amount on every amount step, Edit and Remove on game cards, Skins carry switch, Round Setup and Round Complete words, receipt totals and Thru N chip, a safe-area band on every page, My bag and the linked golfer only, watching phones open on the card, the you star (index.html, admin.html, gps-view.js, gps-game.js, gps-bet.js, gps-range.js, front-door.js, gps-stats.js, hp-index.js, text-safe.js, settlement.html, skins.html, sidematches.html, leaderboard.html, stats.html and others).
+// Moved to v375-2.0 (build 24 re-archive): zero-stake games show no dollar sign (text-safe.js, settlement.html, skins.html, sidematches.html, stats.html, index.html, leaderboard.html, gps-bet.js, gps-game.js, gps-round.js) and Discard an unsaved Round Setup (admin.html).
+// Moved to v374-2.0 (build 24): front-door.js, gps-bet.js, gps-game.js, sidematches.html - one Add a game list (1 v 1 / 2 v 2 /
+// Group, every game on one screen, Done returns where you started); admin.html, simple-flow.js - Round Setup's course list
+// opens with NEAR YOU (only when location is already allowed) then LAST PLAYED; settlement.html + receipt-image.js (new) -
+// Share receipt as a designed image. A device on v373-2.0 keeps the old files: the four add-a-game screens and More tiles,
+// the regional course list first, and the text-only Share receipt.
+const CACHE_VERSION = 'golfapp-v376-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4532,6 +4569,10 @@ const SHELL_FILES = [
     './player-tees.js',
     './handicap-labels.js',
     './aloha-bet.js',
+    // hilo-engine.js (016): the Hi-Lo 2v2 side bet - every rule and every number.
+    // settlement-engine.js and bet-strip.js call it through a typeof guard, so a
+    // cached shell without it would settle a Hi-Lo wager as nothing.
+    './hilo-engine.js',
     // payouts.js is the place/tie prize rule, shared by Trip Mode and both
     // tournament pages. Called unguarded, so a cached shell without it breaks the
     // prize table rather than quietly paying nobody.
@@ -4546,6 +4587,8 @@ const SHELL_FILES = [
     './score-marks.js',
     './scorecard-rows.js',
     './text-safe.js',
+    // 2.0 (23): the + Plus chip under every handicap box.
+    './hcp-plus.js',
     // ui-dialogs.js (v226): the telling, asking and typing this app does for
     // itself. NO APOSTROPHES IN THIS BLOCK - the shell list is read by matching
     // single-quoted strings, so one apostrophe swallows the rest of the array.
