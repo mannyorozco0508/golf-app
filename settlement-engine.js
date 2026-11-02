@@ -351,8 +351,12 @@
         const totalHoles = (courseData || []).length;
         const computeFn = carryOver ? computeSkinsCarryOverForSettle : computeSkinsVoidForSettle;
 
-        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(allPlayers, courseData, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
-        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(allPlayers, courseData, savedScores, 'net') : { skins: [], pendingUnits: 0 };
+        // THE CARRY RIDES TO THE NEXT HOLE PLAYED (URGENT-011, approved): the same
+        // helper computeSkinsPayoutLinesFor already uses. A first-tee round gets the
+        // caller's own array back, so it settles byte-identically.
+        const walk = carryOver ? playOrderOf(data, courseData) : courseData;
+        const grossResult = (potFormat === 'split' || potFormat === 'gross') ? computeFn(allPlayers, walk, savedScores, 'gross') : { skins: [], pendingUnits: 0 };
+        const netResult = (potFormat === 'split' || potFormat === 'net') ? computeFn(allPlayers, walk, savedScores, 'net') : { skins: [], pendingUnits: 0 };
 
         const totalPot = buyIn * allPlayers.length;
         let grossPot = 0, netPot = 0;
@@ -850,14 +854,17 @@
                 });
                 const stake = (segStake === undefined || segStake === null) ? config.overallStake : segStake;
                 const roundComplete = holesCompleted === totalHolesInSeg && totalHolesInSeg > 0;
-                let winner = null, money = 0;
+                // 100a: pay by SIDE ('A'/'B'), never by name. When both sides' first words
+                // match (two "Mike"s, "Test Ann"/"Test Cal") the old name compare paid side A
+                // whoever won. `winner` stays the display string; winSide is a new field.
+                let winner = null, winSide = null, money = 0;
                 if (roundComplete) {
-                    if (p1Total < p2Total) { winner = nameA; money = stake; }
-                    else if (p2Total < p1Total) { winner = nameB; money = stake; }
+                    if (p1Total < p2Total) { winSide = 'A'; winner = nameA; money = stake; }
+                    else if (p2Total < p1Total) { winSide = 'B'; winner = nameB; money = stake; }
                 }
-                const segP1Money = winner === nameA ? money : (winner === nameB ? -money : 0);
+                const segP1Money = winSide === 'A' ? money : (winSide === 'B' ? -money : 0);
                 return { startHole, stake, p1Total, p2Total, holesCompleted, totalHoles: totalHolesInSeg,
-                         roundComplete, winner, p1Money: segP1Money, nameA, nameB,
+                         roundComplete, winner, winSide, p1Money: segP1Money, nameA, nameB,
                          endHole: courseData.length ? courseData[courseData.length - 1].hole : startHole };
             }
 
@@ -1062,7 +1069,7 @@
             // or a mid-round match would print "Holes 1-18" beside money that only ever
             // came from holes 6 onward.
             const smCourse = (typeof sideMatchHoles === 'function')
-                ? sideMatchHoles(sm, courseData)
+                ? sideMatchHoles(sm, courseData, data)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
             // IN PLAY ORDER (2026-10-04, approved). "Started Hole 10" is what a
             // golfer who teed off the 10th sees on the Receipt, and the first hole
@@ -1111,6 +1118,15 @@
                 segments: [], net: 0, netTo: null
             };
 
+            // HI-LO (016, ADDITIVE): a format this branch had never seen. hilo-engine.js
+            // owns the rules and every number; this only hands it the receipt's own
+            // fields and range. Absent the file, a Hi-Lo wager adds no receipt.
+            if (sm.format === 'hilo') {
+                const hiloRc = (typeof hiloReceipt === 'function')
+                    ? hiloReceipt(receipt, sm, teamA, teamB, smCourse, savedScores, firstHole, lastHole) : null;
+                if (hiloRc) receipts.push(hiloRc);
+                return;
+            }
             if (sm.format === 'stroke') {
                 const sides = { sideA: teamA, sideB: teamB };
 
@@ -1197,9 +1213,27 @@
                     };
                 };
 
+                if (calc.mode === 'stroke') {
                 receipt.segments.push(describe(calc.base, 'Overall'));
                 (calc.pressSegs || []).forEach((seg, i) =>
                     receipt.segments.push(describe(seg, `Overall Press ${i + 1}`)));
+                } else {
+                    // 100c (2026-10-29 Manny typed OK): overallMode 'match' has no `base`
+                    // (calculateOverallBetEngine returns baseStatus / pressResults), so the
+                    // stroke describe() threw here. RECEIPT TEXT ONLY: each line reads the
+                    // engine's own status and pays exactly what p1Money already holds.
+                    const ovStake = cfg.overallStake || 0;
+                    const matchSeg = (label, startHole, status) => ({
+                        label, startHole, endHole: lastHole, stake: ovStake,
+                        result: status === 0 ? 'All square' : `${status > 0 ? nameA : nameB} ${Math.abs(status)} up`,
+                        winner: status > 0 ? nameA : (status < 0 ? nameB : null),
+                        money: status === 0 ? 0 : ovStake,
+                        toSideA: status > 0
+                    });
+                    receipt.segments.push(matchSeg('Overall match', firstHole, calc.baseStatus || 0));
+                    (calc.pressResults || []).forEach((pr, i) =>
+                        receipt.segments.push(matchSeg(`Overall Press ${i + 1}`, pr.startHole, pr.status || 0)));
+                }
                 // The one number a golfer argues about. Hole money and overall money
                 // together - the SAME sum settlement pays, or the receipt is a lie.
                 receipt.net = holeNet + calc.p1Money;
@@ -1311,6 +1345,40 @@
         return receipts;
     }
 
+    // 100c: one Vegas / BBB instance -> { label, net: { id: $ } }, or null when the
+    // engine is not loaded on this page or the game is not valid. Pure pass-through to
+    // HardPanVegas.calculateVegas / HardPanBBB.calculateBBB (each zero-sum).
+    function vegasBbbEngines() {
+        const g = (typeof globalThis !== 'undefined') ? globalThis : {};
+        let vegas = (typeof HardPanVegas !== 'undefined') ? HardPanVegas : (g.HardPanVegas || (typeof window !== 'undefined' && window.HardPanVegas) || null);
+        let bbb = (typeof HardPanBBB !== 'undefined') ? HardPanBBB : (g.HardPanBBB || (typeof window !== 'undefined' && window.HardPanBBB) || null);
+        if ((!vegas || !bbb) && typeof module !== 'undefined' && module.exports && typeof require === 'function') {
+            try { vegas = vegas || require('./vegas-engine.js'); } catch (e) { /* not in this build */ }
+            try { bbb = bbb || require('./bbb-engine.js'); } catch (e) { /* not in this build */ }
+        }
+        return { vegas, bbb };
+    }
+    function settleVegasOrBbb(g, players, courseData, savedScores) {
+        const eng = vegasBbbEngines();
+        const nameOf = id => { const p = (players || []).find(x => String(x.id) === String(id)); return p ? p.name : String(id); };
+        if (g.format === 'vegas') {
+            if (!eng.vegas) return null;
+            const r = eng.vegas.calculateVegas(g, courseData || [], savedScores || {});
+            if (!r || !r.valid) return null;
+            const team = t => t.map(nameOf).join('/');
+            return { label: `Vegas \u00B7 ${team(g.vegasTeamA)} vs ${team(g.vegasTeamB)}`, net: r.net };
+        }
+        if (g.format === 'bbb') {
+            if (!eng.bbb) return null;
+            const r = eng.bbb.calculateBBB(g, players || []);
+            if (!r || r.players.length < 2) return null;
+            return { label: 'Bingo Bango Bongo', net: r.net };
+        }
+        return null;
+    }
+    // Pages and the + Game sheet (100b) key the Vegas / BBB tiles on this.
+    if (typeof window !== 'undefined') window.HP_SETTLE_VEGAS_BBB = true;
+
     function computeCombinedNetTotals(data, courseData, savedScores) {
         const netByName = {}; // lowercased key -> { name, net }
 
@@ -1386,6 +1454,31 @@
             Object.keys(gameNet).forEach(pid => {
                 const p = allPlayers.find(pl => String(pl.id) === String(pid));
                 addAmount(p, gameNet[pid], label);
+            });
+        });
+
+        // 100c (2026-10-29 Manny typed OK, 100 Q3): VEGAS + BINGO BANGO BONGO IN SETTLE UP,
+        // ONLY for a game started after this update. getRoundGames skips both formats (they
+        // are not in the catalog), so until now they were "settle separately" cards. A game
+        // the new code writes carries inSettle: true (the + Game sheet and Round Setup);
+        // every game saved before has no such field and is left out exactly as before, so
+        // nothing already settled moves. The money is the engines' own zero-sum net
+        // (vegas-engine.js / bbb-engine.js), booked as it comes back - no golf math here.
+        // A page without the two engines loaded books nothing (the old behavior).
+        const vbInstances = data.additionalGameInstances || {};
+        const vbLabelSeen = {};
+        Object.keys(vbInstances).forEach(id => {
+            const g = vbInstances[id];
+            if (!g || g.enabled === false || g.inSettle !== true) return;
+            if (g.format !== 'vegas' && g.format !== 'bbb') return;
+            const res = settleVegasOrBbb(g, allPlayers, courseData, savedScores);
+            if (!res) return;
+            const base = res.label;
+            vbLabelSeen[base] = (vbLabelSeen[base] || 0) + 1;
+            const label = vbLabelSeen[base] > 1 ? `${base} (${vbLabelSeen[base]})` : base;
+            Object.keys(res.net).forEach(pid => {
+                const p = allPlayers.find(pl => String(pl.id) === String(pid));
+                addAmount(p, res.net[pid], label);
             });
         });
 
@@ -1564,9 +1657,26 @@
             // round, so nothing already settled moves. The engines are untouched: they
             // are simply handed the holes this wager is played over.
             const smCourse = (typeof sideMatchHoles === 'function')
-                ? sideMatchHoles(sm, courseData)
+                ? sideMatchHoles(sm, courseData, data)
                 : ((sm.startHole || 1) > 1 ? courseData.filter(h => h.hole >= sm.startHole) : courseData);
 
+            // HI-LO (016, ADDITIVE): hilo-engine.js decides every point and every
+            // dollar; the split per side is the even split every 2v2 bet above and
+            // below uses. Its ledger line reads like every side match's - "Side Match ·
+            // <A> vs <B>" - then "· Hi-Lo": trip totals file it under "side matches
+            // and presses", and settlement.html's Pay out knows the Low Ball / High
+            // Ball notes below explain it (it matches on that prefix), so it is not
+            // counted twice.
+            if (sm.format === 'hilo') {
+                const hl = (typeof hiloForSideMatch === 'function')
+                    ? hiloForSideMatch(sm, teamAPlayers, teamBPlayers, smCourse, savedScores) : null;
+                if (!hl) return;
+                smDetail[matchId] = { teamA: teamAPlayers.slice(), teamB: teamBPlayers.slice() };
+                const hlLabel = `Side Match \u00B7 ${teamAPlayers.map(p => p.name).join('/')} vs ${teamBPlayers.map(p => p.name).join('/')} \u00B7 Hi-Lo`;
+                teamAPlayers.forEach(p => addAmount(p, hl.toSideA / teamAPlayers.length, hlLabel));
+                teamBPlayers.forEach(p => addAmount(p, -hl.toSideA / teamBPlayers.length, hlLabel));
+                return;
+            }
             if (sm.format === 'stroke') {
                 const p1 = teamAPlayers[0], p2 = teamBPlayers[0];
                 if (!p1 || !p2) return;
@@ -1959,6 +2069,8 @@
 
             holes.push(row);
         });
+        // Walked in play order (URGENT-011); listed by number, as the pages expect.
+        if (opts && opts.listByNumber) holes.sort((a, b) => Number(a.hole) - Number(b.hole));
 
         // Official THRU is the contiguous run from hole 1. A single gap stops it,
         // because "official thru 14" has to mean everything up to 14 is settled -
@@ -2023,14 +2135,16 @@
         const carryOver = (typeof skinsCarriesOver === 'function')
             ? skinsCarriesOver(data.skinsCarryOver) : data.skinsCarryOver === true;
 
+        const walk = carryOver ? playOrderOf(data, courseData) : courseData;
+        const wOpts = walk === courseData ? opts : Object.assign({}, opts, { listByNumber: true });
         const one = {
             mode,
             carryOver,
             participants,
             gross: (mode === 'split' || mode === 'gross')
-                ? buildSkinsLedgerFor(participants, courseData, savedScores, 'gross', carryOver, opts) : null,
+                ? buildSkinsLedgerFor(participants, walk, savedScores, 'gross', carryOver, wOpts) : null,
             net: (mode === 'split' || mode === 'net')
-                ? buildSkinsLedgerFor(participants, courseData, savedScores, 'net', carryOver, opts) : null,
+                ? buildSkinsLedgerFor(participants, walk, savedScores, 'net', carryOver, wOpts) : null,
         };
         one.flights = [Object.assign({ flight: null }, one)];
         return one;

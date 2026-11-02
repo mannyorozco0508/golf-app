@@ -60,7 +60,8 @@
     // THE POINTER, from a round's own data. No token, no players, no scores.
     function pointerFor(code, d, opts) {
         d = d || {}; opts = opts || {};
-        var course = cut(d.courseName, 80);
+        // 2.0 (25) 7:51 f: the provider's dropped apostrophe repaired for the list (as text-safe.js hpCourseNameText).
+        var course = cut(typeof d.courseName === 'string' ? d.courseName.replace(/\bO\s+Odham\b/gi, 'O\u2019odham') : d.courseName, 80);
         var name = cut(d.eventName, 80);
         if (!name || name === 'Single Round') name = course || ('Round ' + code);
         var p = { at: opts.at != null ? opts.at : Date.now(), name: name };

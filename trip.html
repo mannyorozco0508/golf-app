@@ -25,6 +25,7 @@
          stack_action_test.js checks script order with a raw indexOf, and a comment
          that names a file ahead of its real tag reads as the wrong order.) -->
     <script src="handicap.js"></script>
+    <script src="play-order.js"></script>
     <script src="match-engine.js"></script>
     <!-- pwa-boot.js owns GolfNet.isNative(), which native-export.js asks before
          choosing between window.print() and the iOS share sheet. Build 4 shipped
@@ -39,6 +40,7 @@
          cannot disagree with it. -->
     <script src="trip-recap-image.js"></script>
     <script src="text-safe.js"></script>
+    <script src="hcp-plus.js"></script>   <!-- 2.0 (23): the "+ Plus" chip under every handicap box (the decimal pad has no + key) -->
     <!-- UI Wave 4: the telling this page does. The browser dialogs are gone -
          refusals and failures are inline and persistent, receipts float. Shared
          with every other consumer page rather than copied; loaded before the
@@ -76,6 +78,7 @@
          Aloha - two pages showing two different totals, which is the one failure
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
 <script src="settlement-engine.js"></script>
 <!-- pool-engine.js: trip settlement asks each round whether its money is actually
      settled. Without this the check was unreachable - the typeof guard around it
@@ -309,6 +312,14 @@ html {
     padding-top: max(10px, env(safe-area-inset-top, 0px));
     padding-bottom: max(10px, env(safe-area-inset-bottom, 0px));
 }
+/* 2.0 (25) SAFE-TOP BAND (ADVISOR-0725 7:35 b): the page scrolls under the status bar and the
+   Dynamic Island - a solid band there in the page colour, so nothing reads under the clock. The same
+   band admin.html has had since POLISH #13, on ::after (front-door.js uses body::before for its
+   "Where are you playing?" label). 0px on the web. safe_top_25_chrome_test.js holds every page to it. */
+body::after {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f3);
+}
 </style>
 </head>
 <body>
@@ -501,7 +512,7 @@ html {
                 <div class="settle-card" style="padding:10px 12px;">
                     <label class="toggle-label-sm" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                         <input type="checkbox" id="daily-pot-on" style="width:auto;" onchange="dailyPotTouched(); renderDailyPotRow()">
-                        <span>💵 A pot in every round</span>
+                        <span>⛳ A pot in every round</span>
                     </label>
                     <div id="daily-pot-row" style="display:none; margin-top:8px;">
                         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
@@ -677,9 +688,9 @@ html {
     </details>
 
     <details class="trip-section">
-        <summary>💵 Trip Money Settlement</summary>
+        <summary>📊 Trip Money Settlement</summary>
         <div class="trip-section-body">
-            <p class="trip-section-sub">Settle up for real over Venmo — this is just the math.</p>
+            <p class="trip-section-sub">Square up between yourselves — this is just the math.</p>
             <div id="trip-money-settlement"></div>
         </div>
     </details>
@@ -701,7 +712,7 @@ html {
                 <div class="settle-card" style="padding:10px 12px;">
                     <label class="toggle-label-sm" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
                         <input type="checkbox" id="trip-pot-on" style="width:auto;" onchange="tripPotTouched(); renderTripPotRow()">
-                        <span>💰 Play the points race for money</span>
+                        <span>⛳ Play the points race for money</span>
                     </label>
                     <div id="trip-pot-row" style="display:none; margin-top:8px;">
                         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
@@ -726,9 +737,9 @@ html {
                 </div>
             </div>
 
-            <p class="trip-section-sub" style="margin-bottom:8px;">Set the pool and how many spots pay. Ties split their spots.</p>
+            <p class="trip-section-sub" style="margin-bottom:8px;">Set the total in and how many spots pay. Ties split their spots.</p>
             <div class="form-group" style="margin-bottom:8px;">
-                <label>Total Pool ($)</label>
+                <label>Total in ($)</label>
                 <input type="number" id="prize-pool-input" min="0" value="0" oninput="renderPrizeSpotInputs()">
             </div>
             <div class="form-group" style="margin-bottom:8px;">
@@ -1248,6 +1259,12 @@ html {
                 + parsed.flaggedLines.length + ' line'
                 + (parsed.flaggedLines.length === 1 ? '' : 's') + ' I could not read: '
                 + escapeHtml(parsed.flaggedLines.map(l => l.text).join(' / ')) + '</p>';
+        }
+        if (parsed.checkLines && parsed.checkLines.length) {
+            // URGENT-008: lines read, but still holding a number or a stray flight letter.
+            html += '<p style="font-size:0.8rem; color:var(--warn-text);">Check '
+                + (parsed.checkLines.length === 1 ? 'this line' : 'these lines') + ': '
+                + escapeHtml(parsed.checkLines.map(c => '"' + c.text + '" (' + c.why + ')').join(' / ')) + '</p>';
         }
         if (parsed.notedLines.length) {
             html += '<p style="font-size:0.8rem; color:var(--text-muted);">Notes ignored: '
@@ -1950,11 +1967,14 @@ html {
         const name = document.getElementById('trip-name-input').value.trim();
         if (!name) { uiRefuse('⚠️ Give your trip a name first.'); return; }
         const restore = setControlPending(pressedEl, '\u23F3 Creating...');
-        issueUniqueCode({ db, root: 'trips' }).then(code => {
+        // THE TRIP IS ITS CREATOR'S (Manny 2026-10-17, the phase-1 rules): ownerUid is the signed-in
+        // uid (anonymous too), stamped like the planner path's rounds - the rules refuse a trip without it.
+        let ownerUid = null;
+        window.organizerGate.ensureOrganizer(db).then((uid) => { ownerUid = uid; return issueUniqueCode({ db, root: 'trips' }); }).then(code => {
             // Same as the planner path above: mint here, leave holding it.
             const tripToken = makeOrganizerToken();
             return db.ref(`trips/${code}`)
-                .set({ name: name, createdAt: Date.now(), rounds: {}, organizerToken: tripToken })
+                .set({ name: name, createdAt: Date.now(), rounds: {}, organizerToken: tripToken, ownerUid: ownerUid })
                 .then(() => { window.location.href = `trip.html?trip=${code}&organizer=${tripToken}`; });
         }).catch(err => {
             restore();
@@ -2493,7 +2513,7 @@ html {
             const t = tournaments[code];
             return `<div class="round-card">
                 <div class="rc-info">
-                    <div class="rc-label">${t.label}</div>
+                    <div class="rc-label">${escapeHtml(t.label)}</div>
                     <div class="rc-sub">Tournament code: ${code}</div>
                 </div>
                 <a class="rc-link" href="${tournamentUrl(`tournament.html?tourney=${code}`)}">Open ▶</a>
@@ -2808,6 +2828,12 @@ html {
                 + parsed.flaggedLines.length + ' line'
                 + (parsed.flaggedLines.length === 1 ? '' : 's') + ' I could not read: '
                 + escapeHtml(parsed.flaggedLines.map(l => l.text).join(' / ')) + '</p>';
+        }
+        if (parsed.checkLines && parsed.checkLines.length) {
+            // URGENT-008: lines read, but still holding a number or a stray flight letter.
+            html += '<p style="font-size:0.8rem; color:var(--warn-text);">Check '
+                + (parsed.checkLines.length === 1 ? 'this line' : 'these lines') + ': '
+                + escapeHtml(parsed.checkLines.map(c => '"' + c.text + '" (' + c.why + ')').join(' / ')) + '</p>';
         }
         if (parsed.notedLines.length) {
             // Said, not swallowed: the note came off the line so the handicap could
@@ -3522,7 +3548,7 @@ html {
     const TRIP_TOTAL_ONCE_HEAD = 'Settled once at the end';
     const TRIP_TOTALS_DIFFER_NOTE = '<b>Settled after each round</b> adds up what each day\u2019s Results page said, '
         + 'so it is what you paid if you settled up every night. '
-        + '<b>Settled once at the end</b> nets every bet across the whole trip first and rounds to whole dollars once. '
+        + '<b>Settled once at the end</b> nets every game across the whole trip first and rounds to whole dollars once. '
         + 'They differ because each day rounds to whole dollars on its own, and the odd dollar can land on the same golfer more than once. '
         + 'Both are right \u2014 they are two different ways of settling up, and only your group knows which one it is doing.';
     const TRIP_TOTALS_AGREE_NOTE = 'Whether you settled up after each round or settle once at the end, the numbers are the same.';
@@ -3583,7 +3609,7 @@ html {
                 inPlayRounds.push({ label, started: false, thru: 0,
                                     playing: [], left: (data.players || []).length });
                 perRoundBreakdown.push({ label, formatLabel: '', rows: [],
-                                         message: 'Not played yet \u2014 it owes nobody anything.' });
+                                         message: 'Not played yet \u2014 nothing changes hands.' });
                 return;
             }
 
@@ -3764,8 +3790,8 @@ html {
 
         if (!blocked && transactions.length > 0 && hasPlayerToPlayerSettlement(tripContributions)) {
             html += `<div class="settle-card"><div class="settle-header">${tripSettled
-                ? '🏁 Final "Who Pays Who"'
-                : '\u23F3 Who Pays Who \u2014 Not Final'}</div>`;
+                ? '🏁 Final Tally'
+                : '\u23F3 Final Tally \u2014 Not Final'}</div>`;
             if (!totalsAgree) {
                 html += `<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding:0 0 6px;">${TRIP_WHO_PAYS_WHO_NOTE}</div>`;
             }
@@ -3799,7 +3825,7 @@ html {
 
         html += `<div class="settle-card"><div class="settle-header">Per-Round Breakdown</div>`;
         perRoundBreakdown.forEach(r => {
-            html += `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:bold; padding-top:8px; border-top:1px dashed var(--border-faint); margin-top:8px;">${r.label}${r.formatLabel ? ' — ' + r.formatLabel : ''}</div>`;
+            html += `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:bold; padding-top:8px; border-top:1px dashed var(--border-faint); margin-top:8px;">${escapeHtml(r.label)}${r.formatLabel ? ' — ' + r.formatLabel : ''}</div>`;
             if (r.rows.length === 0) {
                 html += `<div style="font-size:0.78rem; color:var(--text-muted); padding:4px 0;">${r.message || 'No money data yet.'}</div>`;
             } else {
@@ -4541,7 +4567,7 @@ html {
         let html = '';
         if (pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--warn-text); background:var(--warn-bg); border:1px solid var(--warn-border); border-radius:6px; padding:8px; margin-bottom:10px;">
-                ⚠️ Payout amounts add up to $${fmtAmt(totalAllocated)}, but the pool is $${fmtAmt(pool)}. Adjust the per-place amounts so they match.
+                ⚠️ Result amounts add up to $${fmtAmt(totalAllocated)}, but the total in is $${fmtAmt(pool)}. Adjust the per-place amounts so they match.
             </div>`;
         }
 
@@ -4593,7 +4619,7 @@ html {
                 const excludedNote = r.countsTowardTrip === false ? ' <span style="color:#999;">(excluded from trip totals)</span>' : '';
 
                 html += `<div style="border:1px solid #ccc; border-radius:8px; padding:14px; margin-bottom:14px; page-break-inside:avoid;">
-                    <div style="font-weight:bold; font-size:1.1rem; color:#0f4c3a;">${r.label}${excludedNote}</div>
+                    <div style="font-weight:bold; font-size:1.1rem; color:#0f4c3a;">${escapeHtml(r.label)}${excludedNote}</div>
                     <div style="margin-top:6px;"><strong>Course:</strong> ${escapeHtml(courseName)}</div>
                     <div><strong>Format:</strong> ${formatLabel}</div>
                     <div><strong>Players (${players.length}):</strong> ${playerNames}</div>
@@ -4748,7 +4774,7 @@ html {
     function tripBothTotalsPlain() {
         const fmt = v => (v > 0.005 ? '+$' : v < -0.005 ? '-$' : '$') + fmtAmt(Math.abs(v));   // the page's one amount rule
         const row = list => list.slice().sort((a, b) => b.net - a.net).map(v => v.name + ' ' + fmt(v.net)).join(', ');
-        return 'Who Pays Who above is for settling once at the end (' + row(cachedTripTotals.once) + '). '
+        return 'The Final Tally above is for settling once at the end (' + row(cachedTripTotals.once) + '). '
              + 'If you settled up after each round, the days added up to: ' + row(cachedTripTotals.daily) + '. '
              + 'The two differ because each day rounded to whole dollars on its own.';
     }
@@ -4808,7 +4834,7 @@ html {
         html += '</div>';
 
         // ---- MONEY. The caveat travels with the card, not just the screen. ----
-        html += '<div class="rc-block"><div class="rc-head">\uD83D\uDCB5 '
+        html += '<div class="rc-block"><div class="rc-head">\uD83D\uDCCA '
              + (cachedTripSettled ? 'FINAL SETTLEMENT' : 'SETTLEMENT SO FAR') + '</div>';
         if (cachedMoneyTransactions.length === 0) {
             html += '<div class="rc-none">Everyone\u2019s settled up.</div>';
@@ -4966,13 +4992,13 @@ html {
         // same caveat as the screen - otherwise the caveat is the one thing that does
         // not get shared.
         text += cachedTripSettled
-            ? `\n💵 FINAL SETTLEMENT\n`
-            : `\n💵 SETTLEMENT SO FAR — NOT FINAL\n`;
+            ? `\n📊 FINAL SETTLEMENT\n`
+            : `\n📊 SETTLEMENT SO FAR — NOT FINAL\n`;
         if (!cachedTripSettled) text += `${tripNotFinalReason()}\n`;
         if (cachedMoneyTransactions.length === 0) {
             text += `Everyone's settled up — no money changes hands.\n`;
         } else {
-            cachedMoneyTransactions.forEach(t => { text += `${t.from} owes ${t.to} $${fmtAmt(t.amount)}\n`; });
+            cachedMoneyTransactions.forEach(t => { text += `${t.from} pays ${t.to} $${fmtAmt(t.amount)}\n`; });
         }
         // THE TWO TOTALS TRAVEL WITH THE PASTE, because the paste is what people
         // settle from. Silent when they agree - there is nothing to choose.

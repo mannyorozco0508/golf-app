@@ -111,6 +111,14 @@ html {
     padding-right: env(safe-area-inset-right, 0px);
     background-color: var(--bg-page, transparent);
 }
+/* 2.0 (25) SAFE-TOP BAND (ADVISOR-0725 7:35 b): the page scrolls under the status bar and the
+   Dynamic Island - a solid band there in the page colour, so nothing reads under the clock. The same
+   band admin.html has had since POLISH #13, on ::after (front-door.js uses body::before for its
+   "Where are you playing?" label). 0px on the web. safe_top_25_chrome_test.js holds every page to it. */
+body::after {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f3);
+}
 </style>
 </head>
 <body>
@@ -139,10 +147,10 @@ html {
 <ol class="step-list">
     <li>Tap the link. If the round has more than one group it asks <strong>How are you joining this round?</strong> &mdash; a foursome offers the same choice on one line above the card. There are three answers.</li>
     <li><strong>Keep score for Group</strong> 1, 2 or 3 &mdash; one person per group does this, and that is the card you keep for the rest of the day.</li>
-    <li><strong>I'm playing (not keeping score)</strong> &mdash; the other three golfers. Pick your name next. You see the card without the score boxes, and you get your own side bets and your own final result. Your group's scorekeeper enters every score.</li>
+    <li><strong>I'm playing (not keeping score)</strong> &mdash; the other three golfers. Pick your name next. You see the card without the score boxes, and you get your own side games and your own final result. Your group's scorekeeper enters every score.</li>
     <li><strong>Just watching</strong> &mdash; you see everything, you change nothing, and nothing will buzz your phone.</li>
     <li>Given a code instead of a link? On Home, open <strong>Open something else</strong>, type it into <strong>GAME CODE</strong> and tap Open. Organizer&rsquo;s code. Over four golfers, pick your group.</li>
-    <li>During the round you move between <strong>Scorecard, Leaderboard, Bets, Results, Matches</strong> and <strong>Game</strong> on the nav bar at the top of the scorecard, with <strong>🚐 Trip</strong>, <strong>🏠 Home</strong> and <strong>🧭 How it works</strong> beside them.</li>
+    <li>During the round you move between <strong>Scorecard, Leaderboard, Games, Results, Matches</strong> and <strong>Format</strong> on the nav bar at the top of the scorecard, with <strong>🚐 Trip</strong>, <strong>🏠 Home</strong> and <strong>🧭 How it works</strong> beside them.</li>
 </ol>
 <div class="info-card">
     <div class="i-name">⚠️ The missing-score warning</div>
@@ -195,7 +203,7 @@ html {
 
     <section id="formats">
 <h2>🎮 Game Formats</h2>
-<p class="section-sub">One of these is the round&rsquo;s main format, picked in the wizard &mdash; it drives the Card, the Board and <strong>Payout Settlement</strong>. Skins, the Dot Game and the birdie game are <em>not</em> here: they run alongside whatever you pick, and they are in Side Games below.</p>
+<p class="section-sub">One of these is the round&rsquo;s main format, picked in the wizard &mdash; it drives the Card, the Board and <strong>Final Results</strong>. Skins, the Dot Game and the birdie game are <em>not</em> here: they run alongside whatever you pick, and they are in Side Games below.</p>
 <div class="format-grid">
     <div class="format-item">
         <div class="f-name">⛳ Stroke Play</div>
@@ -206,8 +214,8 @@ html {
         <div class="f-desc">Points awarded per hole based on your score vs. par, so one bad hole does not end your day.</div>
     </div>
     <div class="format-item">
-        <div class="f-name">💵 Nassau</div>
-        <div class="f-desc">Front, back and overall &mdash; three bets in one round, with presses if you want them. It is a main format here, and also available as a side match between any two players.</div>
+        <div class="f-name">📋 Nassau</div>
+        <div class="f-desc">Front, back and overall &mdash; three games in one round, with presses if you want them. It is a main format here, and also available as a side match between any two players.</div>
     </div>
     <div class="format-item">
         <div class="f-name">👥 Best Ball</div>
@@ -227,11 +235,11 @@ html {
     </div>
     <div class="format-item">
         <div class="f-name">⚔️ Team Match</div>
-        <div class="f-desc">Team vs. team, one bet on the whole thing.</div>
+        <div class="f-desc">Team vs. team, one game on the whole thing.</div>
     </div>
     <div class="format-item">
         <div class="f-name">🏆 Ryder Cup</div>
-        <div class="f-desc">The classic team competition across sessions, with points rather than one bet.</div>
+        <div class="f-desc">The classic team competition across sessions, with points rather than one game.</div>
     </div>
 </div>
     </section>
@@ -265,22 +273,23 @@ html {
     <div class="i-desc">Set up a private 1v1 or 2v2 &mdash; Match Play, <strong>Nassau</strong>, or Stroke Play ($/hole and $/overall with presses) &mdash; between any players in the round, even if they're in different groups or already playing their own group's main format. Everyone can build as many of these as they want, and each one tracks and settles independently.</div>
 </div>
 <div class="info-card">
-    <div class="i-name">🌴 The Aloha bet</div>
-    <div class="i-desc">A last-hole bet on a match that is already decided: the side that is down can put one more wager on the 18th so the walk in still matters. It is money between the two sides of one match, it is agreed before the hole, and like every other bet it is refused while you have no signal.</div>
+    <div class="i-name">🌴 The Aloha game</div>
+    <div class="i-desc">A last-hole game on a match that is already decided: the side that is down can raise the stakes once more on the 18th so the walk in still matters. It is money between the two sides of one match, it is agreed before the hole, and like every other game it is refused while you have no signal.</div>
 </div>
     </section>
 
     <section id="money">
 <h2>🤝 Settling Up</h2>
 <div class="info-card">
-    <div class="i-name">🤝 Payout Settlement</div>
-    <div class="i-desc">The final money ledger for the round &mdash; main format, side games <em>and</em> side matches &mdash; who owes who, ready to Venmo. It is the <strong>Results</strong> tab. Every line it pays is itemised on the page, so you can see exactly where each figure came from, under a card headed <strong>Pay out</strong>. Tap a golfer&rsquo;s line and it opens to show which game every figure came from. Nothing on it marks anybody paid: the app works out who owes who, it never holds money and it never moves any.</div>
+    <div class="i-name">🤝 Final Results</div>
+    <div class="i-desc">The final totals for the round &mdash; main format, side games <em>and</em> side matches &mdash; the final tally for everyone. It is the <strong>Results</strong> tab. Every line is itemised on the page, so you can see exactly where each figure came from, under a card headed <strong>Totals</strong>. Tap a golfer&rsquo;s line and it opens to show which game every figure came from. Nothing on it marks anybody done: the app works out the final tally, it never holds or moves anything.</div>
 </div>
 <div class="info-card">
     <div class="i-name">🧾 Receipt</div>
     <div class="i-desc">One document with the money, every match and press, and the full scorecard. It is on the <strong>Results</strong> tab, and the <strong>Finish Round</strong> panel opens it too. This is the one the group keeps &mdash; send it when somebody questions a number.</div>
 </div>
     </section>
+
 
     <section id="offline">
 <h2>📶 When the Signal Drops</h2>
@@ -290,7 +299,7 @@ html {
     <div class="i-desc">If something did not reach the database you'll see a small banner with a count of changes that did not go through. It states the number and nothing else &mdash; deliberately, because the right thing to do differs by case and a banner cannot know which one you're in. Re-enter the hole it names once you have signal.</div>
 </div>
 <div class="info-card">
-    <div class="i-name">🚫 Bets are refused offline, not queued</div>
+    <div class="i-name">🚫 Games are refused offline, not queued</div>
     <div class="i-desc">A press, a KP, a Wolf call, a new side match &mdash; anything that creates money &mdash; is <strong>refused outright while you're offline</strong> rather than saved up to send later. That is on purpose. A score can be re-entered from the card in your pocket; a $78 press struck on the 7th tee cannot be reconstructed by anybody. So the app would rather tell you now than lose it quietly. Scores themselves keep working normally.</div>
 </div>
     </section>
@@ -311,8 +320,8 @@ html {
             <div class="i-desc">This is the trip competition. Each round awards points by where you finished that day on net, scaled to how many played, so missing a day costs you. Points post only once a round is fully finished — a card still in progress does not count yet.</div>
         </div>
         <div class="info-card">
-            <div class="i-name">💵 Trip Money Settlement</div>
-            <div class="i-desc">Nets every counted round into one “who pays who” list for the whole trip. The panel ends with a line spelling out exactly which games and bets are in that figure — read it there rather than here, so it can never drift out of step with what the app actually counts. Settle up for real over Venmo; the app is just the math.</div>
+            <div class="i-name">📊 Trip Money Settlement</div>
+            <div class="i-desc">Nets every counted round into one “final tally” list for the whole trip. The panel ends with a line spelling out exactly which games are in that figure — read it there rather than here, so it can never drift out of step with what the app actually counts. Final results for real over Venmo; the app is just the math.</div>
         </div>
         <div class="info-card">
             <div class="i-name">🚫 Leaving a round out</div>
@@ -374,10 +383,10 @@ html {
     const GUIDE_BACK_TARGETS = {
         'index.html': 'scorecard',
         'leaderboard.html': 'Leaderboard',
-        'skins.html': 'Bets',
+        'skins.html': 'Games',
         'settlement.html': 'Results',
         'sidematches.html': 'Matches',
-        'game.html': 'Game'
+        'game.html': 'Format'
         // stats.html is DELIBERATELY ABSENT. game_tab_test.js asserts that nothing
         // links to it any more - the page is kept only for the parity tests - and my
         // first draft listed it here out of completeness, which made instructions.html

@@ -36,9 +36,6 @@
         .score-cell { position: relative; width: 28px; height: 28px; line-height: 28px; margin: 0 auto; display: block; font-weight: bold; }
         .circle-1 { position: absolute; top: -1px; left: -1px; right: -1px; bottom: -1px; border: 2px solid #e63946; border-radius: 50%; pointer-events: none; z-index: 1; }
         .circle-2 { position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; border: 1px solid #e63946; border-radius: 50%; pointer-events: none; z-index: 1; }
-        /* URGENT-081: a square for a bogey, a double square for a double bogey or worse - the site's navy (#1d3557), the circles' size and lines. */
-        .box-1 { position: absolute; top: -1px; left: -1px; right: -1px; bottom: -1px; border: 2px solid #1d3557; border-radius: 3px; pointer-events: none; z-index: 1; }
-        .box-2 { position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; border: 1px solid #1d3557; border-radius: 3px; pointer-events: none; z-index: 1; }
         
         .empty-state { text-align: center; padding: 40px; color: #666; font-style: italic; }
     </style>
@@ -53,6 +50,14 @@ html {
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
     background-color: var(--bg-page, transparent);
+}
+/* 2.0 (25) SAFE-TOP BAND (ADVISOR-0725 7:35 b): the page scrolls under the status bar and the
+   Dynamic Island - a solid band there in the page colour, so nothing reads under the clock. The same
+   band admin.html has had since POLISH #13, on ::after (front-door.js uses body::before for its
+   "Where are you playing?" label). 0px on the web. safe_top_25_chrome_test.js holds every page to it. */
+body::after {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f8);
 }
 </style>
 </head>
@@ -72,6 +77,9 @@ html {
 </div>
 
 <script>
+    // A name is text, never markup (audit H1, 2026-10-16).
+    function escapeHtml(value) { if (value === null || value === undefined) return ''; return String(value).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
       authDomain: "golfapp-9fb21.firebaseapp.com",
@@ -147,7 +155,7 @@ html {
         players.forEach(p => {
             let pOut = 0, pIn = 0;
             let shortName = p.name.split(" ")[0]; 
-            let rowHtml = `<tr><td class="sticky-col">${shortName}</td>`;
+            let rowHtml = `<tr><td class="sticky-col">${escapeHtml(shortName)}</td>`;
             
             for(let i=1; i<=18; i++) {
                 let hData = courseData.find(h => h.hole === i) || {par: 4};
@@ -166,10 +174,6 @@ html {
                         shape = `<div class="circle-1"></div>`; // Birdie
                     } else if (diff <= -2) {
                         shape = `<div class="circle-1"></div><div class="circle-2"></div>`; // Eagle or better
-                    } else if (diff === 1) {
-                        shape = `<div class="box-1"></div>`; // Bogey (URGENT-081)
-                    } else if (diff >= 2) {
-                        shape = `<div class="box-1"></div><div class="box-2"></div>`; // Double bogey or worse (URGENT-081)
                     } 
 
                     display = `<div class="score-cell">${score}${shape}</div>`;

@@ -635,10 +635,17 @@ function computeMoneyPool(data, courseData, savedScores) {
 
         // ONE RESOLVE + ONE ALLOCATION PER SLICE - the code that always ran for the
         // whole field, now run per pot.
+        // THE CARRY RIDES TO THE NEXT HOLE PLAYED (URGENT-011, approved). Walked in
+        // play order, then listed by hole number again so the odd dollars still land
+        // on the lowest hole NUMBER and the lines keep their order. A first-tee round
+        // gets the same array back and nothing is re-sorted.
+        const skCd = courseData || [];
+        const skWalk = (carry && typeof playOrderOf === 'function') ? playOrderOf(data, skCd) : skCd;
         const allocateSlice = (slicePlayers, sliceAmountCents, flight) => {
             const calc = carry
-                ? computeSkinsCarryOverForSettle(slicePlayers, courseData || [], savedScores, scoring)
-                : computeSkinsVoidForSettle(slicePlayers, courseData || [], savedScores, scoring);
+                ? computeSkinsCarryOverForSettle(slicePlayers, skWalk, savedScores, scoring)
+                : computeSkinsVoidForSettle(slicePlayers, skCd, savedScores, scoring);
+            if (skWalk !== skCd) calc.skins.sort((a, b) => Number(a.hole) - Number(b.hole));
             const totalUnits = calc.skins.reduce((a, s) => a + s.unitsWon, 0) + calc.pendingUnits;
             const lines = [];
             let paid = 0;

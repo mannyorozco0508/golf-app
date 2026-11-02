@@ -96,6 +96,10 @@
             value: op && op.value === undefined ? null : op.value,
             coalesceKey: (op && op.coalesceKey) || null,
             ts: now,
+            // THE VERSION OF THIS EDIT (audit 2026-10-16, B1/B2). A coalesced edit keeps the
+            // entry's id and position but gets a NEW version, so the confirm of an earlier
+            // send can never remove a correction typed after it.
+            v: 'v' + now + '-' + Math.random().toString(36).slice(2, 8),
             tries: 0
         };
         if (entry.coalesceKey) {
@@ -118,15 +122,32 @@
         return entry;
     }
 
-    function confirm(store, id) {
+    // `v` (optional): remove the entry only if it is still THAT version - the one whose write
+    // the server just confirmed. A newer edit of the same box (same id, new v) stays queued.
+    function confirm(store, id, v) {
         var ops = readAll(store);
         var out = [];
-        for (var i = 0; i < ops.length; i++) { if (ops[i].id !== id) out.push(ops[i]); }
+        for (var i = 0; i < ops.length; i++) {
+            var same = ops[i].id === id && (v === undefined || v === null || ops[i].v === undefined || ops[i].v === v);
+            if (!same) out.push(ops[i]);
+        }
         writeAll(store, out);
         return ops.length - out.length;
     }
 
     function count(store) { return readAll(store).length; }
+    // How many are waiting for ONE round (its path prefix, "events/CODE/"). A page shows its
+    // own round's count, not another round's leftovers it will not send.
+    function countFor(store, prefix) {
+        if (!prefix) return count(store);
+        return readAll(store).filter(function (o) { return o && typeof o.path === 'string' && (o.path === prefix.replace(/\/$/, '') || o.path.indexOf(prefix) === 0); }).length;
+    }
+    // The open round's ops older than `ms` (default 6 hours): sent only after the golfer agrees.
+    var STALE_MS = 6 * 3600 * 1000;
+    function staleFor(store, prefix, ms, nowMs) {
+        var cut = (nowMs || Date.now()) - (ms || STALE_MS);
+        return readAll(store).filter(function (o) { return o && typeof o.path === 'string' && (!prefix || o.path === prefix.replace(/\/$/, '') || o.path.indexOf(prefix) === 0) && Number(o.ts) < cut; });
+    }
     function peek(store) { return readAll(store); }
     function clear(store) { writeAll(store, []); }
 
@@ -174,13 +195,22 @@
                 });
             });
         }
+        // opts.only(op) -> false: not this drain's (another round's, or a stale one held for the
+        // golfer's answer) - left queued, untouched.
+        var only = opts && typeof opts.only === 'function' ? opts.only : null;
         function step(i) {
             if (i >= ops.length) { result.left = count(store); return Promise.resolve(result); }
-            var op = ops[i];
+            // RE-READ BEFORE SENDING (audit B1): the golfer may have corrected this box, or a
+            // live write may have confirmed it, since the drain started. Send what is queued NOW.
+            var cur = null, all = readAll(store);
+            for (var k = 0; k < all.length; k++) { if (all[k].id === ops[i].id) { cur = all[k]; break; } }
+            if (!cur) return step(i + 1);
+            if (only && !only(cur)) return step(i + 1);
+            var op = cur;
             var p;
             try { p = write(op); } catch (e) { p = Promise.reject(e); }
             return timed(p).then(function () {
-                confirm(store, op.id);
+                confirm(store, op.id, op.v);
                 result.sent++;
                 return step(i + 1);
             }, function (err) {
@@ -188,7 +218,7 @@
                     // IT CAN NEVER LAND. Dropping it is the lesser harm: left in
                     // place it blocks every score behind it for the rest of the
                     // round. The reason is returned so the page can say so.
-                    confirm(store, op.id);
+                    confirm(store, op.id, op.v);
                     result.dropped++;
                     result.droppedReason = String((err && (err.code || err.message)) || err);
                     return step(i + 1);
@@ -397,7 +427,7 @@
 
     var api = {
         STORAGE_KEY: KEY, SNAPSHOT_PREFIX: SNAP,
-        enqueue: enqueue, confirm: confirm, count: count, peek: peek, clear: clear,
+        enqueue: enqueue, confirm: confirm, count: count, countFor: countFor, staleFor: staleFor, STALE_MS: STALE_MS, peek: peek, clear: clear,
         drain: drain, isPermanent: isPermanent,
         saveSnapshot: saveSnapshot, loadSnapshot: loadSnapshot, applyQueued: applyQueued,
         localRound: localRound, syncNote: syncNote,

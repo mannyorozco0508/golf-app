@@ -463,7 +463,7 @@ function tripRosterPasteNote(plan, result, incoming, groups) {
             + ' — the pasted list is shorter than the round. Remove them, or paste the rest.');
     }
     if ((groups || []).length > 1 && !result.groupsWritten.length) {
-        lines.push('Groups are left as they are: the pasted groups do not fit this roster exactly, and a group decides who sees which bets.');
+        lines.push('Groups are left as they are: the pasted groups do not fit this roster exactly, and a group decides who sees which games.');
     }
     if (p.closed.length) {
         lines.push('Untouched (already has scores): '

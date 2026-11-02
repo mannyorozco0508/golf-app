@@ -61,12 +61,12 @@ function challengeTermsRefuse(terms) {
     var fmt = String(t.format || '');
     if (CHALLENGE_FORMATS.indexOf(fmt) === -1) return 'Pick Match Play, Nassau or Stroke Play.';
     var hole = Number(t.startHole);
-    if (!(hole >= 1 && hole <= 18)) return 'A bet has to start on a hole from 1 to 18.';
+    if (!(hole >= 1 && hole <= 18)) return 'A game has to start on a hole from 1 to 18.';
     var num = function (v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; };
     if (fmt === 'stroke') {
         // The creator's own rule: a stroke bet with neither amount tracks no money.
         if (num(t.holeStake) <= 0 && num(t.overallStake) <= 0) {
-            return "Set a $ per hole or a $ overall amount above 0, or the bet tracks no money.";
+            return "Set a $ per hole or a $ overall amount above 0, or the game tracks no money.";
         }
     } else if (fmt === 'nassau') {
         if (num(t.frontStake) <= 0 && num(t.backStake) <= 0 && num(t.overallStake) <= 0) {

@@ -12,6 +12,7 @@
     <script src="organizer-gate.js"></script>
     <script src="./firebase-database-compat.js"></script>
     <script src="handicap.js"></script>
+    <script src="play-order.js"></script>
     <!-- match-engine.js (v222, at the merge): season.js totals a round through
          computeCombinedNetTotals, which calls calculateMatchEngine through a typeof
          guard. This branch was cut before v218 split the engine out, so without this
@@ -28,6 +29,7 @@
     <script src="action-model.js"></script>
     <script src="money-engine.js"></script>
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="pool-engine.js"></script>
     <script src="code-issuer.js"></script>
@@ -80,6 +82,27 @@
         .season-unmatched { font-size: 0.78rem; color: var(--warn-text); padding: 6px 0; }
         #season-notes-line { display: none; white-space: pre-wrap; }
     </style>
+<style>
+/* NATIVE SAFE AREA. See the patch notes: inset the root, never the body, so each
+   page keeps its own padding and simply starts below the status bar. Every value
+   here is 0px anywhere without an inset, which is why this is inert on the web. */
+html {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    background-color: var(--bg-page, transparent);
+}
+/* 2.0 (25) SAFE-TOP BAND (ADVISOR-0725 7:35 b): the page scrolls under the status bar and the
+   Dynamic Island - a solid band there in the page colour, so nothing reads under the clock. The same
+   band admin.html has had since POLISH #13, on ::after (front-door.js uses body::before for its
+   "Where are you playing?" label). 0px on the web. safe_top_25_chrome_test.js holds every page to it. */
+body::after {
+    content: ''; position: fixed; left: 0; right: 0; top: 0; z-index: 1500; pointer-events: none;
+    height: env(safe-area-inset-top, 0px); background-color: var(--bg-page, #f4f6f3);
+}
+</style>
 </head>
 <body>
 <div class="container">

@@ -80,8 +80,9 @@ function sideMatchRangeComplete(sm, players, courseData, savedScores, opts) {
     // It costs nothing in accuracy: calculateMatchEngine only scores a hole both
     // sides posted, so a blank hole was never in the money to begin with.
     if (opts && opts.roundFinished) return true;
+    // opts.round (2026-10-19): the round, so a range off another tee is the play-order one.
     const holes = (typeof sideMatchHoles === 'function')
-        ? sideMatchHoles(sm, courseData || [])
+        ? sideMatchHoles(sm, courseData || [], opts && opts.round)
         : (courseData || []).filter(h => h.hole >= ((sm && sm.startHole) || 1));
     if (!holes || holes.length === 0) return false;
     const ids = [].concat(sm.teamAIds || [], sm.teamBIds || []).map(String);
@@ -235,7 +236,7 @@ function sideMatchFinalTotal(receipt, opts) {
     // "of N" counts EVERY bet in the match, presses included, because that is
     // what a golfer is looking at on the card. When the match is complete there
     // are no live segments left, so the denominator is the rows on screen.
-    const won = (n) => '(won ' + n + ' of ' + t.total + ' bet' + (t.total === 1 ? '' : 's') + ')';
+    const won = (n) => '(took ' + n + ' of ' + t.total + ' game' + (t.total === 1 ? '' : 's') + ')';
 
     if (net > 0) return nameA + ' +$' + smlMoney(net) + ' ' + won(t.aBets);
     if (net < 0) return nameB + ' +$' + smlMoney(-net) + ' ' + won(t.bBets);
@@ -244,7 +245,7 @@ function sideMatchFinalTotal(receipt, opts) {
     // each is a match where four bets changed hands; every bet halved is a match
     // where none did. A single "All square" for both is what made Manny go
     // looking for a bug in the first place.
-    if (t.aBets === 0 && t.bBets === 0) return 'All square — nobody pays';
+    if (t.aBets === 0 && t.bBets === 0) return 'All square — all even';
     return nameA + ' +$' + smlMoney(t.aMoney) + ' · ' + nameB + ' +$' + smlMoney(t.bMoney)
         + ' — All square';
 }
@@ -358,7 +359,7 @@ function sideMatchLiveFinals(data, courseData, savedScores, states, opts) {
             ? sideMatches[st.wagerId]
             : (typeof legacyMainAsSideMatch === 'function' ? legacyMainAsSideMatch(d) : null);
         const complete = sideMatchRangeComplete(sm, d.players || [], courseData, savedScores,
-            { roundFinished: roundFinished });
+            { roundFinished: roundFinished, round: d });
         out[matchId] = {
             complete: complete,
             total: sideMatchFinalTotal(receipt, { complete: complete }),
@@ -391,7 +392,7 @@ function sideMatchNetLine(receipt, opts) {
     const net = sideMatchDecidedNet(receipt);
     const nameA = receipt.nameA || 'Side A';
     const nameB = receipt.nameB || 'Side B';
-    const bets = n => n + ' bet' + (n === 1 ? '' : 's');
+    const bets = n => n + ' game' + (n === 1 ? '' : 's');
 
     if (!complete) {
         const decidedCount = t.aBets + t.bBets + t.halvedBets;
@@ -401,12 +402,12 @@ function sideMatchNetLine(receipt, opts) {
     }
 
     if (net > 0) {
-        return nameA + ' +$' + smlMoney(net) + ' — ' + nameA + ' won ' + bets(t.aBets)
+        return nameA + ' +$' + smlMoney(net) + ' — ' + nameA + ' took ' + bets(t.aBets)
             + ' ($' + smlMoney(t.aMoney) + ')'
             + (t.bBets > 0 ? ', ' + nameB + ' ' + bets(t.bBets) + ' ($' + smlMoney(t.bMoney) + ')' : '');
     }
     if (net < 0) {
-        return nameB + ' +$' + smlMoney(-net) + ' — ' + nameB + ' won ' + bets(t.bBets)
+        return nameB + ' +$' + smlMoney(-net) + ' — ' + nameB + ' took ' + bets(t.bBets)
             + ' ($' + smlMoney(t.bMoney) + ')'
             + (t.aBets > 0 ? ', ' + nameA + ' ' + bets(t.aBets) + ' ($' + smlMoney(t.aMoney) + ')' : '');
     }
@@ -414,13 +415,13 @@ function sideMatchNetLine(receipt, opts) {
     // because "$0" is what sent Manny looking for a bug.
     if (t.aBets === 0 && t.bBets === 0) {
         return t.halvedBets === t.total && t.total > 0
-            ? 'All square — every bet halved, nobody pays'
-            : 'All square — nobody pays';
+            ? 'All square — every game halved'
+            : 'All square — all even';
     }
     if (t.aBets === t.bBets && t.aMoney === t.bMoney) {
-        return 'All square — each won ' + bets(t.aBets) + ' ($' + smlMoney(t.aMoney) + ' each)';
+        return 'All square — each took ' + bets(t.aBets) + ' ($' + smlMoney(t.aMoney) + ' each)';
     }
-    return 'All square — ' + nameA + ' won ' + bets(t.aBets) + ' ($' + smlMoney(t.aMoney) + '), '
+    return 'All square — ' + nameA + ' took ' + bets(t.aBets) + ' ($' + smlMoney(t.aMoney) + '), '
         + nameB + ' ' + bets(t.bBets) + ' ($' + smlMoney(t.bMoney) + ')';
 }
 
@@ -450,6 +451,9 @@ var o = opts || {};
 var pressHref = o.pressHref || function () { return ""; };
 var maySee = o.maySee || function () { return true; };
     if (typeof buildLiveMatchStates !== 'function') return '';
+    // Two golfers with one first name read as two names (polish #2): the
+    // engines label from the first word, so they get the round's display copy.
+    if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);
     // EVERY wager visible to this viewer, not just the round format. A real
     // Nassau is created from Action and lives in sideMatches, so reading only
     // the round format left the supported path invisible on the scorecard.
@@ -538,7 +542,7 @@ var maySee = o.maySee || function () { return true; };
 
     let html = '<div class="lm-card"><div class="lm-head">'
         + '<span class="lm-title">\u2694\uFE0F LIVE MATCHES &amp; PRESSES</span>'
-        + '<span class="lm-sub">' + states.length + ' wager' + (states.length === 1 ? '' : 's')
+        + '<span class="lm-sub">' + states.length + ' game' + (states.length === 1 ? '' : 's')
         + '</span></div>';
 
     states.forEach((st, i) => {
@@ -562,10 +566,10 @@ var maySee = o.maySee || function () { return true; };
                  + '</div><div class="lm-top-sub">'
                  + esc(net === 0
                     ? ((t.aBets === t.bBets && t.aMoney === t.bMoney && t.aBets > 0)
-                        ? ('each won ' + t.aBets + ' bet' + (t.aBets === 1 ? '' : 's') + ' ($' + t.aMoney + ')')
-                        : (t.halvedBets === t.total ? 'every bet halved' : 'nobody pays'))
-                    : ('won ' + (net > 0 ? t.aBets : t.bBets) + ' of ' + t.total
-                       + ' bet' + (t.total === 1 ? '' : 's')))
+                        ? ('each took ' + t.aBets + ' game' + (t.aBets === 1 ? '' : 's') + ' ($' + t.aMoney + ')')
+                        : (t.halvedBets === t.total ? 'every game halved' : 'all even'))
+                    : ('took ' + (net > 0 ? t.aBets : t.bBets) + ' of ' + t.total
+                       + ' game' + (t.total === 1 ? '' : 's')))
                  + '</div>';
         } else {
             // NO DOLLARS MID-ROUND. The status is what is true right now.

@@ -44,6 +44,9 @@
         mineSub: 'You are done keeping score.',
         finalHead: '🏁 Final results are in',
         finalSub: 'Every group is finished.',
+        // 2.0 (25) ADVISOR-0725 (7:51, coordinator): a round the engine calls finished (scores checked) while
+        // cards still have blanks - "Final results are in" over 42 missing scores was item c's contradiction.
+        soFarHead: '🏁 Results so far',
         waitHead: 'Still playing',
         results: 'See Results',
         leaderboard: 'See Leaderboard',
@@ -141,6 +144,19 @@
         // is said the same way to the group that just holed out and to somebody who
         // opened the link from the clubhouse.
         if (finished) {
+            // 2.0 (25) 7:51: FINISHED BUT NOT EVERY SCORE IN (the organizer checked the scores with blanks on the
+            // card): the same state and button - the engine's answer stands - but the words say what the card
+            // says: "Results so far", thru the slowest card. Every card complete: exactly as before.
+            if (waiting.length) {
+                var thruMin = Math.min.apply(null, groups.map(function (g) { return g.thru; }));
+                return {
+                    show: true, kind: 'final', partial: true, thru: thruMin,
+                    head: WORDS.soFarHead,
+                    sub: 'Thru ' + thruMin + ' \u2014 not every score is in.',
+                    note: '', cta: WORDS.results, ctaKind: 'results',
+                    fix: mineComplete, waiting: []
+                };
+            }
             return {
                 show: true, kind: 'final',
                 head: WORDS.finalHead,
@@ -196,7 +212,7 @@
     function cardIsInOneLine(state) {
         var st = state || {};
         if (!st.show) return '';
-        if (st.kind === 'final') return WORDS.finalHead;
+        if (st.kind === 'final') return st.partial ? WORDS.soFarHead : WORDS.finalHead;
         if (st.kind === 'mine') {
             // The card-keeper's line keeps the waiting names, because on a
             // multi-group round that is the whole answer to "are we done".
@@ -222,7 +238,7 @@
     // The Results tab's one line, from the same state: who is still out, or Final.
     function resultsBanner(state) {
         var st = state || {};
-        if (st.kind === 'final') return { show: true, text: 'Final', note: '' };
+        if (st.kind === 'final') return st.partial ? { show: true, text: 'Thru ' + st.thru, note: 'Not every score is in.' } : { show: true, text: 'Final', note: '' };
         if (st.note) return { show: true, text: 'Not final yet', note: st.note };
         return { show: false, text: '', note: '' };
     }

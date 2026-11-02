@@ -69,7 +69,7 @@
     // the popup hands Firebase a credential Firebase itself minted. On iOS the
     // credential is built here out of what the Apple or Google SDK returned, so it
     // can be wrong in ways a popup cannot, and each one needs a different answer.
-    var NOTE_BAD_CREDENTIAL = 'Apple or Google signed you in, but this app could not finish it - the sign-in token was rejected. Nothing changed. Use email instead for now and tell Manny it said the token was rejected.';
+    var NOTE_BAD_CREDENTIAL = 'Apple or Google signed you in, but this app could not finish it - the sign-in token was rejected. Nothing changed. Use email instead for now, and if it keeps happening email support@rattlegolf.com and say the token was rejected.';
     var NOTE_NO_CONNECTION = 'No connection while signing in. Nothing changed - try again when you have signal.';
 
     var PROVIDERS = { apple: 'apple.com', google: 'google.com' };
@@ -159,6 +159,57 @@
         return onErr || presented;
     }
 
+    // ONE APPLE TOKEN, ONE FIREBASE CALL (build 7, 2026-10-09). Firebase refuses an
+    // Apple ID token it has already seen: "auth/missing-or-invalid-nonce: Duplicate
+    // credential received. Please try again with a new credential." On Manny's phone
+    // the guest's linkWithCredential spent the token (Apple was already on his real
+    // account - credential-already-in-use), and the adopt then signed in with a
+    // credential carrying THE SAME token: ours when the error had none, and Firebase's
+    // own when it was rebuilt from the token rather than a pendingToken. So:
+    //   - every Apple token sent to Firebase is remembered (in memory, never logged),
+    //     and sendApple refuses to send one twice;
+    //   - the adopt uses Firebase's credential only when it is a one-time
+    //     pendingToken or a token not already spent;
+    //   - otherwise it asks Apple again - the plugin makes a NEW nonce per request -
+    //     and signs in with that.
+    var spentApple = [];
+    function tokenOf(cred) {
+        if (!cred) return null;
+        if (cred.idToken) return String(cred.idToken);
+        try { var j = typeof cred.toJSON === 'function' ? cred.toJSON() : null; return j && j.idToken ? String(j.idToken) : null; } catch (e) { return null; }
+    }
+    function pendingOf(cred) {
+        if (!cred) return null;
+        if (cred.pendingToken) return String(cred.pendingToken);
+        try { var j = typeof cred.toJSON === 'function' ? cred.toJSON() : null; return j && j.pendingToken ? String(j.pendingToken) : null; } catch (e) { return null; }
+    }
+    function isSpent(cred) {
+        var t = tokenOf(cred);
+        return !pendingOf(cred) && !!t && spentApple.indexOf(t) !== -1;
+    }
+    function sendApple(cred, call) {
+        if (isSpent(cred)) {
+            return Promise.reject(Object.assign(new Error('An Apple token is never sent twice'), { code: 'auth/missing-or-invalid-nonce' }));
+        }
+        var t = tokenOf(cred);
+        if (t && !pendingOf(cred)) { spentApple.push(t); if (spentApple.length > 8) spentApple.shift(); }
+        return Promise.resolve(call(cred));
+    }
+    // Firebase's credential for the adopt: on the error (compat) or rebuilt from it.
+    function errorCredential(err) {
+        if (err && err.credential) return err.credential;
+        try {
+            var P = firebase.auth.OAuthProvider;
+            return (P && typeof P.credentialFromError === 'function' && P.credentialFromError(err)) || null;
+        } catch (e) { return null; }
+    }
+    // Apple only: a credential safe to sign in with after the link spent ours, or null
+    // (then a fresh Apple request is the only honest way in).
+    function appleAdoptCredential(err) {
+        var c = errorCredential(err);
+        return c && !isSpent(c) ? c : null;
+    }
+
     function snapshot(user) {
         if (!user || !user.uid) return null;
         return { uid: String(user.uid), isAnonymous: !!user.isAnonymous, email: user.email || null };
@@ -177,6 +228,17 @@
     // asked for. So it refuses, names the problem, and promises nothing.
     var NOTE_LINK_TAKEN = 'That Apple or Google account is already attached to a different account in this app, so it cannot be linked to this one. Nothing was changed. Sign in with that account instead, or remove it from the other one first.';
 
+    // " (auth/invalid-credential: The audience in ID Token [...] does not match ...)".
+    // Anything shaped like a token (eyJ...) is cut out, and it is kept short.
+    function credentialDetail(err) {
+        var code = String((err && err.code) || '');
+        var msg = String((err && err.message) || '').replace(/^Firebase:\s*/i, '').replace(/\s*\(auth\/[a-z-]+\)\.?\s*$/i, '')
+            .replace(/eyJ[A-Za-z0-9_\-\.]{10,}/g, '[token]').trim();
+        if (msg.length > 180) msg = msg.slice(0, 177) + '...';
+        if (msg === code) msg = '';
+        return (code || msg) ? ' (' + code + (msg ? ': ' + msg : '') + ')' : '';
+    }
+
     function messageFor(err, opts) {
         var code = err && err.code;
         if (opts && opts.deliberateLink && isAdoptSignal(err)) return NOTE_LINK_TAKEN;
@@ -187,8 +249,14 @@
         if (code === 'sdk-absent' || code === 'no-provider') return NOTE_NOT_READY;
         // An idToken Firebase will not accept, or a nonce that does not match the
         // one inside it. This is the native path's own failure mode.
+        // THE DETAIL IS SHOWN (2026-10-09). On a new bundle (HardPan GPS,
+        // com.rattlegolf.gpsbeta) Apple failed here and Google did not, and this
+        // sentence alone cannot say WHICH check Firebase refused - the audience
+        // (which app the token is for) or the nonce. Firebase's own message names
+        // it ("The audience in ID Token [..] does not match the expected
+        // audience"), so it is appended - the code and that message, never a token.
         if (code === 'auth/invalid-credential' || code === 'auth/missing-or-invalid-nonce'
-            || code === 'auth/invalid-credential-or-provider-id') return NOTE_BAD_CREDENTIAL;
+            || code === 'auth/invalid-credential-or-provider-id') return NOTE_BAD_CREDENTIAL + credentialDetail(err);
         if (code === 'auth/network-request-failed') return NOTE_NO_CONNECTION;
         // The same lesson the preview sign-in fix recorded: an unauthorized ORIGIN is
         // its own failure and must not be reported as a network problem.
@@ -237,6 +305,27 @@
                         idToken: c.idToken, rawNonce: c.nonce || undefined });
             });
         } catch (e) { return null; }
+    }
+
+    // A FRESH APPLE AUTHORIZATION CODE, FOR DELETING THE ACCOUNT (store-legal).
+    // Apple's account-deletion rule: the app's Sign in with Apple grant is revoked
+    // when the account goes, and revoking needs a code from a fresh Apple sheet -
+    // the server (accountDelete) trades it for a token and revokes that. Nothing
+    // is signed in here: skipNativeAuth, and the credential is never sent to
+    // Firebase. Resolves { code, bundleId } or null when there is no native Apple
+    // sheet (the web); rejects when the golfer cancels it.
+    function appleAuthorizationCode() {
+        var plugins = window.Capacitor && window.Capacitor.Plugins;
+        var plugin = plugins && plugins.FirebaseAuthentication;
+        if (!plugin || typeof plugin.signInWithApple !== 'function') return Promise.resolve(null);
+        var appInfo = (plugins.App && typeof plugins.App.getInfo === 'function')
+            ? Promise.resolve(plugins.App.getInfo()).then(function (i) { return (i && i.id) || ''; }, function () { return ''; })
+            : Promise.resolve('');
+        return Promise.resolve(plugin.signInWithApple({ skipNativeAuth: true })).then(function (r) {
+            var code = r && r.credential && r.credential.authorizationCode;
+            if (!code) return null;
+            return appInfo.then(function (id) { return { code: String(code), bundleId: id }; });
+        });
     }
 
     // EVERY FAILURE IS ALSO LOGGED, because in the iOS shell console.error is the
@@ -289,8 +378,12 @@
         if (native) {
             return native.then(function (credential) {
                 if (!credential) return popupSignIn();
-                if (plan.action === 'link' && auth.currentUser) {
-                    return Promise.resolve(auth.currentUser.linkWithCredential(credential))
+                var apple = which !== 'google';
+                var user = auth.currentUser;
+                var link = function (c) { return user.linkWithCredential(c); };
+                var signInWith = function (c) { return auth.signInWithCredential(c); };
+                if (plan.action === 'link' && user) {
+                    return (apple ? sendApple(credential, link) : Promise.resolve(link(credential)))
                         .then(finish, function (err) {
                             // A DELIBERATE LINK NEVER ADOPTS. The golfer asked to
                             // attach this provider to the account they are in; being
@@ -303,13 +396,22 @@
                             // second step does not have to re-present the first one,
                             // and for Apple that matters: the popup path never re-uses
                             // a credential because the SDK hands back a fresh one, and
-                            // the native path was the only place doing it. Falls back
-                            // to the credential we built, which is what the web tests
-                            // exercise and what a provider that attaches nothing gets.
-                            return Promise.resolve(auth.signInWithCredential(adoptCredential(err, credential))).then(finish);
+                            // the native path was the only place doing it. GOOGLE
+                            // falls back to the credential we built (a Google token
+                            // may be presented again). APPLE never does.
+                            if (!apple) return Promise.resolve(signInWith(adoptCredential(err, credential))).then(finish);
+                            // APPLE: never the spent token again (see sendApple).
+                            var onErr = appleAdoptCredential(err);
+                            if (onErr) return sendApple(onErr, signInWith).then(finish);
+                            var again = nativeCredential(which);
+                            if (!again) throw err;
+                            return again.then(function (fresh) {
+                                if (!fresh) throw err;
+                                return sendApple(fresh, signInWith).then(finish);
+                            });
                         });
                 }
-                return Promise.resolve(auth.signInWithCredential(credential)).then(finish);
+                return (apple ? sendApple(credential, signInWith) : Promise.resolve(signInWith(credential))).then(finish);
             });
         }
 
@@ -334,7 +436,9 @@
         messageFor: messageFor,
         providerFor: providerFor,
         nativeCredential: nativeCredential,
+        appleAuthorizationCode: appleAuthorizationCode,
         adoptCredential: adoptCredential,
+        appleAdoptCredential: appleAdoptCredential,
         signIn: signIn,
         notes: { preserved: NOTE_PRESERVED, adopted: NOTE_ADOPTED, fresh: NOTE_FRESH,
                  cancelled: NOTE_CANCELLED, notEnabled: NOTE_NOT_ENABLED,

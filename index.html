@@ -46,6 +46,7 @@
          calls into. -->
     <script src="handicap-labels.js"></script>
     <script src="text-safe.js"></script>
+    <script src="hcp-plus.js"></script>   <!-- 2.0 (23): the "+ Plus" chip under every handicap box (the decimal pad has no + key) -->
     <!-- UI WAVE 2: the same shared telling, asking and typing the Action page
          adopted in Wave 1. Not a fork - one file, and the scorecard reuses it.
          After text-safe.js, whose escapeHtml it uses when the page has it. -->
@@ -60,6 +61,7 @@
          Aloha - two pages showing two different totals, which is the one failure
          this feature must not have. -->
     <script src="aloha-bet.js"></script>
+    <script src="hilo-engine.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="side-match-lines.js"></script>
     <script src="push-notify.js"></script>
@@ -964,6 +966,9 @@
             display: block; text-align: center; padding: 11px; border-radius: 8px; border: 1px solid var(--brand-green);
             color: var(--brand-green); font-weight: bold; text-decoration: none; font-size: 0.9rem;
         }
+        /* POLISH #32: the app's Round Complete - one main button and a quiet Done. */
+        .fr-one #fr-skip-btn { display: none; }
+        .fr-one .fr-close-btn { background: transparent; color: var(--brand-green); border: 2px solid var(--brand-green); }
         .fr-close-btn { width: 100%; margin-top: 12px; padding: 12px; background: var(--brand-green); color: #fff; border: none; border-radius: 8px; font-weight: bold; font-size: 0.95rem; cursor: pointer; }
 
         .group-btn {
@@ -1092,13 +1097,6 @@
             position: absolute; top: -1px; left: -1px; right: -1px; bottom: -1px;
             border: 1px solid var(--brand-navy); pointer-events: none; z-index: 5;
         }
-        /* URGENT-081 (Manny, 2026-10-26): the bogey square and the double square keep their
-           navy (--brand-navy) and take the circles' 2px line. The box sits INSIDE the score
-           box with a gap - a square drawn on the score box's own edge reads as a border
-           (Manny, 2026-10-16, the GPS app) - and a double square is two 2px lines with a
-           2px gap, like the eagle's two rings. Same elements, same holes (gross vs par). */
-        .shape-box-1 { top: 9px; left: 9px; right: 9px; bottom: 9px; border: 2px solid var(--brand-navy); border-radius: 3px; }
-        .shape-box-2 { top: 5px; left: 5px; right: 5px; bottom: 5px; border: 2px solid var(--brand-navy); border-radius: 3px; }
 
         /* THE SUBORDINATE ADJUSTED-SCORE INDICATOR.
            The primary box is ALWAYS the gross score the golfer actually shot, and
@@ -1503,6 +1501,21 @@
            a dashboard and score entry still starts high on the screen. */
         .lw-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 6px 0 10px 0; }
         .lw-card { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 10px; box-shadow: 0 1px 3px var(--shadow-color); }
+        /* 2.0 (25) ADVISOR-0725 7:44: A CARD NEVER WIDENS THE GRID. In the app's card sheet over the map the
+           Full Card's cards (LIVE LEADERBOARD, SKINS WON, LIVE MATCHES & PRESSES) sat in a 1fr track whose
+           minimum was the board's own content, so at 375-402 the track ran past the sheet and the right
+           edge was cut ("Full Leaderboar", "Holes 1, 2", the $ column). min-width: 0 on the cards lets the
+           track keep the sheet's width; every card already ellipsises or wraps inside itself. */
+        .lw-grid > * { min-width: 0; }
+        /* 2.0 (25) ADVISOR-0725 7:41: THE LIVE GAMES TILE - one line per running game, at the top of the
+           card without a tap (renderLiveGamesTile). Tap = the Games view. No $ on it, ever. */
+        .hp-lt { display: block; width: 100%; text-align: left; margin: 0 0 8px 0; padding: 8px 12px; border: 1.5px solid var(--brand-green); border-radius: 12px; background: var(--bg-card); color: var(--text-main); font: inherit; cursor: pointer; box-sizing: border-box; min-height: 44px; }
+        .hp-lt-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 0.68rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); }
+        .hp-lt-h span:last-child { font-weight: 600; letter-spacing: 0; white-space: nowrap; }
+        /* Manny (OK tile, Nov 2): up to two lines per game - names and a 4-golfer skins line are not cut off; an ellipsis only past two. */
+        .hp-lt-l { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 0.9rem; font-weight: 600; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; }
+        .hp-lt-l b { font-weight: 800; }
+        .hp-lt-more { display: block; font-size: 0.75rem; color: var(--text-secondary); }
         .lw-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         /* A title can never widen the page: it ellipsises before the card does. */
         .lw-title { font-size: 0.7rem; font-weight: bold; letter-spacing: 0.05em; color: var(--brand-green); white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -1602,6 +1615,17 @@
         .ps-out { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--text-muted); }
         .ps-out input { width: 20px; height: 20px; min-height: 0; padding: 0; }
         .ps-row.ps-is-out input.ps-name { text-decoration: line-through; color: var(--text-muted); }
+        /* POLISH #20: the row's controls say what they are - a label over each column
+           (the same five-column grid as .ps-row), so "A", "G1" and "Out" read as
+           Flight, Group and Out. */
+        .ps-head { display: grid; grid-template-columns: 1fr 52px 40px 58px 54px; gap: 6px; padding: 2px 0 0; font-size: 0.66rem; font-weight: bold; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+        .ps-head span { text-align: center; }
+        .ps-head span:first-child { text-align: left; }
+        /* POLISH #20: in the HardPan app, Golfers is a screen of its own - not a card
+           floating over the score sheet. Full height, solid background, above the
+           map (z-index 10050) like the other quick edits (#hp-redit 10300). */
+        #players-sheet.ps-own { z-index: 10300; padding: 0; align-items: stretch; justify-content: stretch; background: var(--bg-page, #f4f6f3); }
+        #players-sheet.ps-own .ps-content { box-sizing: border-box; overflow-y: auto; max-width: none; width: 100%; max-height: none; height: 100%; border-radius: 0; box-shadow: none; padding: calc(env(safe-area-inset-top, 0px) + 16px) 16px calc(env(safe-area-inset-bottom, 0px) + 20px); }
         /* v212: the Index/Course line, on its own line across the row so the
            five controls above it keep their widths and their 40px targets. */
         .ps-hcp-note { grid-column: 1 / -1; font-size: 0.72rem; color: var(--text-muted); line-height: 1.3; padding: 0 0 2px 2px; }
@@ -1873,10 +1897,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     <div class="top-nav-bar" id="app-nav-bar">
         <a href="index.html" class="top-nav-item active nav-link"><span class="tni-glyph">📝</span><span class="tni-label">Scorecard</span></a>
         <a href="leaderboard.html" class="top-nav-item nav-link"><span class="tni-glyph">🏆</span><span class="tni-label">Leaderboard</span></a>
-        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">💰</span><span class="tni-label">Bets</span></a>
+        <a href="skins.html" class="top-nav-item nav-link"><span class="tni-glyph">⛳</span><span class="tni-label">Games</span></a>
         <a href="settlement.html" class="top-nav-item nav-link"><span class="tni-glyph">🤝</span><span class="tni-label">Results</span></a>
         <a href="sidematches.html" class="top-nav-item nav-link matches-nav-link"><span class="tni-glyph">⚔️</span><span class="tni-label">Matches</span></a>
-        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Game</span></a>
+        <a href="game.html" class="top-nav-item nav-link"><span class="tni-glyph">📖</span><span class="tni-label">Format</span></a>
         <a href="trip.html" class="top-nav-item"><span class="tni-glyph">🚐</span><span class="tni-label">Trip</span></a>
         <a href="admin.html" class="top-nav-item nav-link"><span class="tni-glyph">🏠</span><span class="tni-label">Home</span></a>
         <a href="instructions.html" class="top-nav-item"><span class="tni-glyph">🧭</span><span class="tni-label">How it works</span></a>
@@ -1914,7 +1938,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         <details class="live-action-more" id="detailed-breakdown-wrapper">
             <summary>View All Action ▶</summary>
         <div class="nassau-payout-box" id="nassau-payout-container">
-            <div class="nassau-payout-title" id="nassau-payout-header">💵 Live Standings</div>
+            <div class="nassau-payout-title" id="nassau-payout-header">📊 Live Standings</div>
             <div id="payout-rows-wrapper"></div>
         </div>
         </details>
@@ -2014,6 +2038,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
          the Full Card, not in whichever one they happen to be looking at. The words
          and the decision are card-is-in.js; this page only mounts them. -->
     <div id="card-is-in" role="status" style="display:none;"></div>
+
+    <!-- 2.0 (25) ADVISOR-0725 7:41: the live games tile, above both views (renderLiveGamesTile). -->
+    <div id="hp-live-tile-mount"></div>
 
     <div id="hole-view-container">
         <div id="hole-view-card"></div>
@@ -2280,12 +2307,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             <div class="fr-money-title">Review Scores</div>
             <div id="fr-review-note" class="fr-review-note"></div>
             <div id="fr-review-lede" class="fr-review-lede">
-                Before money changes hands, check these against the physical scorecards.
+                Check these against the physical scorecards.
             </div>
             <div id="fr-player-list"></div>
             <div id="fr-kp-block"></div>
-            <button class="btn-primary" style="margin-top:14px;" onclick="frShowResults(true)">✓ Scores Look Right — View Results</button>
-            <button class="fr-secondary-btn" onclick="frShowResults(false)">Skip Review &amp; View Results</button>
+            <button class="btn-primary" id="fr-confirm-btn" style="margin-top:14px;" onclick="frShowResults(true)">✓ Scores Look Right — View Results</button>
+            <button class="fr-secondary-btn" id="fr-skip-btn" onclick="frShowResults(false)">Skip Review &amp; View Results</button>
         </div>
 
         <!-- STATE 2: ONE GOLFER, ALL 18 HOLES -->
@@ -2302,17 +2329,17 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             <button class="fr-back-btn" onclick="frBackToReview()">‹ Back to Review</button>
             <div id="fr-settle-gate"></div>
             <div id="fr-verified-badge"></div>
-            <div class="fr-money-title" id="fr-money-title">Final Money</div>
+            <div class="fr-money-title" id="fr-money-title">Final Totals</div>
             <div id="fr-final-money"></div>
 
-            <div class="fr-money-title">Who Pays Who</div>
+            <div class="fr-money-title">Final Tally</div>
             <div id="fr-who-pays-who"></div>
 
             <button class="btn-primary" style="margin-top: 14px;" onclick="openReceipt()">🧾 Round Receipt</button>
             <div id="fr-jump-links" class="fr-jump-links"></div>
         </div>
 
-        <button class="fr-close-btn" onclick="closeFinishRoundModal()">Done</button>
+        <button class="fr-close-btn" id="fr-done-btn" onclick="closeFinishRoundModal()">Done</button>
     </div>
 </div>
 
@@ -2925,6 +2952,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const p = players.find(x => x.name === name) || { name: String(name || '') };
         return getSmartDisplayName(p, players);
     }
+    // POLISH #2 (2026-10-20): the presenters in bet-strip.js and hole-events.js (both
+    // pinned) cut every name to its first word, so two golfers called Test read
+    // "Test v Test". Display callers hand them the round's display copy instead -
+    // text-safe.js roundDataForDisplay: the same round, colliding names swapped for
+    // "Test A" / "Test B". Never saved; write paths (presses) keep currentData.
+    function shownRound() { return (typeof roundDataForDisplay === 'function') ? roundDataForDisplay(currentData) : currentData; }
+    function shownList(list) { return (list && typeof playersForDisplay === 'function') ? playersForDisplay(list, currentData.players) : list; }
     function shortPlayerLabels(list) {
         return (list || []).map(p => golferLabel(p) || String((p && p.name) || '').trim());
     }
@@ -2955,6 +2989,20 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // score entry stays the dominant thing once a round is actually underway). Dismissal is
     // remembered per round via localStorage, so it reappears for a genuinely new round but
     // doesn't nag on every score entered in this one.
+    // PURE on its arguments: has every golfer still in the group a score on at least one
+    // hole (any hole - a shotgun group's first is not hole 1)? Then hole 1 is behind them.
+    function landingPastFirstHole(players, data) {
+        const d = data || currentData || {};
+        const live = (players || []).filter(p => p && p.out !== true);
+        if (!live.length) return false;
+        const scores = d.scores || {};
+        const holes = new Set();
+        Object.keys(scores).forEach(k => { const m = /^p.+_h(\d+)$/.exec(k); if (m && Number(scores[k]) > 0) holes.add(m[1]); });
+        for (const h of holes) {
+            if (live.every(p => Number(scores['p' + p.id + '_h' + h]) > 0)) return true;
+        }
+        return false;
+    }
     function renderLandingSummary(filteredPlayers, allPlayers) {
         const box = document.getElementById('round-landing-summary');
         if (!box) return;
@@ -2963,6 +3011,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (scopeMissing()) { box.style.display = 'none'; return; }
         const dismissKey = `landingDismissed_${currentMode}`;
         if (localStorage.getItem(dismissKey) === '1') { box.style.display = 'none'; return; }
+        // POLISH #25: a coach card for the first tee. Once the group has a whole hole on
+        // the card it has gone - it was still there, "Got it ✕" and all, after 18.
+        if (landingPastFirstHole(filteredPlayers)) { box.style.display = 'none'; return; }
 
         const namesHtml = filteredPlayers.map(p => escapeHtml(golferLabel(p))).join(', ')
             + ` <button onclick="localStorage.setItem('${dismissKey}','1'); document.getElementById('round-landing-summary').style.display='none';" style="background:none; border:none; color:var(--text-muted); font-size:0.72rem; cursor:pointer; text-decoration:underline; margin-left:6px;">Got it ✕</button>`;
@@ -2979,10 +3030,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (gameFormat === 'nassau') {
             const pressMap = { '2down': 'Automatic press at 2 Down', '1down': 'Automatic press at 1 Down', 'anytime': 'Press available any hole', 'none': 'No presses' };
             const betText = holeBet > 0 ? `$${holeBet} per hole Nassau` : `$${currentData.nassauStake || 10} Nassau`;
-            gameLines.push(`💵 ${betText} — ${pressMap[currentData.nassauPressRule] || 'No presses'}`);
+            gameLines.push(`⛳ ${betText} — ${pressMap[currentData.nassauPressRule] || 'No presses'}`);
         } else if (gameFormat === 'match') {
             const betText = holeBet > 0 ? `$${holeBet} per hole Match Play` : `$${currentData.matchStake || 0} Match Play`;
-            gameLines.push(`💵 ${betText}`);
+            gameLines.push(`⛳ ${betText}`);
         } else if (gameFormat === 'skins') {
             const buyIn = currentData.skinsBuyIn !== undefined ? currentData.skinsBuyIn : 0;
             const carryOver = skinsCarriesOver(currentData.skinsCarryOver);   // the engine's answer, not a private one
@@ -3029,10 +3080,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 // nassauStakeLabel applies money-engine.js's own fallback - a blank
                 // segment is charged at the legacy stake - and adds the auto-press
                 // amount, which this line never showed.
-                const label = (typeof nassauStakeLabel === 'function') ? nassauStakeLabel(sm) : '';
+                // ZERO-STAKE (2.0 (24) ADVISOR-2245): a Nassau played for nothing names its terms, no $.
+                const free = (typeof sideMatchStakeFree === 'function') && sideMatchStakeFree(sm);
+                const label = free ? sideMatchStakeFreeTerms(sm) : ((typeof nassauStakeLabel === 'function') ? nassauStakeLabel(sm) : '');
                 gameLines.push(label ? `⚔️ Nassau · ${label}` : '⚔️ Nassau');
             });
-            if (others > 0) gameLines.push(`⚔️ ${others} Side Bet${others === 1 ? '' : 's'}`);
+            if (others > 0) gameLines.push(`⚔️ ${others} Side Game${others === 1 ? '' : 's'}`);
         }
 
         // A genuinely no-bet round (Stroke Play, nothing else enabled) stays plain rather than
@@ -3058,7 +3111,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         }
         const isNoBetRound = gameFormat === 'stroke' && !currentData.birdieGameEnabled && relevantSideMatches.length === 0 && !poolIsOn;
         document.getElementById('landing-active-games').innerHTML = isNoBetRound
-            ? `<span style="color:var(--text-muted);">Just for score — no bets this round</span>`
+            ? `<span style="color:var(--text-muted);">Just for score — no games this round</span>`
             : gameLines.map(l => `<div style="padding:2px 0;">${l}</div>`).join('');
 
         box.style.display = 'block';
@@ -3733,11 +3786,18 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             games = (typeof getRoundGames === 'function' ? getRoundGames(currentData) : []) || [];
         } catch (e) { games = []; }
         const lines = [];
+        // POLISH #25: in the HardPan app stroke play is how the scores are KEPT, not a game -
+        // a map-only round listed "Stroke Play" under TODAY'S GAMES. The app drops the main
+        // game when it is plain stroke; a real main game (Nassau, skins...) still shows.
+        try {
+            if (window.HardPanBet && typeof window.HardPanBet.on === 'function' && window.HardPanBet.on())
+                games = games.filter(g => !(g && g.role === 'main' && (g.format || 'stroke') === 'stroke'));
+        } catch (e) {}
         games.forEach(g => {
             let text = '';
             try { text = (typeof describeGame === 'function') ? describeGame(g) : (g && g.label); }
             catch (e) { text = g && g.label; }
-            if (text) lines.push('<li>' + esc(text) + '</li>');
+            if (text) lines.push('<li' + (g && g.role === 'additional' && g.key ? ' data-game-key="' + esc(g.key) + '"' : '') + '>' + esc(text) + '</li>');
         });
         // The Weekly Game pot, in the engine's own words.
         let pot = '';
@@ -3760,6 +3820,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const esc = t => String(t === undefined || t === null ? '' : t)
             .replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
         const first = n => String(n || '').trim().split(' ')[0];
+        // Two golfers with one first name: "Test A" / "Test B", not "Test" twice (polish #2).
+        const shortMap = (typeof golferShortNameMap === 'function') ? golferShortNameMap(currentData.players) : {};
+        const short = r => shortMap[String(r && r.id)] || first(r && r.name);
         const rows = [];
 
         // 1. THE TOP FIVE, and the way to the rest.
@@ -3782,7 +3845,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             rows.push('<button type="button" class="hl-row hl-board" onclick="openLiveBoard()"'
                 + ' aria-label="Open the full leaderboard">'
                 + board.slice(0, 5).map(r => '<span class="hl-chip"><b>' + esc(r.positionLabel) + '</b> '
-                    + esc(first(r.name)) + ' ' + esc(formatToPar(r.toPar))
+                    + esc(short(r)) + ' ' + esc(formatToPar(r.toPar))
                     // THRU IS ALWAYS PRINTED, 0 included: before anyone has started,
                     // "E thru 0" is the whole truth about the round and reads as one.
                     + ' <i>thru ' + esc(r.thru || 0) + '</i></span>').join('')
@@ -3797,7 +3860,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         try {
             const ids = (typeof scopedPlayers === 'function' ? scopedPlayers() : []).map(p => String(p.id));
             states = (typeof buildLiveMatchStates === 'function')
-                ? (buildLiveMatchStates(currentData, currentData.courseData || [],
+                ? (buildLiveMatchStates((typeof roundDataForDisplay === 'function' ? roundDataForDisplay(currentData) : currentData), currentData.courseData || [],
                                         currentData.scores || {}, ids) || []) : [];
         } catch (e) { states = []; }
         states.forEach(st => {
@@ -3861,6 +3924,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         renderHoleRecap();
         renderLiveSkins();
         renderLiveTicker();
+        renderLiveGamesTile();   // 2.0 (25) ADVISOR-0725 7:41
         if (document.getElementById('live-board-overlay')
             && document.getElementById('live-board-overlay').style.display === 'flex') {
             renderLiveBoard();   // keep the overlay live while it is open
@@ -4120,7 +4184,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         cipWasIn[key] = isIn;
         // The first thing this session ever saw about this card is not a transition.
         if (!seen) return;
-        if (isIn && was === false) openCardInPopup();
+        // POLISH #8: in a map round the pop-up is Finish's alone. Opened here it waited behind the map
+        // and met the golfer who tapped Card; the card's own "Final results are in" line still says so.
+        let finishOnly = false;
+        if (isIn && was === false && !finishOnly) openCardInPopup();
     }
 
     function cardInPopupRows() {
@@ -4164,7 +4231,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const title = document.getElementById('cip-title');
         if (title) {
             title.textContent = (st && st.kind === 'final')
-                ? window.cardIsIn.WORDS.finalHead
+                ? (st.partial ? window.cardIsIn.WORDS.soFarHead : window.cardIsIn.WORDS.finalHead)   // 2.0 (25) 7:51
                 : (st && st.kind === 'mine' ? window.cardIsIn.WORDS.mine.replace(/\.$/, '')
                                             : window.cardIsIn.WORDS.waitHead);
         }
@@ -4255,6 +4322,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // Points and dots only. No projected payout: what a game is worth is settled
     // in Results, and a running dollar figure mid-round is not final.
     function buildLivePointsHtml(data, courseData, savedScores) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLivePointsState !== 'function') return '';
         const st = buildLivePointsState(data, courseData, savedScores);
         if (!st) return '';
@@ -4288,6 +4356,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // NO MONEY. Settlement is (t1Points - t2Points) x holeBetStake and belongs in
     // Results; a running figure mid-round is not final.
     function buildLiveHiLoHtml(data, courseData, savedScores) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLiveHiLoState !== 'function') return '';
         const st = buildLiveHiLoState(data, courseData, savedScores);
         if (!st) return '';
@@ -4328,6 +4397,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // NO MONEY TOTALS. What the next hole is worth is game state - a running
     // payout is settlement's, and is not final mid-round.
     function buildLiveStrokeBetHtml(data, courseData, savedScores, visibleIds) {
+        if (typeof roundDataForDisplay === 'function') data = roundDataForDisplay(data);   // polish #2: two of one first name
         if (typeof buildLiveStrokeBetStates !== 'function') return '';
         const states = buildLiveStrokeBetStates(data, courseData, savedScores, visibleIds);
         if (!states || states.length === 0) return '';
@@ -4374,8 +4444,109 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // this page passes is the one thing that differs: where a Press link goes.
     function buildLiveMatchHtml(data, courseData, savedScores, visibleIds) {
         if (typeof buildLiveMatchCardHtml !== 'function') return '';
-        return buildLiveMatchCardHtml(data, courseData, savedScores, visibleIds,
+        const lmHtml = buildLiveMatchCardHtml(data, courseData, savedScores, visibleIds,
             { pressHref: sideMatchPressHref });
+        // ZERO-STAKE (2.0 (24) ADVISOR-2245, text-safe.js): a game played for nothing is re-worded with no $; a priced one is handed back as is.
+        const zsHtml = (typeof hpZeroStakeLiveCard === 'function') ? hpZeroStakeLiveCard(lmHtml, data, courseData, savedScores, visibleIds, {}) : lmHtml;
+        // 2.0 (25) ADVISOR-0725 7:44 (text-safe.js): a game added mid-round says "Starts hole 5", not "Not Started".
+        return (typeof hpStartsHoleLiveCard === 'function') ? hpStartsHoleLiveCard(zsHtml, data, courseData, savedScores, visibleIds, {}) : zsHtml;
+    }
+    // ------------------------------------------------------------------
+    // 2.0 (25) ADVISOR-0725 7:41 (only-add rule): THE LIVE GAMES TILE.
+    //
+    // Manny: "I liked it the other way where when we have a game, it shows the widget or tile that
+    // shows the current match standings. This seems harder to find." With 24's Add a game every game
+    // is a side game or a round game instance, and their standings sat behind "My Round - 2 live - tap
+    // to see" on the card and nowhere on the map. One line per running game, visible without a tap:
+    //   "Skins: Manny 2 (1, 3) · Josh 1 (2)"   "Nassau: Josh 2 UP · thru 7 · 1 press"
+    //   "Nassau: starts hole 5"
+    // Drawn at the top of this card (#hp-live-tile-mount) and, through window.hpLiveGamesLines, on the
+    // app's map above its bottom bar. NO NEW NUMBERS: every figure comes from the
+    // presenters My Round already reads (buildActionRows / buildSideActionRows / skinsStateFor in
+    // bet-strip.js), with the same group scoping. NO $ ON THE TILE AT ALL - standings, not money (so a
+    // game played for nothing never shows one either); the money stays on the Games view it opens.
+    function liveGamesTileLines() {
+        try {
+            if (!currentData || scopeMissing()) return [];
+            if (typeof buildActionRows !== 'function' || typeof buildSideActionRows !== 'function') return [];
+            const courseData = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+            const scores = currentData.scores || {};
+            const scoped = scopedPlayers();
+            const me = resolvedMeId();
+            const lines = [];
+            const noMoney = t => String(t || '').replace(/\s*\u00B7?\s*[\u2212+-]?\$\d[\d,]*(\.\d+)?(\/pt)?/g, '').trim();
+            const lastHole = courseData.length ? courseData[courseData.length - 1].hole : 0;
+            const anyScoreFrom = (ids, from) => courseData.some(h => h.hole >= from && (ids || []).some(id => Number(scores['p' + id + '_h' + h.hole]) > 0));
+            // SIDE GAMES (Match, Nassau, Stroke, Hi-Lo), the holder's own first.
+            const side = buildSideActionRows(shownRound(), courseData, scores, shownList(scoped), me) || [];
+            const sms = currentData.sideMatches || {};
+            side.slice().sort((a, b) => (b.mine ? 1 : 0) - (a.mine ? 1 : 0)).forEach(r => {
+                const sm = sms[r.key] || {};
+                const name = r.format === 'Match Play' ? 'Match' : (r.format === 'Stroke Play' ? 'Stroke' : (r.format || 'Game'));
+                const who = r.label ? ' (' + r.label + ')' : '';
+                const from = Number(sm.startHole) || 1;
+                if (from > 1 && from <= lastHole && !anyScoreFrom(r.playerIds, from)) { lines.push({ key: r.key, game: name, text: 'starts hole ' + from + who }); return; }
+                if (!r.status) return;
+                const live = (r.presses || []).filter(p => p && p.live !== false).length;
+                const bits = [noMoney(r.status)];
+                if (r.thru > 0 && !/thru/i.test(r.status)) bits.push('thru ' + r.thru);
+                if (live) bits.push(live + ' press' + (live === 1 ? '' : 'es'));
+                lines.push({ key: r.key, game: name, text: bits.filter(Boolean).join(' \u00B7 ') + who });
+            });
+            // ROUND GAMES (Skins, Dots, Stableford, 9 Points, Vegas, BBB ...), group-scoped like My Round.
+            const games = (buildActionRows(shownRound(), courseData, scores, shownList(scoped)) || []).filter(g => canSeeRoundGame(g.key));
+            let all = [];
+            try { all = typeof getRoundGames === 'function' ? getRoundGames(currentData) : []; } catch (e) { all = []; }
+            games.forEach(g => {
+                const game = all.find(x => x.key === g.key);
+                const label = String(g.label || 'Game').replace(/\s*\u00B7\s*\$.*$/, '');
+                if (game && game.format === 'skins' && typeof skinsStateFor === 'function') {
+                    try {
+                        const holes = (typeof gameHoles === 'function') ? gameHoles(game, courseData) : courseData;
+                        const field = (typeof fieldParticipants === 'function' && game.config) ? fieldParticipants(game.config) : (currentData.players || []);
+                        const from = holes.length ? holes[0].hole : 1;
+                        if (from > 1 && !anyScoreFrom(field.map(p => p.id), from)) { lines.push({ key: g.key, game: 'Skins', text: 'starts hole ' + from }); return; }
+                        const st = skinsStateFor(game.config, holes, scores, field);
+                        const byP = {};
+                        (st.awards || []).forEach(a => { (byP[a.playerId] = byP[a.playerId] || []).push(a.hole); });
+                        const named = field.filter(p => (st.won || {})[p.id] > 0)
+                            .sort((a, b) => st.won[b.id] - st.won[a.id])
+                            .map(p => shortName(p.name) + ' ' + st.won[p.id] + (byP[p.id] ? ' (' + byP[p.id].join(', ') + ')' : ''));
+                        const riding = st.riding > 0 ? st.riding + ' riding' : '';
+                        const text = named.length ? named.join(' \u00B7 ') + (riding ? ' \u00B7 ' + riding : '') : (riding ? 'all square \u00B7 ' + riding : 'no skins yet');
+                        lines.push({ key: g.key, game: label === 'Skins' || /skins/i.test(label) ? label : 'Skins', text });
+                        return;
+                    } catch (e) { /* the status line below */ }
+                }
+                // A line with no standing in it ("In progress" - Wolf, Hi-Lo or a stroke main game) says nothing
+                // a golfer can use between shots; the Games view has it.
+                if (g.status && !/^in progress$/i.test(String(g.status).trim())) lines.push({ key: g.key, game: label, text: noMoney(g.status) });
+            });
+            return lines.filter(l => l.text);
+        } catch (e) { return []; }
+    }
+    window.hpLiveGamesLines = liveGamesTileLines;
+    // Tap = the Games view (the app's Games sheet, or the Games tab).
+    function openLiveGamesView() {
+        const a = document.querySelector('#app-nav-bar a[href*="skins.html"]');
+        window.location.href = a ? a.getAttribute('href') : 'skins.html?game=' + encodeURIComponent(currentMode || '');
+    }
+    window.hpOpenLiveGames = openLiveGamesView;
+    function liveGamesTileHtml(lines, max) {
+        if (!lines || !lines.length) return '';
+        const shown = lines.slice(0, max || lines.length);
+        const more = lines.length - shown.length;
+        return '<button type="button" class="hp-lt" data-hp-lt="1" onclick="hpOpenLiveGames()" aria-label="Live games - open Games">'
+            + '<span class="hp-lt-h"><span>\u2694\uFE0F LIVE GAMES</span><span>Games \u203A</span></span>'
+            + shown.map(l => '<span class="hp-lt-l"><b>' + escapeHtml(l.game) + ':</b> ' + (typeof hpMeMarkText === 'function' ? hpMeMarkText(escapeHtml(l.text)) : escapeHtml(l.text)) + '</span>').join('')
+            + (more > 0 ? '<span class="hp-lt-more">+ ' + more + ' more</span>' : '')
+            + '</button>';
+    }
+    window.hpLiveGamesTileHtml = liveGamesTileHtml;
+    function renderLiveGamesTile() {
+        const mount = document.getElementById('hp-live-tile-mount');
+        const lines = liveGamesTileLines();
+        if (mount) mount.innerHTML = liveGamesTileHtml(lines, 4);
     }
     // ONE DASHBOARD, BUILT ONCE. The loose ticker line is gone: leader information
     // lives in exactly one place per view - the pop-up on Hole View, the card at the
@@ -4653,7 +4824,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         };
         return '<div class="fs-card">'
             + '<div class="fs-head">\uD83C\uDFCC\uFE0F Alternate Shot \u2014 one score per side'
-            + (st && st.scoringMode === 'handicap' ? ' \u00B7 WHS handicap' : ' \u00B7 Scratch')
+            + (st && st.scoringMode === 'handicap' ? ' \u00B7 Handicap' : ' \u00B7 Scratch')
             + '</div>'
             + row('A', roster.a) + '<div class="fs-vs">vs</div>' + row('B', roster.b)
             + '</div>';
@@ -5095,7 +5266,15 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             + (liveSkinsOpen ? 'hide hole-by-hole' : 'hole-by-hole') + '</button>';
         // Order as it always was: heads and standings, the one toggle, then the
         // hole-by-hole rows (each flight's rows under its own label when flighted).
-        mount.innerHTML = '<div class="live-skins">' + sections.map(x => x.label + x.top).join('') + toggle
+        // 2.0 (25) ADVISOR-0725 (7:46): in the app, a Skins game added on this round gets Edit / Remove under its head.
+        const lsActs = (e, i) => {
+            try {
+                const P = window.HardPanBet, k = String((e.section || {}).key || '');
+                if (!P || typeof P.actionsHtml !== 'function' || k.indexOf('wager:') !== 0 || (i > 0 && entries[i - 1].section.key === e.section.key)) return '';
+                return P.actionsHtml(k.slice(6));
+            } catch (x) { return ''; }
+        };
+        mount.innerHTML = '<div class="live-skins">' + sections.map((x, i) => x.label + x.top + lsActs(entries[i], i)).join('') + toggle
             + sections.map(x => x.ledger ? ((x.flighted && x.ledger) ? '<div class="ls-flight-label">Flight ' + x.flight + '</div>' : '') + x.ledger : '').join('') + '</div>';
     }
 
@@ -5189,10 +5368,10 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const savedScores = currentData.scores || {};
         const scoped = scopedPlayers();
         try {
-            return buildBetStrip(currentData, courseData, savedScores, scoped);
+            return buildBetStrip(shownRound(), courseData, savedScores, shownList(scoped));
         } catch (e) {
             // A presenter must never be able to take down score entry.
-            console.error('Bet strip failed to build:', e);
+            console.error('Game strip failed to build:', e);
             return null;
         }
     }
@@ -5273,7 +5452,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // still .add-action-btn, and the href it labels is unchanged - only the words
         // a golfer reads moved. The group-locked variant splits the label around the
         // group number, so it is two strings, not one.
-        return hasGroupLock ? '+ GROUP ' + lockedGroup + ' SIDE BETS' : '+ SIDE BETS';
+        return hasGroupLock ? '+ GROUP ' + lockedGroup + ' SIDE GAMES' : '+ SIDE GAMES';
     }
 
     function addActionStartHole() {
@@ -5311,7 +5490,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                     '<small>' + spec.blurb + '</small></button>';
             }).join('');
             return '<div class="add-action-panel">' +
-                '<div class="aa-title">Side Bets</div>' + choices +
+                '<div class="aa-title">Side Games</div>' + choices +
                 '<button type="button" class="aa-cancel" onclick="closeAddAction()">Cancel</button>' +
                 '</div>';
         }
@@ -5375,8 +5554,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (typeof buildHoleEvents !== 'function') return keys;
         let events = [];
         try {
-            events = buildHoleEvents(currentData, courseData, savedScores,
-                currentViewedHole, resolvedMeId(), scoped);
+            events = buildHoleEvents(shownRound(), courseData, savedScores,
+                currentViewedHole, resolvedMeId(), shownList(scoped));
         } catch (e) { return keys; }
         const moved = events.some(e =>
             e.type === 'LEAD_CHANGE' || e.type === 'WAGER_FINAL' || e.type === 'PRESS_STARTED');
@@ -5392,8 +5571,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (typeof buildHoleEvents !== 'function') return keys;
         let events = [];
         try {
-            events = buildHoleEvents(currentData, courseData, savedScores,
-                currentViewedHole, resolvedMeId(), scoped);
+            events = buildHoleEvents(shownRound(), courseData, savedScores,
+                currentViewedHole, resolvedMeId(), shownList(scoped));
         } catch (e) { return keys; }
         events.forEach(e => {
             if (e.type === 'SKIN_WON' || e.type === 'SKINS_CARRIED') keys.skins = true;
@@ -6271,7 +6450,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // has no other way to tell: every refusal above returns undefined.
         // ONE UPDATE, still: kpLeaders and kpWinners together, so a refusal can
         // never leave half a KP. The queue carries that shape as a single op.
-        return durableWrite('events/' + currentMode, 'update', updates, 'kp:h' + hole)
+        return durableWrite('events/' + currentMode, 'update', updates, 'kp:' + currentMode + ':h' + hole)
             .then(() => {
                 kpEntryOpenHole = null;
                 renderKpEntryMount();
@@ -6470,6 +6649,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         try {
             pushRegisterToken({
                 uid: uid, playerId: playerId, roundCode: currentMode,
+                // 066 #1 (Manny approved): NO iOS PROMPT until the golfer has turned a notification
+                // on (Tools > Customize, or the account screen). Already granted: registered as before.
+                ask: (typeof pushOptinHere === 'function') ? pushOptinHere() : false,
                 // ONE DEVICE, ONE ROW. The row key is the token's own fingerprint,
                 // so re-registering the same phone updates its row instead of
                 // adding a second one - and a golfer with a phone and a watch
@@ -6582,6 +6764,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             'dot-context-row',          // the Dots: selector, on rounds that have one
             'view-mode-toggle',         // Hole View / Full Card
             'group-filter-container',   // All Players, Edit round setup, Players
+            // SCOREKEEPER LINKS, right under the "Group Links" button that opens it
+            // (mailbox 015). It stayed on the page BEHIND the open sheet, so the
+            // button looked dead: the panel opened where nobody could see it.
+            // Shared code: HardPan and Consumer both (2026-10-19, Manny OK).
+            'group-links-panel',
             'qr-share-mount',           // Show QR code (every golfer, not just the organizer)
             'scorecard-footer',         // Save & exit, Receipt, the guide
             'end-round-mount'           // Delete this round (organizer only)
@@ -6799,7 +6986,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                     + '" onclick="setMe(\'' + p.id + '\')">' + escapeHtml(golferLabel(p)) + '</button>').join('')
                 + '</div>'
                 + '<button type="button" class="whoami-skip" onclick="' + (mine ? 'clearMe()' : 'skipWhoAmI()')
-                + '">' + (mine ? 'Show everyone instead' : 'Skip \u2014 just show everything') + '</button>';
+                + '">' + (mine ? 'This isn\u2019t me \u2014 show everyone' : 'Skip \u2014 just show everything') + '</button>';
         }
         return out + '</div>';
     }
@@ -6824,8 +7011,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         let events = [];
         try {
-            events = buildHoleEvents(currentData, courseData, currentData.scores || {},
-                currentViewedHole, resolvedMeId(), scoped);
+            events = buildHoleEvents(shownRound(), courseData, currentData.scores || {},
+                currentViewedHole, resolvedMeId(), shownList(scoped));
         } catch (e) {
             console.error('Hole recap failed:', e);
             mount.innerHTML = '';
@@ -6839,7 +7026,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         mount.innerHTML = '<div class="hole-recap">' +
             '<div class="hr-title">Hole ' + currentViewedHole + ' complete</div>' +
             shown.map(e => '<div class="hr-event' + (e.personal ? ' personal' : '') + '">' +
-                '<span class="hr-icon">' + e.icon + '</span><span>' + e.text + '</span></div>').join('') +
+                '<span class="hr-icon">' + e.icon + '</span><span>' + escapeHtml(e.text) + '</span></div>').join('') +
             (hidden > 0 ? '<button type="button" class="hr-more" onclick="toggleRecap()">+ ' + hidden + ' more</button>' : '') +
             (recapExpanded && events.length > RECAP_LIMIT ? '<button type="button" class="hr-more" onclick="toggleRecap()">Show less</button>' : '') +
             '</div>';
@@ -6864,8 +7051,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         let games = [], side = [], changedKeys = {};
         try {
-            games = buildActionRows(currentData, courseData, savedScores, scoped);
-            side = buildSideActionRows(currentData, courseData, savedScores, scoped, resolvedMeId());
+            games = buildActionRows(shownRound(), courseData, savedScores, shownList(scoped));
+            side = buildSideActionRows(shownRound(), courseData, savedScores, shownList(scoped), resolvedMeId());
             // What moved on the hole in view, so it can rise briefly within its
             // section. Recomputed every render and never stored - bet order is a
             // presentation concern, not something that belongs in Firebase.
@@ -6942,7 +7129,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         const toggle = '<button type="button" class="action-toggle" onclick="toggleActionCenter()">' +
             '<span>\uD83D\uDD25 My Round</span>' +
-            '<span class="ac-count">' + (headline || (totalBets === 0 && hasPool ? 'money pool' : totalBets + ' live')) +
+            '<span class="ac-count">' + (headline || (totalBets === 0 && hasPool ? 'Weekly Game' : totalBets + ' live')) +
                 ' \u00B7 ' + (actionCenterOpen ? 'hide' : 'tap to see') + '</span>' +
             '</button>';
 
@@ -7133,7 +7320,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         body += '<div class="action-foot">Nothing here is settled yet.</div>';
 
         if (addActionOpen) body += buildAddActionPanelHtml();
-        else if (canAddAction()) body += '<button type="button" class="add-action-btn" onclick="openAddAction()">+ SIDE BETS</button>';
+        else if (canAddAction()) body += '<button type="button" class="add-action-btn" onclick="openAddAction()">+ SIDE GAMES</button>';
         // A multi-group round needs the scope-aware flow, which lives on the Action
         // page. This is a LINK to it, never a second copy of the wager form.
         else if (canAddGroupAction()) body += '<a class="add-action-btn" href="' + addGroupActionHref() + '">' + addGroupActionLabel() + '</a>';
@@ -7187,13 +7374,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         }
 
         const sideNote = model.sideBets.total > 0
-            ? '<div class="bet-sidebet-note">\u2694\uFE0F Side Bets \u00B7 ' + model.sideBets.live + ' live \u2014 see the Matches tab</div>'
+            ? '<div class="bet-sidebet-note">\u2694\uFE0F Side Games \u00B7 ' + model.sideBets.live + ' live \u2014 see the Matches tab</div>'
             : '';
 
         mount.innerHTML =
             '<div class="bet-strip-wrap">' +
                 '<div class="bet-strip-head">' +
-                    '<span class="bet-strip-label">Bet Status' +
+                    '<span class="bet-strip-label">Game Status' +
                         (model.pressCount > 0 ? ' \u00B7 ' + model.pressCount + ' press' + (model.pressCount === 1 ? '' : 'es') : '') +
                     '</span>' +
                     pressBtnHtml +
@@ -7220,7 +7407,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // That case keeps the original single-button panel exactly.
             if (model.stakeIsPerHole) {
                 return '<div class="press-panel">' +
-                    '<div class="pp-title">\uD83D\uDD25 Press the bet</div>' +
+                    '<div class="pp-title">\uD83D\uDD25 Press the game</div>' +
                     '<div class="pp-start">NEW PRESS STARTS HOLE ' + startHole + '</div>' +
                     '<div class="bcd-meta" style="margin-top:6px;">A press runs from hole ' + startHole + ' to the end of that match, at $' + model.currentStake + '/hole.</div>' +
                     '<div class="pp-amount-row">' +
@@ -7250,7 +7437,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 : '<div class="pp-amount-row"><button type="button" class="pp-amount-btn" onclick="showPressCustom()">Custom\u2026</button></div>';
 
             return '<div class="press-panel">' +
-                '<div class="pp-title">\uD83D\uDD25 Press the bet</div>' +
+                '<div class="pp-title">\uD83D\uDD25 Press the game</div>' +
                 '<div class="pp-start">NEW PRESS STARTS HOLE ' + startHole + '</div>' +
                 '<div class="bcd-meta" style="margin-top:6px;">A press runs from hole ' + startHole + ' to the end of that match.</div>' +
                 '<div class="pp-amount-row">' + mPresetHtml + '</div>' +
@@ -7278,9 +7465,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             : '<div class="pp-amount-row"><button type="button" class="pp-amount-btn" onclick="showPressCustom()">Custom\u2026</button></div>';
 
         return '<div class="press-panel">' +
-            '<div class="pp-title">\uD83D\uDD25 Press the bet</div>' +
+            '<div class="pp-title">\uD83D\uDD25 Press the game</div>' +
             '<div class="pp-start">NEW PRESS STARTS HOLE ' + startHole + '</div>' +
-            '<div class="bcd-meta" style="margin-top:6px;">Runs hole ' + startHole + ' through the end of the round, alongside the original bet.</div>' +
+            '<div class="bcd-meta" style="margin-top:6px;">Runs hole ' + startHole + ' through the end of the round, alongside the original game.</div>' +
             '<div class="pp-amount-row">' + presetHtml + '</div>' +
             customHtml +
             '<button type="button" class="pp-cancel" onclick="closePressPanel()">Cancel</button>' +
@@ -7303,7 +7490,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // pointing at a hole that has since been completed.
     function confirmStrokePress(stake) {
         const model = currentBetStripModel();
-        if (!model || !model.canPress) { closePressPanel(); uiRefuse('That bet can no longer be pressed.'); return; }
+        if (!model || !model.canPress) { closePressPanel(); uiRefuse('That game can no longer be pressed.'); return; }
         if (!requireOnlineForMoney('PRESS NOT SAVED', 'Pressing needs signal \u2014 auto presses still work.')) { closePressPanel(); return; }
         const pushKey = db.ref(`events/${currentMode}/strokePresses`).push().key;
         durableWrite(`events/${currentMode}/strokePresses/${pushKey}`, 'set',
@@ -7496,7 +7683,18 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         psSnapshot = rosterSignature(currentData.players);
         renderPlayersSheet(currentData);
         const el = document.getElementById('players-sheet');
+        // POLISH #20: in the HardPan app (HardPanBet.on()) Golfers opens ON ITS OWN - a full
+        // screen, named the way Round settings names it - not a sheet on the score sheet.
+        // Every door (Round settings' Golfers row, the quick edit, ?players=1) lands here.
+        const own = psOwnScreen();
+        if (el) el.classList.toggle('ps-own', own);
+        const title = document.getElementById('players-sheet-title');
+        if (title) title.textContent = own ? '\uD83D\uDC65 Golfers' : '\uD83D\uDC65 Players';
+        if (own) { try { if (typeof toggleRoundSheet === 'function' && document.getElementById('round-sheet') && document.getElementById('round-sheet').classList.contains('open')) toggleRoundSheet(false); } catch (e) {} }
         if (el) el.style.display = 'flex';
+    }
+    function psOwnScreen() {
+        try { return !!(window.HardPanBet && typeof window.HardPanBet.on === 'function' && window.HardPanBet.on()); } catch (e) { return false; }
     }
     function closePlayersSheet() {
         const el = document.getElementById('players-sheet');
@@ -7562,7 +7760,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (!body) return;
         const players = data.players || [];
         const boundaries = computeGroupBoundaries(players.length, data.groupSizeOverrides || {});
-        let html = '';
+        // POLISH #20: the column labels, once, over the rows.
+        let html = '<div class="ps-head" aria-hidden="true"><span>Golfer</span><span>' + escapeHtml(psBoxLabel()) + '</span><span>Flight</span><span>Group</span><span></span></div>';
         boundaries.forEach(b => {
             html += '<div class="ps-group"><span>Group ' + b.group + '</span><button type="button" class="ps-add" onclick="psAddRow(' + b.group + ')">+ Add golfer</button></div>';
             for (let i = b.startIdx; i < b.startIdx + b.size; i++) {
@@ -7571,7 +7770,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 html += '<div class="ps-row' + (out ? ' ps-is-out' : '') + '" data-idx="' + i + '" data-id="' + escapeAttr(p.id) + '">'
                     + '<input class="ps-name" type="text" value="' + escapeAttr(p.name) + '" placeholder="Name">'
                     + '<input class="ps-hcp" type="text" inputmode="decimal" value="' + escapeAttr(psBoxValue(p)) + '" placeholder="' + psBoxLabel() + '" oninput="psHcpBoxInput(this)">'
-                    + '<button type="button" class="ps-flight" data-flight="' + (p.flight === 'B' ? 'B' : 'A') + '" onclick="psToggleFlight(this)">' + (p.flight === 'B' ? 'B' : 'A') + '</button>'
+                    + '<button type="button" class="ps-flight" aria-label="Flight" data-flight="' + (p.flight === 'B' ? 'B' : 'A') + '" onclick="psToggleFlight(this)">' + (p.flight === 'B' ? 'B' : 'A') + '</button>'
                     + '<select class="ps-grp" data-group="' + b.group + '" aria-label="Group" onchange="psRefreshMoney()">'
                     + boundaries.map(x => '<option value="' + x.group + '"' + (x.group === b.group ? ' selected' : '') + '>G' + x.group + '</option>').join('')
                     + '</select>'
@@ -7605,7 +7804,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         row.className = 'ps-row ps-new'; row.setAttribute('data-group', String(group));
         row.innerHTML = '<input class="ps-name" type="text" value="" placeholder="New golfer">'
             + '<input class="ps-hcp" type="text" inputmode="decimal" value="" placeholder="' + psBoxLabel() + '" oninput="psHcpBoxInput(this)">'
-            + '<button type="button" class="ps-flight" data-flight="A" onclick="psToggleFlight(this)">A</button>'
+            + '<button type="button" class="ps-flight" aria-label="Flight" data-flight="A" onclick="psToggleFlight(this)">A</button>'
             + '<span class="ps-grp-new">G' + group + '</span>'
             + '<span class="ps-out">new</span>';
         host.appendChild(row);
@@ -8395,6 +8594,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (!canReachSetup()) return;
         groupLinksPanelOpen = !groupLinksPanelOpen;
         renderGroupLinksPanel();
+        // In view when it opens (mailbox 015) - the Round Menu's body scrolls, and
+        // the panel can start below its fold.
+        const panel = document.getElementById('group-links-panel');
+        if (groupLinksPanelOpen && panel && panel.style.display !== 'none' && typeof panel.scrollIntoView === 'function') {
+            try { panel.scrollIntoView({ block: 'nearest' }); } catch (e) { /* older engines: the panel is still open */ }
+        }
     }
 
     function renderGroupLinksPanel() {
@@ -8940,7 +9145,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // refusal that can never land (drop), and it is the only thing that gets
         // to make that call.
         p.then(function () {
-            if (op && q && store) { try { q.confirm(store, op.id); } catch (e) {} }
+            // THIS edit's version only (audit B2): a correction typed while this write was in
+            // flight keeps the same id with a newer version, and must stay queued.
+            if (op && q && store) { try { q.confirm(store, op.id, op.v); } catch (e) {} }
             renderOfflineBadge();
         }, function () { renderOfflineBadge(); });
         renderOfflineBadge();
@@ -8954,11 +9161,41 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // issue the same op twice and could land an older value last.
     var draining = false;
     var lastDrop = 0;
+    // THIS ROUND'S WRITES ONLY (audit B4): a phone carries other rounds' leftovers; opening this
+    // round must never replay them here. Its own ops older than 6 hours wait for the golfer's OK.
+    function queuePrefix() { return 'events/' + currentMode + '/'; }
+    function ownOp(op) { return !!(op && typeof op.path === 'string' && currentMode && (op.path === 'events/' + currentMode || op.path.indexOf(queuePrefix()) === 0)); }
+    function queueWaiting(q, store) {
+        try { return (typeof q.countFor === 'function' ? q.countFor(store, queuePrefix()) : q.count(store)) || 0; } catch (e) { return 0; }
+    }
+    var drainAgain = false, staleAnswer = null, staleAsking = false;
+    async function askAboutStale(q, store) {
+        if (staleAnswer !== null || staleAsking || typeof q.staleFor !== 'function' || typeof uiConfirm !== 'function') return;
+        var old = q.staleFor(store, queuePrefix());
+        if (!old.length) return;
+        staleAsking = true;
+        var ok = false;
+        try {
+            ok = await uiConfirm({
+                title: old.length + ' old change' + (old.length === 1 ? '' : 's') + ' on this phone',
+                body: 'This phone has ' + old.length + ' change' + (old.length === 1 ? '' : 's') + ' to this round saved more than 6 hours ago and never sent. Send ' + (old.length === 1 ? 'it' : 'them') + ' now? They would replace what is on the card.',
+                confirmText: 'Send ' + (old.length === 1 ? 'it' : 'them'), cancelText: 'Discard ' + (old.length === 1 ? 'it' : 'them')
+            });
+        } catch (e) { staleAsking = false; return; }
+        staleAsking = false;
+        staleAnswer = !!ok;
+        if (!ok) old.forEach(function (o) { try { q.confirm(store, o.id, o.v); } catch (e) {} });
+        renderOfflineBadge();
+        drainQueue('stale-answer');
+    }
     function drainQueue(why) {
         var store = offlineStore();
         var q = window.OfflineQueue;
-        if (!q || !store || draining) return Promise.resolve(null);
-        if (!q.count(store)) { renderOfflineBadge(); return Promise.resolve(null); }
+        if (!q || !store) return Promise.resolve(null);
+        // ONE DRAIN AT A TIME (audit B1): a second request while one runs is remembered, not
+        // started alongside it - two drains sent the same box twice, the older value last.
+        if (draining) { drainAgain = true; return Promise.resolve(null); }
+        if (!queueWaiting(q, store)) { renderOfflineBadge(); return Promise.resolve(null); }
         // NOT WHILE THE DEVICE SAYS IT HAS NOTHING. Measured, and it was a real
         // defect of the first version: a drain started while offline issues a
         // write that NEVER SETTLES - that is what an offline write does - so the
@@ -8977,17 +9214,25 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // on "Sending...", and no later drain able to start. offline-queue.js
         // abandons a write that does not settle, leaves the op queued, and
         // returns, so the retry below can have another go.
+        askAboutStale(q, store);
+        var cutoff = Date.now() - ((q.STALE_MS) || 6 * 3600 * 1000);
+        var only = function (op) { return ownOp(op) && (staleAnswer === true || !(Number(op.ts) < cutoff)); };
+        var touchedScores = false;
         return q.drain(store, function (op) {
             var ref = db.ref(op.path);
+            if (/\/scores\//.test(op.path)) touchedScores = true;
             if (op.type === 'remove' || op.value === null) return ref.remove();
             if (op.type === 'update') return ref.update(op.value);
             return ref.set(op.value);
-        }, { timeoutMs: 12000 }).then(function (r) {
+        }, { timeoutMs: 12000, only: only }).then(function (r) {
             draining = false;
+            // A REPLAYED SCORE UNDOES "VERIFIED" EXACTLY AS A TYPED ONE DOES (audit B4).
+            if (touchedScores && r && r.sent && typeof clearScoresVerified === 'function') { try { clearScoresVerified(); } catch (e) {} }
+            if (drainAgain) { drainAgain = false; setTimeout(function () { drainQueue('again'); }, 0); }
             if (r && r.dropped) lastDrop += r.dropped;
             renderOfflineBadge();
             return r;
-        }, function () { draining = false; renderOfflineBadge(); return null; });
+        }, function () { draining = false; if (drainAgain) { drainAgain = false; setTimeout(function () { drainQueue('again'); }, 0); } renderOfflineBadge(); return null; });
     }
 
     // WHEN TO REPLAY. The round's own .info/connected is the honest signal -
@@ -8997,22 +9242,18 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     function armQueueDrain() {
         try {
             db.ref('.info/connected').on('value', function (snap) {
-                if (snap.val() === true) { draining = false; drainQueue('socket'); }
+                // NOT reset here (audit B1): every queued write is time-bound (12 s), so a drain always
+                // ends by itself; a reconnect during one asks for one more after it.
+                if (snap.val() === true) { drainQueue('socket'); }
                 else {
-                    // AND THE FLAG IS RELEASED ON THE WAY DOWN. A drain caught by
-                    // the socket dropping is stuck on a promise that will never
-                    // settle; leaving `draining` true would mean the reconnect
-                    // above could never start a new one. Re-issuing a write that
-                    // is still pending costs nothing here - every op carries its
-                    // full path and its own value, so a replay writes the same
-                    // number to the same place.
-                    draining = false;
+                    // On the way down nothing is reset: a drain caught by the socket dropping ends
+                    // on its own 12 s write timeout and leaves its op queued for the next one.
                     renderOfflineBadge();
                 }
             });
         } catch (e) {}
         try {
-            window.addEventListener('online', function () { draining = false; drainQueue('online-event'); });
+            window.addEventListener('online', function () { drainQueue('online-event'); });
             window.addEventListener('offline', function () { renderOfflineBadge(); });
         } catch (e) {}
         // AND ON ARRIVAL, because the app may have been closed with scores in the
@@ -9047,12 +9288,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         var q = window.OfflineQueue;
         if (!st || !q) return;
         var waiting = 0;
-        try { waiting = q.count(st) || 0; } catch (e) { waiting = 0; }
+        waiting = queueWaiting(q, st);
         if (!waiting) return;
         retryTimer = setInterval(function () {
             var s2 = offlineStore();
             var n = 0;
-            try { n = (window.OfflineQueue && s2) ? (window.OfflineQueue.count(s2) || 0) : 0; } catch (e) { n = 0; }
+            n = (window.OfflineQueue && s2) ? queueWaiting(window.OfflineQueue, s2) : 0;
             if (!n) { clearInterval(retryTimer); retryTimer = null; return; }
             drainQueue('retry');
         }, 20000);
@@ -9071,7 +9312,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         var store = offlineStore();
         if (!q || !store) { el.style.display = 'none'; return; }
         var waiting = 0;
-        try { waiting = q.count(store) || 0; } catch (e) { waiting = 0; }
+        waiting = queueWaiting(q, store);
         // "Sending" ONLY WHILE A DRAIN IS GENUINELY IN FLIGHT. It used to be
         // whatever the caller passed, and a drain stuck on a write that never
         // settled left the word on screen for the rest of the round while nothing
@@ -9125,14 +9366,27 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         currentData = q.applyQueued(snap.data, ops, currentMode) || snap.data;
         hydratedLocalRound = true;
         try { renderScorecard(); } catch (e) {}
-        renderOfflineBadge();
+        try { renderOfflineBadge(); } catch (e) {}
+        // 108 (Oct 31): THE CARD DRAWS ON AN OFFLINE COLD START. This runs while the page's script is
+        // still being read, so the render above can hit a `let` declared further down (measured:
+        // "Cannot access 'pendingScoreFocus' before initialization") - swallowed by its try, and with
+        // no signal no snapshot ever comes to draw the card: "Connecting to game..." forever. And the
+        // `var hydratedLocalRound = false` further down runs AFTER this and clears the flag. So once
+        // the script has finished: the flag again, and the card from this phone's copy - unless the
+        // server has spoken in the meantime (it wins, as always).
+        var hydratedFrom = currentData;
+        setTimeout(function () {
+            if (currentData !== hydratedFrom) return;
+            hydratedLocalRound = true;
+            try { renderScorecard(); } catch (e) { try { console.error('[offline] card from this phone', e); } catch (x) {} }
+            try { renderOfflineBadge(); } catch (e) {}
+        }, 0);
         return true;
     }
 
     // The promise is only OBSERVED. The write itself is unchanged, and the
     // original promise is what callers keep chaining.
     function trackWrite(promise) {
-        setSaveState('saving', 'Saving\u2026');
         return promise
             .then(() => setSaveState('saved', '\u2713 Saved'))
             .catch(() => setSaveState('error',
@@ -9449,7 +9703,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // shows its money without an extra tap. The verification state is still shown
         // beside the KP state below, so the organizer sees both independently.
         const notFinal = missing.length > 0 || kpOpen;
-        if (titleEl) titleEl.textContent = notFinal ? 'Money So Far \u2014 Not Final' : 'Final Money';
+        if (titleEl) titleEl.textContent = notFinal ? 'Totals So Far \u2014 Not Final' : 'Final Totals';
 
         const gateEl = document.getElementById('fr-settle-gate');
         if (gateEl) {
@@ -9457,9 +9711,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 gateEl.innerHTML = '';
             } else {
                 const rows = [];
-                rows.push(isScoresVerified()
-                    ? '<div class="fr-gate-ok">\u2713 Scores verified</div>'
-                    : '<div class="fr-gate-warn">\u26A0\uFE0F Scores not verified</div>');
+                // 2.0 (25) ADVISOR-0725 (7:51 b): ONE STATE, SAID ONCE. With scores missing the warning is the
+                // whole story - no "Scores verified" beside it (a tick next to "42 scores still missing" contradicts
+                // itself), and the missing count is said once, in the warning at the top of this sheet (with its
+                // fix links), not again here. "Scores checked" (the badge below) is shown only on a complete card.
+                if (missing.length === 0 && !isScoresVerified()) rows.push('<div class="fr-gate-warn">\u26A0\uFE0F Scores not verified</div>');
                 const rk = frKpPool();
                 // A cancelled game has no rk.kp, so no KP row appears - there is
                 // nothing outstanding to report.
@@ -9469,13 +9725,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 if (kpOpen && rk && rk.valid && rk.kp && rk.kp.amountCents > 0) {
                     const blank = rk.kp.lines.filter(l => l.state === 'unresolved').length;
                     rows.push('<div class="fr-gate-warn">\u26A0\uFE0F KP not recorded on ' + blank + ' hole'
-                        + (blank === 1 ? '' : 's') + ' \u2014 ' + centsToMoney(rk.kpUnresolvedCents || 0) + ' still in the pot</div>');
+                        + (blank === 1 ? '' : 's') + ' \u2014 ' + centsToMoney(rk.kpUnresolvedCents || 0) + ' still open</div>');
                 }
-                if (missing.length > 0) {
-                    rows.push('<div class="fr-gate-warn">\u26A0\uFE0F ' + missing.length + ' score'
-                        + (missing.length === 1 ? '' : 's') + ' still missing</div>');
-                }
-                gateEl.innerHTML = '<div class="fr-gate">'
+                // (the missing count: once, in #fr-incomplete-warning at the top of this sheet - 2.0 (25) 7:51 b)
+                // Nothing left to list (scores missing, no KP open): no empty "Not final yet" box - the title
+                // below already reads "Totals So Far - Not Final".
+                gateEl.innerHTML = (!rows.length && !kpOpen) ? '' : '<div class="fr-gate">'
                     + '<div class="fr-gate-head">Not final yet</div>' + rows.join('')
                     + (kpOpen ? '<button class="fr-secondary-btn" onclick="frBackToReview()">Review KP Results</button>' : '')
                     + '</div>';
@@ -9488,8 +9743,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // a confirmation that failed or was refused offline.
         const badgeEl = document.getElementById('fr-verified-badge');
         if (badgeEl) {
-            badgeEl.innerHTML = isScoresVerified()
-                ? '<div class="fr-verified-badge">\u2713 Scores verified before settlement</div>' : '';
+            // 2.0 (25) 7:51 b: "Scores checked" once, and only on a complete card (no score missing).
+            badgeEl.innerHTML = isScoresVerified() && missing.length === 0
+                ? '<div class="fr-verified-badge">\u2713 Scores checked</div>' : '';
         }
 
         // THE SAME REFUSAL AS THE RECEIPT, from the same detector. This panel and
@@ -9502,7 +9758,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
             moneyEl.innerHTML = '<div class="fr-empty">'
                 + dupNames.map(d => (d.count > 2 ? d.count + ' golfers are all called' : 'Two golfers are both called')
-                    + ' <strong>' + escD(d.name) + '</strong>. The money is added up '
+                    + ' <strong>' + escD(d.name) + '</strong>. The totals are added up '
                     + 'by name, so it cannot be totalled until one of them is renamed in Setup.')
                     .join(' ')
                 + '</div>';
@@ -9515,14 +9771,14 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             result = computeCombinedNetTotals(currentData, courseData, savedScores);
         } catch (e) {
             console.error('Settlement failed:', e);
-            moneyEl.innerHTML = '<div class="fr-empty">Couldn\'t total the money \u2014 check the Results tab.</div>';
+            moneyEl.innerHTML = '<div class="fr-empty">Couldn\'t add up the totals \u2014 check the Results tab.</div>';
             payEl.innerHTML = '';
             return;
         }
 
         const totals = Object.values(result.netByName || {}).sort((a, b) => b.net - a.net);
         if (totals.length === 0 || totals.every(t => Math.abs(t.net) < 0.005)) {
-            moneyEl.innerHTML = '<div class="fr-empty">No money changed hands today.</div>';
+            moneyEl.innerHTML = '<div class="fr-empty">Nothing to total today.</div>';
             payEl.innerHTML = '';
             return;
         }
@@ -9540,7 +9796,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         const tx = result.transactions || [];
         payEl.innerHTML = tx.length === 0
-            ? '<div class="fr-empty">Everyone\'s square \u2014 nobody owes anybody.</div>'
+            ? '<div class="fr-empty">Everyone\'s square \u2014 nothing to send.</div>'
             : tx.map(t => '<div class="fr-pay-row">' +
                 '<span class="fr-pay-who">' + t.from + ' \u2192 ' + t.to + '</span>' +
                 '<span class="fr-pay-amt">$' + fmtWhole(t.amount) + '</span>' +
@@ -9588,7 +9844,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
         el.innerHTML = gapLineHtml + '<div class="fr-warn">' +
             '<strong>\u26A0\uFE0F ' + missing.length + ' score' + (missing.length === 1 ? '' : 's') + ' still missing</strong>' +
-            'Money below is where things stand, not a final settlement \u2014 some wagers can\'t be decided yet.' +
+            'Totals below are where things stand, not final \u2014 some games can\'t be decided yet.' +
             '<div style="margin-top:6px;">' + rows + more + '</div>' +
             '</div>';
     }
@@ -9631,8 +9887,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         const incomplete = rows.filter(r => !r.complete).length;
         const note = document.getElementById('fr-review-note');
         if (note) {
+            // POLISH #32: "Both golfers" for two (it read "All 2 golfers").
             note.innerHTML = incomplete === 0
-                ? 'All ' + rows.length + ' golfers have a complete card.'
+                ? (rows.length === 2 ? 'Both golfers have a complete card.'
+                    : rows.length === 1 ? 'The card is complete.'
+                    : 'All ' + rows.length + ' golfers have a complete card.')
                 : '\u26A0\uFE0F ' + incomplete + ' golfer' + (incomplete === 1 ? '' : 's')
                   + ' still incomplete \u2014 those rounds have no final score yet.';
             note.className = 'fr-review-note' + (incomplete === 0 ? '' : ' fr-review-warn');
@@ -9690,7 +9949,24 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // `reviewed` records intent: the organizer pressed the confirm button rather
     // than skipping. Wave C decides whether that intent is persisted on the round;
     // nothing is written to Firebase here.
+    // POLISH #32: in the HardPan app Round Complete has ONE main button, "View results",
+    // and "Done" - not three exits that did about the same thing. View results is the
+    // old "Scores Look Right" (it records the check) when there is signal; with none it
+    // shows the results without the confirm (the skip), never an offline refusal.
+    // The web page keeps both buttons as they were.
+    function frOneWay() {
+        try { return !!(window.HardPanBet && typeof window.HardPanBet.on === 'function' && window.HardPanBet.on()); } catch (e) { return false; }
+    }
+    function frOneWayOn() {
+        const one = frOneWay();
+        const ov = document.getElementById('finish-round-modal-overlay');
+        if (ov) ov.classList.toggle('fr-one', one);
+        const c = document.getElementById('fr-confirm-btn');
+        if (c) c.textContent = one ? 'View results' : '\u2713 Scores Look Right \u2014 View Results';
+    }
     function frShowResults(reviewed) {
+        // POLISH #32: the app's one "View results" never stops on the offline refusal.
+        if (reviewed && frOneWay() && typeof navigator !== 'undefined' && navigator.onLine === false) reviewed = false;
         // Only the deliberate confirm persists. Skipping shows the money and records
         // nothing, which is the whole point of having two buttons.
         if (reviewed) {
@@ -9766,7 +10042,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // score correction is allowed to reopen.
         try {
             if (typeof buildSideMatchReceipts === 'function') {
-                buildSideMatchReceipts(data, courseData, savedScores).forEach(rc => {
+                // 100a: display copy so "$10 to Test" reads "$10 to Test A." (text only).
+                buildSideMatchReceipts((typeof roundDataForDisplay === 'function') ? roundDataForDisplay(data) : data, courseData, savedScores).forEach(rc => {
                     (rc.segments || []).forEach(seg => {
                         if (!/press/i.test(seg.label || '')) return;
                         snap.presses[rc.matchId + '|' + seg.label] = {
@@ -9909,9 +10186,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             + list
             + '<div style="margin-top:6px;">' + lines.map(l => '<div class="fr-impact-line">' + l + '</div>').join('') + '</div>'
             + (moved.length
-                ? '<div class="fr-impact-head" style="margin-top:8px;">Final money</div>'
+                ? '<div class="fr-impact-head" style="margin-top:8px;">Final totals</div>'
                   + moved.map(m => '<div class="fr-impact-line fr-impact-money">' + m + '</div>').join('')
-                : '<div class="fr-impact-line" style="margin-top:8px;">Final money: no change</div>')
+                : '<div class="fr-impact-line" style="margin-top:8px;">Final totals: no change</div>')
             + (n > 0
                 ? '<div class="fr-impact-actions" style="margin-top:10px; display:flex; gap:8px;">'
                   + '<button class="btn-primary" style="flex:1;" onclick="frCommitCorrections()">Save '
@@ -10012,7 +10289,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             const orig = r.kpCancelled.originalCents;
             mount.innerHTML = '<div class="fr-money-title">KP Results</div>'
                 + '<div class="fr-review-note">KPs cancelled for this round · '
-                + centsToMoney(orig) + ' moved into the skins pool.</div>';
+                + centsToMoney(orig) + ' moved into Skins.</div>';
             return;
         }
         if (!r.kp || r.kp.amountCents <= 0) { mount.innerHTML = ''; return; }
@@ -10026,7 +10303,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         let html = '<div class="fr-money-title">KP Results · ' + $(r.kp.amountCents) + '</div>';
         if (unresolved > 0) {
             // KP money never refunds (2026-09-22): a blank hole holds the round open.
-            html += '<div class="fr-review-note">' + $(unresolved) + ' still in the pot \u2014 pays when recorded \u2014 record the winner to finish the round.</div>';
+            html += '<div class="fr-review-note">' + $(unresolved) + ' still open \u2014 counts when recorded \u2014 record the winner to finish the round.</div>';
         }
 
         r.kp.lines.forEach(l => {
@@ -10039,13 +10316,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                       + (dist ? '<br><span class="fr-net">' + dist + '</span>' : '');
             } else if (l.state === 'skins') {
                 // "Nobody": the share went into the skins pot (2026-09-22).
-                right = '<span class="fr-net">Nobody \u2014 ' + $(l.cents) + ' to the skins pot</span>';
+                right = '<span class="fr-net">Nobody \u2014 ' + $(l.cents) + ' to Skins</span>';
             } else {
                 // Held: a blank (live or finished), a winner out of the round, or
                 // "nobody" with no skins pot to take it.
                 right = '<span class="fr-incomplete">'
                       + (l.reason === 'out' ? escapeHtml(l.winnerName || '') + ' is out of the round \u2014 re-record it'
-                          : (l.reason === 'nobody' ? 'Nobody \u2014 no skins pot, still in the pot' : 'Not recorded'))
+                          : (l.reason === 'nobody' ? 'Nobody \u2014 no Skins, still open' : 'Not recorded'))
                       + '</span>';
             }
             html += '<div class="fr-player-row' + (l.state === 'unresolved' ? ' fr-row-incomplete' : '') + '">'
@@ -10084,7 +10361,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // skins pot without anyone being asked.
         const ok = await uiConfirm({
             title: 'Record that nobody won the KP on hole ' + hole + '?',
-            body: 'That share goes into the skins pot.',
+            body: 'That share goes to Skins.',
             confirmText: 'Nobody won it', cancelText: 'Back', danger: true
         });
         if (!ok) return;
@@ -10123,15 +10400,15 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             && currentData.moneyPool.skins.mode) || 'none';
         if (skinsMode !== 'remainder') {
             uiFail('\u26A0\uFE0F CAN\u2019T CANCEL KPs\n\nThis round uses a fixed skins amount, so there is '
-                + 'nowhere for the KP money to go. Adjust the Weekly Game setup first.');
+                + 'nowhere for the KP share to go. Adjust the Weekly Game setup first.');
             return;
         }
 
         const amt = centsToMoney(r.kp.amountCents);
         const ok = await uiConfirm({
             title: 'Cancel all KPs for this round?',
-            body: 'The ' + amt + ' KP allocation moves into the skins pool.\n\n'
-                + 'Existing KP leaders will no longer receive KP money.',
+            body: 'The ' + amt + ' KP allocation moves into Skins.\n\n'
+                + 'Existing KP leaders will no longer get the KP share.',
             confirmText: 'Cancel the KPs', cancelText: 'Keep them', danger: true
         });
         if (!ok) return;
@@ -10146,7 +10423,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 currentData.kpCancelled = payload;
                 renderFinishRoundKp();
                 renderFinishRoundMoney();
-                uiToast('\u2705 KPs CANCELLED\n' + amt + ' moved into the skins pool.');
+                uiToast('\u2705 KPs CANCELLED\n' + amt + ' moved into Skins.');
             })
             .catch(err => uiFail('\u26A0\uFE0F KPs NOT CANCELLED\n' + (err && err.message)));
     }
@@ -10339,6 +10616,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         frSection('fr-state-detail', false);
         frSection('fr-state-results', false);
         renderFinishRoundKp();
+        frOneWayOn();
 
         document.getElementById('finish-round-modal-overlay').style.display = 'flex';
     }
@@ -10525,6 +10803,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     const SCORED_ROUND_SENTENCE = 'This round has scores in it, so it cannot be deleted.\n\n'
         + 'That is deliberate \u2014 it stops a round being wiped by accident once anyone has started playing.\n\n'
         + 'To play again, start a new round from Home \u2014 \uD83D\uDD01 Start from it copies this round\u2019s golfers and setup into a new code.';
+    // 2.0 (23) SETUP BUG 2 (ADVISOR-1556, round NEN88S): a refusal on a round with no strokes is "not the
+    // owner", never "has scores" - the LIVE rule lets only the round's ownerUid (or its trip's owner)
+    // delete it. Byte-identical to admin.html's copy (setup_bugs_23_test.js).
+    const NOT_OWNER_DELETE_SENTENCE = 'This round cannot be deleted from this phone.\n\n'
+        + 'No hole has been played, but only the account that created the round can delete it, and this phone is not signed in as that account. Nothing was deleted.\n\n'
+        + 'To delete it, open it on the phone it was set up on (signed in the same way).';
 
     // ASYNC: the most destructive decision in the app now goes through a sheet
     // whose CANCEL is the focused control. onclick only.
@@ -10585,7 +10869,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // owner and a round that cannot come back - and "all 4 golfers" is a count
         // of the roster, which says nothing about whether anyone has teed off.
         // The number that matters is how many of them have scores on the card.
-        const msg = `This erases all scores for all ${golferCount} golfers, and every bet, press and side match with them. `
+        const msg = `This erases all scores for all ${golferCount} golfers, and every game, press and side match with them. `
             + `It cannot be undone.\n\n`
             + (scored > 0
                 ? `${scored} ${scored === 1 ? 'golfer has' : 'golfers have'} scores on this card already, and those scores are erased too.\n\n`
@@ -10615,7 +10899,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // scores in it" for a network failure would be false half the time, so
             // the two are told apart by the error itself.
             const m = String((err && err.message) || err || '');
-            if (/PERMISSION_DENIED/i.test(m)) uiRefuse(SCORED_ROUND_SENTENCE);
+            // Refused: the scores sentence only when this round's card (live on this page) has a real stroke.
+            if (/PERMISSION_DENIED/i.test(m)) uiRefuse(scoredGolferCount() > 0 ? SCORED_ROUND_SENTENCE : NOT_OWNER_DELETE_SENTENCE);
             else uiFail('\u26A0\uFE0F Could not delete the round \u2014 check your signal and try again.');
         });
     }
@@ -10866,8 +11151,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         let inner = '';
 
         if (o.gameFormat === 'hilo' && o.hiloLog) {
-            inner += pill('pill-main', 'Low: ' + (o.hiloLog.lowWinner || 'Halved'));
-            inner += pill('pill-press', 'High: ' + (o.hiloLog.highWinner || 'Halved'));
+            inner += pill('pill-main', 'Low: ' + escapeHtml(o.hiloLog.lowWinner || 'Halved'));
+            inner += pill('pill-press', 'High: ' + escapeHtml(o.hiloLog.highWinner || 'Halved'));
         } else if (o.dots) {
             const d = o.dots || { count: 0, allowed: false };
             const cls = d.count > 0 ? 'dots-btn has-dots' : 'dots-btn';
@@ -10886,17 +11171,17 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 const statusTxt = !log.resolved
                     ? (log.winner === 'tie' ? 'Tied' : 'Pending')
                     : (log.winner === 'wolf' ? 'Wolf Won' : 'Wolf Lost');
-                inner += pill('pill-main', callTag + ' ' + golferLabelFor(log.wolfName));
+                inner += pill('pill-main', callTag + ' ' + escapeHtml(golferLabelFor(log.wolfName)));
                 inner += pill('pill-press', statusTxt);
             } else {
-                inner += pill('pill-main', '\uD83D\uDC3A ' + golferLabelFor(log.wolfName));
+                inner += pill('pill-main', '\uD83D\uDC3A ' + escapeHtml(golferLabelFor(log.wolfName)));
             }
         } else if (o.gameFormat === 'stableford' && o.stablefordParts && o.stablefordParts.length) {
             inner += '<span class="status-pill pill-main" style="white-space:normal; line-height:1.5;">' +
-                o.stablefordParts.join(' \u00B7 ') + '</span>';
+                o.stablefordParts.map(function (t) { return escapeHtml(t); }).join(' \u00B7 ') + '</span>';
         } else if (o.matchPillText) {
             inner += pill('pill-main', o.matchPillText);
-            if (o.holeWinnerText) inner += pill('pill-press', o.holeWinnerText);
+            if (o.holeWinnerText) inner += pill('pill-press', escapeHtml(o.holeWinnerText));   // a team's names: text (audit H1)
         }
 
         let html = '<div class="match-status-cell">' + inner + '</div>';
@@ -11202,6 +11487,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         db.ref(`events/${currentMode}/wolfCalls/h${hole}`).remove()
             .catch(err => uiFail(`Failed to clear: ${err.message}`));
     }
+
 
     function renderWolfCallBox(data, courseData, savedScores) {
         const box = document.getElementById('wolfcall-payout-container');
@@ -11543,7 +11829,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         else if (gameFormat === 'stableford') scoringType = currentData.stablefordScoring || "net";
         window.__scScoringType = scoringType;
 
-        document.getElementById("course-title").textContent = currentData.courseName || "Golf Course";
+        document.getElementById("course-title").textContent = (typeof hpCourseNameText === 'function' ? hpCourseNameText(currentData.courseName || "Golf Course") : (currentData.courseName || "Golf Course"));   // 2.0 (25) 7:51 f
         // THE SAME ANSWER THE PLAYING WITH CARD GIVES - see roundScoringBasis(). This
         // read `${gameFormat} (${scoringType})` straight off the stored keys, which is
         // why a stroke round with a Nassau side match said STROKE (NET) here and
@@ -11583,6 +11869,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // Only players opted in to money betting participate in the payout engines below -
         // everyone still enters scores and shows on the card regardless of this flag.
         const moneyPlayers = filteredPlayers.filter(p => p.playingForMoney !== false);
+        // Labels only: the engines name a side by first word, so two golfers who
+        // share one are handed in as "Test A" / "Test B". Same ids, same scores.
+        const shownPlayers = list => (typeof playersForDisplay === 'function') ? playersForDisplay(list, currentData.players) : list;
 
         let hiloCalc = null;
         let matchCalc = null;
@@ -11595,7 +11884,8 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         let manualMatchPresses = [];
 
         if (gameFormat === 'hilo') {
-            hiloCalc = calculateHiLoEngine(moneyPlayers, courseData, savedScores);
+            // shownPlayers: "Test A" / "Test B" in the team labels when two share a first name (polish #2).
+            hiloCalc = calculateHiLoEngine(shownPlayers(moneyPlayers), courseData, savedScores);
         } else if (gameFormat === 'match' && currentData.matchScoringStyle === 'stroke') {
             // Total strokes, not hole-by-hole match play — a genuinely different model, so this
             // skips calculateMatchEngine entirely rather than feeding it data it can't interpret.
@@ -11616,7 +11906,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             // and holes-remaining all come from the sequence. Off the 1st tee this
             // argument is the same ascending card it has always been, which is why
             // every settled round is untouched.
-            matchCalc = calculateMatchEngine(moneyPlayers, playOrderCourse(courseData), savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses, nassauStakeConfig(currentData));
+            matchCalc = calculateMatchEngine(shownPlayers(moneyPlayers), playOrderCourse(courseData), savedScores, scoringType, gameFormat, pressRule, stakeToUse, holeBet, manualMatchPresses, nassauStakeConfig(currentData));
         }
 
         let wolfCalc = null, stablefordCalc = null;
@@ -11775,7 +12065,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         filteredPlayers.forEach((p, i) => {
             const label = fcLabels[i];
             headRow.innerHTML += `<th data-player-name="${escapeAttr(label)}"${p.out === true ? ' class="golfer-out"' : ''}>`
-                + `<span class="fc-name">${label}</span>`
+                + `<span class="fc-name">${escapeHtml(label)}</span>`
                 + `<span class="fc-hcp">${escapeHtml(golferHandicapLabel(p))}</span></th>`;
         });
 
@@ -11786,7 +12076,9 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         // a Stroke Play round gains no vertical space and no new vocabulary.
         const matchNoteEl = document.getElementById("match-hcp-note");
         if (matchNoteEl) {
-            const firstName = p => p.name.split(" ")[0];
+            // TEXT, NEVER MARKUP (audit H1): a name is whatever the round record says.
+            // golferLabel: the first name, or "Test A" / "Test B" when two share it (polish #2).
+            const firstName = p => escapeHtml(golferLabel(p) || String(p.name || '').split(" ")[0]);
             let noteHtml = "";
             if (dotNoteMode === 'auto' && dotNoteMatches.length > 1) {
                 // MERGED MODE HAS NO SINGLE "LOW". Two matches mean two baselines, so
@@ -11834,7 +12126,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         }
 
         if (showMatchColumn) {
-            let colLabel = gameFormat === 'dots' ? "Dots/Action" : (gameFormat === 'hilo' ? "Hi-Lo Points" : (gameFormat === 'wolf' ? "Wolf" : (gameFormat === 'stableford' ? "Stableford Pts" : "Match & Bets")));
+            let colLabel = gameFormat === 'dots' ? "Dots/Action" : (gameFormat === 'hilo' ? "Hi-Lo Points" : (gameFormat === 'wolf' ? "Wolf" : (gameFormat === 'stableford' ? "Stableford Pts" : "Match & Games")));
             headRow.innerHTML += `<th style="width: 100px;">${colLabel}</th>`;
         }
 
@@ -11976,7 +12268,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 rowHtml += `
                     <td>
                         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-                            <div class="fc-cell-initials" style="font-size: 0.9rem; color: #444; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${initials}</div>
+                            <div class="fc-cell-initials" style="font-size: 0.9rem; color: #444; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.5px;">${escapeHtml(initials)}</div>
                             <div class="score-input-wrapper${markClass}${gapBoxes.has(String(p.id) + '_' + h.hole) ? ' score-gap' : ''}">
                                 ${scoreInputHtml}
                                 ${shapeHtml}
@@ -12127,7 +12419,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             function strokeLeadText(p1Total, p2Total, holesCompleted, p1Name, p2Name) {
                 if (holesCompleted === 0) return "Waiting for scores...";
                 const diff = p1Total - p2Total;
-                return diff === 0 ? "All Square" : (diff < 0 ? `${golferLabelFor(p1Name)} leads by ${Math.abs(diff)}` : `${golferLabelFor(p2Name)} leads by ${Math.abs(diff)}`);
+                return diff === 0 ? "All Square" : (diff < 0 ? `${escapeHtml(golferLabelFor(p1Name))} leads by ${Math.abs(diff)}` : `${escapeHtml(golferLabelFor(p2Name))} leads by ${Math.abs(diff)}`);
             }
 
             if (s.holesCompleted === 0) {
@@ -12173,23 +12465,23 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 `;
             });
 
-            document.getElementById("nassau-payout-header").textContent = `💵 Live Standings (${s.p1.name} vs ${s.p2.name})`;
+            document.getElementById("nassau-payout-header").textContent = `📊 Live Standings (${s.p1.name} vs ${s.p2.name})`;
             document.getElementById("payout-rows-wrapper").innerHTML = `
                 <div class="payout-row">
-                    <span>Bet Type:</span>
+                    <span>Game Type:</span>
                     <span>$${currentData.matchStake || 0} Flat, Stroke Play</span>
                 </div>
                 <div class="payout-row">
-                    <span>${s.p1.name}: ${s.holesCompleted > 0 ? s.p1Total : '-'}</span>
-                    <span>${s.p2.name}: ${s.holesCompleted > 0 ? s.p2Total : '-'}</span>
+                    <span>${escapeHtml(s.p1.name)}: ${s.holesCompleted > 0 ? s.p1Total : '-'}</span>
+                    <span>${escapeHtml(s.p2.name)}: ${s.holesCompleted > 0 ? s.p2Total : '-'}</span>
                 </div>
                 <div class="payout-row" style="justify-content:flex-end;">${pressBtnHtml}</div>
                 ${pressRowsHtml}
                 <div class="payout-row" style="margin-top:8px;">
                     <span>Combined Ledger:</span>
-                    <span>${s.p1.name}: ${fmtStrokeM(strokeCombinedT1Money)} | ${s.p2.name}: ${fmtStrokeM(-strokeCombinedT1Money)}</span>
+                    <span>${escapeHtml(s.p1.name)}: ${fmtStrokeM(strokeCombinedT1Money)} | ${escapeHtml(s.p2.name)}: ${fmtStrokeM(-strokeCombinedT1Money)}</span>
                 </div>
-                ${!s.roundComplete ? `<div class="payout-row" style="justify-content:center; color:var(--text-muted); font-size:0.8rem;">Original bet settles once both players finish all ${s.totalHoles} holes.</div>` : ''}
+                ${!s.roundComplete ? `<div class="payout-row" style="justify-content:center; color:var(--text-muted); font-size:0.8rem;">Original game settles once both players finish all ${s.totalHoles} holes.</div>` : ''}
             `;
 
         } else if (['match', 'bestball', 'scramble', 'ryder'].includes(gameFormat) && matchCalc) {
@@ -12204,7 +12496,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             let tickerPressNum = 0;
             const betsLine = globalBets.length > 0
                 ? `<div style="font-size: 0.75rem; color:#a8dadc; width:100%; margin-top:4px;">${globalBets.map(b => {
-                    const lbl = b.isPrimaryMatch ? 'Main Bet' : `Press #${++tickerPressNum}`;
+                    const lbl = b.isPrimaryMatch ? 'Main Game' : `Press #${++tickerPressNum}`;
                     // statusFull, not statusPlain.
                     //
                     // statusPlain is whosUpText(), which returns only "NAME UP" - the margin
@@ -12218,7 +12510,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 : '';
             statusEl.innerHTML = `<span class="ticker-part">🟢 <strong>${matchStatusStr}</strong>${thruText}</span>${betsLine}`;
             
-            document.getElementById("nassau-payout-header").textContent = `💵 Live Standings (${matchCalc.t1Name} vs ${matchCalc.t2Name})`;
+            document.getElementById("nassau-payout-header").textContent = `📊 Live Standings (${matchCalc.t1Name} vs ${matchCalc.t2Name})`;
             let t1Money = matchCalc.t1TotalMoney;
             function fmtM(amt) {
                 if (amt > 0) return `<span class="val-pos">+$${amt}</span>`;
@@ -12237,11 +12529,11 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 let statusDesc = "All Square ($0)";
                 if (holeBet > 0) {
                     let amt = Math.abs(m.status * holeBet);
-                    if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${amt}`;
-                    else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${amt}`;
+                    if (m.status > 0) statusDesc = `${escapeHtml(matchCalc.t1Name)} +$${amt}`;
+                    else if (m.status < 0) statusDesc = `${escapeHtml(matchCalc.t2Name)} +$${amt}`;
                 } else {
-                    if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${flatStakeForList}`;
-                    else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${flatStakeForList}`;
+                    if (m.status > 0) statusDesc = `${escapeHtml(matchCalc.t1Name)} +$${flatStakeForList}`;
+                    else if (m.status < 0) statusDesc = `${escapeHtml(matchCalc.t2Name)} +$${flatStakeForList}`;
                 }
                 let lockIcon = m.closed ? "🔒 " : "";
                 let indent = m.pressNum > 0 ? "margin-left: 12px; border-left: 2px solid var(--accent-teal); padding-left: 8px;" : "padding-left: 4px;";
@@ -12250,23 +12542,23 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
             document.getElementById("payout-rows-wrapper").innerHTML = `
                 <div class="payout-row">
-                    <span>Bet Type:</span>
+                    <span>Game Type:</span>
                     <span>${betTypeStr}</span>
                 </div>
                 <div class="payout-row" style="flex-direction:column; align-items: stretch; margin-top:8px;">
-                    <div style="font-weight:bold; color:var(--brand-green); margin-bottom:4px; border-bottom: 2px solid var(--accent-teal); padding-bottom:4px;">Bet-by-Bet Breakdown</div>
+                    <div style="font-weight:bold; color:var(--brand-green); margin-bottom:4px; border-bottom: 2px solid var(--accent-teal); padding-bottom:4px;">Game-by-Game Breakdown</div>
                     ${matchBetsListHtml}
                 </div>
                 <div class="payout-row" style="margin-top:8px;">
                     <span>Total Ledger:</span>
-                    <span>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</span>
+                    <span>${escapeHtml(matchCalc.t1Name)}: ${fmtM(t1Money)} | ${escapeHtml(matchCalc.t2Name)}: ${fmtM(-t1Money)}</span>
                 </div>
                 ${pressBtnHtml ? `<div class="payout-row" style="justify-content:flex-end;">${pressBtnHtml}</div>` : ''}
             `;
             
         } else if (gameFormat === 'nassau' && matchCalc) {
             payoutBox.style.display = "block";
-            titleEl.textContent = "💵 LIVE NASSAU MATCH STATUS";
+            titleEl.textContent = "📊 LIVE NASSAU MATCH STATUS";
             
             let t18 = matchCalc.activeMatches.find(m => m.id === '18');
             let f9 = matchCalc.activeMatches.find(m => m.id === 'F9');
@@ -12289,7 +12581,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 statusEl.innerHTML = `<span class="ticker-part">Match: <strong>${singleStr}</strong></span>${pressText}`;
             }
 
-            document.getElementById("nassau-payout-header").textContent = `💵 Live Standings (${matchCalc.t1Name} vs ${matchCalc.t2Name})`;
+            document.getElementById("nassau-payout-header").textContent = `📊 Live Standings (${matchCalc.t1Name} vs ${matchCalc.t2Name})`;
             
             let t1Money = matchCalc.t1TotalMoney;
             function fmtM(amt) {
@@ -12310,12 +12602,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                     const pressBtn = openMatch
                         ? `<button onclick="pressMatchBet('${bId}', ${matchCalc.maxThru + 1})" style="background:var(--brand-navy); color:white; border:none; border-radius:5px; padding:2px 8px; font-size:0.7rem; font-weight:bold; cursor:pointer;">🔥 Press</button>`
                         : '';
-                    matchesListHtml += `<div style="background:var(--subtle-bg); color:var(--brand-green); padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;"><span>${groupLabel} Bets</span>${pressBtn}</div>`;
+                    matchesListHtml += `<div style="background:var(--subtle-bg); color:var(--brand-green); padding:4px 8px; font-weight:bold; font-size:0.75rem; text-transform:uppercase; margin-top:8px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;"><span>${groupLabel} Games</span>${pressBtn}</div>`;
                     
                     groupMatches.forEach(m => {
                         let statusDesc = "All Square ($0)";
-                        if (m.status > 0) statusDesc = `${matchCalc.t1Name} +$${stake}`;
-                        else if (m.status < 0) statusDesc = `${matchCalc.t2Name} +$${stake}`;
+                        if (m.status > 0) statusDesc = `${escapeHtml(matchCalc.t1Name)} +$${stake}`;
+                        else if (m.status < 0) statusDesc = `${escapeHtml(matchCalc.t2Name)} +$${stake}`;
 
                         // A closed segment already reflects a mathematically decided result
                         // (m.finalResult, e.g. "3&2") — an open one is still live and could change.
@@ -12350,12 +12642,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
             document.getElementById("payout-rows-wrapper").innerHTML = `
                 <div class="payout-row" style="flex-direction:column; align-items: stretch;">
-                    <div style="font-weight:bold; color:var(--brand-green); margin-bottom:4px; border-bottom: 2px solid var(--accent-teal); padding-bottom:4px;">Bet-by-Bet Breakdown</div>
+                    <div style="font-weight:bold; color:var(--brand-green); margin-bottom:4px; border-bottom: 2px solid var(--accent-teal); padding-bottom:4px;">Game-by-Game Breakdown</div>
                     ${matchesListHtml}
                 </div>
                 <div class="payout-row" style="margin-top:8px;">
                     <span>Total Ledger:</span>
-                    <span>${matchCalc.t1Name}: ${fmtM(t1Money)} | ${matchCalc.t2Name}: ${fmtM(-t1Money)}</span>
+                    <span>${escapeHtml(matchCalc.t1Name)}: ${fmtM(t1Money)} | ${escapeHtml(matchCalc.t2Name)}: ${fmtM(-t1Money)}</span>
                 </div>
             `;
         } else if (gameFormat === 'hilo' && hiloCalc) {
@@ -12372,17 +12664,17 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             document.getElementById("payout-rows-wrapper").innerHTML = `
                 <div class="payout-row">
                     <span>Team Points:</span>
-                    <span>${hiloCalc.t1Name}: <strong>${hiloCalc.t1Points} Pts</strong> | ${hiloCalc.t2Name}: <strong>${hiloCalc.t2Points} Pts</strong></span>
+                    <span>${escapeHtml(hiloCalc.t1Name)}: <strong>${hiloCalc.t1Points} Pts</strong> | ${escapeHtml(hiloCalc.t2Name)}: <strong>${hiloCalc.t2Points} Pts</strong></span>
                 </div>
                 <div class="payout-row">
                     <span>Financial Ledger:</span>
-                    <span>${hiloCalc.t1Name}: ${fmtM(t1Money)} | ${hiloCalc.t2Name}: ${fmtM(-t1Money)}</span>
+                    <span>${escapeHtml(hiloCalc.t1Name)}: ${fmtM(t1Money)} | ${escapeHtml(hiloCalc.t2Name)}: ${fmtM(-t1Money)}</span>
                 </div>
             `;
             titleEl.textContent = `↕️ HI-LO (LOW BALL / HIGH BALL)`;
             statusEl.innerHTML = `
-                <span class="ticker-part">${hiloCalc.t1Name}: <strong>${hiloCalc.t1Points} Pts</strong></span>
-                <span class="ticker-part">${hiloCalc.t2Name}: <strong>${hiloCalc.t2Points} Pts</strong></span>
+                <span class="ticker-part">${escapeHtml(hiloCalc.t1Name)}: <strong>${hiloCalc.t1Points} Pts</strong></span>
+                <span class="ticker-part">${escapeHtml(hiloCalc.t2Name)}: <strong>${hiloCalc.t2Points} Pts</strong></span>
             `;
         } else if (gameFormat === 'wolf' && wolfCalc) {
             payoutBox.style.display = "none";
@@ -12393,7 +12685,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
             let scoresList = [];
             filteredPlayers.forEach(p => {
-                let shortName = p.name.split(" ")[0];
+                let shortName = golferLabel(p) || p.name.split(" ")[0];   // polish #2: "Test A" / "Test B"
                 let pts = wolfCalc.totals[p.id] || 0;
                 let moneyTxt = "";
                 if (p.playingForMoney !== false && currentData.wolfPointVal) {
@@ -12412,7 +12704,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 
             let scoresList = [];
             filteredPlayers.forEach(p => {
-                let shortName = p.name.split(" ")[0];
+                let shortName = golferLabel(p) || p.name.split(" ")[0];   // polish #2: "Test A" / "Test B"
                 let pts = stablefordCalc.totals[p.id] || 0;
                 let moneyTxt = "";
                 if (p.playingForMoney !== false && currentData.stablefordPointVal) {
@@ -12439,7 +12731,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             
             let scoresList = [];
             filteredPlayers.forEach(p => {
-                let shortName = p.name.split(" ")[0];
+                let shortName = golferLabel(p) || p.name.split(" ")[0];   // polish #2: "Test A" / "Test B"
                 scoresList.push(`<span style="white-space:nowrap;">${escapeHtml(shortName)}: <strong>${playerDots[p.id]}</strong></span>`);
             });
             
@@ -12461,7 +12753,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
                 if (thru > maxThru) maxThru = thru;
                 
                 let toParText = runningStats[p.id] === 0 ? "E" : (runningStats[p.id] > 0 ? `+${runningStats[p.id]}` : `${runningStats[p.id]}`);
-                let shortName = p.name.split(" ")[0]; 
+                let shortName = golferLabel(p) || p.name.split(" ")[0];   // polish #2: "Test A" / "Test B"
                 
                 scoresList.push(`<span style="white-space:nowrap;">${escapeHtml(shortName)}: <strong>${thru === 0 ? '-' : toParText}</strong></span>`);
             });
@@ -12494,6 +12786,13 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             currentViewedHole = nextUp ? nextUp.hole : (sortedHoles[0] ? sortedHoles[0].hole : 1);
         }
         if (currentViewMode === 'hole') renderHoleView();
+        // 2.0 (23) ADVISOR-1325 B: THE FULL CARD'S LIVE CARDS FOLLOW EVERY SCORE TOO. The reading
+        // widgets (LIVE MATCHES & PRESSES, the board, skins - #fc-ticker-mount and #round-reading)
+        // were drawn only by renderHoleView(), so on the Full Card (the Round Menu's Card tile) a
+        // score typed into the grid, or anywhere else, redrew the table and left every live card on
+        // the last hole scored in Hole View: "Front 9 Josh 2 UP thru 2 / Back 9 Not Started" over a
+        // finished card. Same renderers, same order as Hole View's call; nothing is computed here.
+        else renderCardWidgets();
         restoreScoreFocus(focusMemo);
     }
 
