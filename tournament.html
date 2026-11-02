@@ -434,7 +434,7 @@
     <div class="form-group setup-field">
         <label id="t-entry-fee-label">Entry Fee per Team ($, optional)</label>
         <div class="money-input"><span class="money-prefix" aria-hidden="true">$</span><input type="number" id="t-entry-fee" value="0" min="0" placeholder="0"></div>
-        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;" id="t-entry-fee-help">Pool and payouts are calculated for you once teams are in — this is just the calculator, settle up for real however your event normally does.</p>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;" id="t-entry-fee-help">The total in and results are calculated for you once teams are in — this is just the calculator, square up for real however your event normally does.</p>
     </div>
 
     <!-- MOVED HERE FROM #manage-screen, wave 9. Same fault as
@@ -784,7 +784,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              else, never removed (the f0fa56f rule: hide in the tree). The amounts it
              sets are SAVED on the record as payoutSpots and everyone reads those. -->
         <div id="payout-owner-controls" style="display:none;">
-        <h3>🏆 Prize Payout Calculator</h3>
+        <h3>🏆 Prize Results Calculator</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many spots pay — this maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
         <div class="form-group" style="margin-bottom:8px;">
             <label>Paid Spots</label>
@@ -792,7 +792,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
         <div id="payout-spot-amounts"></div>
         </div>
-        <h3 id="payout-public-heading">🏆 Prize Payouts</h3>
+        <h3 id="payout-public-heading">🏆 Prize Results</h3>
         <div id="payout-public-amounts"></div>
         <div id="payout-results" style="margin-top:10px;"></div>
 
@@ -1310,8 +1310,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const help = document.getElementById('t-entry-fee-help');
         if (label) label.textContent = `Entry Fee per ${per} ($, optional)`;
         if (help) {
-            help.textContent = `Pool and payouts are calculated for you once ${noun} are in`
-                + ' — this is just the calculator, settle up for real however your event'
+            help.textContent = `The total in and results are calculated for you once ${noun} are in`
+                + ' — this is just the calculator, square up for real however your event'
                 + ' normally does.';
         }
     }
@@ -3329,8 +3329,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const container = document.getElementById('payout-spot-amounts');
         const subEl = document.getElementById('payout-pool-sub');
         subEl.textContent = pool > 0
-            ? `Pool is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many spots pay — ties split whatever their tied spots add up to.`
-            : `No entry fee set for this tournament — set spot amounts manually if you're running a separate pool.`;
+            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many spots pay — ties split whatever their tied spots add up to.`
+            : `No entry fee set for this tournament — set spot amounts manually if you're running a separate total.`;
 
         let html = '';
         let focusedAt = -1, focusedValue = '';
@@ -3366,12 +3366,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (pub) {
             pub.innerHTML = owner ? '' : (payoutsAreSet(spotAmounts)
                 ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${spotAmounts.map((v, i) => `${ordinal(i + 1)} $${v.toFixed(2)}`).join(' \u00b7 ')}</div>`
-                : `<div class="payout-spot-readonly" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Payouts not set yet.</div>`);
+                : `<div class="payout-spot-readonly" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Results not set yet.</div>`);
         }
         if (!owner && !payoutsAreSet(spotAmounts)) { resultsContainer.innerHTML = ''; return; }
 
         if (!cachedLeaderboardRows || cachedLeaderboardRows.filter(r => r.hasScores).length === 0) {
-            resultsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No scores yet — payouts will show once teams start posting.</div>`;
+            resultsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No scores yet — results will show once teams start posting.</div>`;
             return;
         }
 
@@ -3389,7 +3389,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // that disagrees with the pool.
         if (owner && payoutsAreSet(spotAmounts) && pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--accent-red); background:var(--danger-box-bg); border:1px solid var(--accent-red); border-radius:6px; padding:8px; margin-bottom:10px;">
-                ⚠️ Payout amounts add up to $${totalAllocated.toFixed(2)}, but the pool is $${pool.toFixed(2)}.
+                ⚠️ Result amounts add up to $${totalAllocated.toFixed(2)}, but the total in is $${pool.toFixed(2)}.
             </div>`;
         }
 
@@ -3398,7 +3398,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // that case returns above. Now it is the case where amounts are set but
         // the only scored ranks sit on $0 spots.
         if (!spotAmounts.some((v) => v > 0)) {
-            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Enter spot amounts above to see payouts.</div>`;
+            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Enter spot amounts above to see results.</div>`;
         } else if (payouts.length === 0) {
             html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No paid spots reached yet.</div>`;
         } else {
@@ -4380,7 +4380,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const scoringLine = scoringModeLine(currentData);
 
         let html = `<h1 style="margin-bottom:2px; color:#0f4c3a;">🏆 ${escapeHtml(currentData.name)}</h1>
-            <p style="color:#666; margin-top:0;">${escapeHtml(currentData.courseName)} • ${formatLabelFor(currentData.format)}${view.title ? ` • ${escapeHtml(view.title)}` : ''}${scoringLine ? ` • ${scoringLine}` : ''}${pool > 0 ? ` • Pool: $${pool.toFixed(2)}` : ''}</p>
+            <p style="color:#666; margin-top:0;">${escapeHtml(currentData.courseName)} • ${formatLabelFor(currentData.format)}${view.title ? ` • ${escapeHtml(view.title)}` : ''}${scoringLine ? ` • ${scoringLine}` : ''}${pool > 0 ? ` • Total in: $${pool.toFixed(2)}` : ''}</p>
             <table style="width:100%; border-collapse:collapse; margin-top:14px;">
                 <tr style="border-bottom:2px solid #ccc; text-align:left; font-size:0.85rem; color:#666;">
                     <th style="padding:8px 4px;">Pos</th><th style="padding:8px 4px;">${entryColumnLabel(currentData)}</th><th style="padding:8px 4px;">${view.kind === 'event' ? 'Rds' : 'Thru'}</th><th style="padding:8px 4px; text-align:right;">To Par</th>
@@ -4613,7 +4613,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             document.getElementById('manage-t-name').textContent = `🏆 ${currentData.name}`;
             document.getElementById('manage-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
             const pool = poolTotal();
-            document.getElementById('manage-t-pool').textContent = pool > 0 ? `💰 Pool: $${pool.toFixed(2)}` : '';
+            document.getElementById('manage-t-pool').textContent = pool > 0 ? `📊 Total in: $${pool.toFixed(2)}` : '';
             document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
             document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
             renderEventDetails();

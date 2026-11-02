@@ -113,6 +113,13 @@
             });
         }).catch(function (e) { try { console.warn('[rsvp] not saved', e && e.message); } catch (x) {} return null; });
     }
+    // 106d: DELETE the weekly game -> its In/Out link ends (the owner deletes the node; the published rules allow
+    // it). A friend's page then says "Link has ended". Resolves either way; a failure is said in the console only.
+    function remove(rec, given) {
+        var d = dbOf(given);
+        if (!d || !rec || !rec.rsvpId) return Promise.resolve(false);
+        return d.ref('weeklyRsvp/' + rec.rsvpId).remove().then(function () { return true; }, function (e) { try { console.warn('[rsvp] not removed', e && e.message); } catch (x) {} return false; });
+    }
     function inviteText(rec, id) {
         var d = nextGame(rec);
         return rec.name + ' · ' + SHORT[rec.day] + ' ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ' · ' + timeText(rec.time) + (rec.courseName ? ' · ' + rec.courseName : '')
@@ -179,7 +186,7 @@
 
     // ---- Home card extras: "N of M said In" and the no-answers reminder ----------------------------
     function decorate(box, c, given) {
-        if (!box || !c || !c.rec || !c.rec.rsvpId || c.kind === 'week' || c.kind === 'nudge') return;
+        if (!box || !c || !c.rec || !c.rec.rsvpId || c.kind === 'week' || c.kind === 'nudge' || c.kind === 'skipped') return;   // 106d: not on a skipped week's line
         var rec = c.rec, d = dbOf(given);
         if (!d) return;
         d.ref('weeklyRsvp/' + rec.rsvpId).once('value').then(function (s) {
@@ -190,6 +197,8 @@
             var t = now(), eve = (((Number(rec.day) - t.getDay()) % 7 + 7) % 7) === 1 && t.getHours() >= 18;
             var line = D.createElement('div');
             line.setAttribute('data-rv-line', '1'); line.className = 's'; line.style.marginTop = '8px';
+            // 106e: nobody invited yet -> no "0 of 0 said In"; the way to invite instead.
+            if (!sm.total) { line.innerHTML = '<button type="button" data-hpw="text-group" data-hpw-id="' + esc(rec.id) + '" data-rv-send style="border:0;background:#d4f46a;color:#0f4c3a;border-radius:999px;font-weight:800;min-height:40px;padding:0 14px;font-size:14px;">\uD83D\uDCAC Send the In/Out link</button>'; card.insertBefore(line, card.querySelector('.hpw-btn') || null); return; }
             line.innerHTML = '<b>' + sm.in + ' of ' + sm.total + '</b> said In'
                 + (eve && rec.remindNoAnswers !== false && sm.none > 0 ? ' · <b data-rv-remind>' + sm.none + ' haven’t answered</b> <button type="button" data-hpw="whos-in" data-hpw-id="' + esc(rec.id) + '" style="border:0;background:#d4f46a;color:#0f4c3a;border-radius:999px;font-weight:800;min-height:36px;padding:0 12px;margin-left:6px;">Nudge them</button>' : '');
             var anchor = card.querySelector('.hpw-btn');
@@ -250,7 +259,7 @@
         try { d.ref('weeklyRsvp/' + id).on('value', function (s) { node = s && s.val ? s.val() : null; draw(); }, function () { node = null; draw(); }); } catch (e) { node = null; draw(); }
     }
 
-    W.HardPanRsvp = { newId: newId, weekOf: weekOf, rosterOf: rosterOf, record: record, answer: answer, link: link, summary: summary, ensure: ensure,
+    W.HardPanRsvp = { newId: newId, weekOf: weekOf, rosterOf: rosterOf, record: record, answer: answer, link: link, summary: summary, ensure: ensure, remove: remove,
         inviteText: inviteText, openList: openList, sendLink: sendLink, decorate: decorate, page: page, newPersonKey: newPersonKey, SITE: SITE };
     if ($('rv-app')) {
         if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', function () { page(); }); else setTimeout(function () { page(); }, 0);
