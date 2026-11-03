@@ -4498,6 +4498,9 @@
 // Also in v373-2.0 (build 23, ADVISOR-1306): hcp-plus.js (new) + home.html, index.html, admin.html, trip.html,
 // hp-account-ui.js - a + Plus chip under every handicap box (the decimal pad has no + key). A device on v372-2.0
 // keeps no + Plus chip (no way to type a plus handicap on the decimal pad).
+// Moved to v379-2.0 (build 28): gps-live.js - a course lookup waits for the saved sign-in to restore before showing Sign in to load; simple-flow.js - that Sign in opens the real account sheet on top (never the setup page).
+// Moved to v378-2.0 (build 27): skins.html - the Games page no longer shows the Skins-is-running explainer box (the Round Games card shows the game); the Final Results and Receipt button stays.
+// Moved to v377-2.0 (build 26): the Add golfer sheet keeps its button on screen above the keyboard with a compact tee row, every bottom sheet scrolls and fits above the keyboard, a watching phone opens the Leaderboard page (no map), scorecard words (gps-add-golfer.js, gps-view.js, index.html, leaderboard.html, text-safe.js, front-door.js).
 // Moved to v376-2.0 (build 25): live games tile, No amount on every amount step, Edit and Remove on game cards, Skins carry switch, Round Setup and Round Complete words, receipt totals and Thru N chip, a safe-area band on every page, My bag and the linked golfer only, watching phones open on the card, the you star (index.html, admin.html, gps-view.js, gps-game.js, gps-bet.js, gps-range.js, front-door.js, gps-stats.js, hp-index.js, text-safe.js, settlement.html, skins.html, sidematches.html, leaderboard.html, stats.html and others).
 // Moved to v375-2.0 (build 24 re-archive): zero-stake games show no dollar sign (text-safe.js, settlement.html, skins.html, sidematches.html, stats.html, index.html, leaderboard.html, gps-bet.js, gps-game.js, gps-round.js) and Discard an unsaved Round Setup (admin.html).
 // Moved to v374-2.0 (build 24): front-door.js, gps-bet.js, gps-game.js, sidematches.html - one Add a game list (1 v 1 / 2 v 2 /
@@ -4505,7 +4508,7 @@
 // opens with NEAR YOU (only when location is already allowed) then LAST PLAYED; settlement.html + receipt-image.js (new) -
 // Share receipt as a designed image. A device on v373-2.0 keeps the old files: the four add-a-game screens and More tiles,
 // the regional course list first, and the text-only Share receipt.
-const CACHE_VERSION = 'golfapp-v376-2.0';
+const CACHE_VERSION = 'golfapp-v379-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
