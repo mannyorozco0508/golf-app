@@ -516,3 +516,4 @@ function hpCourseNameText(name) {
 if (typeof module !== 'undefined' && module.exports) {
     Object.assign(module.exports, { hpSideMatchStartsHole, hpSideMatchStartsText, hpCourseNameText });
 }
+

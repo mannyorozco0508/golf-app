@@ -823,13 +823,9 @@ body::after {
             const box = document.getElementById("skins-content");
             if (box) {
                 if (elsewhereCount > 0) {
-                    box.innerHTML = `<div style="padding:14px 4px; font-size:0.85rem; line-height:1.55; color:var(--text-muted);">
-                            <div style="font-weight:bold; color:var(--text-main); margin-bottom:6px;">Skins is running \u2014 see Round Games above</div>
-                            This round has <strong>${elsewhereCount} Skins game${plural(elsewhereCount)}</strong> that ${elsewhereCount === 1 ? 'is' : 'are'} not the round's main format.
-                            ${elsewhereCount === 1 ? 'Its' : 'Their'} live standing is under Round Games; this ledger only follows a round whose main game is Skins.
-                            The Receipt itemises every one, with who is in it and how it finished.
-                        </div>
-                        <a class="btn-primary" href="${linkWithRound('settlement.html')}" style="display:block; text-align:center; text-decoration:none;">\uD83D\uDCC4 Final Results &amp; Receipt</a>`;
+                    // 2.0 (27) Manny: the "Skins is running - see Round Games above" explainer is gone (the Round Games card
+                    // already shows the game); the Final Results & Receipt button stays where it was.
+                    box.innerHTML = `<a class="btn-primary" href="${linkWithRound('settlement.html')}" style="display:block; text-align:center; text-decoration:none;">\uD83D\uDCC4 Final Results &amp; Receipt</a>`;
                 } else {
                     const leftover = currentData.skinsBuyIn !== undefined ? currentData.skinsBuyIn : 0;
                     box.innerHTML = `<div style="padding:14px 4px; font-size:0.85rem; line-height:1.55; color:var(--text-muted);">
