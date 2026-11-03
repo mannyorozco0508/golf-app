@@ -1,0 +1,508 @@
+// ============================================================================
+// POINTS LEAGUE (HardPan, gps-league) - the week's individual points race.
+//
+// PURE. No DOM, no database. The trip page hands it the trip's rounds and the
+// league's settings (trips/<code>/league); this says who has how many points and
+// who gets paid. Plain var/function declarations, like trip-pots.js.
+//
+// THE RULES (defaults; every number is the organizer's to change):
+//   Every round, each group plays 2 v 2 (partners change round to round). Points come
+//   from that group's own 2 v 2 Nassau - its result READ, never changed, from the
+//   ONE engine (match-engine.js calculateMatchEngine, net or gross as the Nassau was
+//   set up): front 9 = 1 pt, back 9 = 1 pt, 18 = 1 pt to EACH golfer on the winning
+//   side; a halve = half each. The organizer can set any segment by hand (A / B /
+//   halved), or enter a match for a group that played no Nassau.
+//   Standings: points over every round of the trip. Tiebreak: most matches won
+//   (a match = more of its points than the other side), then shared.
+//   Pot: buy-in x golfers in the league. Places (default 3, at 50 / 30 / 20 %) are paid
+//   from it; golfers tied on a paid place split the places they cover.
+//
+// ITS OWN MONEY, SETTLED SEPARATELY. Nothing here feeds Who Pays Who or the trip
+// money settlement; nothing in any money engine is called except the match engine,
+// read-only, the way Side Bets calls it. All money in integer cents.
+// ============================================================================
+
+var LEAGUE_DEFAULTS = { buyIn: 20, pts: { front: 1, back: 1, total: 1 }, places: [50, 30, 20] };
+var LEAGUE_SEGS = ['front', 'back', 'total'];
+var LEAGUE_ENGINE_IDS = { front: 'F9', back: 'B9', total: '18' };
+
+function leagueKey(name) { return String(name == null ? '' : name).trim().replace(/\s+/g, ' ').toLowerCase(); }
+
+// The stored settings, made whole. null when there is no league.
+//   trips/<code>/league = { on, buyIn, players: [names] | null (= everyone),
+//     pts: { front, back, total }, places: [%...], overrides: { <matchId>: { front, back,
+//     total: 'A' | 'B' | 'H' | null } }, manual: { <id>: { round, group, a: [names],
+//     b: [names] } }, at }
+// THE POINTS GAME (gps-points, 2026-10-13): the same settings, held by a trip
+// (trips/<code>/league) or by one round (events/<code>/pointsGame). Added:
+//   rounds:    [codes] the rounds that count | null = every round of the trip (later ones too)
+//   teamsMode: 'change' (each round's own 2 v 2 Nassaus, or entered by hand) |
+//              'same'   (the same 2 v 2 sides every round: teams = [{ a: [n, n], b: [n, n] }],
+//                        scored from each round's scores by the match engine)
+//   scoring:   'net' | 'gross' for the same-teams matches (default net)
+//   payMode:   'pct' (places = % of the pot) | 'usd' (placesUsd = $ per place, adding up to the pot)
+function leagueConfig(trip) {
+    var l = trip && (trip.league || trip.pointsGame);
+    if (!l || l.on === false) return null;
+    var num = function (v, d) { var n = Number(v); return isFinite(n) && n >= 0 ? n : d; };
+    var pts = l.pts || {};
+    var places = Array.isArray(l.places) ? l.places.map(function (p) { return num(p, 0); }).filter(function (p) { return p > 0; }) : LEAGUE_DEFAULTS.places.slice();
+    return {
+        buyIn: num(l.buyIn, LEAGUE_DEFAULTS.buyIn),
+        players: Array.isArray(l.players) && l.players.length ? l.players.map(String) : null,
+        pts: { front: num(pts.front, 1), back: num(pts.back, 1), total: num(pts.total, 1) },
+        places: places,
+        overrides: l.overrides || {},
+        manual: l.manual || {},
+        rounds: Array.isArray(l.rounds) && l.rounds.length ? l.rounds.map(String) : null,
+        teamsMode: l.teamsMode === 'same' ? 'same' : l.teamsMode === 'league' ? 'league' : l.teamsMode === 'rr' ? 'rr' : 'change',
+        // ROUND-ROBIN BEST BALL (Manny, 2026-10-13: 10 golfers = 5 pairs): per round the pairs
+        // ({ <round>: [[n, n], ...] }); every pair plays an 18-hole best-ball match against every
+        // other pair. rrPts: { mode: 'match' (win / halve, default 1 / ½) | 'nassau' (front / back / 18) }.
+        pairs: Object.keys(l.pairs || {}).reduce(function (o, k) { var v = l.pairs[k]; v = Array.isArray(v) ? v : Object.keys(v || {}).map(function (x) { return v[x]; });
+            o[k] = v.filter(function (pr) { return Array.isArray(pr) && pr.length === 2 && pr[0] && pr[1]; }).map(function (pr) { return [String(pr[0]), String(pr[1])]; }); return o; }, {}),
+        rrPts: (function (r) { r = r || {}; return { mode: r.mode === 'nassau' ? 'nassau' : 'match', win: num(r.win, 1), halve: num(r.halve, 0.5),
+            pts: { front: num((r.pts || {}).front, 1), back: num((r.pts || {}).back, 1), total: num((r.pts || {}).total, 1) } }; })(l.rrPts),
+        // LEAGUE PAIRINGS (Manny, 2026-10-13): per round, the game's own matches from the league
+        // golfers only - { <round>: [{ a: [names], b: [names] }] }, 2 v 2 or 1 v 1 - whatever
+        // groups they are in. Scored from each golfer's own hole scores.
+        pairings: Object.keys(l.pairings || {}).reduce(function (o, k) { var v = l.pairings[k]; v = Array.isArray(v) ? v : Object.keys(v || {}).map(function (x) { return v[x]; });
+            o[k] = v.filter(function (t) { return t && Array.isArray(t.a) && Array.isArray(t.b) && t.a.length && t.a.length === t.b.length; }).map(function (t) { return { a: t.a.map(String), b: t.b.map(String) }; }); return o; }, {}),
+        teams: Array.isArray(l.teams) ? l.teams.filter(function (t) { return t && Array.isArray(t.a) && Array.isArray(t.b) && t.a.length && t.b.length; })
+            .map(function (t) { return { a: t.a.map(String), b: t.b.map(String) }; }) : [],
+        scoring: l.scoring === 'gross' ? 'gross' : 'net',
+        payMode: l.payMode === 'usd' ? 'usd' : 'pct',
+        placesUsd: Array.isArray(l.placesUsd) ? l.placesUsd.map(function (p) { return num(p, 0); }).filter(function (p) { return p > 0; }) : [],
+        def: leagueRoundCfg(l.def, pts, num),
+        perRound: Object.keys(l.perRound || {}).reduce(function (o, k) { o[k] = leagueRoundCfg(l.perRound[k], (l.def && l.def.pts) || pts, num); return o; }, {})
+    };
+}
+// EACH ROUND ITS OWN FORMAT AND POINTS (Manny, 2026-10-13: "like a Ryder Cup but with individual
+// standings"). format: 'fourball' (best ball 2 v 2) | 'foursomes' (alternate shot 2 v 2) |
+// 'scramble' (2 v 2) | 'singles' (1 v 1). mode: 'nassau' (front / back / 18) | 'match' (18-hole
+// match: win / halve points). Default: four-ball, Nassau-style, 1 / 1 / 1.
+var LEAGUE_FORMATS = ['fourball', 'foursomes', 'scramble', 'singles'];
+function leagueRoundCfg(r, pts, num) {
+    r = r || {}; pts = (r.pts || pts) || {};
+    num = num || function (v, d) { var n = Number(v); return isFinite(n) && n >= 0 ? n : d; };
+    return { format: LEAGUE_FORMATS.indexOf(r.format) !== -1 ? r.format : 'fourball', mode: r.mode === 'match' ? 'match' : 'nassau',
+        pts: { front: num(pts.front, 1), back: num(pts.back, 1), total: num(pts.total, 1) }, win: num(r.win, 2), halve: num(r.halve, 1) };
+}
+function leagueRoundOf(cfg, code) { return (cfg.perRound && cfg.perRound[code]) || cfg.def || leagueRoundCfg(null, cfg.pts); }
+// The match engine can score these from each golfer's own scores; foursomes / scramble have one
+// ball per side, so outside a Cup round their results are tapped in by the organizer.
+function leagueEngineScores(format) { return format === 'fourball' || format === 'singles'; }
+
+// ---- THE MATCHES OF ONE ROUND ---------------------------------------------------
+// One per 2 v 2 Nassau in the round's Side Bets (sideMatches), read through the engine.
+// calc(sm, data) is the caller's: the same calculateMatchEngine call Side Bets makes.
+// A segment is decided once the engine closes it (won), or once every hole of it has
+// been played by both sides with the match level (halved). Otherwise null (not yet).
+// HOLE BY HOLE, IN ANY ORDER (gps-points-start10, 2026-10-13). A group that starts on the 10th
+// plays 10-18 then 1-9; the engine's own close-out counts the holes still to play in the order
+// it is handed them, and on a start-on-10 card it can close the 18 (and presses) before holes
+// 1-9 are played. The Points game does not use the engine's close-out at all: it takes the
+// engine's hole-by-hole winners (holeLog - who won each hole, net as set up) and decides each
+// segment itself: won once the lead is bigger than the segment's holes NOT YET PLAYED - by
+// anyone's count, whatever order they are played in - halved once all are played level.
+// Every league match is scored over the whole card (start = hole 1). The money engines are
+// untouched: this only reads.
+function leagueHoleDiffs(calcOut) {
+    var out = {}, log = (calcOut && calcOut.holeLog) || {};
+    Object.keys(log).forEach(function (h) {
+        var w = log[h] && log[h].holeWinner;
+        if (w == null) return;
+        out[String(h)] = w === calcOut.t1Name ? 1 : w === calcOut.t2Name ? -1 : 0;
+    });
+    return out;
+}
+var LEAGUE_RANGE = { front: [1, 9], back: [10, 18], total: [1, 18] };
+function leagueSegState(calcOut, holes, seg) {
+    var diffs = leagueHoleDiffs(calcOut), r = LEAGUE_RANGE[seg];
+    // The segment's holes on THIS card (a nine-hole card has only its own nine).
+    var mine = (holes || []).map(function (h) { return Number(h.hole); }).filter(function (n) { return n >= r[0] && n <= r[1]; });
+    if (!mine.length) return null;
+    var status = 0, played = 0;
+    mine.forEach(function (n) { var d = diffs[String(n)]; if (d === undefined) return; played++; status += d; });
+    var left = mine.length - played;
+    var decided = played > 0 && (left === 0 || Math.abs(status) > left);
+    return { status: status, played: played, left: left, decided: decided };
+}
+// LIVE: where the 18 stands now (A up > 0), holes played, and the result once decided.
+function leagueLive(calcOut, holes) {
+    if (!calcOut) return null;
+    var t = leagueSegState(calcOut, holes || [], 'total');
+    if (!t) return null;
+    return { status: t.status, thru: t.played, closed: t.decided,
+        result: !t.decided ? null : t.left === 0 ? (t.status === 0 ? 'halved' : Math.abs(t.status) + ' up') : Math.abs(t.status) + '&' + t.left };
+}
+function leagueSegments(calcOut, holes, scores, aIds, bIds) {
+    var out = { front: null, back: null, total: null };
+    if (!calcOut) return out;
+    LEAGUE_SEGS.forEach(function (seg) {
+        var st = leagueSegState(calcOut, holes, seg);
+        if (st && st.decided) out[seg] = st.status > 0 ? 'A' : st.status < 0 ? 'B' : 'H';
+    });
+    return out;
+}
+// The whole card, in hole order, for every league match (start = hole 1).
+function leagueWholeCard(sm) { return Object.assign({}, sm, { startHole: 1 }); }
+function leagueCardHoles(data) { return ((data && data.courseData) || []).slice().sort(function (a, b) { return Number(a.hole) - Number(b.hole); }); }
+
+function leagueRoundMatches(round, calc, holesFor, rc, ryder) {
+    rc = rc || leagueRoundCfg();
+    var data = (round && round.data) || {};
+    var size = rc.format === 'singles' ? 1 : 2;
+    // A CUP ROUND: its own matches, scored by the Ryder engine (four-ball, foursomes, singles).
+    var cup = ryder ? ryder(round) : null;
+    if (cup && cup.length) return cup.filter(function (c) { return c.a.length === c.b.length; }).map(function (c, i) {
+        var seg = { front: null, back: null, total: c.total || null };
+        if (rc.mode === 'nassau' && leagueEngineScores(c.format) && calc && c.aIds && c.bIds) {
+            var sm = { format: 'nassau', teamAIds: c.aIds, teamBIds: c.bIds, scoring: c.scoring || 'net', startHole: 1 };
+            var res = null; try { res = calc(sm, data); } catch (e) { res = null; }
+            var sg = leagueSegments(res, leagueCardHoles(data), data.scores || {}, c.aIds, c.bIds);
+            seg.front = sg.front; seg.back = sg.back;
+        }
+        return { id: round.code + '~cup' + (c.id || i), round: round.code, label: round.label || round.code, group: null, a: c.a, b: c.b, seg: seg, source: 'cup', format: c.format };
+    });
+    var byId = {};
+    (data.players || []).forEach(function (p) { if (p && p.id != null) byId[String(p.id)] = p; });
+    var sms = data.sideMatches || {};
+    var out = [];
+    Object.keys(sms).sort(function (a, b) { return ((sms[a] || {}).createdAt || 0) - ((sms[b] || {}).createdAt || 0) || (a < b ? -1 : 1); }).forEach(function (smId) {
+        var sm = sms[smId];
+        if (!sm || (sm.format !== 'nassau' && sm.format !== 'match')) return;
+        var aIds = (sm.teamAIds || []).map(String), bIds = (sm.teamBIds || []).map(String);
+        if (aIds.length !== size || bIds.length !== size) return;      // 2 v 2, or 1 v 1 for singles
+        var a = aIds.map(function (id) { return byId[id] && byId[id].name; }), b = bIds.map(function (id) { return byId[id] && byId[id].name; });
+        if (a.concat(b).some(function (n) { return !n; })) return;
+        var seg = { front: null, back: null, total: null }, live = null;
+        if (leagueEngineScores(rc.format)) {
+            var whole = leagueWholeCard(sm), res = null;
+            try { res = calc ? calc(whole, data) : null; } catch (e) { res = null; }
+            var holes = leagueCardHoles(data);
+            seg = leagueSegments(res, holes, data.scores || {}, aIds, bIds);
+            live = leagueLive(res, holes);
+        }
+        out.push({ id: round.code + '~' + smId, live: live, round: round.code, label: round.label || round.code, group: sm.ownerGroup || null,
+            a: a, b: b, seg: seg, source: 'nassau' });
+    });
+    return out;
+}
+
+// SAME TEAMS EVERY ROUND: each pairing is a 2 v 2 Nassau in every chosen round where all
+// four golfers played, scored from that round's scores by the same engine call (a stand-in
+// Nassau the round never sees - nothing is written).
+function leagueSameTeamMatches(round, cfg, calc, holesFor, rc) {
+    rc = rc || leagueRoundCfg();
+    var data = (round && round.data) || {};
+    var idOf = {};
+    (data.players || []).forEach(function (p) { if (p && p.name) idOf[leagueKey(p.name)] = String(p.id); });
+    var out = [];
+    // A singles round: each pairing's golfers play their opposite number (A1 v B1, A2 v B2).
+    var pairs = [];
+    (cfg.teams || []).forEach(function (t, i) {
+        if (rc.format === 'singles') t.a.forEach(function (n, k) { if (t.b[k]) pairs.push({ a: [n], b: [t.b[k]], id: i + 's' + k }); });
+        else pairs.push({ a: t.a, b: t.b, id: String(i) });
+    });
+    pairs.forEach(function (t) {
+        var i = t.id;
+        var aIds = t.a.map(function (n) { return idOf[leagueKey(n)]; }), bIds = t.b.map(function (n) { return idOf[leagueKey(n)]; });
+        if (aIds.concat(bIds).some(function (x) { return !x; })) return;   // not all four in this round
+        var sm = { format: 'nassau', teamAIds: aIds, teamBIds: bIds, scoring: cfg.scoring || 'net', startHole: 1 };
+        var seg = { front: null, back: null, total: null }, live = null;
+        if (leagueEngineScores(rc.format)) {
+            var whole = leagueWholeCard(sm), res = null;
+            try { res = calc ? calc(whole, data) : null; } catch (e) { res = null; }
+            var holes = leagueCardHoles(data);
+            seg = leagueSegments(res, holes, data.scores || {}, aIds, bIds);
+            live = leagueLive(res, holes);
+        }
+        out.push({ id: round.code + '~team' + i, live: live, round: round.code, label: round.label || round.code, group: null,
+            a: t.a.slice(), b: t.b.slice(), seg: seg, source: 'team' });
+    });
+    return out;
+}
+
+// LEAGUE PAIRINGS: the round's pairings, each golfer found in this round - or, when the
+// day's groups are separate round codes, in another round of the same day (dayRounds). The
+// golfers are put into one stand-in round (fresh ids, their own scores, this round's card)
+// and the engine scores it. Nothing is written.
+function leaguePairingMatches(round, cfg, calc, holesFor, rc, dayRounds) {
+    var list = (cfg.pairings || {})[round.code] || [];
+    if (!list.length) return [];
+    var pool = [round].concat((dayRounds ? dayRounds(round) : []).filter(function (r) { return r && r.code !== round.code; }));
+    var find = function (name) {
+        for (var i = 0; i < pool.length; i++) {
+            var ps = ((pool[i].data || {}).players) || [];
+            for (var j = 0; j < ps.length; j++) if (ps[j] && leagueKey(ps[j].name) === leagueKey(name)) return { r: pool[i], p: ps[j] };
+        }
+        return null;
+    };
+    var data = (round && round.data) || {};
+    var out = [];
+    list.forEach(function (t, i) {
+        var hits = t.a.concat(t.b).map(find);
+        if (hits.some(function (x) { return !x; })) {
+            out.push({ id: round.code + '~pair' + i, round: round.code, label: round.label || round.code, group: null, a: t.a.slice(), b: t.b.slice(), seg: { front: null, back: null, total: null }, source: 'pairing', missing: true });
+            return;
+        }
+        var vPlayers = [], vScores = {};
+        hits.forEach(function (h, k) {
+            var id = 9001 + k, src = (h.r.data || {}).scores || {};
+            vPlayers.push(Object.assign({}, h.p, { id: id }));
+            Object.keys(src).forEach(function (key) { var m = /^p(.+)_h(\d+)$/.exec(key); if (m && String(m[1]) === String(h.p.id)) vScores['p' + id + '_h' + m[2]] = src[key]; });
+        });
+        var n = t.a.length, aIds = vPlayers.slice(0, n).map(function (p) { return String(p.id); }), bIds = vPlayers.slice(n).map(function (p) { return String(p.id); });
+        var vdata = { players: vPlayers, scores: vScores, courseData: data.courseData || [] };
+        var sm = { format: 'nassau', teamAIds: aIds, teamBIds: bIds, scoring: cfg.scoring || 'net', startHole: 1 };
+        var res = null;
+        try { res = calc ? calc(sm, vdata) : null; } catch (e) { res = null; }
+        var holes = leagueCardHoles(vdata);
+        out.push({ id: round.code + '~pair' + i, round: round.code, label: round.label || round.code, group: null, a: t.a.slice(), b: t.b.slice(),
+            seg: leagueSegments(res, holes, vScores, aIds, bIds), live: leagueLive(res, holes), source: 'pairing' });
+    });
+    return out;
+}
+
+// ROUND-ROBIN: every pair of the round against every other pair - each an 18-hole best-ball
+// match from the golfers' own hole scores, scored like a league pairing (the whole card, order-free).
+function leagueRoundRobinMatches(round, cfg, calc, holesFor, rc, dayRounds) {
+    var prs = (cfg.pairs || {})[round.code] || [];
+    if (prs.length < 2) return [];
+    var list = [], ids = [];
+    for (var i = 0; i < prs.length; i++) for (var j = i + 1; j < prs.length; j++) { list.push({ a: prs[i], b: prs[j] }); ids.push(i + 'v' + j); }
+    var shadow = { pairings: {} }; shadow.pairings[round.code] = list; shadow.scoring = cfg.scoring;
+    return leaguePairingMatches(round, shadow, calc, holesFor, rc, dayRounds).map(function (m, k) {
+        m.id = round.code + '~rr' + ids[k]; m.source = 'rr'; return m;
+    });
+}
+// A PAIR'S RECORD in a round: "Manny & JP: 3-1, 3 pts".
+function leagueRoundRobinRecords(matches, cfg, roundCode) {
+    var prs = (cfg.pairs || {})[roundCode] || [], out = prs.map(function (pr) { return { pair: pr, w: 0, l: 0, h: 0, pts: 0, open: 0 }; });
+    var key = function (pr) { return pr.map(leagueKey).join('|'); };
+    var at = {}; prs.forEach(function (pr, i) { at[key(pr)] = i; });
+    (matches || []).filter(function (m) { return m.source === 'rr' && String(m.round) === String(roundCode); }).forEach(function (m) {
+        [['A', m.a], ['B', m.b]].forEach(function (sd) {
+            var i = at[key(sd[1])]; if (i === undefined) return;
+            var r = leagueMatchFor(m, cfg, sd[1][0]);
+            if (!r) return;
+            out[i].pts += r.pts;
+            if (r.result === 'W') out[i].w++; else if (r.result === 'L') out[i].l++; else if (r.result === 'H') out[i].h++; else out[i].open++;
+        });
+    });
+    return out;
+}
+// DEFAULT PAIRS for a round, partners rotating day to day (the circle method: over n-1 rounds
+// every golfer partners every other once). An odd golfer out sits out that round.
+function leagueAutoPairs(names, roundIndex) {
+    var list = (names || []).slice().sort(function (x, y) { return x < y ? -1 : x > y ? 1 : 0; });
+    var out = [], sit = [];
+    if (list.length % 2) { var k0 = (roundIndex || 0) % list.length; sit = [list[k0]]; list.splice(k0, 1); }
+    var n = list.length; if (n < 2) return { pairs: [], sittingOut: sit.concat(list) };
+    var fixed = list[0], rest = list.slice(1), k = (roundIndex || 0) % (n - 1);
+    rest = rest.slice(k).concat(rest.slice(0, k));
+    out.push([fixed, rest[0]]);
+    for (var i = 1; i < n / 2; i++) out.push([rest[i], rest[n - 1 - i]]);
+    return { pairs: out, sittingOut: sit };
+}
+
+// ---- EVERY MATCH OF THE TRIP, overrides applied --------------------------------------
+// rounds: [{ code, label, data }] in trip order. A round set up AFTER it was played still
+// counts: the results are read from its scores whenever the league is drawn.
+function leagueMatches(rounds, cfg, calc, holesFor, ryder, dayRounds) {
+    if (!cfg) return [];
+    var all = [];
+    (rounds || []).forEach(function (r) {
+        var rc = leagueRoundOf(cfg, r.code);
+        all = all.concat(cfg.teamsMode === 'same' ? leagueSameTeamMatches(r, cfg, calc, holesFor, rc)
+            : cfg.teamsMode === 'league' ? leaguePairingMatches(r, cfg, calc, holesFor, rc, dayRounds)
+            : cfg.teamsMode === 'rr' ? leagueRoundRobinMatches(r, cfg, calc, holesFor, rc, dayRounds)
+            : leagueRoundMatches(r, calc, holesFor, rc, ryder));
+    });
+    Object.keys(cfg.manual || {}).sort().forEach(function (id) {
+        var m = cfg.manual[id];
+        if (!m || !Array.isArray(m.a) || !Array.isArray(m.b) || !m.a.length || !m.b.length) return;
+        var r = (rounds || []).filter(function (x) { return x.code === m.round; })[0];
+        all.push({ id: 'manual~' + id, round: m.round || null, label: r ? (r.label || r.code) : (m.round || 'Round'), group: m.group || null,
+            a: m.a.map(String), b: m.b.map(String), seg: { front: null, back: null, total: null }, source: 'manual' });
+    });
+    all.forEach(function (m) {
+        var rc = leagueRoundOf(cfg, m.round);
+        if (m.source === 'rr') rc = { format: 'fourball', mode: cfg.rrPts.mode, win: cfg.rrPts.win, halve: cfg.rrPts.halve, pts: cfg.rrPts.pts };
+        m.format = m.format || rc.format; m.mode = rc.mode; m.ptsCfg = rc.mode === 'match' ? { win: rc.win, halve: rc.halve } : rc.pts;
+        if (rc.mode === 'match') { m.seg.front = 'NA'; m.seg.back = 'NA'; }
+        var o = (cfg.overrides || {})[m.id];
+        m.set = {};
+        LEAGUE_SEGS.forEach(function (seg) {
+            var v = o && o[seg];
+            if (v === 'A' || v === 'B' || v === 'H') { m.seg[seg] = v; m.set[seg] = true; }
+        });
+    });
+    return all;
+}
+
+// What one golfer gets from one match: points, and the match's W / L / H once all three
+// segments are decided.
+function leagueMatchFor(m, cfg, name) {
+    var k = leagueKey(name);
+    var side = m.a.some(function (n) { return leagueKey(n) === k; }) ? 'A' : m.b.some(function (n) { return leagueKey(n) === k; }) ? 'B' : null;
+    if (!side) return null;
+    var mine = 0, theirs = 0, done = true;
+    if (m.mode === 'match') {
+        // 18-HOLE MATCH: win / halve points (e.g. 2 / 1), the 18 only.
+        var t = m.seg.total, pc = m.ptsCfg || { win: 2, halve: 1 };
+        if (!t) done = false;
+        else if (t === 'H') { mine = pc.halve; theirs = pc.halve; }
+        else if (t === side) mine = pc.win; else theirs = pc.win;
+        return { side: side, pts: mine, against: theirs, result: !done ? null : t === 'H' ? 'H' : t === side ? 'W' : 'L' };
+    }
+    var ptsCfg = m.ptsCfg || cfg.pts;
+    LEAGUE_SEGS.forEach(function (seg) {
+        var r = m.seg[seg], p = ptsCfg[seg];
+        if (!r) { done = false; return; }
+        if (r === 'NA') return;
+        if (r === 'H') { mine += p / 2; theirs += p / 2; }
+        else if (r === side) mine += p;
+        else theirs += p;
+    });
+    return { side: side, pts: mine, against: theirs, result: !done ? null : mine > theirs ? 'W' : mine < theirs ? 'L' : 'H' };
+}
+
+// ---- STANDINGS -----------------------------------------------------------------------
+// players: the league's golfers (names). Rank by points, then matches won; still tied =
+// the same rank (shared).
+function leagueStandings(matches, cfg, players) {
+    var rows = (players || []).map(function (n) { return { name: n, pts: 0, w: 0, l: 0, h: 0, matches: [] }; });
+    rows.forEach(function (row) {
+        (matches || []).forEach(function (m) {
+            var r = leagueMatchFor(m, cfg, row.name);
+            if (!r) return;
+            row.pts += r.pts;
+            if (r.result === 'W') row.w++; else if (r.result === 'L') row.l++; else if (r.result === 'H') row.h++;
+            row.matches.push({ id: m.id, label: m.label, group: m.group, side: r.side, format: m.format, mode: m.mode, live: m.live || null, a: m.a, b: m.b, partner: (r.side === 'A' ? m.a : m.b).filter(function (n) { return leagueKey(n) !== leagueKey(row.name); }),
+                opponents: r.side === 'A' ? m.b : m.a, seg: m.seg, set: m.set || {}, pts: r.pts, result: r.result });
+        });
+    });
+    rows.sort(function (x, y) { return (y.pts - x.pts) || (y.w - x.w) || (x.name < y.name ? -1 : x.name > y.name ? 1 : 0); });
+    rows.forEach(function (row, i) {
+        var prev = rows[i - 1];
+        row.rank = prev && prev.pts === row.pts && prev.w === row.w ? prev.rank : i + 1;
+    });
+    return rows;
+}
+
+// ---- THE POT AND WHO GETS PAID --------------------------------------------------------
+// Pot = buy-in x golfers (cents). Each place = pot x its % (cents; the last paid place
+// takes the rounding, so the places add up to the pot exactly). Golfers tied across
+// places k..k+n-1 share those places' money evenly (the odd cent to the first listed).
+// The %s must add up to 100, or nothing is paid out (said, not guessed).
+function leaguePayouts(rows, cfg) {
+    var n = (rows || []).length;
+    var potC = Math.round(cfg.buyIn * 100) * n;
+    if (cfg.payMode === 'usd') return leaguePayoutsUsd(rows, cfg, potC);
+    var pct = cfg.places.slice(0, n);
+    var sumPct = Math.round(cfg.places.reduce(function (a, b) { return a + b; }, 0) * 1000) / 1000;
+    var out = { potCents: potC, placeCents: [], payCents: {}, valid: sumPct === 100, why: null };
+    if (!out.valid) { out.why = 'The paid places add up to ' + sumPct + '%, not 100%'; return out; }
+    if (n === 0) return out;
+    // Fewer golfers than places: the places left over go back into the ones paid,
+    // pro rata, so the whole pot is still paid out.
+    var usedPct = pct.reduce(function (a, b) { return a + b; }, 0);
+    var placeC = pct.map(function (p) { return Math.floor(potC * p / usedPct); });
+    var left = potC - placeC.reduce(function (a, b) { return a + b; }, 0);
+    for (var i = 0; left > 0; i = (i + 1) % placeC.length) { placeC[i]++; left--; }
+    out.placeCents = placeC;
+    var pos = 0;
+    while (pos < n) {
+        var end = pos;
+        while (end + 1 < n && rows[end + 1].rank === rows[pos].rank) end++;
+        var share = 0;
+        for (var p = pos; p <= end; p++) share += placeC[p] || 0;
+        var cnt = end - pos + 1, each = Math.floor(share / cnt), extra = share - each * cnt;
+        for (var q = pos; q <= end; q++) out.payCents[rows[q].name] = each + (q - pos < extra ? 1 : 0);
+        pos = end + 1;
+    }
+    return out;
+}
+
+// $ PER PLACE (the Weekly game's "Exact dollar amounts"): the amounts must add up to the pot,
+// to the cent, or nothing is paid. Ties split the places they cover, as above.
+function leaguePayoutsUsd(rows, cfg, potC) {
+    var n = (rows || []).length;
+    var placeC = (cfg.placesUsd || []).map(function (d) { return Math.round(d * 100); });
+    var sum = placeC.reduce(function (a, b) { return a + b; }, 0);
+    var out = { potCents: potC, placeCents: placeC, payCents: {}, valid: sum === potC && placeC.length > 0, why: null };
+    if (!out.valid) { out.why = 'The places add up to $' + (sum / 100) + ', not the $' + (potC / 100) + ' pot'; return out; }
+    if (placeC.length > n) { out.valid = false; out.why = 'More paid places (' + placeC.length + ') than golfers (' + n + ')'; return out; }
+    var pos = 0;
+    while (pos < n) {
+        var end = pos;
+        while (end + 1 < n && rows[end + 1].rank === rows[pos].rank) end++;
+        var share = 0;
+        for (var p = pos; p <= end; p++) share += placeC[p] || 0;
+        var cnt = end - pos + 1, each = Math.floor(share / cnt), extra = share - each * cnt;
+        for (var q = pos; q <= end; q++) out.payCents[rows[q].name] = each + (q - pos < extra ? 1 : 0);
+        pos = end + 1;
+    }
+    return out;
+}
+
+// The league's golfers: as set, or everyone in any round of the trip (by name, as the trip
+// page matches golfers across rounds).
+// DEFAULT PAIRINGS for a round: the league golfers playing it, two v two; an odd number
+// leaves two for a 1 v 1 singles worth the same points (one left: sits out). Who plays singles
+// rotates: the golfers with the fewest singles in the earlier rounds' pairings go first; the rest
+// are paired so partners change from round to round (the order turns by the round's index).
+function leagueAutoPairings(names, cfg, roundIndex, earlierCodes) {
+    var list = (names || []).slice().sort(function (x, y) { return x < y ? -1 : x > y ? 1 : 0; });
+    var singlesCount = {};
+    (earlierCodes || []).forEach(function (c) { ((cfg && cfg.pairings && cfg.pairings[c]) || []).forEach(function (t) { if (t.a.length === 1) t.a.concat(t.b).forEach(function (n) { singlesCount[leagueKey(n)] = (singlesCount[leagueKey(n)] || 0) + 1; }); }); });
+    var k = roundIndex || 0, n = list.length;
+    var turned = list.slice(k % Math.max(n, 1)).concat(list.slice(0, k % Math.max(n, 1)));
+    var singles = [];
+    if (n % 4 === 2 || n % 4 === 3) {
+        singles = turned.slice().sort(function (x, y) { return (singlesCount[leagueKey(x)] || 0) - (singlesCount[leagueKey(y)] || 0); }).slice(0, 2);
+    }
+    var rest = turned.filter(function (x) { return singles.indexOf(x) === -1; });
+    var out = [];
+    // Partners change: interleave so neighbours in one round's order don't pair again next round.
+    var step = (k % 2) ? 2 : 1, order = [];
+    for (var s0 = 0; s0 < step; s0++) for (var i = s0; i < rest.length; i += step) order.push(rest[i]);
+    for (var j = 0; j + 3 < order.length; j += 4) out.push({ a: [order[j], order[j + 1]], b: [order[j + 2], order[j + 3]] });
+    if (singles.length === 2) out.push({ a: [singles[0]], b: [singles[1]] });
+    var left = order.slice(Math.floor(order.length / 4) * 4);
+    return { pairings: out, sittingOut: left };
+}
+
+function leaguePlayers(cfg, rounds) {
+    if (cfg && cfg.players) return cfg.players.slice();
+    var seen = {}, out = [];
+    (rounds || []).forEach(function (r) {
+        ((r.data && r.data.players) || []).forEach(function (p) {
+            var nm = p && String(p.name || '').trim();
+            if (nm && !seen[leagueKey(nm)]) { seen[leagueKey(nm)] = 1; out.push(nm); }
+        });
+    });
+    return out;
+}
+
+// Everything the screens draw, in one call.
+function leagueState(trip, rounds, calc, holesFor, ryder, dayRounds) {
+    var cfg = leagueConfig(trip);
+    if (!cfg) return null;
+    if (cfg.rounds) rounds = (rounds || []).filter(function (r) { return cfg.rounds.indexOf(String(r.code)) !== -1; });
+    var players = leaguePlayers(cfg, rounds);
+    var matches = leagueMatches(rounds, cfg, calc, holesFor, ryder, dayRounds);
+    var rows = leagueStandings(matches, cfg, players);
+    return { cfg: cfg, players: players, matches: matches, rows: rows, pay: leaguePayouts(rows, cfg) };
+}
+
+if (typeof window !== 'undefined') {
+    window.HardPanLeagueEngine = { rrMatches: leagueRoundRobinMatches, rrRecords: leagueRoundRobinRecords, autoPairs: leagueAutoPairs, autoPairings: leagueAutoPairings, pairingMatches: leaguePairingMatches, live: leagueLive, roundCfg: leagueRoundCfg, roundOf: leagueRoundOf, FORMATS: LEAGUE_FORMATS, sameTeamMatches: leagueSameTeamMatches, config: leagueConfig, matches: leagueMatches, roundMatches: leagueRoundMatches, segments: leagueSegments, matchFor: leagueMatchFor,
+        standings: leagueStandings, payouts: leaguePayouts, players: leaguePlayers, state: leagueState, key: leagueKey, DEFAULTS: LEAGUE_DEFAULTS };
+}
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { leagueRoundRobinMatches: leagueRoundRobinMatches, leagueRoundRobinRecords: leagueRoundRobinRecords, leagueAutoPairs: leagueAutoPairs, leagueSegState: leagueSegState, leagueHoleDiffs: leagueHoleDiffs, leagueAutoPairings: leagueAutoPairings, leaguePairingMatches: leaguePairingMatches, leagueLive: leagueLive, leagueRoundCfg: leagueRoundCfg, leagueRoundOf: leagueRoundOf, LEAGUE_FORMATS: LEAGUE_FORMATS, leagueSameTeamMatches: leagueSameTeamMatches, leaguePayoutsUsd: leaguePayoutsUsd, leagueConfig: leagueConfig, leagueMatches: leagueMatches, leagueRoundMatches: leagueRoundMatches, leagueSegments: leagueSegments, leagueMatchFor: leagueMatchFor,
+        leagueStandings: leagueStandings, leaguePayouts: leaguePayouts, leaguePlayers: leaguePlayers, leagueState: leagueState, leagueKey: leagueKey, LEAGUE_DEFAULTS: LEAGUE_DEFAULTS };
+}

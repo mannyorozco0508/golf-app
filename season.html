@@ -30,6 +30,9 @@
     <script src="money-engine.js"></script>
     <script src="aloha-bet.js"></script>
     <script src="hilo-engine.js"></script>
+    <!-- web 2.0 (WEB-20-LIVE-PLAN): BBB + Vegas engines, unchanged from 2.0 (28), so the shared settlement engine totals those games on the web as in the app. -->
+    <script src="bbb-engine.js"></script>
+    <script src="vegas-engine.js"></script>
     <script src="settlement-engine.js"></script>
     <script src="pool-engine.js"></script>
     <script src="code-issuer.js"></script>
@@ -109,7 +112,7 @@ body::after {
     <a class="back" href="admin.html">← Game Day</a>
     <div id="season-home">
         <h1>Season</h1>
-        <p class="muted">Running money, skins and closest-to-the-pin for the same crew, week after week. Open a season you already have, or start one.</p>
+        <p class="muted">Running totals, skins and closest-to-the-pin for the same crew, week after week. Open a season you already have, or start one.</p>
         <div id="season-list"></div>
         <label for="season-name-input">Season name</label>
         <input id="season-name-input" type="text" maxlength="80" placeholder="Monday skins" autocomplete="off">

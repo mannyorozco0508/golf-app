@@ -4576,6 +4576,7 @@ const SHELL_FILES = [
     // settlement-engine.js and bet-strip.js call it through a typeof guard, so a
     // cached shell without it would settle a Hi-Lo wager as nothing.
     './hilo-engine.js',
+    './bbb-engine.js', './vegas-engine.js', './league-engine.js', './league-ui.js',
     // payouts.js is the place/tie prize rule, shared by Trip Mode and both
     // tournament pages. Called unguarded, so a cached shell without it breaks the
     // prize table rather than quietly paying nobody.

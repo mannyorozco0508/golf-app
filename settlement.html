@@ -56,6 +56,9 @@
     <script src="aloha-bet.js"></script>
     <script src="hilo-engine.js"></script>
     <script src="offline-queue.js"></script>
+<!-- web 2.0 (WEB-20-LIVE-PLAN): BBB + Vegas engines, unchanged from 2.0 (28), so the shared settlement engine totals those games on the web as in the app. -->
+<script src="bbb-engine.js"></script>
+<script src="vegas-engine.js"></script>
 <script src="settlement-engine.js"></script>
 <script src="side-match-lines.js"></script>
 <script src="live-skins.js"></script>
@@ -755,7 +758,7 @@ body::after {
             if (window.OfflineQueue && currentData.players) {
                 try { window.OfflineQueue.saveSnapshot(localStorage, currentMode, snapshot.val() || currentData); } catch (e) {}
             }
-            document.getElementById("main-title").textContent = `🤝 Settle (${currentData.eventName || "Weekend Round"})`;
+            document.getElementById("main-title").textContent = `🤝 Final Results (${currentData.eventName || "Weekend Round"})`;   // web 2.0 words (WEB-20-LIVE-PLAN): "Settle" -> "Final Results", the page's own heading
             renderSyncCaveat(lr);
             renderResultsGapLine(currentData);
             renderFinalBanner(currentData, currentData.courseData || [], currentData.scores || {});
@@ -2760,6 +2763,33 @@ body::after {
             ${sideHtml}
         `;
     }
+</script>
+
+<!-- web 2.0 (WEB-20-LIVE-PLAN): the round's own Points game card, as in the 2.0 (28) app (read only, organizer:false); league-engine.js + league-ui.js unchanged. -->
+<!-- POINTS GAME (HardPan, gps-points): a round's own Points game - "who gets paid" as its own
+     card, settled separately (not part of Who Pays Who). Its rounds are read, never written. -->
+<div id="pg-card" style="display:none;"></div>
+<div id="pg-settle" style="max-width:640px;margin:0 auto 24px;padding:0 12px;"></div>
+<script src="ryder-cup.js"></script>
+<script src="league-engine.js"></script>
+<script src="league-ui.js"></script>
+<script>
+    (function () {
+        try {
+            const code = String(new URLSearchParams(location.search).get('game') || '').toUpperCase();
+            if (!code || !window.HardPanLeague) return;
+            const read = (p) => db.ref(p).once('value').then((s) => s.val(), () => null);
+            read('events/' + code).then((d) => {
+                const g = d && d.pointsGame;
+                if (!g || g.on === false) return;
+                const codes = [code].concat(Array.isArray(g.rounds) ? g.rounds.filter((c) => c !== code) : []);
+                Promise.all(codes.map((c) => (c === code ? Promise.resolve(d) : read('events/' + c)).then((x) => (x ? { code: c, label: x.courseName || c, data: x } : null)))).then((rs) => {
+                    window.HardPanLeague.render({ holder: d, key: 'pointsGame', base: 'events/' + code + '/pointsGame', ctx: { thisRound: code }, rounds: rs.filter(Boolean), organizer: false, db,
+                        ids: { card: 'pg-card', settle: 'pg-settle', section: 'pg-none' } });
+                });
+            });
+        } catch (e) { /* the rest of the page still settles */ }
+    })();
 </script>
 
 </body>
