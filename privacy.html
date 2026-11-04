@@ -45,11 +45,13 @@
 
 <h1>Privacy Policy</h1>
 <p class="updated">Last updated: 31 October 2026 · Rattle Golf LLC</p>
+<p class="updated">Added November 2026: Round chat and photos.</p>
 
 <p>HardPan is a golf app for private groups: GPS yardages, scoring, and the games your group plays. It is made by Rattle Golf LLC, and the App Store listing may say Rattle Golf. Rattle Golf Tournaments is a separate events product and is not covered by this policy. This policy explains what HardPan stores, why, and what it does not do.</p>
 
 <div class="callout">
     <strong>The short version.</strong> HardPan keeps your group's golf: names, scores and the games you play. It makes you an anonymous account so the rounds you start stay yours. An email address is asked for only if you choose to sign in. Your GPS position is used on your phone to measure yardages and is not sent to us, with one exception you control (setting a green, below). If you choose to scan a paper scorecard, that one photo is sent to Google's Gemini service to read the scores, and HardPan does not keep it. A HardPan Pro subscription is bought through Apple, and we never see your payment details. No ads, no analytics, no tracking, and nothing is sold.
+    Round chat is only for signed-in golfers who join that round's chat. A chat photo leaves your phone without its location data and is deleted 30 days after it is posted.
 </div>
 
 <h2>What is stored</h2>
@@ -68,6 +70,7 @@
     <tr><td>Course-lookup counts and log (your account ID, how many GPS course searches and course downloads it made each day, and a log of each one: the search text or course id, when, and the result)</td><td>To keep within the daily limits of the course data provider and to stop one account running up the cost. This is for running the service, not analytics, and it is never used for ads.</td></tr>
     <tr><td>Notification token and settings, only if you allow notifications</td><td>Your phone's push notification token, the player you said you are in a round, the round code and your notification switches, so the right phone gets the right notification.</td></tr>
     <tr><td><strong>Scorecard-scan counts</strong> (your account ID, how many scorecard scans you have used, and short-lived per-minute and per-day counts)</td><td>So each account gets its free scans and no one can run up the cost. The count of scans you have used is kept under your account ID to enforce the free limit. Deleting your account in the app or on the website erases these counts too. The photo itself is never stored - see Scorecard scan below.</td></tr>
+    <tr><td><strong>Round chat</strong>, only if you join a round's chat in the app: your account ID, the name and group you chat under, your messages, photos and reactions, any message you report, and the organizer's chat settings for the round</td><td>To run that round's chat for the golfers in it. See Round chat and photos, below.</td></tr>
 </table>
 
 <h2>Microphone and voice scoring</h2>
@@ -79,7 +82,7 @@
 
 <h2>Scorecard scan</h2>
 <ul>
-    <li><strong>The camera, only when you ask.</strong> HardPan uses the camera only when you tap to scan a paper scorecard. If you pick a photo instead, only the one picture you choose is read; HardPan does not browse your photo library. The camera is also used when you choose to scan a course's printed scorecard to fill in its pars, handicap (stroke index) rows and tee yardages; that photo goes the same way, to Google's Gemini API through our server, and is not stored (see Scanning a course's printed card, below).</li>
+    <li><strong>The camera, only when you ask.</strong> HardPan uses the camera only when you tap to scan a paper scorecard. If you pick a photo instead, only the one picture you choose is read; HardPan does not browse your photo library. The camera is also used when you choose to scan a course's printed scorecard to fill in its pars, handicap (stroke index) rows and tee yardages; that photo goes the same way, to Google's Gemini API through our server, and is not stored (see Scanning a course's printed card, below). The camera is also used when you choose to take a photo for a round chat (see Round chat and photos, below).</li>
     <li><strong>What is sent.</strong> The photo goes to our server (Cloudflare) together with what the round already knows: the course name, tee, par and stroke index for each hole, and the round's player names (with any initials or nicknames). Handicaps, if the round has them, go to our server only, to check the result; they are not sent on. Our server sends the photo, the course details and the player names to Google's Gemini API, which reads the scores and sends them back. Your sign-in token is sent so the server knows the scan is yours; it is not passed to Google. Your location is never sent.</li>
     <li><strong>What is kept.</strong> HardPan does not store the photo. It is processed in memory and is not written to our database or our logs. Our server's log records only counts, timing, which model was used and whether the result checked out - no photo, no names. Nothing goes on the scorecard until you check the scores and tap to use them; then they are saved exactly as if you had typed them.</li>
     <li><strong>Scanning a course's printed card.</strong> When a course's pars and handicaps are not set up yet, you can scan a blank printed scorecard instead of typing them. Only that photo, the course name and the number of holes go to our server and on to Google's Gemini API, which reads the printed pars, handicap (stroke index) rows and tee yardages and sends them back. No player names, scores, handicaps or location are sent, and the photo is not stored. Nothing is saved until you check the numbers and tap to use them; then they are saved exactly as if you had typed them. Course-card scans have their own free count, kept under your account ID like the scorecard-scan counts.</li>
@@ -90,7 +93,7 @@
 <ul>
     <li>No password or phone number, and an email address only if you choose to sign in</li>
     <li>Your GPS position is never sent to us, and background location is used only while a round's Lock Screen view is on (see Your location)</li>
-    <li>No contacts access, and no browsing of your photo library. The camera is used only when you choose to scan a scorecard, or a course's printed scorecard (see Scorecard scan above). The microphone is used only for voice scoring, as described above, and never recorded.</li>
+    <li>No contacts access, and no browsing of your photo library. The camera is used only when you choose to scan a scorecard, or a course's printed scorecard (see Scorecard scan above). The camera is also used when you choose to take a photo for a round chat, and the photo picker shows only the one photo you choose (see Round chat and photos). The microphone is used only for voice scoring, as described above, and never recorded.</li>
     <li>No advertising identifier, and no third-party analytics or tracking SDK</li>
     <li>No crash-reporting service: errors stay in your phone's own log</li>
     <li>No payment details of any kind — see Money and Purchases, below</li>
@@ -106,6 +109,7 @@
     <li><strong>Green slope.</strong> If you turn on green slope and a green has no slope data in the app yet, your phone asks the U.S. Geological Survey for the heights inside that green's map box (worked out from the green's outline). The request carries only the green's box, never your position. USGS can tell that someone looked at that course.</li>
     <li><strong>Course heights.</strong> For plays-like, your phone asks for the height of the course's own points (in the U.S.), or for the one map square around the course (anywhere), never for where you are. If neither answers, your phone's own GPS altitude can be used while you are on that course; it stays on your phone.</li>
     <li><strong>Wind.</strong> Wind is looked up for the course, using a point from the course data, never your own position.</li>
+    <li><strong>Chat photos.</strong> A photo you add to a round chat is redrawn on your phone before it is sent, which leaves its location data behind. No location is ever sent with a chat photo or message.</li>
     <li>HardPan has no live location sharing: other golfers never see where you are.</li>
     <li>You can switch location off at any time in your phone's settings. Scores, games and the scorecard work without it.</li>
 </ul>
@@ -120,9 +124,11 @@
 <h2>Where data is stored</h2>
 <p>Your account and round data are stored with Google Firebase (Firebase Authentication and Firebase Realtime Database), operated by Google Cloud. Google processes it for us as a service provider under its own security and privacy terms.</p>
 
+<p>Round chat messages are stored in the same Firebase Realtime Database. Round chat photos are stored with Google Firebase Cloud Storage, in the United States.</p>
 <h2>Services that help run HardPan</h2>
 <ul>
 <li><strong>Google Firebase</strong> (Authentication, Realtime Database, Cloud Functions, Cloud Messaging): your account, round data, course searches and notifications. Google processes it for us as a service provider.</li>
+<li><strong>Google Firebase Cloud Storage</strong>: round chat photos, until they are deleted 30 days after they are posted. Cloud Functions also check chat membership before a photo is shown, post HardPan's highlight lines, and mask some words in chat messages.</li>
 <li><strong>GolfAPI</strong> (golfapi.io), through our server: the course name you search for and course ids. Never your position or name.</li>
 <li><strong>Esri (ArcGIS)</strong> and the <strong>U.S. Geological Survey</strong> (USGS): the satellite map on the GPS screen. Your phone asks them for map tiles of the course, and they see that request and your internet address. USGS also gives heights for points on the course (for "plays like"). If a course has no map data, the map can be centered where you stand, so Esri and USGS see tile requests for that area.</li>
 <li><strong>U.S. Geological Survey 3D Elevation Program</strong> (elevation.nationalmap.gov): green slope, only if you turn it on, as described under Your location. It receives a green's map box and your internet address.</li>
@@ -146,9 +152,23 @@
 <h2>Kept on your device only</h2>
 <p>Dark mode, your last roster, recent rounds and courses, which golfer is you, downloaded course maps and any scores waiting for a signal are kept on your phone (or in your browser) and are not sent to us, except that waiting scores are sent to the round once you're back online.</p>
 <p>On iPhone, your club distances, the shots you mark on the GPS screen, your shot pattern, the green slope your phone has built, and the Venmo or Cash App username in your profile are also kept on your phone only.</p>
+<p>In round chat, the list of golfers whose messages you hide is kept on your phone only.</p>
 
 <h2>Who can see a round</h2>
 <p>Rounds are shared by link or code with the group. Anyone holding a round link can view that round, and the people you give a scorekeeper link can score it. Anyone who can guess a code could view it too. There is no public list of rounds and no public profile, so the practical guidance is simple: <strong>treat a round link like a group chat, and don't put anything in a player name you wouldn't want a stranger to read.</strong></p>
+
+<h2>Round chat and photos</h2>
+<p>In the HardPan app, the golfers in a round can chat: one thread for the whole round, and one for each group. You need to be signed in to read or post, and nothing about you is saved until you tap Join chat. The round's code alone does not open the chat.</p>
+<ul>
+    <li><strong>What is kept.</strong> When you join: your account ID, the name you chat under and your group number. For each message: the text or photo, who sent it, when, and which message it replies to. Also the reactions you add, any message you report (with your reason and when), and the chat settings the organizer picks (chat on or off, photos, highlight lines). HardPan posts its own highlight lines from the round's scores, such as a birdie or the closest-to-the-pin leader, and they never show a dollar amount.</li>
+    <li><strong>Who sees it.</strong> The round thread: the golfers who joined that round's chat. A group thread: only the golfers who joined the chat in that group. The organizer sees the reports for the round and can remove messages. Chat is never public and never used for ads.</li>
+    <li><strong>Photos and your location.</strong> You pick a photo, or take one. Before it is sent, your phone redraws it as a new, smaller JPEG (about 1600 pixels across). Only the picture is copied: the photo's hidden details (EXIF), including where it was taken, stay behind on your phone. HardPan never sends your location with a photo or a message.</li>
+    <li><strong>How photos are shown.</strong> No one can open a chat photo directly. The app asks our server for a link that works for 10 minutes, and the server first checks that you joined that round's chat, were not removed from it, and can read the thread the photo is in. Each golfer can post up to 10 photos per round.</li>
+    <li><strong>How long.</strong> Photos are deleted automatically 30 days after they are posted; the message stays and says the photo was removed. Chat text is kept with the round. Reports are kept so we can act on them.</li>
+    <li><strong>Removing it.</strong> You can remove your own messages at any time, and the organizer can remove any message. Removing a photo message deletes the photo too. To have all your chat messages, or a whole round's chat, deleted, email <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a> and we will delete them within 30 days.</li>
+    <li><strong>Report and hide.</strong> Every message has Report and Hide. A report goes to the round's organizer and to HardPan support, and reports are reviewed within 24 hours. Hide messages from a golfer works on your phone only. The organizer can also remove a golfer from the chat, and that golfer cannot rejoin. Abuse: email <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a>.</li>
+    <li><strong>On the website.</strong> Where chat is offered on hardpangolf.com to golfers scoring from a group link without the app or an account, it is text only, with no photos. Their messages carry the golfer's name and group from the round and the website's anonymous account ID.</li>
+</ul>
 
 <h2>How long we keep it</h2>
 <p>Rounds are kept so your group can look back at them, until the organizer wipes the round or asks us to. Your account is kept until you delete it.</p>
@@ -158,6 +178,7 @@
     <li><strong>Green positions and imported course details:</strong> kept in the shared course record, because they describe the course, not you. Ask us and we will remove one.</li>
     <li><strong>Course-lookup counts and log:</strong> kept so we can run the service and stay within the course data provider's limits. Email us and we will remove your account ID from them.</li>
     <li><strong>Scan counts:</strong> the per-minute and per-day counts are short-lived; the free-scan count is kept until you delete your account.</li>
+    <li><strong>Round chat:</strong> photos are deleted 30 days after they are posted; text stays with the round until it is removed (see Round chat and photos).</li>
     <li><strong>Search text on our proxy:</strong> a short time only.</li>
     <li><strong>Scorecard photos:</strong> never stored by HardPan (see Scorecard scan).</li>
     <li><strong>Subscription records:</strong> Apple and RevenueCat keep purchase records under their own terms, as the law and App Store rules require.</li>
@@ -168,6 +189,7 @@
     <li><strong>Your account:</strong> in the app, open your profile (Account) and tap Delete account (it appears once you have signed in; if you never signed in, see <a href="delete-account.html">delete-account</a>). That deletes your sign-in (email and account id) and your saved groups straight away. The <a href="delete-account.html">delete-account</a> page lists exactly what is deleted and what stays. It also erases your scorecard-scan counts (your account ID and how many scans you have used).</li>
     <li><strong>Rounds stay with their round codes:</strong> deleting an account does not delete rounds, because other golfers may still be using them.</li>
     <li><strong>A whole round:</strong> the organizer can use "End &amp; Wipe Round," which deletes that round's data.</li>
+    <li><strong>Round chat:</strong> remove your own message in the chat at any time. Deleting your account does not remove chat messages, because they stay with the round like scores; email us and we will delete them.</li>
     <li><strong>A subscription:</strong> deleting your account does not cancel HardPan Pro. Cancel it in your Apple ID settings (on iPhone: Settings &gt; your name &gt; Subscriptions).</li>
     <li><strong>On your device:</strong> clearing your browser's site data, or deleting the app, removes everything stored locally.</li>
     <li><strong>Anything else, or if you can't open the app:</strong> email <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a> from the address you signed in with (or with the round code). We'll reply within 7 days and delete within 30 days.</li>
@@ -179,6 +201,7 @@
 <h2>Security</h2>
 <p>Everything is sent over encrypted connections (HTTPS). Database rules keep each account's records to its owner. A round is open to anyone who has its code, as described under Who can see a round.</p>
 
+<p>Round chat is not open to anyone with the code: database rules let only signed-in golfers who joined that round's chat read it, let a golfer post only as themselves, and let only the sender or the organizer remove a message. Chat photos cannot be read directly at all.</p>
 <h2>Changes</h2>
 <p>If this policy changes, the date at the top changes.</p>
 
