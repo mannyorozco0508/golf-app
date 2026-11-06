@@ -171,7 +171,7 @@ describe('THE PRIVACY POLICY IS ACCURATE ABOUT THIS APP', () => {
         // RE-PINNED (privacy-scan-mic, Oct 26): the 26 October 2026 policy adds voice + scan. Was (job 019): the 17 October 2026 policy (anonymous accounts, GPS,
         // services list). was: Last updated: 23 September 2026
         // RE-PINNED (114, Oct 31 2026): subscriptions, Venmo/Cash App usernames, 097c USGS slope, search log. Was: 26 October 2026
-        assert.match(P, /Last updated: 31 October 2026/);
+        assert.match(P, /Last updated: 6 November 2026/);
         assert.match(P, /Course search queries/);
         assert.match(P, /golfcourseapi\.com/);
         assert.match(P, /Cloudflare Worker/);
