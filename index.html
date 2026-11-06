@@ -1,6 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>
+/* PREVIEW ONLY (web-chat-preview host): no service worker, and an on-screen report of why a round won't connect. Never on main. */
+(function(){ if(!/^web-chat-preview\./.test(location.hostname)) return;
+ var L=[],t0=Date.now(),box; function say(m){ L.push(((Date.now()-t0)/1000).toFixed(1)+'s '+m); if(box) box.textContent=L.slice(-16).join('\n'); }
+ try{ if(navigator.serviceWorker){ navigator.serviceWorker.register=function(){ say('sw register skipped'); return new Promise(function(){}); }; navigator.serviceWorker.getRegistrations().then(function(r){ say('sw regs '+r.length+' controller '+!!navigator.serviceWorker.controller); r.forEach(function(x){x.unregister();}); }); } if(window.caches) caches.keys().then(function(k){ k.forEach(function(n){caches.delete(n);}); say('caches cleared '+k.length); }); }catch(e){ say('sw err '+e.message); }
+ addEventListener('error',function(e){ var t=e.target; if(t&&t!==window&&t.src) say('LOAD FAIL '+t.src.split('/').pop()); else say('ERROR '+(e.message||'')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno); },true);
+ addEventListener('unhandledrejection',function(e){ say('REJECT '+String(e.reason&&(e.reason.code||e.reason.message)||e.reason).slice(0,120)); });
+ addEventListener('DOMContentLoaded',function(){ box=document.createElement('pre'); box.id='hp-diag'; box.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:2147483647;max-height:45vh;overflow:auto;margin:0;padding:8px;background:#000;color:#7f7;font:11px/1.35 monospace;white-space:pre-wrap;'; document.body.appendChild(box); say('v diag1 '+navigator.userAgent.slice(-40)+' online '+navigator.onLine);
+  var q=new URLSearchParams(location.search).get('game')||'';
+  try{ say('firebase '+(typeof firebase)+' apps '+(firebase.apps?firebase.apps.length:'?')+' db '+(typeof firebase.database));
+   firebase.database().ref('.info/connected').on('value',function(s){ say('rtdb connected '+s.val()); });
+   if(firebase.auth) firebase.auth().onAuthStateChanged(function(u){ say('auth '+(u?(u.isAnonymous?'anon':'account'):'none')); },function(e){ say('auth err '+(e.code||e.message)); });
+   if(window.authReady&&window.authReady.then) window.authReady.then(function(){ say('authReady ok'); },function(e){ say('authReady FAIL '+(e&&(e.code||e.message)||e)); });
+   firebase.database().ref('events/'+q+'/players').once('value').then(function(s){ say('read round: '+(s.exists()?'players found':'NO ROUND')); },function(e){ say('read FAIL '+(e.code||e.message)); });
+   setTimeout(function(){ var c=document.getElementById('hole-view-card'); say('card: '+String(c&&c.innerText||'').slice(0,60).replace(/\n/g,' ')+' | currentData '+(typeof currentData!=='undefined'&&!!currentData)); },9000);
+  }catch(e){ say('diag err '+e.message); } });
+})();
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <link rel="icon" href="hardpan-icon.svg" type="image/svg+xml">
