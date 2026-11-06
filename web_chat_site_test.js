@@ -64,3 +64,15 @@ test('a pasted link with a space: ?game= is trimmed before any page reads it, th
     assert.equal(run('https://hardpangolf.com/index.html?game=4XGBQC&group=1').href, 'https://hardpangolf.com/index.html?game=4XGBQC&group=1', 'a clean link is untouched');
 });
 
+test('the Players link is known on the live pretty URL (/leaderboard, no .html) as well as /leaderboard.html', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, 'round-chat.js'), 'utf8');
+    const m = /var PLAYERS = WEB && \(function \(\) \{ try \{ return (.*?); \} catch/.exec(src);
+    assert.ok(m, 'the PLAYERS line');
+    const is = (pathname, search) => require('vm').runInNewContext(m[1], { W: { location: { pathname, search } } });
+    assert.equal(is('/leaderboard', '?game=4XGBQC&players=1'), true);
+    assert.equal(is('/leaderboard.html', '?game=4XGBQC&players=1'), true);
+    assert.equal(is('/leaderboard/', '?game=4XGBQC&players=1'), true);
+    assert.equal(is('/leaderboard', '?game=4XGBQC'), false, 'the plain Spectator link stays watch only');
+    assert.equal(is('/index', '?game=4XGBQC&players=1'), false);
+});
+
