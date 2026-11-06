@@ -1,3 +1,10 @@
+// A PASTED LINK WITH A SPACE (Manny, Nov 6): ?game=%20ABC123 read "NO ROUND". Cleaned here, before any page reads ?game=.
+(function () {
+    try {
+        var u = new URL(location.href), g = u.searchParams.get('game');
+        if (g && g !== g.trim()) { u.searchParams.set('game', g.trim()); history.replaceState(null, '', u.href); }
+    } catch (e) { /* not a page (the node tests) */ }
+})();
 // ============================================================================
 // GolfApp — Safe Text (SHARED CORE)
 //

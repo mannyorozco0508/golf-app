@@ -53,3 +53,14 @@ test('4 money = base: the engines are origin/main 0d91206d byte for byte', () =>
     assert.equal(sha('bet-strip.js'), 'f05d833c899837cbc157059cc4628e8dbd4443f29185cb3c391b50d94d9b48ec');
     assert.equal(sha('money-engine.js'), 'cfd3f365cc3b3c0634038491d28fca4b2cb16cfaf8d83c8fd684c20d3102bc27');
 });
+
+test('a pasted link with a space: ?game= is trimmed before any page reads it, the rest of the link kept', () => {
+    const src = require('fs').readFileSync(require('path').join(__dirname, 'text-safe.js'), 'utf8');
+    const head = src.slice(0, src.indexOf('})();') + 5);
+    const run = (href) => { const box = { location: { href }, URL, history: { replaceState: (a, b, u) => { box.location.href = u; } } }; require('vm').runInNewContext(head, box); return new URL(box.location.href); };
+    const u = run('https://hardpangolf.com/index.html?game=%204XGBQC%20&group=1');
+    assert.equal(u.searchParams.get('game'), '4XGBQC');
+    assert.equal(u.searchParams.get('group'), '1');
+    assert.equal(run('https://hardpangolf.com/index.html?game=4XGBQC&group=1').href, 'https://hardpangolf.com/index.html?game=4XGBQC&group=1', 'a clean link is untouched');
+});
+
