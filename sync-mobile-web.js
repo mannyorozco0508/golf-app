@@ -224,6 +224,8 @@ const CONSUMER_SHELL = [
     // Running money, skins and KP across rounds. season.html and admin.html
     // load season.js. Consumer only.
     'season.html', 'season.js',
+    // Round chat (2.1b, ADVISOR-1727): the website loads it in web mode for a group link and a Players link.
+    'round-chat.js',
 ];
 
 // The organizer-facing product. tournament-scorecard.html stays HERE and not in

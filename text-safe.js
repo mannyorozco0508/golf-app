@@ -513,6 +513,11 @@ function hpCourseNameText(name) {
     return String(name).replace(/\bO\s+Odham\b/gi, 'O’odham');
 }
 
+// 2.0.2 (Manny): a round's link was shared from this phone: the organizer's 💬 shows from now on (round-chat.js).
+function hpMarkLinkShared(url, code) {
+    try { var m = /[?&]game=([^&#]+)/.exec(String(url || '')), c = String(code || (m && m[1]) || '').toUpperCase(); if (c) localStorage.setItem('hardpan_link_shared_' + c, '1'); } catch (e) {}
+}
+
 if (typeof module !== 'undefined' && module.exports) {
     Object.assign(module.exports, { hpSideMatchStartsHole, hpSideMatchStartsText, hpCourseNameText });
 }

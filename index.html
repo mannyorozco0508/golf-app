@@ -90,6 +90,8 @@
     <script src="net-finish-line.js"></script>
     <script src="bet-strip.js"></script>
     <script src="hole-events.js"></script>
+    <!-- WEB CHAT (2.1b, ADVISOR-1727): the round chat for a group link, no account. Text only; photos stay in the app. -->
+    <script src="round-chat.js" data-hp-chat="web"></script>
     <!-- Grouping. computeGroupSizes / computeGroupBoundaries decide which golfer is
          in which foursome, which is what every ?group=N scorekeeper link and every
          group-scoped write permission is measured against. This page carried its own
@@ -8558,6 +8560,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
         if (!canReachSetup()) return Promise.resolve('failed');
         const was = btn ? btn.textContent : null;
         return window.organizerGate.shareOrganizerLink(currentMode, currentData || {}).then(how => {
+            if (how !== 'failed' && typeof hpMarkLinkShared === 'function') hpMarkLinkShared('', currentMode);
             if (btn) { btn.textContent = how === 'copied' ? '\u2713 Copied' : (how === 'failed' ? 'Not shared' : '\u2713 Shared'); setTimeout(() => { btn.textContent = was; }, 2000); }
             return how;
         });
@@ -8658,6 +8661,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             </div>`;
         }).join('');
 
+        // PLAYERS LINK (ADVISOR-1727): the view-only leaderboard + the round chat, for golfers who aren't scoring.
+        const playersUrl = shareBaseUrl() + 'leaderboard.html?game=' + currentMode + '&players=1';
+        rows += '<div class="group-link-row" data-players-link="1"><div class="glr-info"><div class="glr-title">\uD83D\uDCAC Players link</div>'
+            + '<div class="glr-names">Everyone in the round: leaderboard + chat. No scores.</div></div>'
+            + '<button class="glr-copy" onclick="copyGroupLinkFromScorecard(\'' + playersUrl + '\', 0, this)">\uD83D\uDD17 Copy</button></div>';
+
         panel.innerHTML = `<div class="group-links-box">
             <div class="glb-title">Scorekeeper Links</div>
             <div class="glb-sub">Send each group their own link — it locks them to just their players.</div>
@@ -8736,6 +8745,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     }
 
     function copyGroupLinkFromScorecard(url, groupNum, btn) {
+        if (typeof hpMarkLinkShared === 'function') hpMarkLinkShared(url, currentMode);
         const done = () => {
             const original = btn.innerHTML;
             btn.innerHTML = '✅ Copied';
@@ -8755,6 +8765,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // only "✅ Copied" like a group's. The same copy, the same button feedback,
     // and one sentence - an alert for now, with the rest of the inventory.
     function copyOrganizerLinkFromScorecard(url, btn) {
+        if (typeof hpMarkLinkShared === 'function') hpMarkLinkShared(url, currentMode);
         copyGroupLinkFromScorecard(url, 0, btn);
         uiToast('Copied your organizer link. It can correct any score in the round \u2014 keep it to yourself.');
     }

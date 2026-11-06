@@ -11959,9 +11959,11 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
     // Still alerts, deliberately: three of the 213 dialogs in the inventory, gone
     // with the rest when the toast exists.
     function copyRoundLink(url) {
+        if (typeof hpMarkLinkShared === 'function') hpMarkLinkShared(url);
         navigator.clipboard.writeText(url).then(() => uiToast('Copied. Paste it into your group text \u2014 everyone picks their own group when they open it.'));
     }
     function copyGroupLink(url, groupNum, names) {
+        if (typeof hpMarkLinkShared === 'function') hpMarkLinkShared(url);
         const who = names ? ' \u2014 ' + names : '';
         navigator.clipboard.writeText(url).then(() => uiToast('Copied Group ' + groupNum + '\u2019s link' + who + '.'));
     }

@@ -159,7 +159,8 @@ describe('THE ANDROID SHELL - https://localhost inside Capacitor', () => {
 
     test('and every link on that panel - all groups and the organizer\'s - is a web link', async () => {
         const r = await scorecard('android', NATIVE);
-        assert.equal(r.all.length, 3, 'two group links and one organizer link expected');
+        assert.equal(r.all.length, 4, 'two group links, the Players link (web chat) and one organizer link expected');
+        assert.ok(r.all.some(u => /leaderboard\.html\?game=.*&players=1/.test(u)), 'the Players link is missing');
         r.all.forEach(u => assert.ok(u.startsWith(WEB + '/'), 'a localhost link is on the panel: ' + u));
         assert.ok(r.all.some(u => /organizer=tok1/.test(u)), 'the organizer link is missing');
     });

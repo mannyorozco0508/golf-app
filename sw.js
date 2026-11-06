@@ -4508,7 +4508,8 @@
 // opens with NEAR YOU (only when location is already allowed) then LAST PLAYED; settlement.html + receipt-image.js (new) -
 // Share receipt as a designed image. A device on v373-2.0 keeps the old files: the four add-a-game screens and More tiles,
 // the regional course list first, and the text-only Share receipt.
-const CACHE_VERSION = 'golfapp-v379-2.0';
+// Moved to v380-2.0 (web chat, ADVISOR-1727): round-chat.js (new here) + index.html, leaderboard.html, admin.html, text-safe.js - the round chat for a group link and the Players link, no account, text only. A device on v379-2.0 keeps the old files: no 💬, and it goes on scoring as before.
+const CACHE_VERSION = 'golfapp-v380-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4697,6 +4698,8 @@ const SHELL_FILES = [
     // sheet, so a cached shell without it throws before a golfer can choose.
     './round-role.js',
     './offline-queue.js',
+    // Round chat (ADVISOR-1727): the website loads it in web mode (index.html, leaderboard.html).
+    './round-chat.js',
     // The order the holes are actually played in, for a round that goes off the
     // 10th tee. Every call site is typeof-guarded and falls back to the order the
     // card itself carries, so a cached shell without it plays 1..18 - which is what
