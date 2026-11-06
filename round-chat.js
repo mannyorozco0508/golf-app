@@ -187,7 +187,7 @@
     // themselves ("Which golfer are you?"); "Just watching" = no chat. Joining never grants score rights: this page
     // has no score boxes, and the only writes are the 2.1b chat claim + member record (proven on the emulator).
     // The plain Spectator link (no players=1) stays watch-only: no 💬.
-    var PLAYERS = WEB && (function () { try { return /[?&]players=1(&|$)/.test(W.location.search) && /leaderboard\.html$/i.test(W.location.pathname); } catch (e) { return false; } })();
+    var PLAYERS = WEB && (function () { try { return /[?&]players=1(&|$)/.test(W.location.search) && /\/leaderboard(\.html)?\/?$/i.test(W.location.pathname); } catch (e) { return false; } })();
 
     // A Players link NEVER LEADS TO SCORE ENTRY. The leaderboard's nav bar goes to the Scorecard (and every other page's nav
     // does too), where a tap would put score boxes in front of a golfer this link says can't score. So on this link only,
