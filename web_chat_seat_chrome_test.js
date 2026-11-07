@@ -275,3 +275,12 @@ test('10 Manny\'s preview case: 💬 tapped before the round arrives says Loadin
     assert.equal(await emu.read('chatSlots/' + C + '/101'), 'anon-l-new');
 });
 
+test('11 a round ended on the server, its card still on this phone: the sheet says so, never Loading forever', Object.assign({ timeout: 60000 }, SKIP), async () => {
+    const C = 'TSM011'; await seed(C);
+    const p = await web('g-1', C, 1, '101');
+    await emu.write('events/' + C, null);
+    await p.eval("currentData = {}; 1");
+    await openChat(p);
+    assert.ok(await p.waitFor(has('/This round isn’t there any more/'), 8000), await p.text('#hp-chat'));
+});
+

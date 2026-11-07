@@ -827,6 +827,7 @@
     }
     function webJoinHtml() {
         // 2.0.2 preview (Manny): 💬 tapped before the round or the seats arrived showed "0 golfers" and no names, and stayed that way.
+        if (S.gone && !players().length) return '<div class="rc-card" data-rc-gate="gone"><h3>This round isn’t there any more</h3><p>It was ended or removed, so there’s no chat to join. Ask the organizer for a new link.</p></div>';
         if (!players().length || S.slots === null) return '<div class="rc-empty">Loading the round…</div>';
         var g = myGroup(), list = groupPlayers(g), me = meId();
         var mine = me ? list.filter(function (p) { return String(p.id) === String(me); })[0] : null;
@@ -1151,9 +1152,17 @@
     }
 
     // ---- BOOT -----------------------------------------------------------------------
+    // The card can draw a round from this phone's saved copy after the round was ended: ask the server once, don't say Loading forever.
+    function checkGone() {
+        if (!WEB || players().length) { S.gone = false; S.goneFor = null; return; }
+        if (!S.code || S.goneFor === S.code) return;
+        S.goneFor = S.code;
+        var r = dbRef('events/' + S.code + '/players'); if (!r) return;
+        r.once('value').then(function (v) { S.gone = !(v && v.exists && v.exists()); changed(); }, function () { S.goneFor = null; });
+    }
     function tick() {
         if (!appOn()) return;
-        try { reattach(); if (S.blocksOpened && Date.now() >= S.blocksNext && Object.keys(localHidden()).length) syncBlocks(); if (S.mode) { place(rootEl()); var sig = players().length + '|' + (S.slots === null ? 0 : 1) + '|' + roundTitle(); if (sig !== S.drawSig) { S.drawSig = sig; changed(); } } peek(); } catch (e) { }
+        try { reattach(); if (S.blocksOpened && Date.now() >= S.blocksNext && Object.keys(localHidden()).length) syncBlocks(); if (S.mode) { place(rootEl()); checkGone(); var sig = players().length + '|' + (S.slots === null ? 0 : 1) + '|' + roundTitle() + '|' + !!S.gone; if (sig !== S.drawSig) { S.drawSig = sig; changed(); } } peek(); } catch (e) { }
     }
     var tickTimer = setInterval(tick, 1000);
     if (tickTimer && typeof tickTimer.unref === 'function') tickTimer.unref();   // a page loaded in node (the vm-based tests) is not kept alive by it
