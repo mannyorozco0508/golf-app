@@ -826,6 +826,8 @@
             + (busy ? '' : '<button type="button" class="rc-gbtn rc-again" data-rc-move-no="1">Cancel</button>') + fine + '</div>';
     }
     function webJoinHtml() {
+        // 2.0.2 preview (Manny): 💬 tapped before the round or the seats arrived showed "0 golfers" and no names, and stayed that way.
+        if (!players().length || S.slots === null) return '<div class="rc-empty">Loading the round…</div>';
         var g = myGroup(), list = groupPlayers(g), me = meId();
         var mine = me ? list.filter(function (p) { return String(p.id) === String(me); })[0] : null;
         var rules = '<p><b>The chat rules:</b> no objectionable content and no abuse. Report anything that breaks them: reports are reviewed within 24 hours, and golfers who break the rules are removed.</p>';
@@ -901,7 +903,8 @@
         var gc = groupCount(), n = players().length;
         var sub = S.tab === 'group' ? groupNames(g).join(', ') + ' · only your group sees this'
             : n + ' golfers' + (gc > 1 ? ' · ' + gc + ' groups' : '') + (WEB ? ' · golfers in this round' : ' · signed-in golfers in this round');
-        if (PLAYERS && !joined()) { tabs = ''; S.tab = 'round'; sub = n + ' golfers' + (gc > 1 ? ' · ' + gc + ' groups' : '') + ' · pick your name to chat'; }   // no group before a name is picked
+        if (WEB && !n) sub = 'Getting the round…';
+        else if (PLAYERS && !joined()) { tabs = ''; S.tab = 'round'; sub = n + ' golfers' + (gc > 1 ? ' · ' + gc + ' groups' : '') + ' · pick your name to chat'; }   // no group before a name is picked
         var html = headHtml('💬 ' + (S.tab === 'group' ? 'Group ' + g : roundTitle()) + ' · Chat', sub, { gear: isOwner(), tabs: tabs });
         var gate = gateHtml();
         if (gate) return html + '<div class="rc-body">' + gate + '</div>';
@@ -1150,7 +1153,7 @@
     // ---- BOOT -----------------------------------------------------------------------
     function tick() {
         if (!appOn()) return;
-        try { reattach(); if (S.blocksOpened && Date.now() >= S.blocksNext && Object.keys(localHidden()).length) syncBlocks(); if (S.mode) place(rootEl()); peek(); } catch (e) { }
+        try { reattach(); if (S.blocksOpened && Date.now() >= S.blocksNext && Object.keys(localHidden()).length) syncBlocks(); if (S.mode) { place(rootEl()); var sig = players().length + '|' + (S.slots === null ? 0 : 1) + '|' + roundTitle(); if (sig !== S.drawSig) { S.drawSig = sig; changed(); } } peek(); } catch (e) { }
     }
     var tickTimer = setInterval(tick, 1000);
     if (tickTimer && typeof tickTimer.unref === 'function') tickTimer.unref();   // a page loaded in node (the vm-based tests) is not kept alive by it
