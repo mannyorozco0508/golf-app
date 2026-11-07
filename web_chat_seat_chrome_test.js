@@ -12,6 +12,11 @@
 //   6 rollout: a v380 web holder (65bbf88d) freed by the organizer falls back to its join card
 //   7 chatSeatMove: a non-organizer is refused with nothing written; the organizer frees it and every phone sees the line
 //   10 💬 before the round arrives: Loading, then the names (a taken golfer greyed, no move)     11 a round ended on the server: the sheet says so
+// BASELINE e8af302e: test 1 fails there (it has the move button). FINAL RUN: 10 pass / 0 fail.
+// Controls, each by a scratch .wave copy and RESTORED-OK by sha, all red: a move button back on the taken screen (1), the gear
+//   for everyone (4), Free deletes a banned member (5), Players link .html only (3a), the old phone gets the app join card (5);
+//   on chat-core.js: no organizer check (7), old member kept (7).
+// ============================================================================
 'use strict';
 const fs = require('fs');
 const os = require('os');
