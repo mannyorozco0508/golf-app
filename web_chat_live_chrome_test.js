@@ -327,7 +327,8 @@ test('9b the organizer on the web: chat off hides it, back on the messages retur
 
 const T = {};
 test('10 mixed: v379 web (no chat) + 2.0.2 app + new web: all score, chat flows, the board reads all', Object.assign({ timeout: 200000 }, SKIP), async () => {
-    T.v379 = exportTree(__dirname, 'origin/main', TREES); T.a202 = exportTree(__dirname, 'release-202', TREES); T.a201 = exportTree(__dirname, 'release-201', TREES);
+    // by sha: origin/main has moved on, and each phone here is one exact version
+    T.v379 = exportTree(__dirname, '0d91206d', TREES); T.a202 = exportTree(__dirname, '1995536f', TREES); T.a201 = exportTree(__dirname, '364ada45', TREES);
     const old = T.old = await phone('v379', { url: url(T.v379, 'index.html', 'game=' + M + '&group=1'), preScript: WEB_PRE(M, '102'), auth: ANON('anon-old') });
     assert.equal(await old.eval("typeof HardPanChat"), 'undefined', 'really the old code');
     const app = T.app = await phone('app202', { webgl: true, settleMs: 6000, url: url(T.a202, 'index.html', 'game=' + M + '&group=1'), preScript: APP_PRE(M, '101'), auth: ACCT('u-manny', 'Manny Orozco') });

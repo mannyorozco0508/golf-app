@@ -4509,7 +4509,8 @@
 // Share receipt as a designed image. A device on v373-2.0 keeps the old files: the four add-a-game screens and More tiles,
 // the regional course list first, and the text-only Share receipt.
 // Moved to v380-2.0 (web chat, ADVISOR-1727): round-chat.js (new here) + index.html, leaderboard.html, admin.html, text-safe.js - the round chat for a group link and the Players link, no account, text only. A device on v379-2.0 keeps the old files: no 💬, and it goes on scoring as before.
-const CACHE_VERSION = 'golfapp-v380-2.0';
+// Moved to v381-2.0 (chat seat move): round-chat.js - This is me, move chat to this phone; the organizer's Free this seat; the Players link on /leaderboard. A device on v380-2.0 keeps the old files: a golfer on a new phone stays locked out, and may keep the round-chat.js that ignores /leaderboard.
+const CACHE_VERSION = 'golfapp-v381-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

@@ -42,7 +42,8 @@ test('2 the pages: web mode once; nothing app-only reached the site', () => {
 });
 test('3 the service worker and the shell list', () => {
     const sw = read('sw.js');
-    assert.match(sw, /const CACHE_VERSION = 'golfapp-v380-2\.0';/);
+    assert.match(sw, /const CACHE_VERSION = 'golfapp-v381-2\.0';/);
+    assert.match(sw, /\/\/ Moved to v381-2\.0 \(chat seat move\): round-chat\.js/);
     assert.match(sw, /\/\/ Moved to v380-2\.0 \(web chat, ADVISOR-1727\): round-chat\.js/);
     assert.equal(sw.split("'./round-chat.js'").length - 1, 1, 'precached once');
     assert.ok(/const CONSUMER_SHELL = \[[\s\S]*?'round-chat\.js'[\s\S]*?\];/.test(read('sync-mobile-web.js')), 'in the Consumer shell');

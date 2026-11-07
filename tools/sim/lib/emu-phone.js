@@ -42,13 +42,14 @@ function pre(o) {
     const provider = u.isAnonymous ? 'anonymous' : ((u.providerData && u.providerData[0] && u.providerData[0].providerId) || 'apple.com');
     return `(function () {
   var PORT = ${o.emu.port}, NS = ${JSON.stringify(o.emu.ns)}, USER = ${JSON.stringify(u)};
-  USER.getIdToken = function () { return Promise.resolve('emu-token'); };
+  USER.getIdToken = function () { return Promise.resolve('emu:' + USER.uid + ':' + ${JSON.stringify(provider)}); };
   window.__netEscapes = []; window.__dbDenied = []; window.__simErrs = [];
   var okHost = function (url) { try { var h = new URL(String(url), location.href); return h.protocol === 'file:' || h.hostname === '127.0.0.1'; } catch (e) { return false; } };
   var WS = window.WebSocket;
   window.WebSocket = function (url, p) { if (!okHost(url)) { window.__netEscapes.push(String(url)); throw new Error('emu: off-machine socket'); } return p ? new WS(url, p) : new WS(url); };
   window.WebSocket.prototype = WS.prototype; ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(function (k) { window.WebSocket[k] = WS[k]; });
-  var F = window.fetch; window.fetch = function (x, y) { var url = x && x.url ? x.url : x; if (!okHost(url)) { window.__netEscapes.push(String(url)); return Promise.reject(new Error('emu: off-machine fetch')); } return F.call(window, x, y); };
+  var FN = ${JSON.stringify(o.fnBase || '')}, CF = 'https://us-central1-golfapp-9fb21.cloudfunctions.net';
+  var F = window.fetch; window.fetch = function (x, y) { var url = x && x.url ? x.url : x; if (FN && String(url).indexOf(CF) === 0) return F.call(window, FN + String(url).slice(CF.length), y); if (!okHost(url)) { window.__netEscapes.push(String(url)); return Promise.reject(new Error('emu: off-machine fetch')); } return F.call(window, x, y); };
   var AL = [];
   var authStub = { get currentUser() { return USER; },
     onAuthStateChanged: function (cb) { if (typeof cb === 'function') { AL.push(cb); setTimeout(function () { cb(USER); }, 0); } return function () {}; },
@@ -79,7 +80,7 @@ class EmuPhone extends Phone {
     static async launch(o) { const p = new EmuPhone(o); await p._start(); if (o.url) await p.goto(o.url, o.settleMs); return p; }
     constructor(o) { super(Object.assign({ server: { db: {} } }, o)); }
     async _inject() {
-        await this.cdp('Network.setBlockedURLs', { urls: ['*firebase-auth-compat.js', '*firebaseio.com*', '*firebasedatabase.app*', '*cloudfunctions.net*', '*googleapis.com*', '*arcgisonline.com*', '*arcgis.com*'] });
+        await this.cdp('Network.setBlockedURLs', { urls: ['*/sw.js*', '*firebase-auth-compat.js', '*firebaseio.com*', '*firebasedatabase.app*', '*cloudfunctions.net*', '*googleapis.com*', '*arcgisonline.com*', '*arcgis.com*'] });
         if (this.injected) { for (const id of this.injected) await this.cdp('Page.removeScriptToEvaluateOnNewDocument', { identifier: id }); }
         this.injected = [];
         const a = await this.cdp('Page.addScriptToEvaluateOnNewDocument', { source: pre(this.o) });
