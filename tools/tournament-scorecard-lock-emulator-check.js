@@ -58,6 +58,11 @@ const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const token = (uid, provider) => b64({ alg: 'none', typ: 'JWT' }) + '.' + b64({
     sub: uid, user_id: uid, aud: 'golfapp-9fb21', iss: 'https://securetoken.google.com/golfapp-9fb21',
     iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600,
+    // LIVE RULES (read 2026-11-07) require auth.token.email on every tournaments/<code>
+    // write; a real organizer is email-signed-in. Without the claim, every owner arm
+    // was refused on the live ruleset for a reason that has nothing to do with the
+    // lock. The stranger gets an email too: a signed-in stranger is the harder case.
+    ...(provider === 'anonymous' ? {} : { email: uid + '@example.test', email_verified: true }),
     firebase: { sign_in_provider: provider || 'password' } }) + '.';
 const AS = { owner: token('u-org'), stranger: token('u-who'), anon: token('u-anon', 'anonymous'), nobody: null };
 
