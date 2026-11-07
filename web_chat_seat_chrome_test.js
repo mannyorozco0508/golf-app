@@ -255,3 +255,23 @@ test('9 rollout: a v380 web holder falls back to its join card; a 2.0.2 app phon
     assert.ok(await app.waitFor(has('/Paul moved chat to another phone/', '#hp-chat .rc-body'), 8000), 'the 2.0.2 app shows the line');
     await done(old); await done(app); await done(nw);
 });
+
+test('10 Manny\'s preview case: 💬 tapped before the round arrives says Loading, then fills in by itself, with the Move button for a quiet device\'s seat', Object.assign({ timeout: 90000 }, SKIP), async () => {
+    const C = 'TSM010'; await seed(C);
+    const old = await web('l-old', C, 1, '101'); await join(old, 101); await done(old);
+    const nw = await web('l-new', C, 1);
+    await nw.eval("window.__keep = currentData; currentData = {}; 1");
+    await openChat(nw);
+    const early = await nw.text('#hp-chat');
+    assert.match(early, /Loading the round/, early);
+    assert.doesNotMatch(early, /0 golfers/, early);
+    await nw.eval("currentData = window.__keep; 1");
+    assert.ok(await nw.waitFor(has('/Manny/', '#hp-chat'), 6000), 'the names arrive with the sheet still open');
+    skew = 11 * MIN;
+    await ask(nw, 101);
+    assert.match(await nw.text('#hp-chat'), /Move Manny’s chat to this phone\?/);
+    await yes(nw, 101);
+    assert.ok(await nw.waitFor(IN_CHAT, 10000), 'moved and joined');
+    assert.equal(await emu.read('chatSlots/' + C + '/101'), 'anon-l-new');
+});
+
