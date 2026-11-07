@@ -259,7 +259,7 @@
 
     // ---- STATE --------------------------------------------------------------------------
     var S = { code: null, uid: null, settings: null, member: undefined, msgs: { round: {}, group: {} }, rx: {}, pending: {}, gAttached: null,
-        mode: null, tab: 'round', action: null, report: null, feedOpen: {}, reports: null, offs: [], threadOffs: [], slots: null, pick: null, lastSent: 0, move: null, slotMembers: null,
+        mode: null, tab: 'round', action: null, report: null, feedOpen: {}, reports: null, offs: [], threadOffs: [], slots: null, pick: null, lastSent: 0, slotMembers: null,
         blocks: {}, blocksFor: null, blocksLive: false, blockBusy: {}, blocksOpened: false, blocksNext: 0, unhideGen: 0 };
     // HIDE (see the header): a signed-in account keeps the list on the account (chatBlocks/<uid>); the anonymous session
     // (no account) keeps it on this phone only, as before 2.0.2.
@@ -302,7 +302,7 @@
         var c = code(), u = uidNow();
         if (c === S.code && u === S.uid) return;
         detach(S.offs); detach(S.threadOffs);
-        S.code = c; S.uid = u; S.settings = null; S.member = undefined; S.msgs = { round: {}, group: {} }; S.rx = {}; S.gAttached = null; S.reports = null; S.slots = null; S.pick = null; S.move = null;
+        S.code = c; S.uid = u; S.settings = null; S.member = undefined; S.msgs = { round: {}, group: {} }; S.rx = {}; S.gAttached = null; S.reports = null; S.slots = null; S.pick = null;
         S.blocks = {}; S.blocksFor = null; S.blocksLive = false; S.blockBusy = {}; S.blocksOpened = false;
         if (!c) return;
         listen('chatSettings/' + c, function (v) { var was = chatOn(S.settings); S.settings = v || {}; if (!was && chatOn(S.settings)) { S.gAttached = null; threads(); } changed(); }, S.offs);   // back on: chat off cancelled the thread listeners (the rules refuse the read), so listen again
@@ -397,28 +397,6 @@
         up['chatMembers/' + c + '/' + u].joinedAt = sv();
         r.update(up).then(null, function () { S.pick = String(pid); say('Couldn’t join as that golfer: someone else may have just joined as them.'); draw(); });
     }
-    // WEB: THE WAY BACK (chatSeatMove). A seat belongs to the anonymous session that took it, so a golfer on a new phone or
-    // browser is locked out of their own golfer, and the rules let only the organizer delete a seat. The function checks the
-    // other phone is idle, frees the seat and posts the line; this phone then joins the ordinary way. Plain fetch with the ID
-    // token, as the photo link. Every answer ends in words on the screen, never a dead tap.
-    var SEAT_NO_FN = 'Couldn’t reach HardPan to move the chat. Check your signal and try again, or ask the organizer.';
-    function seatCall(pid) {
-        return within(idToken().then(function (tok) {
-            return fetch(FN_BASE + '/chatSeatMove', { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
-                body: JSON.stringify({ data: { code: S.code, pid: Number(pid) } }) });
-        }).then(function (r) { return r.json(); }).then(function (j) { if (!j || !j.result) throw new Error('no-answer'); return j.result; }), 15000, 'seat');
-    }
-    function seatMove(pid) {
-        var mv = S.move; if (!mv || mv.busy || String(mv.pid) !== String(pid) || !webAnon()) return;
-        mv.busy = true; mv.msg = null; draw();
-        seatCall(pid).then(function (r) {
-            if (S.move !== mv) return;
-            if (!r.ok && r.reason !== 'empty') { S.move = { pid: pid, msg: String(r.message || SEAT_NO_FN) }; draw(); return; }
-            S.move = null;
-            var sl = Object.assign({}, S.slots); delete sl[String(pid)]; S.slots = sl;   // the listener is a beat behind the server
-            webJoin(pid); draw();
-        }, function () { if (S.move === mv) { S.move = { pid: pid, msg: SEAT_NO_FN }; draw(); } });
-    }
     function send(thread, text, replyTo) {
         var t = cleanText(text);
         if (!t) return false;
@@ -503,7 +481,7 @@
         r.update(up).then(function () { say('Seat freed. That golfer can join again.'); loadSeats(); }, function () { say('Couldn’t free the seat.'); });
     }
     function seatsHtml() {
-        if (!WEB || !S.slots) return '';
+        if (!WEB || !isOwner() || !S.slots) return '';   // the round's organizer only (the rules let only the owner delete a seat)
         var ids = Object.keys(S.slots); if (!ids.length) return '';
         return '<div class="rc-srow flat"><i>📱</i><div><b>Seats</b><span>Which phone holds each web golfer</span></div></div><div class="rc-rlist">' + ids.map(function (id) {
             var p = playerById(id); return '<div>' + esc(p ? shortName(p) : 'Golfer') + ' · <button type="button" class="rc-rep" data-rc-free="' + esc(id) + '">Free this seat</button></div>';
@@ -813,18 +791,6 @@
     // phone already holds is shown as taken and cannot be picked (the rules refuse it too).
     function groupPlayers(g) { var m = groupMap(); return players().filter(function (p) { return String(m[p.id]) === String(g); }); }
     function playerById(id) { return players().filter(function (p) { return String(p.id) === String(id); })[0] || null; }
-    function moveBtn(p) {
-        var m = S.move && String(S.move.pid) === String(p.id) ? S.move : null;
-        return (m && m.msg ? '<div class="rc-taken" data-rc-gate="move-no" role="status">' + esc(m.msg) + '</div>' : '')
-            + '<button type="button" class="rc-gbtn rc-again" data-rc-move="' + esc(p.id) + '">This is me, move chat to this phone</button>';
-    }
-    function moveAskHtml(p, fine) {
-        var busy = !!S.move.busy, n = shortName(p);
-        return '<div class="rc-card" data-rc-gate="move-ask"><h3>Move ' + esc(n) + '’s chat to this phone?</h3><p>The other phone loses the seat and goes back to the join screen. Everyone in the round sees a line saying ' + esc(n) + ' moved chat.</p>'
-            + '<p>Only do this if you are ' + esc(n) + '.</p>'
-            + '<button type="button" class="rc-cta" data-rc-move-yes="' + esc(p.id) + '"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Moving…' : 'Yes, move chat to this phone') + '</button>'
-            + (busy ? '' : '<button type="button" class="rc-gbtn rc-again" data-rc-move-no="1">Cancel</button>') + fine + '</div>';
-    }
     function webJoinHtml() {
         // 2.0.2 preview (Manny): 💬 tapped before the round or the seats arrived showed "0 golfers" and no names, and stayed that way.
         if (S.gone && !players().length) return '<div class="rc-card" data-rc-gate="gone"><h3>This round isn’t there any more</h3><p>It was ended or removed, so there’s no chat to join. Ask the organizer for a new link.</p></div>';
@@ -834,10 +800,9 @@
         var rules = '<p><b>The chat rules:</b> no objectionable content and no abuse. Report anything that breaks them: reports are reviewed within 24 hours, and golfers who break the rules are removed.</p>';
         var fine = '<div class="rc-fine">No account needed: you chat as a golfer from this round’s list, text only (photos need the HardPan app). The organizer can remove anyone or turn the chat off. By joining you agree to the chat rules. Abuse? Email <a href="mailto:support@rattlegolf.com">support@rattlegolf.com</a>.</div>';
         var takenOf = function (p) { return slotState(S.slots, p.id, S.uid) === 'taken'; };
-        var takenMsg = function (p, inList) {
-            return '<div class="rc-taken" data-rc-gate="taken"><b>' + esc(shortName(p)) + ' is already in this chat on another phone.</b> Only one phone can chat as each golfer. If that isn’t you, ask the organizer.</div>' + (inList ? '' : moveBtn(p));   // a list carries the button on the golfer's own row
+        var takenMsg = function (p) {
+            return '<div class="rc-taken" data-rc-gate="taken"><b>' + esc(shortName(p)) + ' is already in this chat on another phone.</b> Only one phone can chat as each golfer. If that isn’t you, ask the organizer.</div>';
         };
-        if (S.move && S.move.ask) { var mp = playerById(S.move.pid); if (mp) return moveAskHtml(mp, fine); }
         if (PLAYERS) return playersJoinHtml(rules, fine, takenOf, takenMsg);
         var head = '<div class="rc-card" data-rc-gate="webjoin"><h3>Join the round chat</h3><p>Talk with the whole round and Group ' + esc(g) + '. Only golfers who join can see it.</p>' + rules;
         if (mine) {
@@ -845,10 +810,10 @@
             return head + '<button type="button" class="rc-cta" data-rc-join="' + esc(mine.id) + '">Join chat as ' + esc(shortName(mine)) + ' · Group ' + esc(g) + '</button>' + fine + '</div>';
         }
         var pick = S.pick ? playerById(S.pick) : null;
-        return head + (pick && takenOf(pick) ? takenMsg(pick, true) : '') + '<p><b>Who are you?</b></p><div class="rc-who-pick">' + list.map(function (p) {
+        return head + (pick && takenOf(pick) ? takenMsg(pick) : '') + '<p><b>Who are you?</b></p><div class="rc-who-pick">' + list.map(function (p) {
             var t = takenOf(p);
             return '<button type="button" class="rc-gbtn" data-rc-join="' + esc(p.id) + '"' + (t ? ' disabled aria-disabled="true"' : '') + '>Join chat as ' + esc(shortName(p)) + ' · Group ' + esc(g)
-                + (t ? '<small>Already in the chat on another phone</small>' : '') + '</button>' + (t ? moveBtn(p) : '');
+                + (t ? '<small>Already in the chat on another phone</small>' : '') + '</button>';
         }).join('') + '</div>' + fine + '</div>';
     }
     // PLAYERS LINK: "Which golfer are you?" - the whole round by group (a golfer another phone holds is greyed),
@@ -866,12 +831,12 @@
         players().forEach(function (p) { var g = String(m[p.id] || '1'); if (!by[g]) { by[g] = []; gs.push(g); } by[g].push(p); });
         gs.sort(function (a, b) { return Number(a) - Number(b); });
         return '<div class="rc-card" data-rc-gate="players"><h3>Which golfer are you?</h3><p>' + esc(roundTitle()) + ' · ' + esc(S.code || '') + ' · one phone per golfer</p>'
-            + (pick && takenOf(pick) ? takenMsg(pick, true) : '')
+            + (pick && takenOf(pick) ? takenMsg(pick) : '')
             + gs.map(function (g) {
                 return '<div class="rc-pg">Group ' + esc(g) + '</div><div class="rc-who-pick">' + by[g].map(function (p) {
                     var t = takenOf(p);
                     return '<button type="button" class="rc-gbtn" data-rc-pick="' + esc(p.id) + '"' + (t ? ' disabled aria-disabled="true"' : '') + '>' + esc(String(p.name || shortName(p)))
-                        + '<small>' + (t ? 'Already in the chat on another phone' : 'Group ' + esc(g)) + '</small></button>' + (t ? moveBtn(p) : '');
+                        + '<small>' + (t ? 'Already in the chat on another phone' : 'Group ' + esc(g)) + '</small></button>';
                 }).join('') + '</div>';
             }).join('')
             + '<div class="rc-who-pick"><button type="button" class="rc-gbtn" data-rc="watch">👀 Just watching<small>See the round. No chat, no scores.</small></button></div>' + fineP + '</div>';
@@ -1018,7 +983,7 @@
         if (send(thread, inp.value, reply || null)) inp.value = '';
     }
     function onClick(e) {
-        var t = e.target, b = t && t.closest ? t.closest('[data-rc],[data-rc-tab],[data-rc-msg],[data-rc-quick],[data-rc-react],[data-rc-replies],[data-rc-reason],[data-rc-rm],[data-rc-join],[data-rc-pick],[data-rc-move],[data-rc-move-yes],[data-rc-move-no],[data-rc-free]') : null;
+        var t = e.target, b = t && t.closest ? t.closest('[data-rc],[data-rc-tab],[data-rc-msg],[data-rc-quick],[data-rc-react],[data-rc-replies],[data-rc-reason],[data-rc-rm],[data-rc-join],[data-rc-pick],[data-rc-free]') : null;
         if (!b) return;
         var a = b.getAttribute('data-rc');
         if (a === 'asheet-x' && t !== b) return;   // a tap inside the action panel, not on its dim
@@ -1030,9 +995,6 @@
         if (b.hasAttribute('data-rc-reason')) { var aid = S.action && S.action.id; S.action = null; S.report = null; draw(); if (aid) report(aid, b.getAttribute('data-rc-reason')); return; }
         if (b.hasAttribute('data-rc-join')) { if (!b.disabled) webJoin(b.getAttribute('data-rc-join')); return; }
         if (b.hasAttribute('data-rc-pick')) { if (!b.disabled) { S.pick = b.getAttribute('data-rc-pick') || null; draw(); } return; }
-        if (b.hasAttribute('data-rc-move')) { S.move = { pid: b.getAttribute('data-rc-move'), ask: true }; draw(); return; }
-        if (b.hasAttribute('data-rc-move-yes')) { if (!b.disabled) seatMove(b.getAttribute('data-rc-move-yes')); return; }
-        if (b.hasAttribute('data-rc-move-no')) { S.move = null; draw(); return; }
         if (b.hasAttribute('data-rc-free')) { freeSeat(b.getAttribute('data-rc-free')); return; }
         if (b.hasAttribute('data-rc-rm')) { remove(b.getAttribute('data-rc-rm')); setTimeout(loadReports, 300); return; }
         var m = S.action ? msgById(S.action.id) : null;

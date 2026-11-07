@@ -259,4 +259,23 @@ describe('Web chat 2.1b rules on the RTDB emulator', SKIP, () => {
         assert.equal(await ok(N.db.ref().update(up)), true, 'the chat join still works on a locked round');
         assert.equal(await tryScore('p103_h2', 5), false, 'locked: still refused after the chat join');
     });
+
+    test('13 seats: only the organizer deletes a seat or another golfer\'s member record; a golfer or a signed-in account by hand is refused', { timeout: 30000 }, async () => {
+        const L = 'TWEBSE';
+        await admin(NS_PROP, 'events/' + L, 'PUT', EVENT);
+        const H = P(NS_PROP, 'anon-se1', 'anonymous');
+        assert.equal(await ok(H.db.ref().update(C.webJoinUpdate(L, 'anon-se1', PLAYERS, 103, '1'))), true, 'a golfer holds Test Josh');
+        const G = P(NS_PROP, 'anon-se2', 'anonymous');
+        assert.equal(await ok(G.db.ref().update(C.webJoinUpdate(L, 'anon-se2', PLAYERS, 104, '1'))), true, 'another golfer in the round');
+        const A = P(NS_PROP, 'u-notowner', 'apple.com');
+        for (const [who, N] of [['another golfer', G], ['a stranger', P(NS_PROP, 'anon-se3', 'anonymous')], ['a signed-in account', A]]) {
+            assert.equal(await ok(N.db.ref('chatSlots/' + L + '/103').remove()), false, who + ': the seat');
+            assert.equal(await ok(N.db.ref('chatMembers/' + L + '/anon-se1').remove()), false, who + ': the member record');
+            assert.equal(await ok(N.db.ref().update({ ['chatSlots/' + L + '/103']: null, ['chatMembers/' + L + '/anon-se1']: null })), false, who + ': both in one update');
+        }
+        assert.equal(await admin(NS_PROP, 'chatSlots/' + L + '/103', 'GET'), 'anon-se1', 'still held');
+        const O = P(NS_PROP, 'org', 'apple.com');
+        assert.equal(await ok(O.db.ref().update({ ['chatSlots/' + L + '/103']: null, ['chatMembers/' + L + '/anon-se1']: null })), true, 'the organizer frees it');
+        assert.equal(await admin(NS_PROP, 'chatSlots/' + L + '/103', 'GET'), null);
+    });
 });
