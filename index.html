@@ -4,7 +4,7 @@
 <script>
 /* PREVIEW ONLY (web-chat-preview host): no service worker, and an on-screen report of why a round won't connect. Never on main. */
 (function(){ if(!/^web-chat-preview\./.test(location.hostname)) return;
- var L=[],t0=Date.now(),box; function say(m){ L.push(((Date.now()-t0)/1000).toFixed(1)+'s '+m); if(box) box.textContent=L.slice(-16).join('\n'); }
+ var L=[],t0=Date.now(),box; function say(m){ L.push(((Date.now()-t0)/1000).toFixed(1)+'s '+m); if(box){ box.textContent=L.slice(-16).join('\n'); box.scrollTop=box.scrollHeight; } }
  try{ if(navigator.serviceWorker){ navigator.serviceWorker.register=function(){ say('sw register skipped'); return new Promise(function(){}); }; navigator.serviceWorker.getRegistrations().then(function(r){ say('sw regs '+r.length+' controller '+!!navigator.serviceWorker.controller); r.forEach(function(x){x.unregister();}); }); } if(window.caches) caches.keys().then(function(k){ k.forEach(function(n){caches.delete(n);}); say('caches cleared '+k.length); }); }catch(e){ say('sw err '+e.message); }
  addEventListener('error',function(e){ var t=e.target; if(t&&t!==window&&t.src) say('LOAD FAIL '+t.src.split('/').pop()); else say('ERROR '+(e.message||'')+' @'+String(e.filename||'').split('/').pop()+':'+e.lineno); },true);
  addEventListener('unhandledrejection',function(e){ say('REJECT '+String(e.reason&&(e.reason.code||e.reason.message)||e.reason).slice(0,120)); });
