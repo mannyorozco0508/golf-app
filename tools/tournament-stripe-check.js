@@ -295,6 +295,15 @@ async function run(name, opts) {
         check(/1 of 1 in the field · 1 paid · 0 unpaid/.test(v.day), 'I: desk counts: ' + v.day);
         check(/^sms:6025550100$/.test(v.sms), 'I: Text team uses the team\'s registration phone: ' + v.sms); }
 
+    // K. M6: the HardPan Tournaments bar on both pages, Rattle Golf as the company line.
+    const BAR_PROBE = `JSON.stringify({ bar: ${txt('#hp-brand')}, w: Math.round((document.getElementById('hp-brand') || { getBoundingClientRect: () => ({ width: 0 }) }).getBoundingClientRect().width), title: document.title })`;
+    const k1 = await run('K-landing', { url: fileUrl('tournament.html', ''), db, preScript: fnStub({}), steps: [{ expression: BAR_PROBE }, ...shot('M6-landing.png')] });
+    const k2 = await run('K-scorecard', { url: fileUrl('tournament-scorecard.html', 'tourney=CARD1&team=1'), db, preScript: fnStub({}), steps: [{ expression: BAR_PROBE }, ...shot('M6-scorecard.png')] });
+    out.K = [k1.ran ? k1.values[0] : k1, k2.ran ? k2.values[0] : k2];
+    [k1, k2].forEach((k) => { if (k.ran) { const v = k.values[0];
+        check(/HardPan Tournaments/.test(v.bar) && /by Rattle Golf/.test(v.bar) && v.w > 300, k.name + ': the bar: ' + JSON.stringify(v));
+        check(v.title === 'Rattle Golf Tournaments', k.name + ': the tab title is unchanged: ' + v.title); } });
+
     const verdict = failures.length ? 'DIVERGENCE' : 'OK';
     const notRun = Object.entries(out).filter(([, v]) => v && v.ran === false);
     if (notRun.length) { console.log(JSON.stringify({ verdict: 'COULD NOT RUN', notRun }, null, 2)); process.exit(2); }

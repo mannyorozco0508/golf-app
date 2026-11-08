@@ -325,14 +325,14 @@
         .payout-basis-note { text-align:center; font-size:0.8rem; color:var(--text-muted); margin-top:6px; }
 
         /* ---- STRIPE PHASE 1 (2026-11-08, test mode) -----------------------
-           THE BRAND BAR (M6): the product bar, with Rattle Golf as the
-           company line. The mark is drawn in CSS - a cream ball in a black
+           THE BRAND BAR (M6): HardPan Tournaments, with Rattle Golf as
+           the company line. The mark is drawn in CSS - a cream ball in a black
            tile - so no consumer icon file is loaded on a tournament page. */
         .hp-brand { display: flex; align-items: center; gap: 10px; background: #0f4c3a; color: #ffffff; margin: -12px -12px 12px -12px; padding: 12px 16px; }
         .hp-brand-mark { width: 30px; height: 30px; border-radius: 8px; background: #0B0F0C; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
         .hp-brand-mark span { width: 13px; height: 13px; border-radius: 50%; background: #efe9d8; display: block; }
         .hp-brand-word { font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em; white-space: nowrap; }
-        .hp-brand-word .hp-brand-product { color: #d4f28a; margin-left: 4px; }
+        .hp-brand-word .hp-brand-product { color: #d4f28a; }
         .hp-brand-by { margin-left: auto; font-size: 0.82rem; color: rgba(255,255,255,0.82); white-space: nowrap; }
         /* M2a: the entry fee and the pay button on the signup form. */
         .fee-box { border: 1px solid var(--border-mid); border-radius: 12px; padding: 12px 14px; margin: 4px 0 12px 0; background: var(--bg-card); }
@@ -392,6 +392,10 @@
     </style>
 </head>
 <body>
+<!-- M6 (Stripe Phase 1, 2026-11-08, mockup M6b approved): the HardPan
+     Tournaments bar. Rattle Golf stays as the company line. The mark is CSS -
+     a cream ball in a black tile - so no consumer icon file is loaded here. -->
+<header class="hp-brand" id="hp-brand"><span class="hp-brand-mark" aria-hidden="true"><span></span></span><span class="hp-brand-word">HardPan <span class="hp-brand-product">Tournaments</span></span><span class="hp-brand-by">by Rattle Golf</span></header>
 
 <div class="container" id="setup-screen">
     <!-- THE HERO BAND (polish wave, 2026-09-16; mark lockup 2026-09-18).

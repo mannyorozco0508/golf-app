@@ -191,7 +191,22 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
         // Golf again. The landing wordmark is Rattle Golf + Tournaments. The
         // engine stays product-neutral. The scorecard carries the product
         // name only in its title.
-        ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js', 'tournament-manifest.json']
+        // RE-PINNED 2026-11-08 (Stripe Phase 1, M6, mockup M6b approved by
+        // Manny): the two tournament PAGES carry the HardPan Tournaments bar,
+        // with Rattle Golf as the company line - and nowhere else. The title,
+        // the manifest, the wordmark's aria-label and the engine are unchanged.
+        const BAR = /<header class="hp-brand" id="hp-brand">[\s\S]*?<\/header>/;
+        ['tournament.html', 'tournament-scorecard.html'].forEach(f => {
+            const src = read(f);
+            const bar = BAR.exec(src);
+            assert.ok(bar, `${f} carries the M6 bar`);
+            assert.match(bar[0], /HardPan <span class="hp-brand-product">Tournaments<\/span>/);
+            assert.match(bar[0], /by Rattle Golf/);
+            const rest = src.replace(BAR, '').replace(/<!-- M6 \(Stripe Phase 1[\s\S]*?-->/, '')
+                .replace(/\/\* M6: the HardPan Tournaments bar[^*]*\*\//, '').replace(/THE BRAND BAR \(M6\): HardPan Tournaments/, '');
+            assert.ok(!/HardPan/.test(rest), `${f} says HardPan only in the M6 bar`);
+        });
+        ['tournament-engine.js', 'tournament-manifest.json']
             .forEach(f => assert.ok(!/HardPan/.test(read(f)), `${f} must not say HardPan`));
         assert.match(read('tournament-manifest.json'), /Rattle Golf Tournaments/);
         assert.match(read('tournament.html'), /<title>Rattle Golf Tournaments<\/title>/);
@@ -199,9 +214,12 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
         assert.match(read('tournament.html'), /aria-label="Rattle Golf Tournaments"/);
         assert.ok(!/Rattle/.test(read('tournament-engine.js')),
             'the engine stays product-neutral');
-        const scorecard = read('tournament-scorecard.html').replace(/<title>[^<]*<\/title>/, '');
+        // M6 (2026-11-08): the bar's company line "by Rattle Golf" is the one
+        // other place; it is held exactly above, so it is removed before this.
+        const scorecard = read('tournament-scorecard.html').replace(/<title>[^<]*<\/title>/, '')
+            .replace(BAR, '').replace(/<!-- M6 \(Stripe Phase 1[\s\S]*?-->/, '');
         assert.ok(!/Rattle/.test(scorecard),
-            'the scorecard carries the product name only in the title');
+            'the scorecard carries the product name only in the title and the M6 bar');
         const t = read('tournament.html');
         assert.match(t, /<img class="wm-mark" src="logo-mark\.png"/,
             'the mark file has no word on it');

@@ -270,7 +270,14 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.match(t, /<img class="wm-mark" src="logo-mark\.png"/);
         assert.match(t, /<span class="wm-rattle">Rattle Golf<\/span>/);
         assert.match(t, /<span class="wm-product">Tournaments<\/span>/);
-        assert.ok(!/HardPan/.test(t), 'the tournament page must not say HardPan');
+        // RE-PINNED 2026-11-08 (Stripe Phase 1, M6, mockup M6b approved): the
+        // HardPan Tournaments bar is the one place; the wordmark above is
+        // unchanged and still says Rattle Golf beside the ball.
+        const bar = /<header class="hp-brand" id="hp-brand">[\s\S]*?<\/header>/;
+        assert.match(t, bar, 'positive: the M6 bar is there');
+        const rest = t.replace(bar, '').replace(/<!-- M6 \(Stripe Phase 1[\s\S]*?-->/, '')
+            .replace(/THE BRAND BAR \(M6\): HardPan Tournaments/, '');
+        assert.ok(!/HardPan/.test(rest), 'the tournament page says HardPan only in the M6 bar');
     });
 
     test('the lobby still has the email-link card', () => {
