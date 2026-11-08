@@ -20,7 +20,7 @@
 //          pool the same for every rank past the paid spots (payouts.js returns
 //          every rank; the page printed them all). Now a PAGE filter drops
 //          amount-0 rows and three sentences are each reachable: untyped ->
-//          "Enter spot amounts above to see payouts."; typed and reached ->
+//          "Enter spot amounts above to see results."; typed and reached ->
 //          rows with money only; typed and nobody reaches -> "No paid spots
 //          reached yet." (which had never rendered before). Measured by typing
 //          into the real inputs, as an organizer running a separate pool does.
@@ -329,12 +329,12 @@ if (require.main !== module) return;
         subLine_saysNoFee: /No entry fee set/.test(zero.subLine || ''),
         untyped_noRows: zero.untyped.rows === 0,
         untyped_noZeroDollarRows: zero.untyped.zeros === 0,
-        untyped_saysEnterAmounts: /Enter spot amounts above to see payouts\./.test(zero.untyped.text || ''),
+        untyped_saysEnterAmounts: /Enter spot amounts above to see results\./.test(zero.untyped.text || ''),
         firstOnly_oneRow_leader: zero.firstOnly.rows === 1 && /1st — Team 1/.test(zero.firstOnly.text || ''),
         firstOnly_noZeroDollarRows: zero.firstOnly.zeros === 0,
         secondOnly_oneRow_runnerUp: zero.secondOnly.rows === 1 && /2nd — Team 2/.test(zero.secondOnly.text || '') && zero.secondOnly.zeros === 0,
         nobodyReaches_saysSo: zero.nobodyReaches.rows === 0 && /No paid spots reached yet\./.test(zero.nobodyReaches.text || ''),
-        clearedAgain_saysEnterAmounts: zero.clearedAgain.rows === 0 && /Enter spot amounts above to see payouts\./.test(zero.clearedAgain.text || ''),
+        clearedAgain_saysEnterAmounts: zero.clearedAgain.rows === 0 && /Enter spot amounts above to see results\./.test(zero.clearedAgain.text || ''),
         noBannerWithoutAPool: !/add up to/.test([zero.untyped, zero.firstOnly, zero.nobodyReaches].map(x => x.text).join(' ')),
         // WITH a pool (the team control at $900) and nothing typed yet: no $0.00
         // row and no $0.00-vs-pool banner. Since Wave 1 (A4) there is no even

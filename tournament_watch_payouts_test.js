@@ -159,7 +159,7 @@ describe('A4. the prize amounts are saved, and everyone reads them', () => {
 
     test('nothing saved: a watcher reads "Payouts not set yet." and no invented split', () => {
         const sb = arrive(teamEvent(), null);   // $300 x 3 teams = $900 pool
-        assert.match(html(sb, 'payout-public-amounts'), /Payouts not set yet\./);
+        assert.match(html(sb, 'payout-public-amounts'), /Results not set yet\./);
         assert.doesNotMatch(html(sb, 'payout-public-amounts') + html(sb, 'payout-results'), /\$300\.00/);
     });
 

@@ -15,8 +15,8 @@
 // NOW, a PAGE FILTER - the allocator is untouched (its sha is pinned here for
 // that reason): rows with amount 0 are not printed. Three sentences, each
 // reachable:
-//   no row has scores            -> "No scores yet — payouts will show once teams start posting."
-//   every spot amount is 0       -> "Enter spot amounts above to see payouts."
+//   no row has scores            -> "No scores yet — results will show once teams start posting."
+//   every spot amount is 0       -> "Enter spot amounts above to see results."
 //   amounts set, nobody reaches  -> "No paid spots reached yet."   (e.g. 1st $0, 2nd $50, one team)
 // The mismatch banner keeps its own rule (pool > 0 and amounts != pool).
 //
@@ -59,6 +59,9 @@ const html = (sb, id) => String((sb.document.getElementById(id) || {}).innerHTML
 const text = (sb, id) => String((sb.document.getElementById(id) || {}).textContent || '');
 const count = (s, re) => (String(s || '').match(re) || []).length;
 
+// RE-PINNED 2026-11-07: commit 056517c9 (web-25) renamed the page's words -
+// payouts -> results, pool -> total in. Copy only; the arithmetic asserted here is
+// unchanged, and payouts.js is still pinned byte-identical below.
 describe('1. AT ZERO - fee 0, teams scored, nothing typed', () => {
     [3, 5].forEach((n) => {
         test(`${n} scored teams, fee 0: NO ledger rows, no $0.00, the "Enter spot amounts" sentence`, () => {
@@ -66,14 +69,14 @@ describe('1. AT ZERO - fee 0, teams scored, nothing typed', () => {
             const r = html(sb, 'payout-results');
             assert.equal(count(r, /ledger-row/g), 0, 'hollow rows: ' + r);
             assert.equal(count(r, /\$0\.00/g), 0);
-            assert.match(r, /Enter spot amounts above to see payouts\./);
+            assert.match(r, /Enter spot amounts above to see results\./);
             assert.doesNotMatch(r, /add up to/, 'no mismatch banner without a pool');
             assert.match(text(sb, 'payout-pool-sub'), /No entry fee set for this tournament/, 'the separate-pool sentence stays');
         });
     });
     test('no scores at all keeps the "No scores yet" sentence (the first rule, unchanged)', () => {
         const sb = arrive(0, 3, false);
-        assert.match(html(sb, 'payout-results'), /No scores yet — payouts will show once teams start posting\./);
+        assert.match(html(sb, 'payout-results'), /No scores yet — results will show once teams start posting\./);
         assert.doesNotMatch(html(sb, 'payout-results'), /Enter spot amounts/);
     });
 });
@@ -84,12 +87,12 @@ describe('2. WITH A POOL - the same filter; the banner is the pool\'s own rule',
         const r = html(sb, 'payout-results');
         assert.equal(count(r, /ledger-row/g), 0);
         assert.equal(count(r, /\$0\.00<\/span><\/div>/g), 0, 'no $0.00 ledger amounts');
-        assert.match(r, /Enter spot amounts above to see payouts\./);
+        assert.match(r, /Enter spot amounts above to see results\./);
         // RE-PINNED, Wave 1 (A4). Blank boxes are "not set yet" since the even
         // split was removed, so an untouched calculator no longer accuses itself
         // of adding up to $0.00. The banner waits for an amount - next test.
         assert.doesNotMatch(r, /add up to/, 'a banner over boxes nobody has typed in');
-        assert.match(text(sb, 'payout-pool-sub'), /Pool is \$500\.00/);
+        assert.match(text(sb, 'payout-pool-sub'), /Total in is \$500\.00/);
     });
     test('fee 100, 5 scored teams, $50 typed on 1st: the mismatch banner tells the truth about the pool', () => {
         const sb = arrive(100, 5, true);
@@ -97,7 +100,7 @@ describe('2. WITH A POOL - the same filter; the banner is the pool\'s own rule',
         vm.runInContext('renderPayoutSpotInputs()', sb);
         sb.document.getElementById('payout-spot-0').value = '50';
         vm.runInContext('renderPayoutResults()', sb);   // the box's oninput
-        assert.match(html(sb, 'payout-results'), /add up to \$50\.00, but the pool is \$500\.00/);
+        assert.match(html(sb, 'payout-results'), /add up to \$50\.00, but the total in is \$500\.00/);
     });
 });
 
@@ -107,9 +110,9 @@ describe('3. THE SOURCE - a page filter, three reachable sentences, the allocato
     test('renderPayoutResults filters amount > 0 and prints only those', () => {
         assert.ok(fn.length > 300, 'the renderer exists');
         assert.match(fn, /\.filter\(\(?p\)? => p\.amount > 0\)/, 'the zero-amount filter');
-        assert.match(fn, /Enter spot amounts above to see payouts\./);
+        assert.match(fn, /Enter spot amounts above to see results\./);
         assert.match(fn, /No paid spots reached yet\./, 'the sentence stays, now reachable');
-        assert.match(fn, /No scores yet — payouts will show once teams start posting\./);
+        assert.match(fn, /No scores yet — results will show once teams start posting\./);
         assert.match(fn, /spotAmounts\.some\(\(?v\)? => v > 0\)/, 'the all-zero test decides which sentence');
     });
     test('payouts.js is byte-identical to HEAD at the wave (PROTECTED; the filter is the page\'s)', () => {
@@ -128,7 +131,7 @@ describe('4. THE SEAMS', () => {
         const t = read('tools/tournament-pool-and-flight-check.js');
         assert.match(t, /TEST 18/);
         assert.match(t, /entryFee: 0/);
-        assert.match(t, /Enter spot amounts above to see payouts/);
+        assert.match(t, /Enter spot amounts above to see results/);
     });
     test('HANDOFF records the filter, the dead sentence, and that payouts.js was not touched', () => {
         const h = read('HANDOFF.md');
