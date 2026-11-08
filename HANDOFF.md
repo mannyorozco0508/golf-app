@@ -2015,6 +2015,25 @@ create and keyed scores. Rules-first is harmless (no event has keys).
 - Cache `tournament-v58-scorecard-lock`, `golfapp-v308-scorecard-lock` (v307 is held by
   the uncommitted offline-durable-queue work).
 
+### Saved score queue on the golfer scorecard (2026-11-07, local only)
+
+`tournament-scorecard.html` now loads `offline-queue.js` (unmodified, already in
+SHARED_SHELL) and puts every score write in it BEFORE sending: set, clear, keyed update.
+Storage key `rattle_tournament_scores_wq_v1` - the page hands the module a store that
+files its fixed key under that name, so the other product's `golfapp_wq_v1` is never
+touched. Removed only on server confirm; a refusal is dropped (live or replayed) with
+the existing red "Not saved" sentence; anything else stays. Replay: serial, typed
+order, newest edit of a box wins in place, only this card's event + round, never into a
+round in Setup/Closed (kept, not dropped), triggered by each snapshot, `.info/connected`,
+`online`, and a 20 s retry while something waits. A keyed replay rebuilds the proof from
+the stored `k` with a fresh `ServerValue.TIMESTAMP` (no t is ever stored). **No visible
+UI was added**; `scoreQueueWaiting()` is the count a future chip would show. Not built
+(needs Manny): a waiting chip, "Saved" after a cold-start replay, the 6-hour stale-op
+question index.html asks. Guard `tournament_offline_queue_test.js`; Chrome + emulator
+`tools/tournament-offline-queue-check.js [rules]` (default: the LIVE+lock candidate on
+the Desktop). `cold-arrival.js` gained opt-in `closeBrowser` - a SIGTERM'd headless
+Chrome with the real SDK connected lost localStorage written 5 s+ after load.
+
 ## Dark mode is gone from the Tournament product (Option B, 2026-09-18)
 
 **What decided it: the shared key.** Both tournament pages read and wrote

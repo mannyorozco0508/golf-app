@@ -37,6 +37,10 @@
          Approve button copies it into the field that every page renders. -->
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <!-- Scores typed with no signal are kept in this phone's storage until the
+         server confirms them, so closing the tab cannot lose them. The shared
+         queue, unmodified; the page files it under its own storage key. -->
+    <script src="offline-queue.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -255,8 +259,13 @@
             document.getElementById('main-content').style.display = 'block';
             roundScope = view;   // for a single-round record this IS currentData
             roundLocked = (status !== 'open');
+            // THE ROUND IS KNOWN, AND WHETHER IT IS OPEN: anything this phone
+            // queued for this card goes now. Before the render, so a render that
+            // throws cannot also strand the scores.
+            drainScoreQueue();
             if (group) renderGroup(group); else renderAll();
         });
+        armScoreQueue();
     }
 
     // computeTeamHoleScore and computeTournamentLeaderboard now live in tournament-engine.js
@@ -348,13 +357,181 @@
     // t is the server's now (emulator-proven, offline replay included).
     function keyedScore(path, val) {
         const v = (val === '' || val === null) ? null : parseInt(val, 10);
+        const p = proofTarget(path);
+        return keyedUpdate(path, v, p.who, myScoreKey, p.proof);
+    }
+
+    // WHO a score belongs to and WHERE its proof goes, from the score path alone.
+    function proofTarget(path) {
         const suffix = path.slice(path.lastIndexOf('/') + 1);
         const m = /^(team\d+)_/.exec(suffix);
         const who = m ? m[1] : suffix.slice(0, suffix.lastIndexOf('_h'));
-        const proofPath = myRoundId
+        const proof = myRoundId
             ? `scoreProofs/${currentCode}/r/${myRoundId}/${suffix}`
             : `scoreProofs/${currentCode}/${suffix}`;
-        return { [path]: v, [proofPath]: { who: who, k: myScoreKey, t: firebase.database.ServerValue.TIMESTAMP } };
+        return { who: who, proof: proof };
+    }
+
+    // THE ONE BUILDER OF A KEYED UPDATE, for the live write and for a replay
+    // alike. t is ALWAYS the server-time placeholder, built at the moment the
+    // update is sent: the rules require t === now in the same request, so a
+    // number stored on the phone and replayed later would be refused.
+    function keyedUpdate(path, score, who, k, proofPath) {
+        return { [path]: score, [proofPath]: { who: who, k: k, t: firebase.database.ServerValue.TIMESTAMP } };
+    }
+
+    // ---- SCORES THAT SURVIVE THE TAB CLOSING (2026-11-07) -------------------
+    //
+    // The Firebase SDK keeps an unsent write in memory only. Close the tab or
+    // the app with no signal and every score typed since the signal went is
+    // gone. So each score is written to a queue in this phone's storage BEFORE
+    // it is sent, and leaves it only when the server confirms it.
+    //
+    // offline-queue.js is the shared, tested queue (durable, in order, removed
+    // on confirm, newest edit of one box wins in place, a permanent refusal is
+    // dropped rather than retried). It is used UNMODIFIED. Its storage key is
+    // fixed inside it, so this page hands it a store that files that key under
+    // this product's own name - the other product's queue on the same origin is
+    // never read, written or replayed from here.
+    //
+    // NOTHING ON SCREEN IS NEW. The only sentence a replay can put up is the
+    // refusal this card already shows for a live refused write.
+    const SCORE_QUEUE_KEY = 'rattle_tournament_scores_wq_v1';
+    function scoreQueueStore() {
+        const q = window.OfflineQueue;
+        let ls = null;
+        try { ls = localStorage; } catch (e) { return null; }
+        if (!q || !ls) return null;
+        const own = (k) => (k === q.STORAGE_KEY ? SCORE_QUEUE_KEY : SCORE_QUEUE_KEY + ':' + k);
+        return {
+            getItem: (k) => ls.getItem(own(k)),
+            setItem: (k, v) => ls.setItem(own(k), v)
+        };
+    }
+
+    // What is queued for one score. The path comes from scorePath() in the
+    // writer; a keyed op stores the link's k and the proof's place, never a t.
+    // A value that is not a stroke count is not queued: it could never land,
+    // and a write that throws would sit at the head of the queue for good.
+    function queuedScoreOp(path, val) {
+        const score = (val === '' || val === null) ? null : parseInt(val, 10);
+        if (score !== null && !isFinite(score)) return null;
+        if (myScoreKey) {
+            const p = proofTarget(path);
+            return { path: path, type: 'keyed', value: { score: score, who: p.who, k: myScoreKey, proof: p.proof }, coalesceKey: path };
+        }
+        return score === null
+            ? { path: path, type: 'remove', value: null, coalesceKey: path }
+            : { path: path, type: 'set', value: score, coalesceKey: path };
+    }
+
+    // ENQUEUE, THEN SEND. A crash between the two costs a replay of a write that
+    // already landed - the same number to the same place. The other order costs
+    // the score. `send` is the writer's own write, unchanged.
+    function durableScoreWrite(path, val, send) {
+        const q = window.OfflineQueue;
+        const store = scoreQueueStore();
+        const shaped = queuedScoreOp(path, val);
+        let op = null;
+        if (q && store && shaped) {
+            try { op = q.enqueue(store, shaped); } catch (e) { op = null; }
+        }
+        let p;
+        try { p = send(); }
+        catch (e) { if (op) { try { q.confirm(store, op.id, op.v); } catch (x) {} } throw e; }
+        if (op) {
+            // CONFIRMED BY THE SERVER, and only THIS edit's version: a correction
+            // typed while this write was in flight stays queued. A refusal is
+            // dropped at once - trackWrite already says so in red - because it can
+            // never land. Anything else (no signal) keeps it for the replay.
+            Promise.resolve(p).then(
+                () => { try { q.confirm(store, op.id, op.v); } catch (e) {} },
+                (err) => { if (q.isPermanent(err)) { try { q.confirm(store, op.id, op.v); } catch (e) {} } });
+            ensureScoreRetry();
+        }
+        return p;
+    }
+
+    // A REPLAY, built from what was queued. A keyed one gets a FRESH proof:
+    // the stored k and proof place, t the server's now at the moment of sending.
+    function sendQueuedScore(op) {
+        if (op.type === 'keyed') {
+            const s = op.value || {};
+            return db.ref().update(keyedUpdate(op.path, s.score === undefined ? null : s.score, s.who, s.k, s.proof));
+        }
+        const ref = db.ref(op.path);
+        return op.type === 'remove' ? ref.remove() : ref.set(op.value);
+    }
+
+    // THIS CARD'S OPS ONLY: this event, this round. Another event's or another
+    // day's leftovers wait for their own link.
+    function queueScope() { return scorePath(''); }
+    function isThisCardsOp(op) {
+        return !!(op && typeof op.path === 'string' && op.path.indexOf(queueScope()) === 0);
+    }
+
+    // HOW MANY OF THIS CARD'S SCORES ARE WAITING FOR SIGNAL. Pure count, read
+    // from storage only. Nothing displays it yet (a waiting chip has not been
+    // approved); it exists so one can, without a second definition.
+    function scoreQueueWaiting() {
+        const q = window.OfflineQueue;
+        const store = scoreQueueStore();
+        if (!q || !store) return 0;
+        try { return q.peek(store).filter(isThisCardsOp).length; } catch (e) { return 0; }
+    }
+
+    // REPLAY: serial, in the order typed, one drain at a time. Not before the
+    // card has opened (the round must be known to be open - a queued score is
+    // never pushed into a round in Setup or Closed; it stays queued), and not
+    // while the device says it has no network. Every write is time-bound by the
+    // queue, so a drain that starts a moment too early ends by itself and the
+    // op stays for the next one.
+    let scoreDraining = false;
+    let scoreDrainAgain = false;
+    function drainScoreQueue() {
+        const q = window.OfflineQueue;
+        const store = scoreQueueStore();
+        if (!q || !store) return Promise.resolve(null);
+        if (scoreDraining) { scoreDrainAgain = true; return Promise.resolve(null); }
+        if (!roundScope || roundLocked) return Promise.resolve(null);
+        if (!scoreQueueWaiting()) return Promise.resolve(null);
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) { ensureScoreRetry(); return Promise.resolve(null); }
+        scoreDraining = true;
+        const done = (r) => {
+            scoreDraining = false;
+            // A REPLAY THE SERVER REFUSED is dropped by the queue, never retried,
+            // and the golfer is told with the same red sentence a live refusal
+            // gets - it stays on screen.
+            if (r && r.dropped) setSaveState('error', NOT_SAVED_REFUSED);
+            if (scoreDrainAgain) { scoreDrainAgain = false; setTimeout(drainScoreQueue, 0); }
+            else if (scoreQueueWaiting()) ensureScoreRetry();
+            return r;
+        };
+        return q.drain(store, sendQueuedScore, { timeoutMs: 12000, only: isThisCardsOp })
+            .then(done, () => done(null));
+    }
+
+    // THE RETRY, armed only while something waits. .info/connected and the
+    // online event both need something to CHANGE; one bar in a tree line
+    // changes neither, so something has to ask again. Unref'd where the timer
+    // supports it (Node, i.e. the test realm) so a waiting queue cannot hold a
+    // test process open; a browser timer has no unref and is unaffected.
+    let scoreRetryTimer = null;
+    function ensureScoreRetry() {
+        if (scoreRetryTimer) return;
+        scoreRetryTimer = setTimeout(() => {
+            scoreRetryTimer = null;
+            if (scoreQueueWaiting()) { drainScoreQueue(); ensureScoreRetry(); }
+        }, 20000);
+        if (scoreRetryTimer && typeof scoreRetryTimer.unref === 'function') scoreRetryTimer.unref();
+    }
+
+    // WHEN TO REPLAY: the socket coming up, the device going online, and every
+    // render of the card (which is also the cold start - the first snapshot is
+    // the moment the round is known to be open).
+    function armScoreQueue() {
+        try { db.ref('.info/connected').on('value', (snap) => { if (snap && snap.val() === true) drainScoreQueue(); }); } catch (e) {}
+        try { if (typeof window.addEventListener === 'function') window.addEventListener('online', () => drainScoreQueue()); } catch (e) {}
     }
 
     // THE TWO TEAM WRITERS ASK THE SAME TWO QUESTIONS THE INDIVIDUAL ONE DOES:
@@ -370,15 +547,17 @@
     function saveHoleScore(holeNum, val) {
         if (roundLocked) return;
         const ref = db.ref(scorePath(`team${myTeamNum}_h${holeNum}`));
-        trackWrite(myScoreKey ? db.ref().update(keyedScore(scorePath(`team${myTeamNum}_h${holeNum}`), val))
-            : ((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10))));
+        trackWrite(durableScoreWrite(scorePath(`team${myTeamNum}_h${holeNum}`), val, () => (myScoreKey
+            ? db.ref().update(keyedScore(scorePath(`team${myTeamNum}_h${holeNum}`), val))
+            : ((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10))))));
     }
 
     function savePlayerHoleScore(holeNum, playerIdx, val) {
         if (roundLocked) return;
         const ref = db.ref(scorePath(`team${myTeamNum}_p${playerIdx}_h${holeNum}`));
-        trackWrite(myScoreKey ? db.ref().update(keyedScore(scorePath(`team${myTeamNum}_p${playerIdx}_h${holeNum}`), val))
-            : ((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10))));
+        trackWrite(durableScoreWrite(scorePath(`team${myTeamNum}_p${playerIdx}_h${holeNum}`), val, () => (myScoreKey
+            ? db.ref().update(keyedScore(scorePath(`team${myTeamNum}_p${playerIdx}_h${holeNum}`), val))
+            : ((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10))))));
     }
 
     // A GOLFER'S SCORE IS WRITTEN UNDER THEIR ID. Not their position in the group,
@@ -404,8 +583,9 @@
         const group = (scope.scoringGroups || {})[myGroupId] || {};
         if ((group.playerIds || []).indexOf(playerId) === -1) return;   // not this group's golfer
         const ref = db.ref(scorePath(`${playerId}_h${holeNum}`));
-        trackWrite(myScoreKey ? db.ref().update(keyedScore(scorePath(`${playerId}_h${holeNum}`), val))
-            : ((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10))));
+        trackWrite(durableScoreWrite(scorePath(`${playerId}_h${holeNum}`), val, () => (myScoreKey
+            ? db.ref().update(keyedScore(scorePath(`${playerId}_h${holeNum}`), val))
+            : ((val === '' || val === null) ? ref.remove() : ref.set(parseInt(val, 10))))));
     }
 
     // THE HOLE YOU ARE TYPING IS NEVER TOUCHED.
