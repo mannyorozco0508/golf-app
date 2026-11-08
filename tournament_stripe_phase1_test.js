@@ -33,6 +33,8 @@
 //   evidence of the build. A1/A2/A3 fail at baseline only because mini-dom
 //   hands back a detached, "shown" element for an id the page lacks.
 //   on stripe-1-web after the build: 42 tests - 42 pass / 0 fail.
+//   registrationStatus switch (stripe-1, 2026-11-08): 42 tests - 42 pass / 0 fail;
+//   control (tournament.html put back to the registrations/ read): 40 pass / 2 fail.
 // NEGATIVE CONTROLS (each mutated in tournament.html, restored by sha from a
 // saved copy): pay button with collectByCard false -> A2; card toggle for a
 // not-allow-listed owner -> H2; Refund for a non-owner with the desk gate
@@ -233,25 +235,26 @@ describe('C. every createEntryCheckout refusal reason has its own sentence', () 
 
 describe('D. M2c: back from Stripe - the RECORD decides, never the URL', () => {
     function fireEntry(sb, value) {
-        const hs = sb.__dbHandlers.filter((h) => h.event === 'value' && h.path === 'registrations/REG1/e1');
-        assert.ok(hs.length > 0, 'the page listens on its own entry');
+        const hs = sb.__dbHandlers.filter((h) => h.event === 'value' && h.path === 'registrationStatus/REG1/e1');
+        assert.ok(hs.length > 0, 'the page listens on its own entry status');
+        assert.equal(sb.__dbHandlers.filter((h) => /^registrations\//.test(h.path)).length, 0, 'a signed-out golfer never listens on the owner-only registrations');
         hs.forEach((h) => h.cb({ val: () => clone(value), exists: () => value != null }));
     }
     test('D1 ?checkout=done: Payment processing until paid === true AND paidVia === stripe', async () => {
         const sb = arriveRegister(record({ fees: FEES }), '?register=REG1&entry=e1&checkout=done'); await settle();
         assert.equal(shown(sb, 'reg-form'), false);
         assert.match(plain(html(sb, 'reg-checkout')), /Payment processing…/);
-        fireEntry(sb, { fullName: 'Al Lopez', email: 'al@example.com', createdAt: 1, paid: true, paidVia: 'cash' });
+        fireEntry(sb, { paid: true, paidVia: 'cash', at: 1 });
         assert.match(plain(html(sb, 'reg-checkout')), /Payment processing…/, 'cash is not a card payment');
-        fireEntry(sb, { fullName: 'Al Lopez', email: 'al@example.com', createdAt: 1, paid: false, paidVia: 'stripe' });
+        fireEntry(sb, { paid: false, paidVia: 'stripe', at: 1 });
         assert.match(plain(html(sb, 'reg-checkout')), /Payment processing…/, 'paid false is not paid');
-        fireEntry(sb, { fullName: 'Al Lopez', email: 'al@example.com', createdAt: 1, paid: true, paidVia: 'stripe', amountCents: 10000, ref: 'pi_1' });
+        fireEntry(sb, { paid: true, paidVia: 'stripe', at: 2 });
         const panel = plain(html(sb, 'reg-checkout'));
         assert.match(panel, /You're registered · Paid/);
-        assert.match(panel, /\$100\.00 paid by card · receipt sent to al@example\.com/);
+        assert.match(panel, /\$100\.00 paid by card · Stripe emails your receipt/);
         assert.match(panel, /Shotgun 8:00 AM/);
     });
-    test('D2 the entry cannot be read (the rules refuse a golfer today): the page says so instead of waiting forever', async () => {
+    test('D2 the entry status cannot be read (rules not published, or offline): the page says so instead of waiting forever', async () => {
         // The stub's on() drops a cancel callback, so the arrival keeps it here -
         // installed before the page runs, the way the SDK would hold it.
         const sb = loadHtmlInlineScript(PAGE, [], { search: '?register=REG1&entry=e1&checkout=done', beforeRun(s) {
@@ -261,12 +264,12 @@ describe('D. M2c: back from Stripe - the RECORD decides, never the URL', () => {
         } });
         await settle();
         assert.match(plain(html(sb, 'reg-checkout')), /Payment processing…/);
-        const c = sb.__cancels.find((x) => x.path === 'registrations/REG1/e1');
+        const c = sb.__cancels.find((x) => x.path === 'registrationStatus/REG1/e1');
         assert.ok(c, 'the page listens with a cancel arm');
         c.cancel(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }));
         const panel = plain(html(sb, 'reg-checkout'));
         assert.match(panel, /Payment processing…/);
-        assert.match(panel, /This page can't see the organizer's list from here/);
+        assert.match(panel, /This page can't check the payment from here/);
         assert.match(panel, /Stripe emails your receipt/);
     });
     test('D3 ?checkout=cancel: Registered · Unpaid with Pay again, which asks for the SAME entry', async () => {

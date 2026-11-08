@@ -195,11 +195,11 @@ async function run(name, opts) {
     out.reasonsCovered = REASONS;
 
     // D. M2c done: waits on the RECORD. A cash paid is not Paid; paid+stripe is.
-    const recPath = 'registrations/CARD1/eBack';
+    const recPath = 'registrationStatus/CARD1/eBack';
     const d = await run('D-done', { url: fileUrl('tournament.html', 'register=CARD1&entry=eBack&checkout=done'), db, preScript: fnStub({}),
         steps: [{ expression: REG_PROBE },
-            { deliver: { path: recPath, value: Object.assign({}, db.registrations.CARD1.eBack, { paid: true, paidVia: 'cash' }) } }, { sleep: 200 }, { expression: REG_PROBE },
-            { deliver: { path: recPath, value: Object.assign({}, db.registrations.CARD1.eBack, { paid: true, paidVia: 'stripe', amountCents: 10000, ref: 'pi_x' }) } }, { sleep: 200 }, { expression: REG_PROBE },
+            { deliver: { path: recPath, value: { paid: true, paidVia: 'cash', at: 1 } } }, { sleep: 200 }, { expression: REG_PROBE },
+            { deliver: { path: recPath, value: { paid: true, paidVia: 'stripe', at: 2 } } }, { sleep: 200 }, { expression: REG_PROBE },
             ...shot('M2c-registered-paid.png')] });
     out.D = d;
     if (d.ran) { const [v0, v1, v2] = d.values;

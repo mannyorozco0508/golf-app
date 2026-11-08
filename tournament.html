@@ -2868,7 +2868,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function showPaidPanel(rec) {
         const f = feesOf(registerEvent);
         const cents = Number.isInteger(rec && rec.amountCents) ? rec.amountCents : (f && f.cents);
-        const email = rec && rec.email ? ' · receipt sent to ' + escReg(rec.email) : '';
+        // rec is registrationStatus/<code>/<entryId> ({paid, paidVia, at}):
+        // no email, no team. Stripe sends the receipt (Manny, 2026-11-08).
+        const email = rec && rec.email ? ' · receipt sent to ' + escReg(rec.email) : ' · Stripe emails your receipt';
         const team = rec && rec.teamNum && registerEvent && registerEvent.teams && registerEvent.teams['team' + rec.teamNum]
             ? escReg(registerEvent.teams['team' + rec.teamNum].name || ('Team ' + rec.teamNum)) : 'Organizer assigns';
         const tee = teeTimeText(registerEvent);
@@ -2895,14 +2897,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function showCheckoutReturn(code, entryId, mode) {
         if (mode === 'cancel') { showRegisteredUnpaid(code, entryId, '', ''); return; }
         showProcessingPanel('');
-        const ref = db.ref(`registrations/${code}/${entryId}`);
+        // registrationStatus, not registrations: the golfer is signed out and
+        // registrations/<code> is owner-only. The webhook writes this mirror in
+        // the same update as the entry (STRIPE-CONTRACT.md Addendum 2026-11-08).
+        const ref = db.ref(`registrationStatus/${code}/${entryId}`);
         ref.on('value', (snap) => {
             const rec = snap && snap.val ? snap.val() : null;
             if (entryIsCardPaid(rec)) { try { ref.off('value'); } catch (e) { /* stub */ } showPaidPanel(rec); }
         }, () => {
-            // A golfer cannot read the organizer's list under the rules as they
-            // stand. Said plainly, rather than a page that waits forever.
-            showProcessingPanel("This page can't see the organizer's list from here, so it can't turn Paid by itself. Stripe emails your receipt when the payment goes through, and the organizer sees Paid on their desk.");
+            // The read was refused (rules not published yet, or offline).
+            // Said plainly, rather than a page that waits forever.
+            showProcessingPanel("This page can't check the payment from here, so it can't turn Paid by itself. Stripe emails your receipt when the payment goes through, and the organizer sees Paid on their desk.");
         });
     }
 
