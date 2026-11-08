@@ -85,6 +85,14 @@ const DELIBERATE = [
         why: 'the entry fee box carries a currency adornment beside the input',
         from: '|Entry Fee per Team ($, optional)|',
         to: '|Entry Fee per Team ($, optional)|$|'
+    },
+    {
+        // ADDED 2026-11-07: commit 056517c9 (web-25) renamed the money words on the
+        // setup screen - pool/payouts -> total in/results, settle up -> square up.
+        // Copy only; the same wave's payout tests were re-pinned in a838f5a0.
+        why: 'web-25 wording: no pool / payouts / settle up',
+        from: '|Pool and payouts are calculated for you once teams are in \u2014 this is just the calculator, settle up for real however your event normally does.|',
+        to: '|The total in and results are calculated for you once teams are in \u2014 this is just the calculator, square up for real however your event normally does.|'
     }
 ];
 
