@@ -148,7 +148,7 @@ const shotSteps = (name) => SHOTS ? [{ expression: BOX }, { shot: tmpShot(name) 
     // ---- ARM 3: team event, no basis the engine can pay on ----
     const t3 = await phone(team(), [{ expression: READ }].concat(shotSteps('na'), [{ tap: '#lb-round-filter button', nth: 1 }, { sleep: 300 }, { expression: READ }]));
     const T = t3[0], T2 = t3[t3.length - 1];
-    check('3 the reason is shown', T.prize === 'Choose which result the prizes are paid on.', T.prize);
+    check('3 a golfer reads "Prize results coming soon"', T.prize === 'Prize results coming soon', T.prize);
     check('3 no dollar amount, no label', !/\$\d/.test(T.prize || '') && !T.label, T);
     check('3 a round tap does not invent a list', !/\$\d/.test(T2.prize || '') && T2.prize === T.prize, T2.prize);
     if (SHOTS) shots.push(crop(tmpShot('na'), t3[1], path.join(SHOTS, 'A1-wired-not-available.png')));

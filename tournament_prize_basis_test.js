@@ -27,6 +27,14 @@
 // write against the LIVE rules in the database emulator.
 //
 // WIRING WAVE COUNTS (final run of this file): 22 tests / 22 pass / 0 fail.
+// GOLFER WORDING (Manny via Advisor, 2026-11-08 01:46): a non-organizer sees
+// "Prize results coming soon" until a basis exists; the organizer keeps the
+// engine reason. FINAL RUN: 23 tests / 23 pass / 0 fail. BASELINE against
+// 9e585599 (tournament.html sha 9f630bc573ab3750), this file as it stands:
+// 23 / 21 pass / 2 fail (the golfer test and the source pin; 21 + 2 = 23).
+// CONTROLS (restored by sha 5f6c2a64 each time): golfers see the reason again
+// -> 2 fail; the organizer sees "coming soon" -> 2 fail.
+// The wiring-wave figures below describe the 22-test file before this change.
 // BASELINE against c3b7a139 (tournament-nov7-build; tournament.html sha
 // 8e7736af47183984, unwired), this file as it stands: 22 tests / 12 pass /
 // 10 fail. The 12 that pass there: sections 1-4 (11, engine + payouts.js pin,
@@ -211,12 +219,13 @@ describe('5. WIRED (A1 approved 2026-11-08; this section pinned the unwired stat
         assert.match(lb, /\n        \}\n        renderPayoutSpotInputs\(\);\n    \}\n/,
             'the prize list is re-rendered after the board, refused or not, as the function\'s last line');
     });
-    test('an unavailable basis shows its reason and returns before any row is built', () => {
+    test('an unavailable basis shows its reason (organizer) or "coming soon" (golfer) and returns before any row is built', () => {
         const fn = body(SRC(), 'function renderPayoutResults()');
         const at = fn.indexOf('if (!prize.available)');
         assert.ok(at > 0, 'no refusal branch');
         const branch = fn.slice(at, fn.indexOf('return;', at) + 7);
-        assert.match(branch, /escapeHtml\(prize\.reason/);
+        assert.match(branch, /owner \? \(prize\.reason \|\| ''\) : 'Prize results coming soon'/);
+        assert.match(branch, /escapeHtml\(why\)/);
         assert.ok(at < fn.indexOf('computeTournamentPayouts('), 'the refusal must come before the allocator');
     });
     test('the save is the owner\'s, one path, event or a round that exists', () => {
@@ -287,13 +296,19 @@ describe('6. USER PATH: every phone shows the same prize list, whatever tab it i
         assert.match(html(a, 'payout-results'), /1st — Bob<\/span><span class="val-pos">\$300\.00/);
         assert.equal(html(a, 'payout-basis-label'), 'Paid on <b>Sunday</b>');
     });
-    test('team event, nothing saved: the reason, never a list', () => {
+    test('team event, nothing saved: a golfer reads "Prize results coming soon", never a list', () => {
         const sb = arrive(owned(teamTwoRounds()), null);
-        assert.match(html(sb, 'payout-results'), /Choose which result the prizes are paid on\./);
+        assert.match(html(sb, 'payout-results'), /Prize results coming soon/);
+        assert.doesNotMatch(html(sb, 'payout-results'), /Choose which result/, 'the organizer sentence is not for golfers');
         assert.doesNotMatch(html(sb, 'payout-results'), /\$\d/);
         assert.equal(el(sb, 'payout-basis-label').style.display, 'none');
         tap(sb, 'lb-round-filter', 'Day 1');
         assert.doesNotMatch(html(sb, 'payout-results'), /\$\d/, 'tapping a round must not invent a list');
+    });
+    test('team event, nothing saved: the ORGANIZER keeps the reason sentence', () => {
+        const sb = arrive(owned(teamTwoRounds()), OWNER);
+        assert.match(html(sb, 'payout-results'), /Choose which result the prizes are paid on\./);
+        assert.doesNotMatch(html(sb, 'payout-results'), /coming soon|\$\d/);
     });
     test('the organizer sees "Results are paid on" with every choice, and a tap saves payoutBasis', () => {
         const sb = arrive(owned(individualTwoRounds()), OWNER);

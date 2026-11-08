@@ -3588,8 +3588,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
         // NEVER A MADE-UP LIST. No basis the engine can pay on: its sentence,
         // and no rows at all.
+        // A golfer cannot act on the organizer's sentence, so until the
+        // organizer picks a basis a non-organizer reads only that results are
+        // coming (Manny, 2026-11-08 01:46). The organizer keeps the reason.
         if (!prize.available) {
-            resultsContainer.innerHTML = `<div class="payout-basis-reason" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">${escapeHtml(prize.reason || '')}</div>`;
+            const why = owner ? (prize.reason || '') : 'Prize results coming soon';
+            resultsContainer.innerHTML = `<div class="payout-basis-reason" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">${escapeHtml(why)}</div>`;
             return;
         }
         const prizeRows = prize.rows || [];
