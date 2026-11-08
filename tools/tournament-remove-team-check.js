@@ -44,7 +44,7 @@ const PRE = `window.__alerts = []; window.alert = function (m) { window.__alerts
 window.confirm = function () { return true; };`;
 const TAP_REMOVE = (n) => `(() => { const b = document.querySelector('#team-cards-list .team-remove[data-team="${n}"]');
   if (!b || !b.getClientRects().length) return 'no visible Remove on team ${n}'; b.click(); return 'tapped'; })()`;
-const WRITES = `JSON.stringify({ writes: (window.__coldWrites || []).map(w => w.op + ' ' + w.path), alerts: window.__alerts })`;
+const WRITES = `JSON.stringify({ writes: (window.__coldWrites || []).map(w => w.op + ' ' + w.path), values: (window.__coldWrites || []).map(w => w.value), alerts: window.__alerts })`;
 const DESK = `(() => { const t = (id) => { const e = document.getElementById(id); return e ? e.innerText : ''; };
   return JSON.stringify({ desk: t('registration-list'), counts: t('registration-counts'), chips: t('registration-chips') }); })()`;
 const parsed = (v) => v.map((x) => { try { return JSON.parse(x); } catch (e) { return null; } }).filter(Boolean);
@@ -63,7 +63,10 @@ const needs = (d) => (d.desk.match(/Needs a team/g) || []).length;
     if (!a.value.includes('tapped')) bail('the Remove tap found nothing', a.value);
     const [w, live] = [parsed(a.value).find((x) => x.writes), parsed(a.value).find((x) => 'desk' in x)];
     if (!w || !live) bail('a probe did not parse', a.value);
-    if (JSON.stringify(w.writes) !== JSON.stringify(['remove tournaments/CHKB/teams/team2'])) failures.push('remove wrote ' + JSON.stringify(w.writes));
+    // ONE write. Since the scorecard-lock wave it is a root update carrying the
+    // team AND its key, both null; before that it was a remove of the team.
+    if (JSON.stringify(w.writes) !== JSON.stringify(['update '])) failures.push('remove wrote ' + JSON.stringify(w.writes));
+    if (JSON.stringify(w.values || []) !== JSON.stringify([{ 'tournaments/CHKB/teams/team2': null, 'tournamentKeys/CHKB/t/team2': null }])) failures.push('remove carried ' + JSON.stringify(w.values));
     if (needs(live) !== 2) failures.push('live: ' + needs(live) + ' "Needs a team" badges, wanted 2');
     if (!/2 need a team/.test(live.counts)) failures.push('live: counts read ' + JSON.stringify(live.counts));
 

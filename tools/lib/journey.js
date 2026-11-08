@@ -111,6 +111,12 @@ function statefulStub(dbJson, auth) {
       function writeAt(pathStr, value, merge) {
         var parts = String(pathStr).split('/').filter(Boolean);
         window.__WRITES.push({ path: pathStr, merge: !!merge });
+        // A ROOT update() MERGES: each key is a path of its own, exactly as a
+        // root multi-path update does in the SDK. Only a root set() replaces.
+        if (parts.length === 0 && merge && value && typeof value === 'object' && !Array.isArray(value)) {
+          Object.keys(value).forEach(function (k) { writeAt(k, value[k], false); });
+          return;
+        }
         if (parts.length === 0) { window.__DB = value; return; }
         var parent = nodeAt(parts.slice(0, -1), true);
         var key = parts[parts.length - 1];
@@ -153,6 +159,11 @@ function statefulStub(dbJson, auth) {
         });
       }
       function refFor(pathStr) {
+        // db.ref() WITH NO PATH IS THE ROOT (2026-10-06). String(undefined) made
+        // it the literal key "undefined", so a page's root multi-path update()
+        // - the one write that creates an event with its scoring keys - landed
+        // under DB.undefined and the tool reported that nothing was written.
+        if (pathStr === undefined || pathStr === null) pathStr = '';
         var api = {
           key: String(pathStr).split('/').filter(Boolean).pop() || null,
           on: function (ev, cb) {
@@ -180,7 +191,10 @@ function statefulStub(dbJson, auth) {
       }
       window.firebase = {
         initializeApp: function () { return {}; },
-        database: function () { return { ref: refFor }; },
+        // ServerValue, as the real SDK has it (2026-10-06). A keyed scorecard
+        // write sends t: firebase.database.ServerValue.TIMESTAMP; without this
+        // the stand-in threw before the write and a working card read as broken.
+        database: Object.assign(function () { return { ref: refFor }; }, { ServerValue: { TIMESTAMP: { '.sv': 'timestamp' } } }),
         // auth(): the real SDK is blocked above, so a page that asks for it must
         // find something - and since anonymous sign-in went live, what it finds
         // in production is a USER. By default this is an anonymous one, the way

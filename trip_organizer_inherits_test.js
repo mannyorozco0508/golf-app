@@ -112,7 +112,12 @@ describe('3. IT GRANTS SCREENS, NOT WRITES', () => {
         // truth. A sha says "this file did not move", which is the actual claim.
         const sha = require('crypto').createHash('sha256')
             .update(fs.readFileSync(path.join(__dirname, 'database.rules.json'))).digest('hex').slice(0, 16);
-        assert.equal(sha, '31496c1b5ea03cf8',
+        // RE-PINNED 2026-11-07 (Tournaments scorecard lock): 31496c1b -> e10457af.
+        // The lock adds tournamentKeys + scoreProofs and one AND clause on each
+        // tournament score .write. Nothing under events/ or trips/ moved, so the
+        // claim this pin guards - a setup write still needs the round owner -
+        // still holds.
+        assert.equal(sha, 'e10457afe9bde1d0',
             'database.rules.json moved. This wave grants SCREENS only - a setup write still '
             + 'needs auth.uid === the round owner. If the rules genuinely changed, that is its '
             + 'own wave with Manny approving the diff, and this pin is re-pinned with the reason.');

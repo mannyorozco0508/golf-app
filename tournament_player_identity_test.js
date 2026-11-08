@@ -510,12 +510,20 @@ describe('FLIGHTS AND GROUPS — attached to the right thing', () => {
 
     test('24. a golfer belongs to one scoring group — moving removes them from the old one', () => {
         const t = codeOf('tournament.html');
-        const fn = t.slice(t.indexOf('function assignPlayerToGroup'),
-                           t.indexOf('function assignPlayerToGroup') + 900);
+        // Sliced to the function's own end (it grew in the scorecard-lock wave
+        // and a fixed 900-character window cut off its write).
+        const at = t.indexOf('function assignPlayerToGroup');
+        const fn = t.slice(at, t.indexOf('\n    function ', at + 30));
+        assert.ok(fn.length > 300, 'the slice is empty');
         assert.match(fn, /\.filter\(x => x !== pid\)/,
             'the golfer must be removed from every other group in the same write');
         assert.match(fn, /db\.ref\(groupsPath\(\)\)\.update\(updates\)/,
             'one atomic update, so a golfer is never briefly in two groups');
+        // On an owned event the same moves AND the golfer's key go in one root
+        // update (scorecard-lock): every group change is prefixed into it.
+        assert.match(fn, /full\[`\$\{groupsPath\(\)\}\/\$\{k\}`\] = updates\[k\]/);
+        assert.match(fn, /full\[playerKeyPath\(pid, rid\)\]/);
+        assert.match(fn, /db\.ref\(\)\.update\(full\)/);
         // groupsPath() is the single place that decides whether groups live on the
         // event or on a round, so no caller has to branch on the model - and a
         // multi-round event cannot accidentally write Saturday's draw onto Sunday.

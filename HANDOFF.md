@@ -1976,6 +1976,45 @@ already covers removing a child (targaryen rows in the test).
   live echo and cold reload both show 2 "Needs a team" and "2 need a team").
 - Cache `tournament-v57-remove-team`, `sw.js` `golfapp-v306-remove-team`.
 
+## Tournaments scorecard lock — a link scores only its own card (2026-10-06)
+
+Branch `tournaments-scorecard-lock` from main 3f8bb35. Draft PR; not merged. **Rules
+are NOT published** — `~/Desktop/PUBLISH-THIS-scorecard-lock.rules.json` (+ ROLLBACK =
+live, + README). **Publish the rules BEFORE the page deploys**: the new page writes
+`tournamentKeys` and `scoreProofs`, which live rules refuse, so page-first breaks event
+create and keyed scores. Rules-first is harmless (no event has keys).
+
+- **Keys** live at `tournamentKeys/<code>` (owner-only read/write; outside
+  `tournaments/<code>` because that node is public and a child rule cannot hide).
+  `on: true` is the lock; `t/team<N>`, `g/<gid>`, `p/<pid>` (single-round golfer =
+  their group key), `r/<rid>/<pid>` (multi-round). Links carry `&k=`.
+- **A keyed score** is ONE multi-path update: the score at its usual path (shape and
+  readers unchanged) + `scoreProofs/<code>/[r/<rid>/]<scoreKey> = {who, k, t:
+  TIMESTAMP}`. Rules: with keys on, the score needs that same-update proof (`t ===
+  now`); the proof needs the right key for `who` and `scoreKey.beginsWith(who+'_')`.
+  `now` equal across both paths was PROVEN in the emulator first, including writes
+  queued offline and replayed. Owner writes need no proof (parent .write).
+- **Every path that makes a team/group writes its key in the same update**: create
+  (born locked), Add Another Team, Desk approve into a new team, group create, golfer
+  assigned/moved (their key follows), group delete and Remove team (key deleted).
+  Round create needs none (teams are event-level, groups start empty).
+  `tournament_scorecard_lock_test.js` drives each and asks targaryen whether the key on
+  the rendered link can score.
+- **Existing events** stay open until the owner taps **Lock scoring links** on Setup,
+  offered only while the event has zero posted scores (any round). Legacy events (no
+  owner) cannot be keyed. No crypto = no key written (never a guessable one).
+- **Card refusal**: "Not saved — this link can't score this card. Ask the organizer for
+  your team's link." in red, persistent, never "Saved".
+- **Checks**: `tools/tournament-scorecard-lock-emulator-check.js [rules]` (real rules,
+  36 arms + SDK offline replay; needs Java + the cached emulator jar);
+  `tools/tournament-team-link-check.js` now opens cards with the REAL SDK against the
+  emulator and measures the refused write; `tools/tournament-scorecard-lock-check.js`
+  taps Lock. Emulator quirks found: any `Authorization: Bearer` header is ADMIN (users
+  go in `?auth=`), and it cannot load `\s` in a regex class (sent as a space; disk file
+  untouched). `tools/lib/journey.js` now treats `db.ref()` as the root.
+- Cache `tournament-v58-scorecard-lock`, `golfapp-v308-scorecard-lock` (v307 is held by
+  the uncommitted offline-durable-queue work).
+
 ## Dark mode is gone from the Tournament product (Option B, 2026-09-18)
 
 **What decided it: the shared key.** Both tournament pages read and wrote
