@@ -339,7 +339,15 @@ function readDevToolsPort(profileDir, timeoutMs) {
 // Browser.close was there. (With the stand-in database, a kill kept it.) A
 // check about what survives a closed app needs the browser to close, not to be
 // shot. Opt-in; default behaviour is unchanged.
-async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth, profileDir, emulator, closeBrowser }) {
+// `navigatesAway` (2026-11-08, Stripe Phase 1) IS FOR A CHECK WHOSE LAST TAP
+// HANDS THE BROWSER TO AN EXTERNAL https URL (Stripe Checkout). Leaving a
+// file:// page for https swaps the renderer, and the closing document.URL
+// evaluate then waits on a context that never answers - "CDP timeout on
+// Runtime.evaluate", with the one thing the check needed (the URL the page
+// asked for) thrown away. With this set, the steps must end on the tap (and a
+// sleep); the result carries `requests` as usual and finalUrl null. Opt-in;
+// no caller that omits it is touched.
+async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth, profileDir, emulator, closeBrowser, navigatesAway }) {
     const keepProfile = !!profileDir;
     const profile = profileDir || fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
     if (keepProfile) {
@@ -621,6 +629,7 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
                            + 'block the renderer and were auto-dismissed (cancel): '
                            + dialogs.map(d => d.type + ' "' + d.message.slice(0, 70) + '"').join(' | ') };
         }
+        if (navigatesAway) return { ok: true, value: value, requests: requests.slice(), dialogs: dialogs.slice(), finalUrl: null };
         return { ok: true, value: value,
                  requests: requests.slice(),
                  dialogs: dialogs.slice(),

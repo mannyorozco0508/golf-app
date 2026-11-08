@@ -323,6 +323,72 @@
         .payout-basis-seg button.on { background:var(--brand-navy); color:#fff; }
         .payout-basis-label { text-align:center; font-size:0.85rem; color:var(--text-main); margin-top:8px; }
         .payout-basis-note { text-align:center; font-size:0.8rem; color:var(--text-muted); margin-top:6px; }
+
+        /* ---- STRIPE PHASE 1 (2026-11-08, test mode) -----------------------
+           THE BRAND BAR (M6): the product bar, with Rattle Golf as the
+           company line. The mark is drawn in CSS - a cream ball in a black
+           tile - so no consumer icon file is loaded on a tournament page. */
+        .hp-brand { display: flex; align-items: center; gap: 10px; background: #0f4c3a; color: #ffffff; margin: -12px -12px 12px -12px; padding: 12px 16px; }
+        .hp-brand-mark { width: 30px; height: 30px; border-radius: 8px; background: #0B0F0C; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+        .hp-brand-mark span { width: 13px; height: 13px; border-radius: 50%; background: #efe9d8; display: block; }
+        .hp-brand-word { font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em; white-space: nowrap; }
+        .hp-brand-word .hp-brand-product { color: #d4f28a; margin-left: 4px; }
+        .hp-brand-by { margin-left: auto; font-size: 0.82rem; color: rgba(255,255,255,0.82); white-space: nowrap; }
+        /* M2a: the entry fee and the pay button on the signup form. */
+        .fee-box { border: 1px solid var(--border-mid); border-radius: 12px; padding: 12px 14px; margin: 4px 0 12px 0; background: var(--bg-card); }
+        .fee-box-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 1rem; padding-bottom: 8px; border-bottom: 1px solid var(--border-faint); }
+        .fee-box-row strong { font-size: 1.05rem; }
+        .fee-box-note { font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; line-height: 1.4; }
+        .btn-pay { width: 100%; background: var(--brand-navy); color: #ffffff; border: none; padding: 15px; font-size: 1.08rem; font-weight: 800; border-radius: 12px; cursor: pointer; margin-top: 6px; }
+        .btn-pay[disabled] { opacity: 0.6; }
+        .reg-cash-line { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: 10px 0 0 0; }
+        .link-btn { background: none; border: none; padding: 0; margin: 0; width: auto; color: var(--text-muted); text-decoration: underline; font: inherit; cursor: pointer; }
+        /* M2c: back from Stripe. */
+        .checkout-panel { text-align: center; padding: 24px 4px 8px 4px; }
+        .checkout-tick { width: 64px; height: 64px; border-radius: 50%; background: #e3f1ea; color: #0f4c3a; font-size: 2rem; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto; }
+        .checkout-title { font-size: 1.45rem; font-weight: 800; margin: 0 0 8px 0; }
+        .checkout-line { font-size: 0.92rem; color: var(--text-muted); margin: 2px 0; line-height: 1.4; }
+        .checkout-card { border: 1px solid var(--border-mid); border-radius: 12px; margin: 16px 0; text-align: left; }
+        .checkout-card div { display: flex; justify-content: space-between; padding: 10px 14px; font-size: 0.92rem; }
+        .checkout-card div + div { border-top: 1px solid var(--border-faint); }
+        .checkout-note { font-size: 0.8rem; color: var(--text-muted); margin-top: 12px; line-height: 1.4; }
+        .checkout-error { font-size: 0.88rem; color: var(--accent-red); margin-top: 10px; line-height: 1.4; }
+        /* M3: the desk's money tiles, payment badges and the refund sheet. */
+        .pay-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 6px 0; }
+        .pay-tile { border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 4px; text-align: center; }
+        .pay-tile b { display: block; font-size: 1.05rem; }
+        .pay-tile span { font-size: 0.74rem; color: var(--text-muted); }
+        .pay-note { font-size: 0.74rem; color: var(--text-muted); text-align: center; margin: 0 0 6px 0; line-height: 1.4; }
+        .reg-state-stripe { background: #ece6fb; color: #4b2aa8; border: 1px solid #b7a6ea; }
+        .reg-state-cash { background: #e6f4ea; color: #1b5e20; border: 1px solid #7fc48a; }
+        .reg-state-refunded, .reg-state-pending { background: #eef0f2; color: #3c4650; border: 1px solid #c5ccd3; }
+        .reg-state-disputed { background: #fdecea; color: #b00020; border: 1px solid #e57373; }
+        .reg-pay-btn { width: auto; padding: 6px 10px; font-size: 0.78rem; margin: 0; }
+        .reg-refund-btn { color: #b3261e; border-color: #e3a6a1; }
+        .pay-sheet { align-items: flex-end; padding: 0; }
+        .pay-sheet .modal-content { max-width: 520px; border-radius: 18px 18px 0 0; padding: 20px 18px 24px 18px; }
+        .pay-sheet h3 { color: var(--text-main); font-size: 1.2rem; margin: 0 0 8px 0; }
+        .pay-sheet p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.45; margin: 0 0 14px 0; }
+        .btn-danger { width: 100%; background: #b3261e; color: #ffffff; border: none; padding: 14px; font-size: 1.02rem; font-weight: 800; border-radius: 12px; cursor: pointer; margin-top: 6px; }
+        .btn-soft { width: 100%; background: #e3e9f3; color: var(--brand-navy); border: none; padding: 14px; font-size: 1.02rem; font-weight: 800; border-radius: 12px; cursor: pointer; margin-top: 8px; }
+        /* M4: the Entry fees card on Setup. */
+        .fees-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-faint); }
+        .fees-row:last-child { border-bottom: none; }
+        .fees-row small { display: block; font-weight: normal; color: var(--text-muted); font-size: 0.78rem; }
+        .fees-row input[type="text"] { width: 7.5em; text-align: right; }
+        .fees-error { font-size: 0.8rem; color: var(--accent-red); margin: 4px 0 0 0; }
+        .fees-stripe { border: 2px solid var(--brand-green); border-radius: 12px; padding: 10px 14px; margin-top: 10px; font-size: 0.88rem; }
+        .fees-stripe-head { font-weight: 800; letter-spacing: 0.06em; color: var(--brand-green); font-size: 0.78rem; margin-bottom: 4px; }
+        .fees-stripe div { display: flex; justify-content: space-between; padding: 4px 0; }
+        .fees-test-mode { background: #fbecd0; color: #8a5a00; font-weight: 800; font-size: 0.74rem; border-radius: 10px; padding: 2px 8px; }
+        .fees-soon { font-size: 0.82rem; color: var(--text-muted); margin: 8px 0 0 0; }
+        /* M1: the organizer's event-day panel on the board. */
+        .day-card { border: 1px solid var(--border-mid); border-radius: 12px; padding: 10px 14px; margin: 0 0 12px 0; }
+        .day-head { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.08em; color: var(--text-muted); text-transform: uppercase; padding-bottom: 6px; border-bottom: 1px solid var(--border-faint); }
+        .day-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; font-size: 0.88rem; }
+        .day-row + .day-row { border-top: 1px solid var(--border-faint); }
+        .day-quiet { background: #fbecd0; color: #8a5a00; font-weight: 800; font-size: 0.76rem; border-radius: 10px; padding: 2px 8px; white-space: nowrap; }
+        .day-text { width: auto; margin: 0; padding: 5px 10px; font-size: 0.78rem; text-decoration: none; display: inline-block; }
     </style>
 </head>
 <body>
@@ -555,9 +621,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <label><input type="checkbox" id="reg-sponsor"> I'd like to sponsor a hole</label>
             <input type="text" id="reg-sponsor-name" placeholder="Sponsor name (optional)" maxlength="120" style="margin-top:6px;">
         </div>
+        <!-- M2a (Stripe Phase 1, test mode): shown ONLY when the event's fees
+             say collectByCard with a whole-cent fee. With no fees node the form
+             is exactly the form it was - these three stay hidden and Sign up
+             stays the button. The amount is the record's entryFeeCents; the
+             server reads the same field and never takes one from this page. -->
+        <div class="fee-box" id="reg-fee-box" style="display:none;">
+            <div class="fee-box-row"><span>Entry fee</span><strong id="reg-fee-amount"></strong></div>
+            <div class="fee-box-note">Card payments go to Rattle Golf LLC. Refunds by the organizer.</div>
+        </div>
+        <button class="btn-pay" id="reg-pay" style="display:none;" onclick="submitRegistrationAndPay()"></button>
         <button class="btn-primary" id="reg-submit" onclick="submitRegistration()">Sign up</button>
+        <p class="reg-cash-line" id="reg-cash-line" style="display:none;">Paying cash at the course? <button class="link-btn" id="reg-cash-signup" onclick="submitRegistration()">Sign up without paying</button></p>
         <p id="reg-status" style="font-size:0.85rem; color:var(--brand-green); margin-top:10px; text-align:center;"></p>
     </div>
+    <!-- M2c: back from Stripe Checkout (?checkout=done|cancel&entry=ID).
+         "Paid" is shown only when the RECORD says paid by Stripe - the
+         webhook writes it; the redirect URL proves nothing. -->
+    <div id="reg-checkout" class="checkout-panel" style="display:none;"></div>
 </div>
 
 <div class="container" id="manage-screen" style="display:none;">
@@ -607,6 +688,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
         <!-- SCORING LINKS LOCK (scorecard-lock wave). Owner only; hidden otherwise,
              in the tree. renderLockPanel decides the sentence and the button. -->
+        <!-- M4 (Stripe Phase 1): the Entry fees card. tournaments/<code>/fees,
+             owner-written, integer cents. The card-collection switch is drawn
+             only when payments/allowedOwners/<uid> reads true for the signed-in
+             organizer; everyone else reads "Card payments coming soon". -->
+        <div class="team-card" id="entry-fees-block" style="display:none; margin-top:12px;"></div>
         <div class="team-card" id="lock-links-block" style="display:none; margin-top:12px;">
             <div class="team-card-header"><span class="team-label">🔑 Scoring links</span></div>
             <p id="lock-links-state" style="font-size:0.8rem; color:var(--text-muted); margin:0 0 8px 0;"></p>
@@ -775,6 +861,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <h2 style="text-align:center; font-size:1.3rem;" id="lb-t-name"></h2>
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="lb-t-sub"></p>
         <div class="t-details" id="lb-t-details" style="display:none;"></div>
+        <!-- M1 (web part): the organizer's event-day panel. Owner only, hidden
+             in the tree for everyone else. Reads the same rows as the board and
+             the same prize view as Prize Results; it computes no money. -->
+        <div id="event-day-panel" style="display:none;"></div>
         <!-- Only rendered when flights exist. A tournament without them shows exactly
              the leaderboard it always did, with no extra control to ignore. -->
         <!-- Only rendered for a multi-round event. A single-round tournament shows the
@@ -849,6 +939,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 </div>
 
 <!-- Share Team Link Modal -->
+<!-- M3: the refund sheet. refundEntry runs on the server; this page never
+     changes paid on a Stripe entry. After the refund it asks, separately,
+     whether to take the golfer out of the field. -->
+<div class="modal-overlay pay-sheet" id="refund-sheet">
+    <div class="modal-content" id="refund-sheet-body"></div>
+</div>
+
 <div class="modal-overlay" id="share-link-modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -2231,6 +2328,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         syncKeysListener();
         renderLockPanel();
         renderRegistrationList();
+        renderEntryFeesCard();
     }
 
     // "Signed in as <email>" - a fact about the session, never a claim about
@@ -2387,6 +2485,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // key regardless. Team preference is ALSO gated by "is a team event".
             // Set in code, not only in markup, so the default is the page's decision.
             applyRegistrationFields(data);
+            // M2a/M2c (Stripe Phase 1). No fees node: nothing below changes
+            // the form. Back from Checkout: the result panel replaces it.
+            applyRegistrationFees(data);
+            const back = new URLSearchParams(window.location.search);
+            const checkout = back.get('checkout');
+            const entry = back.get('entry');
+            if ((checkout === 'done' || checkout === 'cancel') && entry) showCheckoutReturn(registerCode, entry, checkout);
         }).catch(() => {
             const form = document.getElementById('reg-form');
             const closed = document.getElementById('reg-closed');
@@ -2530,7 +2635,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const code = (err && (err.code || (err.message && String(err.message).split(':')[0]))) || 'unknown';
         setRegistrationStatus('error', REG_REFUSAL, String(code));
     }
+    // THE M2a BUTTON: the same signup write, then Checkout. A flag rather than
+    // an argument, read and cleared on entry, so Sign up and "Sign up without
+    // paying" (both plain submitRegistration()) can never inherit it.
+    var regWantsPay = false;
+    function submitRegistrationAndPay() { regWantsPay = true; submitRegistration(); }
     function submitRegistration() {
+        const pay = regWantsPay === true && !!(feesOf(registerEvent) || {}).collectByCard;
+        regWantsPay = false;
         if (!registerCode || !registerEvent || !registerEvent.ownerUid) {
             alert('This event is not taking signups.');
             return;
@@ -2541,7 +2653,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!regPendingId) regPendingId = mintId('e');
         const entryId = regPendingId;
         const payload = built.payload;
-        const button = document.getElementById('reg-submit');
+        const button = document.getElementById(pay ? 'reg-pay' : 'reg-submit');
         const attempt = ++regAttempt;
         if (button) button.disabled = true;
         setRegistrationStatus('pending', 'Sending\u2026');
@@ -2555,6 +2667,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             settled = true; clearTimeout(timer);
             if (attempt !== regAttempt && regPendingId !== entryId) return;   // an older tap for an entry already confirmed
             regPendingId = null;
+            // SIGNED UP FIRST, THEN PAID: the entry exists before Checkout is
+            // asked for, so a closed tab or a failed card leaves a golfer
+            // Registered and Unpaid - never paid with no entry.
+            if (pay) { if (button) button.disabled = false; startCheckout(registerCode, entryId); return; }
             ['reg-name', 'reg-email', 'reg-phone', 'reg-handicap', 'reg-dinner', 'reg-team-pref', 'reg-sponsor-name'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
             const shirt = document.getElementById('reg-shirt'); if (shirt) shirt.value = '';
             const box = document.getElementById('reg-sponsor'); if (box) box.checked = false;
@@ -2588,6 +2704,591 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         };
         db.ref('registrations/' + code).on('value', registrationCb);
         registrationBoundCode = code;
+    }
+
+
+    // ===== STRIPE PHASE 1, TEST MODE (2026-11-08) ===========================
+    //
+    // THE CONTRACT IS STRIPE-CONTRACT.md (claude-mailbox-shared/tournaments).
+    // This page never sets an amount, never marks a card payment paid, and
+    // never changes paid on an entry whose paidVia is 'stripe'. It:
+    //   - shows the fee from tournaments/<code>/fees.entryFeeCents (integer
+    //     cents, owner-written) and writes the signup FIRST, then asks the
+    //     createEntryCheckout callable for a Checkout URL and goes there;
+    //   - on the way back waits on the RECORD (the webhook writes paid,
+    //     paidVia 'stripe'), never on the redirect URL;
+    //   - on the Desk shows who paid how, and asks the refundEntry callable for
+    //     a refund - removing the golfer from the field is a separate owner
+    //     write, made only when the organizer says yes;
+    //   - lets the owner write the fees node; the card switch is drawn only
+    //     when payments/allowedOwners/<uid> reads true for that owner.
+    // WITH NO fees NODE the signup form and the desk are exactly what they were.
+    //
+    // `var`, not `let`: the auth listener above can reach syncPaymentsAllowed
+    // before this point of the script has run, and a `let` would still be in
+    // its temporal dead zone.
+    var paymentsAllowed = false;      // payments/allowedOwners/<uid> === true, read as that uid
+    var paymentsAllowedUid = null;    // whose answer paymentsAllowed is
+    var fnSdkPromise = null;          // the functions SDK, loaded once on first need
+    var refundSheetEntry = null;      // the entry the refund sheet is open on
+    var refundInFlight = false;
+
+    var FEE_MIN_CENTS = 100;
+    var FEE_MAX_CENTS = 100000;
+
+    // THE ONE READER OF THE fees NODE. null = no fees (the default state).
+    // cents is null unless it is an integer in the contract's range, and card
+    // collection is off without a valid fee - a fee the server would refuse
+    // ('bad-fee') is never offered as a button.
+    function feesOf(data) {
+        const f = data && data.fees;
+        if (!f || typeof f !== 'object') return null;
+        const c = f.entryFeeCents;
+        const valid = Number.isInteger(c) && c >= FEE_MIN_CENTS && c <= FEE_MAX_CENTS;
+        return { cents: valid ? c : null, collectByCard: valid && f.collectByCard === true, allowCash: f.allowCash === true };
+    }
+    // Cents to "$100.00" - integer arithmetic, no float on the way in.
+    function centsText(c) {
+        const n = Math.abs(Math.trunc(Number(c) || 0));
+        const dollars = Math.floor(n / 100), cents = n % 100;
+        return '$' + dollars.toLocaleString('en-US') + '.' + String(cents).padStart(2, '0');
+    }
+    // "$3,200" when whole, "$3,200.50" otherwise - the desk tiles.
+    function centsShort(c) {
+        const n = Math.abs(Math.trunc(Number(c) || 0));
+        return n % 100 === 0 ? '$' + (n / 100).toLocaleString('en-US') : centsText(n);
+    }
+
+    // ---- THE CALLABLES -----------------------------------------------------
+    // firebase-functions-compat.js 9.22.2 is vendored beside the other SDK
+    // files and loaded on first need, not as a blocking tag: only a golfer who
+    // taps Pay or an organizer who taps Refund needs it, and both need signal
+    // anyway. It is NOT in the shell precache (sw.js is not this wave's).
+    function loadFunctionsSdk() {
+        if (typeof firebase.functions === 'function') return Promise.resolve();
+        if (fnSdkPromise) return fnSdkPromise;
+        fnSdkPromise = new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = './firebase-functions-compat.js';
+            s.onload = () => (typeof firebase.functions === 'function') ? resolve() : reject(Object.assign(new Error('functions SDK missing'), { code: 'functions/unavailable' }));
+            s.onerror = () => { fnSdkPromise = null; reject(Object.assign(new Error('functions SDK did not load'), { code: 'functions/unavailable' })); };
+            document.head.appendChild(s);
+        });
+        return fnSdkPromise;
+    }
+    function stripeCall(name, data) {
+        return loadFunctionsSdk().then(() => firebase.functions().httpsCallable(name)(data));
+    }
+    function callReason(err) {
+        return (err && err.details && typeof err.details.reason === 'string') ? err.details.reason : '';
+    }
+
+    // EVERY REASON createEntryCheckout CAN GIVE, AS A SENTENCE A GOLFER CAN ACT
+    // ON. The keys are the contract's details.reason strings, exactly.
+    var CHECKOUT_REASON_TEXT = {
+        'not-found': "We couldn't find your sign-up on the organizer's list. Reload this page and sign up again.",
+        'already-paid': "This entry is already paid. There is nothing more to pay.",
+        'not-collecting': "This event isn't taking card payments right now. Your spot is saved; pay the organizer at the course.",
+        'not-allowed-owner': "Card payments aren't switched on for this organizer yet. Your spot is saved; pay the organizer at the course.",
+        'too-many-attempts': "Too many payment attempts on this entry. Wait a few minutes, then tap Pay again.",
+        'bad-fee': "The entry fee on this event isn't set up right. Your spot is saved; text the organizer."
+    };
+    var CHECKOUT_FALLBACK_TEXT = "Checkout didn't open. Check your signal and tap Pay again.";
+    function checkoutRefusalText(err) {
+        return CHECKOUT_REASON_TEXT[callReason(err)] || CHECKOUT_FALLBACK_TEXT;
+    }
+
+    // ---- M2a: THE SIGNUP FORM ----------------------------------------------
+    function applyRegistrationFees(data) {
+        const f = feesOf(data);
+        const card = !!(f && f.collectByCard);
+        const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+        show('reg-fee-box', card);
+        show('reg-pay', card);
+        show('reg-submit', !card);
+        show('reg-cash-line', card && f.allowCash);
+        if (card) {
+            const amt = document.getElementById('reg-fee-amount');
+            if (amt) amt.textContent = centsText(f.cents);
+            const pay = document.getElementById('reg-pay');
+            if (pay) pay.textContent = 'Pay entry fee ' + centsText(f.cents) + ' ›';
+        }
+    }
+
+    // The signup is written; now the server builds the Checkout session from
+    // the record's own fee and hands back its URL.
+    function startCheckout(code, entryId) {
+        if (!requireOnlineForSignup('CHECKOUT NOT OPENED', 'Reconnect and tap Pay again.')) return Promise.resolve();
+        setRegistrationStatus('pending', 'Opening secure checkout…');
+        const pay = document.getElementById('reg-pay'); if (pay) pay.disabled = true;
+        const again = document.getElementById('reg-pay-again'); if (again) again.disabled = true;
+        return stripeCall('createEntryCheckout', { code: code, entryId: entryId }).then((res) => {
+            const url = res && res.data && res.data.url;
+            if (typeof url !== 'string' || !/^https:\/\//.test(url)) throw Object.assign(new Error('no checkout url'), { details: { reason: '' } });
+            window.location.href = url;
+        }).catch((err) => {
+            if (pay) pay.disabled = false;
+            if (again) again.disabled = false;
+            showRegisteredUnpaid(code, entryId, checkoutRefusalText(err), callReason(err));
+        });
+    }
+
+    // ---- M2c: BACK FROM STRIPE ---------------------------------------------
+    function checkoutPanel(html) {
+        const form = document.getElementById('reg-form');
+        const panel = document.getElementById('reg-checkout');
+        if (form) form.style.display = 'none';
+        if (panel) { panel.style.display = 'block'; panel.innerHTML = html; }
+    }
+    function eventLine(data) {
+        return [escReg((data && data.name) || ''), escReg(formatEventDate(data && data.eventDate))].filter(Boolean).join(' · ');
+    }
+    function teeTimeText(data) {
+        const t = formatStartTime(data && data.startTime);
+        if (!t) return '';
+        return (data.startType === 'shotgun' ? 'Shotgun ' : 'Tee time ') + t;
+    }
+    function showRegisteredUnpaid(code, entryId, why, reason) {
+        const f = feesOf(registerEvent);
+        const owed = f && f.cents ? centsText(f.cents) : '';
+        const canPay = reason !== 'already-paid' && reason !== 'not-collecting' && reason !== 'not-allowed-owner' && !!(f && f.collectByCard);
+        checkoutPanel(
+            `<h2 class="checkout-title" id="reg-checkout-title">Registered · Unpaid</h2>`
+            + `<p class="checkout-line">${eventLine(registerEvent)}</p>`
+            + `<p class="checkout-line">Your spot is saved.${owed ? ' The ' + owed + ' entry fee is still owed.' : ''}</p>`
+            + (why ? `<p class="checkout-error" id="reg-checkout-error">${escReg(why)}</p>` : '')
+            + (canPay ? `<button class="btn-pay" id="reg-pay-again" data-code="${escReg(code)}" data-entry="${escReg(entryId)}" onclick="startCheckout(this.dataset.code, this.dataset.entry)">Pay again</button>` : '')
+            + (f && f.allowCash ? `<p class="checkout-note">Or pay cash at the course.</p>` : '')
+            + `<p id="reg-status" style="font-size:0.85rem; color:var(--brand-green); margin-top:10px; text-align:center;"></p>`);
+    }
+    function showPaidPanel(rec) {
+        const f = feesOf(registerEvent);
+        const cents = Number.isInteger(rec && rec.amountCents) ? rec.amountCents : (f && f.cents);
+        const email = rec && rec.email ? ' · receipt sent to ' + escReg(rec.email) : '';
+        const team = rec && rec.teamNum && registerEvent && registerEvent.teams && registerEvent.teams['team' + rec.teamNum]
+            ? escReg(registerEvent.teams['team' + rec.teamNum].name || ('Team ' + rec.teamNum)) : 'Organizer assigns';
+        const tee = teeTimeText(registerEvent);
+        checkoutPanel(
+            `<div class="checkout-tick" aria-hidden="true">✓</div>`
+            + `<h2 class="checkout-title" id="reg-checkout-title">You're registered · Paid</h2>`
+            + `<p class="checkout-line">${eventLine(registerEvent)}</p>`
+            + `<p class="checkout-line" id="reg-checkout-amount">${cents ? centsText(cents) + ' paid by card' : 'Paid by card'}${email}</p>`
+            + `<div class="checkout-card">`
+            + (eventIsIndividual(registerEvent) ? '' : `<div><span>Team</span><strong>${team}</strong></div>`)
+            + (tee ? `<div><span>Tee time</span><strong>${escReg(tee)}</strong></div>` : '')
+            + `</div>`);
+    }
+    function showProcessingPanel(extra) {
+        checkoutPanel(
+            `<h2 class="checkout-title" id="reg-checkout-title">Payment processing…</h2>`
+            + `<p class="checkout-line">${eventLine(registerEvent)}</p>`
+            + (extra ? `<p class="checkout-note" id="reg-checkout-wait">${escReg(extra)}</p>` : '')
+            + `<p class="checkout-note">If this page says "Payment processing", it turns Paid by itself; nothing to tap again.</p>`);
+    }
+    // Only paid === true AND paidVia === 'stripe' is Paid. The webhook writes
+    // both in one update; anything else keeps the page waiting.
+    function entryIsCardPaid(rec) { return !!(rec && rec.paid === true && rec.paidVia === 'stripe'); }
+    function showCheckoutReturn(code, entryId, mode) {
+        if (mode === 'cancel') { showRegisteredUnpaid(code, entryId, '', ''); return; }
+        showProcessingPanel('');
+        const ref = db.ref(`registrations/${code}/${entryId}`);
+        ref.on('value', (snap) => {
+            const rec = snap && snap.val ? snap.val() : null;
+            if (entryIsCardPaid(rec)) { try { ref.off('value'); } catch (e) { /* stub */ } showPaidPanel(rec); }
+        }, () => {
+            // A golfer cannot read the organizer's list under the rules as they
+            // stand. Said plainly, rather than a page that waits forever.
+            showProcessingPanel("This page can't see the organizer's list from here, so it can't turn Paid by itself. Stripe emails your receipt when the payment goes through, and the organizer sees Paid on their desk.");
+        });
+    }
+
+    // ---- M3: THE DESK ------------------------------------------------------
+    // One word for how an entry stands on money. Refund and dispute states win
+    // over paid: a refunded entry is not a paid one.
+    function payState(e) {
+        if (!e) return 'unpaid';
+        if (e.disputedAt) return 'disputed';
+        if (e.refundedAt) return 'refunded';
+        if (e.refundPendingAt) return 'refund-pending';
+        if (e.paid === true && e.paidVia === 'stripe') return 'stripe';
+        if (e.paid === true) return 'cash';
+        return 'unpaid';
+    }
+    // AN ENTRY STRIPE HAS TOUCHED. Its paid is the server's: no checkbox, no
+    // Undo, no Mark cash paid - only Refund, which goes through the server.
+    function entryPaidByServer(e) {
+        return !!(e && (e.paidVia === 'stripe' || e.ref || e.amountCents || e.refundPendingAt || e.refundedAt || e.disputedAt));
+    }
+    function deskFeesOn() {
+        const f = feesOf(currentData);
+        return !!(f && f.cents);
+    }
+    function shortDate(ms) {
+        const d = new Date(Number(ms) || 0);
+        return isNaN(d.getTime()) ? '' : `${EV_MONTHS[d.getMonth()]} ${d.getDate()}`;
+    }
+    function payBadgeHtml(e) {
+        const st = payState(e);
+        const amt = Number.isInteger(e.amountCents) ? ' ' + centsShort(e.amountCents) : '';
+        if (st === 'stripe') return `<span class="reg-state reg-state-stripe">Paid (Stripe)${amt}</span>`;
+        if (st === 'cash') return `<span class="reg-state reg-state-cash">Paid (cash)</span>`;
+        if (st === 'refunded') {
+            const r = Number.isInteger(e.refundCents) ? ' ' + centsShort(e.refundCents) : '';
+            const when = shortDate(e.refundedAt);
+            return `<span class="reg-state reg-state-refunded">Refunded${r}${when ? ' · ' + when : ''}</span>`;
+        }
+        if (st === 'refund-pending') return `<span class="reg-state reg-state-pending">Refund pending</span>`;
+        if (st === 'disputed') return `<span class="reg-state reg-state-disputed">Disputed</span>`;
+        return `<span class="reg-state reg-state-unpaid">Unpaid</span>`;
+    }
+    // THE PAY CONTROL FOR ONE ROW. Refund only for the signed-in owner and only
+    // on a card payment that is not already being refunded. Undo only on cash.
+    function payControlHtml(id, e) {
+        const st = payState(e);
+        const eid = escReg(id);
+        if (st === 'stripe') return canManage() ? `<button class="btn-outline reg-pay-btn reg-refund-btn" onclick="openRefundSheet('${eid}')">Refund</button>` : '';
+        if (entryPaidByServer(e)) return '';
+        if (st === 'cash') return `<button class="btn-outline reg-pay-btn reg-undo-btn" onclick="setCashPaid('${eid}', false)">Undo</button>`;
+        return `<button class="btn-outline reg-pay-btn reg-cash-btn" onclick="setCashPaid('${eid}', true)">Mark cash paid</button>`;
+    }
+    var PAY_FILTERS = [
+        { key: 'all', label: 'All', test: () => true },
+        { key: 'card', label: 'Card', test: (e) => payState(e) === 'stripe' },
+        { key: 'cash', label: 'Cash', test: (e) => payState(e) === 'cash' },
+        { key: 'unpaid', label: 'Unpaid', test: (e) => payState(e) === 'unpaid' },
+        { key: 'refunded', label: 'Refunded', test: (e) => ['refunded', 'refund-pending', 'disputed'].indexOf(payState(e)) !== -1 }
+    ];
+    // With fees on, the money chips replace All / Unpaid / Paid; the field
+    // chips stay after them.
+    function deskFilters() {
+        if (!deskFeesOn()) return REG_FILTERS;
+        return PAY_FILTERS.concat(REG_FILTERS.filter((f) => ['all', 'unpaid', 'paid'].indexOf(f.key) === -1));
+    }
+    // THE TILES. Card is what the server recorded (amountCents); cash and
+    // unpaid are counts times the fee. All integer cents until the text.
+    function payTotals(entries) {
+        const f = feesOf(currentData);
+        const fee = (f && f.cents) || 0;
+        const t = { cardCents: 0, card: 0, cash: 0, unpaid: 0, refunds: 0, refundTotal: 0, pending: 0, disputed: 0 };
+        entries.forEach((e) => {
+            const st = payState(e);
+            if (st === 'stripe') { t.card++; t.cardCents += Number.isInteger(e.amountCents) ? e.amountCents : fee; }
+            else if (st === 'cash') t.cash++;
+            else if (st === 'unpaid') t.unpaid++;
+            else if (st === 'refunded') { t.refunds++; t.refundTotal += Number.isInteger(e.refundCents) ? e.refundCents : 0; }
+            else if (st === 'refund-pending') t.pending++;
+            else if (st === 'disputed') t.disputed++;
+        });
+        t.cashCents = t.cash * fee;
+        t.unpaidCents = t.unpaid * fee;
+        return t;
+    }
+    function payTilesHtml(entries) {
+        const t = payTotals(entries);
+        const extra = [];
+        if (t.refunds) extra.push(`${t.refunds} ${t.refunds === 1 ? 'refund' : 'refunds'}: ${centsShort(t.refundTotal)}.`);
+        if (t.pending) extra.push(`${t.pending} refund${t.pending === 1 ? '' : 's'} pending.`);
+        if (t.disputed) extra.push(`${t.disputed} disputed.`);
+        return `<div class="pay-tiles" id="pay-tiles">`
+            + `<div class="pay-tile"><b id="pay-tile-card">${centsShort(t.cardCents)}</b><span>card (${t.card})</span></div>`
+            + `<div class="pay-tile"><b id="pay-tile-cash">${centsShort(t.cashCents)}</b><span>cash (${t.cash})</span></div>`
+            + `<div class="pay-tile"><b id="pay-tile-unpaid">${centsShort(t.unpaidCents)}</b><span>unpaid (${t.unpaid})</span></div>`
+            + `</div><p class="pay-note" id="pay-note">Card fees are absorbed by Rattle Golf, so the card total is what golfers paid.${extra.length ? ' ' + extra.join(' ') : ''}</p>`;
+    }
+
+    // MARK CASH PAID / UNDO: the owner's own write, paid + paidAt + paidVia
+    // 'cash' together, or all three cleared. Refused on a Stripe entry here
+    // and, per the contract, by the rules.
+    function setCashPaid(entryId, on) {
+        if (!currentCode || !canManage()) return;
+        const e = (registrationData || {})[entryId];
+        if (!e || entryPaidByServer(e)) return;
+        const patch = on ? { paid: true, paidAt: Date.now(), paidVia: 'cash' } : { paid: false, paidAt: null, paidVia: null };
+        db.ref(`registrations/${currentCode}/${entryId}`).update(patch)
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+
+    // ---- THE REFUND SHEET --------------------------------------------------
+    function refundSheet(html) {
+        const sheet = document.getElementById('refund-sheet');
+        const body = document.getElementById('refund-sheet-body');
+        if (body) body.innerHTML = html;
+        if (sheet) sheet.classList.add('open');
+    }
+    function closeRefundSheet() {
+        const sheet = document.getElementById('refund-sheet');
+        if (sheet) sheet.classList.remove('open');
+        refundSheetEntry = null;
+    }
+    function refundAmountCents(e) {
+        if (e && Number.isInteger(e.amountCents)) return e.amountCents;
+        const f = feesOf(currentData);
+        return (f && f.cents) || 0;
+    }
+    function openRefundSheet(entryId) {
+        if (!currentCode || !canManage()) return;
+        const e = (registrationData || {})[entryId];
+        if (!e || payState(e) !== 'stripe') return;
+        refundSheetEntry = entryId;
+        const who = escReg(String(e.fullName || e.name || 'this golfer').trim());
+        const amt = centsText(refundAmountCents(e));
+        refundSheet(
+            `<h3 id="refund-sheet-title">Refund ${who} ${amt}?</h3>`
+            + `<p>Back to the card they paid with, usually in 5-10 days. Stripe keeps its fee; Rattle Golf absorbs it. You'll be asked next whether to take them out of the field.</p>`
+            + `<p class="checkout-error" id="refund-sheet-error" style="display:none;"></p>`
+            + `<button class="btn-danger" id="refund-confirm" onclick="confirmRefund()">Refund ${amt}</button>`
+            + `<button class="btn-soft" onclick="closeRefundSheet()">Keep</button>`);
+    }
+    function confirmRefund() {
+        const entryId = refundSheetEntry;
+        if (!entryId || refundInFlight || !currentCode || !canManage()) return;
+        const e = (registrationData || {})[entryId];
+        if (!e || payState(e) !== 'stripe') return;
+        if (!requireOnlineForSignup('REFUND NOT SENT', 'Reconnect and tap Refund again - nothing was changed.')) return;
+        refundInFlight = true;
+        const btn = document.getElementById('refund-confirm');
+        if (btn) { btn.disabled = true; btn.textContent = 'Refunding…'; }
+        const code = currentCode;
+        stripeCall('refundEntry', { code: code, entryId: entryId }).then(() => {
+            refundInFlight = false;
+            askRemoveFromField(entryId);
+        }).catch((err) => {
+            refundInFlight = false;
+            if (btn) { btn.disabled = false; btn.textContent = 'Refund ' + centsText(refundAmountCents(e)); }
+            const msg = document.getElementById('refund-sheet-error');
+            const reason = callReason(err) || (err && err.code) || 'unknown';
+            if (msg) { msg.style.display = 'block'; msg.textContent = "The refund didn't go through. Nothing was changed. Check your signal and try again (" + reason + ')'; }
+        });
+    }
+    // THE SECOND QUESTION, ASKED EVERY TIME (Manny's decision). A golfer who
+    // is not in the field has nothing to be removed from, so it is not asked.
+    function askRemoveFromField(entryId) {
+        const e = (registrationData || {})[entryId] || {};
+        const who = escReg(String(e.fullName || e.name || 'this golfer').trim());
+        refundSheetEntry = entryId;
+        if (!regInField(e)) {
+            refundSheet(`<h3 id="refund-sheet-title">Refund started</h3><p>${who} shows Refund pending until Stripe confirms it.</p>`
+                + `<button class="btn-soft" onclick="closeRefundSheet()">Done</button>`);
+            return;
+        }
+        refundSheet(`<h3 id="refund-sheet-title">Also remove from the field?</h3>`
+            + `<p>Refund started. ${who} shows Refund pending until Stripe confirms it. They are still in the field.</p>`
+            + `<p class="checkout-error" id="refund-sheet-error" style="display:none;"></p>`
+            + `<button class="btn-danger" id="refund-remove-yes" onclick="removeRefundedFromField()">Remove from the field</button>`
+            + `<button class="btn-soft" id="refund-remove-no" onclick="closeRefundSheet()">Keep in the field</button>`);
+    }
+    // ONE OWNER WRITE, ONLY ON YES. An individual golfer is WITHDRAWN (the id
+    // and any scores stay - the page's own rule). A team golfer's name comes
+    // off the team list, which is only safe while the team has no scores:
+    // per-golfer scores are keyed by position on the list.
+    function removeRefundedFromField() {
+        const entryId = refundSheetEntry;
+        if (!entryId || !currentCode || !canManage()) return;
+        const e = (registrationData || {})[entryId] || {};
+        const say = (t) => { const m = document.getElementById('refund-sheet-error'); if (m) { m.style.display = 'block'; m.textContent = t; } };
+        if (e.playerId && (currentData.players || {})[e.playerId]) {
+            db.ref(`tournaments/${currentCode}/players/${e.playerId}/status`).set(COMPETITOR_WITHDRAWN)
+                .then(closeRefundSheet, (err) => say(`Error: ${err.message}`));
+            return;
+        }
+        const team = e.teamNum ? (currentData.teams || {})['team' + e.teamNum] : null;
+        if (!team) { say('Not on a team any more - nothing to remove.'); return; }
+        if (teamHasScores(team.num)) { say('Their team has posted scores, so the name stays on the card. Change the team on Setup.'); return; }
+        const name = String(e.fullName || e.name || '').trim().toLowerCase();
+        const players = (team.players || []).slice();
+        const at = players.findIndex((p) => String(p || '').trim().toLowerCase() === name);
+        if (at === -1) { say('That name is not on the team list - change the team on Setup.'); return; }
+        players.splice(at, 1);
+        db.ref(`tournaments/${currentCode}/teams/team${team.num}/players`).set(players)
+            .then(closeRefundSheet, (err) => say(`Error: ${err.message}`));
+    }
+
+    // ---- M4: THE ENTRY FEES CARD ------------------------------------------
+    // WHOSE ANSWER: the signed-in owner's. canManage() is true only when the
+    // signed-in uid IS the record's ownerUid, so that is the uid read - the
+    // page's one auth seam is not read a second time here.
+    function syncPaymentsAllowed() {
+        const uid = (currentData && currentData.ownerUid && canManage()) ? currentData.ownerUid : null;
+        if (uid === paymentsAllowedUid) return;
+        paymentsAllowedUid = uid;
+        paymentsAllowed = false;
+        if (!uid) return;
+        db.ref('payments/allowedOwners/' + uid).once('value').then((snap) => {
+            if (paymentsAllowedUid !== uid) return;
+            paymentsAllowed = !!(snap && snap.val && snap.val() === true);
+            renderEntryFeesCard();
+        }).catch(() => { /* not readable = not allowed */ });
+    }
+    // DOLLARS TYPED, CENTS STORED. "100", "100.5", "$1,250.00" are accepted;
+    // anything with more than two decimals, or outside $1.00..$1,000.00, is
+    // refused with a sentence and nothing is written.
+    function parseFeeDollars(raw) {
+        const t = String(raw == null ? '' : raw).trim().replace(/^\$/, '').replace(/,/g, '');
+        if (t === '') return { blank: true };
+        if (!/^\d{1,4}(\.\d{1,2})?$/.test(t)) return { error: 'Type dollars and cents, like 100 or 85.50.' };
+        const parts = t.split('.');
+        const cents = Number(parts[0]) * 100 + Number(((parts[1] || '') + '00').slice(0, 2));
+        if (!Number.isInteger(cents) || cents < FEE_MIN_CENTS || cents > FEE_MAX_CENTS) return { error: 'The entry fee must be from $1.00 to $1,000.00.' };
+        return { cents: cents };
+    }
+    function feesError(text) {
+        const el = document.getElementById('fees-error');
+        if (el) { el.textContent = text || ''; el.style.display = text ? 'block' : 'none'; }
+    }
+    function setFeeDollars(raw) {
+        if (!currentCode || !canManage()) return;
+        const p = parseFeeDollars(raw);
+        const f = feesOf(currentData);
+        if (p.blank) {
+            if (f && f.collectByCard) { feesError('Turn off card payments before clearing the fee.'); return; }
+            feesError('');
+            db.ref(`tournaments/${currentCode}/fees`).remove().catch((err) => feesError(`Error: ${err.message}`));
+            return;
+        }
+        if (p.error) { feesError(p.error); return; }
+        feesError('');
+        const cur = (currentData && currentData.fees) || {};
+        db.ref(`tournaments/${currentCode}/fees`).update({
+            entryFeeCents: p.cents,
+            collectByCard: cur.collectByCard === true,
+            allowCash: cur.allowCash !== false
+        }).catch((err) => feesError(`Error: ${err.message}`));
+    }
+    function setFeesFlag(key, on) {
+        if (!currentCode || !canManage()) return;
+        if (key !== 'collectByCard' && key !== 'allowCash') return;
+        const f = feesOf(currentData);
+        if (!f || !f.cents) { renderEntryFeesCard(); feesError('Set the entry fee first.'); return; }
+        if (key === 'collectByCard' && !paymentsAllowed) { renderEntryFeesCard(); return; }
+        db.ref(`tournaments/${currentCode}/fees/${key}`).set(!!on).catch((err) => feesError(`Error: ${err.message}`));
+    }
+    function feesToggle(id, key, on) {
+        return `<label class="toggle-switch"><input type="checkbox" id="${id}"${on ? ' checked' : ''} onchange="setFeesFlag('${key}', this.checked)"><span class="toggle-slider"></span></label>`;
+    }
+    function renderEntryFeesCard() {
+        const block = document.getElementById('entry-fees-block');
+        if (!block) return;
+        syncPaymentsAllowed();
+        const show = !!(currentCode && currentData && currentData.ownerUid && canManage());
+        block.style.display = show ? 'block' : 'none';
+        if (!show) { block.innerHTML = ''; return; }
+        const f = feesOf(currentData);
+        const typed = f && f.cents ? (f.cents % 100 === 0 ? String(f.cents / 100) : centsText(f.cents).slice(1).replace(/,/g, '')) : '';
+        const err = document.getElementById('fees-error');
+        const keepErr = err ? err.textContent : '';
+        let html = `<h3 style="margin:0 0 4px 0;">Entry fees</h3>`
+            + `<div class="fees-row"><span><strong>Entry fee</strong><small>per golfer</small></span>`
+            + `<span class="money-input"><span class="money-prefix" aria-hidden="true">$</span><input type="text" inputmode="decimal" id="fees-dollars" value="${escReg(typed)}" placeholder="0.00" onchange="setFeeDollars(this.value)"></span></div>`
+            + `<p class="fees-error" id="fees-error" style="display:${keepErr ? 'block' : 'none'};">${escReg(keepErr)}</p>`;
+        if (paymentsAllowed) {
+            html += `<div class="fees-row"><span><strong>Collect entry fees by card</strong><small>Golfers pay when they sign up</small></span>${feesToggle('fees-card', 'collectByCard', !!(f && f.collectByCard))}</div>`
+                + `<div class="fees-row"><span><strong>Also allow pay at the course</strong><small>Desk marks Paid (cash)</small></span>${feesToggle('fees-cash', 'allowCash', !!(f && f.allowCash))}</div>`
+                + `<div class="fees-stripe" id="fees-stripe"><div class="fees-stripe-head">✓ STRIPE CONNECTED</div>`
+                + `<div><span>Account</span><strong>Rattle Golf LLC</strong></div>`
+                + `<div><span>Mode</span><span class="fees-test-mode">TEST MODE</span></div></div>`;
+        } else {
+            html += `<p class="fees-soon" id="fees-soon">Card payments coming soon. Golfers pay at the course; the Desk marks Paid (cash).</p>`;
+        }
+        block.innerHTML = html;
+    }
+
+    // ---- M1 (web part): THE EVENT-DAY PANEL --------------------------------
+    // QUIET IS WHAT THIS PHONE SAW. Score writes carry no time a page can read
+    // (the proofs are not readable), so each competitor's posted-hole count is
+    // remembered with the moment THIS PAGE saw it change, kept per event in
+    // localStorage so a reload does not reset the clock. Quiet = posting, not
+    // finished, and no new hole seen for 40 minutes.
+    var QUIET_MS = 40 * 60 * 1000;
+    var daySeen = null;          // { code, map: { entryKey: { thru, at } } }
+    var dayTimer = null;
+    function daySeenFor(code) {
+        if (daySeen && daySeen.code === code) return daySeen.map;
+        let map = {};
+        try { map = JSON.parse(localStorage.getItem('hpEventDaySeen:' + code) || '{}') || {}; } catch (e) { map = {}; }
+        daySeen = { code: code, map: map };
+        return map;
+    }
+    function daySeenSave() {
+        try { localStorage.setItem('hpEventDaySeen:' + daySeen.code, JSON.stringify(daySeen.map)); } catch (e) { /* this phone only */ }
+    }
+    function dayRoundId() {
+        if (!isMultiRound(currentData)) return null;
+        if (lbRoundId && lbRoundId !== 'event' && (currentData.rounds || {})[lbRoundId]) return lbRoundId;
+        const ids = orderedRoundIds(currentData);
+        return ids.find((rid) => roundStatus(currentData.rounds[rid]) === ROUND_OPEN) || ids[0] || null;
+    }
+    function clockText(ms) {
+        const d = new Date(ms);
+        const h = d.getHours(), m = d.getMinutes();
+        return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')}`;
+    }
+    function teamPhones(num) {
+        return Object.keys(registrationData || {}).map((id) => registrationData[id] || {})
+            .filter((e) => e.teamNum === num && e.phone).map((e) => String(e.phone).replace(/[^\d+]/g, ''))
+            .filter(Boolean);
+    }
+    function renderEventDayPanel() {
+        const panel = document.getElementById('event-day-panel');
+        if (!panel) return;
+        const show = !!(currentCode && currentData && currentData.ownerUid && canManage());
+        panel.style.display = show ? 'block' : 'none';
+        if (!show) { panel.innerHTML = ''; return; }
+        const now = Date.now();
+        const rid = dayRoundId();
+        const view = resolveLeaderboardView(currentData, rid, null);
+        const rows = (view && view.available ? view.rows : []) || [];
+        const holes = ((rid ? (currentData.rounds[rid] || {}).courseData : currentData.courseData) || []).length || 18;
+        const seen = daySeenFor(currentCode);
+        const keyOf = (r) => String(r.entryKey || r.teamName);
+        rows.forEach((r) => {
+            const prev = seen[keyOf(r)];
+            if (!prev || prev.thru !== (r.thru || 0)) seen[keyOf(r)] = { thru: r.thru || 0, at: now };
+        });
+        daySeenSave();
+        const individual = recordIsIndividual();
+        const noun = individual ? 'golfers' : 'teams';
+        const posting = rows.filter((r) => (r.thru || 0) > 0);
+        const quiet = posting.filter((r) => r.thru < holes && now - seen[keyOf(r)].at >= QUIET_MS);
+        const silent = posting.length ? rows.filter((r) => !(r.thru > 0)) : [];
+        const textBtn = (r) => {
+            if (individual || !r.num) return '';
+            const phones = teamPhones(r.num);
+            return phones.length ? `<a class="btn-outline day-text" href="sms:${phones.join(',')}">Text team</a>` : '';
+        };
+        let scores = `<div class="day-card" id="day-scores"><div class="day-head">Scores by ${individual ? 'golfer' : 'team'}</div>`
+            + `<div class="day-row"><span id="day-posting">${posting.length} of ${rows.length} ${noun} posting</span>`
+            + (quiet.length ? `<span class="day-quiet" id="day-quiet">${quiet.length} quiet 40+ min</span>` : '') + `</div>`;
+        quiet.forEach((r) => {
+            scores += `<div class="day-row"><span>${escapeHtml(r.teamName)} · last score ${clockText(seen[keyOf(r)].at)}, thru ${r.thru}</span>${textBtn(r)}</div>`;
+        });
+        silent.forEach((r) => { scores += `<div class="day-row"><span>${escapeHtml(r.teamName)} · no scores yet</span>${textBtn(r)}</div>`; });
+        scores += `</div>`;
+        // PRIZES: the same resolvePrizeView and computeTournamentPayouts the
+        // Prize Results list uses, with the SAVED amounts. Nothing computed here.
+        const prize = resolvePrizeView(currentData || {});
+        const spots = savedPayoutSpots();
+        let prizes = `<div class="day-card" id="day-prizes"><div class="day-head">Prize results${prize.available && prize.title ? ' · paid on ' + escapeHtml(prize.title) : ''}</div>`;
+        if (!payoutsAreSet(spots)) prizes += `<div class="day-row"><span>Results not set yet.</span></div>`;
+        else if (!prize.available) prizes += `<div class="day-row"><span>${escapeHtml(prize.reason || '')}</span></div>`;
+        else {
+            const paid = computeTournamentPayouts(prize.rows || [], spots).filter((p) => p.amount > 0);
+            if (!paid.length) prizes += `<div class="day-row"><span>No paid spots reached yet.</span></div>`;
+            paid.forEach((p) => { prizes += `<div class="day-row"><span>${ordinal(p.rank)} ${escapeHtml(p.teamName)}</span><strong>$${p.amount.toFixed(2)}</strong></div>`; });
+        }
+        prizes += `</div>`;
+        // THE DESK, IN NUMBERS. There is no check-in field in the registration
+        // schema, so "in the field" is the count the desk already keeps.
+        const entries = Object.keys(registrationData || {}).map((id) => registrationData[id] || {});
+        const c = registrationCounts(entries);
+        const desk = `<div class="day-card" id="day-desk"><div class="day-head">Desk</div>`
+            + `<div class="day-row"><span id="day-desk-counts">${c.inField} of ${c.signups} in the field · ${c.paid} paid · ${c.signups - c.paid} unpaid</span></div></div>`;
+        panel.innerHTML = scores + prizes + desk;
+        // A minute tick so "quiet" turns on without a new snapshot. unref'd
+        // where the host allows it, so a test runner is never held open.
+        if (!dayTimer && typeof setInterval === 'function') {
+            dayTimer = setInterval(() => { renderEventDayPanel(); }, 60000);
+            if (dayTimer && typeof dayTimer.unref === 'function') dayTimer.unref();
+        }
     }
 
     // ===== SCORING-LINK KEYS (scorecard-lock wave, 2026-10-06) ===============
@@ -2839,6 +3540,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function renderRegistrationList() {
         renderRegistrationSetupRow();
         renderRegistrationDesk();
+        renderEventDayPanel();
     }
 
     function registrationAllowed() {
@@ -2892,7 +3594,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return !regTeam(e);
     }
     function setRegistrationFilter(key) {
-        registrationFilter = REG_FILTERS.some((f) => f.key === key) ? key : 'all';
+        registrationFilter = deskFilters().some((f) => f.key === key) ? key : 'all';
         renderRegistrationDesk();
     }
     function registrationSearchText() {
@@ -2939,7 +3641,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // there is NO total - the line gives the count, the fee and the reason,
         // rather than a number that is wrong by the team size.
         const fee = Number(currentData && currentData.entryFee) || 0;
-        if (fee > 0) {
+        if (fee > 0 && !deskFeesOn()) {
             if (recordIsIndividual()) lines.push(`<div class="reg-count-line">Fees collected ${regDollars(c.paid * fee)} · ${c.paid} paid × ${regDollars(fee)}</div>`);
             else lines.push(`<div class="reg-count-line">${c.paid} paid golfers · ${regDollars(fee)} per team · teams form at approval</div>`);
         }
@@ -2992,7 +3694,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             list.innerHTML = '';
             return;
         }
-        if (note) note.textContent = 'Tick Paid when you have the cash, then approve golfers into the field.';
+        const feesOn = deskFeesOn();
+        if (note) note.textContent = feesOn
+            ? 'Card payments mark themselves Paid. Mark cash paid when you have the cash, then approve golfers into the field.'
+            : 'Tick Paid when you have the cash, then approve golfers into the field.';
         const all = Object.keys(registrationData || {}).map((id) => [id, registrationData[id] || {}])
             .sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
         if (all.length === 0) {
@@ -3003,12 +3708,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }
         showExport(true);
         const entriesOnly = all.map((x) => x[1]);
-        if (countsEl) countsEl.innerHTML = registrationCountsHtml(registrationCounts(entriesOnly));
-        if (chipsEl) chipsEl.innerHTML = REG_FILTERS.filter((f) => !f.teamOnly || !recordIsIndividual()).map((f) => {
+        if (countsEl) countsEl.innerHTML = (feesOn ? payTilesHtml(entriesOnly) : '') + registrationCountsHtml(registrationCounts(entriesOnly));
+        const filters = deskFilters();
+        if (!filters.some((f) => f.key === registrationFilter)) registrationFilter = 'all';
+        if (chipsEl) chipsEl.innerHTML = filters.filter((f) => !f.teamOnly || !recordIsIndividual()).map((f) => {
             const n = entriesOnly.filter(f.test).length;
             return `<button class="reg-chip${f.key === registrationFilter ? ' active' : ''}" onclick="setRegistrationFilter('${f.key}')">${f.label} ${n}</button>`;
         }).join('');
-        const filter = REG_FILTERS.find((f) => f.key === registrationFilter) || REG_FILTERS[0];
+        const filter = filters.find((f) => f.key === registrationFilter) || filters[0];
         const q = registrationSearchText();
         const shown = all.filter(([, e]) => filter.test(e) && (!q
             || String(e.fullName || e.name || '').toLowerCase().indexOf(q) !== -1
@@ -3049,7 +3756,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // THE STATE, AS A WORD: the payment badge beside the name; "In the field"
             // (the pinned words, once) as a badge in place of the button; "Needs a
             // team" beside it when regNeedsTeam says so. The checkbox stays the control.
-            const payBadge = e.paid === true ? `<span class="reg-state reg-state-paid">Paid</span>` : `<span class="reg-state reg-state-unpaid">Unpaid</span>`;
+            // STRIPE PHASE 1: with fees set, or on any entry Stripe has touched,
+            // the badge names HOW it was paid and the checkbox gives way to one
+            // control - Mark cash paid, Undo (cash only) or Refund (card only).
+            const moneyRow = feesOn || entryPaidByServer(e);
+            const payBadge = moneyRow ? payBadgeHtml(e)
+                : (e.paid === true ? `<span class="reg-state reg-state-paid">Paid</span>` : `<span class="reg-state reg-state-unpaid">Unpaid</span>`);
+            const payControl = moneyRow ? payControlHtml(id, e)
+                : `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`;
             const approve = inField
                 ? `<span class="reg-state reg-state-field">In the field</span>${regTeam(e) ? `<span class="reg-state reg-state-team">${escReg(regTeam(e).name || ('Team ' + regTeam(e).num))}</span>` : ''}${regNeedsTeam(e) ? `<span class="reg-state reg-state-needs">Needs a team</span>` : ''}`
                 : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`;
@@ -3062,7 +3776,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return `<div class="reg-row" data-entry-id="${escReg(id)}">`
                 + `<span class="reg-name">${escReg(e.fullName || e.name || '')}</span>`
                 + payBadge
-                + `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`
+                + payControl
                 + dest
                 + approve
                 + fix
@@ -3227,6 +3941,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     function setRegistrationPaid(entryId, paid) {
         if (!currentCode || !canManage()) return;
+        // A card entry's paid is the server's (Phase 1): never here.
+        if (entryPaidByServer((registrationData || {})[entryId])) return;
         const patch = { paid: !!paid };
         patch.paidAt = paid ? Date.now() : null;
         db.ref(`registrations/${currentCode}/${entryId}`).update(patch)
@@ -4860,6 +5576,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
             document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
             renderEventDetails();
+            renderEntryFeesCard();
 
             // A tournament created before this feature existed has no startType field at all —
             // treated as 'normal' automatically, no migration needed.
@@ -4894,6 +5611,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderLeaderboardFlightFilter();
             renderTripLinkStatus();
             renderLeaderboard();
+            renderEventDayPanel();
             // Last, so it can remove what the renders above filled in. Runs on
             // every snapshot: the record may gain an owner while the page is open.
             applyManageGate();
