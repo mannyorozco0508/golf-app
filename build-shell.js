@@ -271,7 +271,7 @@ const PRODUCTS = {
         // new event is born locked, Setup offers Lock scoring links, and the card
         // sends each keyed score with its proof. A device on v57 keeps a card
         // that cannot score a locked event.
-        cacheName: 'tournament-v58-scorecard-lock',
+        cacheName: 'tournament-v59-nov7-build',
         appName: 'Rattle Golf Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

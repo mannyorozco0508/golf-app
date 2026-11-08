@@ -4513,7 +4513,8 @@
 // Moved to v382-2.0 (no self-serve seat move, Manny): round-chat.js - the This is me, move chat to this phone button and its confirm are gone; the organizer's Free this seat stays; a round ended on the server says so; Loading fills in by itself. A device on v381-2.0 keeps the self-serve button (and its call to a function that is not deployed).
 // Moved to v383-2.0 (web sign-in by redirect): oauth-signin.js + admin.html - Continue with / Link Apple and Google go by redirect on hardpangolf.com and golf-app-5a5.pages.dev (authDomain is the page's own host there, /__/auth/ proxied by functions/_middleware.js), the popup stays everywhere else; and this worker leaves /__/ to the network. A device on v382-2.0 keeps the popup-only oauth-signin.js and the firebaseapp.com authDomain, which still works there as before (popup only).
 // Moved to v384-2.0 (tournament scorecard lock): tournament.html + tournament-scorecard.html - a team/group link carries &k= and each score is written with its keyed proof in the same update (rules live since 2026-11-07 9:49 AM). A device on v383-2.0 keeps the unkeyed scorecard, whose score writes the live rules now refuse on a locked event.
-const CACHE_VERSION = 'golfapp-v384-2.0';
+// Moved to v385-2.0 (tournaments nov7 build): tournament.html + tournament-scorecard.html + tournament-engine.js - scores saved on the phone before sending (offline queue), prize results from one saved basis on every phone, shotgun next hole, flights/Event golfer board, "N waiting for signal" chip. A device on v384-2.0 keeps a scorecard that loses unsent scores when closed.
+const CACHE_VERSION = 'golfapp-v385-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
