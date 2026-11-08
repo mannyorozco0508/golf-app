@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="HardPan Golf: GPS, games and live scoring for your group, and a tournament tool for the people who organize the day.">
+<link rel="icon" href="/hardpan-icon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>HardPan Golf</title>
+<!--
+  THE MARKETING PAGE (website-b, ADVISOR-20261108-0356, Manny picked design B).
+  Served at /home (the _redirects rewrite) and /hardpan-home. It is NOT the app:
+  / stays index.html (the scorecard, which sends a visit with no ?game= to the
+  admin.html front door), and every game / tournament link keeps its own page.
+  It is not in sw.js's shell list and not in the native bundle.
+
+  TO FILL (grep data-todo):
+    data-todo="app-store-url"   the App Store link (Grok)
+    data-todo="play-store-url"  the Google Play link (Grok; Play is not live yet)
+    data-todo="store-badge-art" the official Apple / Google badge artwork
+    data-todo="copy-approve"    claims Grok flagged for Manny's wording OK
+  Prices: none in this file. site-pricing.js fills every data-price slot.
+-->
+<style>
+    :root { --g:#0f4a36; --g2:#163f31; --lime:#d9f07a; --cream:#f4f1e8; --navy:#1d3357; --ink:#14201b; --mut:#5d6b64; --card:#fff; --line:#e3e0d6; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html { scroll-behavior:smooth; }
+    body { font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Inter, Arial, sans-serif; color:var(--ink); background:var(--cream); -webkit-font-smoothing:antialiased; }
+    a { color:inherit; text-decoration:none; }
+    .wrap { max-width:1180px; margin:0 auto; padding:0 28px; }
+    nav.top { display:flex; align-items:center; justify-content:space-between; padding:18px 0; gap:16px; }
+    .logo { display:flex; align-items:center; gap:10px; font-weight:800; font-size:20px; }
+    .logo img { width:36px; height:36px; border-radius:9px; display:block; }
+    .links { display:flex; gap:26px; font-size:15px; font-weight:600; }
+    .links a:hover { color:var(--g); }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:13px 20px; border-radius:12px; font-weight:700; font-size:15px; white-space:nowrap; }
+    .lime { background:var(--lime); color:var(--g); }
+    .hero { text-align:center; padding:40px 28px 30px; }
+    .hero h1 { font-size:60px; font-weight:900; letter-spacing:-.03em; line-height:1.05; }
+    .hero h1 span { color:var(--g); }
+    .sub { color:var(--mut); font-size:18px; max-width:640px; line-height:1.5; }
+    .hero .sub { margin:16px auto 0; }
+    .hero .webapp { display:inline-block; margin-top:18px; font-size:15px; font-weight:700; color:var(--g); border-bottom:2px solid var(--lime); }
+    .split { display:grid; grid-template-columns:1fr 1fr; gap:22px; padding-bottom:70px; }
+    .panel { border-radius:28px; padding:38px; color:#fff; }
+    .panel.play { background:var(--g); display:flex; gap:24px; align-items:center; }
+    .panel.org { background:var(--navy); }
+    .kicker { font-weight:800; font-size:13px; letter-spacing:.14em; }
+    .play .kicker { color:var(--lime); }
+    .org .kicker { color:#9fc2ff; }
+    .panel h2 { font-size:34px; margin:10px 0; }
+    .play p { color:#cfe0d6; line-height:1.5; margin-bottom:22px; }
+    .org p { color:#cdd8ea; line-height:1.5; margin-bottom:20px; }
+    .badges { display:flex; gap:12px; flex-wrap:wrap; }
+    .badge { display:inline-block; background:#000; color:#fff; border-radius:10px; padding:9px 16px; font-size:12px; line-height:1.2; border:1px solid #a6a6a6; min-height:44px; }
+    .badge b { display:block; font-size:17px; }
+    .phone-wrap { transform:scale(.8); transform-origin:center; flex:0 0 auto; }
+    .phone { width:250px; height:510px; border-radius:38px; background:#0b0f0d; padding:10px; box-shadow:0 30px 60px rgba(0,0,0,.35); }
+    .scr { width:100%; height:100%; border-radius:30px; overflow:hidden; background:#2f5a3a; position:relative; }
+    .scr .top { position:absolute; left:10px; right:10px; top:16px; background:#111a15; border-radius:16px; color:#fff; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; }
+    .scr .top small { font-size:9px; color:#aab; letter-spacing:.1em; }
+    .scr .top b { font-size:34px; color:var(--lime); }
+    .fair { position:absolute; left:70px; top:120px; width:110px; height:300px; border-radius:60px; background:#4f8a4c; transform:rotate(8deg); }
+    .grn { position:absolute; left:92px; top:118px; width:60px; height:44px; border-radius:50%; background:#7fbf6a; border:2px solid #fff; }
+    .bot { position:absolute; left:10px; right:10px; bottom:14px; background:var(--lime); border-radius:14px; text-align:center; font-weight:800; color:var(--g); padding:10px; font-size:13px; }
+    .pill { position:absolute; right:12px; bottom:70px; background:#f4f1e8; color:var(--ink); border-radius:16px; padding:8px 12px; font-size:11px; font-weight:700; }
+    .board { background:#fff; color:var(--ink); border-radius:18px; padding:18px; font-size:14px; }
+    .board .row { display:flex; justify-content:space-between; margin-top:8px; gap:12px; }
+    .board .live { color:#c0392b; font-weight:800; font-size:12px; letter-spacing:.08em; }
+    .org .btn { margin-top:22px; }
+    .sec { padding:80px 0; }
+    .sec.white { background:#fff; }
+    .h2 { font-size:38px; font-weight:850; letter-spacing:-.02em; margin-bottom:12px; }
+    .price { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:34px; }
+    .pc { background:#fff; border-radius:18px; padding:22px; border:1px solid var(--line); line-height:1.45; font-size:15px; }
+    .pc .nm { font-weight:700; }
+    .pc b { font-size:28px; display:block; margin:8px 0; }
+    .pc.hi { background:var(--g); color:#fff; border:0; }
+    .pc.hi b { color:var(--lime); }
+    .pc small { display:block; margin-top:10px; font-size:13px; opacity:.8; }
+    .note { font-size:13px; color:var(--mut); margin-top:16px; max-width:760px; line-height:1.5; }
+    .getapp { background:var(--g); color:#fff; text-align:center; }
+    .getapp .h2 { color:#fff; }
+    .getapp .sub { color:#cfe0d6; margin:0 auto 28px; }
+    .getapp .badges { justify-content:center; }
+    .getapp .webapp { display:inline-block; margin-top:22px; color:var(--lime); font-weight:700; }
+    footer { background:var(--ink); color:#c9d1cc; padding:40px 0; font-size:14px; line-height:1.6; }
+    footer .wrap { display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+    footer .flinks a { margin-right:16px; color:#fff; text-decoration:underline; text-underline-offset:3px; }
+    @media (max-width:980px) { .price { grid-template-columns:repeat(2,1fr); } .phone-wrap { display:none; } }
+    @media (max-width:700px) {
+        .wrap { padding:0 16px; }
+        .links { display:none; }
+        .price { grid-template-columns:1fr; }
+        .h2 { font-size:28px; }
+        .hero { padding:28px 16px 24px; }
+        .hero h1 { font-size:40px; }
+        .split { grid-template-columns:1fr; }
+        .panel { padding:28px 22px; }
+        .panel h2 { font-size:28px; }
+        .sec { padding:56px 0; }
+        footer .wrap { flex-direction:column; }
+    }
+</style>
+</head>
+<body>
+
+<nav class="wrap top" aria-label="Main">
+    <a class="logo" href="/home"><img src="/hardpan-icon.svg" alt="" width="36" height="36">HardPan Golf</a>
+    <div class="links">
+        <a href="#golfers">Games</a>
+        <a href="#golfers">GPS &amp; Coaching</a>
+        <a href="#organizers">Tournaments</a>
+        <a href="#pricing">Pricing</a>
+        <a href="/support">Support</a>
+    </div>
+    <a class="btn lime" id="nav-get-app" href="#get-the-app">Get the app</a>
+</nav>
+
+<section class="wrap hero">
+    <h1>Play it. Run it.<br><span>HardPan does the math.</span></h1>
+    <p class="sub">GPS, games and live scoring for your group, and a full tournament tool for the people who organize the day.</p>
+    <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
+</section>
+
+<section class="wrap split">
+    <div class="panel play" id="golfers">
+        <div style="flex:1">
+            <div class="kicker">I PLAY</div>
+            <h2>For golfers</h2>
+            <p>Satellite yardages, side games, chat, Strokes Gained and coaching. Free for one group.</p>
+            <div class="badges">
+                <a class="badge" href="#get-the-app" data-todo="app-store-url" data-store="apple">Download on the<b>App Store</b></a>
+                <a class="badge" href="#get-the-app" data-todo="play-store-url" data-store="google">Get it on<b>Google Play</b></a>
+            </div>
+        </div>
+        <div class="phone-wrap" aria-hidden="true">
+            <div class="phone"><div class="scr">
+                <div class="top"><div><small>HOLE 7 &middot; MIDDLE</small><br><b>152</b></div><div style="font-size:11px;text-align:right">B 166<br>F 139</div></div>
+                <div class="fair"></div><div class="grn"></div>
+                <div class="pill">Plays like 158 &middot; 7i</div>
+                <div class="bot">Hole 7 &middot; Enter score</div>
+            </div></div>
+        </div>
+    </div>
+    <div class="panel org" id="organizers">
+        <div class="kicker">I ORGANIZE</div>
+        <h2>HardPan Tournaments</h2>
+        <p data-todo="copy-approve">Registration, entry fees by card, flights, shotgun starts, live leaderboard and prize results that match on every phone.</p>
+        <div class="board" aria-label="Example leaderboard">
+            <b style="font-size:16px">Rattle Classic</b> &middot; <span class="live">LIVE</span>
+            <div class="row"><span>1. Team 9 &middot; Reyes / Cho</span><b>&minus;11</b></div>
+            <div class="row"><span>2. Team 2 &middot; Hale / Ruiz</span><b>&minus;9</b></div>
+            <div class="row"><span>3. Team 4 &middot; Lopez / Kim</span><b>&minus;8</b></div>
+        </div>
+        <a class="btn lime" id="run-an-event" href="/tournament">Run an event &rarr;</a>
+    </div>
+</section>
+
+<section class="sec white">
+    <div class="wrap">
+        <div class="h2">Friendly games, not gambling</div>
+        <p class="sub" data-todo="copy-approve">HardPan keeps track of what your group agreed and shows who owes who. It never holds, sends or takes a cut of money. Tournament entry fees go straight to the organizer through Stripe.</p>
+    </div>
+</section>
+
+<section class="sec" id="pricing">
+    <div class="wrap">
+        <div class="h2">Simple pricing</div>
+        <div class="price">
+            <div class="pc"><span class="nm">Free</span><b data-price="free"></b>One group of up to <span data-price="free-golfers"></span>. Scores, games, leaderboard.</div>
+            <div class="pc hi"><span class="nm">HardPan Pro</span><b data-price="pro-headline"></b><span data-price="pro-label"></span>. Full GPS map, coaching, hosting. <span data-price="pro-trial-days"></span>-day free trial.
+                <small>Or <span data-price="pro-yearly"></span>/yr, or <span data-price="pro-monthly"></span>/mo.</small></div>
+            <div class="pc"><span class="nm">Host Pro</span><b data-price="host-yearly"></b>Host bigger games and events all year.</div>
+            <div class="pc"><span class="nm">Trip Pass</span><b data-price="trip-pass"></b>One golf trip, <span data-price="trip-pass-days"></span> days of hosting.</div>
+        </div>
+        <p class="note">US prices. The App Store or Google Play shows the price in your country before you confirm. Subscriptions renew automatically until cancelled in your store account; the free trial is for new subscribers. Joining a round and scoring are always free.</p>
+    </div>
+</section>
+
+<section class="sec getapp" id="get-the-app">
+    <div class="wrap">
+        <div class="h2">Get the app</div>
+        <p class="sub">HardPan for iPhone and Android. Your group can also join any round from the link, in the browser.</p>
+        <div class="badges" data-todo="store-badge-art">
+            <a class="badge" href="#get-the-app" data-todo="app-store-url" data-store="apple">Download on the<b>App Store</b></a>
+            <a class="badge" href="#get-the-app" data-todo="play-store-url" data-store="google">Get it on<b>Google Play</b></a>
+        </div>
+        <a class="webapp" href="/admin">Or open HardPan in your browser &rarr;</a>
+    </div>
+</section>
+
+<footer>
+    <div class="wrap">
+        <div><b style="color:#fff">HardPan Golf</b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ</div>
+        <div class="flinks">
+            <a href="/support">Support</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/refunds">Entry-fee refunds</a>
+        </div>
+        <div>HardPan keeps track of your group's games. It never handles money for bets.</div>
+    </div>
+</footer>
+
+<script src="/site-pricing.js"></script>
+<script>
+    if (typeof window.HardPanSitePricingFill === 'function') window.HardPanSitePricingFill(document);
+</script>
+</body>
+</html>
