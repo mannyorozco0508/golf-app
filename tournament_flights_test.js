@@ -364,8 +364,24 @@ describe('HISTORICAL — a tournament from before flights is unchanged', () => {
         assert.ok(!/[?&]flight=/.test(src),
             'a flight is a division, not a scorecard - links stay team-scoped');
         assert.match(codeOf('tournament-scorecard.html'), /urlParams\.get\('team'\)/);
-        assert.ok(!/flight/i.test(codeOf('tournament-scorecard.html')),
-            'the golfer scoring surface has no business knowing about flights');
+        // RE-PINNED DELIBERATELY (2026-11-08). This used to say the card never
+        // says "flight" at all. Manny approved mockup A3 on 2026-11-08: the
+        // golfer's Leaderboard tab now shows the event's flights as chips and
+        // defaults to the golfer's own. What must STILL hold is the point of
+        // this test - a flight is a VIEW of the board, never a scorecard: the
+        // link carries no flight, nothing is written under one, and the only
+        // flight id the card handles is the one handed to the board's view.
+        const card = codeOf('tournament-scorecard.html');
+        assert.match(card, /golferLeaderboardView\(data, \{/,
+            'positive: the card reads flights only through the board view');
+        assert.ok(!/urlParams\.get\('flight'\)/.test(card) && !/[?&]flight=/.test(card),
+            'a scoring link never carries a flight');
+        assert.ok(!/scorePath\([^)]*flight/i.test(card),
+            'nothing is written under a flight');
+        assert.ok(!/flight/i.test(card.slice(card.indexOf('function saveHoleScore'), card.indexOf('function renderGroup'))),
+            'the score writers know nothing about flights');
+        assert.ok(card.indexOf('function saveHoleScore') > 0 && card.indexOf('function renderGroup') > card.indexOf('function saveHoleScore'),
+            'positive: the writer slice exists');
     });
 });
 

@@ -108,6 +108,25 @@
         .lb-score { width: 60px; text-align: right; font-weight: bold; }
         .lb-row.leader { background: #fff8e1; }
         .lb-row.me { border: 2px solid var(--brand-green); border-radius: 6px; }
+
+        /* A2 (approved 2026-11-08): the row a golfer plays next, and what each
+           row is. Applied after render, never in the markup the shape key reads. */
+        .hole-state { font-size: 0.72rem; color: var(--text-muted); }
+        .hole-row.is-next, .hole-row-multi.is-next { border-left: 5px solid var(--brand-green); padding-left: 8px; }
+        .play-order-note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin: 12px 0 0 0; }
+        /* J4 (approved 2026-11-08): scores this phone holds that the server has
+           not confirmed. Amber, not red - they are safe here, just not sent. */
+        .waiting-row { text-align: center; margin: -4px 0 10px 0; }
+        .waiting-chip { display: inline-block; background: #fbefd9; color: #8a5a00; font-weight: bold; font-size: 0.82rem; border-radius: 999px; padding: 5px 12px; }
+        /* A3 (approved 2026-11-08): the golfer board's division chips and the
+           This round / Event switch. Neither renders on an event without them. */
+        .lb-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .lb-chip { border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--brand-green); border-radius: 999px; padding: 8px 14px; font-weight: bold; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
+        .lb-chip.on { background: var(--brand-navy); border-color: var(--brand-navy); color: #ffffff; }
+        .lb-seg { display: flex; gap: 3px; border: 1px solid var(--border-mid); border-radius: 10px; padding: 3px; margin-bottom: 10px; background: var(--bg-card); }
+        .lb-seg button { flex: 1; border: 0; background: transparent; color: var(--text-muted); font-weight: bold; font-size: 0.85rem; padding: 8px 0; border-radius: 8px; cursor: pointer; font-family: inherit; }
+        .lb-seg button.on { background: var(--brand-navy); color: #ffffff; }
+        .lb-note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -145,11 +164,19 @@
              One quiet line that settles back to idle, rather than a toast per keystroke -
              rapid entry must stay uninterrupted. -->
         <div class="save-state" id="save-state" aria-live="polite"></div>
+        <!-- J4: how many of this card's scores are on this phone but not yet on
+             the server. Hidden at zero, and hidden while a send is merely in
+             flight on a good signal - see renderWaitingChip. -->
+        <div class="waiting-row"><span class="waiting-chip" id="score-waiting" style="display:none;"></span></div>
         <div id="holes-list"></div>
+        <div class="play-order-note" id="play-order-note" style="display:none;"></div>
     </div>
 
     <div id="tab-leaderboard" style="display:none;">
+        <div class="lb-chips" id="lb-chips" style="display:none;"></div>
+        <div class="lb-seg" id="lb-scope" style="display:none;"></div>
         <div id="leaderboard-list"></div>
+        <div class="lb-note" id="lb-note" style="display:none;"></div>
     </div>
 </div>
 
@@ -178,7 +205,9 @@
     // NO DARK MODE ON THIS PRODUCT (2026-09-18, Option B) - see tournament.html.
     // This page never touches the browser's stored theme preference.
 
+    let boardTabOpen = false;   // the Leaderboard tab is on screen: snapshots re-render it
     function showTab(tab) {
+        boardTabOpen = (tab === 'leaderboard');
         document.getElementById('tab-scorecard').style.display = tab === 'scorecard' ? 'block' : 'none';
         document.getElementById('tab-leaderboard').style.display = tab === 'leaderboard' ? 'block' : 'none';
         document.getElementById('tab-btn-scorecard').classList.toggle('active', tab === 'scorecard');
@@ -210,7 +239,6 @@
     // in the same update (keyedScore). Absent on links built before the lock.
     const myScoreKey = urlParams.get('k') || null;
     let currentData = {};
-    let hasAutoScrolled = false; // guards the shotgun starting-hole auto-scroll to fire once per page load
 
     if (!currentCode || (!myTeamNum && !myGroupId)) {
         document.getElementById('error-detail').textContent = !currentCode
@@ -263,7 +291,12 @@
             // queued for this card goes now. Before the render, so a render that
             // throws cannot also strand the scores.
             drainScoreQueue();
+            lastSnapshotAt = Date.now();
             if (group) renderGroup(group); else renderAll();
+            renderWaitingChip();
+            // "Updates live" (A3) is true only if the open board re-renders
+            // on each snapshot. Before this it changed only on a tab tap.
+            if (boardTabOpen) renderLeaderboard();
         });
         armScoreQueue();
     }
@@ -271,33 +304,119 @@
     // computeTeamHoleScore and computeTournamentLeaderboard now live in tournament-engine.js
     // so this page and the organizer's tournament.html always agree on totals and standings.
 
+    // ---- A3: THE GOLFER'S BOARD - A DIVISION, THE EVENT, AND (You) ----------
+    // Approved by Manny (mockup A3, 2026-11-08). No new standings: every row
+    // comes from golferLeaderboardView, the organizer board's own resolution
+    // (resolveLeaderboardView with a round and a flight), so a golfer's B
+    // board and the organizer's B board are one call.
+    //
+    // WHAT A GOLFER WHO TOUCHES NOTHING SEES. Their own division when the event
+    // has them and they sit in exactly one (defaultFlightFor - a mixed group has
+    // no single own division and gets Overall); the round this link is for; and
+    // (You) on their own row, by team number on a team link and by player id on
+    // a group link (isMeRow). An event with no divisions and one round shows no
+    // chips, no switch and no note - the board it always showed.
+    let lbFlightPick;            // undefined until tapped: the golfer's own, then their choice
+    let lbScopePick = 'round';   // 'round' (this link's round) or 'event'
+    var lastSnapshotAt = 0;      // var: written by the snapshot listener, registered above
+
+    function boardWho() {
+        return myGroupId ? { groupId: myGroupId, roundId: myRoundId } : { teamNum: myTeamNum };
+    }
+    function boardMe() {
+        if (!myGroupId) return { teamNum: myTeamNum };
+        const scope = roundScope || currentData || {};
+        const g = (scope.scoringGroups || {})[myGroupId] || {};
+        return { groupPlayerIds: g.playerIds || [] };
+    }
+    function pickBoardFlight(fid) { lbFlightPick = fid || null; renderLeaderboard(); }
+    function pickBoardScope(scope) { lbScopePick = scope === 'event' ? 'event' : 'round'; renderLeaderboard(); }
+
+    function renderBoardControls(data, view, own, multi) {
+        const chips = document.getElementById('lb-chips');
+        const seg = document.getElementById('lb-scope');
+        const note = document.getElementById('lb-note');
+        const flights = (data && data.flights) || {};
+        const fids = Object.keys(flights).sort((a, b) => (flights[a].createdAt || 0) - (flights[b].createdAt || 0));
+        if (fids.length) {
+            chips.style.display = 'flex';
+            chips.innerHTML = `<button type="button" class="lb-chip ${!view.flightId ? 'on' : ''}" data-f="" onclick="pickBoardFlight(this.getAttribute('data-f'))">Overall</button>`
+                + fids.map(fid => `<button type="button" class="lb-chip ${view.flightId === fid ? 'on' : ''}" data-f="${escapeHtml(fid)}" onclick="pickBoardFlight(this.getAttribute('data-f'))">${escapeHtml(flights[fid].name || 'Flight')}${fid === own ? ' ★' : ''}</button>`).join('');
+        } else {
+            chips.style.display = 'none';
+            chips.innerHTML = '';
+        }
+        if (multi) {
+            const n = Object.keys(data.rounds || {}).length;
+            const onEvent = lbScopePick === 'event';
+            seg.style.display = 'flex';
+            seg.innerHTML = `<button type="button" class="${onEvent ? '' : 'on'}" onclick="pickBoardScope('round')">This round</button>`
+                + `<button type="button" class="${onEvent ? 'on' : ''}" onclick="pickBoardScope('event')">Event (${n} rounds)</button>`;
+        } else {
+            seg.style.display = 'none';
+            seg.innerHTML = '';
+        }
+        if (fids.length) {
+            const at = lastSnapshotAt ? new Date(lastSnapshotAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+            const mine = own ? `${flights[own].name || 'Flight'} is yours (★). ` : '';
+            note.style.display = 'block';
+            note.textContent = `${mine}Updates live${at ? ' · last update ' + at : ''}.`;
+        } else {
+            note.style.display = 'none';
+            note.textContent = '';
+        }
+    }
+
     function renderLeaderboard() {
         const container = document.getElementById('leaderboard-list');
+        const data = currentData || {};
         // THE ROUND THIS LINK IS FOR. Reading the event root showed this golfer
         // a full field with every score blank - including the fifty-four they
         // had just entered on the card one tab away. Same resolution the
-        // organizer's board and printed sheet use.
-        const view = resolveLeaderboardView(currentData, myRoundId);
+        // organizer's board and printed sheet use, through golferLeaderboardView.
+        const multi = isMultiRound(data);
+        const own = defaultFlightFor(data, boardWho());
+        const view = golferLeaderboardView(data, {
+            roundId: myRoundId,
+            scope: multi ? lbScopePick : 'round',
+            flightId: lbFlightPick === undefined ? own : lbFlightPick
+        });
+        // The controls first: a refused Event total must still leave the
+        // switch on screen, or a golfer who tapped it could not get back.
+        renderBoardControls(data, view, own, multi);
         const rows = view.rows;
         if (!view.available) {
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:20px;">${view.reason}</div>`;
             return;
         }
+        const flights = data.flights || {};
+        if (rows.length === 0 && view.flightId && flights[view.flightId]) {
+            container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:20px;">Nobody in ${escapeHtml(flights[view.flightId].name || 'Flight')} yet.</div>`;
+            return;
+        }
 
+        const me = boardMe();
+        const onEvent = view.kind === 'event';
         const rankCounts = {};
         rows.forEach(r => { if (r.rank) rankCounts[r.rank] = (rankCounts[r.rank] || 0) + 1; });
 
         let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
+            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(data)}</span><span class="lb-thru">${onEvent ? 'Rds' : 'Thru'}</span><span class="lb-score">To Par</span>
         </div>`;
         rows.forEach(r => {
             const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
-            const isMe = r.num === myTeamNum;
+            const isMe = isMeRow(r, me);
             const tieTag = (r.rank && rankCounts[r.rank] > 1) ? '<span style="font-size:0.68rem; color:var(--text-muted); font-weight:normal;"> (tied)</span>' : '';
+            // The organizer board's event marking, in the same word.
+            const partial = (onEvent && r.hasScores && !r.completedAll)
+                ? '<span style="font-size:0.68rem; color:var(--text-muted); font-weight:normal;"> (incomplete)</span>' : '';
+            const thru = onEvent
+                ? (r.hasScores ? `${r.roundsComplete}/${r.countableRounds}` : '-')
+                : (r.hasScores ? r.thru : '-');
             html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''} ${isMe ? 'me' : ''}">
                 <span class="lb-pos">${r.rank || '-'}</span>
-                <span class="lb-team">${escapeHtml(r.teamName)}${tieTag} ${isMe ? '<span style="font-weight:normal; color:var(--brand-green); font-size:0.78rem;">(You)</span>' : ''}</span>
-                <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${tieTag}${partial} ${isMe ? '<span style="font-weight:normal; color:var(--brand-green); font-size:0.78rem;">(You)</span>' : ''}</span>
+                <span class="lb-thru">${thru}</span>
                 <span class="lb-score">${toParStr}</span>
             </div>`;
         });
@@ -445,9 +564,10 @@
             // dropped at once - trackWrite already says so in red - because it can
             // never land. Anything else (no signal) keeps it for the replay.
             Promise.resolve(p).then(
-                () => { try { q.confirm(store, op.id, op.v); } catch (e) {} },
-                (err) => { if (q.isPermanent(err)) { try { q.confirm(store, op.id, op.v); } catch (e) {} } });
+                () => { try { q.confirm(store, op.id, op.v); } catch (e) {} renderWaitingChip(); },
+                (err) => { if (q.isPermanent(err)) { try { q.confirm(store, op.id, op.v); } catch (e) {} } renderWaitingChip(); });
             ensureScoreRetry();
+            renderWaitingChip();
         }
         return p;
     }
@@ -471,13 +591,54 @@
     }
 
     // HOW MANY OF THIS CARD'S SCORES ARE WAITING FOR SIGNAL. Pure count, read
-    // from storage only. Nothing displays it yet (a waiting chip has not been
-    // approved); it exists so one can, without a second definition.
+    // from storage only. The J4 chip below is its one display.
     function scoreQueueWaiting() {
         const q = window.OfflineQueue;
         const store = scoreQueueStore();
         if (!q || !store) return 0;
         try { return q.peek(store).filter(isThisCardsOp).length; } catch (e) { return 0; }
+    }
+
+    // ---- J4: THE WAITING CHIP (mockup J4, approved 2026-11-08) ---------------
+    // "N waiting for signal", amber, from scoreQueueWaiting() and nothing else.
+    // Zero waiting: no chip at all.
+    //
+    // NOT EVERY QUEUED SCORE IS WAITING FOR SIGNAL. Every score is queued
+    // before it is sent, so on a good signal the queue holds it for the
+    // ~100 ms until the server confirms. Showing the chip then would flash
+    // "1 waiting for signal" on every keystroke, on a phone with full bars.
+    // So the chip shows only when the phone says it is offline, the socket
+    // is known to be down, or a score has sat unconfirmed past
+    // WAITING_GRACE_MS; otherwise it re-checks once that grace has passed.
+    //
+    // Repainted on enqueue, on every confirm, after every drain, on the
+    // socket going up or down, on the online/offline events, and on every
+    // snapshot. NOT "round closed, scores not sent" - that sentence is not
+    // approved; a locked round's queued scores simply stay counted here.
+    var WAITING_GRACE_MS = 4000;    // var, not const: the socket listener can fire before this line runs
+    var scoreSocketUp = null;   // null: not heard yet
+    var waitingRecheck = null;
+    function oldestWaitingAge() {
+        const q = window.OfflineQueue;
+        const store = scoreQueueStore();
+        if (!q || !store) return 0;
+        try {
+            const ts = q.peek(store).filter(isThisCardsOp).map(o => Number(o.ts) || 0);
+            return ts.length ? Date.now() - Math.min(...ts) : 0;
+        } catch (e) { return 0; }
+    }
+    function renderWaitingChip() {
+        const el = document.getElementById('score-waiting');
+        if (!el) return;
+        const n = scoreQueueWaiting();
+        const noSignal = (typeof navigator !== 'undefined' && navigator.onLine === false) || scoreSocketUp === false;
+        const show = n > 0 && (noSignal || oldestWaitingAge() >= WAITING_GRACE_MS);
+        el.textContent = show ? `${n} waiting for signal` : '';
+        el.style.display = show ? 'inline-block' : 'none';
+        if (n > 0 && !show && !waitingRecheck) {
+            waitingRecheck = setTimeout(() => { waitingRecheck = null; renderWaitingChip(); }, WAITING_GRACE_MS + 100);
+            if (waitingRecheck && typeof waitingRecheck.unref === 'function') waitingRecheck.unref();
+        }
     }
 
     // REPLAY: serial, in the order typed, one drain at a time. Not before the
@@ -503,6 +664,7 @@
             // and the golfer is told with the same red sentence a live refusal
             // gets - it stays on screen.
             if (r && r.dropped) setSaveState('error', NOT_SAVED_REFUSED);
+            renderWaitingChip();
             if (scoreDrainAgain) { scoreDrainAgain = false; setTimeout(drainScoreQueue, 0); }
             else if (scoreQueueWaiting()) ensureScoreRetry();
             return r;
@@ -530,8 +692,15 @@
     // render of the card (which is also the cold start - the first snapshot is
     // the moment the round is known to be open).
     function armScoreQueue() {
-        try { db.ref('.info/connected').on('value', (snap) => { if (snap && snap.val() === true) drainScoreQueue(); }); } catch (e) {}
-        try { if (typeof window.addEventListener === 'function') window.addEventListener('online', () => drainScoreQueue()); } catch (e) {}
+        try { db.ref('.info/connected').on('value', (snap) => {
+            scoreSocketUp = !!(snap && snap.val() === true);
+            renderWaitingChip();
+            if (scoreSocketUp) drainScoreQueue();
+        }); } catch (e) {}
+        try { if (typeof window.addEventListener === 'function') {
+            window.addEventListener('online', () => { renderWaitingChip(); drainScoreQueue(); });
+            window.addEventListener('offline', () => renderWaitingChip());
+        } } catch (e) {}
     }
 
     // THE TWO TEAM WRITERS ASK THE SAME TWO QUESTIONS THE INDIVIDUAL ONE DOES:
@@ -682,6 +851,75 @@
         keep.focus();
     }
 
+    // ---- A2: THE NEXT HOLE, IN THE ORDER THIS CARD PLAYS (mockup A2, -----
+    // approved 2026-11-08). Display only - every score is still stored under
+    // its real hole number. The rows are listed in play order from the card's
+    // starting hole (8 -> 18, then 1 -> 7) by tournamentPlayOrder, the next
+    // hole is nextHoleInPlayOrder over the card's own "played" rule, and the
+    // status line names it. No starting hole means hole 1 first: the order,
+    // the status and the list are exactly what they were.
+
+    // WHEN A HOLE COUNTS AS PLAYED ON A GROUP CARD - THE OPEN DECISION.
+    // EVERY golfer on the card has a score for it. Manny has not yet chosen
+    // between "every" and "any"; if he picks "any", the one change is
+    // `ids.every` -> `ids.some` on the line below.
+    // tournament_scorecard_wired_test.js names this function in its header.
+    function groupHolePlayed(scores, ids, hole) {
+        return ids.length > 0 && ids.every(pid => (scores[`${pid}_h${hole}`] || 0) > 0);
+    }
+
+    // The play-order note under the list, only when the order is not 1..18.
+    function playOrderSentence(order) {
+        if (!order.length) return '';
+        const nums = order.map(h => Number(h.hole));
+        const first = nums[0];
+        const min = Math.min(...nums), max = Math.max(...nums);
+        if (first === min) return '';
+        const before = nums[nums.length - 1];
+        return `Holes listed in play order: ${first} → ${max}, then `
+            + (before === min ? `${min}.` : `${min} → ${before}.`);
+    }
+
+    // WHAT EACH ROW IS. Applied AFTER setHolesListPreservingFocus, never in
+    // the markup it builds: the shape key is the markup, so a "played" label
+    // in it would rebuild the whole card on every score the golfer types.
+    function applyPlayState(order, isPlayed, next) {
+        order.forEach(h => {
+            const n = Number(h.hole);
+            const row = document.getElementById(`hole-row-${n}`);
+            if (!row || !row.classList) return;
+            const isNext = !!next && next.hole === n;
+            row.classList.toggle('is-next', isNext);
+            const st = row.querySelector ? row.querySelector('.hole-state') : null;
+            if (st) st.textContent = isPlayed(n) ? 'played' : (isNext ? 'next to play' : '');
+        });
+        const note = document.getElementById('play-order-note');
+        if (note) {
+            const sentence = playOrderSentence(order);
+            note.textContent = sentence;
+            note.style.display = sentence ? 'block' : 'none';
+        }
+    }
+
+    // MOVE TO THE NEXT HOLE when it changes. Not on an untouched card (its
+    // next hole is the top row already), and never under a golfer's thumb:
+    // if a box on the card has focus they are already driving, so that move
+    // is consumed without scrolling.
+    let lastScrolledNext = null;
+    function scrollToNextHole(order, next) {
+        if (!next || !order.length) return;
+        if (lastScrolledNext === null && next.hole === Number(order[0].hole)) { lastScrolledNext = next.hole; return; }
+        if (next.hole === lastScrolledNext) return;
+        lastScrolledNext = next.hole;
+        const list = document.getElementById('holes-list');
+        const active = document.activeElement;
+        if (active && active.tagName === 'INPUT' && list && typeof list.contains === 'function' && list.contains(active)) return;
+        const row = document.getElementById(`hole-row-${next.hole}`);
+        if (row && typeof row.scrollIntoView === 'function') {
+            setTimeout(() => row.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+        }
+    }
+
     function renderGroup(group) {
         // THE ROUND VIEW, NOT THE EVENT. Shadowing the outer currentData here is
         // deliberate: everything below reads course, format, scoring mode, groups and
@@ -730,17 +968,18 @@
         }
 
         let html = '';
-        const thruCount = {};
-        courseData.forEach(h => {
+        // A2: listed in play order from this group's tee; no tee = 1..18.
+        const order = tournamentPlayOrder(courseData, group.startingHole);
+        order.forEach(h => {
             html += `<div class="hole-row" id="hole-row-${h.hole}" style="flex-wrap:wrap;">
                 <div class="hole-info">
                     <span class="hole-num">Hole ${h.hole}</span>
                     <span class="hole-par">Par ${h.par}</span>
+                    <span class="hole-state"></span>
                 </div>
                 <div style="flex-basis:100%; display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">` +
                 ids.map(pid => {
                     const v = scores[`${pid}_h${h.hole}`];
-                    if (v && v > 0) thruCount[pid] = (thruCount[pid] || 0) + 1;
                     const first = (players[pid].name || '').split(' ')[0];
                     // WHERE THIS GOLFER GETS A SHOT. The card showed a handicap in
                     // the roster and never said which holes it fell on, which is
@@ -769,8 +1008,17 @@
         });
         setHolesListPreservingFocus(html, 'locked:' + roundLocked);
 
-        const played = Math.max(0, ...ids.map(pid => thruCount[pid] || 0));
-        document.getElementById('status-main').textContent = `Thru ${played}`;
+        // THRU AND NEXT READ ONE RULE: groupHolePlayed. "Thru" used to be the
+        // furthest any one golfer had got; it is now the holes the whole card
+        // has finished, so it can never disagree with the hole it says is next.
+        const isPlayed = (n) => groupHolePlayed(scores, ids, n);
+        const played = order.filter(h => isPlayed(Number(h.hole))).length;
+        const next = nextHoleInPlayOrder({ holes: courseData, startingHole: group.startingHole, isScored: isPlayed });
+        applyPlayState(order, isPlayed, roundLocked ? null : next);
+        if (!roundLocked) scrollToNextHole(order, next);
+        document.getElementById('status-main').textContent = (roundLocked || !next)
+            ? `Thru ${played}`
+            : (played === 0 ? `Enter Hole ${next.hole}` : `Next: Hole ${next.hole} · Par ${next.par}`);
         document.getElementById('status-sub').textContent = roundLocked
             ? (currentData.roundStatus === 'closed'
                 ? 'This round is closed — scores are final'
@@ -823,16 +1071,21 @@
 
         let thru = 0, total = 0, parPlayed = 0;
         let html = '';
+        // A2: listed in play order from this team's tee; no tee = 1..18. A hole
+        // is played exactly when it counts toward Thru below - one rule.
+        const order = tournamentPlayOrder(courseData, team.startingHole);
+        const playedHoles = {};
 
         if (format === 'scramble') {
-            courseData.forEach(h => {
+            order.forEach(h => {
                 const key = `team${myTeamNum}_h${h.hole}`;
                 const v = scores[key];
-                if (v && v > 0) { thru++; total += parseInt(v, 10); parPlayed += h.par; }
+                if (v && v > 0) { thru++; total += parseInt(v, 10); parPlayed += h.par; playedHoles[h.hole] = true; }
                 html += `<div class="hole-row" id="hole-row-${h.hole}">
                     <div class="hole-info">
                         <span class="hole-num">Hole ${h.hole}</span>
                         <span class="hole-par">Par ${h.par}</span>
+                        <span class="hole-state"></span>
                     </div>
                     <input type="number" class="hole-score-input" inputmode="numeric" min="1"
                         value="${v || ''}"
@@ -840,7 +1093,7 @@
                 </div>`;
             });
         } else {
-            courseData.forEach(h => {
+            order.forEach(h => {
                 const holeScores = [];
                 let playerCellsHtml = '';
                 team.players.forEach((p, pIdx) => {
@@ -856,12 +1109,12 @@
                 });
 
                 const teamHoleScore = computeTeamHoleScore(format, holeScores, shambleCountBest);
-                if (teamHoleScore !== null) { thru++; total += teamHoleScore; parPlayed += h.par; }
+                if (teamHoleScore !== null) { thru++; total += teamHoleScore; parPlayed += h.par; playedHoles[h.hole] = true; }
                 const resultText = teamHoleScore === null ? '' : `Team: ${teamHoleScore}`;
 
                 html += `<div class="hole-row-multi" id="hole-row-${h.hole}">
                     <div class="hole-info-row">
-                        <span><span class="hole-num">Hole ${h.hole}</span> <span class="hole-par">Par ${h.par}</span></span>
+                        <span><span class="hole-num">Hole ${h.hole}</span> <span class="hole-par">Par ${h.par}</span> <span class="hole-state"></span></span>
                         <span class="team-hole-result">${resultText}</span>
                     </div>
                     <div class="player-score-grid">${playerCellsHtml}</div>
@@ -879,25 +1132,31 @@
 
         // Starting hole is purely a display/navigation aid — the scored hole is always the
         // real golf hole (hole 8 is still hole 8, stored the same way regardless of when it
-        // was entered). Auto-scroll only fires once per page load, not on every score-driven
-        // re-render, so a teammate entering a score elsewhere doesn't yank the view back.
+        // was entered). The list now STARTS at the tee (A2), so the old once-per-load scroll
+        // to the starting row is gone: that row is the top. What moves the view is the NEXT
+        // hole changing (scrollToNextHole), never while a box on the card has focus.
         const startBanner = document.getElementById('starting-hole-banner');
         if (team.startingHole) {
             startBanner.style.display = 'block';
             startBanner.textContent = `🚀 Starting Hole: ${team.startingHole}`;
-            if (!hasAutoScrolled) {
-                hasAutoScrolled = true;
-                const startHoleNum = parseInt(team.startingHole, 10);
-                const targetRow = document.getElementById(`hole-row-${startHoleNum}`);
-                if (targetRow) setTimeout(() => targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
-            }
         } else {
             startBanner.style.display = 'none';
         }
 
+        const isPlayed = (n) => !!playedHoles[n];
+        const next = nextHoleInPlayOrder({ holes: courseData, startingHole: team.startingHole, isScored: isPlayed });
+        applyPlayState(order, isPlayed, roundLocked ? null : next);
+        if (!roundLocked) scrollToNextHole(order, next);
+
         const toPar = thru > 0 ? total - parPlayed : null;
         const toParStr = toPar === null ? '' : (toPar === 0 ? 'E' : (toPar > 0 ? `+${toPar}` : toPar));
-        document.getElementById('status-main').textContent = thru > 0 ? `Thru ${thru} — ${total} strokes` : `Enter Hole 1`;
+        // A2's words: "Enter Hole 8" before a stroke, then "Next: Hole 9 · Par 4"
+        // over "Thru 1 · 3 strokes · E". A finished or locked card keeps the
+        // line it always had.
+        const midRound = !roundLocked && !!next && thru > 0;
+        document.getElementById('status-main').textContent = midRound
+            ? `Next: Hole ${next.hole} · Par ${next.par}`
+            : (thru > 0 ? `Thru ${thru} — ${total} strokes` : `Enter Hole ${next ? next.hole : 1}`);
         // A GUARD THAT SILENTLY DROPS THE WRITE IS WORSE THAN NO GUARD.
         // Refusing the save while leaving eighteen live boxes on screen lets a
         // team enter a full round, watch the numbers sit there, and save none of
@@ -912,7 +1171,8 @@
             ? (currentData.roundStatus === 'closed'
                 ? 'This round is closed — scores are final'
                 : 'This round is not open for scoring yet')
-            : (toPar === null ? 'Enter your team\'s score below to get started' : `${toParStr} to par`);
+            : (toPar === null ? 'Enter your team\'s score below to get started'
+                : (midRound ? `Thru ${thru} · ${total} strokes · ${toParStr}` : `${toParStr} to par`));
         if (roundLocked) {
             document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
         }

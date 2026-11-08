@@ -27,6 +27,14 @@
 //
 // TESTS: 20 (final run of the finished file: 20 pass / 0 fail).
 //
+// WIRING WAVE (2026-11-08, mockup A3 approved by Manny). The last describe
+// block's three page pins were FLIPPED ON PURPOSE to the wired board: a
+// group-link golfer lands on their own flight with both golfers marked
+// (You), a team-link golfer on their own flight, and the source calls
+// golferLeaderboardView/defaultFlightFor/isMeRow. Still 20 tests, 20 pass.
+// Against c3b7a139's card those three fail and the other 17 pass
+// (17 / 3 / 0 / 20). The baseline and controls below are the logic wave's.
+//
 // BASELINE against 1fb1ef43 (tournament-engine.js sha256 3626301c...; the
 // scorecard is unchanged by this wave, a18e5dbf...), the engine swapped back to
 // that commit's copy and restored by sha from a saved copy:
@@ -246,7 +254,11 @@ describe('UNCHANGED: the existing engine outputs did not move', () => {
 });
 
 // ----------------------------------------------------------------------------
-// THE CARD TODAY - PRE-APPROVAL STATE.
+// THE CARD, WIRED (2026-11-08). These three pinned the PRE-APPROVAL board (whole
+// field, nobody marked on a group link, no new calls). Manny approved mockup A3
+// on 2026-11-08 and the wiring wave flipped them ON PURPOSE, still through the
+// page listener and the tab's own onclick. Both fixtures carry flights, so a
+// golfer who touches nothing now lands on their OWN flight.
 // ----------------------------------------------------------------------------
 const CODE = 'GLB1';
 function openBoard(query, record) {
@@ -267,26 +279,27 @@ function openBoard(query, record) {
     return String(sb.document.getElementById('leaderboard-list').innerHTML || '');
 }
 
-describe('PRE-APPROVAL STATE: the golfer board is unchanged by this wave', () => {
-    test('group-link golfer in the Championship flight: whole field shown, nobody marked (You)', () => {
+describe('WIRED (A3 approved 2026-11-08): the golfer board opens on their flight, (You) marked', () => {
+    test('group-link golfer in the Championship flight: their flight shown, both golfers marked (You)', () => {
         const html = openBoard('tourney=' + CODE + '&group=g1', singleIndividual());
-        ['Ann Lee', 'Bo Park', 'Cal Ruiz', 'Dee Fox'].forEach((n) => assert.ok(html.includes(n), 'positive: ' + n + ' on the board'));
-        assert.ok(!html.includes('(You)'), 'PRE-APPROVAL: wiring marks Ann and Bo');
-        // And the engine already knows who should be marked.
+        ['Ann Lee', 'Bo Park'].forEach((n) => assert.ok(html.includes(n), 'positive: ' + n + ' on the board'));
+        ['Cal Ruiz', 'Dee Fox'].forEach((n) => assert.ok(!html.includes(n), n + ' is B Flight, not on the default board'));
+        assert.equal((html.match(/\(You\)/g) || []).length, 2, 'flipped: Ann and Bo are marked');
         const me = { groupPlayerIds: GROUPS.g1.playerIds };
-        assert.equal(gv(singleIndividual(), {}).rows.filter((r) => engine.isMeRow(r, me)).length, 2);
+        assert.equal(gv(singleIndividual(), { flightId: 'fA' }).rows.filter((r) => engine.isMeRow(r, me)).length, 2);
     });
 
-    test('team-link golfer: (You) on their own team, by team number, as today', () => {
+    test('team-link golfer: (You) on their own team, on their own flight (B: Hawks only)', () => {
         const html = openBoard('tourney=' + CODE + '&team=2', singleTeam());
         assert.equal((html.match(/\(You\)/g) || []).length, 1);
         assert.match(html, /Hawks[^]*?\(You\)/);
-        ['Eagles', 'Owls'].forEach((n) => assert.ok(html.includes(n), 'positive: ' + n + ' still on the overall board'));
+        ['Eagles', 'Owls'].forEach((n) => assert.ok(!html.includes(n), n + ' is Championship, not on the default B board'));
     });
 
-    test('the scorecard does not call the new functions yet', () => {
+    test('the scorecard calls the new functions', () => {
         const src = fs.readFileSync(path.join(__dirname, 'tournament-scorecard.html'), 'utf8');
-        assert.match(src, /resolveLeaderboardView\(currentData, myRoundId\)/, 'positive: today\'s call is there');
-        assert.ok(!/golferLeaderboardView|defaultFlightFor|isMeRow/.test(src), 'wired before approval');
+        assert.match(src, /golferLeaderboardView\(data, \{/, 'positive: the board resolves through the golfer view');
+        assert.ok(/defaultFlightFor\(/.test(src) && /isMeRow\(/.test(src), 'wired');
+        assert.ok(!/resolveLeaderboardView\(currentData, myRoundId\)/.test(src), 'the pre-approval call is gone');
     });
 });

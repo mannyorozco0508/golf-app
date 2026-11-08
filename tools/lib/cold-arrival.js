@@ -497,6 +497,25 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
                 // put back: a screenshot of the first 844px of a trip page shows
                 // the header and nothing anybody asked about. Pushes the path and
                 // the byte count, so a check can fail when nothing was captured.
+                // { shot, viewportOnly: true } (2026-11-08) - what the PHONE SCREEN
+                // shows at its current scroll, at the given viewport (default
+                // 390x844) and 2x: no resize to the page height, so a scroll the
+                // page made by itself is what gets captured. Opt-in; every
+                // existing caller still gets the full-page shot.
+                if (step.shot && step.viewportOnly) {
+                    const vp = viewport || { width: 390, height: 844 };
+                    await rpc(ws, id++, 'Emulation.setDeviceMetricsOverride',
+                        { width: vp.width, height: vp.height, deviceScaleFactor: 2, mobile: true });
+                    await new Promise(r => setTimeout(r, 150));
+                    const shot = await rpc(ws, id++, 'Page.captureScreenshot', { format: 'png' });
+                    const data = shot.result && shot.result.data;
+                    if (!data) { value.push('no screenshot: ' + JSON.stringify(shot.error || {})); continue; }
+                    const buf = Buffer.from(data, 'base64');
+                    const out = path.isAbsolute(step.shot) ? step.shot : path.join(REPO_ROOT, step.shot);
+                    fs.writeFileSync(out, buf);
+                    value.push('shot ' + out + ' ' + buf.length + ' bytes ' + vp.width + 'x' + vp.height + ' @2x viewport');
+                    continue;
+                }
                 if (step.shot) {
                     const metrics = await rpc(ws, id++, 'Page.getLayoutMetrics', {});
                     const css = (metrics.result && (metrics.result.cssContentSize || metrics.result.contentSize)) || {};

@@ -23,6 +23,13 @@
 //
 // TESTS: 18 (final run of the finished file: 18 pass / 0 fail).
 //
+// WIRING WAVE (2026-11-08, mockup A2 approved by Manny). The last describe
+// block's five page pins were FLIPPED ON PURPOSE to the wired card: "Enter
+// Hole 8", rows 8..18 then 1..7, group card "Enter Hole 8", and the source
+// now calling tournamentPlayOrder/nextHoleInPlayOrder. Still 18 tests, 18
+// pass. Against c3b7a139's card those five fail and the 13 engine tests pass
+// (13 / 5 / 0 / 18). The baseline and controls below are the logic wave's.
+//
 // BASELINE against 1fb1ef43 (tournament-engine.js sha256 3626301c...; the
 // scorecard is unchanged by this wave, a18e5dbf...), the engine swapped back to
 // that commit's copy and restored by sha from a saved copy:
@@ -137,8 +144,11 @@ describe('Item 2. play order from the group\'s tee', () => {
 });
 
 // ----------------------------------------------------------------------------
-// THE CARD TODAY - PRE-APPROVAL STATE. These pin what a golfer sees NOW, through
-// the page's own listener. The wiring wave changes them on purpose.
+// THE CARD, WIRED (2026-11-08). These pinned the PRE-APPROVAL card ("Enter Hole
+// 1" under "Starting Hole: 8", rows 1..18). Manny approved mockup A2 on
+// 2026-11-08 and the wiring wave flipped all five ON PURPOSE, through the same
+// page listener, to what the approved card shows. The fuller user-path guard
+// is tournament_scorecard_wired_test.js.
 // ----------------------------------------------------------------------------
 const CODE = 'NXT1';
 function openCard(query, record) {
@@ -162,39 +172,40 @@ const groupEvent = () => ({ name: 'Shotgun Stroke', format: 'individual', scorin
     players: { pA: { id: 'pA', name: 'Ann Lee', handicap: '4' } },
     scoringGroups: { g1: { name: 'Group 1', playerIds: ['pA'], startingHole: '8' } }, scores: {} });
 
-describe('PRE-APPROVAL STATE: the card is unchanged by this wave', () => {
-    test('team card on a hole-8 start, no scores: still "Enter Hole 1" beside "Starting Hole: 8"', () => {
+describe('WIRED (A2 approved 2026-11-08): the card plays from its tee', () => {
+    test('team card on a hole-8 start, no scores: "Enter Hole 8" beside "Starting Hole: 8"', () => {
         const c = openCard('tourney=' + CODE + '&team=1', teamEvent());
-        assert.equal(c.text('status-main'), 'Enter Hole 1', 'PRE-APPROVAL: wiring flips this to "Enter Hole 8"');
+        assert.equal(c.text('status-main'), 'Enter Hole 8', 'flipped from the pre-approval "Enter Hole 1"');
         assert.equal(c.text('starting-hole-banner'), '🚀 Starting Hole: 8');
         assert.equal(c.text('status-sub'), "Enter your team's score below to get started");
     });
 
-    test('team card list is still printed 1..18 in card order', () => {
+    test('team card list is printed in play order: 8..18 then 1..7', () => {
         const c = openCard('tourney=' + CODE + '&team=1', teamEvent());
         const rows = [...c.list.matchAll(/id="hole-row-(\d+)"/g)].map((m) => Number(m[1]));
-        assert.deepEqual(rows, C18.map((h) => h.hole));
+        assert.deepEqual(rows, [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 1, 2, 3, 4, 5, 6, 7]);
     });
 
-    test('the engine already knows the answer the card does not show yet: 8', () => {
-        // The record the card was just fed, read with the card's own rule for "scored".
+    test('the card shows the engine answer: 8', () => {
         const rec = teamEvent();
         const hit = next({ holes: rec.courseData, startingHole: rec.teams.team1.startingHole,
             isScored: (h) => (rec.scores['team1_h' + h] || 0) > 0 });
         assert.equal(hit.hole, 8);
-        assert.equal(openCard('tourney=' + CODE + '&team=1', rec).text('status-main'), 'Enter Hole 1');
+        assert.equal(openCard('tourney=' + CODE + '&team=1', rec).text('status-main'), 'Enter Hole ' + hit.hole);
     });
 
-    test('individual group card on a hole-8 start: banner "Start on hole 8", status "Thru 0"', () => {
+    test('individual group card on a hole-8 start: banner "Start on hole 8", status "Enter Hole 8"', () => {
         const c = openCard('tourney=' + CODE + '&group=g1', groupEvent());
         assert.equal(c.text('starting-hole-banner'), '🚀 Start on hole 8');
-        assert.equal(c.text('status-main'), 'Thru 0', 'PRE-APPROVAL: no "Next: Hole N" yet');
+        assert.equal(c.text('status-main'), 'Enter Hole 8', 'flipped from the pre-approval "Thru 0"');
         assert.match(c.list, /id="hole-row-1"/);
+        assert.match(c.list, /^\s*<div class="hole-row" id="hole-row-8"/, 'hole 8 is the first row');
     });
 
-    test('the scorecard does not call the new functions yet (source, decoded escapes not needed: identifiers)', () => {
+    test('the scorecard calls the play-order functions (source, identifiers)', () => {
         const src = fs.readFileSync(path.join(__dirname, 'tournament-scorecard.html'), 'utf8');
-        assert.match(src, /`Enter Hole 1`/, 'positive: the slice of truth is there');
-        assert.ok(!/nextHoleInPlayOrder|tournamentPlayOrder/.test(src), 'wired before approval');
+        assert.match(src, /`Enter Hole \$\{/, 'positive: the status names a computed hole');
+        assert.ok(/nextHoleInPlayOrder\(/.test(src) && /tournamentPlayOrder\(/.test(src), 'wired');
+        assert.ok(!/`Enter Hole 1`/.test(src), 'the hard-coded hole 1 is gone');
     });
 });
