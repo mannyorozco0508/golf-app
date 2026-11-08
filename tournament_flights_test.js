@@ -478,9 +478,9 @@ describe('PAYOUTS — canonical, and deliberately still overall-only', () => {
         // which is a prize policy nobody has specified - per-flight money needs its
         // own pot per flight.
         const src = codeOf('tournament.html');
-        // Brace-matched: renderLeaderboard grew a multi-round branch and a fixed
-        // window stopped reaching the single-round assignment.
-        const start = src.indexOf('function renderLeaderboard()');
+        // Brace-matched: renderPayoutResults is the one place prize money is
+        // computed on this page.
+        const start = src.indexOf('function renderPayoutResults()');
         let depth = 0, end = src.indexOf('{', start);
         for (let i = end; i < src.length; i++) {
             if (src[i] === '{') depth++;
@@ -488,22 +488,22 @@ describe('PAYOUTS — canonical, and deliberately still overall-only', () => {
         }
         const fn = src.slice(start, end + 1);
 
-        // EVERY board caches the UNFILTERED field for the prize calculator - the
-        // single-round board, the round board and the combined board alike. Paying
-        // places from a filtered view would silently mean "3rd in the B flight takes
-        // third prize", which is a prize policy nobody has specified.
-        // RE-PINNED, wave 10. The three boards used to resolve themselves inline,
-        // one assignment each; they now share resolveLeaderboardView, which the
-        // printed sheet and the golfer's card also use. The RULE is unchanged and
-        // is what is asserted: the cache is taken WITHOUT a flight, so it is the
-        // whole field whichever view is on screen.
-        const cacheLine = /cachedLeaderboardRows = resolveLeaderboardView\(([^)]*)\)\.rows;/.exec(fn);
-        assert.ok(cacheLine, 'the payout cache must come from the shared resolution');
-        assert.ok(!/lbFlightId/.test(cacheLine[1]),
-            'the payout cache must be taken WITHOUT a flight - a filtered cache would '
+        // RE-PINNED, audit #1 (A1, 2026-11-08). The prize rows no longer come
+        // from a cache of the board view at all: renderPayoutResults asks
+        // resolvePrizeView(currentData), which takes the DATA only - no tab, no
+        // flight - and pays computeTournamentPayouts from exactly those rows.
+        // The RULE is unchanged and is what is asserted: whichever view is on
+        // screen, prizes pay out of the whole field.
+        assert.ok(start > 0 && fn.length > 200, 'positive: the slice is the prize renderer');
+        const prizeLine = /const prize = resolvePrizeView\(([^)]*)\);/.exec(fn);
+        assert.ok(prizeLine, 'prize rows must come from resolvePrizeView');
+        assert.ok(!/lbFlightId|lbRoundId/.test(prizeLine[1]),
+            'the prize rows must be taken WITHOUT a flight or tab - a filtered list would '
             + 'quietly mean "3rd in the B flight takes third prize"');
-        assert.ok(!/cachedLeaderboardRows = rows;|cachedLeaderboardRows = view\.rows;/.test(fn),
-            'no board may cache the flight-filtered rows it is displaying');
+        assert.match(fn, /computeTournamentPayouts\(prizeRows, spotAmounts\)/);
+        assert.match(fn, /const prizeRows = prize\.rows/);
+        assert.doesNotMatch(src, /cachedLeaderboardRows/,
+            'no board may cache the rows it is displaying for the prize list');
     });
 
     test('and the payout answer does not move when a flight is being viewed', () => {

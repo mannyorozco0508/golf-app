@@ -13,14 +13,39 @@
 // ('event' | round id), else the event total when the engine can compute one,
 // else nothing (never a list invented from a round nobody chose).
 //
-// NOT WIRED YET. Manny approves the mockups (A1 "Results are paid on") before
-// any visible change, so tournament.html still reads the tab. Section 5 pins
-// that pre-approval state on purpose: the wiring wave flips it deliberately.
+// WIRED (2026-11-08, mockup A1 approved). Section 5 used to pin the unwired
+// state; it was flipped deliberately and now asserts the wiring, each slice
+// with a positive assertion. Section 6 is the USER PATH in mini-dom: each
+// "phone" is a fresh realm fed through the page's own value listener, tabs
+// are tapped by running the onclick the page rendered, and no render
+// function is called by name.
 //
-// WHAT THIS CANNOT PROVE: anything on screen. It is engine-level plus a source
-// pin; the wiring wave needs a cold-arrival check on two "phones".
+// WHAT THIS CANNOT PROVE: layout, or anything only a browser shows (mini-dom
+// does not parse static markup, so the every-phone sentence is invisible
+// here). tools/tournament-prize-basis-check.js is two cold Chrome pages read
+// with innerText; tools/tournament-prize-basis-rules-check.js is the owner
+// write against the LIVE rules in the database emulator.
 //
-// COUNTS (final run of this file): 12 tests / 12 pass / 0 fail.
+// WIRING WAVE COUNTS (final run of this file): 22 tests / 22 pass / 0 fail.
+// BASELINE against c3b7a139 (tournament-nov7-build; tournament.html sha
+// 8e7736af47183984, unwired), this file as it stands: 22 tests / 12 pass /
+// 10 fail. The 12 that pass there: sections 1-4 (11, engine + payouts.js pin,
+// unchanged by the wiring) and 6 "a signed-in stranger ..." (1, vacuous on the
+// base: no control and no save function exist there). 11 + 1 = 12; 12 + 10 = 22.
+// WIRING CONTROLS (tournament.html mutated, restored by sha 9f630bc5 each time):
+//   C1 prize rows from the viewer's tab again         -> 5 fail here (+2 re-pins)
+//   C2 prize render moved back into the row renderer  -> 1 fail (source pin only;
+//      INERT on screen - applyManageGate re-renders the list on every snapshot)
+//   C3 save without the owner check                   -> 2 fail
+//   C4 unavailable basis lists rows anyway            -> 2 fail
+//   C5 watcher label never shown                      -> 2 fail
+//   C6 basis control shown to everyone                -> 2 fail
+//   C7 no choice highlighted                          -> 1 fail
+//   C8 single-round shows the control                 -> 1 fail
+//   C9 every-phone sentence changed                   -> 0 fail here (static
+//      markup; caught by the Chrome check, arm 1)
+//
+// PRE-WIRING COUNTS (logic wave, kept for the record): 12 tests / 12 pass / 0 fail.
 // BASELINE against pre-build tournaments-nov7-build a838f5a0 (tournament-engine.js
 // sha 3626301cf0c2a614, no resolvePrizeView): 12 tests / 4 pass / 8 fail. The 4
 // that pass there are the defect reproduction (2), the payouts.js pin (1) and
@@ -162,14 +187,141 @@ describe('4. PROTECTED', () => {
     });
 });
 
-describe('5. PRE-APPROVAL STATE (pinned on purpose; the wiring wave flips this)', () => {
-    test('tournament.html still fills the prize cache from the viewer\'s tab - NOT wired until A1 is approved', () => {
-        const src = fs.readFileSync(path.join(REPO_ROOT, 'tournament.html'), 'utf8');
-        const at = src.indexOf('function renderLeaderboard()');
-        const fn = src.slice(at, src.indexOf('\n    function ', at + 30));
-        assert.ok(fn.length > 200 && /resolveLeaderboardView\(currentData, lbRoundId, lbFlightId\)/.test(fn),
+describe('5. WIRED (A1 approved 2026-11-08; this section pinned the unwired state until then)', () => {
+    const SRC = () => fs.readFileSync(path.join(REPO_ROOT, 'tournament.html'), 'utf8');
+    const body = (src, sig) => {
+        const at = src.indexOf(sig);
+        return at < 0 ? '' : src.slice(at, src.indexOf('\n    function ', at + 30));
+    };
+    test('the prize renderer asks resolvePrizeView(currentData) - data only, no tab, no flight', () => {
+        const fn = body(SRC(), 'function renderPayoutResults()');
+        assert.ok(fn.length > 200 && /computeTournamentPayouts\(prizeRows, spotAmounts\)/.test(fn),
+            'positive: the slice is the prize renderer and it pays from prizeRows');
+        const m = /const prize = resolvePrizeView\(([^)]*)\);/.exec(fn);
+        assert.ok(m, 'the prize renderer does not call resolvePrizeView');
+        assert.equal(m[1].replace(/\s/g, ''), 'currentData||{}');
+        assert.match(fn, /const prizeRows = prize\.rows/);
+    });
+    test('no board view feeds the prize list any more', () => {
+        const src = SRC();
+        const lb = body(src, 'function renderLeaderboard()');
+        assert.ok(lb.length > 200 && /resolveLeaderboardView\(currentData, lbRoundId, lbFlightId\)/.test(lb),
             'positive: the slice is the board renderer');
-        assert.match(fn, /cachedLeaderboardRows = resolveLeaderboardView\(currentData, lbRoundId\)\.rows;/);
-        assert.doesNotMatch(src, /resolvePrizeView/, 'wired before Manny approved the mockup');
+        assert.doesNotMatch(src, /cachedLeaderboardRows/);
+        assert.match(lb, /\n        \}\n        renderPayoutSpotInputs\(\);\n    \}\n/,
+            'the prize list is re-rendered after the board, refused or not, as the function\'s last line');
+    });
+    test('an unavailable basis shows its reason and returns before any row is built', () => {
+        const fn = body(SRC(), 'function renderPayoutResults()');
+        const at = fn.indexOf('if (!prize.available)');
+        assert.ok(at > 0, 'no refusal branch');
+        const branch = fn.slice(at, fn.indexOf('return;', at) + 7);
+        assert.match(branch, /escapeHtml\(prize\.reason/);
+        assert.ok(at < fn.indexOf('computeTournamentPayouts('), 'the refusal must come before the allocator');
+    });
+    test('the save is the owner\'s, one path, event or a round that exists', () => {
+        const fn = body(SRC(), 'function setPayoutBasis(');
+        assert.ok(fn.length > 50 && /db\.ref\(`tournaments\/\$\{currentCode\}\/payoutBasis`\)\.set\(v\)/.test(fn),
+            'positive: setPayoutBasis writes payoutBasis');
+        assert.match(fn, /!canManage\(\)/);
+        assert.match(fn, /v !== 'event' && !\(currentData\.rounds \|\| \{\}\)\[v\]/);
     });
 });
+
+// ============================================================================
+// 6. THE USER PATH (mini-dom). Each "phone" is a fresh page realm: the record is
+// handed to the page's OWN value listener, a tab is tapped by running the
+// onclick the page itself rendered, and nothing here calls a render function by
+// name. What this CANNOT prove: layout, or what is visible on a real screen -
+// mini-dom has no layout and innerHTML is a string. That half is
+// tools/tournament-prize-basis-check.js, two cold Chrome pages, innerText.
+// ============================================================================
+describe('6. USER PATH: every phone shows the same prize list, whatever tab it is on', () => {
+    const vm = require('vm');
+    const { loadHtmlInlineScript } = require('./helpers/load-script.js');
+    const CODE = 'PRIZE1';
+    const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
+    const STRANGER = { uid: 'u-who', email: 'who@example.com', isAnonymous: false };
+    const owned = (d) => Object.assign(d, { ownerUid: OWNER.uid, courseName: 'Test GC', courseData: CD18, createdAt: 1, payoutSpots: [300, 100] });
+    function arrive(rec, user) {
+        const sb = loadHtmlInlineScript('tournament.html', [], { search: '?tourney=' + CODE });
+        sb.__dbHandlers.filter((x) => x.event === 'value' && new RegExp('tournaments/' + CODE + '$').test(x.path))
+            .forEach((x) => x.cb({ val: () => JSON.parse(JSON.stringify(rec)), exists: () => true }));
+        if (user) sb.__auth.setUser(user);
+        return sb;
+    }
+    const el = (sb, id) => sb.document.getElementById(id);
+    const html = (sb, id) => String(el(sb, id).innerHTML || '');
+    // Tap the rendered button whose label is `label` inside #id: run ITS onclick.
+    function tap(sb, id, label) {
+        const re = /<button[^>]*onclick="([^"]+)"[^>]*>([^<]*)<\/button>/g;
+        let m, hit = null;
+        while ((m = re.exec(html(sb, id)))) if (m[2] === label) hit = m[1];
+        assert.ok(hit, `no "${label}" button rendered in #${id}`);
+        vm.runInContext(hit, sb);
+    }
+
+    test('nothing saved: the phone on "Sunday" and the phone on "Event" show the same money', () => {
+        const a = arrive(owned(individualTwoRounds()), null);
+        const b = arrive(owned(individualTwoRounds()), null);
+        const boardBefore = html(a, 'leaderboard-list');
+        tap(a, 'lb-round-filter', 'Sunday');
+        assert.notEqual(html(a, 'leaderboard-list'), boardBefore, 'positive: the tab tap really moved phone A\'s board');
+        assert.notEqual(html(a, 'leaderboard-list'), html(b, 'leaderboard-list'), 'positive: the two boards differ');
+        assert.equal(html(a, 'payout-results'), html(b, 'payout-results'), 'two phones, two prize lists');
+        assert.match(html(b, 'payout-results'), /1st — Ann<\/span><span class="val-pos">\$300\.00/, 'positive: money is on the list');
+    });
+    test('a watcher sees "Paid on Event total" and the every-phone note, no control', () => {
+        const sb = arrive(owned(individualTwoRounds()), null);
+        assert.equal(el(sb, 'payout-basis-label').style.display, 'block');
+        assert.equal(html(sb, 'payout-basis-label'), 'Paid on <b>Event total</b>');
+        assert.equal(el(sb, 'payout-basis-note').style.display, 'block');
+        assert.equal(el(sb, 'payout-basis-control').style.display, 'none');
+        assert.equal(html(sb, 'payout-basis-control'), '');
+    });
+    test('saved on Sunday: both phones pay Sunday (Bob), and say so, whichever tab is open', () => {
+        const rec = () => owned(individualTwoRounds({ payoutBasis: 'r2' }));
+        const a = arrive(rec(), null), b = arrive(rec(), null);
+        tap(a, 'lb-round-filter', 'Saturday');
+        assert.equal(html(a, 'payout-results'), html(b, 'payout-results'));
+        assert.match(html(a, 'payout-results'), /1st — Bob<\/span><span class="val-pos">\$300\.00/);
+        assert.equal(html(a, 'payout-basis-label'), 'Paid on <b>Sunday</b>');
+    });
+    test('team event, nothing saved: the reason, never a list', () => {
+        const sb = arrive(owned(teamTwoRounds()), null);
+        assert.match(html(sb, 'payout-results'), /Choose which result the prizes are paid on\./);
+        assert.doesNotMatch(html(sb, 'payout-results'), /\$\d/);
+        assert.equal(el(sb, 'payout-basis-label').style.display, 'none');
+        tap(sb, 'lb-round-filter', 'Day 1');
+        assert.doesNotMatch(html(sb, 'payout-results'), /\$\d/, 'tapping a round must not invent a list');
+    });
+    test('the organizer sees "Results are paid on" with every choice, and a tap saves payoutBasis', () => {
+        const sb = arrive(owned(individualTwoRounds()), OWNER);
+        const ctl = html(sb, 'payout-basis-control');
+        assert.equal(el(sb, 'payout-basis-control').style.display, 'block');
+        assert.match(ctl, /Results are paid on/);
+        assert.match(ctl, /class="on"[^>]*>Event total</, 'nothing saved and the event total computes: Event total is on');
+        assert.deepEqual((ctl.match(/>([^<>]+)<\/button>/g) || []).map((x) => x.slice(1, -9)), ['Event total', 'Saturday', 'Sunday']);
+        tap(sb, 'payout-basis-control', 'Sunday');
+        const w = sb.__dbWrites.filter((x) => /payoutBasis/.test(x.path));
+        assert.deepEqual(plain(w), [{ path: 'tournaments/PRIZE1/payoutBasis', op: 'set', value: 'r2' }]);
+    });
+    test('a signed-in stranger gets no control, and the save refuses them', () => {
+        const sb = arrive(owned(individualTwoRounds()), STRANGER);
+        assert.equal(html(sb, 'payout-basis-control'), '');
+        assert.match(html(sb, 'payout-results'), /\$300\.00/, 'positive: the stranger still sees the prize list');
+        try { vm.runInContext("setPayoutBasis('r2')", sb); } catch (e) { /* no such function is also no write */ }
+        assert.deepEqual(sb.__dbWrites.filter((x) => /payoutBasis/.test(x.path)), []);
+    });
+    test('single-round event: no control, label or note - and the list still pays', () => {
+        const d = owned({ name: 'One day', format: 'scramble',
+            teams: { team1: { num: 1, name: 'Alpha', players: ['A'], handicap: 0 }, team2: { num: 2, name: 'Bravo', players: ['B'], handicap: 0 } },
+            scores: Object.assign({}, fill('team1', 4), fill('team2', 5)) });
+        const sb = arrive(d, OWNER);
+        ['payout-basis-control', 'payout-basis-label', 'payout-basis-note'].forEach((id) =>
+            assert.equal(el(sb, id).style.display, 'none', id + ' is showing on a single-round event'));
+        const w = arrive(d, null);
+        assert.match(html(w, 'payout-results'), /1st — Alpha<\/span><span class="val-pos">\$300\.00/);
+    });
+});
+
