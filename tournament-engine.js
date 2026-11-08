@@ -979,3 +979,125 @@ function tournamentScorePath(code, roundId, suffix) {
 function teamHoleKey(teamNum, hole) { return `team${teamNum}_h${hole}`; }
 function teamPlayerHoleKey(teamNum, playerIdx, hole) { return `team${teamNum}_p${playerIdx}_h${hole}`; }
 function playerHoleKey(playerId, hole) { return `${playerId}_h${hole}`; }
+
+// ===========================================================================
+// SHOTGUN: THE NEXT HOLE, IN THE ORDER THE GROUP ACTUALLY PLAYS (2026-11-07)
+//
+// LOGIC ONLY - NOTHING CALLS THESE YET. The golfer card still says "Enter Hole 1"
+// on a hole-8 start; wiring waits for Manny's approval of the mockup.
+// tournament_next_hole_test.js holds both the arithmetic and that pre-approval
+// state, so the wiring wave flips the page test deliberately.
+//
+// The card stays numbered 1..18 - a score on hole 8 is stored as hole 8 whenever
+// it was entered. Only the SEQUENCE starts at the group's tee and wraps 18 -> 1.
+//
+// NOT CALLED playOrder. play-order.js already declares a global playOrder for the
+// consumer pages, and plain function declarations collide across script tags.
+// The rotation is the same one (sort by number, rotate at the tee), and the test
+// holds the two in parity on numeric tees.
+//
+// startingHole is a LABEL, not a number: autoAssignShotgunHoles writes "1".."18"
+// and, past eighteen teams, "1A", "1B". Same reading as tournament.html's
+// parseHoleLabel - the wave letter says WHICH group on that tee, not a different
+// hole, so "8A" plays hole 8 first.
+// ===========================================================================
+
+// The hole number a starting-hole label names, or null for blank/garbage.
+function startingHoleNumber(label) {
+    const m = /^(\d+)\s*([A-Za-z]?)$/.exec(String(label === undefined || label === null ? '' : label).trim());
+    return m ? Number(m[1]) : null;
+}
+
+// THE HOLES IN PLAY ORDER. A rotation of the card, never a filter: every hole
+// appears once. A tee that is not a hole on this card (absent, garbage, a 12 on a
+// nine-hole round) plays from the first hole, because "in order" is the one
+// answer that is never wrong.
+function tournamentPlayOrder(holes, startingHole) {
+    const sorted = (holes || []).filter(h => h && !isNaN(Number(h.hole)))
+        .slice().sort((a, b) => Number(a.hole) - Number(b.hole));
+    const want = startingHoleNumber(startingHole);
+    const at = want === null ? -1 : sorted.findIndex(h => Number(h.hole) === want);
+    if (at <= 0) return sorted;
+    return sorted.slice(at).concat(sorted.slice(0, at));
+}
+
+// THE FIRST UNSCORED HOLE IN PLAY ORDER, as { hole, par }, or null when every
+// hole is scored. isScored(holeNumber) is the caller's own reading of the card,
+// so "scored" means exactly what the card's Thru count means. A hole skipped
+// mid-round (8 and 10 scored) is the next hole, not one past the furthest.
+function nextHoleInPlayOrder(opts) {
+    const o = opts || {};
+    const scored = typeof o.isScored === 'function' ? o.isScored : () => false;
+    const order = tournamentPlayOrder(o.holes, o.startingHole);
+    for (let i = 0; i < order.length; i++) {
+        const n = Number(order[i].hole);
+        if (!scored(n)) return { hole: n, par: order[i].par };
+    }
+    return null;
+}
+
+// ===========================================================================
+// THE GOLFER'S LEADERBOARD: A FLIGHT, OR THE EVENT TOTAL (2026-11-07)
+//
+// LOGIC ONLY - NOTHING CALLS THESE YET. tournament-scorecard.html still calls
+// resolveLeaderboardView(currentData, myRoundId) and marks (You) by team number.
+//
+// NO NEW STANDINGS. This is a selection in front of resolveLeaderboardView - the
+// same resolution the organizer's board makes with lbRoundId and lbFlightId - so a
+// golfer's B-flight board and the organizer's B-flight board are one call.
+// Team multi-round totals stay REFUSED: computeEventStandings refuses them, with
+// its sentence, and this passes the refusal through untouched.
+// ===========================================================================
+
+// scope 'round' (default) shows the round this link is for; 'event' the combined
+// standings. A single-round record ignores scope, exactly as resolveLeaderboardView
+// does. A flightId this event does not have falls back to Overall - the organizer
+// board's own rule for a flight deleted while it was being viewed.
+function golferLeaderboardView(data, opts) {
+    const o = opts || {};
+    const flights = (data && data.flights) || {};
+    const flightId = (o.flightId && flights[o.flightId]) ? o.flightId : null;
+    const selection = o.scope === 'event' ? 'event' : (o.roundId || null);
+    const v = resolveLeaderboardView(data, selection, flightId);
+    return { rows: v.rows, available: v.available, reason: v.reason,
+             kind: v.kind, title: v.title, flightId: flightId };
+}
+
+// THE GOLFER'S OWN FLIGHT, or null. A team link reads the team; a player id reads
+// the player; a group link reads its golfers, and answers only when every golfer
+// still in the group sits in the same flight - a mixed group has no single "own"
+// flight, and guessing one would show somebody the wrong board. A flight that no
+// longer exists is no flight.
+function defaultFlightFor(data, who) {
+    const d = data || {};
+    const w = who || {};
+    const flights = d.flights || {};
+    const known = fid => (fid && flights[fid]) ? fid : null;
+    if (w.playerId) return known(((d.players || {})[w.playerId] || {}).flightId);
+    if (w.teamNum !== undefined && w.teamNum !== null) {
+        return known(((d.teams || {})['team' + w.teamNum] || {}).flightId);
+    }
+    if (w.groupId) {
+        const scope = (isMultiRound(d) && w.roundId) ? roundView(d, w.roundId) : d;
+        const group = ((scope || {}).scoringGroups || {})[w.groupId];
+        const players = d.players || {};
+        const ids = ((group || {}).playerIds || []).filter(pid => players[pid] && !isWithdrawn(players[pid]));
+        if (!ids.length) return null;
+        const first = known(players[ids[0]].flightId);
+        return (first && ids.every(pid => players[pid].flightId === first)) ? first : null;
+    }
+    return null;
+}
+
+// IS THIS ROW THE GOLFER HOLDING THE PHONE. A team row by team number; a player
+// row - round or event - by player id against the group this link scores. Never
+// by position: a player row's num is its place in the field, and matching it
+// against a team number would mark a stranger.
+function isMeRow(row, me) {
+    const r = row || {};
+    const m = me || {};
+    if (r.entryType === 'team') {
+        return m.teamNum !== undefined && m.teamNum !== null && r.num === m.teamNum;
+    }
+    return !!r.playerId && (m.groupPlayerIds || []).indexOf(r.playerId) !== -1;
+}
