@@ -62,6 +62,10 @@ test-runs/
 .env.*
 !.env.example
 
+# Firebase Functions emulator secrets (stripe-functions/README.md, local round trip).
+.secret.local
+.runtimeconfig.json
+
 # wrangler's local secrets file, for `wrangler pages dev --binding`. THIS REPO'S
 # ROOT IS SERVED PUBLICLY BY CLOUDFLARE PAGES - measured: /package.json and
 # /build-shell.js both return 200, so any file here is a downloadable URL. A

@@ -25,7 +25,7 @@
 // Top-level folders that are not the site (some exist only on other branches).
 export const BLOCKED_DIRS = [
     'tools', 'helpers', 'docs', 'scripts', 'android', 'ios', 'gps-beta',
-    'firebase-functions', 'functions', 'test-runs', 'dist', 'www',
+    'firebase-functions', 'functions', 'stripe-functions', 'test-runs', 'dist', 'www',
     'node_modules', '.github', '.wrangler', '.git'
 ];
 

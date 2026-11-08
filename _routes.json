@@ -21,6 +21,8 @@
     "/gps-beta/*",
     "/firebase-functions",
     "/firebase-functions/*",
+    "/stripe-functions",
+    "/stripe-functions/*",
     "/functions",
     "/functions/*",
     "/test-runs",
