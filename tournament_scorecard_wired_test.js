@@ -45,7 +45,7 @@
 // file run, and the wired card restored by cp from a saved copy (sha
 // 2e186179... RESTORED-OK):
 //
-//   2 PASS / 15 FAIL / 0 cancelled / 17 tests.   2 + 15 = 17.
+//   all 17 tests: 2 PASS / 15 FAIL / 0 cancelled.   2 + 15 = 17.
 //
 // The 2 that pass at baseline are the lines this wave must NOT move: a
 // finished card's "Thru 18 — 72 strokes", and the untouched card with no

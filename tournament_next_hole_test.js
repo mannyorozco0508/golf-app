@@ -34,7 +34,7 @@
 // scorecard is unchanged by this wave, a18e5dbf...), the engine swapped back to
 // that commit's copy and restored by sha from a saved copy:
 //
-//   4 PASS / 14 FAIL / 0 cancelled / 18 tests.   4 + 14 = 18.
+//   all 18 tests: 4 PASS / 14 FAIL / 0 cancelled.   4 + 14 = 18.
 //
 // The file LOADS at baseline - the engine exists, only the new names do not -
 // so each engine test fails on "not a function"; nothing is cancelled. The 14

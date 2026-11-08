@@ -39,7 +39,7 @@
 // scorecard is unchanged by this wave, a18e5dbf...), the engine swapped back to
 // that commit's copy and restored by sha from a saved copy:
 //
-//   2 PASS / 18 FAIL / 0 cancelled / 20 tests.   2 + 18 = 20.
+//   all 20 tests: 2 PASS / 18 FAIL / 0 cancelled.   2 + 18 = 20.
 //
 // The file LOADS at baseline; the new names are missing, so every test that
 // reaches them fails on "not a function". The 2 that pass are page-only pins:
