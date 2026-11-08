@@ -795,6 +795,47 @@ function resolveLeaderboardView(data, selection, flightId) {
              title: round.name || 'Round' };
 }
 
+// PRIZE RESULTS READ ONE FIXED BASIS, NEVER THE BOARD TAB (audit #1, 2026-11-07).
+//
+// tournament.html filled the prize calculator from resolveLeaderboardView(data,
+// lbRoundId) - the tab the viewer happened to tap. On a multi-round event one
+// phone on "Round 2" and another on "Event" showed two different prize lists for
+// the same event, and a multi-round TEAM event showed "No scores yet" on the
+// Event tab with every team posted. Money shown must be the same on every phone,
+// so this takes the DATA only: no tab, no flight (prizes stay on the overall
+// field, as the comment in renderLeaderboard already decided).
+//
+// The basis is data.payoutBasis, set by the owner: 'event' or a round id. With
+// none saved it is the event total when the engine can work one out, and
+// otherwise NOTHING - a list is never invented from a round nobody chose.
+// The reason strings are DRAFTS awaiting Manny's mockup approval (A1).
+// PROTECTED-ADJACENT: ranking and payouts.js are untouched; this only chooses
+// which existing rows feed computeTournamentPayouts.
+function resolvePrizeView(data) {
+    data = data || {};
+    if (!isMultiRound(data)) {
+        return { basis: 'single', available: true, reason: null, title: null,
+                 rows: computeTournamentLeaderboard(data) };
+    }
+    const rounds = data.rounds || {};
+    const saved = data.payoutBasis || null;
+    if (saved && saved !== 'event') {
+        if (!rounds[saved]) {
+            return { basis: saved, available: false, rows: [], title: null,
+                     reason: 'The round these results were paid on is no longer part of this event. Choose again.' };
+        }
+        return { basis: saved, available: true, reason: null,
+                 rows: computeRoundLeaderboard(data, saved),
+                 title: rounds[saved].name || 'Round' };
+    }
+    const ev = computeEventStandings(data);
+    if (ev.available) {
+        return { basis: 'event', available: true, reason: null, rows: ev.rows || [], title: 'Event total' };
+    }
+    return { basis: saved, available: false, rows: [], title: null,
+             reason: saved === 'event' ? ev.reason : 'Choose which result the prizes are paid on.' };
+}
+
 // FLIGHTS FILTER THE FIELD; THEY DO NOT RANK IT DIFFERENTLY.
 //
 // A flight is a subset of the same competitors, standing in the same
