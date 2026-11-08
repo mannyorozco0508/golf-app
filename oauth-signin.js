@@ -246,6 +246,9 @@
         if (code === 'auth/popup-blocked') return NOTE_POPUP_BLOCKED;
         if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'
             || code === 'auth/user-cancelled') return NOTE_CANCELLED;
+        // Back from Google or Apple with no result: the golfer pressed Back or
+        // closed the page there. Nothing was linked or switched.
+        if (code === 'auth/redirect-cancelled') return NOTE_REDIRECT_CANCELLED;
         if (code === 'sdk-absent' || code === 'no-provider') return NOTE_NOT_READY;
         // An idToken Firebase will not accept, or a nonce that does not match the
         // one inside it. This is the native path's own failure mode.
@@ -357,6 +360,153 @@
         });
     }
 
+    // ========================================================================
+    // SIGN-IN BY REDIRECT ON THE WEBSITE (web-signin-redirect, 2026-11-07)
+    //
+    // WHY. Manny's live check on hardpangolf.com (TEAM-LOG 07:50): Chrome blocked
+    // the Google popup on the second try. A redirect cannot be blocked - the page
+    // itself goes to Google or Apple and comes back.
+    //
+    // WHY IT NEEDS THE PROXY. A redirect returns through <authDomain>/__/auth/
+    // handler, and the result is handed back to the page through an iframe on
+    // authDomain. With authDomain golfapp-9fb21.firebaseapp.com and the page on
+    // hardpangolf.com that iframe is THIRD-PARTY, and Safari (ITP), Firefox and
+    // Chrome M115+ partition its storage - so the redirect comes back with no
+    // result. Firebase's "Best practices for using signInWithRedirect on browsers
+    // that block third-party storage access" gives five options; this is
+    // OPTION 3, reverse-proxy /__/auth/ to firebaseapp.com: functions/_middleware.js
+    // forwards /__/auth/* and /__/firebase/* (GET and POST, transparently, never a
+    // 302) on the Pages project itself, and admin.html sets authDomain to the
+    // page's own host (authDomainFor below) on exactly the hosts listed here.
+    // Option 1 needs Firebase Hosting on the custom domain (not ours - Cloudflare
+    // Pages serves it); option 4 (self-hosted copies) "doesn't work for Apple
+    // sign-in" per the same page; option 5 means two more SDKs.
+    //
+    // ONLY THESE HOSTS. Each one also needs https://<host>/__/auth/handler on the
+    // Google OAuth client's redirect URIs and on the Apple Services ID's return
+    // URLs - console steps, not code. Every other host (a preview subdomain,
+    // rattlegolf.com, localhost, the native shell) keeps the firebaseapp.com
+    // authDomain and the POPUP, exactly as before: the popup is the fallback.
+    //
+    // THE UID GUARANTEE IS THE POPUP'S, STEP FOR STEP:
+    //   anonymous / provider not on the account -> linkWithRedirect  SAME uid
+    //   came back credential-already-in-use (second device), not deliberate
+    //       -> signInWithCredential(Firebase's credential off the error) - the
+    //          popup path's second signInWithPopup - and the note SAYS nothing
+    //          was copied (noteFor, unchanged). No credential on the error ->
+    //          one plain signInWithRedirect, the same move the popup makes.
+    //   a DELIBERATE link that comes back already-in-use -> refused, never adopted
+    //   nobody signed in, or provider already on the account -> signInWithRedirect
+    // The uid before the trip is kept in sessionStorage (this tab only) so the
+    // note after it is computed from the same before/after the popup uses.
+    // ========================================================================
+    var REDIRECT_HOSTS = ['hardpangolf.com', 'golf-app-5a5.pages.dev'];
+    var DEFAULT_AUTH_DOMAIN = 'golfapp-9fb21.firebaseapp.com';
+    var PENDING_KEY = 'hardpan_oauth_redirect_pending';
+    var PENDING_MAX_MS = 30 * 60 * 1000;
+    var NOTE_REDIRECT_CANCELLED = 'Sign-in was not finished. Nothing changed.';
+
+    function hostOf(h) {
+        if (h !== undefined) return String(h || '').toLowerCase();
+        try { return String((window.location && window.location.hostname) || '').toLowerCase(); } catch (e) { return ''; }
+    }
+    // The authDomain admin.html initialises Firebase with: the page's own host
+    // where the proxy answers, firebaseapp.com everywhere else.
+    function authDomainFor(hostname) {
+        var h = hostOf(hostname);
+        return REDIRECT_HOSTS.indexOf(h) !== -1 ? h : DEFAULT_AUTH_DOMAIN;
+    }
+    function storage() {
+        try { var s = window.sessionStorage; if (!s) return null; s.setItem(PENDING_KEY + '_probe', '1'); s.removeItem(PENDING_KEY + '_probe'); return s; } catch (e) { return null; }
+    }
+    function hasNativePlugin() {
+        try { return !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.FirebaseAuthentication); } catch (e) { return false; }
+    }
+    // A redirect is used only when ALL of these hold: a listed host, the app
+    // really was initialised with that host as authDomain (so the proxy is what
+    // the SDK will talk to), the SDK has the redirect calls, this tab can keep
+    // the before-uid, and there is no native sheet (the shell has its own path).
+    function redirectAvailable(auth) {
+        var h = hostOf();
+        if (REDIRECT_HOSTS.indexOf(h) === -1) return false;
+        if (hasNativePlugin()) return false;
+        if (!storage()) return false;
+        var a = auth || authInstance();
+        if (!a || typeof a.signInWithRedirect !== 'function' || typeof a.getRedirectResult !== 'function') return false;
+        try {
+            var opts = (a.app && a.app.options) || (firebase.app && firebase.app().options) || {};
+            if (String(opts.authDomain || '').toLowerCase() !== h) return false;
+        } catch (e) { return false; }
+        return true;
+    }
+    function readPending() {
+        var s = storage(); if (!s) return null;
+        try { var v = JSON.parse(s.getItem(PENDING_KEY) || 'null'); return v && v.which ? v : null; } catch (e) { return null; }
+    }
+    function writePending(p) { var s = storage(); if (s) { try { s.setItem(PENDING_KEY, JSON.stringify(p)); } catch (e) { /* no note after return */ } } }
+    function clearPending() { var s = storage(); if (s) { try { s.removeItem(PENDING_KEY); } catch (e) { /* nothing to clear */ } } }
+
+    // LEAVES THE PAGE. Resolves { redirecting: true } once the SDK has been asked
+    // to go; the page then navigates to Google or Apple. Rejects (and clears the
+    // pending note) when the SDK refuses before leaving.
+    function startRedirect(auth, which, provider, plan, deliberate, before, adopting) {
+        var user = auth.currentUser;
+        var link = plan.action === 'link' && user && typeof user.linkWithRedirect === 'function';
+        writePending({ v: 1, which: which, deliberate: !!deliberate, action: link ? 'link' : 'sign-in',
+            adopting: !!adopting, before: before ? { uid: before.uid, isAnonymous: before.isAnonymous } : null, at: Date.now() });
+        var go;
+        try { go = link ? user.linkWithRedirect(provider) : auth.signInWithRedirect(provider); }
+        catch (e) { clearPending(); return Promise.reject(e); }
+        return Promise.resolve(go).then(function () { return { redirecting: true, which: which }; },
+            function (err) { clearPending(); throw err; });
+    }
+
+    // BACK FROM GOOGLE OR APPLE. Called once on page load (admin.html, after the
+    // auth SDK is in). Resolves null when this tab started no redirect - an
+    // ordinary page load changes nothing and asks Firebase nothing. Otherwise
+    // resolves the same { uid, email, note, preserved } the popup does, plus
+    // which / deliberate, or rejects with a coded error for messageFor.
+    function resumeRedirect() {
+        var pending = readPending();
+        if (!pending) return Promise.resolve(null);
+        clearPending();   // one answer per trip, whatever happens below: never a loop
+        var auth = authInstance();
+        var tag = function (err) { try { err.which = pending.which; err.deliberate = !!pending.deliberate; } catch (e) { } return err; };
+        if (!auth || typeof auth.getRedirectResult !== 'function') {
+            return Promise.reject(tag(Object.assign(new Error('sdk-absent'), { code: 'sdk-absent' })));
+        }
+        if (!(Date.now() - (pending.at || 0) < PENDING_MAX_MS)) return Promise.resolve(null);
+        var before = pending.before && pending.before.uid ? { uid: String(pending.before.uid), isAnonymous: !!pending.before.isAnonymous } : null;
+        var which = pending.which;
+        function finish(cred) {
+            var after = snapshot((cred && cred.user) || auth.currentUser);
+            return { which: which, deliberate: !!pending.deliberate, via: 'redirect',
+                     uid: after ? after.uid : null, email: after ? after.email : null,
+                     note: noteFor(before, after),
+                     preserved: !!(before && after && String(before.uid) === String(after.uid)) };
+        }
+        return Promise.resolve(auth.getRedirectResult()).then(function (cred) {
+            if (!cred || !cred.user) {
+                throw Object.assign(new Error('redirect-cancelled'), { code: 'auth/redirect-cancelled' });
+            }
+            return finish(cred);
+        }).then(null, function (err) {
+            if (err && err.code === 'auth/redirect-cancelled') throw tag(err);
+            if (pending.deliberate) throw tag(err);                       // a deliberate link never adopts
+            if (pending.action !== 'link' || !isAdoptSignal(err)) throw tag(err);
+            // THE SECOND DEVICE, as the popup does it: sign in as the account that
+            // already holds this provider. Firebase's own credential off the error
+            // (a one-time pendingToken for Apple, so never a spent token).
+            var c = which === 'google' ? errorCredential(err) : appleAdoptCredential(err);
+            if (c && typeof auth.signInWithCredential === 'function') {
+                return Promise.resolve(auth.signInWithCredential(c)).then(finish, function (e2) { throw tag(e2); });
+            }
+            var provider = providerFor(which);
+            if (!provider || pending.adopting) throw tag(err);           // at most one extra trip
+            return startRedirect(auth, which, provider, { action: 'sign-in' }, false, before, true);
+        }).then(null, function (err) { logFailure(which, err); throw err; });
+    }
+
     function signInAttempt(which, opts) {
         var deliberate = !!(opts && opts.deliberateLink);
         var auth = authInstance();
@@ -365,6 +515,14 @@
         if (!provider) return Promise.reject(Object.assign(new Error('no-provider'), { code: 'no-provider' }));
         var before = snapshot(auth.currentUser);
         var plan = planOauth(auth.currentUser, which);
+
+        // BY REDIRECT, only when the caller asked for it (the two Account-panel
+        // taps) and this host can do it. Every other caller - the delete
+        // re-authentication included, which must not leave the page mid-delete -
+        // passes no `redirect` and gets the popup exactly as before.
+        if (opts && opts.redirect && redirectAvailable(auth)) {
+            return startRedirect(auth, which, provider, plan, deliberate, before, false);
+        }
 
         function finish(cred) {
             var after = snapshot((cred && cred.user) || auth.currentUser);
@@ -440,8 +598,15 @@
         adoptCredential: adoptCredential,
         appleAdoptCredential: appleAdoptCredential,
         signIn: signIn,
+        // web-signin-redirect (added): the redirect path, its hosts and its resume.
+        REDIRECT_HOSTS: REDIRECT_HOSTS.slice(),
+        authDomainFor: authDomainFor,
+        redirectAvailable: function () { return redirectAvailable(); },
+        resumeRedirect: resumeRedirect,
+        redirectPending: function () { return !!readPending(); },
         notes: { preserved: NOTE_PRESERVED, adopted: NOTE_ADOPTED, fresh: NOTE_FRESH,
                  cancelled: NOTE_CANCELLED, notEnabled: NOTE_NOT_ENABLED,
-                 popupBlocked: NOTE_POPUP_BLOCKED, notReady: NOTE_NOT_READY, generic: NOTE_GENERIC }
+                 popupBlocked: NOTE_POPUP_BLOCKED, notReady: NOTE_NOT_READY, generic: NOTE_GENERIC,
+                 redirectCancelled: NOTE_REDIRECT_CANCELLED }
     };
 })();

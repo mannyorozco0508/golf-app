@@ -75,9 +75,60 @@ export function notFound() {
     });
 }
 
+// ============================================================================
+// /__/auth/ AND /__/firebase/ ARE FIREBASE'S, FORWARDED (web-signin-redirect,
+// 2026-11-07). Firebase's "Best practices for using signInWithRedirect on
+// browsers that block third-party storage access", OPTION 3: "forward GET and
+// POST requests from https://<app domain>/__/auth/ to
+// https://<project>.firebaseapp.com/__/auth/", transparently - "this cannot be
+// done via a 302 Redirect". admin.html sets authDomain to this host on
+// hardpangolf.com and golf-app-5a5.pages.dev, so the sign-in handler and its
+// iframe are FIRST-PARTY and Safari / Chrome storage partitioning no longer
+// loses the redirect result. /__/firebase/ (init.json) is forwarded too, so the
+// handler finds the project's config on the same origin it runs on.
+//
+// Only these two prefixes, only to the one project's own firebaseapp.com host
+// (a fixed origin - nothing in the request picks where it goes), GET/HEAD/POST
+// only, never cached, and redirects are handed back to the browser untouched
+// (Google's and Apple's sign-in pages are where they point). Before this the
+// paths fell through to the SPA fallback (index.html, 200 - measured live).
+// ============================================================================
+export const AUTH_PROXY_ORIGIN = 'https://golfapp-9fb21.firebaseapp.com';
+export const AUTH_PROXY_PREFIXES = ['/__/auth/', '/__/firebase/'];
+const AUTH_PROXY_METHODS = ['GET', 'HEAD', 'POST', 'OPTIONS'];
+// Hop-by-hop and Cloudflare's own headers are not the browser's to forward.
+const AUTH_PROXY_DROP = ['host', 'cf-connecting-ip', 'cf-ipcountry', 'cf-ray', 'cf-visitor', 'cf-worker',
+    'x-forwarded-host', 'x-forwarded-proto', 'x-real-ip', 'connection', 'keep-alive', 'transfer-encoding', 'upgrade'];
+
+export function isAuthProxyPath(pathname) {
+    const p = String(pathname || '');
+    return AUTH_PROXY_PREFIXES.some((x) => p.startsWith(x)) && !/(^|\/)\.\.(\/|$)/.test(p) && !/%2e%2e/i.test(p);
+}
+
+export function authProxyTarget(requestUrl) {
+    const u = new URL(requestUrl);
+    return AUTH_PROXY_ORIGIN + u.pathname + u.search;
+}
+
+export async function authProxy(request, fetchImpl) {
+    const method = String(request.method || 'GET').toUpperCase();
+    if (!AUTH_PROXY_METHODS.includes(method)) {
+        return new Response('Method not allowed', { status: 405, headers: { Allow: AUTH_PROXY_METHODS.join(', '), 'Cache-Control': 'no-store' } });
+    }
+    const headers = new Headers(request.headers);
+    AUTH_PROXY_DROP.forEach((h) => headers.delete(h));
+    const init = { method, headers, redirect: 'manual' };
+    if (method === 'POST') init.body = await request.arrayBuffer();   // Apple posts its answer (form_post)
+    const res = await (fetchImpl || fetch)(authProxyTarget(request.url), init);
+    const out = new Headers(res.headers);
+    out.set('Cache-Control', 'no-store');
+    return new Response(method === 'HEAD' ? null : res.body, { status: res.status, statusText: res.statusText, headers: out });
+}
+
 export async function onRequest(context) {
     let pathname = '/';
     try { pathname = new URL(context.request.url).pathname; } catch (e) { /* treat as / */ }
+    if (isAuthProxyPath(pathname)) return authProxy(context.request);
     if (isBlockedPath(pathname)) return notFound();
     return context.next();
 }

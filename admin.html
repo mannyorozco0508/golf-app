@@ -2709,9 +2709,15 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
 
 <script>
     // --- DYNAMIC BETA TIME BOMB ---
+    // authDomain (web-signin-redirect, 2026-11-07): the page's OWN host on
+    // hardpangolf.com and golf-app-5a5.pages.dev, where functions/_middleware.js
+    // proxies /__/auth/ to firebaseapp.com so a sign-in by redirect is first-party
+    // (oauth-signin.js authDomainFor says why). Every other host - previews, the
+    // native shell, file:// - keeps "golfapp-9fb21.firebaseapp.com", as before.
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
-      authDomain: "golfapp-9fb21.firebaseapp.com",
+      authDomain: (window.oauthSignin && typeof window.oauthSignin.authDomainFor === 'function')
+          ? window.oauthSignin.authDomainFor(location.hostname) : "golfapp-9fb21.firebaseapp.com",
       databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
       projectId: "golfapp-9fb21",
       storageBucket: "golfapp-9fb21.firebasestorage.app",
@@ -9360,15 +9366,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
             'Sign-in is not ready yet. Wait a moment and try again.');
         var btn = document.getElementById(which === 'apple' ? 'oauth-link-apple' : 'oauth-link-google');
         tapBusy(btn, '\u23F3 Opening\u2026');
-        window.oauthSignin.signIn(which, { deliberateLink: true }).then(function (r) {
-            clearSignInFailures();
-            tapDone(btn, '\u2713 ' + (which === 'apple' ? 'Apple' : 'Google')
-                + ' linked \u2014 next time it is one tap on this account.');
-            refreshAccountState();
-            syncOauthLinkRow();
+        // BY REDIRECT where this host can (oauth-signin.js decides; the popup
+        // otherwise). A redirect resolves { redirecting } and the page leaves -
+        // the answer is written by resumeOauthRedirect when it comes back.
+        window.oauthSignin.signIn(which, { deliberateLink: true, redirect: true }).then(function (r) {
+            if (r && r.redirecting) return;
+            oauthLinkDone(btn, which);
         }, function (err) {
             tapFail(btn, window.oauthSignin.messageFor(err, { deliberateLink: true }));
         });
+    }
+    // THE LINK'S ANSWER, one writer for both ways it can come back (the popup's
+    // .then above, or resumeOauthRedirect after a redirect). Same words as before.
+    function oauthLinkDone(btn, which) {
+        clearSignInFailures();
+        tapDone(btn, '\u2713 ' + (which === 'apple' ? 'Apple' : 'Google')
+            + ' linked \u2014 next time it is one tap on this account.');
+        refreshAccountState();
+        syncOauthLinkRow();
     }
 
     // A SIGN-IN THAT WORKED CLEARS EVERY SIGN-IN FAILURE ON THE SHEET (2026-10-09):
@@ -9390,16 +9405,62 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         // next to the button and is scrolled into view - the two things missing
         // every time Manny reported a button as doing nothing.
         tapBusy(btn, '\u23F3 Opening\u2026');
-        window.oauthSignin.signIn(which).then(function (r) {
-            clearSignInFailures();
-            tapDone(btn, '\u2713 Signed in' + (r && r.email ? ' as ' + r.email : '')
-                + (r && r.preserved ? ' \u2014 your rounds and trial stay on this account.' : ''));
-            refreshAccountState();
-            if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
+        // BY REDIRECT where this host can, the popup otherwise (see oauthLinkTap).
+        window.oauthSignin.signIn(which, { redirect: true }).then(function (r) {
+            if (r && r.redirecting) return;
+            oauthSignedInDone(btn, r);
         }, function (err) {
             tapFail(btn, window.oauthSignin.messageFor(err));
         });
     }
+    // THE SIGN-IN'S ANSWER, one writer for the popup and the redirect. Same words.
+    function oauthSignedInDone(btn, r) {
+        clearSignInFailures();
+        tapDone(btn, '\u2713 Signed in' + (r && r.email ? ' as ' + r.email : '')
+            + (r && r.preserved ? ' \u2014 your rounds and trial stay on this account.' : ''));
+        refreshAccountState();
+        if (typeof syncMyGroupsVisibility === 'function') syncMyGroupsVisibility();
+    }
+
+    // BACK FROM GOOGLE OR APPLE (web-signin-redirect). Runs once per page load,
+    // after auth-boot.js has the auth SDK in (authReady settles either way). A
+    // load that started no redirect does nothing at all - oauth-signin.js reads
+    // its own sessionStorage note and asks Firebase nothing. One that did opens
+    // the Account panel and writes the answer beside the button that was
+    // pressed, in the same words the popup uses.
+    function resumeOauthRedirect() {
+        const O = window.oauthSignin;
+        if (!O || typeof O.redirectPending !== 'function' || !O.redirectPending()) return Promise.resolve(null);
+        return O.resumeRedirect().then(function (r) {
+            if (!r || r.redirecting) return r;
+            openAccountPanel();
+            if (r.deliberate) oauthLinkDone(document.getElementById(r.which === 'apple' ? 'oauth-link-apple' : 'oauth-link-google'), r.which);
+            else oauthSignedInDone(document.getElementById(r.which === 'apple' ? 'oauth-apple' : 'oauth-google'), r);
+            return r;
+        }, function (err) {
+            openAccountPanel();
+            const which = err && err.which;
+            const id = (err && err.deliberate) ? (which === 'apple' ? 'oauth-link-apple' : 'oauth-link-google')
+                : (which === 'apple' ? 'oauth-apple' : 'oauth-google');
+            tapFail(document.getElementById(id), O.messageFor(err, { deliberateLink: !!(err && err.deliberate) }));
+            return null;
+        });
+    }
+    (function () {
+        const go = function () { try { resumeOauthRedirect(); } catch (e) { /* never blocks the page */ } };
+        const ready = window.authReady;
+        if (ready && typeof ready.then === 'function') ready.then(go, go);
+        // BACK BUTTON FROM GOOGLE OR APPLE. The page can come back from the
+        // back-forward cache with the tapped button still on "Opening..." and
+        // disabled. Nothing finished, so it gets its label back.
+        window.addEventListener('pageshow', function (ev) {
+            if (!ev || !ev.persisted) return;
+            ['oauth-apple', 'oauth-google', 'oauth-link-apple', 'oauth-link-google'].forEach(function (id) {
+                const b = document.getElementById(id);
+                if (b && b.disabled && typeof tapRestore === 'function') tapRestore(b);
+            });
+        });
+    })();
     // The email card is the FALLBACK, shown only when asked for. It is unchanged
     // otherwise - same form, same handlers, same guarantees.
     // THE STATE IS A VARIABLE, NOT A READ OF style.display. mini-dom does not parse
@@ -9751,7 +9812,24 @@ Next group..." oninput="previewPastedPlayers()"></textarea>
         const linked = accountIsLinked();
         // Signed in by any way (Apple, Google, the email link): no failure note from
         // an earlier attempt stays on the sheet.
-        if (linked && typeof clearSignInFailures === 'function') clearSignInFailures();
+        // ONCE PER ACCOUNT, NOT ON EVERY REPAINT (web-signin-redirect). This ran on
+        // every refresh, and the panel's own MutationObserver refreshes on every
+        // write in the panel - so a failure note written to a SIGNED-IN account
+        // (Link Google refused: "already attached to a different account") was
+        // deleted the instant it appeared, measured in real Chrome. Now the sheet
+        // is cleared when the signed-in account CHANGES (the case the 2026-10-09
+        // note above clearSignInFailures is about), and a refusal shown to the
+        // account that is still here stays on screen. The marker is an attribute,
+        // which the observer does not watch.
+        if (linked && typeof clearSignInFailures === 'function') {
+            let nowUid = '';
+            try { const cu = firebase.auth().currentUser; nowUid = String((cu && cu.uid) || ''); } catch (e) { nowUid = ''; }
+            const sheet = document.getElementById('account-modal');
+            if (!sheet || sheet.getAttribute('data-failures-cleared-for') !== nowUid) {
+                clearSignInFailures();
+                if (sheet) sheet.setAttribute('data-failures-cleared-for', nowUid);
+            }
+        }
         if (typeof syncOauthCard === 'function') syncOauthCard();
         // The beta switch lives in this panel now, so it repaints with the panel -
         // including the moment a sign-in completes without the panel closing (v214's

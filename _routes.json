@@ -3,6 +3,8 @@
   "include": [
     "/",
     "/api/*",
+    "/__/auth/*",
+    "/__/firebase/*",
     "/tools",
     "/tools/*",
     "/helpers",
