@@ -249,7 +249,8 @@ test('H7. a multicast that throws is logged, not fatal: pushed counts only what 
 // ---------------------------------------------------------------- (c) index.js
 test('X1. index.js exports sendAnnouncement beside the three Stripe functions: us-central1, a callable, NO Stripe secret bound', SKIP, async () => {
     const m = req('index.js');
-    assert.deepEqual(Object.keys(m).sort(), ['createEntryCheckout', 'refundEntry', 'sendAnnouncement', 'stripeWebhook']);
+    // RE-PINNED at the event-tools merge (2026-11-09): E4 adds approvePhoto, hidePhoto, photoLinks, reportPhoto.
+    assert.deepEqual(Object.keys(m).sort(), ['approvePhoto', 'createEntryCheckout', 'hidePhoto', 'photoLinks', 'refundEntry', 'reportPhoto', 'sendAnnouncement', 'stripeWebhook']);
     const ep = m.sendAnnouncement.__endpoint;
     assert.deepEqual(ep.region, ['us-central1']);
     assert.ok(ep.callableTrigger);
