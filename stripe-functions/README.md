@@ -98,3 +98,23 @@ the rules block in the DB emulator against LIVE rules.
 **Not proven: any call to Stripe's real API** (session creation, refunds, the PaymentIntent
 lookup, the real webhook payload shapes for this API version). That needs test keys and the
 round trip above.
+
+## Photo wall (E4, 2026-11-09): four more callables in this codebase
+`photoLinks`, `approvePhoto`, `hidePhoto`, `reportPhoto` (photo-handlers.js; no Stripe, no secret,
+no money). They move files in bucket `golfapp-9fb21.firebasestorage.app` under
+`tournamentPhotos/<code>/{pending,shown,hidden}/` and the meta under `tournamentPhotoMeta/<code>/`.
+A plain `--only functions:tournaments-stripe` deploy ships them WITH the Stripe functions. To ship one
+feature alone, name the functions: `--only functions:tournaments-stripe:approvePhoto,functions:tournaments-stripe:hidePhoto,...`.
+They need `storage.rules` (repo root; `--only storage`) and the E4 database block published first,
+or a golfer's post is refused. `photoLinks` signs 10-minute v4 URLs: the default compute service
+account already has Service Account Token Creator (granted 2026-11-03 for chat photos).
+
+### Deleting hidden photos (Phase 1: BY HAND, 7 days after the event)
+Hide moves a photo to `tournamentPhotos/<code>/hidden/<id>.jpg` and its meta to
+`tournamentPhotoMeta/<code>/hidden/<id>` (with `hiddenAt`). Seven days after the event date:
+```
+gsutil -m rm "gs://golfapp-9fb21.firebasestorage.app/tournamentPhotos/<CODE>/hidden/**"
+npx firebase-tools database:remove "/tournamentPhotoMeta/<CODE>/hidden" --project golfapp-9fb21 --instance golfapp-9fb21-default-rtdb
+```
+Only `hidden/` - never `shown/` (the recap) or `pending/` (not yet checked). No scheduled function yet.
+Tests: `node --test tournament_photo_handlers_test.js tournament_photo_storage_rules_test.js`.
