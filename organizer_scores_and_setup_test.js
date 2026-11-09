@@ -149,8 +149,11 @@ describe('4. canWritePlayer HONOURS THE ORGANIZER\'S PICKED GROUP', () => {
         assert.match(fn, /playerGroupOf\(playerId\)/, 'the pick is not limited to that group’s golfers');
         // Every existing gate is still there, ahead of it.
         assert.match(fn, /roundSuperseded\(\)/);
-        assert.match(fn, /hpSpectating\(\)/);
-        assert.match(fn, /hpKeyState !== 'none' && hpKeyState !== 'ok'/);
+        // The GPS-only gates (GPS:BEGIN blocks) exist only in the app build; the web build strips them.
+        if (/function hpSpectating\(/.test(IDX)) {
+            assert.match(fn, /hpSpectating\(\)/);
+            assert.match(fn, /hpKeyState !== 'none' && hpKeyState !== 'ok'/);
+        }
         assert.match(fn, /frOrganizerEditContext && hasOrganizerAuthority\(\)/);
         assert.ok(!/meId/.test(fn), 'scoring scope must not come from personal identity');
     });
