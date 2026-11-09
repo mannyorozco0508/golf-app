@@ -378,11 +378,23 @@ describe('e) and f) CREATING a tournament', () => {
 // ===========================================================================
 describe('g) tournament-scorecard.html: no auth SDK, no sign-in, no change', () => {
 
-    test('the scorecard loads no auth SDK and calls no auth API', () => {
+    // RE-PINNED ON PURPOSE (E4 photo wall, plan section 4 approved 2026-11-09:
+    // "uploads only to pending/ by an anonymous-auth uid on the scorecard page").
+    // The page still loads NO auth SDK on arrival and never signs anyone in with
+    // an account: the auth SDK is fetched, and an ANONYMOUS session made, only
+    // inside photoIdToken - i.e. when a golfer taps "Post to the event wall".
+    // Nothing a golfer sees is a sign-in.
+    test('the scorecard loads no auth SDK on arrival; the only auth use is the anonymous session a photo post makes', () => {
         const src = read('tournament-scorecard.html');
-        assert.ok(!/firebase-auth-compat/.test(src), 'the scorecard must not download the sign-in SDK');
-        assert.ok(!/firebase\.auth\(/.test(src), 'the scorecard must not call firebase.auth()');
-        assert.ok(!/onAuthStateChanged|signInWith|signOut/.test(src));
+        assert.ok(!/<script[^>]+firebase-auth-compat/.test(src), 'the scorecard must not download the sign-in SDK on arrival');
+        assert.ok(!/onAuthStateChanged|signInWith|signOut/.test(src), 'no listener, no account sign-in, no sign-out');
+        const at = src.indexOf('function photoIdToken(');
+        assert.ok(at > -1, 'positive: the photo post path exists');
+        const body = src.slice(at, src.indexOf('\n    function ', at + 30));
+        assert.match(body, /signInAnonymously\(\)/, 'positive: the session it makes is anonymous');
+        const outside = src.slice(0, at) + src.slice(at + body.length);
+        assert.ok(!/firebase-auth-compat/.test(outside), 'the auth SDK is loaded nowhere else');
+        assert.ok(!/firebase\.auth\(/.test(outside), 'firebase.auth() is called nowhere else');
     });
 
     test('loaded, the scorecard registers no auth listener', () => {

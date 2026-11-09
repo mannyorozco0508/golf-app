@@ -341,8 +341,16 @@ test('R2. refundEntry refusals: non-owner, signed-out, cash-paid, already refund
 // ---------------------------------------------------------------- the deployed wrappers (index.js)
 test('X1. index.js: exports exactly the three contract functions, us-central1, both secrets bound, HttpsError carries details.reason', SKIP, async () => {
     const m = require(path.join(FN, 'index.js'));
-    assert.deepEqual(Object.keys(m).sort(), ['createEntryCheckout', 'refundEntry', 'stripeWebhook']);
-    for (const k of Object.keys(m)) {
+    // E4 (2026-11-09) adds the four photo-wall callables to this codebase - re-pinned on purpose. They
+    // bind NO secret (no Stripe in them); the three Stripe functions below are pinned exactly as before.
+    const PHOTO = ['approvePhoto', 'hidePhoto', 'photoLinks', 'reportPhoto'];
+    assert.deepEqual(Object.keys(m).sort(), ['approvePhoto', 'createEntryCheckout', 'hidePhoto', 'photoLinks', 'refundEntry', 'reportPhoto', 'stripeWebhook']);
+    for (const k of PHOTO) {
+        assert.deepEqual(m[k].__endpoint.region, ['us-central1'], k);
+        assert.ok(m[k].__endpoint.callableTrigger, k + ' is a callable');
+        assert.ok(!(m[k].__endpoint.secretEnvironmentVariables || []).length, k + ' binds no Stripe secret');
+    }
+    for (const k of ['createEntryCheckout', 'refundEntry', 'stripeWebhook']) {
         assert.deepEqual(m[k].__endpoint.region, ['us-central1'], k);
         assert.deepEqual(m[k].__endpoint.secretEnvironmentVariables.map((s) => s.key).sort(), ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'], k);
     }

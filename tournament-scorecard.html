@@ -40,6 +40,8 @@
     <!-- E2 contest holes: the one ranking and entry builder this page and
          tournament.html share (tournament-contests.js). -->
     <script src="tournament-contests.js"></script>
+    <!-- E4: the photo wall's paths and builders (tournament-photos.js). -->
+    <script src="tournament-photos.js"></script>
     <!-- Scores typed with no signal are kept in this phone's storage until the
          server confirms them, so closing the tab cannot lose them. The shared
          queue, unmodified; the page files it under its own storage key. -->
@@ -67,6 +69,7 @@
         .top-nav-bar { display: flex; gap: 6px; margin-bottom: 14px; }
         .top-nav-item { flex: 1; padding: 10px; text-align: center; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; cursor: pointer; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
+        .top-nav-bar.compact .top-nav-item { padding: 10px 2px; font-size: 0.8rem; white-space: nowrap; }
 
         .event-title { text-align: center; font-size: 1.3rem; font-weight: bold; color: var(--brand-green); margin-bottom: 2px; }
         .event-sub { text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 4px; }
@@ -157,6 +160,24 @@
         .cb-row .cb-val { font-weight: 800; white-space: nowrap; }
         .cb-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; color: var(--text-muted); padding: 8px 0 2px 0; }
         .cb-note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+        /* E4a photo post (approved "as mocked" 2026-11-09). */
+        .ph-pick { position: relative; display: flex; align-items: center; justify-content: center; height: 220px; border-radius: 14px; overflow: hidden; background: linear-gradient(135deg, #7aab68, #2f6e4f); cursor: pointer; margin-bottom: 12px; }
+        .ph-pick img { width: 100%; height: 100%; object-fit: cover; }
+        .ph-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .ph-empty { color: #ffffff; font-weight: bold; font-size: 1rem; }
+        .ph-tag { position: absolute; left: 8px; bottom: 8px; background: rgba(20, 40, 25, 0.85); color: #ffffff; font-weight: bold; font-size: 0.82rem; border-radius: 8px; padding: 4px 8px; }
+        .ph-cap-label { display: block; font-size: 0.85rem; font-weight: bold; color: #555; margin-bottom: 6px; }
+        .ph-caption { width: 100%; box-sizing: border-box; border: 1px solid var(--border-mid); border-radius: 12px; padding: 12px; font-size: 1rem; font-family: inherit; margin-bottom: 10px; }
+        .ph-post { width: 100%; background: var(--brand-navy); color: #ffffff; border: 0; border-radius: 12px; padding: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .ph-post:disabled { opacity: 0.5; }
+        .ph-msg { min-height: 16px; text-align: center; font-size: 0.82rem; font-weight: bold; margin-top: 8px; }
+        .ph-msg.ok { color: var(--brand-green); }
+        .ph-msg.err { color: var(--accent-red); }
+        .ph-note { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: 8px 0 14px 0; }
+        .ph-wall { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .ph-tile { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 4 / 3; background: var(--nav-bg); }
+        .ph-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .ph-report { position: absolute; right: 6px; top: 6px; background: rgba(255,255,255,0.85); border: 0; border-radius: 8px; font-size: 0.72rem; padding: 3px 6px; cursor: pointer; color: #444; font-family: inherit; }
         /* M6: the HardPan Tournaments bar (same rules as tournament.html). */
         .hp-brand { display: flex; align-items: center; gap: 10px; background: #0f4c3a; color: #ffffff; margin: -12px -12px 12px -12px; padding: 12px 16px; }
         .hp-brand-mark { width: 30px; height: 30px; border-radius: 8px; background: #0B0F0C; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
@@ -178,6 +199,8 @@
         <span class="top-nav-item" id="tab-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</span>
         <!-- E2c: shown only when the event has contest holes. -->
         <span class="top-nav-item" id="tab-btn-contests" style="display:none;" onclick="showTab('contests')">🎯 Contests</span>
+        <!-- E4a: shown on a link that carries its scoring key (posting needs it). -->
+        <span class="top-nav-item" id="tab-btn-photos" style="display:none;" onclick="showTab('photos')">📷 Photos</span>
     </div>
 
     <div class="event-title" id="event-title"></div>
@@ -230,6 +253,24 @@
     <div id="tab-contests" style="display:none;">
         <div id="contest-board"></div>
     </div>
+
+    <!-- E4a: post a photo to the event wall. It waits for the organizer;
+         nothing shows until they say yes. The phone resizes to 1600 px and
+         re-encodes it (no location leaves the phone). -->
+    <div id="tab-photos" style="display:none;">
+        <label class="ph-pick" id="photo-pick">
+            <img id="photo-preview" alt="" style="display:none;">
+            <span class="ph-empty" id="photo-empty">📷 Tap to choose a photo</span>
+            <span class="ph-tag" id="photo-tag" style="display:none;">Your photo</span>
+            <input type="file" id="photo-file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp" onchange="photoChosen(this)">
+        </label>
+        <label class="ph-cap-label" for="photo-caption">Caption (optional)</label>
+        <input type="text" class="ph-caption" id="photo-caption" maxlength="120">
+        <button type="button" class="ph-post" id="photo-post" onclick="postPhoto()">Post to the event wall</button>
+        <div class="ph-msg" id="photo-msg" aria-live="polite"></div>
+        <p class="ph-note">The organizer approves photos before anyone sees them.<br>Photos of other golfers: ask first.</p>
+        <div class="ph-wall" id="photo-wall"></div>
+    </div>
 </div>
 
 <div class="container" id="error-content" style="display:none; text-align:center;">
@@ -259,7 +300,7 @@
 
     let boardTabOpen = false;   // the Leaderboard tab is on screen: snapshots re-render it
     // The page's tabs. Contests (E2c) is drawn only on an event with contest holes.
-    const CARD_TABS = ['scorecard', 'leaderboard', 'contests'];
+    const CARD_TABS = ['scorecard', 'leaderboard', 'contests', 'photos'];
     function showTab(tab) {
         boardTabOpen = (tab === 'leaderboard');
         CARD_TABS.forEach((k) => {
@@ -270,6 +311,7 @@
         });
         if (tab === 'leaderboard') renderLeaderboard();
         if (tab === 'contests') renderContestBoard();
+        if (tab === 'photos') { bindPhotoWall(); renderPhotoWall(); }
     }
 
     // ONE SCORING SURFACE, TWO SCOPES.
@@ -1257,9 +1299,9 @@
     // confirmed a winner. It goes once every golfer on the card has an entry, or
     // when "Not on the green" is tapped.
     //
-    // TYPED ONLY ON THE WEB. The app's GPS mark (HardPanMark: gps-kp.js /
+    // TYPED ONLY ON THE WEB. The app's GPS mark (the shared Mark button: gps-kp.js /
     // gps-longdrive.js) is not on this page: the tournament record carries no
-    // link to a HardPan GPS course (gps_links / gps_courses), those records need
+    // link to a mapped GPS course (gps_links / gps_courses), those records need
     // a signed-in reader, and this page has no sign-in and no GPS code. So no
     // "Mark with GPS" box is drawn here, and nothing here asks for a location.
     // A GPS-marked entry from the app shows on the board with its pin.
@@ -1316,10 +1358,14 @@
             const b = document.getElementById('tab-btn-' + k);
             if (b && CARD_TAB_WORDS[k]) b.textContent = CARD_TAB_WORDS[k][compact ? 1 : 0];
         });
+        const bar = btns.length ? btns[0].parentNode : null;
+        if (bar && bar.classList) bar.classList.toggle('compact', compact);
     }
     function renderContestArea() {
         const tabBtn = document.getElementById('tab-btn-contests');
         if (tabBtn) tabBtn.style.display = contestsOn() ? '' : 'none';
+        const photoBtn = document.getElementById('tab-btn-photos');
+        if (photoBtn) photoBtn.style.display = photosOn() ? '' : 'none';
         syncCardTabs();
         renderContestPrompt();
         const panel = document.getElementById('tab-contests');
@@ -1418,6 +1464,128 @@
             const foot = c.winner ? 'Winner confirmed by the organizer' : `${thru.done} of ${thru.total} ${thru.noun} through`;
             return `<div class="cb-card"><div class="cb-head">${TournamentContests.KIND_ICON[c.kind]} Hole ${c.hole} · ${TournamentContests.KIND_LABEL[c.kind]}</div>${body}<div class="cb-foot"><span>${foot}</span>${legend}</div></div>`;
         }).join('') + (list.length ? `<p class="cb-note" id="contest-board-note">Organizer confirms winners at the end. Prizes are whatever the organizer announces: nothing is paid in the app.</p>` : '');
+    }
+
+    // ===== E4a: POST A PHOTO TO THE EVENT WALL (approved "as mocked" 2026-11-09) =====
+    //
+    // The tab is drawn on a link that carries its scoring key: the database
+    // takes a photo's meta only with that key's proof (as a score). The flow:
+    //   1. pick -> resized on THIS phone to 1600 px and re-encoded as JPEG by a
+    //      canvas. A canvas carries no EXIF, so the photo's location (a phone
+    //      photo has GPS in its EXIF) never leaves the phone.
+    //   2. Post -> an anonymous Firebase session (loaded only now), the JPEG
+    //      uploaded to Storage tournamentPhotos/<code>/pending/<id>.jpg (REST,
+    //      as round chat does), THEN one database update: the pending meta and
+    //      its proof (TournamentPhotos.metaUpdate). The file first, so a meta
+    //      never points at a missing file.
+    //   3. Nothing shows until the organizer taps Show (approvePhoto moves it).
+    // The wall below lists shown photos (public), each with Report.
+    var photoPick = null;            // { blob, w, h, url } of the resized photo
+    var photoShown = {};
+    var photoWallBound = false;
+    const PHOTO_REFUSED = "⚠️ Not posted — this link can't post photos. Ask the organizer for your team's link.";
+    function photosOn() { return !!(myScoreKey && currentCode); }
+    function photoWho() {
+        if (myTeamNum) return `team${myTeamNum}`;
+        return (contestCtx && contestCtx.golfers && contestCtx.golfers[0]) ? contestCtx.golfers[0].who : null;
+    }
+    function photoSay(cls, text) {
+        const el = document.getElementById('photo-msg');
+        if (el) { el.className = 'ph-msg' + (cls ? ' ' + cls : ''); el.textContent = text; }
+    }
+    function resizePhoto(file) {
+        return new Promise((resolve, reject) => {
+            const src = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                const fit = TournamentPhotos.fitWithin(img.naturalWidth, img.naturalHeight);
+                if (!fit) { URL.revokeObjectURL(src); reject(new Error('not an image')); return; }
+                const c = document.createElement('canvas');
+                c.width = fit.w; c.height = fit.h;
+                c.getContext('2d').drawImage(img, 0, 0, fit.w, fit.h);
+                URL.revokeObjectURL(src);
+                c.toBlob((blob) => blob ? resolve({ blob: blob, w: fit.w, h: fit.h, url: URL.createObjectURL(blob) }) : reject(new Error('encode failed')), 'image/jpeg', 0.85);
+            };
+            img.onerror = () => { URL.revokeObjectURL(src); reject(new Error('not an image')); };
+            img.src = src;
+        });
+    }
+    function photoChosen(input) {
+        const file = input && input.files && input.files[0];
+        if (!file) return;
+        photoSay('', 'Getting your photo ready…');
+        return resizePhoto(file).then((p) => {
+            if (photoPick && photoPick.url) URL.revokeObjectURL(photoPick.url);
+            photoPick = p;
+            const img = document.getElementById('photo-preview');
+            img.src = p.url; img.style.display = 'block';
+            document.getElementById('photo-empty').style.display = 'none';
+            document.getElementById('photo-tag').style.display = '';
+            photoSay('', '');
+        }).catch(() => photoSay('err', "That file isn't a photo this page can read. Try another."));
+    }
+    function loadScriptOnce(src, ready) {
+        if (ready()) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.onload = () => ready() ? resolve() : reject(new Error(src + ' missing'));
+            s.onerror = () => reject(new Error(src + ' did not load'));
+            document.head.appendChild(s);
+        });
+    }
+    function photoIdToken() {
+        return loadScriptOnce('./firebase-auth-compat.js', () => typeof firebase.auth === 'function')
+            .then(() => firebase.auth().currentUser ? null : firebase.auth().signInAnonymously())
+            .then(() => firebase.auth().currentUser.getIdToken());
+    }
+    function postPhoto() {
+        const who = photoWho();
+        if (!photosOn() || !who) { photoSay('err', PHOTO_REFUSED); return; }
+        if (!photoPick) { photoSay('err', 'Choose a photo first.'); return; }
+        if (photoPick.blob.size > TournamentPhotos.MAX_BYTES) { photoSay('err', 'That photo is too big to post.'); return; }
+        const btn = document.getElementById('photo-post');
+        if (btn) btn.disabled = true;
+        photoSay('', 'Posting…');
+        const id = db.ref().push().key;
+        const pick = photoPick;
+        const caption = (document.getElementById('photo-caption') || {}).value || '';
+        return photoIdToken()
+            .then((tok) => fetch(TournamentPhotos.uploadUrl(currentCode, id), { method: 'POST', headers: { 'Content-Type': 'image/jpeg', Authorization: 'Firebase ' + tok }, body: pick.blob }))
+            .then((r) => { if (!r.ok) throw Object.assign(new Error('upload ' + r.status), { code: r.status === 403 ? 'PERMISSION_DENIED' : 'upload' }); })
+            .then(() => db.ref().update(TournamentPhotos.metaUpdate({ code: currentCode, id: id, who: who, k: myScoreKey, caption: caption, w: pick.w, h: pick.h },
+                firebase.database.ServerValue.TIMESTAMP)))
+            .then(() => {
+                photoPick = null;
+                document.getElementById('photo-preview').style.display = 'none';
+                document.getElementById('photo-empty').style.display = '';
+                document.getElementById('photo-tag').style.display = 'none';
+                const cap = document.getElementById('photo-caption'); if (cap) cap.value = '';
+                photoSay('ok', '✓ Sent. It goes on the wall when the organizer approves it.');
+            })
+            .catch((err) => photoSay('err', (err && err.code === 'PERMISSION_DENIED') ? PHOTO_REFUSED : '⚠️ Could not post — check your signal and try again.'))
+            .then(() => { if (btn) btn.disabled = false; });
+    }
+    function bindPhotoWall() {
+        if (photoWallBound || !currentCode) return;
+        photoWallBound = true;
+        db.ref(`tournamentPhotoMeta/${currentCode}/shown`).on('value', (snap) => {
+            photoShown = (snap && snap.val()) || {};
+            renderPhotoWall();
+        }, () => { /* rules not published yet: no wall */ });
+    }
+    function renderPhotoWall() {
+        const el = document.getElementById('photo-wall');
+        if (!el) return;
+        el.innerHTML = TournamentPhotos.ordered(photoShown).map((p) =>
+            `<div class="ph-tile"><img src="${escapeHtml(TournamentPhotos.shownUrl(currentCode, p.id))}" alt="${escapeHtml(TournamentPhotos.photoLabel(currentData, p))}" loading="lazy" onerror="this.style.display='none'"><span class="ph-tag">${escapeHtml(TournamentPhotos.photoLabel(currentData, p))}</span><button type="button" class="ph-report" data-photo="${escapeHtml(p.id)}" onclick="reportShownPhoto(this.dataset.photo, this)">Report</button></div>`).join('');
+    }
+    function reportShownPhoto(id, el) {
+        if (!confirm('Report this photo to the organizer?')) return;
+        return loadScriptOnce('./firebase-functions-compat.js', () => typeof firebase.functions === 'function')
+            .then(() => firebase.functions().httpsCallable('reportPhoto')({ code: currentCode, photoId: id }))
+            .then(() => { if (el) { el.textContent = 'Reported'; el.disabled = true; } })
+            .catch(() => { if (el) el.textContent = 'Try again'; });
     }
 </script>
 </body>

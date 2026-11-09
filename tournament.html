@@ -58,6 +58,8 @@
     <script src="tournament-engine.js"></script>
     <!-- E2: contest holes - the ranking and labels the golfer's card uses too. -->
     <script src="tournament-contests.js"></script>
+    <!-- E4: the photo wall's paths and labels (tournament-photos.js). -->
+    <script src="tournament-photos.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -245,6 +247,29 @@
         .ct-btn.rm { border-color: #f3b4b8; color: #b3261e; }
         .ct-note { text-align: center; font-size: 0.85rem; color: var(--text-muted); }
         .ct-gps { background: none; border: 0; padding: 0; font: inherit; font-weight: bold; color: var(--text-main); cursor: pointer; text-decoration: underline; }
+        /* E4b photo queue + E4c recap (approved "as mocked" 2026-11-09). */
+        .pq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        .pq-tile { position: relative; border-radius: 14px; overflow: hidden; aspect-ratio: 4 / 3; background: linear-gradient(135deg, #cfe3d6, #7aa58b); }
+        .pq-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .pq-grid > :nth-child(4n+2) .pq-tile, .pq-grid > .pq-tile:nth-child(4n+2) { background: linear-gradient(135deg, #f1d08f, #c48a3a); }
+        .pq-grid > :nth-child(4n+3) .pq-tile, .pq-grid > .pq-tile:nth-child(4n+3) { background: linear-gradient(135deg, #9fc3e3, #3f6fa8); }
+        .pq-grid > :nth-child(4n) .pq-tile, .pq-grid > .pq-tile:nth-child(4n) { background: linear-gradient(135deg, #e3b893, #a4623a); }
+        .pq-tag { position: absolute; left: 8px; bottom: 8px; background: rgba(20, 40, 25, 0.85); color: #ffffff; font-weight: bold; font-size: 0.8rem; border-radius: 8px; padding: 4px 8px; max-width: 85%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pq-flag { position: absolute; right: 8px; top: 8px; background: #b3261e; color: #ffffff; font-weight: bold; font-size: 0.72rem; border-radius: 8px; padding: 3px 7px; }
+        .pq-acts { display: flex; gap: 6px; margin-top: 6px; }
+        .pq-acts button { flex: 1; border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--brand-navy); border-radius: 12px; padding: 10px 4px; font-weight: bold; font-size: 0.95rem; cursor: pointer; font-family: inherit; }
+        .pq-acts button.hide { border-color: #f3b4b8; color: #b3261e; }
+        .pq-count { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--border-mid); border-radius: 14px; padding: 14px; background: var(--bg-card); font-size: 1rem; }
+        .pq-count span { color: var(--text-muted); font-size: 0.85rem; }
+        .rc-title { font-size: 1.6rem; margin: 6px 0 4px 0; color: var(--text-main); }
+        .rc-sub { color: var(--text-muted); margin: 0 0 14px 0; font-size: 1rem; }
+        .rc-card { border: 1px solid var(--border-mid); border-radius: 14px; padding: 4px 14px; margin-bottom: 12px; background: var(--bg-card); }
+        .rc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border-faint); }
+        .rc-row:last-child { border-bottom: 0; }
+        .rc-row strong { text-align: right; }
+        .rc-share { width: 100%; background: #e3e9f3; color: var(--brand-navy); border: 0; border-radius: 14px; padding: 16px; font-size: 1.1rem; font-weight: bold; cursor: pointer; font-family: inherit; }
+        .rc-report { position: absolute; right: 6px; top: 6px; background: rgba(255,255,255,0.85); border: 0; border-radius: 8px; font-size: 0.72rem; padding: 3px 6px; cursor: pointer; color: #444; font-family: inherit; }
+        .rc-msg { text-align: center; font-size: 0.85rem; color: var(--text-muted); min-height: 16px; }
         .team-card { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: var(--nassau-box-bg); }
         .team-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .team-card-header .team-label { font-weight: bold; color: var(--brand-green); }
@@ -665,6 +690,19 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <div id="reg-checkout" class="checkout-panel" style="display:none;"></div>
 </div>
 
+<!-- E4c (approved "as mocked" 2026-11-09): the RECAP, ?tourney=CODE&recap=1.
+     Read-only and public: the results, the contest winners the organizer
+     confirmed, and the photos the organizer showed. No organizer control is
+     drawn here, whoever opens it. Each photo has Report. -->
+<div class="container" id="recap-screen" style="display:none;">
+    <h1 class="rc-title" id="recap-title"></h1>
+    <p class="rc-sub" id="recap-sub"></p>
+    <div class="rc-card" id="recap-winners" style="display:none;"></div>
+    <div class="pq-grid" id="recap-photos"></div>
+    <button type="button" class="rc-share" id="recap-share" onclick="shareRecap()">Share recap link</button>
+    <p class="rc-msg" id="recap-msg" aria-live="polite"></p>
+</div>
+
 <div class="container" id="manage-screen" style="display:none;">
     <!-- WHO IS SIGNED IN, AS A FACT. No word that promises a lock: the sign-in
          gates what this page renders, not what the database accepts. -->
@@ -675,6 +713,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <span class="top-nav-item" onclick="showTab('desk')" id="tab-btn-desk">📋 Desk</span>
         <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard">🏆 Leaderboard</span>
         <span class="top-nav-item" onclick="showTab('contests')" id="tab-btn-contests">🎯 Contests</span>
+        <span class="top-nav-item" onclick="showTab('photos')" id="tab-btn-photos">📷 Photos</span>
     </div>
 
     <div id="manage-tab-setup">
@@ -969,6 +1008,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div class="ct-card" id="contest-holes-list"></div>
         <div class="ct-card" id="contest-entries" style="display:none;"></div>
         <p class="ct-note" id="contest-note">Override: "Make winner" locks the hole; a later entry cannot replace it. Allow GPS marks: <button type="button" class="ct-gps" id="contest-gps-toggle" onclick="toggleContestGps()">on</button></p>
+    </div>
+
+    <!-- E4b (approved "as mocked" 2026-11-09): the organizer's photo queue.
+         Gated. Every photo is checked one at a time - there is no "approve
+         all". Show and Hide run the approvePhoto / hidePhoto callables, which
+         move the file; a reported photo on the wall comes back here. -->
+    <div id="manage-tab-photos" style="display:none;">
+        <h2 style="font-size:1.4rem; margin:4px 0 12px 0;" id="photo-queue-title">Photos waiting · 0</h2>
+        <div class="pq-grid" id="photo-queue"></div>
+        <div class="pq-count" id="photo-counts"></div>
+        <p class="ct-note"><a href="#" id="photo-recap-link">Open the recap page ›</a></p>
     </div>
 
     <div id="tournament-print-view"></div>
@@ -2251,9 +2301,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // The three manage tabs. Setup and Desk are the GATED pair: applyManageGate
     // HIDES both for anyone who is not the owner of an owned tournament, and
     // shows both on sign-in. Leaderboard is always there.
-    // E2d adds Contests, gated with them (owner only).
-    const MANAGE_TABS = ['setup', 'desk', 'leaderboard', 'contests'];
-    const GATED_TABS = ['setup', 'desk', 'contests'];
+    // E2d adds Contests and E4b Photos, gated with them (owner only).
+    const MANAGE_TABS = ['setup', 'desk', 'leaderboard', 'contests', 'photos'];
+    const GATED_TABS = ['setup', 'desk', 'contests', 'photos'];
     function showTab(tab) {
         // A gated tab is hidden for a non-owner (applyManageGate). Asking for it
         // then lands on the leaderboard - the tab is in the tree, so "is the
@@ -2269,6 +2319,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (tab === 'leaderboard') renderLeaderboard();
         if (tab === 'desk') renderRegistrationDesk();
         if (tab === 'contests') renderContestsTab();
+        if (tab === 'photos') { syncPhotoListeners(); renderPhotosTab(); }
     }
 
     // ---- SIGN-IN AND THE MANAGE GATE -------------------------------------
@@ -5739,6 +5790,139 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return db.ref().update(changes).catch((err) => alert(`Error: ${err.message}`));
     }
 
+    // ===== E4b: THE ORGANIZER'S PHOTO QUEUE (approved "as mocked" 2026-11-09) =====
+    //
+    // Pending photos are unreadable to every client in Storage, so the owner
+    // sees them through photoLinks (10-minute signed links, owner checked on
+    // the server). Show = approvePhoto (moves the file to shown/, public);
+    // Hide = hidePhoto (to hidden/, deleted by hand 7 days after the event).
+    // A REPORTED photo on the wall comes back into this queue with a flag;
+    // Show there keeps it up and clears the reports. One photo at a time,
+    // deliberately: there is no "approve all".
+    const photoMeta = { pending: {}, shown: {}, hidden: {}, reports: {} };
+    let photoMetaCode = null;
+    let photoLinkUrls = {};          // id -> signed url (pending, reported)
+    let photoLinkAsked = {};
+    let photoBusy = {};
+    function syncPhotoListeners() {
+        if (!currentCode || !canManage() || photoMetaCode === currentCode) return;
+        photoMetaCode = currentCode;
+        const code = currentCode;
+        Object.keys(photoMeta).forEach((k) => {
+            db.ref(`tournamentPhotoMeta/${code}/${k}`).on('value', (snap) => {
+                if (currentCode !== code) return;
+                photoMeta[k] = (snap && snap.val()) || {};
+                fetchPhotoLinks();
+                renderPhotosTab();
+            }, () => { /* rules not published yet: nothing to show */ });
+        });
+    }
+    function photoQueue() {
+        const pending = TournamentPhotos.ordered(photoMeta.pending).map((p) => Object.assign(p, { state: 'pending' }));
+        const reported = TournamentPhotos.ordered(photoMeta.shown).filter((p) => photoMeta.reports[p.id])
+            .map((p) => Object.assign(p, { state: 'shown', reports: Number(photoMeta.reports[p.id].count) || 1 }));
+        return pending.concat(reported);
+    }
+    function fetchPhotoLinks() {
+        const want = photoQueue().filter((p) => !photoLinkUrls[p.id] && !photoLinkAsked[p.id]);
+        if (!want.length || !canManage()) return;
+        want.forEach((p) => { photoLinkAsked[p.id] = true; });
+        return stripeCall('photoLinks', { code: currentCode })
+            .then((res) => { Object.assign(photoLinkUrls, (res && res.data && res.data.links) || {}); renderPhotosTab(); })
+            .catch(() => { want.forEach((p) => { delete photoLinkAsked[p.id]; }); });
+    }
+    function renderPhotosTab() {
+        const grid = document.getElementById('photo-queue');
+        if (!grid || !currentData) return;
+        const q = photoQueue();
+        document.getElementById('photo-queue-title').textContent = `Photos waiting · ${q.length}`;
+        grid.innerHTML = q.map((p) => {
+            const url = photoLinkUrls[p.id] || (p.state === 'shown' ? TournamentPhotos.shownUrl(currentCode, p.id) : '');
+            const label = TournamentPhotos.photoLabel(currentData, p);
+            const busy = photoBusy[p.id] ? ' disabled' : '';
+            return `<div class="pq-item" data-photo="${escapeHtml(p.id)}"><div class="pq-tile">${url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" onerror="this.style.display='none'">` : ''}`
+                + `${label ? `<span class="pq-tag">${escapeHtml(label)}</span>` : ''}${p.state === 'shown' ? `<span class="pq-flag">Reported · ${p.reports}</span>` : ''}</div>`
+                + `<div class="pq-acts"><button type="button" class="show" data-photo="${escapeHtml(p.id)}" onclick="showPhoto(this.dataset.photo)"${busy}>✓ Show</button>`
+                + `<button type="button" class="hide" data-photo="${escapeHtml(p.id)}" onclick="hidePhoto(this.dataset.photo)"${busy}>Hide</button></div></div>`;
+        }).join('');
+        const shown = Object.keys(photoMeta.shown).length, hidden = Object.keys(photoMeta.hidden).length;
+        document.getElementById('photo-counts').innerHTML = `On the wall: ${shown} · Hidden: ${hidden} <span>every photo is checked</span>`;
+        const link = document.getElementById('photo-recap-link');
+        if (link) link.href = recapUrl();
+    }
+    function photoAction(name, id) {
+        if (!canManage() || photoBusy[id]) return;
+        photoBusy[id] = true;
+        renderPhotosTab();
+        return stripeCall(name, { code: currentCode, photoId: id })
+            .catch((err) => alert(name === 'approvePhoto' ? 'Could not show that photo. Try again.' : 'Could not hide that photo. Try again.'))
+            .then(() => { delete photoBusy[id]; renderPhotosTab(); });
+    }
+    function showPhoto(id) { return photoAction('approvePhoto', id); }
+    function hidePhoto(id) { return photoAction('hidePhoto', id); }
+
+    // ===== E4c: THE RECAP, ?tourney=CODE&recap=1 (read-only, public) =====
+    function recapUrl() { return shareBaseUrl() + 'tournament.html?tourney=' + encodeURIComponent(currentCode) + '&recap=1'; }
+    let recapEntries = {}, recapShown = {};
+    function openRecap(code) {
+        currentCode = code;
+        ['setup-screen', 'manage-screen', 'register-screen'].forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+        document.getElementById('recap-screen').style.display = 'block';
+        db.ref(`tournaments/${code}`).on('value', (snap) => { currentData = (snap && snap.val()) || null; renderRecap(); });
+        db.ref(`contestEntries/${code}`).on('value', (snap) => { recapEntries = (snap && snap.val()) || {}; renderRecap(); }, () => {});
+        db.ref(`tournamentPhotoMeta/${code}/shown`).on('value', (snap) => { recapShown = (snap && snap.val()) || {}; renderRecap(); }, () => {});
+    }
+    function recapDate(d) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))) return '';
+        const [y, m, day] = d.split('-').map(Number);
+        const dt = new Date(y, m - 1, day);
+        return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).replace(',', '');
+    }
+    function renderRecap() {
+        const data = currentData;
+        if (!data) { document.getElementById('recap-title').textContent = 'No tournament found with that code.'; return; }
+        document.getElementById('recap-title').textContent = `${data.name || 'Tournament'} recap`;
+        const n = competitorCount(data);
+        document.getElementById('recap-sub').textContent = [recapDate(data.eventDate), data.courseName, n ? `${n} ${competitorNoun(data, n)}` : ''].filter(Boolean).join(' · ');
+        const rows = [];
+        const view = resolveLeaderboardView(data, isMultiRound(data) ? 'event' : null, null);
+        const top = (view.rows || []).filter((r) => r.rank === 1);
+        if (top.length) {
+            const toPar = (v) => v === 0 ? 'E' : (v > 0 ? `+${v}` : String(v));
+            const names = top.map((r) => {
+                const t = r.entryType === 'team' ? ((data.teams || {})[r.entryKey] || {}) : null;
+                const who = t && (t.players || []).length ? ` · ${(t.players || []).map((p) => String(p).trim().split(' ').pop()).join(' / ')}` : '';
+                return `${r.teamName || r.name || ''}${who} ${toPar(r.toPar)}`;
+            }).join(', ');
+            rows.push(['🏆 Winners', names]);
+        }
+        const won = TournamentContests.confirmedWinners(data, recapEntries);
+        const kp = won.filter((w) => w.kind === 'kp'), ld = won.filter((w) => w.kind === 'ld');
+        if (kp.length) rows.push([`⛳ KP ${kp.map((w) => w.hole).join(' / ')}`, kp.map((w) => w.name).join(' · ')]);
+        ld.forEach((w) => rows.push([`🏌️ Long drive ${w.hole}`, `${w.name} ${w.value}`]));
+        const card = document.getElementById('recap-winners');
+        card.innerHTML = rows.map(([a, b]) => `<div class="rc-row"><span>${escapeHtml(a)}</span><strong>${escapeHtml(b)}</strong></div>`).join('');
+        card.style.display = rows.length ? 'block' : 'none';
+        document.getElementById('recap-photos').innerHTML = TournamentPhotos.ordered(recapShown).map((p) => {
+            const label = TournamentPhotos.photoLabel(data, p);
+            return `<div class="pq-tile"><img src="${escapeHtml(TournamentPhotos.shownUrl(currentCode, p.id))}" alt="${escapeHtml(label)}" loading="lazy" onerror="this.style.display='none'">${label ? `<span class="pq-tag">${escapeHtml(label)}</span>` : ''}`
+                + `<button type="button" class="rc-report" data-photo="${escapeHtml(p.id)}" onclick="reportRecapPhoto(this.dataset.photo, this)">Report</button></div>`;
+        }).join('');
+    }
+    function shareRecap() {
+        const url = recapUrl();
+        const say = (t) => { document.getElementById('recap-msg').textContent = t; };
+        if (navigator.share) return navigator.share({ title: (currentData && currentData.name) || 'Recap', url }).catch(() => {});
+        if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(url).then(() => say('Link copied.'), () => say(url));
+        say(url);
+    }
+    function reportRecapPhoto(id, el) {
+        if (!confirm('Report this photo to the organizer?')) return;
+        return stripeCall('reportPhoto', { code: currentCode, photoId: id })
+            .then(() => { if (el) { el.textContent = 'Reported'; el.disabled = true; } document.getElementById('recap-msg').textContent = 'Thanks. The organizer will look at it.'; })
+            .catch(() => { if (el) el.textContent = 'Try again'; });
+    }
+
     function loadTournament(code) {
         db.ref(`tournaments/${code}`).on('value', (snap) => {
             currentData = snap.val();
@@ -5795,6 +5979,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderEventDayPanel();
             syncContestEntriesListener();
             renderContestsTab();
+            syncPhotoListeners();
+            renderPhotosTab();
             // Last, so it can remove what the renders above filled in. Runs on
             // every snapshot: the record may gain an owner while the page is open.
             applyManageGate();
@@ -5807,6 +5993,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     tripLinkCode = urlParams.get('trip');
     if (registerParam) {
         openRegisterScreen(registerParam.toUpperCase());
+    } else if (tourneyParam && urlParams.get('recap') === '1') {
+        // E4c: the read-only recap. Never the console, whoever opens it.
+        openRecap(tourneyParam.toUpperCase());
     } else if (tourneyParam) {
         currentCode = tourneyParam.toUpperCase();
         loadTournament(currentCode);

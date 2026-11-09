@@ -123,7 +123,9 @@ describe('A. THE DEFAULT STATE: no contest holes, the card and console as they w
         const sb = arriveCard(teamEvent(), undefined, {});
         assert.equal(shown(sb, 'contest-prompt'), false, 'no prompt');
         assert.equal(shown(sb, 'tab-btn-contests'), false, 'no Contests tab');
-        assert.notEqual(el(sb, 'tab-btn-leaderboard').textContent, 'Board', 'the two tabs keep their words');
+        // A link with no key has no Photos tab either (E4): two tabs, their old words.
+        const plainLink = arriveCard(teamEvent(), '?tourney=CT1&team=4', {});
+        assert.notEqual(el(plainLink, 'tab-btn-leaderboard').textContent, 'Board', 'two tabs keep their words');
         assert.match(el(sb, 'status-main').textContent, /Next: Hole 7/, 'positive: the card rendered and its next hole is 7');
     });
     test('A2 a visitor who is not the owner sees no Contests tab on the organizer page', () => {
