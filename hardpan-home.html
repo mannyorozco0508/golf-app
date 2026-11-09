@@ -15,10 +15,16 @@
   admin.html front door), and every game / tournament link keeps its own page.
   It is not in sw.js's shell list and not in the native bundle.
 
-  TO FILL (grep data-todo):
-    data-todo="app-store-url"   the App Store link (Grok)
-    data-todo="play-store-url"  the Google Play link (Grok; Play is not live yet)
-    data-todo="store-badge-art" the official Apple / Google badge artwork
+  FILLED (Manny, website facts 2026-11-08 sections 1-2):
+    App Store: https://apps.apple.com/app/id6808220335 on both Apple badges.
+    Badge art: Apple's official black "Download on the App Store" en-us badge,
+      app-store-badge.svg, saved unchanged from Apple's public badge service
+      (toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us).
+      Shown 44 px high (min 40), natural aspect, Apple first, 12 px clear space.
+    Google Play: NOT public yet, so a plain "Android / Coming soon" tile, not a
+      link and not Google's badge art, until Android 19 is approved.
+  STILL TO FILL (grep data-todo):
+    data-todo="play-store-url"  the real Play link + Google's official badge, once Play is public
     data-todo="copy-approve"    claims Grok flagged for Manny's wording OK
   Prices: none in this file. site-pricing.js fills every data-price slot.
 -->
@@ -53,8 +59,10 @@
     .play p { color:#cfe0d6; line-height:1.5; margin-bottom:22px; }
     .org p { color:#cdd8ea; line-height:1.5; margin-bottom:20px; }
     .badges { display:flex; gap:12px; flex-wrap:wrap; }
-    .badge { display:inline-block; background:#000; color:#fff; border-radius:10px; padding:9px 16px; font-size:12px; line-height:1.2; border:1px solid #a6a6a6; min-height:44px; }
-    .badge b { display:block; font-size:17px; }
+    .store-apple { display:inline-block; line-height:0; }
+    .store-apple img { display:block; height:44px; width:auto; }
+    .soon { display:inline-block; border:1px dashed currentColor; border-radius:10px; padding:9px 16px; font-size:12px; line-height:1.2; min-height:44px; opacity:.85; }
+    .soon b { display:block; font-size:17px; }
     .phone-wrap { transform:scale(.8); transform-origin:center; flex:0 0 auto; }
     .phone { width:250px; height:510px; border-radius:38px; background:#0b0f0d; padding:10px; box-shadow:0 30px 60px rgba(0,0,0,.35); }
     .scr { width:100%; height:100%; border-radius:30px; overflow:hidden; background:#2f5a3a; position:relative; }
@@ -131,8 +139,8 @@
             <h2>For golfers</h2>
             <p>Satellite yardages, side games, chat, Strokes Gained and coaching. Free for one group.</p>
             <div class="badges">
-                <a class="badge" href="#get-the-app" data-todo="app-store-url" data-store="apple">Download on the<b>App Store</b></a>
-                <a class="badge" href="#get-the-app" data-todo="play-store-url" data-store="google">Get it on<b>Google Play</b></a>
+                <a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a>
+                <div class="soon" data-store="google" data-todo="play-store-url">Android<b>Coming soon</b></div>
             </div>
         </div>
         <div class="phone-wrap" aria-hidden="true">
@@ -183,9 +191,9 @@
     <div class="wrap">
         <div class="h2">Get the app</div>
         <p class="sub">HardPan for iPhone and Android. Your group can also join any round from the link, in the browser.</p>
-        <div class="badges" data-todo="store-badge-art">
-            <a class="badge" href="#get-the-app" data-todo="app-store-url" data-store="apple">Download on the<b>App Store</b></a>
-            <a class="badge" href="#get-the-app" data-todo="play-store-url" data-store="google">Get it on<b>Google Play</b></a>
+        <div class="badges">
+            <a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a>
+            <div class="soon" data-store="google" data-todo="play-store-url">Android<b>Coming soon</b></div>
         </div>
         <a class="webapp" href="/admin">Or open HardPan in your browser &rarr;</a>
     </div>
@@ -198,6 +206,7 @@
             <a href="/support">Support</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/refunds">Entry-fee refunds</a>
         </div>
         <div>HardPan keeps track of your group's games. It never handles money for bets.</div>
+        <div style="font-size:12px">Apple, the Apple logo and App Store are trademarks of Apple Inc., registered in the U.S. and other countries.</div>
     </div>
 </footer>
 

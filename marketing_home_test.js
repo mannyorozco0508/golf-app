@@ -14,8 +14,10 @@
 // a golfer at a course with no signal opens the marketing page, not the round.
 //
 // WHAT THIS FILE PROVES, AND HOW
-//   1. The page: its links (Get the app, Run an event, footer), the store
-//      placeholders, and that it carries no dollar figure of its own.
+//   1. The page: its links (Get the app, Run an event, footer), the filled
+//      store badges (the real App Store link on Apple's official artwork, an
+//      Android "Coming soon" tile that is not a link), the filled refund page,
+//      and that the page carries no dollar figure of its own.
 //   2. Prices: site-pricing.js against terms.html section 6 and (when the
 //      dev-205 branch is in this repo) the app's gps-config.js / hp-pricing.js.
 //      The page's every data-price slot is filled from it - run through the
@@ -35,7 +37,11 @@
 // BASELINE (c65b45bd, before this branch): hardpan-home.html, refunds.html,
 // site-pricing.js and _redirects do not exist there, so sections 1-3 fail on
 // a missing file; section 4's unchanged-worker tests pass there too, which is
-// the point - nothing in sw.js moved. On website-b: 29 tests, 29 pass, 0 fail.
+// the point - nothing in sw.js moved. On website-b f5fb0852: 29/29. After the
+// placeholder fill: 32 tests, 32 pass, 0 fail. Fill negative controls (6, each
+// restored): Play as a link with Google's wording (2 red), one App Store link
+// back to #get-the-app (1), the badge recolored (1), a 48-hour deadline on the
+// refund page (1), a [blank] back on it (1), the Android tile before Apple (1).
 // Negative controls (9, each restored by sha): Run an event -> /admin (1 red),
 // a $ figure in the page (2), founding price drift (2), / rewritten in
 // _redirects (1), the plain-visit split in functions/index.js (3), the page
@@ -113,20 +119,49 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         hrefs.forEach((h) => assert.ok(exists(h.slice(1) + '.html'), h + ' has no page'));
     });
 
-    test('every store badge is a marked placeholder until its real link is filled', () => {
-        const badges = a.filter((x) => x.attrs['data-store']);
-        assert.equal(badges.length, 4, 'two badges in the golfers card, two in Get the app');
-        badges.forEach((b) => {
-            const want = b.attrs['data-store'] === 'apple' ? 'app-store-url' : 'play-store-url';
-            if (b.attrs['data-todo']) {
-                // A placeholder points at the section, never at a guessed store url.
-                assert.equal(b.attrs['data-todo'], want);
-                assert.equal(b.attrs.href, '#get-the-app');
-            } else {
-                // Filled: the real store, and the marker removed with it.
-                const re = want === 'app-store-url' ? /^https:\/\/apps\.apple\.com\// : /^https:\/\/play\.google\.com\//;
-                assert.match(b.attrs.href, re, 'a filled badge points somewhere that is not its store');
-            }
+    const APP_STORE_URL = 'https://apps.apple.com/app/id6808220335';
+
+    test('every App Store badge is the real store link, with Apple\'s official artwork', () => {
+        const apple = a.filter((x) => x.attrs['data-store'] === 'apple');
+        assert.equal(apple.length, 2, 'one App Store badge in the golfers card, one in Get the app');
+        apple.forEach((b) => {
+            assert.equal(b.attrs.href, APP_STORE_URL, 'an App Store badge points somewhere else');
+            assert.equal(b.attrs['data-todo'], undefined, 'a filled badge still carries its placeholder marker');
+        });
+        const imgs = html.match(/<img[^>]*src="\/app-store-badge\.svg"[^>]*>/g) || [];
+        assert.equal(imgs.length, 2, 'each App Store link shows the official badge image');
+        imgs.forEach((t) => {
+            assert.match(t, /alt="Download on the App Store"/);
+            assert.ok(Number(/height="(\d+)"/.exec(t)[1]) >= 40, 'Apple: at least 40 px high on screen');
+        });
+        assert.match(html, /\.store-apple img \{[^}]*height:(4[0-9]|[5-9]\d)px;[^}]*width:auto;/, 'the badge must keep its own aspect, >= 40 px');
+        assert.match(html, /are trademarks of Apple Inc\./, 'the Apple trademark credit is gone');
+    });
+
+    test('the badge file is Apple\'s artwork unchanged (no redraw, no recolor)', () => {
+        const svg = fs.readFileSync(path.join(ROOT, 'app-store-badge.svg'));
+        const sha = require('crypto').createHash('sha256').update(svg).digest('hex');
+        assert.equal(sha, 'a26fc5b38380272c92e9019a2eb8b45542a66814b3e2b203772db8904b9fb99f',
+            'app-store-badge.svg is not the file Apple\'s badge service served (black, en-us)');
+        assert.doesNotMatch(String(svg), /<script|href=|foreignObject/i);
+    });
+
+    test('no hand-drawn store badge is left, and no Google Play badge or link while Play is not public', () => {
+        assert.doesNotMatch(html, /class="badge"/, 'a hand-drawn badge is back');
+        assert.doesNotMatch(html, /Get it on/i, 'Google\'s "Get it on Google Play" wording is on the page');
+        assert.doesNotMatch(html, /play\.google\.com/, 'a Play link is on the page before Android is public');
+    });
+
+    test('Android is a plain "Coming soon" tile, not a link, after the App Store badge', () => {
+        assert.equal(a.filter((x) => x.attrs['data-store'] === 'google').length, 0, 'the Android tile is a link');
+        const tiles = html.match(/<div class="soon" data-store="google"[^>]*>([\s\S]*?)<\/div>/g) || [];
+        assert.equal(tiles.length, 2);
+        tiles.forEach((t) => assert.match(t.replace(/<[^>]+>/g, ' '), /Android\s+Coming soon/));
+        const groups = html.split('<div class="badges">').slice(1);
+        assert.equal(groups.length, 2);
+        groups.forEach((g) => {
+            const ap = g.indexOf('data-store="apple"'), go = g.indexOf('data-store="google"');
+            assert.ok(ap >= 0 && go >= 0 && ap < go, 'Apple comes first in every badge row');
         });
     });
 
@@ -137,11 +172,27 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         assert.match(html, /<script src="\/site-pricing\.js"><\/script>/);
     });
 
-    test('the refund policy page exists and says it is a draft', () => {
+    test('the refund page is filled: no data-todo, no blanks, dated, still noindex until the live OK', () => {
         const r = read('refunds.html');
-        assert.match(r, /DRAFT - Manny to approve/);
-        assert.match(r, /<meta name="robots" content="noindex">/, 'an unapproved policy must not be indexed');
-        assert.match(r, /data-todo="refund-policy-text"/);
+        const body = stripComments(r);
+        assert.doesNotMatch(body, /data-todo/, 'a placeholder marker is left on the refund page');
+        assert.doesNotMatch(body, /class="blank"|\[[^\]]*\]|DRAFT/, 'a blank or the draft banner is left');
+        assert.match(body, /Last updated (January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, 20\d\d/);
+        assert.match(r, /<meta name="robots" content="noindex">/, 'noindex goes only with the typed live OK');
+        assert.match(body, /mailto:support@rattlegolf\.com/, 'the site\'s support contact');
+        assert.match(body, /cancellation deadline shown on the event's sign-up page/);
+        assert.match(body, /cancels the event/);
+        assert.match(body, /weather/);
+        assert.match(body, /rescheduled/);
+        assert.match(body, /Charged twice|duplicate/i);
+        assert.match(body, /card you paid with/);
+        assert.match(body, /5 to 10 business days/);
+        assert.match(body, /not guaranteed/);
+        assert.match(body, /App Store or Google Play[\s\S]*Apple or Google handles those refunds/);
+        // The outline leaves these to Manny: no made-up deadline, no fee kept.
+        assert.doesNotMatch(body, /\d+\s*-?\s*hours?\b/i, 'an invented hour deadline');
+        assert.doesNotMatch(body, /deduct|processing fee|fee is kept|non-refundable/i, 'a fee deduction nobody decided');
+        assert.doesNotMatch(body, /\$\s?\d/, 'a dollar figure');
     });
 });
 
@@ -264,7 +315,7 @@ describe('3. ROUTING: / and every app link are served as before', () => {
 
     test('_routes.json sends none of the new paths to a Function (static, no cost), and keeps / and /__/auth/*', () => {
         const inc = JSON.parse(read('_routes.json')).include;
-        ['/home', '/home/*', '/hardpan-home', '/refunds', '/site-pricing.js'].forEach((p) =>
+        ['/home', '/home/*', '/hardpan-home', '/refunds', '/site-pricing.js', '/app-store-badge.svg'].forEach((p) =>
             assert.ok(!inc.includes(p), p + ' now runs a Function'));
         assert.ok(inc.includes('/'));
         assert.ok(inc.includes('/__/auth/*'));
@@ -298,7 +349,7 @@ describe('3. ROUTING: / and every app link are served as before', () => {
         assert.equal(MW.isAuthProxyPath('/__/auth/iframe'), true);
         assert.equal(MW.isAuthProxyPath('/__/firebase/init.json'), true);
         assert.equal(MW.AUTH_PROXY_ORIGIN, 'https://golfapp-9fb21.firebaseapp.com');
-        ['/home', '/hardpan-home', '/refunds', '/site-pricing.js', '/', '/admin', '/tournament'].forEach((p) =>
+        ['/home', '/hardpan-home', '/refunds', '/site-pricing.js', '/app-store-badge.svg', '/', '/admin', '/tournament'].forEach((p) =>
             assert.equal(MW.isBlockedPath(p), false, p + ' answers 404'));
         assert.equal(MW.isBlockedPath('/package.json'), true, 'positive control: the block list still blocks');
     });
@@ -322,9 +373,9 @@ describe('4. THE SERVICE WORKER: unchanged, and the app still opens offline', ()
         assert.match(src, /const CACHE_VERSION = 'golfapp-v384-2\.0';/);
         const shell = src.slice(src.indexOf('const SHELL_FILES = ['), src.indexOf('];', src.indexOf('const SHELL_FILES = [')));
         assert.match(shell, /'\.\/index\.html'/, 'positive: the slice holds the shell list');
-        assert.doesNotMatch(shell, /hardpan-home|refunds|site-pricing/, 'the marketing page joined the app shell');
+        assert.doesNotMatch(shell, /hardpan-home|refunds|site-pricing|app-store-badge/, 'the marketing page joined the app shell');
         const sync = read('sync-mobile-web.js');
-        assert.doesNotMatch(sync, /hardpan-home|refunds\.html|site-pricing/, 'the marketing page joined the native bundle');
+        assert.doesNotMatch(sync, /hardpan-home|refunds\.html|site-pricing|app-store-badge/, 'the marketing page joined the native bundle');
     });
 
     test('the worker still leaves /__/auth/ to the network', async () => {
