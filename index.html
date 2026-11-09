@@ -9044,7 +9044,21 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             const isMultiGroupRound = players.length > 4;
             // A spectator on a multi-group round has no ?group= either, and must stay
             // read-only - the same condition the scorecard already renders on.
-            return !isMultiGroupRound;
+            if (!isMultiGroupRound) return true;
+            // THE ORGANIZER'S PICKED GROUP (2.0.4). canScoreBox unlocks the boxes
+            // for the organizer on a bare link once he picks "Score for: Group N";
+            // this gate never asked, so every score he typed was dropped by
+            // rejectCrossGroupWrite and the box emptied on the next snapshot. The
+            // SAME two conditions as canScoreBox - a picked group AND the organizer
+            // gate - and only for golfers in that group. A spectator has no picked
+            // group (organizerScoreGroup() is null without canReachSetup()), so he
+            // stays read-only exactly as before.
+            const mine = organizerScoreGroup();
+            if (mine && canReachSetup()) {
+                const g = playerGroupOf(playerId);
+                return g !== null && String(g) === String(mine);
+            }
+            return false;
         }
         const grp = playerGroupOf(playerId);
         if (grp === null) return true; // single-group round, no map built
