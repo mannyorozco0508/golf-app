@@ -404,6 +404,18 @@
         .ann-row + .ann-row { border-top: 1px solid var(--border-faint); }
         .ann-row-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
         .ann-row-bell { color: var(--text-muted); white-space: nowrap; font-size: 0.88rem; }
+        .pace-sub { font-size: 0.86rem; color: var(--text-muted); margin: 0 0 12px 0; }
+        .pace-sub input { width: 3.2em; font: inherit; color: var(--text-main); border: 0; border-bottom: 1px dashed var(--text-muted); background: transparent; padding: 0; text-align: center; border-radius: 0; }
+        .pace-sub .pace-switch { font: inherit; font-weight: bold; color: var(--text-main); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+        .pace-grid { display: grid; grid-template-columns: 1fr 3.4em 6.6em; column-gap: 8px; align-items: center; }
+        .pace-grid > div { padding: 9px 0; border-top: 1px solid var(--border-faint); font-size: 0.9rem; }
+        .pace-grid > .pace-hd { border-top: 0; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; }
+        .pace-on { color: var(--brand-green); font-weight: bold; }
+        .pace-behind { color: #b42318; font-weight: bold; }
+        .pace-none { color: var(--text-muted); font-size: 0.82rem; }
+        .pace-call { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.92rem; }
+        .pace-call .btn-outline { width: auto; margin: 0; padding: 8px 12px; color: var(--brand-navy); border: 1px solid var(--border-mid); white-space: nowrap; }
+        .pace-foot { text-align: center; font-size: 0.86rem; color: var(--text-muted); margin: 10px 0 0 0; }
     </style>
 </head>
 <body>
@@ -895,6 +907,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div class="day-card" id="ann-sent" style="display:none; margin-top:14px;"></div>
     </div>
 
+    <!-- E3a (mockup approved 2026-11-09): pace of play. Scores only, never a
+         location: the times are the server's own on each score's proof. Off
+         per event until the organizer turns it on. Owner only. -->
+    <div id="manage-tab-pace" style="display:none;">
+        <h2 class="ev-h">Pace of play</h2>
+        <p class="pace-sub" id="pace-sub"></p>
+        <div class="day-card" id="pace-table" style="display:none;"></div>
+        <div id="pace-calls"></div>
+        <p class="pace-foot" id="pace-foot" style="display:none;">"Behind" can be wrong when a group simply has not entered scores yet. It is a hint, not a ruling.</p>
+    </div>
+
     <div id="manage-tab-leaderboard" style="display:none;">
         <h2 style="text-align:center; font-size:1.3rem;" id="lb-t-name"></h2>
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="lb-t-sub"></p>
@@ -907,6 +930,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              Owner only, hidden in the tree for everyone else. -->
         <div class="ev-tools" id="event-tools-row" style="display:none;">
             <button class="btn-outline" id="open-announce" onclick="showTab('announce')">📣 Announcements</button>
+            <button class="btn-outline" id="open-pace" onclick="showTab('pace')">⏱️ Pace of play</button>
         </div>
         <!-- Only rendered when flights exist. A tournament without them shows exactly
              the leaderboard it always did, with no extra control to ignore. -->
@@ -2261,14 +2285,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // E1c (2026-11-09): the event tools are gated tabs with no pill of their
     // own - their door is #event-tools-row on the Leaderboard, owner only.
     // Kept in their own list so the Setup/Desk gate above is unchanged.
-    const EV_GATED_TABS = ['announce'];
+    const EV_GATED_TABS = ['announce', 'pace'];
     const MANAGE_TABS = ['setup', 'desk', 'leaderboard'].concat(EV_GATED_TABS);
     const GATED_TABS = ['setup', 'desk'];
     function showTab(tab) {
         // A gated tab is hidden for a non-owner (applyManageGate). Asking for it
         // then lands on the leaderboard - the tab is in the tree, so "is the
         // element there" is not the test; canManage() is.
-        if ((GATED_TABS.includes(tab) || EV_GATED_TABS.includes(tab)) && !canManage()) tab = 'leaderboard';
+        if (GATED_TABS.includes(tab) && !canManage()) tab = 'leaderboard';
+        if (EV_GATED_TABS.includes(tab) && !canManage()) tab = 'leaderboard';
         if (!document.getElementById('manage-tab-' + tab)) tab = 'leaderboard';
         MANAGE_TABS.forEach((k) => {
             const panel = document.getElementById('manage-tab-' + k);
@@ -3359,7 +3384,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // {time} / {place} the template leaves for the organizer keeps Send
     // disabled until it is filled in; Start time takes the event's start time.
     var evToolTab = null;            // 'announce' while that tool is on screen
-    var EV_TOOL_LABELS = { announce: 'Announcements' };
+    var EV_TOOL_LABELS = { announce: 'Announcements', pace: 'Pace of play' };
     var evBrandBy = null;            // the bar's company line, read once from the markup
     var ANNOUNCE_TEMPLATES = {
         start: 'Shotgun start at {time}. Head to your starting hole. Good luck!',
@@ -3385,7 +3410,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             by.textContent = (owner && evToolTab) ? EV_TOOL_LABELS[evToolTab] : evBrandBy;
         }
         syncFollowersListener(owner);
+        syncProofsListener(owner && evToolTab === 'pace' && paceSettings().on);
         if (owner && evToolTab === 'announce') renderAnnounce();
+        if (owner && evToolTab === 'pace') renderPace();
     }
 
     // HOW MANY APP FOLLOWERS: tournamentFollowers/<code>, owner-only to read.
@@ -3488,6 +3515,165 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return loadFunctionsSdk().then(() => firebase.functions().httpsCallable('sendAnnouncement')({ code: code, id: id }))
                 .catch(() => { /* the note is up; the row shows no bell */ });
         }).catch((err) => { alert(`Error: ${err.message}`); renderAnnounceMeta(); });
+    }
+
+    // ===== E3a: PACE OF PLAY (mockup approved 2026-11-09, plan section 3) ====
+    //
+    // tournaments/<code>/pace = {on, targetMin}: OFF until the organizer turns
+    // it on (absent = off), target 4:15 (255 min) by default, editable.
+    // SCORES ONLY, NEVER A LOCATION. The only score times that exist are the
+    // server's own t on each score's proof (scoreProofs/<code>, owner-readable
+    // under rules block E3), so a team's pace is read from its LAST SCORED
+    // HOLE: it finished `thru` holes by that time, against the target of
+    // thru x targetMin/18 minutes from the start (event date + start time; a
+    // shotgun is one start for everyone). A team a full hole's target or more
+    // behind reads "N min behind"; less is "on pace". A team with scores but
+    // no proof time (an unlocked event) reads "—": no time, no claim.
+    //
+    // Group ahead: on a shotgun, the team that started on the nearest later
+    // hole (it plays that hole while this one plays its own); on a tee-time
+    // start, the team before it in order.
+    //
+    // A nudge is tournaments/<code>/nudges/<team> = {at, tpl:'pace1', thru}:
+    // the fixed sentence on that team's card until it scores past `thru`.
+    var PACE_DEFAULT_MIN = 255;
+    var paceProofs = null;
+    var proofsBoundCode = null, proofsCb = null;
+
+    function paceSettings() {
+        const p = (currentData && currentData.pace) || {};
+        const t = Number(p.targetMin);
+        return { on: p.on === true, targetMin: (Number.isInteger(t) && t >= 120 && t <= 360) ? t : PACE_DEFAULT_MIN };
+    }
+    function syncProofsListener(wanted) {
+        const code = wanted ? currentCode : null;
+        if (proofsBoundCode === code) return;
+        if (proofsBoundCode && proofsCb) {
+            try { db.ref('scoreProofs/' + proofsBoundCode).off('value', proofsCb); } catch (e) { /* stub */ }
+        }
+        proofsBoundCode = null; proofsCb = null; paceProofs = null;
+        if (!code) return;
+        proofsCb = (snap) => {
+            if (currentCode !== code) return;
+            paceProofs = (snap && snap.val()) || {};
+            if (evToolTab === 'pace') renderPace();
+        };
+        db.ref('scoreProofs/' + code).on('value', proofsCb);
+        proofsBoundCode = code;
+    }
+    function paceMinText(min) { return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`; }
+    function paceStartMs(data) {
+        if (!EVENT_DETAIL_KEYS.startTime.test((data && data.startTime) || '')) return null;
+        const [h, m] = data.startTime.split(':').map(Number);
+        const d = EVENT_DETAIL_KEYS.eventDate.test(data.eventDate || '') ? data.eventDate.split('-').map(Number) : null;
+        const now = new Date();
+        return (d ? new Date(d[0], d[1] - 1, d[2], h, m, 0) : new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0)).getTime();
+    }
+
+    // One row per team (team event) or scoring group (individual event), in
+    // the round on screen (dayRoundId, the event-day panel's round).
+    function paceUnits(data, proofsAll, rid) {
+        const view = rid ? (roundView(data, rid) || {}) : data;
+        const holes = ((view.courseData || []).map((h) => Number(h.hole))).sort((a, b) => a - b);
+        const scores = view.scores || {};
+        const proofs = (rid ? ((proofsAll || {}).r || {})[rid] : proofsAll) || {};
+        const lastT = (prefixes) => Object.keys(proofs).reduce((best, k) => {
+            const p = proofs[k];
+            return (k !== 'r' && p && typeof p.t === 'number' && prefixes.some((x) => k.indexOf(x) === 0) && p.t > best) ? p.t : best;
+        }, 0) || null;
+        const shotgun = data.startType === 'shotgun';
+        const units = [];
+        if (recordIsIndividual()) {
+            const groups = view.scoringGroups || {};
+            Object.keys(groups).forEach((gid) => {
+                const g = groups[gid] || {};
+                const ids = (g.playerIds || []).filter(Boolean);
+                const thru = holes.filter((h) => ids.length > 0 && ids.every((pid) => (scores[`${pid}_h${h}`] || 0) > 0)).length;
+                units.push({ key: gid, label: g.name || 'Group', start: shotgun ? (Number(g.startingHole) || null) : null, thru, lastT: lastT(ids.map((pid) => pid + '_')), order: units.length });
+            });
+        } else {
+            const format = view.format || data.format || 'scramble';
+            Object.values(view.teams || data.teams || {}).filter((t) => t && t.num).sort((a, b) => a.num - b.num).forEach((t) => {
+                const n = t.num;
+                const thru = holes.filter((h) => {
+                    if (format === 'scramble') return (scores[`team${n}_h${h}`] || 0) > 0;
+                    const hs = (t.players || []).map((p, i) => Number(scores[`team${n}_p${i}_h${h}`]) || 0).filter((v) => v > 0);
+                    return computeTeamHoleScore(format, hs, view.shambleCountBest || data.shambleCountBest || 1) !== null;
+                }).length;
+                units.push({ key: 'team' + n, label: t.name || ('Team ' + n), start: shotgun ? (Number(t.startingHole) || null) : null, thru, lastT: lastT(['team' + n + '_']), order: units.length });
+            });
+        }
+        return units;
+    }
+    function paceRows(data, proofsAll, rid, settings) {
+        const per = settings.targetMin / 18;
+        const start = paceStartMs(data);
+        const units = paceUnits(data, proofsAll, rid);
+        units.forEach((u) => {
+            if (!u.thru) { u.status = 'none'; return; }
+            if (!u.lastT || !start) { u.status = 'unknown'; return; }
+            u.behindMin = Math.round((u.lastT - start) / 60000 - u.thru * per);
+            u.status = u.behindMin >= per ? 'behind' : 'on';
+        });
+        units.forEach((u) => {
+            let ahead = null;
+            if (u.start) {
+                let best = 99;
+                units.forEach((o) => { if (o !== u && o.start) { const d = (o.start - u.start + 18) % 18; if (d > 0 && d < best) { best = d; ahead = o; } } });
+            } else if (u.order > 0) ahead = units[u.order - 1];
+            u.ahead = ahead;
+        });
+        return units;
+    }
+
+    function renderPace() {
+        const s = paceSettings();
+        const sub = document.getElementById('pace-sub');
+        const table = document.getElementById('pace-table');
+        const calls = document.getElementById('pace-calls');
+        const foot = document.getElementById('pace-foot');
+        if (!sub) return;
+        const active = document.activeElement;
+        if (!(active && active.id === 'pace-target')) {
+            sub.innerHTML = `From last scored hole only. No locations. Target <input id="pace-target" inputmode="numeric" value="${paceMinText(s.targetMin)}" onchange="setPaceTarget(this.value)" aria-label="Target for 18"> for 18. Opt-in: <button type="button" class="pace-switch" id="pace-switch" onclick="setPaceOn(${s.on ? 'false' : 'true'})">${s.on ? 'on' : 'off'}</button> for this event.`;
+        }
+        if (!s.on) {
+            table.style.display = 'none'; table.innerHTML = ''; calls.innerHTML = ''; foot.style.display = 'none';
+            return;
+        }
+        const rows = paceRows(currentData || {}, paceProofs, dayRoundId(), s);
+        const rank = { behind: 0, on: 1, unknown: 2, none: 3 };
+        const shown = rows.slice().sort((a, b) => (b.thru - a.thru) || (rank[a.status] - rank[b.status]) || (a.order - b.order));
+        const vs = (u) => u.status === 'on' ? '<span class="pace-on">on pace</span>'
+            : u.status === 'behind' ? `<span class="pace-behind">${u.behindMin} min behind</span>`
+            : u.status === 'none' ? '<span class="pace-none">no scores yet</span>' : '<span class="pace-none">—</span>';
+        table.style.display = 'block';
+        table.innerHTML = `<div class="pace-grid"><div class="pace-hd">Team</div><div class="pace-hd">Thru</div><div class="pace-hd">vs target</div>`
+            + shown.map((u) => `<div>${escapeHtml(u.label)}${u.start ? ` · started ${u.start}` : ''}</div><div>${u.thru || '—'}</div><div>${vs(u)}</div>`).join('') + `</div>`;
+        calls.innerHTML = rows.filter((u) => u.status === 'behind').map((u) =>
+            `<div class="day-card pace-call"><span><strong>${escapeHtml(u.label)}</strong> is a hole behind ${u.ahead ? escapeHtml(u.ahead.label) : 'the group ahead'}</span>`
+            + `<button class="btn-outline" data-team="${escapeHtml(u.key)}" data-thru="${u.thru}" onclick="sendNudge(this.getAttribute('data-team'), Number(this.getAttribute('data-thru')))">Send a nudge</button></div>`).join('');
+        foot.style.display = 'block';
+    }
+
+    function setPaceOn(on) {
+        if (!canManage()) return;
+        db.ref(`tournaments/${currentCode}/pace`).set({ on: !!on, targetMin: paceSettings().targetMin })
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+    // "4:15" or "255". Anything outside 2:00..6:00 puts the saved value back.
+    function setPaceTarget(v) {
+        if (!canManage()) return;
+        const m = /^\s*(\d{1,2}):([0-5]\d)\s*$/.exec(String(v || '')) ;
+        const min = m ? Number(m[1]) * 60 + Number(m[2]) : (/^\s*\d{3}\s*$/.test(String(v || '')) ? Number(v) : NaN);
+        if (!(Number.isInteger(min) && min >= 120 && min <= 360)) { const el = document.getElementById('pace-target'); if (el) el.value = paceMinText(paceSettings().targetMin); return; }
+        db.ref(`tournaments/${currentCode}/pace`).set({ on: paceSettings().on, targetMin: min })
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+    function sendNudge(key, thru) {
+        if (!canManage() || !/^(team[0-9]+|g[a-z0-9]+)$/.test(String(key || '')) || !(Number.isInteger(thru) && thru >= 0 && thru <= 18)) return;
+        db.ref(`tournaments/${currentCode}/nudges/${key}`).set({ at: firebase.database.ServerValue.TIMESTAMP, tpl: 'pace1', thru: thru })
+            .catch((err) => alert(`Error: ${err.message}`));
     }
 
     // ===== SCORING-LINK KEYS (scorecard-lock wave, 2026-10-06) ===============

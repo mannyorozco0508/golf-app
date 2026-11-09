@@ -144,6 +144,12 @@
         .older-list { border: 1px solid var(--border-mid); border-radius: 12px; padding: 4px 12px; margin: 0 0 12px 0; }
         .older-row { padding: 8px 0; font-size: 0.88rem; overflow-wrap: anywhere; }
         .older-row + .older-row { border-top: 1px solid var(--border-faint); }
+        /* E3b (mockup approved 2026-11-09): the organizer's pace nudge, on THIS
+           team's card only, until it scores the next hole. Fixed words. */
+        .pace-note { background: var(--brand-navy); color: #ffffff; border-radius: 14px; padding: 12px 14px; margin: 0 0 12px 0; }
+        .pace-note-head { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.88; margin-bottom: 4px; }
+        .pace-note-text { font-size: 1rem; line-height: 1.35; }
+        .pace-note-foot { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: 0 0 12px 0; }
     </style>
 </head>
 <body>
@@ -158,6 +164,12 @@
     <div class="org-note" id="org-note" style="display:none;" role="status">
         <div class="org-note-head" id="org-note-head"></div>
         <div class="org-note-text" id="org-note-text"></div>
+    </div>
+    <!-- E3b (2026-11-09): tournaments/<code>/nudges/<this card's team or
+         group>, shown until the card has scored past the nudge's thru. -->
+    <div class="pace-note" id="pace-note" style="display:none;" role="status">
+        <div class="pace-note-head">⏱️ Friendly pace note</div>
+        <div class="pace-note-text">You're about a hole behind the group ahead. Ready golf helps everyone. Thanks!</div>
     </div>
     <div class="top-nav-bar">
         <span class="top-nav-item active" id="tab-btn-scorecard" onclick="showTab('scorecard')">📝 Scorecard</span>
@@ -198,6 +210,7 @@
         <!-- E1a: "Older notes" opens the earlier ones. Shown only when there are. -->
         <div class="older-notes" id="older-notes" style="display:none;">Older notes: <a href="#" id="older-notes-link" onclick="toggleOlderNotes(); return false;"></a></div>
         <div class="older-list" id="older-list" style="display:none;"></div>
+        <div class="pace-note-foot" id="pace-note-foot" style="display:none;">Only your team sees this. It goes away after you score the next hole.</div>
         <div id="holes-list"></div>
         <div class="play-order-note" id="play-order-note" style="display:none;"></div>
     </div>
@@ -325,6 +338,7 @@
             if (group) renderGroup(group); else renderAll();
             renderWaitingChip();
             renderOrgNotes();
+            renderPaceNote();
             // "Updates live" (A3) is true only if the open board re-renders
             // on each snapshot. Before this it changed only on a tab tap.
             if (boardTabOpen) renderLeaderboard();
@@ -367,6 +381,19 @@
         list.innerHTML = older.map((n) => `<div class="older-row">${orgNoteClock(n.at)} · ${escapeHtml(n.text)}</div>`).join('');
     }
     function toggleOlderNotes() { olderNotesOpen = !olderNotesOpen; renderOrgNotes(); }
+
+    // ---- E3b: THE PACE NUDGE (mockup approved 2026-11-09) ---------------------
+    // nudges/<team{n} | group id> = {at, tpl:'pace1', thru}, owner-written. Shown
+    // on this card only while the card's own Thru (the count its status line
+    // reads, set by renderAll / renderGroup) has not passed the nudge's thru.
+    var cardThru = 0;   // var: written by the renderers the snapshot listener calls
+    function renderPaceNote() {
+        const key = myGroupId ? myGroupId : ('team' + myTeamNum);
+        const n = ((currentData && currentData.nudges) || {})[key];
+        const show = !!(n && n.tpl === 'pace1' && Number.isInteger(n.thru) && cardThru <= n.thru);
+        document.getElementById('pace-note').style.display = show ? 'block' : 'none';
+        document.getElementById('pace-note-foot').style.display = show ? 'block' : 'none';
+    }
 
     // computeTeamHoleScore and computeTournamentLeaderboard now live in tournament-engine.js
     // so this page and the organizer's tournament.html always agree on totals and standings.
@@ -1080,6 +1107,7 @@
         // has finished, so it can never disagree with the hole it says is next.
         const isPlayed = (n) => groupHolePlayed(scores, ids, n);
         const played = order.filter(h => isPlayed(Number(h.hole))).length;
+        cardThru = played;
         const next = nextHoleInPlayOrder({ holes: courseData, startingHole: group.startingHole, isScored: isPlayed });
         applyPlayState(order, isPlayed, roundLocked ? null : next);
         if (!roundLocked) scrollToNextHole(order, next);
@@ -1211,6 +1239,7 @@
         }
 
         const isPlayed = (n) => !!playedHoles[n];
+        cardThru = thru;
         const next = nextHoleInPlayOrder({ holes: courseData, startingHole: team.startingHole, isScored: isPlayed });
         applyPlayState(order, isPlayed, roundLocked ? null : next);
         if (!roundLocked) scrollToNextHole(order, next);
