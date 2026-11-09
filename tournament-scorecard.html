@@ -134,6 +134,16 @@
         .hp-brand-word { font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em; white-space: nowrap; }
         .hp-brand-word .hp-brand-product { color: #d4f28a; }
         .hp-brand-by { margin-left: auto; font-size: 0.82rem; color: rgba(255,255,255,0.82); white-space: nowrap; }
+        /* E1a (mockup approved 2026-11-09): the organizer's newest note on top
+           of the card until the next one. One-way: nothing here takes a reply. */
+        .org-note { background: #7c2d12; color: #ffffff; border-radius: 14px; padding: 12px 14px; margin: 0 0 12px 0; }
+        .org-note-head { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.88; margin-bottom: 4px; }
+        .org-note-text { font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
+        .older-notes { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: 0 0 12px 0; }
+        .older-notes a { color: var(--text-muted); }
+        .older-list { border: 1px solid var(--border-mid); border-radius: 12px; padding: 4px 12px; margin: 0 0 12px 0; }
+        .older-row { padding: 8px 0; font-size: 0.88rem; overflow-wrap: anywhere; }
+        .older-row + .older-row { border-top: 1px solid var(--border-faint); }
     </style>
 </head>
 <body>
@@ -143,6 +153,12 @@
 <header class="hp-brand" id="hp-brand"><span class="hp-brand-mark" aria-hidden="true"><span></span></span><span class="hp-brand-word">HardPan <span class="hp-brand-product">Tournaments</span></span><span class="hp-brand-by">by Rattle Golf</span></header>
 
 <div class="container" id="main-content" style="display:none;">
+    <!-- E1a (2026-11-09): the newest organizer note. Read from the same
+         tournaments/<code> snapshot as the card; hidden when there is none. -->
+    <div class="org-note" id="org-note" style="display:none;" role="status">
+        <div class="org-note-head" id="org-note-head"></div>
+        <div class="org-note-text" id="org-note-text"></div>
+    </div>
     <div class="top-nav-bar">
         <span class="top-nav-item active" id="tab-btn-scorecard" onclick="showTab('scorecard')">📝 Scorecard</span>
         <span class="top-nav-item" id="tab-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</span>
@@ -179,6 +195,9 @@
              the server. Hidden at zero, and hidden while a send is merely in
              flight on a good signal - see renderWaitingChip. -->
         <div class="waiting-row"><span class="waiting-chip" id="score-waiting" style="display:none;"></span></div>
+        <!-- E1a: "Older notes" opens the earlier ones. Shown only when there are. -->
+        <div class="older-notes" id="older-notes" style="display:none;">Older notes: <a href="#" id="older-notes-link" onclick="toggleOlderNotes(); return false;"></a></div>
+        <div class="older-list" id="older-list" style="display:none;"></div>
         <div id="holes-list"></div>
         <div class="play-order-note" id="play-order-note" style="display:none;"></div>
     </div>
@@ -305,12 +324,49 @@
             lastSnapshotAt = Date.now();
             if (group) renderGroup(group); else renderAll();
             renderWaitingChip();
+            renderOrgNotes();
             // "Updates live" (A3) is true only if the open board re-renders
             // on each snapshot. Before this it changed only on a tab tap.
             if (boardTabOpen) renderLeaderboard();
         });
         armScoreQueue();
     }
+
+    // ---- E1a: THE ORGANIZER'S NOTES (mockup approved 2026-11-09) -----------
+    // tournaments/<code>/announcements/<id> = {text, tpl, at, by, pushed?},
+    // owner-written, public to read like the board. The newest sits on top of
+    // the card until the next one; "Older notes" lists the rest, newest first.
+    // One-way by design: no reply, no field chat - nothing here writes.
+    var olderNotesOpen = false;   // var: read by the snapshot listener, registered above
+    function orgNotesSorted(data) {
+        const a = (data && data.announcements) || {};
+        return Object.keys(a).map((id) => a[id])
+            .filter((x) => x && typeof x.text === 'string' && x.text.trim() && typeof x.at === 'number')
+            .sort((x, y) => y.at - x.at);
+    }
+    function orgNoteClock(ms) { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+    function renderOrgNotes() {
+        const notes = orgNotesSorted(currentData);
+        const box = document.getElementById('org-note');
+        if (!box) return;
+        if (!notes.length) {
+            box.style.display = 'none';
+            document.getElementById('older-notes').style.display = 'none';
+            document.getElementById('older-list').style.display = 'none';
+            return;
+        }
+        const top = notes[0];
+        box.style.display = 'block';
+        document.getElementById('org-note-head').textContent = `${top.tpl === 'weather' ? '⚡ ' : ''}From the organizer · ${orgNoteClock(top.at)}`;
+        document.getElementById('org-note-text').textContent = top.text;
+        const older = notes.slice(1);
+        document.getElementById('older-notes').style.display = older.length ? 'block' : 'none';
+        document.getElementById('older-notes-link').textContent = `${older.length} earlier from the organizer`;
+        const list = document.getElementById('older-list');
+        list.style.display = (older.length && olderNotesOpen) ? 'block' : 'none';
+        list.innerHTML = older.map((n) => `<div class="older-row">${orgNoteClock(n.at)} · ${escapeHtml(n.text)}</div>`).join('');
+    }
+    function toggleOlderNotes() { olderNotesOpen = !olderNotesOpen; renderOrgNotes(); }
 
     // computeTeamHoleScore and computeTournamentLeaderboard now live in tournament-engine.js
     // so this page and the organizer's tournament.html always agree on totals and standings.

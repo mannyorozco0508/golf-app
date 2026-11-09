@@ -341,8 +341,11 @@ test('R2. refundEntry refusals: non-owner, signed-out, cash-paid, already refund
 // ---------------------------------------------------------------- the deployed wrappers (index.js)
 test('X1. index.js: exports exactly the three contract functions, us-central1, both secrets bound, HttpsError carries details.reason', SKIP, async () => {
     const m = require(path.join(FN, 'index.js'));
-    assert.deepEqual(Object.keys(m).sort(), ['createEntryCheckout', 'refundEntry', 'stripeWebhook']);
-    for (const k of Object.keys(m)) {
+    // RE-PINNED 2026-11-09 (E1): the codebase also exports sendAnnouncement,
+    // which binds NO Stripe secret - tournament_e1_announce_server_test.js X1
+    // holds that. The three contract functions below are unchanged.
+    assert.deepEqual(Object.keys(m).sort(), ['createEntryCheckout', 'refundEntry', 'sendAnnouncement', 'stripeWebhook']);
+    for (const k of ['createEntryCheckout', 'refundEntry', 'stripeWebhook']) {
         assert.deepEqual(m[k].__endpoint.region, ['us-central1'], k);
         assert.deepEqual(m[k].__endpoint.secretEnvironmentVariables.map((s) => s.key).sort(), ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'], k);
     }

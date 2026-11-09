@@ -5,6 +5,7 @@
 //
 // Secrets (Firebase secrets only, never in the repo): STRIPE_SECRET_KEY,
 // STRIPE_WEBHOOK_SECRET. Deploy: README.md. Never deploy without Manny's typed OK.
+// Also E1 sendAnnouncement (2026-11-09): organizer notes pushed to app followers.
 // ============================================================================
 'use strict';
 
@@ -63,5 +64,31 @@ exports.stripeWebhook = onRequest(OPTS, async (req, res) => {
     } catch (e) {
         logger.error('stripeWebhook internal error', e && e.message);
         res.status(500).send('error');
+    }
+});
+
+// ---- E1 (2026-11-09): sendAnnouncement, owner only. No Stripe and no secret:
+// its own options object, so the Stripe secrets are not bound to it. Every rule
+// lives in announce-core.js / handlers-announce.js (injected db + messaging).
+const { makeAnnounceHandlers, AnnounceError } = require('./handlers-announce.js');
+const ANNOUNCE_OPTS = { region: 'us-central1' };
+let announceCached = null;
+function announceHandlers() {
+    if (!announceCached) {
+        announceCached = makeAnnounceHandlers({
+            db: admin.database(),
+            messaging: admin.messaging(),
+            log: (...a) => logger.warn(...a)
+        });
+    }
+    return announceCached;
+}
+exports.sendAnnouncement = onCall(ANNOUNCE_OPTS, async (request) => {
+    try {
+        return await announceHandlers().sendAnnouncement(request.data, { uid: request.auth && request.auth.uid });
+    } catch (e) {
+        if (e instanceof AnnounceError) throw new HttpsError(e.code, e.reason, { reason: e.reason });
+        logger.error('sendAnnouncement internal error', e && e.message);
+        throw new HttpsError('internal', 'internal');
     }
 });
