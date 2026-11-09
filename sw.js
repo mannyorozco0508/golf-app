@@ -4728,6 +4728,9 @@ const SHELL_FILES = [
     // broken shell, which reads as "the app is working" and is worse than the
     // offline notice.
     './tournament-engine.js',
+    // E2 contest holes (event-e2e4): both tournament pages load it. No
+    // CACHE_VERSION move here - the lead bumps once for the merged event tools.
+    './tournament-contests.js',
     './qrcode.min.js',
     './pwa-boot.js',
     // THE FIREBASE SDK, SERVED FROM THIS ORIGIN.

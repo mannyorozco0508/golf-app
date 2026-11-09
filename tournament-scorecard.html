@@ -37,6 +37,9 @@
          Approve button copies it into the field that every page renders. -->
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <!-- E2 contest holes: the one ranking and entry builder this page and
+         tournament.html share (tournament-contests.js). -->
+    <script src="tournament-contests.js"></script>
     <!-- Scores typed with no signal are kept in this phone's storage until the
          server confirms them, so closing the tab cannot lose them. The shared
          queue, unmodified; the page files it under its own storage key. -->
@@ -127,6 +130,33 @@
         .lb-seg button { flex: 1; border: 0; background: transparent; color: var(--text-muted); font-weight: bold; font-size: 0.85rem; padding: 8px 0; border-radius: 8px; cursor: pointer; font-family: inherit; }
         .lb-seg button.on { background: var(--brand-navy); color: #ffffff; }
         .lb-note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
+        /* E2 (approved "as mocked" 2026-11-09): the contest-hole prompt and the
+           Contests board. Typed distances only on the web - no GPS mark here. */
+        .contest-prompt { border: 2px solid #d4a017; border-radius: 14px; padding: 14px; margin: 0 0 14px 0; background: var(--bg-card); }
+        .cp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+        .cp-title { font-weight: 800; font-size: 1.05rem; color: var(--text-main); }
+        .cp-meta { font-size: 0.8rem; font-weight: bold; color: var(--text-muted); white-space: nowrap; }
+        .cp-sub { font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 10px 0; }
+        .cp-who { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .cp-chip { border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--brand-navy); border-radius: 999px; padding: 7px 12px; font-weight: bold; font-size: 0.82rem; cursor: pointer; font-family: inherit; }
+        .cp-chip.on { background: var(--brand-navy); border-color: var(--brand-navy); color: #ffffff; }
+        .cp-inputs { display: flex; gap: 10px; }
+        .cp-box { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; border: 2px solid var(--brand-navy); border-radius: 10px; padding: 8px; }
+        .cp-box input { width: 64px; border: 0; font-size: 1.3rem; font-weight: 800; text-align: right; background: transparent; color: var(--text-main); font-family: inherit; }
+        .cp-box input:focus { outline: none; }
+        .cp-box span { font-size: 1.15rem; font-weight: 800; }
+        .cp-save { width: 100%; margin-top: 10px; background: var(--brand-navy); color: #ffffff; border: 0; border-radius: 12px; padding: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .cp-msg { min-height: 16px; text-align: center; font-size: 0.8rem; font-weight: bold; margin-top: 8px; }
+        .cp-msg.ok { color: var(--brand-green); }
+        .cp-msg.err { color: var(--accent-red); }
+        .cp-skip { display: block; margin: 6px auto 0 auto; background: none; border: 0; color: var(--text-muted); text-decoration: underline; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
+        .cb-card { border: 1px solid var(--border-mid); border-radius: 14px; padding: 10px 14px; margin-bottom: 12px; background: var(--bg-card); }
+        .cb-head { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #444; padding: 4px 0 8px 0; border-bottom: 1px solid var(--border-faint); }
+        .cb-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border-faint); font-size: 0.95rem; }
+        .cb-row .cb-team { color: var(--text-muted); font-size: 0.82rem; }
+        .cb-row .cb-val { font-weight: 800; white-space: nowrap; }
+        .cb-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; color: var(--text-muted); padding: 8px 0 2px 0; }
+        .cb-note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
         /* M6: the HardPan Tournaments bar (same rules as tournament.html). */
         .hp-brand { display: flex; align-items: center; gap: 10px; background: #0f4c3a; color: #ffffff; margin: -12px -12px 12px -12px; padding: 12px 16px; }
         .hp-brand-mark { width: 30px; height: 30px; border-radius: 8px; background: #0B0F0C; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
@@ -146,6 +176,8 @@
     <div class="top-nav-bar">
         <span class="top-nav-item active" id="tab-btn-scorecard" onclick="showTab('scorecard')">📝 Scorecard</span>
         <span class="top-nav-item" id="tab-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</span>
+        <!-- E2c: shown only when the event has contest holes. -->
+        <span class="top-nav-item" id="tab-btn-contests" style="display:none;" onclick="showTab('contests')">🎯 Contests</span>
     </div>
 
     <div class="event-title" id="event-title"></div>
@@ -170,6 +202,9 @@
             <div class="status-main" id="status-main">Thru 0</div>
             <div class="status-sub" id="status-sub"></div>
         </div>
+        <!-- E2a / E2b: the contest-hole prompt, on the hole this card is playing
+             (or has just played) when the organizer made it a contest hole. -->
+        <div class="contest-prompt" id="contest-prompt" style="display:none;"></div>
         <!-- SAVE STATE. Scores were written fire-and-forget with no confirmation, so a
              golfer on a thin signal had no way to tell a saved hole from a lost one.
              One quiet line that settles back to idle, rather than a toast per keystroke -
@@ -188,6 +223,12 @@
         <div class="lb-seg" id="lb-scope" style="display:none;"></div>
         <div id="leaderboard-list"></div>
         <div class="lb-note" id="lb-note" style="display:none;"></div>
+    </div>
+
+    <!-- E2c: the live contest board. Leaders update as entries land; the
+         organizer confirms. Nothing is paid in the app. -->
+    <div id="tab-contests" style="display:none;">
+        <div id="contest-board"></div>
     </div>
 </div>
 
@@ -217,13 +258,18 @@
     // This page never touches the browser's stored theme preference.
 
     let boardTabOpen = false;   // the Leaderboard tab is on screen: snapshots re-render it
+    // The page's tabs. Contests (E2c) is drawn only on an event with contest holes.
+    const CARD_TABS = ['scorecard', 'leaderboard', 'contests'];
     function showTab(tab) {
         boardTabOpen = (tab === 'leaderboard');
-        document.getElementById('tab-scorecard').style.display = tab === 'scorecard' ? 'block' : 'none';
-        document.getElementById('tab-leaderboard').style.display = tab === 'leaderboard' ? 'block' : 'none';
-        document.getElementById('tab-btn-scorecard').classList.toggle('active', tab === 'scorecard');
-        document.getElementById('tab-btn-leaderboard').classList.toggle('active', tab === 'leaderboard');
+        CARD_TABS.forEach((k) => {
+            const panel = document.getElementById('tab-' + k);
+            const btn = document.getElementById('tab-btn-' + k);
+            if (panel) panel.style.display = tab === k ? 'block' : 'none';
+            if (btn) btn.classList.toggle('active', tab === k);
+        });
         if (tab === 'leaderboard') renderLeaderboard();
+        if (tab === 'contests') renderContestBoard();
     }
 
     // ONE SCORING SURFACE, TWO SCOPES.
@@ -310,6 +356,12 @@
             if (boardTabOpen) renderLeaderboard();
         });
         armScoreQueue();
+        // E2: the event's contest entries (public, like the board). The prompt
+        // reads it to know who on this card has entered; the board ranks it.
+        db.ref(`contestEntries/${currentCode}`).on('value', (snap) => {
+            contestEntries = (snap && snap.val()) || {};
+            renderContestArea();
+        });
     }
 
     // computeTeamHoleScore and computeTournamentLeaderboard now live in tournament-engine.js
@@ -1044,6 +1096,10 @@
         if (roundLocked) {
             document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
         }
+        // E2: who on this card can enter a contest - each golfer by player id.
+        contestCtx = { order: order, isPlayed: isPlayed, next: roundLocked ? null : next,
+            golfers: ids.map(pid => ({ entryKey: pid, who: pid, team: pid, name: competitorDisplayName(players[pid]) || 'Golfer' })) };
+        renderContestArea();
         if (currentData.roundName) {
             document.getElementById('event-sub').textContent =
                 `${currentData.courseName} • ${currentData.roundName} • Individual Stroke Play • ${netMode ? 'Net' : 'Gross'}`;
@@ -1187,6 +1243,181 @@
         if (roundLocked) {
             document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
         }
+        // E2: who on this card can enter a contest - each golfer by index.
+        contestCtx = { order: order, isPlayed: isPlayed, next: roundLocked ? null : next,
+            golfers: (team.players || []).map((name, i) => ({ entryKey: `team${myTeamNum}_p${i}`, who: `team${myTeamNum}`, team: `team${myTeamNum}`, name: String(name || '') || `Golfer ${i + 1}` })) };
+        renderContestArea();
+    }
+
+    // ===== E2: CONTEST HOLES ON THE CARD (approved "as mocked" 2026-11-09) =====
+    //
+    // THE PROMPT (E2a closest to the pin, E2b long drive) shows on the hole this
+    // card is playing - the next hole in its play order - or the hole it has just
+    // finished, when the organizer made that hole a contest hole and has not yet
+    // confirmed a winner. It goes once every golfer on the card has an entry, or
+    // when "Not on the green" is tapped.
+    //
+    // TYPED ONLY ON THE WEB. The app's GPS mark (HardPanMark: gps-kp.js /
+    // gps-longdrive.js) is not on this page: the tournament record carries no
+    // link to a HardPan GPS course (gps_links / gps_courses), those records need
+    // a signed-in reader, and this page has no sign-in and no GPS code. So no
+    // "Mark with GPS" box is drawn here, and nothing here asks for a location.
+    // A GPS-marked entry from the app shows on the board with its pin.
+    //
+    // THE WRITE IS A SCORE'S WRITE: one update, the entry and (on a keyed link)
+    // its proof {who, k, t: now}, built by TournamentContests.entryUpdate. Only a
+    // distance and a time are written - never a position.
+    var contestEntries = {};
+    var contestCtx = null;
+    var contestPick = {};          // hole -> the golfer chosen on this card
+    var contestMsg = {};           // hole -> { cls, text } after a save
+    var contestShape = '';
+    const CONTEST_REFUSED = "⚠️ Not saved — this link can't enter for this card. Ask the organizer for your team's link.";
+
+    function contestsOn() {
+        const data = currentData || {};
+        return !isMultiRound(data) && TournamentContests.contestList(data).length > 0;
+    }
+    function contestSkipKey(hole) {
+        return `rattle_contest_skip_${currentCode}_${hole}_${myGroupId || myTeamNum}`;
+    }
+    function contestSkipped(hole) {
+        if (contestSkippedNow[hole]) return true;
+        try { return localStorage.getItem(contestSkipKey(hole)) === '1'; } catch (e) { return false; }
+    }
+    // The contest this card is on now: the next hole, else the hole just played.
+    function contestHoleNow() {
+        if (!contestCtx || !contestsOn()) return null;
+        const data = currentData || {};
+        const order = contestCtx.order || [];
+        const cands = [];
+        if (contestCtx.next) {
+            cands.push(Number(contestCtx.next.hole));
+            const at = order.findIndex(h => Number(h.hole) === Number(contestCtx.next.hole));
+            if (at > 0 && contestCtx.isPlayed(Number(order[at - 1].hole))) cands.push(Number(order[at - 1].hole));
+        }
+        for (const hole of cands) {
+            const c = TournamentContests.contestFor(data, hole);
+            if (!c || c.lockedAt || contestSkipped(hole)) continue;
+            const got = contestEntries[c.key] || {};
+            if (contestCtx.golfers.length && contestCtx.golfers.every(g => got[g.entryKey])) continue;
+            return c;
+        }
+        return null;
+    }
+    // THE TAB WORDS. Two tabs keep the words they always had. With a third
+    // (Contests, Photos) the bar uses the mockups' short words - "Board" for
+    // Leaderboard (E4a), no icons - so every tab fits one line at 390 wide.
+    const CARD_TAB_WORDS = { scorecard: ['📝 Scorecard', 'Scorecard'], leaderboard: ['🏆 Leaderboard', 'Board'], contests: ['🎯 Contests', 'Contests'], photos: ['📷 Photos', 'Photos'] };
+    function syncCardTabs() {
+        const btns = CARD_TABS.map((k) => document.getElementById('tab-btn-' + k)).filter(Boolean);
+        const compact = btns.filter((b) => b.style.display !== 'none').length > 2;
+        CARD_TABS.forEach((k) => {
+            const b = document.getElementById('tab-btn-' + k);
+            if (b && CARD_TAB_WORDS[k]) b.textContent = CARD_TAB_WORDS[k][compact ? 1 : 0];
+        });
+    }
+    function renderContestArea() {
+        const tabBtn = document.getElementById('tab-btn-contests');
+        if (tabBtn) tabBtn.style.display = contestsOn() ? '' : 'none';
+        syncCardTabs();
+        renderContestPrompt();
+        const panel = document.getElementById('tab-contests');
+        if (panel && panel.style.display === 'block') renderContestBoard();
+    }
+    function renderContestPrompt() {
+        const box = document.getElementById('contest-prompt');
+        if (!box) return;
+        const c = contestHoleNow();
+        if (!c) { box.style.display = 'none'; box.innerHTML = ''; contestShape = ''; return; }
+        const got = contestEntries[c.key] || {};
+        const golfers = contestCtx.golfers;
+        const open = golfers.filter(g => !got[g.entryKey]);
+        if (golfers.length === 1) contestPick[c.hole] = golfers[0].entryKey;
+        const pick = contestPick[c.hole] || null;
+        const msg = contestMsg[c.hole] || null;
+        // Rebuilt only when what it shows changes, so a snapshot cannot wipe a
+        // distance being typed.
+        const shape = JSON.stringify([c.key, c.kind, pick, golfers.map(g => [g.entryKey, !!got[g.entryKey]]), msg]);
+        box.style.display = 'block';
+        if (shape === contestShape) return;
+        contestShape = shape;
+        const kp = c.kind === 'kp';
+        const meta = kp ? `Par ${c.par || 3}` : `Par ${c.par || ''}${c.fairwayOnly ? ' · fairway only' : ''}`;
+        let html = `<div class="cp-head"><span class="cp-title">${TournamentContests.KIND_ICON[c.kind]} Hole ${c.hole} · ${TournamentContests.KIND_LABEL[c.kind]}</span><span class="cp-meta">${escapeHtml(meta)}</span></div>`;
+        html += `<div class="cp-sub">${kp ? 'On the green in one? Enter how far from the cup.' : (c.fairwayOnly ? 'In the fairway? Enter your drive.' : 'Enter your drive.')}</div>`;
+        if (golfers.length > 1) {
+            html += `<div class="cp-who" role="group" aria-label="Whose ball?">` + golfers.map(g => {
+                const e = got[g.entryKey];
+                const first = escapeHtml(String(g.name).split(' ')[0]);
+                return e
+                    ? `<span class="cp-chip" aria-disabled="true">${first} ✓ ${escapeHtml(TournamentContests.valueText(e))}</span>`
+                    : `<button type="button" class="cp-chip${pick === g.entryKey ? ' on' : ''}" data-entry="${escapeHtml(g.entryKey)}" onclick="pickContestGolfer(${c.hole}, this.dataset.entry)">${first}</button>`;
+            }).join('') + `</div>`;
+        }
+        html += kp
+            ? `<div class="cp-inputs"><label class="cp-box"><input id="cp-ft" type="number" inputmode="numeric" min="0" max="100" aria-label="Feet"><span>ft</span></label><label class="cp-box"><input id="cp-in" type="number" inputmode="numeric" min="0" max="11" aria-label="Inches"><span>in</span></label></div>`
+            : `<div class="cp-inputs"><label class="cp-box"><input id="cp-yds" type="number" inputmode="numeric" min="${TournamentContests.LD_MIN_YD}" max="${TournamentContests.LD_MAX_YD}" aria-label="Yards"><span>yds</span></label></div>`;
+        html += `<button type="button" class="cp-save" id="cp-save" onclick="saveContestEntry(${c.hole})">${kp ? 'Save my KP' : 'Save my drive'}</button>`;
+        html += `<div class="cp-msg${msg ? ' ' + msg.cls : ''}" id="cp-msg" aria-live="polite">${msg ? escapeHtml(msg.text) : ''}</div>`;
+        if (kp) html += `<button type="button" class="cp-skip" id="cp-skip" onclick="skipContestHole(${c.hole})">Not on the green</button>`;
+        box.innerHTML = html;
+        if (open.length === 0) box.style.display = 'none';
+    }
+    function pickContestGolfer(hole, entryKey) {
+        contestPick[hole] = entryKey;
+        contestMsg[hole] = null;
+        renderContestPrompt();
+    }
+    function skipContestHole(hole) {
+        try { localStorage.setItem(contestSkipKey(hole), '1'); } catch (e) { /* private window: hides until reload */ }
+        contestSkippedNow[hole] = true;
+        renderContestPrompt();
+    }
+    var contestSkippedNow = {};
+    function saveContestEntry(hole) {
+        const data = currentData || {};
+        const c = TournamentContests.contestFor(data, hole);
+        if (!c || !contestCtx) return;
+        const g = contestCtx.golfers.find(x => x.entryKey === contestPick[hole]);
+        const say = (cls, text) => { contestMsg[hole] = { cls, text }; contestShape = ''; renderContestPrompt(); };
+        if (!g) { say('err', 'Tap whose ball it is first.'); return; }
+        const val = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+        const o = { code: currentCode, hole: c.hole, kind: c.kind, entryKey: g.entryKey, who: g.who, team: g.team, name: g.name, k: myScoreKey };
+        if (c.kind === 'kp') {
+            o.inches = TournamentContests.kpInches(val('cp-ft'), val('cp-in'));
+            if (o.inches === null) { say('err', 'Enter feet and inches (up to 100 ft).'); return; }
+        } else {
+            o.yards = TournamentContests.ldYards(val('cp-yds'));
+            if (o.yards === null) { say('err', `Enter yards from ${TournamentContests.LD_MIN_YD} to ${TournamentContests.LD_MAX_YD}.`); return; }
+        }
+        const update = TournamentContests.entryUpdate(o, firebase.database.ServerValue.TIMESTAMP);
+        contestMsg[hole] = { cls: '', text: 'Saving…' };
+        return db.ref().update(update)
+            .then(() => { contestMsg[hole] = { cls: 'ok', text: `✓ Saved: ${String(g.name).split(' ')[0]} ${TournamentContests.valueText(o)}` }; contestPick[hole] = null; contestShape = ''; renderContestPrompt(); })
+            .catch((err) => say('err', (err && err.code === 'PERMISSION_DENIED') ? CONTEST_REFUSED : '⚠️ Could not save — check your signal and try again.'));
+    }
+
+    // E2c: THE BOARD. Every contest hole, its leaders, and who has played it.
+    function renderContestBoard() {
+        const el = document.getElementById('contest-board');
+        if (!el) return;
+        const data = currentData || {};
+        const list = contestsOn() ? TournamentContests.contestList(data) : [];
+        let gpsLegend = false;
+        el.innerHTML = list.map((c) => {
+            const rows = TournamentContests.ranked(contestEntries[c.key] || {}, c.kind).slice(0, 3);
+            const thru = TournamentContests.throughCount(data, c.hole);
+            const anyGps = rows.some(r => r.by === 'gps');
+            const legend = anyGps && !gpsLegend ? (gpsLegend = true, '<span>GPS 📍 = marked</span>') : '';
+            const body = rows.length ? rows.map((r, i) => {
+                const team = TournamentContests.teamLabel(data, r.team);
+                const won = c.winner === r.key ? ' <span class="cb-team">· Winner ✓</span>' : '';
+                return `<div class="cb-row"><span><strong>${i + 1}</strong> ${escapeHtml(r.name || '')}${r.by === 'gps' ? ' 📍' : ''}${team ? ` <span class="cb-team">${escapeHtml(team)}</span>` : ''}${won}</span><span class="cb-val">${escapeHtml(TournamentContests.valueText(r))}</span></div>`;
+            }).join('') : `<div class="cb-row"><span class="cb-team">No entries yet</span></div>`;
+            const foot = c.winner ? 'Winner confirmed by the organizer' : `${thru.done} of ${thru.total} ${thru.noun} through`;
+            return `<div class="cb-card"><div class="cb-head">${TournamentContests.KIND_ICON[c.kind]} Hole ${c.hole} · ${TournamentContests.KIND_LABEL[c.kind]}</div>${body}<div class="cb-foot"><span>${foot}</span>${legend}</div></div>`;
+        }).join('') + (list.length ? `<p class="cb-note" id="contest-board-note">Organizer confirms winners at the end. Prizes are whatever the organizer announces: nothing is paid in the app.</p>` : '');
     }
 </script>
 </body>

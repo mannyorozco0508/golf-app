@@ -397,7 +397,8 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
         assert.doesNotMatch(setup, /id="registration-list"/, 'the list has left Setup');
         assert.match(desk, /id="registration-list"/);
         assert.ok(!/id="registration-section"|id="registration-list"/.test(src.slice(b)), 'one of each, nowhere else');
-        assert.match(src, /const GATED_TABS = \['setup', 'desk'\];/, 'the gate names both tabs');
+        // E2d (2026-11-09) adds Contests to the gate - re-pinned on purpose; Setup and Desk still lead it.
+        assert.match(src, /const GATED_TABS = \['setup', 'desk', 'contests'\];/, 'the gate names both tabs, and Contests');
     });
 });
 

@@ -56,6 +56,8 @@
          Approve button copies it into the field that every page renders. -->
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <!-- E2: contest holes - the ranking and labels the golfer's card uses too. -->
+    <script src="tournament-contests.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -225,6 +227,24 @@
         #main-format-picker .format-card.active .fmt-icon { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.35); }
         #main-format-picker .format-card.active::after { content: '✓'; position: absolute; top: 12px; right: 14px; color: #ffffff; font-weight: 700; }
 
+        /* E2d contest holes (approved "as mocked" 2026-11-09). */
+        .ct-card { border: 1px solid var(--border-mid); border-radius: 14px; padding: 6px 14px; margin-bottom: 12px; background: var(--bg-card); }
+        .ct-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border-faint); font-size: 1rem; }
+        .ct-row:last-child { border-bottom: 0; }
+        .ct-hole { background: none; border: 0; padding: 0; font: inherit; color: var(--text-main); cursor: pointer; text-align: left; }
+        .ct-hole.on strong { text-decoration: underline; }
+        .ct-pill { border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; font-weight: bold; white-space: nowrap; }
+        .ct-pill.kp { background: #e3f3ec; color: #0f4c3a; }
+        .ct-pill.ld { background: #ece8fb; color: #5b33c9; }
+        .ct-add { background: none; border: 0; padding: 12px 0; font: inherit; color: var(--text-muted); cursor: pointer; }
+        .ct-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0; }
+        .ct-form select { padding: 8px; border-radius: 8px; border: 1px solid var(--border-mid); font-size: 0.95rem; }
+        .ct-head { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #555; padding: 10px 0 8px 0; border-bottom: 1px solid var(--border-faint); }
+        .ct-btns { display: flex; gap: 6px; flex: 0 0 auto; }
+        .ct-btn { border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--brand-navy); border-radius: 10px; padding: 7px 9px; font-weight: bold; font-size: 0.82rem; cursor: pointer; font-family: inherit; white-space: nowrap; }
+        .ct-btn.rm { border-color: #f3b4b8; color: #b3261e; }
+        .ct-note { text-align: center; font-size: 0.85rem; color: var(--text-muted); }
+        .ct-gps { background: none; border: 0; padding: 0; font: inherit; font-weight: bold; color: var(--text-main); cursor: pointer; text-decoration: underline; }
         .team-card { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: var(--nassau-box-bg); }
         .team-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .team-card-header .team-label { font-weight: bold; color: var(--brand-green); }
@@ -654,6 +674,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup">⚙️ Setup &amp; Links</span>
         <span class="top-nav-item" onclick="showTab('desk')" id="tab-btn-desk">📋 Desk</span>
         <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard">🏆 Leaderboard</span>
+        <span class="top-nav-item" onclick="showTab('contests')" id="tab-btn-contests">🎯 Contests</span>
     </div>
 
     <div id="manage-tab-setup">
@@ -937,6 +958,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div id="group-links-list"></div>
         </div>
         </div>
+    </div>
+
+    <!-- E2d (approved "as mocked" 2026-11-09): the organizer's contest holes.
+         Gated like Setup and Desk. Marks holes (closest to the pin, long drive),
+         shows the entries, confirms a winner ("Make winner" locks the hole) or
+         removes a bad entry. Nothing is paid in the app. -->
+    <div id="manage-tab-contests" style="display:none;">
+        <h2 style="font-size:1.4rem; margin:4px 0 12px 0;">Contest holes</h2>
+        <div class="ct-card" id="contest-holes-list"></div>
+        <div class="ct-card" id="contest-entries" style="display:none;"></div>
+        <p class="ct-note" id="contest-note">Override: "Make winner" locks the hole; a later entry cannot replace it. Allow GPS marks: <button type="button" class="ct-gps" id="contest-gps-toggle" onclick="toggleContestGps()">on</button></p>
     </div>
 
     <div id="tournament-print-view"></div>
@@ -2219,8 +2251,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // The three manage tabs. Setup and Desk are the GATED pair: applyManageGate
     // HIDES both for anyone who is not the owner of an owned tournament, and
     // shows both on sign-in. Leaderboard is always there.
-    const MANAGE_TABS = ['setup', 'desk', 'leaderboard'];
-    const GATED_TABS = ['setup', 'desk'];
+    // E2d adds Contests, gated with them (owner only).
+    const MANAGE_TABS = ['setup', 'desk', 'leaderboard', 'contests'];
+    const GATED_TABS = ['setup', 'desk', 'contests'];
     function showTab(tab) {
         // A gated tab is hidden for a non-owner (applyManageGate). Asking for it
         // then lands on the leaderboard - the tab is in the tree, so "is the
@@ -2235,6 +2268,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
         if (tab === 'leaderboard') renderLeaderboard();
         if (tab === 'desk') renderRegistrationDesk();
+        if (tab === 'contests') renderContestsTab();
     }
 
     // ---- SIGN-IN AND THE MANAGE GATE -------------------------------------
@@ -5567,6 +5601,144 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return true;
     }
 
+    // ===== E2d: CONTEST HOLES, THE ORGANIZER'S SIDE (approved 2026-11-09) =====
+    //
+    // tournaments/<code>/contests/h<N> = { kind, fairwayOnly?, allowGps, winner?, lockedAt? }
+    // is the owner's (the rules: tournaments/<code> is owner-written). Entries
+    // are contestEntries/<code>/h<N>/<entryKey>, written by the golfer's card
+    // with its key. "Make winner" writes winner + lockedAt in one update; after
+    // that the rules refuse new entries on the hole, so a later entry cannot
+    // replace it. "Remove" deletes one entry (owner). Nothing is paid here.
+    // ONE-ROUND EVENTS ONLY for now: a contest is per hole, and a two-day event
+    // plays each hole twice - the card hides contests on a multi-round event.
+    let contestEntriesAll = {};
+    let contestEntriesCode = null;
+    let contestSelected = null;     // the hole whose entries are open
+    let contestAdding = false;
+    function syncContestEntriesListener() {
+        if (!currentCode || contestEntriesCode === currentCode) return;
+        contestEntriesCode = currentCode;
+        const code = currentCode;
+        db.ref(`contestEntries/${code}`).on('value', (snap) => {
+            if (currentCode !== code) return;
+            contestEntriesAll = (snap && snap.val()) || {};
+            renderContestsTab();
+        });
+    }
+    function contestGpsOn() {
+        const list = TournamentContests.contestList(currentData || {});
+        return list.length ? list.every((c) => c.allowGps) : contestGpsDefault;
+    }
+    let contestGpsDefault = true;   // "allow GPS marks", default on (plan section 2)
+    function renderContestsTab() {
+        const box = document.getElementById('contest-holes-list');
+        if (!box || !currentData) return;
+        const list = TournamentContests.contestList(currentData);
+        const multi = isMultiRound(currentData);
+        const course = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        if (!list.some((c) => c.key === contestSelected)) contestSelected = list.length ? list[0].key : null;
+        let html = list.map((c) => {
+            const pill = c.kind === 'kp' ? 'Closest to the pin' : ('Long drive' + (c.fairwayOnly ? ' · fairway only' : ''));
+            return `<div class="ct-row"><button type="button" class="ct-hole${c.key === contestSelected ? ' on' : ''}" data-hole="${c.key}" onclick="openContestHole(this.dataset.hole)"><strong>Hole ${c.hole}</strong>${c.par ? ` par ${c.par}` : ''}</button><span class="ct-pill ${c.kind}">${pill}</span></div>`;
+        }).join('');
+        if (multi) {
+            html += `<div class="ct-row"><span style="color:var(--text-muted); font-size:0.9rem;">Contest holes are for one-round events.</span></div>`;
+        } else if (contestAdding) {
+            const used = list.map((c) => c.hole);
+            const opts = course.filter((h) => used.indexOf(Number(h.hole)) === -1)
+                .map((h) => `<option value="${h.hole}">Hole ${h.hole} · par ${h.par}</option>`).join('');
+            html += `<div class="ct-form" id="contest-add-form">
+                <select id="contest-add-hole" aria-label="Hole" onchange="contestHoleChosen()">${opts}</select>
+                <select id="contest-add-kind" aria-label="Contest" onchange="contestHoleChosen(true)"><option value="kp">Closest to the pin</option><option value="ld">Long drive</option></select>
+                <label id="contest-add-fw-row" style="font-size:0.9rem;"><input type="checkbox" id="contest-add-fw"> fairway only</label>
+                <button type="button" class="ct-btn" id="contest-add-save" onclick="addContestHole()">Add</button>
+                <button type="button" class="ct-btn" onclick="cancelContestHole()">Cancel</button></div>`;
+        } else {
+            html += `<div class="ct-row"><button type="button" class="ct-add" id="contest-add-btn" onclick="startContestHole()">+ Add a contest hole</button></div>`;
+        }
+        box.innerHTML = html;
+        if (contestAdding && !multi) contestHoleChosen();
+        renderContestEntries(list);
+        const gps = document.getElementById('contest-gps-toggle');
+        if (gps) gps.textContent = contestGpsOn() ? 'on' : 'off';
+    }
+    function renderContestEntries(list) {
+        const box = document.getElementById('contest-entries');
+        if (!box) return;
+        const c = list.find((x) => x.key === contestSelected);
+        if (!c) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        const rows = TournamentContests.ranked(contestEntriesAll[c.key] || {}, c.kind);
+        let html = `<div class="ct-head">Hole ${c.hole} entries</div>`;
+        html += rows.length ? rows.map((r) => {
+            const who = `${escapeHtml(r.name || '')} ${escapeHtml(TournamentContests.valueText(r))}${r.by === 'gps' ? ' 📍' : ''}`;
+            const btns = c.winner === r.key
+                ? `<button type="button" class="ct-btn" data-hole="${c.key}" onclick="clearContestWinner(this.dataset.hole)">Winner ✓</button>`
+                : `<button type="button" class="ct-btn" data-hole="${c.key}" data-entry="${escapeHtml(r.key)}" onclick="makeContestWinner(this.dataset.hole, this.dataset.entry)">Make winner</button><button type="button" class="ct-btn rm" data-hole="${c.key}" data-entry="${escapeHtml(r.key)}" onclick="removeContestEntry(this.dataset.hole, this.dataset.entry)">Remove</button>`;
+            return `<div class="ct-row"><span>${who}</span><span class="ct-btns">${btns}</span></div>`;
+        }).join('') : `<div class="ct-row"><span style="color:var(--text-muted);">No entries yet.</span><button type="button" class="ct-btn rm" data-hole="${c.key}" onclick="removeContestHole(this.dataset.hole)">Remove hole</button></div>`;
+        box.innerHTML = html;
+        box.style.display = 'block';
+    }
+    function contestsRef(key) { return db.ref(`tournaments/${currentCode}/contests/${key}`); }
+    function openContestHole(key) { contestSelected = key; renderContestsTab(); }
+    function startContestHole() { contestAdding = true; renderContestsTab(); }
+    function cancelContestHole() { contestAdding = false; renderContestsTab(); }
+    // KP on par 3s, long drive on 4s and 5s - the default the kind follows
+    // until the organizer picks one.
+    function contestHoleChosen(kindTouched) {
+        const holeSel = document.getElementById('contest-add-hole');
+        const kindSel = document.getElementById('contest-add-kind');
+        if (!holeSel || !kindSel) return;
+        if (!kindTouched) {
+            const h = (currentData.courseData || []).find((x) => String(x.hole) === String(holeSel.value));
+            kindSel.value = h && Number(h.par) === 3 ? 'kp' : (h ? 'ld' : 'kp');
+        }
+        const fw = document.getElementById('contest-add-fw-row');
+        if (fw) fw.style.display = kindSel.value === 'ld' ? '' : 'none';
+    }
+    function addContestHole() {
+        if (!canManage()) return;
+        const hole = Number((document.getElementById('contest-add-hole') || {}).value);
+        const kind = (document.getElementById('contest-add-kind') || {}).value === 'ld' ? 'ld' : 'kp';
+        if (!(hole >= 1 && hole <= 18)) return;
+        const rec = { kind: kind, allowGps: contestGpsOn() };
+        if (kind === 'ld' && (document.getElementById('contest-add-fw') || {}).checked) rec.fairwayOnly = true;
+        contestAdding = false;
+        contestSelected = TournamentContests.holeKey(hole);
+        return contestsRef(contestSelected).set(rec).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function removeContestHole(key) {
+        if (!canManage()) return;
+        if (Object.keys(contestEntriesAll[key] || {}).length) return;
+        if (!confirm('Remove this contest hole?')) return;
+        return contestsRef(key).remove().catch((err) => alert(`Error: ${err.message}`));
+    }
+    function makeContestWinner(key, entryKey) {
+        if (!canManage()) return;
+        return contestsRef(key).update({ winner: entryKey, lockedAt: firebase.database.ServerValue.TIMESTAMP })
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+    function clearContestWinner(key) {
+        if (!canManage()) return;
+        if (!confirm('Unlock this hole? Golfers can enter again and you can pick another winner.')) return;
+        return contestsRef(key).update({ winner: null, lockedAt: null }).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function removeContestEntry(key, entryKey) {
+        if (!canManage()) return;
+        if (!confirm('Remove this entry?')) return;
+        return db.ref(`contestEntries/${currentCode}/${key}/${entryKey}`).remove().catch((err) => alert(`Error: ${err.message}`));
+    }
+    function toggleContestGps() {
+        if (!canManage()) return;
+        const next = !contestGpsOn();
+        contestGpsDefault = next;
+        const list = TournamentContests.contestList(currentData || {});
+        if (!list.length) { renderContestsTab(); return; }
+        const changes = {};
+        list.forEach((c) => { changes[`tournaments/${currentCode}/contests/${c.key}/allowGps`] = next; });
+        return db.ref().update(changes).catch((err) => alert(`Error: ${err.message}`));
+    }
+
     function loadTournament(code) {
         db.ref(`tournaments/${code}`).on('value', (snap) => {
             currentData = snap.val();
@@ -5621,6 +5793,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderTripLinkStatus();
             renderLeaderboard();
             renderEventDayPanel();
+            syncContestEntriesListener();
+            renderContestsTab();
             // Last, so it can remove what the renders above filled in. Runs on
             // every snapshot: the record may gain an owner while the page is open.
             applyManageGate();
