@@ -52,6 +52,7 @@
     "/*.fixture.json",
     "/*.tests-data.json",
     "/database.rules*",
+    "/*.rules",
     "/*.md",
     "/*.mjs",
     "/*.ts",

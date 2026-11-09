@@ -43,6 +43,7 @@ export const BLOCKED_PATTERNS = [
     /\.fixture\.json$/i,      // test fixtures
     /\.tests-data\.json$/i,
     /^database\.rules.*\.json$/i,   // rules (live and rollback copies)
+    /\.rules$/i,              // storage.rules (E4 photo wall, 2026-11-09)
     /\.md$/i,                 // notes and plans
     /\.mjs$/i,
     /\.ts$/i,

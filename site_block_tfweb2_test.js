@@ -63,7 +63,7 @@ const BLOCKED = ['/tools/my-rounds-backfill.js', '/tools/lib/journey.js', '/tool
     '/functions/_middleware.js', '/docs/x.md', '/gps-beta/x.js', '/firebase-functions/index.js', '/scripts/x.sh',
     '/node_modules/targaryen/package.json', '/.github/workflows/x.yml', '/package.json', '/package-lock.json',
     '/firebase.json', '/build-shell.js', '/sync-mobile-web.js', '/global_courses_snapshot.json', '/capacitor.config.ts',
-    '/.gitignore', '/CLAUDE.md', '/HANDOFF.md', '/database.rules.json', '/database.rules.stage1.json',
+    '/.gitignore', '/CLAUDE.md', '/HANDOFF.md', '/database.rules.json', '/database.rules.stage1.json', '/storage.rules',
     '/money_engine_test.js', '/round-ready.test.js', '/unstarted_round.fixture.json', '/security-rules.tests-data.json',
     '/x.mjs', '/x.swift', '/%74ools/api-404-check.js', '//tools/api-404-check.js', '/tool%73/lib/journey.js'];
 
@@ -113,6 +113,7 @@ describe('tfweb-2 site block: the non-site files answer 404', () => {
         const nonSite = tracked.filter((f) => /^(tools|helpers|ios|android|functions)\//.test(f)
             || (!f.includes('/') && /(_test\.js|\.test\.js|\.fixture\.json|\.tests-data\.json|\.md|\.mjs|\.ts)$/.test(f))
             || /^database\.rules.*\.json$/.test(f)
+            || (!f.includes('/') && /\.rules$/.test(f))
             || ['package.json', 'package-lock.json', 'firebase.json', 'build-shell.js', 'sync-mobile-web.js', 'global_courses_snapshot.json', '.gitignore'].includes(f));
         assert.ok(nonSite.length > 500, nonSite.length + ' non-site files');
         assert.deepEqual(nonSite.filter((f) => !M.isBlockedPath('/' + f)), [], 'blocked by the Function');
