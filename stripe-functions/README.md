@@ -11,7 +11,12 @@ from this branch, and never `firebase deploy` without `--only`.
 |---|---|
 | `stripe-core.js` | Pure rules, no SDK: fee check, origin allow-list, metadata parse, checkout/refund planners, event -> update mapping, attempt count |
 | `handlers.js` | The three handlers with db + stripe injected (what the tests drive) |
-| `index.js` | Thin firebase-functions wrappers: `createEntryCheckout`, `refundEntry` (onCall), `stripeWebhook` (onRequest) |
+| `index.js` | Thin firebase-functions wrappers: `createEntryCheckout`, `refundEntry` (onCall), `stripeWebhook` (onRequest), and E1 `sendAnnouncement` (onCall, no secret) |
+| `announce-core.js` | E1 (2026-11-09) pure rules: owner check, 1/min/event, pushPrefs, token list, the notification |
+| `handlers-announce.js` | E1 `sendAnnouncement` with db + messaging injected. Server-only path: `announcementSends/<code>` = `{lastAt}` |
+
+E1 needs its rules block published first (`TOURNAMENTS-E1-RULES-BLOCK.md` in the inbox), and FCM
+(already used by gps-live). It needs no secret. Tests: `node --test tournament_e1_announce_server_test.js`.
 
 Server-only path not named in the contract: `payments/checkoutAttempts/<code>/<entryId>`
 (integer, max 5 sessions per entry). Clients cannot read or write `payments/`.
