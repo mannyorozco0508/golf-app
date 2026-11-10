@@ -585,6 +585,48 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
         assert.match(home, /Side games, just for fun/);
     });
 
+    // WEBSITE-D (Manny Nov 10, "Clips: use the 11 now"): the 7 website clips
+    // from clips-205/web are in media/clips/; the other 7 stay poster-only.
+    const CUT = { 'gps.mp4': 3, 'just-say-it.mp4': 4.3, 'add-a-game.mp4': 4, 'group-scoring.mp4': 3,
+        'games-live-board.mp4': 3, 'results.mp4': 3.5, 'tournaments.mp4': 3.5 };
+    test('website-d: the 7 cut clips are in media/clips (MP4, under 400 KB), the 7 uncut ones are not', () => {
+        manifest.clips.forEach((c) => {
+            const f = path.join('media', 'clips', c.file);
+            if (c.file in CUT) {
+                assert.ok(exists(f), c.file + ' is missing');
+                const buf = fs.readFileSync(path.join(ROOT, f));
+                assert.equal(buf.slice(4, 8).toString('latin1'), 'ftyp', c.file + ' is not an MP4');
+                assert.ok(buf.length > 50 * 1024 && buf.length < 400 * 1024, c.file + ' is ' + buf.length + ' bytes');
+                assert.equal(c.seconds, CUT[c.file], c.file + ': manifest seconds');
+            } else {
+                assert.ok(!exists(f), c.file + ' exists but was not in the cut set (its poster should show)');
+            }
+        });
+        assert.equal(Object.keys(CUT).length, 7);
+        assert.doesNotMatch(manifest._about, /^[^.]*Not yet cut: each will be cut/, 'the about line still says nothing is cut');
+        Object.keys(CUT).forEach((f) => assert.ok(manifest._about.includes(f.replace('.mp4', '')), f + ' not named in _about'));
+    });
+    test('website-d: every play badge on a page matches its clip length in the manifest (whole seconds)', () => {
+        const secs = Object.fromEntries(manifest.clips.map((c) => [c.file, c.seconds]));
+        let n = 0;
+        [PAGE].concat(helpPages).forEach((f) => {
+            for (const m of read(f).matchAll(/data-src="\/media\/clips\/([a-z0-9-]+\.mp4)"[^>]*><\/video><span class="cb">&#9654; 0:(\d\d)</g)) {
+                n += 1;
+                assert.equal(Number(m[2]), Math.floor(secs[m[1]] + 0.5), f + ': ' + m[1] + ' badge 0:' + m[2]);
+            }
+        });
+        assert.equal(n, 9 + 8 + 8, 'positive: every badge was read');
+    });
+    test('website-d: the clips are served (not blocked, not routed to a Function)', async () => {
+        const MW = await import(pathToFileURL(path.join(ROOT, 'functions', '_middleware.js')).href);
+        const inc = JSON.parse(read('_routes.json')).include;
+        Object.keys(CUT).forEach((f) => {
+            assert.equal(MW.isBlockedPath('/media/clips/' + f), false, f + ' answers 404');
+            assert.ok(!inc.some((r) => r === '/media/*' || r === '/media/clips/*' || r === '/*.mp4'), 'clips run a Function');
+        });
+        assert.equal(MW.isBlockedPath('/media/clips/manifest.json'), false);
+    });
+
     test('the new pages and media are static: no Function, no rewrite, not in the app shell or the native bundle', () => {
         const inc = JSON.parse(read('_routes.json')).include;
         ['/help', '/help/*', '/media/*', '/site-clips.js', '/google-play-badge.png'].forEach((p) => assert.ok(!inc.includes(p), p));

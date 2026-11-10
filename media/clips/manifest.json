@@ -1,11 +1,11 @@
 {
-  "_about": "Clips for the website feature tiles (/home) and Help (/help). Not yet cut: each will be cut from the App Preview recording. Format: H.264 MP4, muted (no audio track), portrait, 590x1280 or smaller (posters are 295x640), loops cleanly, about 150-400 KB each. Until a file exists its poster shows; nothing else changes when it is added.",
+  "_about": "Clips for the website feature tiles (/home and /) and Help (/help). CUT (clips 2.0.5, from the 2.0.4 App Preview recording, Manny Nov 10 \"Clips: use the 11 now\"): gps, just-say-it, add-a-game, group-scoring, games-live-board, results, tournaments. Not in the recording, so not cut yet (poster only): weekly-code, chat, my-bag-stats, start-round, add-golfers, join-with-a-code, erase-a-round. Format: H.264 MP4, muted (no audio track), portrait, 590x1280 or smaller (posters are 295x640), about 150-400 KB each. Until a file exists its poster shows; nothing else changes when it is added. The play badge on a tile shows seconds rounded to whole seconds (0:04 for 4.3 and 3.5).",
   "folder": "/media/clips/",
   "posters": "/media/posters/<name>.jpg",
   "clips": [
     {
       "file": "gps.mp4",
-      "seconds": 5,
+      "seconds": 3,
       "poster": "/media/posters/gps.jpg",
       "used_on": [
         "/home tile: GPS",
@@ -14,7 +14,7 @@
     },
     {
       "file": "just-say-it.mp4",
-      "seconds": 6,
+      "seconds": 4.3,
       "poster": "/media/posters/just-say-it.jpg",
       "used_on": [
         "/home tile: Just say it"
@@ -22,7 +22,7 @@
     },
     {
       "file": "group-scoring.mp4",
-      "seconds": 5,
+      "seconds": 3,
       "poster": "/media/posters/group-scoring.jpg",
       "used_on": [
         "/home tile: Group scoring",
@@ -31,7 +31,7 @@
     },
     {
       "file": "games-live-board.mp4",
-      "seconds": 5,
+      "seconds": 3,
       "poster": "/media/posters/games-live-board.jpg",
       "used_on": [
         "/home tile: Games & live board"
@@ -39,7 +39,7 @@
     },
     {
       "file": "results.mp4",
-      "seconds": 4,
+      "seconds": 3.5,
       "poster": "/media/posters/results.jpg",
       "used_on": [
         "/home tile: Results"
@@ -47,7 +47,7 @@
     },
     {
       "file": "tournaments.mp4",
-      "seconds": 6,
+      "seconds": 3.5,
       "poster": "/media/posters/tournaments.jpg",
       "used_on": [
         "/home tile: Tournaments",
