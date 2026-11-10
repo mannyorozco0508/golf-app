@@ -115,8 +115,9 @@ describe('no scores: the team is removed and the Desk flags its golfers', () => 
         // Read off a WATCHER's page: they render the saved payoutSpots. The
         // owner previews the boxes, which mini-dom cannot parse from innerHTML.
         const pay = html(page(after, STRANGER), 'payout-results');
-        assert.match(pay, /1st — Eagles<\/span><span class="val-pos">\$200\.00/);
-        assert.match(pay, /2nd — Owls<\/span><span class="val-pos">\$100\.00/);
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was $200.00 / $100.00.
+        assert.match(pay, /1st — Eagles<\/span><span class="val-pos">\$200 pro shop credit/);
+        assert.match(pay, /2nd — Owls<\/span><span class="val-pos">\$100 pro shop credit/);
     });
 });
 

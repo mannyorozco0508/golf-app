@@ -804,12 +804,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              sets are SAVED on the record as payoutSpots and everyone reads those. -->
         <div id="payout-owner-controls" style="display:none;">
         <h3>🏆 Prize Results Calculator</h3>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many spots pay — this maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many places win a prize — this maps straight onto the standings above. Ties split the pro shop credit their tied places add up to.</p>
         <!-- RESULTS ARE PAID ON (audit #1, A1): multi-round only, filled by
              renderPayoutBasis. Saved as payoutBasis; every phone reads it. -->
         <div id="payout-basis-control" style="display:none;"></div>
         <div class="form-group" style="margin-bottom:8px;">
-            <label>Paid Spots</label>
+            <label>Prize Places</label>
             <input type="number" id="payout-spots-input" min="1" max="20" value="3" oninput="renderPayoutSpotInputs()" onchange="savePayoutSpots()">
         </div>
         <div id="payout-spot-amounts"></div>
@@ -3616,6 +3616,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
     }
     const payoutsAreSet = (spots) => spots.some((v) => v > 0);
+    // NO CASH PRIZES (Manny, 2026-11-10: "Never show cash prizes - our prizes are
+    // trophies and pro shop credit only"). The amount an organizer types for a
+    // place IS pro shop credit, so every place reads "$600 pro shop credit", and
+    // a place with no amount reads "Trophy". Wording only: payouts.js and the
+    // allocation are untouched (tournament_no_cash_prize_test.js).
+    const prizeLabel = (v) => (v > 0 ? `$${v % 1 === 0 ? v : v.toFixed(2)} pro shop credit` : 'Trophy');
 
     function payoutSpotCount() {
         const spotsInput = document.getElementById('payout-spots-input');
@@ -3654,8 +3660,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const container = document.getElementById('payout-spot-amounts');
         const subEl = document.getElementById('payout-pool-sub');
         subEl.textContent = pool > 0
-            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many spots pay — ties split whatever their tied spots add up to.`
-            : `No entry fee set for this tournament — set spot amounts manually if you're running a separate total.`;
+            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many places win a prize — ties split the pro shop credit their tied places add up to.`
+            : `No entry fee set for this tournament — type each place's pro shop credit below.`;
 
         let html = '';
         let focusedAt = -1, focusedValue = '';
@@ -3666,7 +3672,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // not an amount.
             const val = i < saved.length ? saved[i] : '';
             html += `<div class="form-group" style="margin-bottom:6px;">
-                <label>${ordinal(i + 1)} Place ($)</label>
+                <label>${ordinal(i + 1)} Place — pro shop credit $ (0 = Trophy)</label>
                 <input type="number" id="payout-spot-${i}" min="0" value="${val}" placeholder="0" oninput="renderPayoutResults()" onchange="savePayoutSpots()">
             </div>`;
         }
@@ -3702,7 +3708,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const choices = [['event', 'Event total']].concat(ids.map((rid) => [rid, rounds[rid].name || 'Round']));
         if (owner) {
             ctl.style.display = 'block';
-            ctl.innerHTML = `<div class="payout-basis-head">Results are paid on</div><div class="payout-basis-seg" role="group" aria-label="Results are paid on">`
+            ctl.innerHTML = `<div class="payout-basis-head">Prizes go by</div><div class="payout-basis-seg" role="group" aria-label="Prizes go by">`
                 + choices.map(([v, name]) => `<button type="button" class="${prize.basis === v ? 'on' : ''}" aria-pressed="${prize.basis === v}" onclick="setPayoutBasis('${v}')">${escapeHtml(name)}</button>`).join('')
                 + `</div>`;
         } else {
@@ -3713,7 +3719,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const listed = prize.available && (owner || payoutsAreSet(savedPayoutSpots()));
         if (!owner && listed) {
             label.style.display = 'block';
-            label.innerHTML = `Paid on <b>${escapeHtml(prize.title || '')}</b>`;
+            label.innerHTML = `Prizes go by <b>${escapeHtml(prize.title || '')}</b>`;
         } else {
             label.style.display = 'none'; label.innerHTML = '';
         }
@@ -3738,7 +3744,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const pub = document.getElementById('payout-public-amounts');
         if (pub) {
             pub.innerHTML = owner ? '' : (payoutsAreSet(spotAmounts)
-                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${spotAmounts.map((v, i) => `${ordinal(i + 1)} $${v.toFixed(2)}`).join(' \u00b7 ')}</div>`
+                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${spotAmounts.map((v, i) => `${ordinal(i + 1)} ${prizeLabel(v)}`).join(' \u00b7 ')}</div>`
                 : `<div class="payout-spot-readonly" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Results not set yet.</div>`);
         }
         // ONE BASIS FOR EVERY PHONE (audit #1, A1). The data decides - the
@@ -3769,7 +3775,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // Printing those made a finished-looking table of $0.00 rows - every
         // scored team at fee 0, every unpaid rank with a pool. Only rows with
         // money are rows; "Paid Spots" already says how many there are.
-        const payouts = computeTournamentPayouts(prizeRows, spotAmounts).filter((p) => p.amount > 0);
+        // P1-a, 2026-11-10 (no cash prizes): a place INSIDE the organizer's
+        // "Prize Places" count with no amount is a trophy place, and its winner
+        // is named, reading "Trophy". Ranks past that count stay filtered out,
+        // and nothing shows until an amount is set, exactly as before.
+        const placesSet = payoutsAreSet(spotAmounts);
+        const payouts = computeTournamentPayouts(prizeRows, spotAmounts)
+            .filter((p) => p.amount > 0 || (placesSet && p.rank <= spotAmounts.length));
         const totalAllocated = spotAmounts.reduce((s, v) => s + v, 0);
         const pool = poolTotal();
 
@@ -3778,21 +3790,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // that disagrees with the pool.
         if (owner && payoutsAreSet(spotAmounts) && pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--accent-red); background:var(--danger-box-bg); border:1px solid var(--accent-red); border-radius:6px; padding:8px; margin-bottom:10px;">
-                ⚠️ Result amounts add up to $${totalAllocated.toFixed(2)}, but the total in is $${pool.toFixed(2)}.
+                ⚠️ Pro shop credit adds up to $${totalAllocated.toFixed(2)}, but the total in is $${pool.toFixed(2)}.
             </div>`;
         }
 
-        // Three sentences, each reachable. "No paid spots reached yet." had never
+        // Three sentences, each reachable. "No prize places reached yet." had never
         // rendered before the filter: the list was empty only with no scores, and
         // that case returns above. Now it is the case where amounts are set but
         // the only scored ranks sit on $0 spots.
+        // P1-a, 2026-11-10: a $0 place inside the count is now a "Trophy" row, so
+        // with a scored team 1st is always listed and this sentence is a
+        // fallback that no fixture reaches. Kept, not deleted (wording only).
         if (!spotAmounts.some((v) => v > 0)) {
             html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Enter spot amounts above to see results.</div>`;
         } else if (payouts.length === 0) {
-            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No paid spots reached yet.</div>`;
+            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No prize places reached yet.</div>`;
         } else {
             payouts.forEach(p => {
-                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${escapeHtml(p.teamName)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${p.amount.toFixed(2)}</span></div>`;
+                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${escapeHtml(p.teamName)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">${prizeLabel(p.amount)}</span></div>`;
             });
         }
         resultsContainer.innerHTML = html;

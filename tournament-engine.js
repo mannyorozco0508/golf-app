@@ -822,7 +822,7 @@ function resolvePrizeView(data) {
     if (saved && saved !== 'event') {
         if (!rounds[saved]) {
             return { basis: saved, available: false, rows: [], title: null,
-                     reason: 'The round these results were paid on is no longer part of this event. Choose again.' };
+                     reason: 'The round these prizes went by is no longer part of this event. Choose again.' };
         }
         return { basis: saved, available: true, reason: null,
                  rows: computeRoundLeaderboard(data, saved),
@@ -833,7 +833,7 @@ function resolvePrizeView(data) {
         return { basis: 'event', available: true, reason: null, rows: ev.rows || [], title: 'Event total' };
     }
     return { basis: saved, available: false, rows: [], title: null,
-             reason: saved === 'event' ? ev.reason : 'Choose which result the prizes are paid on.' };
+             reason: saved === 'event' ? ev.reason : 'Choose which result the prizes go by.' };
 }
 
 // FLIGHTS FILTER THE FIELD; THEY DO NOT RANK IT DIFFERENTLY.

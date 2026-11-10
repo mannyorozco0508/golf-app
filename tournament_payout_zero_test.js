@@ -19,6 +19,10 @@
 //   every spot amount is 0       -> "Enter spot amounts above to see results."
 //   amounts set, nobody reaches  -> "No paid spots reached yet."   (e.g. 1st $0, 2nd $50, one team)
 // The mismatch banner keeps its own rule (pool > 0 and amounts != pool).
+// 2026-11-10 (P1-a, no cash prizes): a $0 place INSIDE the place count is now a
+// "Trophy" row, so the third sentence reads "No prize places reached yet." and
+// is a fallback no fixture reaches (a scored 1st is always listed). Amounts
+// read "$50 pro shop credit"; tournament_no_cash_prize_test.js holds that.
 //
 // HARNESS. mini-dom does not parse the spot <input>s out of innerHTML, so every
 // amount reads 0 here: this file proves the zero-amount rules and the
@@ -100,7 +104,9 @@ describe('2. WITH A POOL - the same filter; the banner is the pool\'s own rule',
         vm.runInContext('renderPayoutSpotInputs()', sb);
         sb.document.getElementById('payout-spot-0').value = '50';
         vm.runInContext('renderPayoutResults()', sb);   // the box's oninput
-        assert.match(html(sb, 'payout-results'), /add up to \$50\.00, but the total in is \$500\.00/);
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): the banner says "Pro shop credit adds up to", was "Result amounts add up to".
+        // The entry-fee total stays in dollars (entry fees are not prizes).
+        assert.match(html(sb, 'payout-results'), /Pro shop credit adds up to \$50\.00, but the total in is \$500\.00/);
     });
 });
 
@@ -109,9 +115,13 @@ describe('3. THE SOURCE - a page filter, three reachable sentences, the allocato
     const fn = SRC.slice(at, SRC.indexOf('\n    }', at));
     test('renderPayoutResults filters amount > 0 and prints only those', () => {
         assert.ok(fn.length > 300, 'the renderer exists');
-        assert.match(fn, /\.filter\(\(?p\)? => p\.amount > 0\)/, 'the zero-amount filter');
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): a $0 place INSIDE the organizer's place count is a
+        // trophy place and is listed as "Trophy"; ranks past the count are still filtered.
+        assert.match(fn, /\.filter\(\(?p\)? => p\.amount > 0 \|\| \(placesSet && p\.rank <= spotAmounts\.length\)\)/, 'the zero-amount filter');
         assert.match(fn, /Enter spot amounts above to see results\./);
-        assert.match(fn, /No paid spots reached yet\./, 'the sentence stays, now reachable');
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was "No paid spots reached yet." It is a fallback now: with
+        // trophy places listed, a scored 1st is always a row.
+        assert.match(fn, /No prize places reached yet\./, 'the sentence stays');
         assert.match(fn, /No scores yet — results will show once teams start posting\./);
         assert.match(fn, /spotAmounts\.some\(\(?v\)? => v > 0\)/, 'the all-zero test decides which sentence');
     });
