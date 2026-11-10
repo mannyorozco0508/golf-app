@@ -805,14 +805,16 @@ describe('EVENT VIEW — one renderer, three sources', () => {
     });
 
     test('every board caches the UNFILTERED field for the prize calculator', () => {
-        // RE-PINNED, wave 10. One shared resolution replaced the three inline
-        // ones; what matters is unchanged and is asserted directly - the cache is
-        // taken without a flight, so every view caches the whole field.
-        const fn = fnBody(src(), 'renderLeaderboard');
-        const cacheLine = /cachedLeaderboardRows = resolveLeaderboardView\(([^)]*)\)\.rows;/.exec(fn);
-        assert.ok(cacheLine, 'the payout cache must come from the shared resolution');
-        assert.ok(!/lbFlightId/.test(cacheLine[1]),
-            'the cache must be the UNFILTERED field on every view');
-        assert.ok(!/cachedLeaderboardRows = rows;|cachedLeaderboardRows = view\.rows;/.test(fn));
+        // RE-PINNED, audit #1 (A1, 2026-11-08). There is no board cache any
+        // more: the prize renderer asks resolvePrizeView(currentData) - data
+        // only, no tab, no flight - so every view pays out of the same field.
+        // The rule (never the filtered or tab-chosen rows) is asserted directly.
+        const fn = fnBody(src(), 'renderPayoutResults()');
+        assert.ok(fn.length > 200, 'positive: the slice is the prize renderer');
+        const prizeLine = /const prize = resolvePrizeView\(([^)]*)\);/.exec(fn);
+        assert.ok(prizeLine, 'prize rows must come from resolvePrizeView');
+        assert.ok(!/lbFlightId|lbRoundId/.test(prizeLine[1]),
+            'the prize rows must be the UNFILTERED field on every view');
+        assert.doesNotMatch(src(), /cachedLeaderboardRows/);
     });
 });

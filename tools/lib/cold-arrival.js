@@ -331,7 +331,15 @@ function readDevToolsPort(profileDir, timeoutMs) {
 // disk; a second process over the SAME profile directory is what a restart
 // actually is. Pass a directory to keep it, and the caller owns deleting it.
 // Default behaviour is unchanged: no option, throwaway profile, removed on exit.
-async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth, profileDir, emulator }) {
+// `closeBrowser` (2026-11-07) ENDS THE RUN WITH Browser.close INSTEAD OF A KILL,
+// and waits for the process to exit. Measured with the real SDK connected to the
+// database emulator: localStorage written five seconds or more after load was
+// NOT on disk when the process was killed - not after 10 s, not after 30 s -
+// and a second process over the same profile read nothing; the same write with
+// Browser.close was there. (With the stand-in database, a kill kept it.) A
+// check about what survives a closed app needs the browser to close, not to be
+// shot. Opt-in; default behaviour is unchanged.
+async function arriveCold({ url, rounds, db, expression, steps, viewport, settleMs, preScript, blockUrls, auth, profileDir, emulator, closeBrowser }) {
     const keepProfile = !!profileDir;
     const profile = profileDir || fs.mkdtempSync(path.join(os.tmpdir(), 'cold-arrival-'));
     if (keepProfile) {
@@ -489,6 +497,25 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
                 // put back: a screenshot of the first 844px of a trip page shows
                 // the header and nothing anybody asked about. Pushes the path and
                 // the byte count, so a check can fail when nothing was captured.
+                // { shot, viewportOnly: true } (2026-11-08) - what the PHONE SCREEN
+                // shows at its current scroll, at the given viewport (default
+                // 390x844) and 2x: no resize to the page height, so a scroll the
+                // page made by itself is what gets captured. Opt-in; every
+                // existing caller still gets the full-page shot.
+                if (step.shot && step.viewportOnly) {
+                    const vp = viewport || { width: 390, height: 844 };
+                    await rpc(ws, id++, 'Emulation.setDeviceMetricsOverride',
+                        { width: vp.width, height: vp.height, deviceScaleFactor: 2, mobile: true });
+                    await new Promise(r => setTimeout(r, 150));
+                    const shot = await rpc(ws, id++, 'Page.captureScreenshot', { format: 'png' });
+                    const data = shot.result && shot.result.data;
+                    if (!data) { value.push('no screenshot: ' + JSON.stringify(shot.error || {})); continue; }
+                    const buf = Buffer.from(data, 'base64');
+                    const out = path.isAbsolute(step.shot) ? step.shot : path.join(REPO_ROOT, step.shot);
+                    fs.writeFileSync(out, buf);
+                    value.push('shot ' + out + ' ' + buf.length + ' bytes ' + vp.width + 'x' + vp.height + ' @2x viewport');
+                    continue;
+                }
                 if (step.shot) {
                     const metrics = await rpc(ws, id++, 'Page.getLayoutMetrics', {});
                     const css = (metrics.result && (metrics.result.cssContentSize || metrics.result.contentSize)) || {};
@@ -602,6 +629,13 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
     } catch (e) {
         return { ok: false, reason: String(e && e.message || e) };
     } finally {
+        if (closeBrowser && ws) {
+            try {
+                const exited = new Promise((r) => { if (chrome.exitCode !== null) r(); else chrome.once('exit', r); });
+                ws.send(JSON.stringify({ id: 999999, method: 'Browser.close', params: {} }));
+                await Promise.race([exited, new Promise((r) => setTimeout(r, 10000))]);
+            } catch (e) { /* the kill below still runs */ }
+        }
         try { if (ws) ws.close(); } catch (e) {}
         registry.release(tracked);
         chrome.kill();

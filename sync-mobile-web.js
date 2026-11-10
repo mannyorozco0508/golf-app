@@ -112,6 +112,16 @@ const SHARED_SHELL = [
     // auth-boot.js on the way to every round they create.
     'organizer-gate.js',
     'sw.js', 'manifest.json',
+    // MOVED HERE FROM CONSUMER 2026-11-10 (Manny OK, tournaments phase 1): tournament.html
+    // now loads it too, for Apple and Google organizer sign-in. FILES_TO_SYNC is SHARED +
+    // CONSUMER, so the phone app ships exactly the same files. NO APOSTROPHES IN THIS BLOCK.
+    // oauth-signin.js (v264): Apple and Google one-tap sign-in, and the uid
+    // guarantee that links a provider to the anonymous organizer so rounds, the
+    // free trial and a founder pass stay put. admin.html calls it through a typeof
+    // guard, so a bundle without it falls back to the email link rather than
+    // breaking - but the email link is the flow that failed on a real phone, so it
+    // ships. NO APOSTROPHES IN THIS BLOCK.
+    'oauth-signin.js',
 ];
 
 // THE ICONS LEFT SHARED IN WAVE 19, and that is the whole point of the wave.
@@ -162,13 +172,6 @@ const CONSUMER_SHELL = [
     // gives the wizard a My Groups button that throws. It ships.
     // NO APOSTROPHES IN THIS BLOCK.
     'my-groups.js',
-    // oauth-signin.js (v264): Apple and Google one-tap sign-in, and the uid
-    // guarantee that links a provider to the anonymous organizer so rounds, the
-    // free trial and a founder pass stay put. admin.html calls it through a typeof
-    // guard, so a bundle without it falls back to the email link rather than
-    // breaking - but the email link is the flow that failed on a real phone, so it
-    // ships. NO APOSTROPHES IN THIS BLOCK.
-    'oauth-signin.js',
     // account-exit.js (v267): sign out, and delete account. App Review 5.1.1(v)
     // asks an app that creates accounts to let somebody delete one from inside it,
     // and Wave 33 made Apple and Google the front door. admin.html calls it through

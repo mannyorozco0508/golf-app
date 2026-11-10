@@ -20,7 +20,7 @@
 //          pool the same for every rank past the paid spots (payouts.js returns
 //          every rank; the page printed them all). Now a PAGE filter drops
 //          amount-0 rows and three sentences are each reachable: untyped ->
-//          "Enter spot amounts above to see payouts."; typed and reached ->
+//          "Enter spot amounts above to see results."; typed and reached ->
 //          rows with money only; typed and nobody reaches -> "No paid spots
 //          reached yet." (which had never rendered before). Measured by typing
 //          into the real inputs, as an organizer running a separate pool does.
@@ -204,7 +204,7 @@ const PROBE_POOL = `
     spots[0].dispatchEvent(new Event('input', { bubbles: true }));
   }
   out.payoutResultsAfterEditing = t('payout-results');
-  out.bannerFired = /add up to/.test(out.payoutResultsAfterEditing || '');
+  out.bannerFired = /adds? up to/.test(out.payoutResultsAfterEditing || '');
 
   const pb = Array.from(document.querySelectorAll('button'))
       .find(x => /printTournamentResults/.test(x.getAttribute('onclick') || ''));
@@ -321,21 +321,27 @@ if (require.main !== module) return;
     // --- TEST 18 ------------------------------------------------------------
     // CONTROL: the calculator must produce a money row when money is typed, or
     // "no $0.00 rows" is just a blank list.
-    if (!zero.firstOnly || zero.firstOnly.rows !== 1 || !/\$50\.00/.test(zero.firstOnly.text || '')) {
-        bail('TEST 18 CONTROL FAILED - typing $50 on 1st did not produce one $50.00 row: ' + JSON.stringify(zero.firstOnly));
+    // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop
+    // credit only). An amount reads "$50 pro shop credit", and a place INSIDE the
+    // place count with no amount is listed as "Trophy" - so 3 places with $50 on
+    // 1st is three rows now, not one. Ranks past the count are still dropped.
+    if (!zero.firstOnly || zero.firstOnly.rows !== 3 || !/\$50 pro shop credit/.test(zero.firstOnly.text || '')) {
+        bail('TEST 18 CONTROL FAILED - typing $50 on 1st did not produce a $50 pro shop credit row: ' + JSON.stringify(zero.firstOnly));
     }
     const t18 = {
         headerPoolHidden: !zero.headerPool,
         subLine_saysNoFee: /No entry fee set/.test(zero.subLine || ''),
         untyped_noRows: zero.untyped.rows === 0,
         untyped_noZeroDollarRows: zero.untyped.zeros === 0,
-        untyped_saysEnterAmounts: /Enter spot amounts above to see payouts\./.test(zero.untyped.text || ''),
-        firstOnly_oneRow_leader: zero.firstOnly.rows === 1 && /1st — Team 1/.test(zero.firstOnly.text || ''),
+        untyped_saysEnterAmounts: /Enter spot amounts above to see results\./.test(zero.untyped.text || ''),
+        firstOnly_leader_then_trophies: zero.firstOnly.rows === 3 && /1st — Team 1 \$50 pro shop credit 2nd — Team 2 Trophy 3rd — Team 3 Trophy/.test(zero.firstOnly.text || ''),
         firstOnly_noZeroDollarRows: zero.firstOnly.zeros === 0,
-        secondOnly_oneRow_runnerUp: zero.secondOnly.rows === 1 && /2nd — Team 2/.test(zero.secondOnly.text || '') && zero.secondOnly.zeros === 0,
-        nobodyReaches_saysSo: zero.nobodyReaches.rows === 0 && /No paid spots reached yet\./.test(zero.nobodyReaches.text || ''),
-        clearedAgain_saysEnterAmounts: zero.clearedAgain.rows === 0 && /Enter spot amounts above to see payouts\./.test(zero.clearedAgain.text || ''),
-        noBannerWithoutAPool: !/add up to/.test([zero.untyped, zero.firstOnly, zero.nobodyReaches].map(x => x.text).join(' ')),
+        secondOnly_runnerUp_credit: zero.secondOnly.rows === 3 && /1st — Team 1 Trophy 2nd — Team 2 \$50 pro shop credit/.test(zero.secondOnly.text || '') && zero.secondOnly.zeros === 0,
+        // was: 0 rows and "No paid spots reached yet." - the three scored teams now
+        // hold trophy places 1-3, and the unreached 4th ($50) is not a row.
+        nobodyReaches_trophiesOnly: zero.nobodyReaches.rows === 3 && (zero.nobodyReaches.text.match(/Trophy/g) || []).length === 3 && !/\$/.test(zero.nobodyReaches.text || ''),
+        clearedAgain_saysEnterAmounts: zero.clearedAgain.rows === 0 && /Enter spot amounts above to see results\./.test(zero.clearedAgain.text || ''),
+        noBannerWithoutAPool: !/adds? up to/.test([zero.untyped, zero.firstOnly, zero.nobodyReaches].map(x => x.text).join(' ')),
         // WITH a pool (the team control at $900) and nothing typed yet: no $0.00
         // row and no $0.00-vs-pool banner. Since Wave 1 (A4) there is no even
         // split, so the boxes are blank and the banner waits for an amount.

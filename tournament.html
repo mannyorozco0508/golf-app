@@ -29,9 +29,14 @@
     <script src="./qrcode.min.js"></script>
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
-    <!-- auth-compat, 9.22.2: the organizer console will sign in; the scorecard a
-         golfer opens never loads this. No auth call exists on this page yet. -->
+    <!-- auth-compat, 9.22.2: the organizer console signs in; the scorecard a
+         golfer opens never loads this. -->
     <script src="./firebase-auth-compat.js"></script>
+    <!-- Apple and Google sign-in (P1-b, 2026-11-10): the SAME module admin.html
+         uses - popup or redirect by host, the uid rules, the native seam for the
+         app. Loaded before the inline script, because firebaseConfig reads
+         authDomainFor from it. -->
+    <script src="oauth-signin.js"></script>
     <script src="course-data.js"></script>
     <!-- The pure half of online course search, shared with admin.html: what a valid
          card is, the canonical tee, every refusal sentence. Loaded before the inline
@@ -316,6 +321,13 @@
         .fa-row select { font-size:0.85rem; padding:5px 6px; max-width:52%; }
         .lb-flight-btn { display:inline-block; font-size:0.8rem; padding:6px 12px; margin:3px; border:1px solid var(--brand-green); border-radius:14px; color:var(--brand-green); background:transparent; cursor:pointer; }
         .lb-flight-btn.active { background:var(--brand-green); color:#fff; }
+        /* Results are paid on (audit #1, mockup A1). */
+        .payout-basis-head { font-size:0.8rem; font-weight:800; color:var(--text-muted); letter-spacing:.05em; text-transform:uppercase; margin:4px 0 6px; }
+        .payout-basis-seg { display:flex; flex-wrap:wrap; gap:3px; padding:3px; border:1px solid var(--border-mid); border-radius:12px; background:var(--bg-card); margin-bottom:12px; }
+        .payout-basis-seg button { flex:1 1 0; min-width:72px; font-size:0.82rem; font-weight:800; padding:8px 4px; border:0; border-radius:9px; background:transparent; color:var(--text-muted); cursor:pointer; }
+        .payout-basis-seg button.on { background:var(--brand-navy); color:#fff; }
+        .payout-basis-label { text-align:center; font-size:0.85rem; color:var(--text-main); margin-top:8px; }
+        .payout-basis-note { text-align:center; font-size:0.8rem; color:var(--text-muted); margin-top:6px; }
     </style>
 </head>
 <body>
@@ -434,7 +446,7 @@
     <div class="form-group setup-field">
         <label id="t-entry-fee-label">Entry Fee per Team ($, optional)</label>
         <div class="money-input"><span class="money-prefix" aria-hidden="true">$</span><input type="number" id="t-entry-fee" value="0" min="0" placeholder="0"></div>
-        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;" id="t-entry-fee-help">The total in and results are calculated for you once teams are in — this is just the calculator, square up for real however your event normally does.</p>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;" id="t-entry-fee-help">The organizer collects entry fees (cash, Venmo, etc.). Card payments in Rattle Golf are coming.</p>
     </div>
 
     <!-- MOVED HERE FROM #manage-screen, wave 9. Same fault as
@@ -784,7 +796,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <!-- THE WATCH LINK (Wave 1, A3). The board itself, for family and the
              clubhouse TV. Shown to everyone: a watcher forwarding it is the point. -->
         <button class="btn-outline" id="lb-watch-share" onclick="openShareModal(leaderboardWatchUrl(), (currentData && currentData.name) || 'Event', 'leaderboard')">📣 Share live leaderboard</button>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-4px; text-align:center;">Anyone with this link can watch the board as scores come in.</p>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:8px; text-align:center;">Anyone with this link can watch the board as scores come in.</p>
 
         <hr class="section-divider">
         <!-- THE CALCULATOR IS THE ORGANIZER'S (Wave 1, A3/A4). Hidden for everyone
@@ -792,16 +804,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              sets are SAVED on the record as payoutSpots and everyone reads those. -->
         <div id="payout-owner-controls" style="display:none;">
         <h3>🏆 Prize Results Calculator</h3>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many spots pay — this maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many places win a prize — this maps straight onto the standings above. Ties split the pro shop credit their tied places add up to.</p>
+        <!-- RESULTS ARE PAID ON (audit #1, A1): multi-round only, filled by
+             renderPayoutBasis. Saved as payoutBasis; every phone reads it. -->
+        <div id="payout-basis-control" style="display:none;"></div>
         <div class="form-group" style="margin-bottom:8px;">
-            <label>Paid Spots</label>
+            <label>Prize Places</label>
             <input type="number" id="payout-spots-input" min="1" max="20" value="3" oninput="renderPayoutSpotInputs()" onchange="savePayoutSpots()">
         </div>
         <div id="payout-spot-amounts"></div>
         </div>
         <h3 id="payout-public-heading">🏆 Prize Results</h3>
         <div id="payout-public-amounts"></div>
+        <div id="payout-basis-label" class="payout-basis-label" style="display:none;"></div>
         <div id="payout-results" style="margin-top:10px;"></div>
+        <p id="payout-basis-note" class="payout-basis-note" style="display:none;">Same list on every phone. Changing the board tab above does not change it.</p>
 
         <!-- THE ORGANIZER'S HANDOUT, HIDDEN FOR EVERYONE ELSE (Wave 1, A3). The print
              buttons and the scoring links lived beside the public board, so the page
@@ -851,9 +868,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
 
 <script>
+    // authDomain is decided by oauth-signin.js authDomainFor, exactly as on
+    // admin.html: the page's own host where functions/_middleware.js proxies
+    // /__/auth/ (hardpangolf.com, golf-app-5a5.pages.dev), firebaseapp.com
+    // everywhere else - tournaments.rattlegolf.com, previews, the app shell.
+    // The rest of the config is admin.html's, so the signed-in user Firebase
+    // keeps for this origin is the same one on both pages.
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
-      authDomain: "golfapp-9fb21.firebaseapp.com",
+      authDomain: (window.oauthSignin && typeof window.oauthSignin.authDomainFor === 'function')
+          ? window.oauthSignin.authDomainFor(location.hostname) : "golfapp-9fb21.firebaseapp.com",
       databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
       projectId: "golfapp-9fb21",
       storageBucket: "golfapp-9fb21.firebasestorage.app",
@@ -1312,14 +1336,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // follow the format card the organizer just pressed.
     function syncEntryFeeWording(fmt) {
         const per = (fmt === 'individual') ? 'Golfer' : 'Team';
-        const noun = (fmt === 'individual') ? 'golfers' : 'teams';
         const label = document.getElementById('t-entry-fee-label');
         const help = document.getElementById('t-entry-fee-help');
         if (label) label.textContent = `Entry Fee per ${per} ($, optional)`;
         if (help) {
-            help.textContent = `The total in and results are calculated for you once ${noun} are in`
-                + ' — this is just the calculator, square up for real however your event'
-                + ' normally does.';
+            // Manny 2026-11-10: the entry-fee help says who collects the fee.
+            help.textContent = 'The organizer collects entry fees (cash, Venmo, etc.). Card payments in Rattle Golf are coming.';
         }
     }
 
@@ -2235,8 +2257,72 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             out.href = '#'; out.textContent = 'Sign out';
             out.onclick = (e) => { if (e && e.preventDefault) e.preventDefault(); signOutNow(); };
             el.appendChild(out);
+            // SIGNED IN, BUT NOT AS THIS EVENT'S ORGANIZER (P1-b). Apple, Google
+            // and email are three different accounts unless Firebase linked them,
+            // so an organizer who set the event up with email and then tapped
+            // Apple lands here with no Setup tab and nothing saying why - the
+            // event looks as if it vanished. ownerUid is never moved; the line
+            // says which way back in there is. Manage screen only: the setup
+            // screen has no event to belong to.
+            if (id === 'signed-in-as' && currentData && currentData.ownerUid && !canManage()) {
+                const why = document.createElement('div');
+                why.id = 'signed-in-other-account';
+                why.textContent = NOT_THIS_ORGANIZER;
+                el.appendChild(why);
+            }
         });
         renderSignInPanels();
+    }
+
+    // ---- APPLE, GOOGLE, THEN EMAIL (P1-b, 2026-11-10) ---------------------
+    //
+    // THE SAME BUTTONS, ORDER AND WORDING AS admin.html's live sign-in card:
+    // "Continue with Apple" (primary), "Continue with Google" (outline), the
+    // answer under them, then "Use email instead". Here the email option is
+    // this page's own email + password - the account every organizer made
+    // before this wave - so nothing about it changed except that it is one
+    // tap away, as admin.html's email option is.
+    //
+    // ONE BUILDER. The tap goes through window.oauthSignin.signIn, the module
+    // admin.html uses: popup or redirect by host, planOauth's uid rules, and
+    // the Capacitor seam (nativeCredential) when the page runs inside the app.
+    // Nothing about HOW to sign in is decided on this page.
+    //
+    // ONE SENTENCE IS THIS PAGE'S OWN: auth/account-exists-with-different-
+    // credential. Firebase raises it when the Apple or Google email already
+    // has an account it will not merge on its own - here, an organizer's
+    // email + password account. The module's sentence for an unmapped code is
+    // "Could not finish sign-in... (code)", and admin.html has no password
+    // form, so the honest answer ("sign in with your password") only exists
+    // on this page. The credential Firebase put on the error is kept, and the
+    // next email + password sign-in to THAT email links it - the account the
+    // events belong to gains Google or Apple, and ownerUid never moves.
+    const NOT_THIS_ORGANIZER = 'This event belongs to a different organizer account. If you set it up with another sign-in (email and password, Apple or Google), sign out and sign in that way.';
+    const signinUi = { emailShown: {}, busy: {}, note: {} };
+    let pendingOauthLink = null;   // { which, email, credential } from account-exists
+
+    function providerName(which) { return which === 'apple' ? 'Apple' : 'Google'; }
+
+    function accountExistsSentence(which, linkable) {
+        return 'This email already has an organizer account that signs in with a password, and your events are on that account. '
+            + 'Sign in with your email and password below.'
+            + (linkable ? ' ' + providerName(which) + ' is then added to that account, so next time Continue with ' + providerName(which) + ' opens it too.' : '');
+    }
+
+    function oauthFailureSentence(err, which) {
+        const O = window.oauthSignin;
+        if (err && err.code === 'auth/account-exists-with-different-credential') {
+            let cred = err.credential || null;
+            try {
+                if (!cred && firebase.auth.OAuthProvider && typeof firebase.auth.OAuthProvider.credentialFromError === 'function') {
+                    cred = firebase.auth.OAuthProvider.credentialFromError(err);
+                }
+            } catch (e) { cred = null; }
+            const email = String(err.email || (err.customData && err.customData.email) || '').trim().toLowerCase();
+            pendingOauthLink = (cred && email) ? { which: which, email: email, credential: cred } : null;
+            return accountExistsSentence(which, !!pendingOauthLink);
+        }
+        return (O && typeof O.messageFor === 'function') ? O.messageFor(err) : 'Could not finish sign-in. Nothing changed - try again, or use email instead.';
     }
 
     function renderSignInPanels() {
@@ -2245,16 +2331,96 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (!el) return;
             if (authUser) { el.style.display = 'none'; el.innerHTML = ''; return; }
             el.style.display = 'block';
+            const shown = !!signinUi.emailShown[id];
+            const busy = signinUi.busy[id];
             el.innerHTML = `
                 <div class="signin-card">
                     <div class="signin-card-note">Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.</div>
-                    <div class="signin-card-row">
+                    <button type="button" id="${id}-apple" class="btn-primary"${busy ? ' disabled' : ''} onclick="oauthTapTournament('${id}', 'apple')">${busy === 'apple' ? '⏳ Opening…' : '&#63743;&nbsp; Continue with Apple'}</button>
+                    <button type="button" id="${id}-google" class="btn-outline"${busy ? ' disabled' : ''} onclick="oauthTapTournament('${id}', 'google')">${busy === 'google' ? '⏳ Opening…' : 'Continue with Google'}</button>
+                    <p id="${id}-oauth-status" class="signin-card-error" role="status"></p>
+                    <button type="button" id="${id}-email-toggle" class="btn-outline" onclick="toggleTournamentEmail('${id}')">${shown ? 'Hide the email option' : 'Use email instead'}</button>
+                    <div class="signin-card-row" id="${id}-email-row" style="display:${shown ? 'grid' : 'none'}; margin-top:8px;">
                         <input type="email" id="${id}-email" placeholder="Email" autocomplete="username">
                         <input type="password" id="${id}-password" placeholder="Password" autocomplete="current-password">
                         <button class="btn-outline" onclick="signInNow('${id}')">Sign in</button>
                     </div>
                     <div id="${id}-error" class="signin-card-error"></div>
                 </div>`;
+            // Written as text, never into the markup: the sentence can carry an
+            // error message from Firebase.
+            const status = document.getElementById(id + '-oauth-status');
+            if (status) status.textContent = signinUi.note[id] || '';
+            if (shown && pendingOauthLink) {
+                const box = document.getElementById(id + '-email');
+                if (box && !box.value) box.value = pendingOauthLink.email;
+            }
+        });
+    }
+
+    function toggleTournamentEmail(panelId) {
+        signinUi.emailShown[panelId] = !signinUi.emailShown[panelId];
+        renderSignInPanels();
+        const box = signinUi.emailShown[panelId] && document.getElementById(panelId + '-email');
+        if (box && typeof box.focus === 'function') { try { box.focus(); } catch (e) { /* not focusable */ } }
+    }
+
+    function oauthTapTournament(panelId, which) {
+        const O = window.oauthSignin;
+        signinUi.note[panelId] = '';
+        if (!O || typeof O.signIn !== 'function') {
+            signinUi.note[panelId] = 'Sign-in is not ready yet. Wait a moment and try again.';
+            renderSignInPanels();
+            return;
+        }
+        signinUi.busy[panelId] = which;
+        renderSignInPanels();
+        // BY REDIRECT where this host can (oauth-signin.js decides; the popup
+        // otherwise, and the native sheet inside the app). A redirect resolves
+        // { redirecting } and the page leaves; resumeTournamentOauth answers
+        // when it comes back. A sign-in that worked needs no sentence here: the
+        // auth listener hides this card and names the account.
+        O.signIn(which, { redirect: true }).then((r) => {
+            if (r && r.redirecting) return;
+            signinUi.busy[panelId] = null;
+            renderSignInPanels();
+        }, (err) => {
+            signinUi.busy[panelId] = null;
+            signinUi.note[panelId] = oauthFailureSentence(err, which);
+            if (pendingOauthLink) signinUi.emailShown[panelId] = true;
+            renderSignInPanels();
+        });
+    }
+
+    // BACK FROM GOOGLE OR APPLE after a redirect (hardpangolf.com and
+    // golf-app-5a5.pages.dev only). A load that started no redirect asks
+    // Firebase nothing - oauth-signin.js reads its own sessionStorage note.
+    function resumeTournamentOauth() {
+        const O = window.oauthSignin;
+        if (!O || typeof O.redirectPending !== 'function' || !O.redirectPending()) return;
+        O.resumeRedirect().then(null, (err) => {
+            const which = (err && err.which) || 'google';
+            const sentence = oauthFailureSentence(err, which);
+            ['signin-panel-manage', 'signin-panel-setup'].forEach((id) => {
+                signinUi.note[id] = sentence;
+                if (pendingOauthLink) signinUi.emailShown[id] = true;
+            });
+            renderSignInPanels();
+        });
+    }
+
+    // THE PENDING LINK, after the password sign-in it was waiting for. Only to
+    // the SAME email the Apple or Google account carries: a different address
+    // typed into the box is a different organizer, and attaching this
+    // provider to it would be the stray-account defect the other way round.
+    function linkPendingOauth(user) {
+        const p = pendingOauthLink;
+        pendingOauthLink = null;
+        if (!p || !user || typeof user.linkWithCredential !== 'function') return Promise.resolve(null);
+        if (String(user.email || '').trim().toLowerCase() !== p.email) return Promise.resolve(null);
+        return Promise.resolve(user.linkWithCredential(p.credential)).then(() => p.which, (e) => {
+            try { console.error('tournament sign-in: linking ' + p.which + ' failed: ' + String((e && e.code) || 'no-code')); } catch (x) { /* no console */ }
+            return null;
         });
     }
 
@@ -2263,7 +2429,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const password = (document.getElementById(panelId + '-password') || {}).value || '';
         const err = document.getElementById(panelId + '-error');
         if (err) err.textContent = '';
-        firebase.auth().signInWithEmailAndPassword(email.trim(), password).catch((e) => {
+        firebase.auth().signInWithEmailAndPassword(email.trim(), password).then((cred) => {
+            if (pendingOauthLink) return linkPendingOauth(cred && cred.user);
+            return null;
+        }).catch((e) => {
             if (err) err.textContent = (e && e.message) ? String(e.message) : 'Sign-in failed.';
         });
     }
@@ -2286,6 +2455,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         applyManageGate();
         renderSignedInAs();
     });
+    // Once per load, after the listener is in, so a redirect that came back
+    // signed in is shown by the listener like any other sign-in.
+    try { resumeTournamentOauth(); } catch (e) { /* never blocks the page */ }
 
     // ---- REGISTRATION (Wave 1) -------------------------------------------
     //
@@ -3361,22 +3533,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // ONE RESOLUTION, shared with the printed sheet and the golfer's card.
         const view = resolveLeaderboardView(currentData, lbRoundId, lbFlightId);
 
-        // PAYOUTS STAY ON THE OVERALL FIELD. The prize calculator below reads
-        // this cache, and paying places out of a filtered board would quietly
-        // mean "3rd in the B flight takes third prize" - a policy nobody has
-        // specified. Per-flight prize money needs its own pot per flight, which
-        // is a decision, not a filter.
-        cachedLeaderboardRows = resolveLeaderboardView(currentData, lbRoundId).rows;
-
+        // PRIZES DO NOT READ THIS VIEW (audit #1, A1, 2026-11-08). The prize
+        // calculator used to cache resolveLeaderboardView(currentData, lbRoundId)
+        // - the tab THIS viewer tapped - so two phones on one event showed two
+        // prize lists. renderPayoutResults now asks resolvePrizeView(currentData)
+        // itself: the saved basis, never the tab, never a flight. It is rendered
+        // on every board, including a refused one, so the board tab can never
+        // leave the prize list stale either.
         if (!view.available) {
             // A REFUSAL IS NOT AN ERROR. The organizer gets the sentence, and
             // every round leaderboard still works beside it.
             note.style.display = 'block';
             note.textContent = view.reason;
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px;">Pick a round above to see its leaderboard.</div>`;
-            return;
+        } else {
+            renderLeaderboardRows(container, view.rows, view.kind);
         }
-        renderLeaderboardRows(container, view.rows, view.kind);
+        renderPayoutSpotInputs();
     }
 
     // ONE ROW RENDERER for every board. A round, a flight and the combined standings
@@ -3420,10 +3593,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             </div>`;
         });
         container.innerHTML = html;
-        renderPayoutSpotInputs();
     }
-
-    let cachedLeaderboardRows = [];
 
     // THE PRIZE AMOUNTS ARE SAVED (Wave 1, A4). They lived only in the DOM, so
     // an organizer's typed amounts vanished on reload, and every other phone saw
@@ -3444,6 +3614,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
     }
     const payoutsAreSet = (spots) => spots.some((v) => v > 0);
+    // NO CASH PRIZES (Manny, 2026-11-10: "Never show cash prizes - our prizes are
+    // trophies and pro shop credit only"). The amount an organizer types for a
+    // place IS pro shop credit, so every place reads "$600 pro shop credit", and
+    // a place with no amount reads "Trophy". Wording only: payouts.js and the
+    // allocation are untouched (tournament_no_cash_prize_test.js).
+    const prizeLabel = (v) => (v > 0 ? `$${v % 1 === 0 ? v : v.toFixed(2)} pro shop credit` : 'Trophy');
 
     function payoutSpotCount() {
         const spotsInput = document.getElementById('payout-spots-input');
@@ -3482,8 +3658,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const container = document.getElementById('payout-spot-amounts');
         const subEl = document.getElementById('payout-pool-sub');
         subEl.textContent = pool > 0
-            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many spots pay — ties split whatever their tied spots add up to.`
-            : `No entry fee set for this tournament — set spot amounts manually if you're running a separate total.`;
+            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many places win a prize — ties split the pro shop credit their tied places add up to.`
+            : `No entry fee set for this tournament — type each place's pro shop credit below.`;
 
         let html = '';
         let focusedAt = -1, focusedValue = '';
@@ -3494,7 +3670,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // not an amount.
             const val = i < saved.length ? saved[i] : '';
             html += `<div class="form-group" style="margin-bottom:6px;">
-                <label>${ordinal(i + 1)} Place ($)</label>
+                <label>${ordinal(i + 1)} Place — pro shop credit $ (0 = Trophy)</label>
                 <input type="number" id="payout-spot-${i}" min="0" value="${val}" placeholder="0" oninput="renderPayoutResults()" onchange="savePayoutSpots()">
             </div>`;
         }
@@ -3504,6 +3680,54 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (el) { el.value = focusedValue; if (el.focus) el.focus(); }
         }
         renderPayoutResults();
+    }
+
+    // RESULTS ARE PAID ON (audit #1, approved mockup A1, 2026-11-08).
+    //
+    // A multi-round event pays on ONE result: the event total, or one round.
+    // The organizer picks it here and it is saved as
+    // tournaments/<code>/payoutBasis ('event' or a round id) - the same owner
+    // write setEventDetail and savePayoutSpots make, accepted by the live rules
+    // for the owner only (tools/tournament-prize-basis-rules-check.js). Every
+    // other phone reads the record and sees "Paid on <name>" over the same
+    // rows, no inputs. A single-round event has one result, so none of this
+    // shows there.
+    function renderPayoutBasis(prize, owner) {
+        const ctl = document.getElementById('payout-basis-control');
+        const label = document.getElementById('payout-basis-label');
+        const note = document.getElementById('payout-basis-note');
+        if (!ctl || !label || !note) return;
+        const ids = recordIsMultiRound() ? orderedRoundIds(currentData) : [];
+        if (ids.length === 0) {
+            [ctl, label, note].forEach((e) => { e.style.display = 'none'; e.innerHTML = ''; });
+            return;
+        }
+        const rounds = currentData.rounds || {};
+        const choices = [['event', 'Event total']].concat(ids.map((rid) => [rid, rounds[rid].name || 'Round']));
+        if (owner) {
+            ctl.style.display = 'block';
+            ctl.innerHTML = `<div class="payout-basis-head">Prizes go by</div><div class="payout-basis-seg" role="group" aria-label="Prizes go by">`
+                + choices.map(([v, name]) => `<button type="button" class="${prize.basis === v ? 'on' : ''}" aria-pressed="${prize.basis === v}" onclick="setPayoutBasis('${v}')">${escapeHtml(name)}</button>`).join('')
+                + `</div>`;
+        } else {
+            ctl.style.display = 'none'; ctl.innerHTML = '';
+        }
+        // The watcher's line names the basis above the rows it pays - only when
+        // there ARE rows to pay: amounts saved and a basis the engine can pay on.
+        const listed = prize.available && (owner || payoutsAreSet(savedPayoutSpots()));
+        if (!owner && listed) {
+            label.style.display = 'block';
+            label.innerHTML = `Prizes go by <b>${escapeHtml(prize.title || '')}</b>`;
+        } else {
+            label.style.display = 'none'; label.innerHTML = '';
+        }
+        note.style.display = listed ? 'block' : 'none';
+    }
+
+    function setPayoutBasis(v) {
+        if (!currentCode || !canManage() || !recordIsMultiRound()) return;
+        if (v !== 'event' && !(currentData.rounds || {})[v]) return;
+        db.ref(`tournaments/${currentCode}/payoutBasis`).set(v).catch(err => alert(`Error: ${err.message}`));
     }
 
     function renderPayoutResults() {
@@ -3518,12 +3742,28 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const pub = document.getElementById('payout-public-amounts');
         if (pub) {
             pub.innerHTML = owner ? '' : (payoutsAreSet(spotAmounts)
-                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${spotAmounts.map((v, i) => `${ordinal(i + 1)} $${v.toFixed(2)}`).join(' \u00b7 ')}</div>`
+                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${spotAmounts.map((v, i) => `${ordinal(i + 1)} ${prizeLabel(v)}`).join(' \u00b7 ')}</div>`
                 : `<div class="payout-spot-readonly" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Results not set yet.</div>`);
         }
+        // ONE BASIS FOR EVERY PHONE (audit #1, A1). The data decides - the
+        // organizer's saved payoutBasis, else the event total when the engine can
+        // work one out - and never the board tab or flight this viewer has open.
+        const prize = resolvePrizeView(currentData || {});
+        renderPayoutBasis(prize, owner);
         if (!owner && !payoutsAreSet(spotAmounts)) { resultsContainer.innerHTML = ''; return; }
 
-        if (!cachedLeaderboardRows || cachedLeaderboardRows.filter(r => r.hasScores).length === 0) {
+        // NEVER A MADE-UP LIST. No basis the engine can pay on: its sentence,
+        // and no rows at all.
+        // A golfer cannot act on the organizer's sentence, so until the
+        // organizer picks a basis a non-organizer reads only that results are
+        // coming (Manny, 2026-11-08 01:46). The organizer keeps the reason.
+        if (!prize.available) {
+            const why = owner ? (prize.reason || '') : 'Prize results coming soon';
+            resultsContainer.innerHTML = `<div class="payout-basis-reason" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">${escapeHtml(why)}</div>`;
+            return;
+        }
+        const prizeRows = prize.rows || [];
+        if (prizeRows.filter(r => r.hasScores).length === 0) {
             resultsContainer.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No scores yet — results will show once teams start posting.</div>`;
             return;
         }
@@ -3533,7 +3773,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // Printing those made a finished-looking table of $0.00 rows - every
         // scored team at fee 0, every unpaid rank with a pool. Only rows with
         // money are rows; "Paid Spots" already says how many there are.
-        const payouts = computeTournamentPayouts(cachedLeaderboardRows, spotAmounts).filter((p) => p.amount > 0);
+        // P1-a, 2026-11-10 (no cash prizes): a place INSIDE the organizer's
+        // "Prize Places" count with no amount is a trophy place, and its winner
+        // is named, reading "Trophy". Ranks past that count stay filtered out,
+        // and nothing shows until an amount is set, exactly as before.
+        const placesSet = payoutsAreSet(spotAmounts);
+        const payouts = computeTournamentPayouts(prizeRows, spotAmounts)
+            .filter((p) => p.amount > 0 || (placesSet && p.rank <= spotAmounts.length));
         const totalAllocated = spotAmounts.reduce((s, v) => s + v, 0);
         const pool = poolTotal();
 
@@ -3542,21 +3788,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // that disagrees with the pool.
         if (owner && payoutsAreSet(spotAmounts) && pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--accent-red); background:var(--danger-box-bg); border:1px solid var(--accent-red); border-radius:6px; padding:8px; margin-bottom:10px;">
-                ⚠️ Result amounts add up to $${totalAllocated.toFixed(2)}, but the total in is $${pool.toFixed(2)}.
+                ⚠️ Pro shop credit adds up to $${totalAllocated.toFixed(2)}, but the total in is $${pool.toFixed(2)}.
             </div>`;
         }
 
-        // Three sentences, each reachable. "No paid spots reached yet." had never
+        // Three sentences, each reachable. "No prize places reached yet." had never
         // rendered before the filter: the list was empty only with no scores, and
         // that case returns above. Now it is the case where amounts are set but
         // the only scored ranks sit on $0 spots.
+        // P1-a, 2026-11-10: a $0 place inside the count is now a "Trophy" row, so
+        // with a scored team 1st is always listed and this sentence is a
+        // fallback that no fixture reaches. Kept, not deleted (wording only).
         if (!spotAmounts.some((v) => v > 0)) {
             html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Enter spot amounts above to see results.</div>`;
         } else if (payouts.length === 0) {
-            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No paid spots reached yet.</div>`;
+            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No prize places reached yet.</div>`;
         } else {
             payouts.forEach(p => {
-                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${escapeHtml(p.teamName)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${p.amount.toFixed(2)}</span></div>`;
+                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${escapeHtml(p.teamName)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">${prizeLabel(p.amount)}</span></div>`;
             });
         }
         resultsContainer.innerHTML = html;

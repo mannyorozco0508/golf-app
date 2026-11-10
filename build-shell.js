@@ -271,7 +271,10 @@ const PRODUCTS = {
         // new event is born locked, Setup offers Lock scoring links, and the card
         // sends each keyed score with its proof. A device on v57 keeps a card
         // that cannot score a locked event.
-        cacheName: 'tournament-v58-scorecard-lock',
+        // Moved to v60 FOR PHASE 1 (2026-11-10). tournament.html, tournament-scorecard.html
+        // and tournament-engine.js changed: in-app card and board, Apple/Google organizer
+        // sign-in, no cash prize wording. A device on v59 keeps cash prize wording.
+        cacheName: 'tournament-v60-phase1',
         appName: 'Rattle Golf Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

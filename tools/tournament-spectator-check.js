@@ -114,9 +114,10 @@ async function look(r, auth) {
     if (!(L.scorecardLinks >= 3 && L.qrCodes >= 3 && L.printButtons >= 3)) failures.push('legacy, signed out: the handout is not on screen: ' + JSON.stringify({ links: L.scorecardLinks, qr: L.qrCodes, print: L.printButtons }));
     if (L.payoutInputs) failures.push('legacy: ' + L.payoutInputs + ' payout input(s) on an event nobody can save amounts on');
     if (o.amountBoxValues.some((v) => v !== '')) failures.push('owner, nothing saved: amount boxes read ' + JSON.stringify(o.amountBoxValues) + ' - an amount nobody typed');
-    if (!/1st \$500\.00 · 2nd \$300\.00 · 3rd \$100\.00/.test(out.watcherSaved.publicPayouts || '')) failures.push('watcher, saved: amounts read ' + JSON.stringify(out.watcherSaved.publicPayouts));
+    if (!/1st \$500 pro shop credit · 2nd \$300 pro shop credit · 3rd \$100 pro shop credit/.test(out.watcherSaved.publicPayouts || '')) failures.push('watcher, saved: amounts read ' + JSON.stringify(out.watcherSaved.publicPayouts));
     if (!/Payouts not set yet\./.test(out.watcherUnsaved.publicPayouts || '')) failures.push('watcher, unsaved: reads ' + JSON.stringify(out.watcherUnsaved.publicPayouts));
-    if (/\$300\.00/.test(out.watcherUnsaved.tabText)) failures.push('watcher, unsaved: an even-split $300.00 is on screen');
+    // 2026-11-10 (P1-a): amounts read "$300 pro shop credit" now, so /\$300\.00/ could never match.
+    if (/\$300\b/.test(out.watcherUnsaved.tabText)) failures.push('watcher, unsaved: an even-split $300 is on screen');
 
     const brief = (m) => ({ boardRows: m.boardRows, scorecardLinks: m.scorecardLinks, qrCodes: m.qrCodes, printButtons: m.printButtons,
         payoutInputs: m.payoutInputs, watchButton: m.watchButton, amountBoxValues: m.amountBoxValues, publicPayouts: m.publicPayouts });

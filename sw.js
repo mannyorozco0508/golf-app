@@ -4515,7 +4515,6 @@
 // Moved to v385-2.0 (tournament scorecard lock): tournament.html + tournament-scorecard.html - a team/group link carries &k= and each score is written with its keyed proof in the same update (rules live since 2026-11-07 9:49 AM). A device on v383-2.0 keeps the unkeyed scorecard, whose score writes the live rules now refuse on a locked event.
 // Moved to v393-2.0 (website-c, Manny Nov 10): instructions.html (How it works without betting words) + trip.html, trip-pots.js (panel "Trip Settlement"). A device on v385-2.0 keeps the old wording until it reloads.
 // Moved to v394-2.0 (website-d, Manny Nov 10): hardpangolf.com/ is the homepage now and the web app is /app. A bare / answers the homepage, so this worker (1) never stores a response marked X-HardPan-Page: home, (2) stores the precached app shell under ./index.html AND under / and /app, so an offline /?game=CODE still opens the app, and (3) refuses a homepage answer to its install fetch. Also the web pages lost the Dark Mode button (light only on the web). A device on v393-2.0 would cache the homepage under / on its first plain visit - and an offline game link would then open the homepage; this bump replaces that worker and drops its cache.
-const CACHE_VERSION = 'golfapp-v394-2.0';
 
 // THE HOMEPAGE IS NOT THE APP (website-d). functions/_front-door.js marks its
 // homepage answer with this header. Such a response is served, never cached:
@@ -4530,6 +4529,9 @@ function isHomepageResponse(res) {
 // query (every share link Cloudflare has ever 308ed from /index.html?game=...)
 // and /app (the web app's address since website-d).
 const APP_SHELL_ALIASES = ['./', './app'];
+// Moved to v395-2.0 (tournaments nov7 build, merged with phase 1): tournament.html + tournament-scorecard.html + tournament-engine.js - scores saved on the phone before sending (offline queue), prize results from one saved basis on every phone, shotgun next hole, flights/Event golfer board, "N waiting for signal" chip. A device on v394-2.0 keeps a scorecard that loses unsent scores when closed.
+//   and (tournaments phase 1): tournament.html + tournament-scorecard.html + tournament-engine.js - in-app card and board (app mode), Apple/Google organizer sign-in, prizes read pro shop credit / Trophy, entry-fee help, Share note gap. A device on v394-2.0 keeps cash prize wording and email-only organizer sign-in.
+const CACHE_VERSION = 'golfapp-v395-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
