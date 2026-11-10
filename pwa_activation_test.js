@@ -276,13 +276,17 @@ describe('SERVICE WORKER - install and update behaviour', () => {
         // online:false - which no browser does.
         const sw = loadServiceWorker({ online: true });
         await sw.install();
-        assert.equal(sw.stores.get(CACHE_NAME).size, SHELL_COUNT, `All ${SHELL_COUNT} shell files should be cached.`);
+        // website-d (v394): ./index.html is ALSO stored under / and /app (APP_SHELL_ALIASES
+        // in sw.js), so an offline /?game= opens the app now that a bare / is the
+        // homepage. Two more entries, the same file.
+        assert.equal(sw.stores.get(CACHE_NAME).size, SHELL_COUNT + 2, `All ${SHELL_COUNT} shell files (+ the / and /app aliases of index.html) should be cached.`);
+        assert.ok(sw.stores.get(CACHE_NAME).has(ORIGIN + '/') && sw.stores.get(CACHE_NAME).has(ORIGIN + '/app'), 'the two aliases are / and /app');
     });
 
     test('one failing file costs that file only, and is logged rather than swallowed', async () => {
         const sw = loadServiceWorker({ online: true, failUrls: ['./icon-512.png'] });
         await sw.install();
-        assert.equal(sw.stores.get(CACHE_NAME).size, SHELL_COUNT - 1, 'A single failure must not abort the whole install.');
+        assert.equal(sw.stores.get(CACHE_NAME).size, SHELL_COUNT + 2 - 1, 'A single failure must not abort the whole install.');
         assert.equal(sw.warnings.length, 1, 'The failure should be logged.');
     });
 
@@ -300,7 +304,7 @@ describe('SERVICE WORKER - install and update behaviour', () => {
         // It is pinned to the shape, plus the current value, so a bump is a
         // deliberate one-line edit here rather than four mystery failures.
         assert.match(CACHE_NAME, /^golfapp-v\d+/, 'The cache key must carry a version number.');
-        assert.equal(CACHE_NAME, 'golfapp-v386-2.0', 'Cache key changed - if that was deliberate, update this line; every installed device drops its old cache on activate.');
+        assert.equal(CACHE_NAME, 'golfapp-v395-2.0', 'Cache key changed - if that was deliberate, update this line; every installed device drops its old cache on activate.');
     });
 });
 

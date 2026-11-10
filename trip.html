@@ -326,6 +326,12 @@ body::after {
 </style>
 </head>
 <body>
+    <!-- WEB IS LIGHT ONLY (website-d, Manny Nov 10: "remove the moon Dark Mode button from the website to match the app").
+         Placed first in <body>, after every <head> script, before the header. On the web (http/https, not the app) html gets hp-web-light: the Dark Mode button is hidden and a saved
+         golfapp-theme = dark is not applied, so nobody is left in dark with no way out. The key itself is left alone.
+         The iOS/Android app (Capacitor, capacitor://, Android https://localhost) is untouched and keeps its switch. -->
+    <script>(function(){try{var C=window.Capacitor,L=window.location,n=!!(C&&(typeof C.isNativePlatform!=='function'||C.isNativePlatform()))||!/^https?:$/.test(L.protocol)||(L.hostname==='localhost'&&!L.port);window.hpWebLight=!n;if(!n)document.documentElement.classList.add('hp-web-light');}catch(e){}})();</script>
+    <style>html.hp-web-light .theme-toggle-btn{display:none !important;}html.hp-web-light .lobby-account-row{justify-content:flex-end;}</style>
 
 <div class="container" id="setup-screen">
     <a class="back-btn" onclick="goBack()">← Back</a>
@@ -691,7 +697,7 @@ body::after {
     </details>
 
     <details class="trip-section">
-        <summary>📊 Trip Money Settlement</summary>
+        <summary>📊 Trip Settlement</summary>
         <div class="trip-section-body">
             <p class="trip-section-sub">Square up between yourselves — this is just the math.</p>
             <div id="trip-money-settlement"></div>
@@ -821,7 +827,7 @@ body::after {
         localStorage.setItem('golfapp-theme', isDark ? 'dark' : 'light');
         document.querySelectorAll('.theme-toggle-btn').forEach(btn => { btn.textContent = isDark ? '☀️ Light Mode' : '🌙 Dark Mode'; });
     }
-    if (localStorage.getItem('golfapp-theme') === 'dark') document.documentElement.classList.add('dark-mode');
+    if (!window.hpWebLight && localStorage.getItem('golfapp-theme') === 'dark') document.documentElement.classList.add('dark-mode');
     document.addEventListener('DOMContentLoaded', () => {
         if (document.documentElement.classList.contains('dark-mode')) {
             document.querySelectorAll('.theme-toggle-btn').forEach(btn => { btn.textContent = '☀️ Light Mode'; });

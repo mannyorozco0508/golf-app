@@ -1,0 +1,8 @@
+# Cloudflare Pages rewrites (website-b, ADVISOR-20261108-0356).
+# /home (and /home/) show the marketing page, hardpan-home.html, with a 200; the
+# address bar keeps /home. Nothing here touches /, /index.html, /admin, any
+# ?game= / ?tourney= link, /api/* or /__/auth/* (marketing_home_test.js pins it).
+# website-d: a BARE / is the homepage too, and /app is the web app - both done in
+# functions/ (index.js, app/[[path]].js), because _redirects cannot read a query.
+/home   /hardpan-home  200
+/home/  /hardpan-home  200

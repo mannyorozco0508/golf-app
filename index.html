@@ -1871,6 +1871,12 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
 </style>
 </head>
 <body>
+    <!-- WEB IS LIGHT ONLY (website-d, Manny Nov 10: "remove the moon Dark Mode button from the website to match the app").
+         Placed first in <body>, after every <head> script, before the header. On the web (http/https, not the app) html gets hp-web-light: the Dark Mode button is hidden and a saved
+         golfapp-theme = dark is not applied, so nobody is left in dark with no way out. The key itself is left alone.
+         The iOS/Android app (Capacitor, capacitor://, Android https://localhost) is untouched and keeps its switch. -->
+    <script>(function(){try{var C=window.Capacitor,L=window.location,n=!!(C&&(typeof C.isNativePlatform!=='function'||C.isNativePlatform()))||!/^https?:$/.test(L.protocol)||(L.hostname==='localhost'&&!L.port);window.hpWebLight=!n;if(!n)document.documentElement.classList.add('hp-web-light');}catch(e){}})();</script>
+    <style>html.hp-web-light .theme-toggle-btn{display:none !important;}html.hp-web-light .lobby-account-row{justify-content:flex-end;}</style>
 
 <div id="print-area"></div>
 
@@ -2365,7 +2371,7 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
     // --- DARK MODE ---
     (function initTheme() {
         const saved = localStorage.getItem('golfapp-theme');
-        if (saved === 'dark') {
+        if (saved === 'dark' && !window.hpWebLight) {
             document.documentElement.classList.add('dark-mode');
         }
     })();
@@ -9044,7 +9050,21 @@ button.hl-board { appearance: none; -webkit-appearance: none; background: none; 
             const isMultiGroupRound = players.length > 4;
             // A spectator on a multi-group round has no ?group= either, and must stay
             // read-only - the same condition the scorecard already renders on.
-            return !isMultiGroupRound;
+            if (!isMultiGroupRound) return true;
+            // THE ORGANIZER'S PICKED GROUP (2.0.4). canScoreBox unlocks the boxes
+            // for the organizer on a bare link once he picks "Score for: Group N";
+            // this gate never asked, so every score he typed was dropped by
+            // rejectCrossGroupWrite and the box emptied on the next snapshot. The
+            // SAME two conditions as canScoreBox - a picked group AND the organizer
+            // gate - and only for golfers in that group. A spectator has no picked
+            // group (organizerScoreGroup() is null without canReachSetup()), so he
+            // stays read-only exactly as before.
+            const mine = organizerScoreGroup();
+            if (mine && canReachSetup()) {
+                const g = playerGroupOf(playerId);
+                return g !== null && String(g) === String(mine);
+            }
+            return false;
         }
         const grp = playerGroupOf(playerId);
         if (grp === null) return true; // single-group round, no map built

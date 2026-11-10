@@ -49,7 +49,7 @@ const SHARED_SHELL = [
     // 084: the Rounds I am running list - admin.html, trip.html and (GPS) home.html load it.
     'my-rounds.js',
     'trip-recap-image.js',
-    'grouping.js', 'handicap.js', 'player-tees.js', 'handicap-labels.js', 'aloha-bet.js', 'payouts.js', 'course-data.js', 'score-marks.js',
+    'grouping.js', 'handicap.js', 'player-tees.js', 'handicap-labels.js', 'aloha-bet.js', 'hilo-engine.js', 'payouts.js', 'course-data.js', 'score-marks.js',
     // scorecard-rows.js: the hole-by-hole rows, drawn once. settlement.html
     // (the Receipt) and leaderboard.html (the tap-a-name card) load it.
     'scorecard-rows.js',
@@ -91,6 +91,10 @@ const SHARED_SHELL = [
     'code-issuer.js',
     // One HTML escaper for every page that renders a user-supplied name.
     'text-safe.js',
+    // 2.0 (23): the + Plus chip under every handicap box (index, admin, trip and home load it).
+    'hcp-plus.js',
+    // 2.0.1 shipped these four in GPS blocks; main has none, so they sit here. bbb-engine.js and vegas-engine.js: admin, game, index, leaderboard, season, settlement, sidematches, skins, stats and trip load them. league-engine.js and league-ui.js: settlement loads them.
+    'bbb-engine.js', 'vegas-engine.js', 'league-engine.js', 'league-ui.js',
     // Runtime plumbing. The vendored Firebase SDK, the service-worker boot, and
     // the worker and manifest themselves.
     // product-links.js is the only place that knows the two products may live at

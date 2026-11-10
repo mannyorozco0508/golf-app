@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="HardPan Golf: GPS, games and live scoring for your group, and a tournament tool for the people who organize the day.">
+<link rel="icon" href="/hardpan-icon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>HardPan Golf</title>
+<!--
+  THE MARKETING PAGE (website-b, ADVISOR-20261108-0356, Manny picked design B).
+  Served at / (website-d: a BARE / only - functions/index.js + _front-door.js),
+  /home (the _redirects rewrite) and /hardpan-home. It is NOT the app: the web
+  app is /app, and / with any app query (?game=, ?tourney=, ?trip=, ...) is
+  still index.html; every game / tournament link keeps its own page. The logo
+  goes to / (website-d; it was /home). The two "open the web app" links stay
+  /admin: that IS the app's front door, one hop shorter than /app.
+  It is not in sw.js's shell list and not in the native bundle.
+
+  FILLED (Manny, website facts 2026-11-08 sections 1-2):
+    App Store: https://apps.apple.com/app/id6808220335 on both Apple badges.
+    Badge art: Apple's official black "Download on the App Store" en-us badge,
+      app-store-badge.svg, saved unchanged from Apple's public badge service
+      (toolbox.marketingtools.apple.com/api/v2/badges/download-on-the-app-store/black/en-us).
+      Shown 44 px high (min 40), natural aspect, Apple first, 12 px clear space.
+    Google Play (website-c, Manny 2026-11-10): Google's official "Get it on Google
+      Play" badge, google-play-badge.png saved unchanged from
+      play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png,
+      linking to https://play.google.com/store/apps/details?id=com.rattlegolf.app.
+      The PNG carries its own clear space; the black badge is drawn 44 px high,
+      the same as Apple's, Apple first. Trademark line in the footer.
+  WEBSITE-C (Manny's pick 27A): under the hero, "EVERYTHING IN THE APP", 9 tiles,
+    each a muted clip slot that plays ONCE and holds its last frame (website-d,
+    Manny "keep option 1": no loop, so nothing jumps; poster = a real 2.0.4 still in media/posters/,
+    clip = media/clips/<name>.mp4, see media/clips/manifest.json). site-clips.js
+    loads a clip only in view, pauses it out of view, and keeps the poster when
+    the file is missing. Help (28A) is /help and /help/<topic>.
+  STILL TO FILL (grep data-todo):
+    data-todo="copy-approve"    claims Grok flagged for Manny's wording OK
+  Prices: none in this file. site-pricing.js fills every data-price slot.
+-->
+<style>
+    :root { --g:#0f4a36; --g2:#163f31; --lime:#d9f07a; --cream:#f4f1e8; --navy:#1d3357; --ink:#14201b; --mut:#5d6b64; --card:#fff; --line:#e3e0d6; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html { scroll-behavior:smooth; }
+    body { font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Inter, Arial, sans-serif; color:var(--ink); background:var(--cream); -webkit-font-smoothing:antialiased; }
+    a { color:inherit; text-decoration:none; }
+    .wrap { max-width:1180px; margin:0 auto; padding:0 28px; }
+    nav.top { display:flex; align-items:center; justify-content:space-between; padding:18px 0; gap:16px; }
+    .logo { display:flex; align-items:center; gap:10px; font-weight:800; font-size:20px; }
+    .logo img { width:36px; height:36px; border-radius:9px; display:block; }
+    .links { display:flex; gap:26px; font-size:15px; font-weight:600; }
+    .links a:hover { color:var(--g); }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:13px 20px; border-radius:12px; font-weight:700; font-size:15px; white-space:nowrap; }
+    .lime { background:var(--lime); color:var(--g); }
+    .hero { text-align:center; padding:40px 28px 30px; }
+    .hero h1 { font-size:60px; font-weight:900; letter-spacing:-.03em; line-height:1.05; }
+    .hero h1 span { color:var(--g); }
+    .sub { color:var(--mut); font-size:18px; max-width:640px; line-height:1.5; }
+    .hero .sub { margin:16px auto 0; }
+    .hero .webapp { display:inline-block; margin-top:18px; font-size:15px; font-weight:700; color:var(--g); border-bottom:2px solid var(--lime); }
+    .split { display:grid; grid-template-columns:1fr 1fr; gap:22px; padding-bottom:70px; }
+    .panel { border-radius:28px; padding:38px; color:#fff; }
+    .panel.play { background:var(--g); display:flex; gap:24px; align-items:center; }
+    .panel.org { background:var(--navy); }
+    .kicker { font-weight:800; font-size:13px; letter-spacing:.14em; }
+    .play .kicker { color:var(--lime); }
+    .org .kicker { color:#9fc2ff; }
+    .panel h2 { font-size:34px; margin:10px 0; }
+    .play p { color:#cfe0d6; line-height:1.5; margin-bottom:22px; }
+    .org p { color:#cdd8ea; line-height:1.5; margin-bottom:20px; }
+    .badges { display:flex; gap:12px; flex-wrap:wrap; }
+    .store-apple { display:inline-block; line-height:0; }
+    .store-apple img { display:block; height:44px; width:auto; }
+    .phone-wrap { transform:scale(.8); transform-origin:center; flex:0 0 auto; }
+    .phone { width:250px; height:510px; border-radius:38px; background:#0b0f0d; padding:10px; box-shadow:0 30px 60px rgba(0,0,0,.35); }
+    .scr { width:100%; height:100%; border-radius:30px; overflow:hidden; background:#2f5a3a; position:relative; }
+    .scr .top { position:absolute; left:10px; right:10px; top:16px; background:#111a15; border-radius:16px; color:#fff; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; }
+    .scr .top small { font-size:9px; color:#aab; letter-spacing:.1em; }
+    .scr .top b { font-size:34px; color:var(--lime); }
+    .fair { position:absolute; left:70px; top:120px; width:110px; height:300px; border-radius:60px; background:#4f8a4c; transform:rotate(8deg); }
+    .grn { position:absolute; left:92px; top:118px; width:60px; height:44px; border-radius:50%; background:#7fbf6a; border:2px solid #fff; }
+    .bot { position:absolute; left:10px; right:10px; bottom:14px; background:var(--lime); border-radius:14px; text-align:center; font-weight:800; color:var(--g); padding:10px; font-size:13px; }
+    .pill { position:absolute; right:12px; bottom:70px; background:#f4f1e8; color:var(--ink); border-radius:16px; padding:8px 12px; font-size:11px; font-weight:700; }
+    .board { background:#fff; color:var(--ink); border-radius:18px; padding:18px; font-size:14px; }
+    .board .row { display:flex; justify-content:space-between; margin-top:8px; gap:12px; }
+    .board .live { color:#c0392b; font-weight:800; font-size:12px; letter-spacing:.08em; }
+    .org .btn { margin-top:22px; }
+    .sec { padding:80px 0; }
+    .sec.white { background:#fff; }
+    .h2 { font-size:38px; font-weight:850; letter-spacing:-.02em; margin-bottom:12px; }
+    .price { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:34px; }
+    .pc { background:#fff; border-radius:18px; padding:22px; border:1px solid var(--line); line-height:1.45; font-size:15px; }
+    .pc .nm { font-weight:700; }
+    .pc b { font-size:28px; display:block; margin:8px 0; }
+    .pc.hi { background:var(--g); color:#fff; border:0; }
+    .pc.hi b { color:var(--lime); }
+    .pc small { display:block; margin-top:10px; font-size:13px; opacity:.8; }
+    .note { font-size:13px; color:var(--mut); margin-top:16px; max-width:760px; line-height:1.5; }
+    .getapp { background:var(--g); color:#fff; text-align:center; }
+    .getapp .h2 { color:#fff; }
+    .getapp .sub { color:#cfe0d6; margin:0 auto 28px; }
+    .getapp .badges { justify-content:center; }
+    .getapp .webapp { display:inline-block; margin-top:22px; color:var(--lime); font-weight:700; }
+    footer { background:var(--ink); color:#c9d1cc; padding:40px 0; font-size:14px; line-height:1.6; }
+    footer .wrap { display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+    footer .flinks a { margin-right:16px; color:#fff; text-decoration:underline; text-underline-offset:3px; }
+    @media (max-width:980px) { .price { grid-template-columns:repeat(2,1fr); } .phone-wrap { display:none; } }
+    @media (max-width:700px) {
+        .wrap { padding:0 16px; }
+        .links { display:none; }
+        .price { grid-template-columns:1fr; }
+        .h2 { font-size:28px; }
+        .hero { padding:28px 16px 24px; }
+        .hero h1 { font-size:40px; }
+        .split { grid-template-columns:1fr; }
+        .panel { padding:28px 22px; }
+        .panel h2 { font-size:28px; }
+        .sec { padding:56px 0; }
+        footer .wrap { flex-direction:column; }
+    }
+
+    /* website-c: feature grid (27A) and Help (28A). Clip slots: poster now, clip when the file exists (site-clips.js). */
+    .clip { position:relative; overflow:hidden; border-radius:18px; background:#dfe8e4; box-shadow:0 0 0 4px #10231c, 0 10px 24px rgba(0,0,0,.18); }
+    .clip video { width:100%; height:100%; object-fit:cover; display:block; }
+    .clip .cb { display:none; position:absolute; left:8px; bottom:8px; background:rgba(16,35,28,.86); color:#fff; font-size:12px; font-weight:700; border-radius:8px; padding:3px 8px; }
+    .clip.has-clip .cb { display:block; }
+    .store-google { display:inline-block; line-height:0; }
+    /* Google's badge PNG carries its own clear space (41 of 250 px top and bottom), so the image is
+       drawn 250/168 x 44 px high and pulled in by that padding: the black badge itself is 44 px, the same as Apple's. */
+    .store-google img { display:block; height:65.5px; width:auto; margin:-10.75px; }
+
+    .hero { padding-bottom:18px; }
+    .hb { justify-content:center; margin-top:18px; }
+    .ftitle { font-size:13px; font-weight:800; letter-spacing:.14em; color:var(--g); text-align:center; margin:6px 0 16px; }
+    .fa { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; padding-bottom:50px; }
+    .fa .t { display:flex; gap:16px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:20px; padding:14px; }
+    .fa .clip { flex:0 0 112px; height:170px; border-radius:14px; box-shadow:0 0 0 3px #10231c; }
+    .fa h3 { font-size:19px; margin-bottom:4px; }
+    .fa p { font-size:14.5px; color:var(--mut); line-height:1.4; }
+    @media (max-width:700px) {
+        .hero { padding:18px 16px 12px; }
+        .hero h1 { font-size:30px; }
+        .hero .sub { font-size:15px; margin-top:8px; }
+        .hb { margin-top:12px; }
+        .hero .webapp { margin-top:10px; font-size:14px; }
+        .fa { gap:8px; }
+        .fa .t { flex-direction:column; align-items:stretch; gap:6px; padding:6px; border-radius:14px; }
+        .fa .clip { flex:none; height:128px; border-radius:10px; }
+        .fa h3 { font-size:13.5px; margin:0 2px; line-height:1.2; }
+        .fa p { display:none; }
+        .fa .cb { font-size:10px; padding:2px 5px; left:5px; bottom:5px; }
+        .ftitle { margin:4px 0 10px; }
+    }
+</style>
+</head>
+<body>
+
+<nav class="wrap top" aria-label="Main">
+    <a class="logo" href="/"><img src="/hardpan-icon.svg" alt="" width="36" height="36">HardPan Golf</a>
+    <div class="links">
+        <a href="#features">Features</a>
+        <a href="#golfers">Games</a>
+        <a href="#golfers">GPS &amp; Coaching</a>
+        <a href="#organizers">Tournaments</a>
+        <a href="#pricing">Pricing</a>
+        <a href="/help">Help</a>
+        <a href="/support">Support</a>
+    </div>
+    <a class="btn lime" id="nav-get-app" href="#get-the-app">Get the app</a>
+</nav>
+
+<section class="wrap hero">
+    <h1>Play it. Run it.<br><span>HardPan does the math.</span></h1>
+    <p class="sub">GPS, games and live scoring for your group, and a full tournament tool for the people who organize the day.</p>
+    <div class="badges hb"><a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a><a class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app" data-store="google"><img src="/google-play-badge.png" alt="Get it on Google Play" width="170" height="66"></a></div>
+    <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
+</section>
+
+<section class="wrap" id="features">
+    <h2 class="ftitle">EVERYTHING IN THE APP</h2>
+    <div class="fa">
+        <div class="t" id="f-gps"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/gps.jpg" data-src="/media/clips/gps.mp4" style="object-position:top" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></div><div><h3>GPS</h3><p>Satellite yardages to the front, middle and back of every green, plus Plays like for slope and weather.</p></div></div>
+        <div class="t" id="f-say"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/just-say-it.jpg" data-src="/media/clips/just-say-it.mp4" style="object-position:top" aria-hidden="true"></video><span class="cb">&#9654; 0:06</span></div><div><h3>Just say it</h3><p>Type the round in one line. HardPan sets up the course, the golfers and the games.</p></div></div>
+        <div class="t" id="f-group"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/group-scoring.jpg" data-src="/media/clips/group-scoring.mp4" style="object-position:bottom" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></div><div><h3>Group scoring</h3><p>Everyone starts at par. Tap &minus; or +, and one tap saves the whole group.</p></div></div>
+        <div class="t" id="f-games"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/games-live-board.jpg" data-src="/media/clips/games-live-board.mp4" style="object-position:center" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></div><div><h3>Games &amp; live board</h3><p>Skins, Nassau, Match play, Vegas and more, with a leaderboard that moves every hole.</p></div></div>
+        <div class="t" id="f-results"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/results.jpg" data-src="/media/clips/results.mp4" style="object-position:top" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></div><div><h3>Results</h3><p>Final scores, net and gross, and every game&rsquo;s result, ready to share.</p></div></div>
+        <div class="t" id="f-tourney"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/tournaments.jpg" data-src="/media/clips/tournaments.mp4" style="object-position:center" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></div><div><h3>Tournaments</h3><p>Create one in four questions. Golfers join with one code.</p></div></div>
+        <div class="t" id="f-weekly"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/weekly-code.jpg" data-src="/media/clips/weekly-code.mp4" style="object-position:50% 45%" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></div><div><h3>Weekly code</h3><p>Your weekly game keeps the same join code, every week.</p></div></div>
+        <div class="t" id="f-chat"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/chat.jpg" data-src="/media/clips/chat.mp4" style="object-position:top" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></div><div><h3>Chat</h3><p>Talk with the whole round, or just your group.</p></div></div>
+        <div class="t" id="f-bag"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/my-bag-stats.jpg" data-src="/media/clips/my-bag-stats.mp4" style="object-position:top" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></div><div><h3>My bag &amp; stats</h3><p>Your real carries, Strokes Gained and every past round.</p></div></div>
+    </div>
+</section>
+
+<section class="wrap split">
+    <div class="panel play" id="golfers">
+        <div style="flex:1">
+            <div class="kicker">I PLAY</div>
+            <h2>For golfers</h2>
+            <p>Satellite yardages, side games, chat, Strokes Gained and coaching. Free for one group.</p>
+            <div class="badges"><a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a><a class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app" data-store="google"><img src="/google-play-badge.png" alt="Get it on Google Play" width="170" height="66"></a></div>
+        </div>
+        <div class="phone-wrap" aria-hidden="true">
+            <div class="phone"><div class="scr">
+                <div class="top"><div><small>HOLE 7 &middot; MIDDLE</small><br><b>152</b></div><div style="font-size:11px;text-align:right">B 166<br>F 139</div></div>
+                <div class="fair"></div><div class="grn"></div>
+                <div class="pill">Plays like 158 &middot; 7i</div>
+                <div class="bot">Hole 7 &middot; Enter score</div>
+            </div></div>
+        </div>
+    </div>
+    <div class="panel org" id="organizers">
+        <div class="kicker">I ORGANIZE</div>
+        <h2>HardPan Tournaments</h2>
+        <p data-todo="copy-approve">Registration, flights, shotgun starts, live leaderboard and prize results that match on every phone.</p>
+        <div class="board" aria-label="Example leaderboard">
+            <b style="font-size:16px">Rattle Classic</b> &middot; <span class="live">LIVE</span>
+            <div class="row"><span>1. Team 9 &middot; Reyes / Cho</span><b>&minus;11</b></div>
+            <div class="row"><span>2. Team 2 &middot; Hale / Ruiz</span><b>&minus;9</b></div>
+            <div class="row"><span>3. Team 4 &middot; Lopez / Kim</span><b>&minus;8</b></div>
+        </div>
+        <a class="btn lime" id="run-an-event" href="/tournament">Run an event &rarr;</a>
+    </div>
+</section>
+
+<section class="sec white">
+    <div class="wrap">
+        <div class="h2">Side games, just for fun</div>
+        <p class="sub" data-todo="copy-approve">HardPan keeps the points, skins and Nassau your group agreed on and shows where everyone finished, so settling up is easy. It never holds, sends or takes a cut of money.</p>
+    </div>
+</section>
+
+<section class="sec" id="pricing">
+    <div class="wrap">
+        <div class="h2">Simple pricing</div>
+        <div class="price">
+            <div class="pc"><span class="nm">Free</span><b data-price="free"></b>One group of up to <span data-price="free-golfers"></span>. Scores, games, leaderboard.</div>
+            <div class="pc hi"><span class="nm">HardPan Pro</span><b data-price="pro-headline"></b><span data-price="pro-label"></span>. Full GPS map, coaching, hosting. <span data-price="pro-trial-days"></span>-day free trial.
+                <small>Or <span data-price="pro-yearly"></span>/yr, or <span data-price="pro-monthly"></span>/mo.</small></div>
+            <div class="pc"><span class="nm">Host Pro</span><b data-price="host-yearly"></b>Host bigger games and events all year.</div>
+            <div class="pc"><span class="nm">Trip Pass</span><b data-price="trip-pass"></b>One golf trip, <span data-price="trip-pass-days"></span> days of hosting.</div>
+        </div>
+        <p class="note">US prices. The App Store or Google Play shows the price in your country before you confirm. Subscriptions renew automatically until cancelled in your store account; the free trial is for new subscribers. Joining a round and scoring are always free.</p>
+    </div>
+</section>
+
+<section class="sec getapp" id="get-the-app">
+    <div class="wrap">
+        <div class="h2">Get the app</div>
+        <p class="sub">HardPan for iPhone and Android. Your group can also join any round from the link, in the browser.</p>
+        <div class="badges"><a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a><a class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app" data-store="google"><img src="/google-play-badge.png" alt="Get it on Google Play" width="170" height="66"></a></div>
+        <a class="webapp" href="/admin">Or open HardPan in your browser &rarr;</a>
+    </div>
+</section>
+
+<footer>
+    <div class="wrap">
+        <div><b style="color:#fff">HardPan Golf</b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ</div>
+        <div class="flinks">
+            <a href="/help">Help</a><a href="/support">Support</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+        </div>
+        <div>HardPan keeps score for your group's side games. It never holds or moves money.</div>
+        <div style="font-size:12px">Apple, the Apple logo and App Store are trademarks of Apple Inc., registered in the U.S. and other countries.</div>
+        <div style="font-size:12px">Google Play and the Google Play logo are trademarks of Google LLC.</div>
+    </div>
+</footer>
+
+<script src="/site-clips.js" defer></script>
+<script src="/site-pricing.js"></script>
+<script>
+    if (typeof window.HardPanSitePricingFill === 'function') window.HardPanSitePricingFill(document);
+</script>
+</body>
+</html>

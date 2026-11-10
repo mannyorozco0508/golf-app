@@ -125,3 +125,73 @@ describe('3. EDIT ROUND SETUP IS IN THE ROUND MENU, AT THE TOP', () => {
         assert.match(IDX, /renderSetupEntry\(\);/, 'renderSetupEntry is never called');
     });
 });
+
+// ---- 4. AND THE WRITE GATE AGREES WITH THE BOXES (2.0.4) -------------------
+// canScoreBox unlocked the organizer's picked group on a bare link; canWritePlayer
+// never asked, so every score he typed was refused by rejectCrossGroupWrite with
+// only a console line. The Chrome proof is org_score_group_chrome_test.js; this is
+// the predicate. NEGATIVE CONTROL: with the picked-group branch removed from
+// canWritePlayer, 4a and 4b go red (4c and 4d hold there - they guard what stays shut).
+describe('4. canWritePlayer HONOURS THE ORGANIZER\'S PICKED GROUP', () => {
+    const vm = require('vm');
+    const { loadHtmlInlineScript } = require('./helpers/load-script.js');
+    const { makeCourseData, makePlayers } = require('./helpers/fixtures.js');
+    const PAGE = ['action-model.js', 'match-engine.js', 'money-engine.js', 'settlement-engine.js', 'bet-strip.js', 'hole-events.js'];
+
+    test('4a the gate consults organizerScoreGroup() and the organizer gate, by group', () => {
+        const raw = fnOf('canWritePlayer');
+        // CODE ONLY: the comment above the branch names organizerScoreGroup() too, and a
+        // comment must not be what keeps this green.
+        const fn = raw && raw.split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
+        assert.ok(fn && fn.length > 300, 'canWritePlayer did not slice - this test is guarding nothing');
+        assert.match(fn, /organizerScoreGroup\(\)/, 'canWritePlayer ignores the organizer’s picked group');
+        assert.match(fn, /canReachSetup\(\)/, 'canWritePlayer does not ask whether this device is the organizer');
+        assert.match(fn, /playerGroupOf\(playerId\)/, 'the pick is not limited to that group’s golfers');
+        // Every existing gate is still there, ahead of it.
+        assert.match(fn, /roundSuperseded\(\)/);
+        // The GPS-only gates (GPS:BEGIN blocks) exist only in the app build; the web build strips them.
+        if (/function hpSpectating\(/.test(IDX)) {
+            assert.match(fn, /hpSpectating\(\)/);
+            assert.match(fn, /hpKeyState !== 'none' && hpKeyState !== 'ok'/);
+        }
+        assert.match(fn, /frOrganizerEditContext && hasOrganizerAuthority\(\)/);
+        assert.ok(!/meId/.test(fn), 'scoring scope must not come from personal identity');
+    });
+
+    function boot(isOrganizer, pick) {
+        const sb = loadHtmlInlineScript('index.html', PAGE, { localStorage: true });   // a real store: the pick is remembered
+        const names = ['Manny', 'Jose', 'Ann', 'Bob', 'Marty', 'John', 'Cal', 'Dee'];
+        const p = makePlayers(names, names.map(() => 0));
+        const map = {}; p.forEach((pl, i) => { map[pl.id] = i < 4 ? 1 : 2; });
+        vm.runInContext(`
+            currentMode = 'ORG8';
+            currentData = ${JSON.stringify({ gameFormat: 'stroke', players: p, courseData: makeCourseData(18), scores: {} })};
+            window.__scPlayerGroupMap = ${JSON.stringify(map)};
+            hasGroupLock = false; lockedGroup = null;
+            canReachSetup = function () { return ${!!isOrganizer}; };
+            try { localStorage.removeItem(organizerScoreGroupKey()); } catch (e) {}
+            ${pick ? `try { localStorage.setItem(organizerScoreGroupKey(), '${pick}'); } catch (e) {}` : ''}
+        `, sb);
+        return { sb, p, can: (id) => vm.runInContext(`canWritePlayer('${id}')`, sb), box: (id) => vm.runInContext(`canScoreBox('${id}', window.__scPlayerGroupMap, true)`, sb) };
+    }
+
+    test('4b the organizer with Group 1 picked writes Group 1 - the same answer the box gives', () => {
+        const b = boot(true, 1);
+        b.p.slice(0, 4).forEach((pl) => {
+            assert.equal(b.box(pl.id), true, 'positive control: the box is open');
+            assert.equal(b.can(pl.id), true, pl.name + ': the box is open but the write is refused');
+        });
+    });
+
+    test('4c ... and not Group 2', () => {
+        const b = boot(true, 1);
+        b.p.slice(4).forEach((pl) => { assert.equal(b.can(pl.id), false, pl.name); assert.equal(b.box(pl.id), false); });
+    });
+
+    test('4d a spectator - no organizer gate - writes nothing, even with a pick left in storage; no pick, nothing', () => {
+        const s = boot(false, 1);
+        s.p.forEach((pl) => assert.equal(s.can(pl.id), false, 'spectator wrote ' + pl.name));
+        const o = boot(true, null);
+        o.p.forEach((pl) => assert.equal(o.can(pl.id), false, 'organizer with no pick wrote ' + pl.name));
+    });
+});

@@ -303,7 +303,7 @@ function tripPotsLine(potCfg, dailyCfg, fieldSize) {
         bits.push('Daily pot $' + dailyCfg.buyIn + ' a round');
     }
     if (!bits.length) return '';
-    return bits.join(' · ') + '. Both are in Trip Money Settlement below.';
+    return bits.join(' · ') + '. Both are in Trip Settlement below.';
 }
 
 if (typeof module !== 'undefined' && module.exports) {

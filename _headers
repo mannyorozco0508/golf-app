@@ -1,3 +1,13 @@
+# Cloudflare Pages response headers (website-d, Nov 10).
+# The service worker script is revalidated on every update check, so a
+# returning visitor picks up a new worker (and its cache version) at once.
+# Live sent max-age=14400 for /sw.js. Chrome and Safari already bypass the
+# HTTP cache for the worker script by default (updateViaCache 'imports'), and
+# pwa-boot.js now registers with updateViaCache: 'none'; this covers anything
+# that does not.
+/sw.js
+  Cache-Control: no-cache
+
 # Cloudflare Pages response headers (P1-e, 2026-11-10).
 #
 # The two app-link association files must be served as application/json with
