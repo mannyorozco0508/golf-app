@@ -2,6 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <!-- WEB IS LIGHT ONLY (website-d, Manny Nov 10: "remove the moon Dark Mode button from the website to match the app").
+         On the web (http/https, not the app) html gets hp-web-light: the Dark Mode button is hidden and a saved
+         golfapp-theme = dark is not applied, so nobody is left in dark with no way out. The key itself is left alone.
+         The iOS/Android app (Capacitor, capacitor://, Android https://localhost) is untouched and keeps its switch. -->
+    <script>(function(){try{var C=window.Capacitor,L=window.location,n=!!(C&&(typeof C.isNativePlatform!=='function'||C.isNativePlatform()))||!/^https?:$/.test(L.protocol)||(L.hostname==='localhost'&&!L.port);window.hpWebLight=!n;if(!n)document.documentElement.classList.add('hp-web-light');}catch(e){}})();</script>
+    <style>html.hp-web-light .theme-toggle-btn{display:none !important;}html.hp-web-light .lobby-account-row{justify-content:flex-end;}</style>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <link rel="icon" href="hardpan-icon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
@@ -286,7 +292,7 @@ body::after {
     // --- DARK MODE ---
     (function initTheme() {
         const saved = localStorage.getItem('golfapp-theme');
-        if (saved === 'dark') {
+        if (saved === 'dark' && !window.hpWebLight) {
             document.documentElement.classList.add('dark-mode');
         }
     })();

@@ -58,6 +58,18 @@
 // Website-c negative controls (4, each 1 red, restored by sha): "bet" in a Help
 // page, a missing clip keeping its src, the Play link pointed elsewhere, the
 // Play badge drawn smaller than Apple's.
+//
+// WEBSITE-D (Manny Nov 10: "make hardpangolf.com show the 27A homepage and move
+// the web app to hardpangolf.com/app"). The split section 4 warned about is now
+// DONE, and the trap it measured is closed in sw.js v394 instead of avoided:
+// the homepage answer is marked X-HardPan-Page: home and never cached, and the
+// install stores the app shell under /index.html, / and /app. Re-pinned here,
+// each saying so: the / Function test (a bare / and /#x are now the homepage;
+// every app query still falls through), "no Function knows about the
+// marketing page" (functions/_front-door.js now names it on purpose; the rule
+// that remains is that only a BARE / reaches it), and CACHE_VERSION v394-2.0.
+// The full link inventory, the SW install/online/offline tests and their
+// negative controls live in web_d_homepage_root_test.js.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');
@@ -358,7 +370,8 @@ describe('3. ROUTING: / and every app link are served as before', () => {
         assert.ok(inc.includes('/__/firebase/*'));
     });
 
-    for (const p of ['/', '/?game=TEST', '/?game=TEST&group=1', '/?tourney=TEST', '/?trip=TEST', '/#x']) {
+    // website-d re-pin: '/' and '/#x' left this list - a bare / is the homepage now.
+    for (const p of ['/?game=TEST', '/?game=TEST&group=1', '/?tourney=TEST', '/?trip=TEST', '/?k=abc', '/?game=TEST#x']) {
         test('the / Function hands ' + p + ' to the static app (index.html), as before', async () => {
             const c = ctx('https://hardpangolf.com' + p);
             const res = await IDX.onRequest(c);
@@ -375,9 +388,17 @@ describe('3. ROUTING: / and every app link are served as before', () => {
         assert.equal(c.nexts(), 0);
     });
 
-    test('no Function knows about the marketing page (the split is not wired at /)', () => {
-        ['index.js', '_middleware.js'].forEach((f) =>
-            assert.doesNotMatch(read(path.join('functions', f)), /hardpan-home|marketing|\/home\b/i, f));
+    // website-d re-pin: the split IS wired at / now, in one place.
+    test('only a BARE / reaches the marketing page: _front-door.js names it, the middleware does not', async () => {
+        assert.match(read(path.join('functions', '_front-door.js')), /HOMEPAGE_ASSET = '\/hardpan-home'/);
+        assert.doesNotMatch(read(path.join('functions', '_middleware.js')), /hardpan-home|marketing|\/home\b/i);
+        const assets = { fetch: async (req) => new Response('ASSET:' + new URL(req.url).pathname, { status: 200 }) };
+        for (const [p, want] of [['/', 'ASSET:/hardpan-home'], ['/#x', 'ASSET:/hardpan-home'], ['/?utm_source=x', 'ASSET:/hardpan-home'], ['/?game=TEST', 'STATIC']]) {
+            const c = ctx('https://hardpangolf.com' + p);
+            c.env = { ASSETS: assets };
+            const res = await IDX.onRequest(c);
+            assert.equal(await res.text(), want, p);
+        }
     });
 
     test('the sign-in proxy paths are untouched and the new pages are not blocked', () => {
@@ -419,7 +440,8 @@ describe('4. THE SERVICE WORKER: unchanged, and the app still opens offline', ()
 
     test('CACHE_VERSION and the shell list did not move (no shell file changed)', () => {
         // v393-2.0 (Nov 10): moved for How it works + Trip Settlement, not for the marketing pages.
-        assert.match(src, /const CACHE_VERSION = 'golfapp-v393-2\.0';/);
+        // website-d re-pin: v394-2.0, moved FOR the homepage at / (see sw.js "Moved to v394").
+        assert.match(src, /const CACHE_VERSION = 'golfapp-v394-2\.0';/);
         const shell = src.slice(src.indexOf('const SHELL_FILES = ['), src.indexOf('];', src.indexOf('const SHELL_FILES = [')));
         assert.match(shell, /'\.\/index\.html'/, 'positive: the slice holds the shell list');
         assert.doesNotMatch(shell, /hardpan-home|refunds|site-pricing|app-store-badge/, 'the marketing page joined the app shell');

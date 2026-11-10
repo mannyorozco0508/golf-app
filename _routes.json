@@ -2,6 +2,10 @@
   "version": 1,
   "include": [
     "/",
+    "/app",
+    "/app/*",
+    "/index",
+    "/index.html",
     "/api/*",
     "/__/auth/*",
     "/__/firebase/*",

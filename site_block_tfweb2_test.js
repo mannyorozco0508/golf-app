@@ -145,8 +145,12 @@ describe('tfweb-2 _routes.json', () => {
         }
     });
     test('NEGATIVE CONTROL: the site pages are NOT routed to a Function (served static, as before)', () => {
-        const pages = PAGES.filter((p) => p !== '/');
+        // website-d: /index.html is routed too - a BARE /index.html must stay the app
+        // now that a bare / is the homepage (functions/_middleware.js serves it;
+        // with a query it falls through to the static 308 as before).
+        const pages = PAGES.filter((p) => p !== '/' && p !== '/index.html');
+        assert.ok(routed('/index.html'), 'positive: /index.html is the one page routed on purpose');
         assert.deepEqual(pages.filter(routed), []);
-        assert.deepEqual(swPrecache().filter((p) => p !== '/' && routed(p)), []);
+        assert.deepEqual(swPrecache().filter((p) => p !== '/' && p !== '/index.html' && routed(p)), []);
     });
 });

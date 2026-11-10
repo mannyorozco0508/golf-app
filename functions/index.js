@@ -26,7 +26,18 @@
 // golfapp-v* bump. tournament.html is unchanged, so tournament-v* stays.
 //
 // THE ENTRY POINT PAGES INVOKES IS onRequest. Tests drive that, not a helper.
+//
+// WEBSITE-D (Manny, Nov 10): a BARE `/` on any other host is now the 27A
+// homepage (hardpan-home.html, 200, the address bar stays `/`). "Bare" is
+// decided in _front-door.js: no query, or only tracking tags (utm_*, fbclid,
+// gclid, ref ...). EVERY other `/` - /?game=, /?game=&group=, /?tourney=,
+// /?trip=, /?k=, /?mode=signIn&oobCode=, any query at all - still calls next()
+// and gets index.html exactly as before. The web app's own address is /app
+// (functions/app/[[path]].js). If the homepage file cannot be read, `/` falls
+// back to the app, never to an error page.
 // ============================================================================
+
+import { isHomepageVisit, serveHomepage } from './_front-door.js';
 
 const TOURNAMENTS_HOST = 'tournaments.rattlegolf.com';
 
@@ -49,6 +60,12 @@ function hostnamesOf(request) {
 function isTournamentsHost(host) {
     const h = String(host || '').toLowerCase();
     return h === TOURNAMENTS_HOST || h.endsWith('.' + TOURNAMENTS_HOST);
+}
+
+// Also read by _middleware.js (bare /index.html) and app/[[path]].js (/app):
+// on the Tournaments host neither may serve the Consumer app (website-d).
+export function isTournamentsRequest(request) {
+    return hostnamesOf(request).some(isTournamentsHost);
 }
 
 function isConsumerDefaultDocument(pathname) {
@@ -77,6 +94,10 @@ export async function onRequest(context) {
     const request = context.request;
     if (shouldRedirectToTournament(request)) {
         return redirectToTournament(request);
+    }
+    if (isHomepageVisit(request.url)) {
+        const home = await serveHomepage(context);
+        if (home) return home;
     }
     if (typeof context.next === 'function') return context.next();
     // Pages always provides next() so `/` can fall through to index.html.

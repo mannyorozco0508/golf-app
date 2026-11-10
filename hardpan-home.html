@@ -10,9 +10,12 @@
 <title>HardPan Golf</title>
 <!--
   THE MARKETING PAGE (website-b, ADVISOR-20261108-0356, Manny picked design B).
-  Served at /home (the _redirects rewrite) and /hardpan-home. It is NOT the app:
-  / stays index.html (the scorecard, which sends a visit with no ?game= to the
-  admin.html front door), and every game / tournament link keeps its own page.
+  Served at / (website-d: a BARE / only - functions/index.js + _front-door.js),
+  /home (the _redirects rewrite) and /hardpan-home. It is NOT the app: the web
+  app is /app, and / with any app query (?game=, ?tourney=, ?trip=, ...) is
+  still index.html; every game / tournament link keeps its own page. The logo
+  goes to / (website-d; it was /home). The two "open the web app" links stay
+  /admin: that IS the app's front door, one hop shorter than /app.
   It is not in sw.js's shell list and not in the native bundle.
 
   FILLED (Manny, website facts 2026-11-08 sections 1-2):
@@ -154,7 +157,7 @@
 <body>
 
 <nav class="wrap top" aria-label="Main">
-    <a class="logo" href="/home"><img src="/hardpan-icon.svg" alt="" width="36" height="36">HardPan Golf</a>
+    <a class="logo" href="/"><img src="/hardpan-icon.svg" alt="" width="36" height="36">HardPan Golf</a>
     <div class="links">
         <a href="#features">Features</a>
         <a href="#golfers">Games</a>
