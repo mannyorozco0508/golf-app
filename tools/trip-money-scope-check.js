@@ -50,7 +50,7 @@ const { arriveCold, fileUrl } = require('./lib/cold-arrival.js');
 // A new one added to the page without a row here is the gap this list exists to
 // close, so `expectedCount` is asserted too - see the gate below.
 const TRIP_MONEY_SURFACES = [
-    { key: 'panel', what: 'the Trip Money Settlement panel',
+    { key: 'panel', what: 'the Trip Settlement panel',
       reach: 'open the section', why: 'the screen the organizer reads' },
     { key: 'card', what: 'the recap CARD',
       reach: 'press "Trip Recap Card"', why: 'the image that gets screenshotted into a group chat' },

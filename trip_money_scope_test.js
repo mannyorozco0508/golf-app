@@ -120,7 +120,7 @@ const REWORDED_LIES = [
 const MUST_STAY_CLEAN = [
     'Copies course/format/side games from that round - handy for a 36-hole day.',
     'Settle up for real over Venmo - this is just the math.',
-    'Trip Money Settlement',
+    'Trip Settlement',
     'Prize Payout Calculator',
     'set the pool and how many spots pay, and it maps straight onto the standings above.',
     'Standings, settlement, and awards in one message for the group chat.',
@@ -178,7 +178,7 @@ describe('trip.html MARKUP MAKES NO CLAIM ABOUT WHAT THE TOTAL CONTAINS', () => 
         assert.ok(lines.length > 30,
             `only ${lines.length} markup lines survived stripping - the guard below would be `
             + 'asserting against almost nothing');
-        assert.ok(lines.some((l) => /Trip Money Settlement/.test(l)),
+        assert.ok(lines.some((l) => /Trip Settlement/.test(l)),
             'the money section heading is not in the stripped markup, so the strip removed '
             + 'the very region this guard exists to police');
     });
