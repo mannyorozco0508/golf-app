@@ -29,9 +29,14 @@
     <script src="./qrcode.min.js"></script>
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
-    <!-- auth-compat, 9.22.2: the organizer console will sign in; the scorecard a
-         golfer opens never loads this. No auth call exists on this page yet. -->
+    <!-- auth-compat, 9.22.2: the organizer console signs in; the scorecard a
+         golfer opens never loads this. -->
     <script src="./firebase-auth-compat.js"></script>
+    <!-- Apple and Google sign-in (P1-b, 2026-11-10): the SAME module admin.html
+         uses - popup or redirect by host, the uid rules, the native seam for the
+         app. Loaded before the inline script, because firebaseConfig reads
+         authDomainFor from it. -->
+    <script src="oauth-signin.js"></script>
     <script src="course-data.js"></script>
     <!-- The pure half of online course search, shared with admin.html: what a valid
          card is, the canonical tee, every refusal sentence. Loaded before the inline
@@ -863,9 +868,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
 
 <script>
+    // authDomain is decided by oauth-signin.js authDomainFor, exactly as on
+    // admin.html: the page's own host where functions/_middleware.js proxies
+    // /__/auth/ (hardpangolf.com, golf-app-5a5.pages.dev), firebaseapp.com
+    // everywhere else - tournaments.rattlegolf.com, previews, the app shell.
+    // The rest of the config is admin.html's, so the signed-in user Firebase
+    // keeps for this origin is the same one on both pages.
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
-      authDomain: "golfapp-9fb21.firebaseapp.com",
+      authDomain: (window.oauthSignin && typeof window.oauthSignin.authDomainFor === 'function')
+          ? window.oauthSignin.authDomainFor(location.hostname) : "golfapp-9fb21.firebaseapp.com",
       databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
       projectId: "golfapp-9fb21",
       storageBucket: "golfapp-9fb21.firebasestorage.app",
@@ -2247,8 +2259,72 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             out.href = '#'; out.textContent = 'Sign out';
             out.onclick = (e) => { if (e && e.preventDefault) e.preventDefault(); signOutNow(); };
             el.appendChild(out);
+            // SIGNED IN, BUT NOT AS THIS EVENT'S ORGANIZER (P1-b). Apple, Google
+            // and email are three different accounts unless Firebase linked them,
+            // so an organizer who set the event up with email and then tapped
+            // Apple lands here with no Setup tab and nothing saying why - the
+            // event looks as if it vanished. ownerUid is never moved; the line
+            // says which way back in there is. Manage screen only: the setup
+            // screen has no event to belong to.
+            if (id === 'signed-in-as' && currentData && currentData.ownerUid && !canManage()) {
+                const why = document.createElement('div');
+                why.id = 'signed-in-other-account';
+                why.textContent = NOT_THIS_ORGANIZER;
+                el.appendChild(why);
+            }
         });
         renderSignInPanels();
+    }
+
+    // ---- APPLE, GOOGLE, THEN EMAIL (P1-b, 2026-11-10) ---------------------
+    //
+    // THE SAME BUTTONS, ORDER AND WORDING AS admin.html's live sign-in card:
+    // "Continue with Apple" (primary), "Continue with Google" (outline), the
+    // answer under them, then "Use email instead". Here the email option is
+    // this page's own email + password - the account every organizer made
+    // before this wave - so nothing about it changed except that it is one
+    // tap away, as admin.html's email option is.
+    //
+    // ONE BUILDER. The tap goes through window.oauthSignin.signIn, the module
+    // admin.html uses: popup or redirect by host, planOauth's uid rules, and
+    // the Capacitor seam (nativeCredential) when the page runs inside the app.
+    // Nothing about HOW to sign in is decided on this page.
+    //
+    // ONE SENTENCE IS THIS PAGE'S OWN: auth/account-exists-with-different-
+    // credential. Firebase raises it when the Apple or Google email already
+    // has an account it will not merge on its own - here, an organizer's
+    // email + password account. The module's sentence for an unmapped code is
+    // "Could not finish sign-in... (code)", and admin.html has no password
+    // form, so the honest answer ("sign in with your password") only exists
+    // on this page. The credential Firebase put on the error is kept, and the
+    // next email + password sign-in to THAT email links it - the account the
+    // events belong to gains Google or Apple, and ownerUid never moves.
+    const NOT_THIS_ORGANIZER = 'This event belongs to a different organizer account. If you set it up with another sign-in (email and password, Apple or Google), sign out and sign in that way.';
+    const signinUi = { emailShown: {}, busy: {}, note: {} };
+    let pendingOauthLink = null;   // { which, email, credential } from account-exists
+
+    function providerName(which) { return which === 'apple' ? 'Apple' : 'Google'; }
+
+    function accountExistsSentence(which, linkable) {
+        return 'This email already has an organizer account that signs in with a password, and your events are on that account. '
+            + 'Sign in with your email and password below.'
+            + (linkable ? ' ' + providerName(which) + ' is then added to that account, so next time Continue with ' + providerName(which) + ' opens it too.' : '');
+    }
+
+    function oauthFailureSentence(err, which) {
+        const O = window.oauthSignin;
+        if (err && err.code === 'auth/account-exists-with-different-credential') {
+            let cred = err.credential || null;
+            try {
+                if (!cred && firebase.auth.OAuthProvider && typeof firebase.auth.OAuthProvider.credentialFromError === 'function') {
+                    cred = firebase.auth.OAuthProvider.credentialFromError(err);
+                }
+            } catch (e) { cred = null; }
+            const email = String(err.email || (err.customData && err.customData.email) || '').trim().toLowerCase();
+            pendingOauthLink = (cred && email) ? { which: which, email: email, credential: cred } : null;
+            return accountExistsSentence(which, !!pendingOauthLink);
+        }
+        return (O && typeof O.messageFor === 'function') ? O.messageFor(err) : 'Could not finish sign-in. Nothing changed - try again, or use email instead.';
     }
 
     function renderSignInPanels() {
@@ -2257,16 +2333,96 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (!el) return;
             if (authUser) { el.style.display = 'none'; el.innerHTML = ''; return; }
             el.style.display = 'block';
+            const shown = !!signinUi.emailShown[id];
+            const busy = signinUi.busy[id];
             el.innerHTML = `
                 <div class="signin-card">
                     <div class="signin-card-note">Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.</div>
-                    <div class="signin-card-row">
+                    <button type="button" id="${id}-apple" class="btn-primary"${busy ? ' disabled' : ''} onclick="oauthTapTournament('${id}', 'apple')">${busy === 'apple' ? '⏳ Opening…' : '&#63743;&nbsp; Continue with Apple'}</button>
+                    <button type="button" id="${id}-google" class="btn-outline"${busy ? ' disabled' : ''} onclick="oauthTapTournament('${id}', 'google')">${busy === 'google' ? '⏳ Opening…' : 'Continue with Google'}</button>
+                    <p id="${id}-oauth-status" class="signin-card-error" role="status"></p>
+                    <button type="button" id="${id}-email-toggle" class="btn-outline" onclick="toggleTournamentEmail('${id}')">${shown ? 'Hide the email option' : 'Use email instead'}</button>
+                    <div class="signin-card-row" id="${id}-email-row" style="display:${shown ? 'grid' : 'none'}; margin-top:8px;">
                         <input type="email" id="${id}-email" placeholder="Email" autocomplete="username">
                         <input type="password" id="${id}-password" placeholder="Password" autocomplete="current-password">
                         <button class="btn-outline" onclick="signInNow('${id}')">Sign in</button>
                     </div>
                     <div id="${id}-error" class="signin-card-error"></div>
                 </div>`;
+            // Written as text, never into the markup: the sentence can carry an
+            // error message from Firebase.
+            const status = document.getElementById(id + '-oauth-status');
+            if (status) status.textContent = signinUi.note[id] || '';
+            if (shown && pendingOauthLink) {
+                const box = document.getElementById(id + '-email');
+                if (box && !box.value) box.value = pendingOauthLink.email;
+            }
+        });
+    }
+
+    function toggleTournamentEmail(panelId) {
+        signinUi.emailShown[panelId] = !signinUi.emailShown[panelId];
+        renderSignInPanels();
+        const box = signinUi.emailShown[panelId] && document.getElementById(panelId + '-email');
+        if (box && typeof box.focus === 'function') { try { box.focus(); } catch (e) { /* not focusable */ } }
+    }
+
+    function oauthTapTournament(panelId, which) {
+        const O = window.oauthSignin;
+        signinUi.note[panelId] = '';
+        if (!O || typeof O.signIn !== 'function') {
+            signinUi.note[panelId] = 'Sign-in is not ready yet. Wait a moment and try again.';
+            renderSignInPanels();
+            return;
+        }
+        signinUi.busy[panelId] = which;
+        renderSignInPanels();
+        // BY REDIRECT where this host can (oauth-signin.js decides; the popup
+        // otherwise, and the native sheet inside the app). A redirect resolves
+        // { redirecting } and the page leaves; resumeTournamentOauth answers
+        // when it comes back. A sign-in that worked needs no sentence here: the
+        // auth listener hides this card and names the account.
+        O.signIn(which, { redirect: true }).then((r) => {
+            if (r && r.redirecting) return;
+            signinUi.busy[panelId] = null;
+            renderSignInPanels();
+        }, (err) => {
+            signinUi.busy[panelId] = null;
+            signinUi.note[panelId] = oauthFailureSentence(err, which);
+            if (pendingOauthLink) signinUi.emailShown[panelId] = true;
+            renderSignInPanels();
+        });
+    }
+
+    // BACK FROM GOOGLE OR APPLE after a redirect (hardpangolf.com and
+    // golf-app-5a5.pages.dev only). A load that started no redirect asks
+    // Firebase nothing - oauth-signin.js reads its own sessionStorage note.
+    function resumeTournamentOauth() {
+        const O = window.oauthSignin;
+        if (!O || typeof O.redirectPending !== 'function' || !O.redirectPending()) return;
+        O.resumeRedirect().then(null, (err) => {
+            const which = (err && err.which) || 'google';
+            const sentence = oauthFailureSentence(err, which);
+            ['signin-panel-manage', 'signin-panel-setup'].forEach((id) => {
+                signinUi.note[id] = sentence;
+                if (pendingOauthLink) signinUi.emailShown[id] = true;
+            });
+            renderSignInPanels();
+        });
+    }
+
+    // THE PENDING LINK, after the password sign-in it was waiting for. Only to
+    // the SAME email the Apple or Google account carries: a different address
+    // typed into the box is a different organizer, and attaching this
+    // provider to it would be the stray-account defect the other way round.
+    function linkPendingOauth(user) {
+        const p = pendingOauthLink;
+        pendingOauthLink = null;
+        if (!p || !user || typeof user.linkWithCredential !== 'function') return Promise.resolve(null);
+        if (String(user.email || '').trim().toLowerCase() !== p.email) return Promise.resolve(null);
+        return Promise.resolve(user.linkWithCredential(p.credential)).then(() => p.which, (e) => {
+            try { console.error('tournament sign-in: linking ' + p.which + ' failed: ' + String((e && e.code) || 'no-code')); } catch (x) { /* no console */ }
+            return null;
         });
     }
 
@@ -2275,7 +2431,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const password = (document.getElementById(panelId + '-password') || {}).value || '';
         const err = document.getElementById(panelId + '-error');
         if (err) err.textContent = '';
-        firebase.auth().signInWithEmailAndPassword(email.trim(), password).catch((e) => {
+        firebase.auth().signInWithEmailAndPassword(email.trim(), password).then((cred) => {
+            if (pendingOauthLink) return linkPendingOauth(cred && cred.user);
+            return null;
+        }).catch((e) => {
             if (err) err.textContent = (e && e.message) ? String(e.message) : 'Sign-in failed.';
         });
     }
@@ -2298,6 +2457,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         applyManageGate();
         renderSignedInAs();
     });
+    // Once per load, after the listener is in, so a redirect that came back
+    // signed in is shown by the listener like any other sign-in.
+    try { resumeTournamentOauth(); } catch (e) { /* never blocks the page */ }
 
     // ---- REGISTRATION (Wave 1) -------------------------------------------
     //
