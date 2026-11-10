@@ -96,7 +96,45 @@ describe('THE PAGE: an anonymous user sees what a signed-out user sees', () => {
 // the captured surface with exactly those two booleans flipped for legacy
 // arrivals, and nothing else - every other string on the screen is held
 // character for character.
-const narrowed = (captured, kind) => kind === 'legacy' ? Object.assign({}, captured, { setupTab: false, setupPanel: false }) : captured;
+const narrowedOnly = (captured, kind) => kind === 'legacy' ? Object.assign({}, captured, { setupTab: false, setupPanel: false }) : captured;
+// THE SECOND DELIBERATE SUBSTITUTION (P1-b, 2026-11-10, Apple and Google
+// sign-in). Exactly two things moved, and each is written out here as the
+// literal delta rather than re-read from the page:
+//   1. A SIGNED-OUT panel gains Continue with Apple, Continue with Google and
+//      "Use email instead" ahead of the unchanged email + password row - the
+//      admin.html card's buttons, order and wording. The note sentence and the
+//      email row are held character for character around the insertion.
+//   2. A STRANGER on an OWNED record (signed in, not its organizer) gains one
+//      sentence after "Sign out", saying the event belongs to a different
+//      organizer account. The organizer, nobody, and every legacy arrival are
+//      untouched. It is checked on the ACTUAL surface (present there, absent
+//      everywhere else, and the captured string once it is taken out),
+//      because this harness's textOf reads a mount's text twice and where the
+//      repeat falls depends on the arrival order - in a browser it is the one
+//      line after "Sign out".
+const P1B_PANEL_OLD = '| | | | |Sign in';
+const P1B_PANEL_NEW = '| |&#63743;&nbsp; Continue with Apple| |Continue with Google| | |Use email instead| | | | |Sign in';
+const P1B_OTHER_ACCOUNT = 'This event belongs to a different organizer account. If you set it up with another sign-in (email and password, Apple or Google), sign out and sign in that way.';
+function p1b(s, who, kind) {
+    const out = Object.assign({}, s);
+    ['panelManage', 'panelSetup'].forEach((k) => {
+        if (out[k] && out[k].html) {
+            assert.ok(out[k].html.includes(P1B_PANEL_OLD), 'the captured panel no longer holds the email row it was captured with: ' + out[k].html);
+            out[k] = Object.assign({}, out[k], { html: out[k].html.replace(P1B_PANEL_OLD, P1B_PANEL_NEW) });
+        }
+    });
+    return out;
+}
+function p1bActual(a, who, kind) {
+    const has = String(a.signedInAs).includes(P1B_OTHER_ACCOUNT);
+    if (who === 'stranger' && kind === 'owned') {
+        assert.ok(has, 'a stranger on an owned event is not told it belongs to a different organizer account: ' + a.signedInAs);
+        return Object.assign({}, a, { signedInAs: a.signedInAs.split(P1B_OTHER_ACCOUNT).join('') });
+    }
+    assert.ok(!has, who + '/' + kind + ' must not carry the other-account sentence: ' + a.signedInAs);
+    return a;
+}
+const narrowed = (captured, kind, who) => p1b(narrowedOnly(captured, kind), who, kind);
 
 describe('THE PROOF: email users, strangers and nobody see the page they saw at 6536216, character for character', () => {
     test('the baseline is pinned', () => {
@@ -110,10 +148,11 @@ describe('THE PROOF: email users, strangers and nobody see the page they saw at 
         assert.match(PREV.arrivals['organizer/owned/user-first'].signedInAs, /Signed in as org@example\.com/, 'captured with content');
     });
     Object.entries(USERS).forEach(([u, user]) => [['owned', H.OWNED], ['legacy', H.LEGACY]].forEach(([r, rec]) => ['user-first', 'record-first'].forEach(order =>
-        test(`${u} / ${r} / ${order}`, () => assert.deepEqual(H.surface(H.arrive(rec(), user, order)), narrowed(PREV.arrivals[u + '/' + r + '/' + order], r))))));
+        test(`${u} / ${r} / ${order}`, () => assert.deepEqual(p1bActual(H.surface(H.arrive(rec(), user, order)), u, r), narrowed(PREV.arrivals[u + '/' + r + '/' + order], r, u))))));
     Object.entries(USERS).forEach(([u, user]) => test(`Save as ${u}: the same alerts, the same creating set (ownerUid ${user ? user.uid : 'none - refused'})`, async () => {
         const r = await H.save(user);
-        assert.deepEqual(r, PREV.saves[u]);
+        // The setup screen has no event, so only the P1-b panel insertion applies.
+        assert.deepEqual(r, Object.assign({}, PREV.saves[u], { surface: p1b(PREV.saves[u].surface, u, 'setup') }));
     }));
 });
 
