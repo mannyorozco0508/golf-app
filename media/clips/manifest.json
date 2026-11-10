@@ -1,0 +1,122 @@
+{
+  "_about": "Clips for the website feature tiles (/home) and Help (/help). Not yet cut: each will be cut from the App Preview recording. Format: H.264 MP4, muted (no audio track), portrait, 590x1280 or smaller (posters are 295x640), loops cleanly, about 150-400 KB each. Until a file exists its poster shows; nothing else changes when it is added.",
+  "folder": "/media/clips/",
+  "posters": "/media/posters/<name>.jpg",
+  "clips": [
+    {
+      "file": "gps.mp4",
+      "seconds": 5,
+      "poster": "/media/posters/gps.jpg",
+      "used_on": [
+        "/home tile: GPS",
+        "/help and /help/gps-basics"
+      ]
+    },
+    {
+      "file": "just-say-it.mp4",
+      "seconds": 6,
+      "poster": "/media/posters/just-say-it.jpg",
+      "used_on": [
+        "/home tile: Just say it"
+      ]
+    },
+    {
+      "file": "group-scoring.mp4",
+      "seconds": 5,
+      "poster": "/media/posters/group-scoring.jpg",
+      "used_on": [
+        "/home tile: Group scoring",
+        "/help and /help/score-your-group"
+      ]
+    },
+    {
+      "file": "games-live-board.mp4",
+      "seconds": 5,
+      "poster": "/media/posters/games-live-board.jpg",
+      "used_on": [
+        "/home tile: Games & live board"
+      ]
+    },
+    {
+      "file": "results.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/results.jpg",
+      "used_on": [
+        "/home tile: Results"
+      ]
+    },
+    {
+      "file": "tournaments.mp4",
+      "seconds": 6,
+      "poster": "/media/posters/tournaments.jpg",
+      "used_on": [
+        "/home tile: Tournaments",
+        "/help and /help/run-a-tournament"
+      ]
+    },
+    {
+      "file": "weekly-code.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/weekly-code.jpg",
+      "used_on": [
+        "/home tile: Weekly code"
+      ]
+    },
+    {
+      "file": "chat.mp4",
+      "seconds": 3,
+      "poster": "/media/posters/chat.jpg",
+      "used_on": [
+        "/home tile: Chat"
+      ]
+    },
+    {
+      "file": "my-bag-stats.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/my-bag-stats.jpg",
+      "used_on": [
+        "/home tile: My bag & stats"
+      ]
+    },
+    {
+      "file": "start-round.mp4",
+      "seconds": 5,
+      "poster": "/media/posters/start-round.jpg",
+      "used_on": [
+        "/help and /help/start-round"
+      ]
+    },
+    {
+      "file": "add-golfers.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/add-golfers.jpg",
+      "used_on": [
+        "/help and /help/add-golfers"
+      ]
+    },
+    {
+      "file": "add-a-game.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/add-a-game.jpg",
+      "used_on": [
+        "/help and /help/add-a-game"
+      ]
+    },
+    {
+      "file": "join-with-a-code.mp4",
+      "seconds": 3,
+      "poster": "/media/posters/join-with-a-code.jpg",
+      "used_on": [
+        "/help and /help/join-with-a-code"
+      ]
+    },
+    {
+      "file": "erase-a-round.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/erase-a-round.jpg",
+      "used_on": [
+        "/help and /help/erase-a-round"
+      ]
+    }
+  ]
+}

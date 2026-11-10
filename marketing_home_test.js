@@ -47,6 +47,17 @@
 // _redirects (1), the plain-visit split in functions/index.js (3), the page
 // added to the SW shell (1), refunds noindex removed (1), footer refund link
 // dropped (1), Get the app pointed elsewhere (1).
+//
+// WEBSITE-C (Manny's picks 27A + 28A, the Play badge, side-games wording). Four
+// tests above were re-pinned for what Manny asked to change - each says so:
+// the footer (Help first), 3 App Store badges (a hero row), and the two Android
+// tests, now "Google's official badge, linked" instead of "Coming soon, not a
+// link". Section 5 is new. Counts: 23272a8c 32/32; on website-c's tree before
+// the re-pin 28 pass / 4 fail (exactly those four). After: 41 tests, 41 pass,
+// 0 fail (33 in sections 1-4, of which one is new: the Play badge file; 8 in 5).
+// Website-c negative controls (4, each 1 red, restored by sha): "bet" in a Help
+// page, a missing clip keeping its src, the Play link pointed elsewhere, the
+// Play badge drawn smaller than Apple's.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');
@@ -115,7 +126,8 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         const foot = /<footer>([\s\S]*?)<\/footer>/.exec(html);
         assert.ok(foot);
         const hrefs = anchors(foot[1]).map((x) => x.attrs.href);
-        assert.deepEqual(hrefs, ['/support', '/privacy', '/terms', '/refunds']);
+        // website-c: Help joins the footer, first (28A).
+        assert.deepEqual(hrefs, ['/help', '/support', '/privacy', '/terms', '/refunds']);
         hrefs.forEach((h) => assert.ok(exists(h.slice(1) + '.html'), h + ' has no page'));
     });
 
@@ -123,13 +135,14 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
 
     test('every App Store badge is the real store link, with Apple\'s official artwork', () => {
         const apple = a.filter((x) => x.attrs['data-store'] === 'apple');
-        assert.equal(apple.length, 2, 'one App Store badge in the golfers card, one in Get the app');
+        // website-c: a third row under the hero (27A).
+        assert.equal(apple.length, 3, 'one App Store badge under the hero, one in the golfers card, one in Get the app');
         apple.forEach((b) => {
             assert.equal(b.attrs.href, APP_STORE_URL, 'an App Store badge points somewhere else');
             assert.equal(b.attrs['data-todo'], undefined, 'a filled badge still carries its placeholder marker');
         });
         const imgs = html.match(/<img[^>]*src="\/app-store-badge\.svg"[^>]*>/g) || [];
-        assert.equal(imgs.length, 2, 'each App Store link shows the official badge image');
+        assert.equal(imgs.length, 3, 'each App Store link shows the official badge image');
         imgs.forEach((t) => {
             assert.match(t, /alt="Download on the App Store"/);
             assert.ok(Number(/height="(\d+)"/.exec(t)[1]) >= 40, 'Apple: at least 40 px high on screen');
@@ -146,23 +159,45 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         assert.doesNotMatch(String(svg), /<script|href=|foreignObject/i);
     });
 
-    test('no hand-drawn store badge is left, and no Google Play badge or link while Play is not public', () => {
+    // website-c (Manny 2026-11-10): Android is public. The "Coming soon" tile is
+    // replaced everywhere by Google's official badge, linking to the Play listing.
+    const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.rattlegolf.app';
+
+    test('no hand-drawn store badge is left, and no "Coming soon" Android tile anywhere on the site', () => {
         assert.doesNotMatch(html, /class="badge"/, 'a hand-drawn badge is back');
-        assert.doesNotMatch(html, /Get it on/i, 'Google\'s "Get it on Google Play" wording is on the page');
-        assert.doesNotMatch(html, /play\.google\.com/, 'a Play link is on the page before Android is public');
+        assert.doesNotMatch(html, /class="soon"|data-todo="play-store-url"/, 'the Android placeholder tile is back');
+        ['hardpan-home.html', 'help.html', 'support.html', 'refunds.html', 'terms.html', 'privacy.html'].forEach((f) =>
+            assert.doesNotMatch(stripComments(read(f)), /Coming soon/i, f + ' still says Android is coming soon'));
     });
 
-    test('Android is a plain "Coming soon" tile, not a link, after the App Store badge', () => {
-        assert.equal(a.filter((x) => x.attrs['data-store'] === 'google').length, 0, 'the Android tile is a link');
-        const tiles = html.match(/<div class="soon" data-store="google"[^>]*>([\s\S]*?)<\/div>/g) || [];
-        assert.equal(tiles.length, 2);
-        tiles.forEach((t) => assert.match(t.replace(/<[^>]+>/g, ' '), /Android\s+Coming soon/));
-        const groups = html.split('<div class="badges">').slice(1);
-        assert.equal(groups.length, 2);
-        groups.forEach((g) => {
-            const ap = g.indexOf('data-store="apple"'), go = g.indexOf('data-store="google"');
-            assert.ok(ap >= 0 && go >= 0 && ap < go, 'Apple comes first in every badge row');
+    test('every Google Play badge is Google\'s official artwork, linking to the Play listing, after Apple\'s', () => {
+        const g = a.filter((x) => x.attrs['data-store'] === 'google');
+        assert.equal(g.length, 3, 'one Google Play badge beside each App Store badge');
+        g.forEach((b) => assert.equal(b.attrs.href, PLAY_URL, 'a Play badge points somewhere else'));
+        const imgs = html.match(/<img[^>]*src="\/google-play-badge\.png"[^>]*>/g) || [];
+        assert.equal(imgs.length, 3);
+        imgs.forEach((t) => assert.match(t, /alt="Get it on Google Play"/));
+        const groups = html.split(/<div class="badges(?: hb)?">/).slice(1);
+        assert.equal(groups.length, 3);
+        groups.forEach((gr) => {
+            const ap = gr.indexOf('data-store="apple"'), go = gr.indexOf('data-store="google"');
+            assert.ok(ap >= 0 && go > ap, 'Apple comes first in every badge row');
         });
+        assert.match(html, /Google Play and the Google Play logo are trademarks of Google LLC\./, 'Google\'s trademark line');
+    });
+
+    test('the Play badge file is Google\'s PNG unchanged, and its black badge is drawn the same 44 px as Apple\'s', () => {
+        const png = fs.readFileSync(path.join(ROOT, 'google-play-badge.png'));
+        const sha = require('crypto').createHash('sha256').update(png).digest('hex');
+        assert.equal(sha, 'f72611e2df8e88204009fd896d05d5e8e83c77009c63943bbffa169559934849',
+            'google-play-badge.png is not en_badge_web_generic.png as play.google.com serves it');
+        assert.equal(png.readUInt32BE(16), 646); assert.equal(png.readUInt32BE(20), 250);
+        // The PNG's opaque badge is 168 of its 250 px high (41 px clear space top and
+        // bottom, measured). Drawn 65.5 px high, the badge itself is 65.5 * 168/250 = 44.0 px.
+        const m = /\.store-google img \{[^}]*height:([\d.]+)px;[^}]*width:auto;[^}]*margin:-([\d.]+)px;/.exec(html);
+        assert.ok(m, 'the Play badge size rule is gone');
+        assert.ok(Math.abs(Number(m[1]) * 168 / 250 - 44) < 0.25, 'the black Play badge is not 44 px high');
+        assert.ok(Math.abs(Number(m[2]) - Number(m[1]) * 41 / 250) < 0.1, 'the pull-in is not the PNG\'s own clear space');
     });
 
     test('the page has no dollar figure of its own (prices come from site-pricing.js)', () => {
@@ -412,5 +447,115 @@ describe('4. THE SERVICE WORKER: unchanged, and the app still opens offline', ()
         const r = await sw.request(nav(ORIGIN + '/home'));
         assert.equal(r.response.status, 503);
         assert.match(String(r.response.body), /No connection/);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// 5. WEBSITE-C: the feature grid (27A), Help (28A), the clip slots, the wording.
+// Source-level, like sections 1-3. The rendered pages (clip slots falling back
+// to their posters on a missing file, the badges' measured 44 px, no sideways
+// scroll at 393) were measured in headless Chrome; shots and numbers in
+// outbox/website-c-shots/ and the website-c report.
+// ---------------------------------------------------------------------------
+describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording', () => {
+    const home = stripComments(read(PAGE));
+    const HELP_TOPICS = ['start-round', 'add-golfers', 'score-your-group', 'add-a-game',
+        'run-a-tournament', 'join-with-a-code', 'gps-basics', 'erase-a-round'];
+    const helpPages = ['help.html'].concat(HELP_TOPICS.map((t) => 'help/' + t + '.html'));
+    const videos = (h) => h.match(/<video\b[^>]*>/g) || [];
+    const manifest = JSON.parse(read('media/clips/manifest.json'));
+    const manifestFiles = manifest.clips.map((c) => '/media/clips/' + c.file);
+
+    test('the homepage has "EVERYTHING IN THE APP" with the nine tiles, in order, right after the hero', () => {
+        const at = home.indexOf('id="features"');
+        assert.ok(at > home.indexOf('class="wrap hero"') && at < home.indexOf('class="wrap split"'), 'the grid is not between the hero and the panels');
+        assert.match(home, /EVERYTHING IN THE APP/);
+        const sec = /<section class="wrap" id="features">([\s\S]*?)<\/section>/.exec(home)[1];
+        const titles = (sec.match(/<h3>([^<]*)<\/h3>/g) || []).map((t) => t.replace(/<\/?h3>/g, '').replace('&amp;', '&'));
+        assert.deepEqual(titles, ['GPS', 'Just say it', 'Group scoring', 'Games & live board', 'Results',
+            'Tournaments', 'Weekly code', 'Chat', 'My bag & stats']);
+        assert.equal(videos(sec).length, 9, 'each tile is a clip slot');
+    });
+
+    test('every clip slot is muted, looping, inline, loads nothing up front, has a poster and a clip in the manifest', () => {
+        const all = [PAGE].concat(helpPages);
+        let n = 0;
+        all.forEach((f) => videos(stripComments(read(f))).forEach((v) => {
+            n += 1;
+            ['muted', 'loop', 'playsinline'].forEach((k) => assert.match(v, new RegExp('\\b' + k + '\\b'), f + ' ' + k));
+            assert.match(v, /preload="none"/, f + ': a clip would download before it is seen');
+            assert.doesNotMatch(v, /(?<![-\w])src="|autoplay|controls/, f + ': the clip must start from data-src, in view, with no player chrome');
+            const poster = /poster="\/(media\/posters\/[a-z0-9-]+\.jpg)"/.exec(v);
+            assert.ok(poster, f + ': no poster');
+            assert.ok(exists(poster[1]), poster[1] + ' is missing');
+            const size = fs.statSync(path.join(ROOT, poster[1])).size;
+            assert.ok(size < 60 * 1024, poster[1] + ' is ' + size + ' bytes, over 60 KB');
+            const clip = /data-src="(\/media\/clips\/[a-z0-9-]+\.mp4)"/.exec(v);
+            assert.ok(clip && manifestFiles.includes(clip[1]), f + ': ' + (clip && clip[1]) + ' is not in media/clips/manifest.json');
+        }));
+        assert.equal(n, 9 + 8 + 8, 'home 9 + help list 8 + one per topic page');
+        all.forEach((f) => assert.match(read(f), /<script src="\/site-clips\.js" defer><\/script>/, f + ' does not load the clip script'));
+    });
+
+    test('the clips manifest names every expected file with a length, and nothing unused', () => {
+        assert.equal(manifest.folder, '/media/clips/');
+        const used = new Set();
+        [PAGE].concat(helpPages).forEach((f) => videos(read(f)).forEach((v) => used.add(/data-src="([^"]+)"/.exec(v)[1])));
+        assert.deepEqual([...used].sort(), manifestFiles.slice().sort());
+        manifest.clips.forEach((c) => assert.ok(c.seconds >= 2 && c.seconds <= 10 && c.used_on.length >= 1, c.file));
+    });
+
+    test('site-clips.js: loads in view, pauses out of view, keeps the poster when a clip is missing, honours reduce motion', () => {
+        const js = read('site-clips.js');
+        assert.match(js, /new IntersectionObserver/);
+        assert.match(js, /v\.src = v\.getAttribute\('data-src'\)/, 'positive: the clip is loaded from data-src');
+        assert.match(js, /else if [^\n]{0,120}v\.pause\(\)/, 'a clip that leaves the screen is not paused');
+        assert.match(js, /addEventListener\('error', function \(\) \{ giveUp\(v\); \}\)/);
+        assert.match(js, /function giveUp\(v\) \{[\s\S]*?removeAttribute\('src'\)[\s\S]*?\}/, 'a missing clip leaves a broken player');
+        assert.match(js, /prefers-reduced-motion: reduce/);
+        assert.match(js, /p\.catch\(/, 'a refused autoplay throws');
+    });
+
+    test('Help: a topic list, and one page per topic with its own link, a clip slot and 3-5 steps', () => {
+        const list = stripComments(read('help.html'));
+        const links = anchors(list).map((x) => x.attrs.href).filter((h) => /^\/help\//.test(h));
+        assert.deepEqual(links, HELP_TOPICS.map((t) => '/help/' + t));
+        HELP_TOPICS.forEach((t) => {
+            const h = stripComments(read('help/' + t + '.html'));
+            assert.match(h, /<a class="crumb" href="\/help">/, t + ': no way back to the list');
+            assert.equal(videos(h).length, 1, t);
+            const steps = (/<ol class="st">([\s\S]*?)<\/ol>/.exec(h) || [, ''])[1].match(/<li>/g) || [];
+            assert.ok(steps.length >= 3 && steps.length <= 5, t + ' has ' + steps.length + ' steps');
+        });
+        // spot-check the steps are the ones Manny approved (CHOICES-27-29-STEPS.md)
+        assert.match(read('help/score-your-group.html'), /Tap <b>Save · Next hole ›<\/b>\. One tap saves the whole group/);
+        assert.match(read('help/erase-a-round.html'), /<b>🗑️ Erase this round for everyone<\/b>/);
+    });
+
+    test('Help is linked from the homepage nav and footer, and from the support and refund pages', () => {
+        assert.ok(anchors(/<nav[\s\S]*?<\/nav>/.exec(home)[0]).some((x) => x.attrs.href === '/help'), 'nav');
+        assert.match(read('support.html'), /<a href="\/help">Help<\/a>/);
+        assert.match(read('refunds.html'), /<a href="\/help">Help<\/a>/);
+        helpPages.forEach((f) => assert.match(read(f), /href="\/home#get-the-app"/, f + ': Get the app goes nowhere'));
+    });
+
+    test('no betting words in the marketing and Help copy (side-games wording)', () => {
+        const BET = /\b(bet|bets|betting|wager\w*|gambl\w*|pot|pots|buy-?ins?)\b|money for bets/i;
+        [PAGE, 'support.html', 'refunds.html'].concat(helpPages).forEach((f) => {
+            const visible = stripScripts(stripComments(read(f))).replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ');
+            assert.ok(visible.length > 400, f + ': positive - the page has copy to judge');
+            assert.doesNotMatch(visible, BET, f);
+        });
+        assert.match(home, /Side games, just for fun/);
+    });
+
+    test('the new pages and media are static: no Function, no rewrite, not in the app shell or the native bundle', () => {
+        const inc = JSON.parse(read('_routes.json')).include;
+        ['/help', '/help/*', '/media/*', '/site-clips.js', '/google-play-badge.png'].forEach((p) => assert.ok(!inc.includes(p), p));
+        assert.deepEqual(redirectsProblems(read('_redirects')).rules.map((r) => r[0]), ['/home', '/home/']);
+        const shell = read('sw.js');
+        assert.doesNotMatch(shell.slice(shell.indexOf('const SHELL_FILES = ['), shell.indexOf('];', shell.indexOf('const SHELL_FILES = ['))),
+            /help|media\/|site-clips|google-play-badge/);
+        assert.doesNotMatch(read('sync-mobile-web.js'), /help\.html|media\/|site-clips|google-play-badge/);
     });
 });
