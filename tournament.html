@@ -446,7 +446,7 @@
     <div class="form-group setup-field">
         <label id="t-entry-fee-label">Entry Fee per Team ($, optional)</label>
         <div class="money-input"><span class="money-prefix" aria-hidden="true">$</span><input type="number" id="t-entry-fee" value="0" min="0" placeholder="0"></div>
-        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;" id="t-entry-fee-help">The total in and results are calculated for you once teams are in — this is just the calculator, square up for real however your event normally does.</p>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;" id="t-entry-fee-help">The organizer collects entry fees (cash, Venmo, etc.). Card payments in Rattle Golf are coming.</p>
     </div>
 
     <!-- MOVED HERE FROM #manage-screen, wave 9. Same fault as
@@ -796,7 +796,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <!-- THE WATCH LINK (Wave 1, A3). The board itself, for family and the
              clubhouse TV. Shown to everyone: a watcher forwarding it is the point. -->
         <button class="btn-outline" id="lb-watch-share" onclick="openShareModal(leaderboardWatchUrl(), (currentData && currentData.name) || 'Event', 'leaderboard')">📣 Share live leaderboard</button>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-4px; text-align:center;">Anyone with this link can watch the board as scores come in.</p>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:8px; text-align:center;">Anyone with this link can watch the board as scores come in.</p>
 
         <hr class="section-divider">
         <!-- THE CALCULATOR IS THE ORGANIZER'S (Wave 1, A3/A4). Hidden for everyone
@@ -1336,14 +1336,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // follow the format card the organizer just pressed.
     function syncEntryFeeWording(fmt) {
         const per = (fmt === 'individual') ? 'Golfer' : 'Team';
-        const noun = (fmt === 'individual') ? 'golfers' : 'teams';
         const label = document.getElementById('t-entry-fee-label');
         const help = document.getElementById('t-entry-fee-help');
         if (label) label.textContent = `Entry Fee per ${per} ($, optional)`;
         if (help) {
-            help.textContent = `The total in and results are calculated for you once ${noun} are in`
-                + ' — this is just the calculator, square up for real however your event'
-                + ' normally does.';
+            // Manny 2026-11-10: the entry-fee help says who collects the fee.
+            help.textContent = 'The organizer collects entry fees (cash, Venmo, etc.). Card payments in Rattle Golf are coming.';
         }
     }
 

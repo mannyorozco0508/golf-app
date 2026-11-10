@@ -92,7 +92,8 @@ const DELIBERATE = [
         // Copy only; the same wave's payout tests were re-pinned in a838f5a0.
         why: 'web-25 wording: no pool / payouts / settle up',
         from: '|Pool and payouts are calculated for you once teams are in \u2014 this is just the calculator, settle up for real however your event normally does.|',
-        to: '|The total in and results are calculated for you once teams are in \u2014 this is just the calculator, square up for real however your event normally does.|'
+        // RE-PINNED 2026-11-10 (Manny's wording, phase 1; "Rattle Golf" per the 09-23 lock, Manny picked): the help says who collects the fee.
+        to: '|The organizer collects entry fees (cash, Venmo, etc.). Card payments in Rattle Golf are coming.|'
     }
 ];
 

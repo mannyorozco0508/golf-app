@@ -22,7 +22,12 @@ test('1 added files: round-chat.js is the only new site file; package.json and C
     const added = execFileSync('git', ['diff', '--name-only', '--diff-filter=A', '0d91206d'], { cwd: __dirname, encoding: 'utf8' }).split('\n').filter(Boolean)
         .concat(execFileSync('git', ['ls-files', '--others', '--exclude-standard'], { cwd: __dirname, encoding: 'utf8' }).split('\n').filter(Boolean));
     assert.ok(added.includes('web_chat_site_test.js') || added.includes('round-chat.js'), 'the list is real (positive)');
-    const served = added.filter((f) => !M.isBlockedPath('/' + f));
+    // Re-pinned 2026-11-10 (Tournaments phase 1, P1-e): the two app-link
+    // association files are served on purpose (team links open the app), and
+    // _headers is Cloudflare Pages' header config, like _routes.json. Any other
+    // new served file still fails here.
+    const P1E = ['.well-known/apple-app-site-association', '.well-known/assetlinks.json', '_headers'];
+    const served = added.filter((f) => !M.isBlockedPath('/' + f) && !P1E.includes(f));
     assert.deepEqual(served, added.includes('round-chat.js') ? ['round-chat.js'] : [], 'served by the site');
     ['/package.json', '/CLAUDE.md', '/tools/sim/lib/emu-phone.js', '/web_chat_live_chrome_test.js', '/database.rules.json'].forEach((p) => assert.equal(M.isBlockedPath(p), true, p));
     assert.equal(M.isBlockedPath('/round-chat.js'), false, 'the chat itself is served');
@@ -42,7 +47,7 @@ test('2 the pages: web mode once; nothing app-only reached the site', () => {
 });
 test('3 the service worker and the shell list', () => {
     const sw = read('sw.js');
-    assert.match(sw, /const CACHE_VERSION = 'golfapp-v385-2\.0';/);
+    assert.match(sw, /const CACHE_VERSION = 'golfapp-v386-2\.0';/);
     assert.match(sw, /\/\/ Moved to v382-2\.0 \(no self-serve seat move, Manny\): round-chat\.js/);
     assert.match(sw, /\/\/ Moved to v380-2\.0 \(web chat, ADVISOR-1727\): round-chat\.js/);
     assert.equal(sw.split("'./round-chat.js'").length - 1, 1, 'precached once');
