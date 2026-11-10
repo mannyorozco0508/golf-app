@@ -460,13 +460,17 @@ function themeInit(html) {
 
 describe('3. NO DARK MODE BUTTON ON THE WEBSITE (the app keeps its own)', () => {
     const gates = THEME_PAGES.map((p) => [p, GATE_RE.exec(read(p))]);
-    test('every page that had the button carries the same gate, in <head>, before any script', () => {
+    test('every page that had the button carries the same gate, first in <body>: after every <head> script, before the button', () => {
+        // Not in <head>: a tag there ahead of pwa-boot.js / auth-boot.js / the
+        // engines breaks the script-order guards (and a <style> ahead of the page's
+        // own breaks the stylesheet slices) - measured on the first draft.
         for (const [p, m] of gates) {
             assert.ok(m, p + ' has no web light-only gate');
             const html = read(p);
-            assert.ok(html.indexOf(m[0]) < html.indexOf('</head>'), p + ': gate is not in <head>');
-            const firstSrc = html.indexOf('<script src');
-            assert.ok(firstSrc === -1 || html.indexOf(m[0]) < firstSrc, p + ': gate runs after a script');
+            const at = html.indexOf(m[0]);
+            assert.ok(at > html.indexOf('</head>'), p + ': gate is in <head>');
+            assert.match(html.slice(html.indexOf('</head>'), at), /^<\/head>\s*<body[^>]*>\s*<!--[\s\S]*?-->\s*$/, p + ': gate is not the first thing in <body>');
+            assert.ok(at < html.indexOf('class="theme-toggle-btn"'), p + ': gate comes after the button');
             assert.equal(m[1], gates[0][1][1], p + ' gate differs from admin.html');
         }
         assert.match(gates[0][1][2], /\.lobby-account-row\{justify-content:flex-end;\}/, 'Account stays on the right with the moon gone');
