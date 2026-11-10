@@ -1,5 +1,5 @@
 {
-  "_about": "Clips for the website feature tiles (/home and /) and Help (/help). CUT (clips 2.0.5, from the 2.0.4 App Preview recording, Manny Nov 10 \"Clips: use the 11 now\"): gps, just-say-it, add-a-game, group-scoring, games-live-board, results, tournaments. Not in the recording, so not cut yet (poster only): weekly-code, chat, my-bag-stats, start-round, add-golfers, join-with-a-code, erase-a-round. Format: H.264 MP4, muted (no audio track), portrait, 590x1280 or smaller (posters are 295x640), about 150-400 KB each. Until a file exists its poster shows; nothing else changes when it is added. The play badge on a tile shows seconds rounded to whole seconds (0:04 for 4.3 and 3.5).",
+  "_about": "Clips for the website feature tiles (/home and /) and Help (/help). CUT (clips 2.0.5, from the 2.0.4 App Preview recording, Manny Nov 10 \"Clips: use the 11 now\", then \"keep option 1\"): gps, add-a-game, group-scoring, games-live-board, results, tournaments. Each poster of these six is the clip's own first frame, and each clip plays ONCE and holds on its last frame (no loop). Poster only (not cut, or held back): just-say-it (the recording has no Ask HardPan moment; the add-a-game cut is not used for it), weekly-code, chat, my-bag-stats, start-round, add-golfers, join-with-a-code, erase-a-round. Format: H.264 MP4, muted (no audio track), portrait, 590x1280 or smaller (posters are 295x640), about 150-400 KB each. Until a file exists its poster shows; nothing else changes when it is added. The play badge on a tile shows seconds rounded to whole seconds (0:04 for 3.5).",
   "folder": "/media/clips/",
   "posters": "/media/posters/<name>.jpg",
   "clips": [
@@ -14,7 +14,7 @@
     },
     {
       "file": "just-say-it.mp4",
-      "seconds": 4.3,
+      "seconds": 6,
       "poster": "/media/posters/just-say-it.jpg",
       "used_on": [
         "/home tile: Just say it"

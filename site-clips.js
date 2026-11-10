@@ -2,12 +2,16 @@
 // THE FEATURE / HELP CLIP SLOTS (website-c, Manny's picks 27A and 28A)
 //
 // Every clip on the marketing pages is
-//   <video muted loop playsinline preload="none" poster="/media/posters/X.jpg"
+//   <video muted playsinline preload="none" poster="/media/posters/X.jpg"
 //          data-src="/media/clips/X.mp4">
 // The poster is a real 2.0.4 still and is all a visitor sees until the clip
 // file exists. This script:
 //   - loads a clip only when its tile scrolls into view (nothing is fetched
-//     for a tile that is never seen), then plays it muted and looping;
+//     for a tile that is never seen), then plays it muted, ONCE: there is no
+//     loop attribute (website-d, Manny "keep option 1"), so at the end the
+//     video stays on its last frame - nothing jumps back to the first frame,
+//     and the poster (that clip's own first frame) does not come back. Back in
+//     view after it ended, play() starts it again from the top;
 //   - pauses it again when the tile leaves the screen;
 //   - if the clip file is missing or will not play, drops the src so the
 //     poster stays (no broken player, no spinner), and never asks again;

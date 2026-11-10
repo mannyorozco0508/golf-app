@@ -513,12 +513,15 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
         assert.equal(videos(sec).length, 9, 'each tile is a clip slot');
     });
 
-    test('every clip slot is muted, looping, inline, loads nothing up front, has a poster and a clip in the manifest', () => {
+    // website-d re-pin (Manny "keep option 1"): no `loop` - a clip plays once and
+    // holds its last frame. Was: muted, looping, inline.
+    test('every clip slot is muted, plays once (no loop), inline, loads nothing up front, has a poster and a clip in the manifest', () => {
         const all = [PAGE].concat(helpPages);
         let n = 0;
         all.forEach((f) => videos(stripComments(read(f))).forEach((v) => {
             n += 1;
-            ['muted', 'loop', 'playsinline'].forEach((k) => assert.match(v, new RegExp('\\b' + k + '\\b'), f + ' ' + k));
+            ['muted', 'playsinline'].forEach((k) => assert.match(v, new RegExp('\\b' + k + '\\b'), f + ' ' + k));
+            assert.doesNotMatch(v, /\bloop\b/, f + ': a looping clip jumps back to its first frame');
             assert.match(v, /preload="none"/, f + ': a clip would download before it is seen');
             assert.doesNotMatch(v, /(?<![-\w])src="|autoplay|controls/, f + ': the clip must start from data-src, in view, with no player chrome');
             const poster = /poster="\/(media\/posters\/[a-z0-9-]+\.jpg)"/.exec(v);
@@ -587,9 +590,11 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
 
     // WEBSITE-D (Manny Nov 10, "Clips: use the 11 now"): the 7 website clips
     // from clips-205/web are in media/clips/; the other 7 stay poster-only.
-    const CUT = { 'gps.mp4': 3, 'just-say-it.mp4': 4.3, 'add-a-game.mp4': 4, 'group-scoring.mp4': 3,
+    // website-d, "keep option 1": just-say-it.mp4 is NOT shipped (it was the
+    // add-a-game cut; the tile keeps its own still). Six clips.
+    const CUT = { 'gps.mp4': 3, 'add-a-game.mp4': 4, 'group-scoring.mp4': 3,
         'games-live-board.mp4': 3, 'results.mp4': 3.5, 'tournaments.mp4': 3.5 };
-    test('website-d: the 7 cut clips are in media/clips (MP4, under 400 KB), the 7 uncut ones are not', () => {
+    test('website-d: the 6 cut clips are in media/clips (MP4, under 400 KB), the 8 others are not', () => {
         manifest.clips.forEach((c) => {
             const f = path.join('media', 'clips', c.file);
             if (c.file in CUT) {
@@ -602,9 +607,30 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
                 assert.ok(!exists(f), c.file + ' exists but was not in the cut set (its poster should show)');
             }
         });
-        assert.equal(Object.keys(CUT).length, 7);
+        assert.equal(Object.keys(CUT).length, 6);
+        assert.equal(manifest.clips.find((c) => c.file === 'just-say-it.mp4').seconds, 6, 'just-say-it keeps its planned length (poster only)');
         assert.doesNotMatch(manifest._about, /^[^.]*Not yet cut: each will be cut/, 'the about line still says nothing is cut');
         Object.keys(CUT).forEach((f) => assert.ok(manifest._about.includes(f.replace('.mp4', '')), f + ' not named in _about'));
+        assert.match(manifest._about, /Poster only \(not cut, or held back\): just-say-it/);
+    });
+    test('website-d: each cut clip has a poster made from its first frame at the clip aspect (295x640 JPEG); just-say-it keeps its still', () => {
+        // sha256 (first 16 hex) of each poster as made on website-d: AVAssetImageGenerator
+        // at time 0 with zero tolerance, then sips to 295x640 JPEG. A re-cut clip needs a
+        // new poster AND a new pin here, on purpose.
+        const posterSha = (buf) => require('crypto').createHash('sha256').update(buf).digest('hex').slice(0, 16);
+        posterSha.FIRST_FRAME = { 'gps': '9eabb5637af8d7be', 'add-a-game': '3494edfa101d9586', 'group-scoring': '9b4ef5b896565a5c',
+            'games-live-board': '461ae62aac009946', 'results': '847620f41248eb7e', 'tournaments': '56b0258365e63705' };
+        posterSha.KEPT = { 'just-say-it': '7bcb59a6ecafe3b8' };
+        Object.keys(CUT).forEach((f) => {
+            const name = f.replace('.mp4', '');
+            const buf = fs.readFileSync(path.join(ROOT, 'media', 'posters', name + '.jpg'));
+            assert.equal(buf[0], 0xff, name + ' poster is not a JPEG'); assert.equal(buf[1], 0xd8);
+            const sof = buf.indexOf(Buffer.from([0xff, 0xc0]));
+            assert.ok(sof > 0, name + ': positive - a baseline JPEG frame header');
+            assert.deepEqual([buf.readUInt16BE(sof + 7), buf.readUInt16BE(sof + 5)], [295, 640], name + ' poster is not 295x640 (the clip aspect)');
+            assert.equal(posterSha(buf), posterSha.FIRST_FRAME[name], name + ' poster is not the first-frame poster');
+        });
+        assert.equal(posterSha(fs.readFileSync(path.join(ROOT, 'media', 'posters', 'just-say-it.jpg'))), posterSha.KEPT['just-say-it'], 'the Just say it still changed');
     });
     test('website-d: every play badge on a page matches its clip length in the manifest (whole seconds)', () => {
         const secs = Object.fromEntries(manifest.clips.map((c) => [c.file, c.seconds]));
