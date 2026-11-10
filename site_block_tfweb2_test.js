@@ -136,11 +136,12 @@ describe('tfweb-2 _routes.json', () => {
         for (const d of M.BLOCKED_DIRS) { assert.ok(ROUTES.include.includes('/' + d), d); assert.ok(ROUTES.include.includes('/' + d + '/*'), d + '/*'); }
         for (const f of M.BLOCKED_FILES) assert.ok(routed('/' + f), f);
     });
-    test('every function file is still reachable: its route is "/" or under "/api/"', () => {
+    // website-d: functions/app/[[path]].js (/app, the web app's address) joins "/" and "/api/".
+    test('every function file is still reachable: its route is "/", "/app" or under "/api/"', () => {
         const fnFiles = tracked.filter((f) => f.startsWith('functions/') && !/\/_[^/]*$/.test(f));
         for (const f of fnFiles) {
             const route = f === 'functions/index.js' ? '/' : '/' + f.replace(/^functions\//, '').replace(/\.js$/, '');
-            assert.ok(route === '/' || route.startsWith('/api/'), f + ' -> ' + route);
+            assert.ok(route === '/' || route.startsWith('/api/') || route.startsWith('/app/'), f + ' -> ' + route);
             assert.ok(routed(route.replace(/\[\[?[^\]]+\]\]?/g, 'x')), route);
         }
     });

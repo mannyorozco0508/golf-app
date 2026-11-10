@@ -448,6 +448,34 @@ describe('2. THE SERVICE WORKER: the app shell is the app, the homepage is never
         assert.equal((await cold.nav(SW_ORIGIN + '/app')).body, 'APP');
     });
 
+    test('returning visitors: activate deletes EVERY older cache (v380 ... v393 and anything else), keeps only v394', async () => {
+        const sw = loadSW({ seed: [] });
+        const src = read('sw.js');
+        assert.match(src, /self\.skipWaiting\(\)/, 'a new worker waits for every tab to close');
+        assert.match(src, /self\.clients\.claim\(\)/, 'a new worker does not take over open pages');
+        // Rebuild with old caches present, then activate.
+        const names = ['golfapp-v380-2.0', 'golfapp-v383-2.0', 'golfapp-v385-2.0', 'golfapp-v393-2.0', 'golfapp-v331-new-logo'];
+        const sandboxCaches = new Map(names.map((n) => [n, new Map([[SW_ORIGIN + '/', fakeRes('OLD ' + n, { url: SW_ORIGIN + '/' })]])]));
+        const listeners = {};
+        const waits = [];
+        const ctx = { self: { addEventListener: (t, f) => { listeners[t] = f; }, skipWaiting() {}, clients: { claim() {} }, location: { origin: SW_ORIGIN, href: SW_ORIGIN + '/sw.js' } },
+            caches: { keys: () => Promise.resolve([...sandboxCaches.keys()]), delete: (n) => Promise.resolve(sandboxCaches.delete(n)),
+                open: (n) => { if (!sandboxCaches.has(n)) sandboxCaches.set(n, new Map()); return Promise.resolve({ put: () => Promise.resolve() }); } },
+            URL, Promise, console: { warn() {} }, fetch: () => Promise.reject(new TypeError('offline')), Response: class {}, Request: class {} };
+        vm.createContext(ctx); vm.runInContext(src, ctx);
+        sandboxCaches.set('golfapp-v394-2.0', new Map());
+        listeners.activate({ waitUntil: (p) => waits.push(p) });
+        await Promise.all(waits);
+        assert.deepEqual([...sandboxCaches.keys()], ['golfapp-v394-2.0']);
+        assert.ok(sw, 'positive: the worker loads');
+    });
+    test('returning visitors: sw.js is never served from the HTTP cache (_headers no-cache, updateViaCache none)', () => {
+        const h = read('_headers');
+        assert.match(h, /^\/sw\.js\n  Cache-Control: no-cache$/m);
+        assert.match(read('pwa-boot.js'), /register\('sw\.js', \{ scope: '\.\/', updateViaCache: 'none' \}\)/);
+        assert.ok(!ROUTES.include.includes('/sw.js'), 'sw.js stays static (the header applies to static files)');
+    });
+
     test('NEGATIVE CONTROL: the v393 worker (no homepage guard) DOES cache the homepage under /, and the offline game link opens it', async () => {
         // This is what a device keeps until v394 replaces it - the reason for the bump.
         const v393 = read('sw.js')

@@ -341,7 +341,9 @@ describe('CURRENT DEPLOYMENT — unchanged, and provably so', () => {
     });
 
     test('pwa-boot.js still registers exactly one worker at the current scope', () => {
-        assert.match(read('pwa-boot.js'), /navigator\.serviceWorker\.register\('sw\.js', \{ scope: '\.\/' \}\)/);
+        // website-d re-pin: + updateViaCache 'none' (returning visitors always fetch a new sw.js). Same one worker, same scope.
+        assert.match(read('pwa-boot.js'), /navigator\.serviceWorker\.register\('sw\.js', \{ scope: '\.\/', updateViaCache: 'none' \}\)/);
+        assert.equal((read('pwa-boot.js').match(/serviceWorker\.register\(/g) || []).length, 1, 'exactly one register call');
     });
 
     test('every current route still exists', () => {
