@@ -127,7 +127,8 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         assert.ok(foot);
         const hrefs = anchors(foot[1]).map((x) => x.attrs.href);
         // website-c: Help joins the footer, first (28A).
-        assert.deepEqual(hrefs, ['/help', '/support', '/privacy', '/terms', '/refunds']);
+        // Nov 10 (Manny): the refund link is held off until Stripe is live.
+        assert.deepEqual(hrefs, ['/help', '/support', '/privacy', '/terms']);
         hrefs.forEach((h) => assert.ok(exists(h.slice(1) + '.html'), h + ' has no page'));
     });
 
@@ -350,7 +351,7 @@ describe('3. ROUTING: / and every app link are served as before', () => {
 
     test('_routes.json sends none of the new paths to a Function (static, no cost), and keeps / and /__/auth/*', () => {
         const inc = JSON.parse(read('_routes.json')).include;
-        ['/home', '/home/*', '/hardpan-home', '/refunds', '/site-pricing.js', '/app-store-badge.svg'].forEach((p) =>
+        ['/home', '/home/*', '/hardpan-home', '/site-pricing.js', '/app-store-badge.svg'].forEach((p) =>
             assert.ok(!inc.includes(p), p + ' now runs a Function'));
         assert.ok(inc.includes('/'));
         assert.ok(inc.includes('/__/auth/*'));
@@ -384,8 +385,20 @@ describe('3. ROUTING: / and every app link are served as before', () => {
         assert.equal(MW.isAuthProxyPath('/__/auth/iframe'), true);
         assert.equal(MW.isAuthProxyPath('/__/firebase/init.json'), true);
         assert.equal(MW.AUTH_PROXY_ORIGIN, 'https://golfapp-9fb21.firebaseapp.com');
-        ['/home', '/hardpan-home', '/refunds', '/site-pricing.js', '/app-store-badge.svg', '/', '/admin', '/tournament'].forEach((p) =>
+        ['/home', '/hardpan-home', '/site-pricing.js', '/app-store-badge.svg', '/', '/admin', '/tournament'].forEach((p) =>
             assert.equal(MW.isBlockedPath(p), false, p + ' answers 404'));
+    });
+
+    // Nov 10 (Manny): "Hold the refunds page (and any footer/links to it) off the
+    // site until Stripe is live." The file stays; the middleware answers 404.
+    test('the refund page is held off the site: 404 at every spelling, and no page links to it', () => {
+        ['/refunds', '/refunds/', '/refunds.html', '/Refunds', '/refunds%2Ehtml'].forEach((p) =>
+            assert.equal(MW.isBlockedPath(p), true, p + ' is still served'));
+        const inc = JSON.parse(read('_routes.json')).include;
+        ['/refunds', '/refunds/', '/refunds.html'].forEach((p) => assert.ok(inc.includes(p), p + ' never reaches the block'));
+        const pages = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html')).concat(fs.readdirSync(path.join(ROOT, 'help')).map((f) => 'help/' + f));
+        pages.filter((f) => f !== 'refunds.html').forEach((f) =>
+            assert.doesNotMatch(read(f), /href="\/refunds/, f + ' still links to the refund page'));
         assert.equal(MW.isBlockedPath('/package.json'), true, 'positive control: the block list still blocks');
     });
 

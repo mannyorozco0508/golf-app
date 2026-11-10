@@ -33,7 +33,11 @@ export const BLOCKED_DIRS = [
 export const BLOCKED_FILES = [
     'package.json', 'package-lock.json', 'firebase.json', 'build-shell.js',
     'sync-mobile-web.js', 'global_courses_snapshot.json', 'capacitor.config.ts',
-    '.gitignore'
+    '.gitignore',
+    // HELD OFF THE SITE until Stripe is live (Manny, Nov 10 2026): the
+    // entry-fee refund page describes card payments that are not live yet.
+    // The file stays in the repo; take these two lines out to put it back.
+    'refunds', 'refunds.html'
 ];
 
 // Top-level file patterns that are not the site.
