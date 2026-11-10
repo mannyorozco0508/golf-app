@@ -4,7 +4,9 @@
       {
         "appIDs": ["A2Z95T64UU.com.rattlegolf.app"],
         "components": [
-          { "/": "/tournament-scorecard*", "comment": "A tournament team link (with or without .html) opens the Rattle Golf app" }
+          { "/": "/tournament-scorecard*", "exclude": true, "comment": "Team scorecard links stay in the browser until the app ships the in-app card (2.0.6). Manny, 2026-11-10." },
+          { "/": "/tournament*", "exclude": true, "comment": "Tournament pages stay in the browser." },
+          { "/": "*", "exclude": true, "comment": "Nothing on this host opens the app yet." }
         ]
       }
     ]

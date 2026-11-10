@@ -10,15 +10,12 @@
 
 # Cloudflare Pages response headers (P1-e, 2026-11-10).
 #
-# The two app-link association files must be served as application/json with
-# no redirect. apple-app-site-association has no extension, so Pages would
-# otherwise send it as application/octet-stream; assetlinks.json is set
-# explicitly so the type cannot drift. An hour's cache: a changed file reaches
+# The app-link association file must be served as application/json with no
+# redirect. apple-app-site-association has no extension, so Pages would
+# otherwise send it as application/octet-stream. assetlinks.json is held back
+# until the app ships the in-app card (2.0.6; Manny 2026-11-10). An hour's cache: a changed file reaches
 # Apple's and Google's verifiers the same day.
 /.well-known/apple-app-site-association
   Content-Type: application/json
   Cache-Control: public, max-age=3600
 
-/.well-known/assetlinks.json
-  Content-Type: application/json
-  Cache-Control: public, max-age=3600

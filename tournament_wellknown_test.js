@@ -1,48 +1,36 @@
 // ============================================================================
-// P1-e: TEAM LINKS OPEN THE APP - THE TWO ASSOCIATION FILES (2026-11-10)
+// APP-LINK ASSOCIATION FILES: CLAIM NOTHING UNTIL 2.0.6 (Manny, 2026-11-10)
 //
-// /.well-known/apple-app-site-association  iOS universal links: the Rattle
-//   Golf app (A2Z95T64UU.com.rattlegolf.app) claims /tournament-scorecard*,
-//   which is every path hp-email-link-open.js's tourneyTarget() accepts
-//   (release-204: /^\/tournament-scorecard(\.html)?$/ on
-//   tournaments.rattlegolf.com and golf-app-5a5.pages.dev).
-// /.well-known/assetlinks.json  Android app links: byte-for-byte the live
-//   https://golfapp-9fb21.firebaseapp.com/.well-known/assetlinks.json
-//   (fetched read-only 2026-11-10, sha256 766628b5...), as Android asked in
-//   inbox/ANDROID-TOURNEY-ASSETLINKS.md.
+// "Today's store apps (iOS 2.0.3/2.0.4, Android 19/23) can't show tournament
+// scorecards. If any team/scorecard/tournament link is claimed, exclude those
+// paths until the app ships the in-app card (2.0.6), so they keep opening in
+// the browser."
 //
-// THE EMAIL SIGN-IN LINK IS NOT TOUCHED. It lives on golfapp-9fb21.firebaseapp.com
-// (Firebase Hosting), whose own AASA claims /__/auth/links* - a different
-// host, which nothing here serves or changes. And this file must NOT claim
-// /__/auth/ on our hosts: there /__/auth/ is the web sign-in redirect proxy
-// (functions/_middleware.js), and an app that claimed it would pull a
-// browser's Google/Apple sign-in into the app. Test 1 holds that.
+// /.well-known/apple-app-site-association is served, and every component is
+//   an EXCLUDE: /tournament-scorecard*, /tournament*, and "*". iOS 2.0.4 lists
+//   applinks:tournaments.rattlegolf.com and golf-app-5a5.pages.dev, so a claim
+//   here would pull team links into an app that cannot show them. It claims no
+//   path on any host (test 1).
+// /.well-known/assetlinks.json is NOT served. It cannot exclude a path: it
+//   vouches for the whole domain, and the paths come from the app's manifest.
+//   Android 23 lists /tournament-scorecard on both hosts without autoVerify; on
+//   Android 11 and older, one autoVerify filter (firebaseapp /__/auth/links)
+//   makes the system verify every host, so serving this file there would let
+//   the app claim team links. Held back (test 2). The file to restore at 2.0.6
+//   is the live firebaseapp.com copy, sha256 766628b5... (LIVE_ASSETLINKS below).
 //
-// SERVED AS application/json, NO REDIRECT, NOT BLOCKED: the middleware's
-// isBlockedPath is false for both (the dot-file rule applies to a top-level
-// FILE, and .well-known is a folder); _routes.json does not send them to the
-// Function at all, so they are plain static files; _headers sets the type
-// (the AASA has no extension, which Pages would serve as octet-stream);
-// there is no _redirects. What only a deploy can prove: the live response.
-// After the web deploy, `curl -sI https://tournaments.rattlegolf.com/.well-known/apple-app-site-association`
-// must say 200 and application/json (today it says 200 text/html - the SPA
-// fallback, measured 2026-11-10).
+// THE EMAIL SIGN-IN LINK IS NOT TOUCHED: it lives on golfapp-9fb21.firebaseapp.com
+// (Firebase Hosting), which nothing here serves or changes.
 //
-// TESTS: 5. BASELINE against p1-base 48121bea (the two files and _headers
-// absent there; this file run with them moved aside to a scratch folder,
-// then restored by cp, shas RESTORED-OK):
+// TESTS: 5. BASELINE against main-phase1 a3be2930 (the AASA claimed
+// /tournament-scorecard*, assetlinks.json served):
 //
-//   all 5 tests: 1 PASS / 4 FAIL / 0 cancelled.   1 + 4 = 5.
-//
-// The 1 that passes at baseline is test 4 (isBlockedPath and _routes.json
-// already let both paths through) - it is held so a later block rule cannot
-// silently take them away.
+//   all 5 tests: 3 PASS / 2 FAIL / 0 cancelled.   3 + 2 = 5.
 //
 // NEGATIVE CONTROLS (restored by cp from a saved copy, sha RESTORED-OK):
-//   C11 '.well-known' added to BLOCKED_DIRS in functions/_middleware.js  1 fail CAUGHT
-//   C12 the AASA rule removed from _headers                              1 fail CAUGHT
-//   C13 the AASA claims "/tournament-scorecard.html" only                1 fail CAUGHT
-//   C14 one assetlinks fingerprint changed by one character              1 fail CAUGHT
+//   C21 the AASA's first component loses "exclude": true          test 1 CAUGHT
+//   C22 assetlinks.json put back                                  test 2 CAUGHT
+//   C23 the AASA rule removed from _headers                       test 3 CAUGHT
 // ============================================================================
 'use strict';
 const { test, describe, before } = require('node:test');
@@ -72,26 +60,29 @@ let M = null;
 before(async () => { M = await import(pathToFileURL(path.join(ROOT, 'functions', '_middleware.js')).href); });
 
 describe('P1-e association files', () => {
-    test('1. the AASA: the Rattle Golf app, every team-link path tourneyTarget accepts, and nothing else', () => {
+    test('1. the AASA: the Rattle Golf app, and every component excludes - no path is claimed', () => {
         const j = JSON.parse(read(AASA));
         const details = j.applinks && j.applinks.details;
         assert.equal(details.length, 1);
         assert.deepEqual(details[0].appIDs, ['A2Z95T64UU.com.rattlegolf.app']);
-        const pats = details[0].components.map((c) => c['/']);
-        const claims = (p) => details[0].components.some((c) => !c.exclude && aasaMatch(c['/'], p));
-        assert.ok(pats.length >= 1, 'at least one component');
-        ['/tournament-scorecard', '/tournament-scorecard.html'].forEach((p) => assert.ok(claims(p), 'not claimed: ' + p));
-        ['/', '/index.html', '/home.html', '/admin.html', '/tournament.html', '/tournament', '/__/auth/handler', '/__/auth/links',
-            '/__/auth/action', '/__/firebase/init.json', '/api/scan', '/game.html'].forEach((p) => assert.ok(!claims(p), 'must not claim ' + p));
+        const comps = details[0].components;
+        assert.ok(comps.length >= 1, 'positive: the file has components');
+        assert.ok(comps.some((c) => c['/'] === '/tournament-scorecard*' && c.exclude === true), 'team links excluded by name');
+        comps.forEach((c) => assert.equal(c.exclude, true, 'a component that claims: ' + c['/']));
+        const claims = (p) => comps.some((c) => !c.exclude && aasaMatch(c['/'], p));
+        ['/tournament-scorecard', '/tournament-scorecard.html', '/tournament', '/tournament.html', '/', '/app', '/index.html',
+            '/admin', '/admin.html', '/game.html', '/trip.html', '/__/auth/handler', '/__/auth/links'].forEach((p) =>
+            assert.ok(!claims(p), 'must not claim ' + p));
     });
 
-    test('2. assetlinks.json is the live firebaseapp.com file, byte for byte', () => {
-        const raw = fs.readFileSync(LINKS);
-        assert.deepEqual(JSON.parse(raw.toString('utf8')), LIVE_ASSETLINKS);
-        assert.equal(crypto.createHash('sha256').update(raw).digest('hex'), LIVE_SHA);
+    test('2. assetlinks.json is held back until 2.0.6 (it cannot exclude a path)', () => {
+        assert.equal(fs.existsSync(LINKS), false, 'assetlinks.json is served');
+        // the content to restore at 2.0.6 is still pinned, so it is not lost
+        assert.equal(LIVE_ASSETLINKS[0].target.package_name, 'com.rattlegolf.app');
+        assert.equal(LIVE_SHA.length, 64);
     });
 
-    test('3. _headers serves both as application/json', () => {
+    test('3. _headers serves the AASA as application/json', () => {
         const lines = read(path.join(ROOT, '_headers')).split('\n');
         const rules = {};
         let cur = null;
@@ -102,11 +93,10 @@ describe('P1-e association files', () => {
             if (cur && m) rules[cur][m[1].trim().toLowerCase()] = m[2].trim();
         });
         assert.equal((rules['/.well-known/apple-app-site-association'] || {})['content-type'], 'application/json');
-        assert.equal((rules['/.well-known/assetlinks.json'] || {})['content-type'], 'application/json');
     });
 
     test('4. not blocked, not routed to the Function, no redirect', () => {
-        ['/.well-known/apple-app-site-association', '/.well-known/assetlinks.json'].forEach((p) => {
+        ['/.well-known/apple-app-site-association'].forEach((p) => {
             assert.equal(M.isBlockedPath(p), false, p + ' is blocked');
             assert.equal(M.isAuthProxyPath(p), false);
         });
@@ -115,13 +105,13 @@ describe('P1-e association files', () => {
         assert.equal(M.isBlockedPath('/.git/config'), true);
         const routes = JSON.parse(read(path.join(ROOT, '_routes.json')));
         const match = (rule, p) => new RegExp('^' + rule.split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + '$').test(p);
-        ['/.well-known/apple-app-site-association', '/.well-known/assetlinks.json'].forEach((p) =>
+        ['/.well-known/apple-app-site-association'].forEach((p) =>
             assert.ok(!routes.include.some((r) => match(r, p)), p + ' would run the Function'));
         assert.ok(!fs.existsSync(path.join(ROOT, '_redirects')) || !/well-known/.test(read(path.join(ROOT, '_redirects'))), 'a redirect rule');
     });
 
-    test('5. both files are plain JSON, no BOM, tracked where Pages serves them (the repo root)', () => {
-        [AASA, LINKS].forEach((f) => {
+    test('5. the AASA is plain JSON, no BOM, tracked where Pages serves them (the repo root)', () => {
+        [AASA].forEach((f) => {
             const raw = fs.readFileSync(f);
             assert.notEqual(raw[0], 0xef, 'BOM in ' + f);
             assert.doesNotThrow(() => JSON.parse(raw.toString('utf8')));
