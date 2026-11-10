@@ -63,9 +63,15 @@ async function fromAssets(context, assetPath, pageName) {
         method: context.request.method === 'HEAD' ? 'HEAD' : 'GET',
         headers: context.request.headers
     }));
-    if (!res || res.status !== 200) return null;
+    // 304 IS AN ANSWER, NOT A FAILURE. A returning browser revalidates `/` with
+    // If-None-Match; the asset server compares it with THIS file's ETag and
+    // says 304 when the copy the browser holds is this file. Treating that as
+    // "cannot read the homepage" served the app instead - measured in Chrome on
+    // wrangler pages dev: the second visit to `/` opened the app.
+    if (!res || (res.status !== 200 && res.status !== 304)) return null;
     const headers = new Headers(res.headers);
     headers.set(PAGE_HEADER, pageName);
+    if (res.status === 304) return new Response(null, { status: 304, statusText: res.statusText, headers });
     return new Response(context.request.method === 'HEAD' ? null : res.body, {
         status: 200, statusText: res.statusText, headers
     });

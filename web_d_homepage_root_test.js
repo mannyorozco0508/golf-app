@@ -220,6 +220,32 @@ describe('1. THE LINK INVENTORY: every app link opens what it always opened; onl
         assert.equal(r.final, '/?game=TEST&group=2');
     });
 
+    // Measured in Chrome on wrangler pages dev: the SECOND visit to / opened the
+    // app. The browser revalidated with If-None-Match, the asset server said 304,
+    // and the first draft took a non-200 as "no homepage" and served index.html.
+    test('a returning browser (If-None-Match) gets 304 for the homepage it holds, and the homepage when it holds the app', async () => {
+        const ETAG = { '/hardpan-home': '"home-etag"', '/': '"app-etag"' };
+        const assets = { fetch: async (req) => {
+            const p = new URL(req.url).pathname;
+            const inm = req.headers.get('if-none-match');
+            if (inm && inm === ETAG[p]) return new Response(null, { status: 304, headers: { etag: ETAG[p] } });
+            return new Response('ASSET:' + p, { status: 200, headers: { etag: ETAG[p] || '"x"' } });
+        } };
+        const run = async (url, inm, fn) => {
+            const request = new Request(HOST + url, { headers: inm ? { 'if-none-match': inm } : {} });
+            return (fn || IDX.onRequest)({ request, env: { ASSETS: assets }, next: async () => new Response('STATIC-APP', { status: 200 }) });
+        };
+        const same = await run('/', '"home-etag"');
+        assert.equal(same.status, 304, 'the homepage the browser holds is still current');
+        assert.equal(same.headers.get('x-hardpan-page'), 'home');
+        const held = await run('/', '"app-etag"');
+        assert.equal(held.status, 200);
+        assert.equal(await held.text(), 'ASSET:/hardpan-home', 'a browser holding the old app copy of / gets the homepage');
+        const app = await run('/app', '"app-etag"', APPFN.onRequest);
+        assert.equal(app.status, 304, '/app revalidates too');
+        assert.equal(app.headers.get('x-hardpan-page'), 'app');
+    });
+
     test('the Tournaments host: / and bare /index.html still go to /tournament; /app does too (never the Consumer app)', async () => {
         for (const u of ['/', '/?tourney=TEST', '/index.html', '/app', '/app?tourney=TEST']) {
             const r = await visit(u, 'tournaments.rattlegolf.com');
