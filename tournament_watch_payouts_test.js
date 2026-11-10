@@ -150,17 +150,21 @@ describe('A4. the prize amounts are saved, and everyone reads them', () => {
     test('a watcher reads the saved amounts, read-only, and the payouts by standing', () => {
         const sb = arrive(teamEvent({ payoutSpots: [500, 300, 100] }), null);
         const pub = html(sb, 'payout-public-amounts');
-        assert.match(pub, /1st \$500\.00 · 2nd \$300\.00 · 3rd \$100\.00/);
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was "1st $500.00 · 2nd $300.00 · 3rd $100.00".
+        assert.match(pub, /1st \$500 pro shop credit · 2nd \$300 pro shop credit · 3rd \$100 pro shop credit/);
         assert.doesNotMatch(pub, /<input/);
         const res = html(sb, 'payout-results');
-        assert.match(res, /1st — Eagles<\/span><span class="val-pos">\$500\.00/);
-        assert.match(res, /3rd — Owls<\/span><span class="val-pos">\$100\.00/);
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was $500.00 / $100.00.
+        assert.match(res, /1st — Eagles<\/span><span class="val-pos">\$500 pro shop credit/);
+        assert.match(res, /3rd — Owls<\/span><span class="val-pos">\$100 pro shop credit/);
     });
 
     test('nothing saved: a watcher reads "Payouts not set yet." and no invented split', () => {
         const sb = arrive(teamEvent(), null);   // $300 x 3 teams = $900 pool
         assert.match(html(sb, 'payout-public-amounts'), /Results not set yet\./);
-        assert.doesNotMatch(html(sb, 'payout-public-amounts') + html(sb, 'payout-results'), /\$300\.00/);
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was /\$300\.00/, which the new "$300 pro shop credit" form
+        // could never match - an inert negative. Any $300 amount at all is the invented split.
+        assert.doesNotMatch(html(sb, 'payout-public-amounts') + html(sb, 'payout-results'), /\$300\b/);
     });
 
     test('nothing saved: the owner’s boxes are blank, not pool / spots', () => {
@@ -193,7 +197,8 @@ describe('A4. the prize amounts are saved, and everyone reads them', () => {
         const many = Array.from({ length: 25 }, () => 10);
         const sb = arrive(teamEvent({ payoutSpots: many }), null);
         const pub = html(sb, 'payout-public-amounts');
-        assert.match(pub, /20th \$10\.00/);
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was "20th $10.00".
+        assert.match(pub, /20th \$10 pro shop credit/);
         assert.doesNotMatch(pub, /21st/);
     });
 });

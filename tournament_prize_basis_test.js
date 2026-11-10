@@ -173,7 +173,8 @@ describe('3. NEVER AN INVENTED LIST', () => {
         const v = engine.resolvePrizeView(teamTwoRounds());
         assert.equal(v.available, false);
         assert.deepEqual(plain(v.rows), []);
-        assert.match(v.reason, /Choose which result the prizes are paid on/);
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): the reason no longer says "paid on".
+        assert.match(v.reason, /Choose which result the prizes go by/);
     });
     test('team multi-round with a saved round: that round pays (Bravo wins Day 2)', () => {
         const v = engine.resolvePrizeView(teamTwoRounds({ payoutBasis: 'r2' }));
@@ -278,12 +279,14 @@ describe('6. USER PATH: every phone shows the same prize list, whatever tab it i
         assert.notEqual(html(a, 'leaderboard-list'), boardBefore, 'positive: the tab tap really moved phone A\'s board');
         assert.notEqual(html(a, 'leaderboard-list'), html(b, 'leaderboard-list'), 'positive: the two boards differ');
         assert.equal(html(a, 'payout-results'), html(b, 'payout-results'), 'two phones, two prize lists');
-        assert.match(html(b, 'payout-results'), /1st — Ann<\/span><span class="val-pos">\$300\.00/, 'positive: money is on the list');
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): an amount reads as pro shop credit.
+        assert.match(html(b, 'payout-results'), /1st — Ann<\/span><span class="val-pos">\$300 pro shop credit/, 'positive: money is on the list');
     });
-    test('a watcher sees "Paid on Event total" and the every-phone note, no control', () => {
+    test('a watcher sees "Prizes go by Event total" and the every-phone note, no control', () => {
         const sb = arrive(owned(individualTwoRounds()), null);
         assert.equal(el(sb, 'payout-basis-label').style.display, 'block');
-        assert.equal(html(sb, 'payout-basis-label'), 'Paid on <b>Event total</b>');
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was 'Paid on <b>Event total</b>'.
+        assert.equal(html(sb, 'payout-basis-label'), 'Prizes go by <b>Event total</b>');
         assert.equal(el(sb, 'payout-basis-note').style.display, 'block');
         assert.equal(el(sb, 'payout-basis-control').style.display, 'none');
         assert.equal(html(sb, 'payout-basis-control'), '');
@@ -293,8 +296,9 @@ describe('6. USER PATH: every phone shows the same prize list, whatever tab it i
         const a = arrive(rec(), null), b = arrive(rec(), null);
         tap(a, 'lb-round-filter', 'Saturday');
         assert.equal(html(a, 'payout-results'), html(b, 'payout-results'));
-        assert.match(html(a, 'payout-results'), /1st — Bob<\/span><span class="val-pos">\$300\.00/);
-        assert.equal(html(a, 'payout-basis-label'), 'Paid on <b>Sunday</b>');
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was $300.00 and 'Paid on <b>Sunday</b>'.
+        assert.match(html(a, 'payout-results'), /1st — Bob<\/span><span class="val-pos">\$300 pro shop credit/);
+        assert.equal(html(a, 'payout-basis-label'), 'Prizes go by <b>Sunday</b>');
     });
     test('team event, nothing saved: a golfer reads "Prize results coming soon", never a list', () => {
         const sb = arrive(owned(teamTwoRounds()), null);
@@ -307,14 +311,16 @@ describe('6. USER PATH: every phone shows the same prize list, whatever tab it i
     });
     test('team event, nothing saved: the ORGANIZER keeps the reason sentence', () => {
         const sb = arrive(owned(teamTwoRounds()), OWNER);
-        assert.match(html(sb, 'payout-results'), /Choose which result the prizes are paid on\./);
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was "the prizes are paid on".
+        assert.match(html(sb, 'payout-results'), /Choose which result the prizes go by\./);
         assert.doesNotMatch(html(sb, 'payout-results'), /coming soon|\$\d/);
     });
-    test('the organizer sees "Results are paid on" with every choice, and a tap saves payoutBasis', () => {
+    test('the organizer sees "Prizes go by" with every choice, and a tap saves payoutBasis', () => {
         const sb = arrive(owned(individualTwoRounds()), OWNER);
         const ctl = html(sb, 'payout-basis-control');
         assert.equal(el(sb, 'payout-basis-control').style.display, 'block');
-        assert.match(ctl, /Results are paid on/);
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was "Results are paid on".
+        assert.match(ctl, /Prizes go by/);
         assert.match(ctl, /class="on"[^>]*>Event total</, 'nothing saved and the event total computes: Event total is on');
         assert.deepEqual((ctl.match(/>([^<>]+)<\/button>/g) || []).map((x) => x.slice(1, -9)), ['Event total', 'Saturday', 'Sunday']);
         tap(sb, 'payout-basis-control', 'Sunday');
@@ -324,7 +330,8 @@ describe('6. USER PATH: every phone shows the same prize list, whatever tab it i
     test('a signed-in stranger gets no control, and the save refuses them', () => {
         const sb = arrive(owned(individualTwoRounds()), STRANGER);
         assert.equal(html(sb, 'payout-basis-control'), '');
-        assert.match(html(sb, 'payout-results'), /\$300\.00/, 'positive: the stranger still sees the prize list');
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was $300.00.
+        assert.match(html(sb, 'payout-results'), /\$300 pro shop credit/, 'positive: the stranger still sees the prize list');
         try { vm.runInContext("setPayoutBasis('r2')", sb); } catch (e) { /* no such function is also no write */ }
         assert.deepEqual(sb.__dbWrites.filter((x) => /payoutBasis/.test(x.path)), []);
     });
@@ -336,7 +343,8 @@ describe('6. USER PATH: every phone shows the same prize list, whatever tab it i
         ['payout-basis-control', 'payout-basis-label', 'payout-basis-note'].forEach((id) =>
             assert.equal(el(sb, id).style.display, 'none', id + ' is showing on a single-round event'));
         const w = arrive(d, null);
-        assert.match(html(w, 'payout-results'), /1st — Alpha<\/span><span class="val-pos">\$300\.00/);
+        // RE-PINNED 2026-11-10 (P1-a, Manny: no cash prizes - trophies and pro shop credit only): was $300.00.
+        assert.match(html(w, 'payout-results'), /1st — Alpha<\/span><span class="val-pos">\$300 pro shop credit/);
     });
 });
 

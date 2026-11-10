@@ -254,8 +254,13 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
         const list = html(sb, 'registration-list');
         assert.ok(list && /no signups yet/i.test(list),
             'an empty list is a sentence, not a blank box: ' + list);
-        assert.ok(/Paid/.test(read(PAGE).replace(/<script[\s\S]*?<\/script>/g, ''))
-            || /Paid/.test(list) || /cash|offline/i.test(html(sb, 'registration-section') || ''),
+        // RE-PINNED 2026-11-10 (P1-a, no cash prizes). The first arm used to be
+        // satisfied by the prize calculator's "Paid Spots" label, which is not
+        // the desk at all; that label is now "Prize Places" and the arm went red.
+        // The desk names offline Paid in its own note, which the page writes on
+        // this default arrival - read that element, not the whole markup.
+        const deskNote = sb.document.getElementById('registration-desk-note');
+        assert.match(String((deskNote && deskNote.textContent) || ''), /Tick Paid when you have the cash/,
             'cash/offline Paid is named on the organizer surface');
     });
 

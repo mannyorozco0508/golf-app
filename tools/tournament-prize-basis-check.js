@@ -22,7 +22,7 @@
 //                     Bob $300.00 and both say "Paid on Sunday".
 //   3 team event      nothing saved, combined team total refused: the reason
 //                     sentence, no dollar amount, before and after a round tap.
-//   4 organizer       sees RESULTS ARE PAID ON with Event total on; tapping
+//   4 organizer       sees PRIZES GO BY (was RESULTS ARE PAID ON, 2026-11-10) with Event total on; tapping
 //                     "Sunday" writes payoutBasis = 'r2' (the stand-in records
 //                     it); the next snapshot moves the highlight to Sunday.
 //
@@ -129,10 +129,10 @@ const shotSteps = (name) => SHOTS ? [{ expression: BOX }, { shot: tmpShot(name) 
     if (!aAfter || !b || !b.lbShown) bail('a watcher did not land on the Leaderboard', { aAfter, b });
     check('1 positive: phone A\'s tap moved its board', aBefore.board !== aAfter.board && /Bob/.test(aAfter.board.split('\n').slice(0, 8).join(' ')), { before: aBefore.board, after: aAfter.board });
     check('1 positive: the two boards differ', aAfter.board !== b.board, null);
-    check('1 positive: money displays ($300.00 on the list)', /\$300\.00/.test(b.prize || ''), b.prize);
+    check('1 positive: money displays ($300 pro shop credit on the list)', /\$300 pro shop credit/.test(b.prize || ''), b.prize);
     check('1 the prize lists are identical on both phones', aAfter.prize === b.prize, { A: aAfter.prize, B: b.prize });
-    check('1 Ann is paid 1st (event total)', /1st\s+—\s+Ann\s+\$300\.00/.test(b.prize || ''), b.prize);
-    check('1 both say "Paid on Event total"', aAfter.label === 'Paid on Event total' && b.label === 'Paid on Event total', [aAfter.label, b.label]);
+    check('1 Ann is paid 1st (event total)', /1st\s+—\s+Ann\s+\$300 pro shop credit/.test(b.prize || ''), b.prize);
+    check('1 both say "Prizes go by Event total"', aAfter.label === 'Prizes go by Event total' && b.label === 'Prizes go by Event total', [aAfter.label, b.label]);
     check('1 the every-phone note is on screen', b.note === 'Same list on every phone. Changing the board tab above does not change it.', b.note);
     check('1 a watcher has no basis control', !b.control, b.control);
     if (SHOTS) shots.push(crop(tmpShot('watcher'), b1[1], path.join(SHOTS, 'A1-wired-watcher.png')));
@@ -142,8 +142,8 @@ const shotSteps = (name) => SHOTS ? [{ expression: BOX }, { shot: tmpShot(name) 
     const b2 = await phone(individual({ payoutBasis: 'r2' }), [{ expression: READ }]);
     const A2 = a2[2], B2 = b2[0];
     check('2 the prize lists are identical on both phones', A2.prize === B2.prize, { A: A2.prize, B: B2.prize });
-    check('2 Bob is paid 1st (Sunday)', /1st\s+—\s+Bob\s+\$300\.00/.test(B2.prize || ''), B2.prize);
-    check('2 both say "Paid on Sunday"', A2.label === 'Paid on Sunday' && B2.label === 'Paid on Sunday', [A2.label, B2.label]);
+    check('2 Bob is paid 1st (Sunday)', /1st\s+—\s+Bob\s+\$300 pro shop credit/.test(B2.prize || ''), B2.prize);
+    check('2 both say "Prizes go by Sunday"', A2.label === 'Prizes go by Sunday' && B2.label === 'Prizes go by Sunday', [A2.label, B2.label]);
 
     // ---- ARM 3: team event, no basis the engine can pay on ----
     const t3 = await phone(team(), [{ expression: READ }].concat(shotSteps('na'), [{ tap: '#lb-round-filter button', nth: 1 }, { sleep: 300 }, { expression: READ }]));
@@ -160,12 +160,12 @@ const shotSteps = (name) => SHOTS ? [{ expression: BOX }, { shot: tmpShot(name) 
         { deliver: { path: 'tournaments/' + CODE, value: individual() } }, { sleep: 300 }].concat(shotSteps('organizer'));
     const o = await phone(individual(), steps4, OWNER);
     const O1 = o[2], O2 = o[5], D = o[6], O3 = o[8];
-    check('4 the organizer sees the control with every choice', /RESULTS ARE PAID ON/i.test(O1.control || '') && /Event total/.test(O1.control) && /Saturday/.test(O1.control) && /Sunday/.test(O1.control), O1.control);
+    check('4 the organizer sees the control with every choice', /PRIZES GO BY/i.test(O1.control || '') && /Event total/.test(O1.control) && /Saturday/.test(O1.control) && /Sunday/.test(O1.control), O1.control);
     check('4 Event total is on with nothing saved', JSON.stringify(O1.on) === '["Event total"]', O1.on);
-    check('4 positive: the organizer\'s list shows money', /\$300\.00/.test(O1.prize || ''), O1.prize);
+    check('4 positive: the organizer\'s list shows money', /\$300 pro shop credit/.test(O1.prize || ''), O1.prize);
     check('4 the tap wrote payoutBasis = r2, once', O2.writes.length === 1 && O2.writes[0].path === 'tournaments/' + CODE + '/payoutBasis' && O2.writes[0].value === 'r2', O2.writes);
     check('4 the next snapshot reached the page', D && D.listeners > 0 && D.threw.length === 0, D);
-    check('4 after it, Sunday is on and Bob is paid 1st', JSON.stringify(O3.on) === '["Sunday"]' && /1st\s+—\s+Bob\s+\$300\.00/.test(O3.prize || ''), O3);
+    check('4 after it, Sunday is on and Bob is paid 1st', JSON.stringify(O3.on) === '["Sunday"]' && /1st\s+—\s+Bob\s+\$300 pro shop credit/.test(O3.prize || ''), O3);
     if (SHOTS) shots.push(crop(tmpShot('organizer'), o[o.length - 2], path.join(SHOTS, 'A1-wired-organizer.png')));
 
     console.log(JSON.stringify({ verdict: failures.length ? 'FAIL' : 'PASS', page: path.relative(REPO_ROOT, PAGE), failures, arms, shots }, null, 2));
