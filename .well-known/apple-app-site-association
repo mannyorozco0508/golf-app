@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["A2Z95T64UU.com.rattlegolf.app"],
+        "components": [
+          { "/": "/tournament-scorecard*", "comment": "A tournament team link (with or without .html) opens the Rattle Golf app" }
+        ]
+      }
+    ]
+  }
+}

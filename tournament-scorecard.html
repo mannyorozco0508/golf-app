@@ -127,11 +127,73 @@
         .lb-seg button { flex: 1; border: 0; background: transparent; color: var(--text-muted); font-weight: bold; font-size: 0.85rem; padding: 8px 0; border-radius: 8px; cursor: pointer; font-family: inherit; }
         .lb-seg button.on { background: var(--brand-navy); color: #ffffff; }
         .lb-note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
+
+        /* ---- P1-c / P1-d: THE APP LAYOUT (T1A card, T2C board; Manny's picks
+           2026-11-10). Sizes and colours are the mockups' (2.0.4 light style).
+           Every rule is scoped to body.app-mode, which only the app (or ?app=1)
+           sets, so the website card is untouched. #app-view sits inside
+           #main-content and is display:none outside app mode. */
+        body.app-mode { background: #eef2f0; color: #10231c; padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 40px 16px; font-family: -apple-system, system-ui, sans-serif; }
+        body.app-mode #main-content { background: transparent; box-shadow: none; padding: 0; max-width: 520px; }
+        body.app-mode:not([data-app-screen="card"]) #main-content > :not(#app-view) { display: none !important; }
+        body.app-mode[data-app-screen="card"] #main-content { background: var(--bg-card); box-shadow: 0 4px 12px var(--shadow-color); padding: 14px 16px 20px 16px; border-radius: 16px; }
+        body.app-mode[data-app-screen="card"] #ap-hole, body.app-mode[data-app-screen="card"] #ap-board { display: none !important; }
+        body.app-mode:not([data-app-screen="board"]) #ap-board { display: none !important; }
+        body.app-mode:not([data-app-screen="hole"]) #ap-hole { display: none !important; }
+        #app-view button { font-family: inherit; }
+        .ap-top { display: flex; align-items: center; gap: 10px; padding: 4px 0 10px; }
+        .ap-bk { width: 34px; height: 34px; flex: none; border-radius: 50%; background: #fff; border: 1px solid #dfe8e4; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #13432f; font-weight: 800; padding: 0; cursor: pointer; }
+        .ap-tt { font-size: 19px; font-weight: 800; line-height: 1.1; color: #10231c; }
+        .ap-ts { font-size: 12.5px; color: #4b6a5f; margin-top: 2px; }
+        .ap-live { display: inline-block; background: #dc2626; color: #fff; font-size: 10px; font-weight: 800; border-radius: 5px; padding: 1px 5px; margin-right: 6px; vertical-align: 2px; }
+        .ap-card { background: #fff; border: 1px solid #dfe8e4; border-radius: 16px; padding: 12px 14px; margin-bottom: 10px; }
+        .ap-dk { background: #13432f; color: #fff; border: 0; }
+        .ap-cap { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: #4b6a5f; text-transform: uppercase; }
+        .ap-dk .ap-cap { color: #b9d3c6; }
+        .ap-big { font-size: 30px; font-weight: 800; }
+        .ap-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .ap-small { font-size: 13px; opacity: .85; }
+        .ap-step { display: flex; align-items: center; gap: 14px; flex: none; }
+        .ap-step button { width: 52px; height: 52px; border-radius: 50%; background: #fff; border: 2px solid #13432f; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; color: #13432f; padding: 0; cursor: pointer; }
+        .ap-step .ap-n { font-size: 44px; font-weight: 800; width: 50px; text-align: center; }
+        .ap-step.ap-sm { gap: 10px; }
+        .ap-step.ap-sm button { width: 44px; height: 44px; font-size: 22px; }
+        .ap-step.ap-sm .ap-n { font-size: 32px; width: 40px; }
+        .ap-golfer { padding: 8px 0; border-top: 1px solid #eef2ef; }
+        .ap-golfer:first-child { border-top: 0; padding-top: 0; }
+        .ap-gname { font-size: 18px; font-weight: 800; }
+        .ap-dots { color: #2a9d8f; font-weight: 800; margin-left: 4px; }
+        .ap-chip { display: inline-block; font-size: 11.5px; font-weight: 800; border-radius: 999px; padding: 3px 9px; background: #e7f3ec; color: #13432f; }
+        .ap-chip.ap-am { background: #fef3c7; color: #92400e; }
+        .ap-err { color: #b91c1c; font-weight: 800; font-size: 13px; }
+        .ap-grn { display: block; width: 100%; border: 0; background: #13432f; color: #fff; border-radius: 14px; text-align: center; font-weight: 800; font-size: 17px; padding: 14px; cursor: pointer; }
+        .ap-grn:disabled { opacity: .45; cursor: default; }
+        .ap-note { text-align: center; font-size: 13px; color: #4b6a5f; margin: 10px 0 14px; }
+        .ap-link { display: block; width: 100%; text-align: left; font-size: inherit; color: inherit; cursor: pointer; }
+        .ap-go { font-weight: 800; color: #1e3358; }
+        .ap-ghost { display: block; width: 100%; background: #fff; border: 1px solid #c9d8d1; color: #1e3358; border-radius: 12px; text-align: center; font-weight: 800; font-size: 15px; padding: 10px; cursor: pointer; }
+        .ap-lb { display: grid; grid-template-columns: 30px 1fr 42px 46px; align-items: center; padding: 9px 0; border-top: 1px solid #eef2ef; font-size: 14.5px; }
+        .ap-lb .ap-p { font-weight: 800; color: #4b6a5f; }
+        .ap-lb .ap-tp { font-weight: 800; text-align: right; }
+        .ap-lb .ap-th { color: #4b6a5f; text-align: center; font-size: 13px; }
+        .ap-lb.ap-me { background: #fffbe6; margin: 0 -14px; padding: 9px 14px; }
+        .ap-red { color: #b91c1c; }
     </style>
 </head>
 <body>
 
 <div class="container" id="main-content" style="display:none;">
+    <!-- P1-c / P1-d: THE APP LAYOUT. Filled by renderAppView() from the same
+         snapshot, the same card state and the same score writers as the card
+         below; shown only in app mode (APP_MODE). The website never shows it. -->
+    <div id="app-view" style="display:none;">
+        <div class="ap-top">
+            <button type="button" class="ap-bk" id="ap-back" onclick="appBack()" aria-label="Back">‹</button>
+            <div><div class="ap-tt" id="ap-title"></div><div class="ap-ts" id="ap-sub"></div></div>
+        </div>
+        <div id="ap-hole"></div>
+        <div id="ap-board"></div>
+    </div>
     <div class="top-nav-bar">
         <span class="top-nav-item active" id="tab-btn-scorecard" onclick="showTab('scorecard')">📝 Scorecard</span>
         <span class="top-nav-item" id="tab-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</span>
@@ -238,6 +300,22 @@
     // keys are on, a score is accepted only with a proof carrying it, written
     // in the same update (keyedScore). Absent on links built before the lock.
     const myScoreKey = urlParams.get('k') || null;
+    // APP MODE (P1-c, 2026-11-10): the T1A card and the T2C board. On when this
+    // page runs inside the Capacitor app, or with ?app=1 (testing and previews).
+    // Everything else about the page - the snapshot, the lock, the writers, the
+    // offline queue - is the website card's, unchanged; app mode only adds a
+    // second view of it (renderAppView, at the bottom).
+    var APP_MODE = (function () {
+        try {
+            var C = window.Capacitor;
+            if (C && typeof C.isNativePlatform === 'function' && C.isNativePlatform()) return true;
+        } catch (e) { /* not native */ }
+        return urlParams.get('app') === '1';
+    })();
+    if (APP_MODE && document.body && document.body.classList) {
+        document.body.classList.add('app-mode');
+        document.body.setAttribute('data-app-screen', 'hole');
+    }
     let currentData = {};
 
     if (!currentCode || (!myTeamNum && !myGroupId)) {
@@ -297,6 +375,7 @@
             // "Updates live" (A3) is true only if the open board re-renders
             // on each snapshot. Before this it changed only on a tab tap.
             if (boardTabOpen) renderLeaderboard();
+            if (APP_MODE) renderAppView();
         });
         armScoreQueue();
     }
@@ -443,6 +522,7 @@
                 }
             }, 2000);
         }
+        if (APP_MODE) appSaveStateChanged(state);
     }
 
     // The Firebase paths below are UNCHANGED - team{n}_h{h} and team{n}_p{i}_h{h},
@@ -639,6 +719,7 @@
             waitingRecheck = setTimeout(() => { waitingRecheck = null; renderWaitingChip(); }, WAITING_GRACE_MS + 100);
             if (waitingRecheck && typeof waitingRecheck.unref === 'function') waitingRecheck.unref();
         }
+        if (APP_MODE) renderAppChip();
     }
 
     // REPLAY: serial, in the order typed, one drain at a time. Not before the
@@ -1016,6 +1097,9 @@
         const next = nextHoleInPlayOrder({ holes: courseData, startingHole: group.startingHole, isScored: isPlayed });
         applyPlayState(order, isPlayed, roundLocked ? null : next);
         if (!roundLocked) scrollToNextHole(order, next);
+        // The app view reads THIS card's state - its order, its "played" rule.
+        cardState = { kind: 'group', label: group.name || 'your group', courseData, scores, order, isPlayed,
+            startingHole: group.startingHole, netMode, players, ids, data: currentData };
         document.getElementById('status-main').textContent = (roundLocked || !next)
             ? `Thru ${played}`
             : (played === 0 ? `Enter Hole ${next.hole}` : `Next: Hole ${next.hole} · Par ${next.par}`);
@@ -1147,6 +1231,9 @@
         const next = nextHoleInPlayOrder({ holes: courseData, startingHole: team.startingHole, isScored: isPlayed });
         applyPlayState(order, isPlayed, roundLocked ? null : next);
         if (!roundLocked) scrollToNextHole(order, next);
+        // The app view reads THIS card's state - its order, its "played" rule.
+        cardState = { kind: format === 'scramble' ? 'scramble' : 'team-players', label: teamName, courseData, scores, order,
+            isPlayed, startingHole: team.startingHole, team, format, shambleCountBest, data: currentData };
 
         const toPar = thru > 0 ? total - parPlayed : null;
         const toParStr = toPar === null ? '' : (toPar === 0 ? 'E' : (toPar > 0 ? `+${toPar}` : toPar));
@@ -1176,6 +1263,329 @@
         if (roundLocked) {
             document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
         }
+    }
+
+    // ========================================================================
+    // P1-c T1A AND P1-d T2C: THE APP VIEW (Manny's picks, 2026-11-10)
+    //
+    // ONE BUILDER. Nothing here reads the database, decides what "played"
+    // means, or writes a score its own way:
+    //   - the card's state (play order, the played rule, the scores) is what
+    //     renderAll / renderGroup just computed for the website card (cardState);
+    //   - "next to play" is nextHoleInPlayOrder over that same rule (A2);
+    //   - Save calls saveHoleScore / savePlayerHoleScore / saveIndividualScore,
+    //     so the keyed proof (&k=), the offline queue and the J4 chip are the
+    //     website card's own;
+    //   - the standings are golferLeaderboardView in the golfer's own flight,
+    //     with (You) by isMeRow - the A3 board's calls.
+    // The only state of its own: which screen is open, the stepper's numbers,
+    // and the holes this phone just saved (so Save moves on at once, with or
+    // without signal, until the snapshot carries them).
+    //
+    // NO PRIZES. Neither screen shows a prize or an amount.
+    // ========================================================================
+    var cardState = null;        // written by renderAll / renderGroup
+    var appScreen = 'hole';      // 'hole' (T1A) | 'board' (T2C) | 'card' (the whole card)
+    var appBoardAll = false;     // T2C: "See all N teams" opened
+    var appDraft = null;         // { hole, vals: { entryId: strokes } }
+    var appSaved = {};           // hole -> true: saved on this phone, not yet in a snapshot
+    var appPending = null;       // the hole whose writes are in flight
+    var appLastSaved = null;     // the hole the chip names
+    var appRefusedDraft = null;  // the numbers of the save in flight, restored if it is refused
+
+    const APP_MINUS = '−';
+    function appToPar(n) {
+        if (n === null || n === undefined || !isFinite(n)) return '—';
+        return n === 0 ? 'E' : (n > 0 ? '+' + n : APP_MINUS + Math.abs(n));
+    }
+    function appClock(ms) {
+        return ms ? new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : '';
+    }
+    function appSurname(name) {
+        const parts = String(name || '').trim().split(/\s+/);
+        return parts[parts.length - 1] || '';
+    }
+
+    // WHO IS SCORED ON THIS CARD: one entry per stepper.
+    function appEntries() {
+        const s = cardState;
+        if (!s) return [];
+        if (s.kind === 'scramble') {
+            return [{ id: 'team', name: 'Team score', sub: (s.team.players || []).map(appSurname).filter(Boolean).join(' · '),
+                key: (h) => `team${myTeamNum}_h${h}`, save: (h, v) => saveHoleScore(h, v) }];
+        }
+        if (s.kind === 'team-players') {
+            return (s.team.players || []).map((p, i) => ({ id: 'p' + i, name: p, sub: '',
+                key: (h) => `team${myTeamNum}_p${i}_h${h}`, save: (h, v) => savePlayerHoleScore(h, i, v) }));
+        }
+        return s.ids.map((pid) => ({ id: pid, name: competitorDisplayName(s.players[pid]), sub: '', pid: pid,
+            key: (h) => `${pid}_h${h}`, save: (h, v) => saveIndividualScore(pid, h, v) }));
+    }
+
+    // PLAYED: the card's own rule, plus what this phone has just saved.
+    function appIsPlayed(n) { return !!appSaved[n] || !!(cardState && cardState.isPlayed(n)); }
+    function appNextHole() {
+        const s = cardState;
+        if (!s) return null;
+        return nextHoleInPlayOrder({ holes: s.courseData, startingHole: s.startingHole, isScored: appIsPlayed });
+    }
+
+    // THE GOLFER'S PLACE: the A3 board's own view, in their own flight.
+    function appStanding() {
+        const data = currentData || {};
+        const own = defaultFlightFor(data, boardWho());
+        const view = golferLeaderboardView(data, { roundId: myRoundId, scope: 'round', flightId: own });
+        const rows = view.available ? view.rows : [];
+        const me = boardMe();
+        const mine = rows.filter((r) => isMeRow(r, me));
+        const flights = data.flights || {};
+        return { rows, mine, meRow: mine[0] || null, me,
+            flightName: view.flightId && flights[view.flightId] ? (flights[view.flightId].name || 'Flight') : null };
+    }
+
+    function renderAppView() {
+        const view = document.getElementById('app-view');
+        if (!view || !cardState) return;
+        view.style.display = 'block';
+        document.body.setAttribute('data-app-screen', appScreen);
+        // A hole this phone saved that the snapshot now carries needs no overlay.
+        Object.keys(appSaved).forEach((h) => { if (cardState.isPlayed(Number(h))) delete appSaved[h]; });
+        const data = currentData || {};
+        const scope = cardState.data || data;
+        const live = !roundLocked ? '<span class="ap-live">LIVE</span>' : '';
+        const back = document.getElementById('ap-back');
+        if (appScreen === 'board') {
+            const st = appStanding();
+            document.getElementById('ap-title').textContent = 'Leaderboard';
+            document.getElementById('ap-sub').innerHTML = `${live}${escapeHtml(data.name || '')} · ${st.rows.length} ${competitorNoun(data, st.rows.length)}`
+                + (st.flightName ? ` in ${escapeHtml(st.flightName)}` : '');
+            back.style.visibility = 'visible';
+            renderAppBoard(st, data);
+        } else if (appScreen === 'card') {
+            document.getElementById('ap-title').textContent = 'Whole card';
+            document.getElementById('ap-sub').innerHTML = `${live}${escapeHtml(cardState.label)} · ${escapeHtml(scope.courseName || '')}`;
+            back.style.visibility = 'visible';
+        } else {
+            const start = appStartLine(data);
+            document.getElementById('ap-title').textContent = data.name || '';
+            document.getElementById('ap-sub').innerHTML = `${live}` + [cardState.label, scope.courseName, scope.roundName, start]
+                .filter(Boolean).map(escapeHtml).join(' · ');
+            back.style.visibility = (typeof history !== 'undefined' && history.length > 1) ? 'visible' : 'hidden';
+            renderAppHole(scope);
+        }
+        renderAppChip();
+    }
+
+    function appStartLine(data) {
+        const m = /^(\d{1,2}):(\d{2})$/.exec(String(data.startTime || ''));
+        const t = m ? `${(Number(m[1]) % 12) || 12}:${m[2]} ${Number(m[1]) < 12 ? 'AM' : 'PM'}` : '';
+        if (data.startType === 'shotgun') return t ? `Shotgun ${t}` : 'Shotgun';
+        return t ? `Starts ${t}` : '';
+    }
+
+    // ---- T1A: ONE HOLE AT A TIME --------------------------------------------
+    function renderAppHole(scope) {
+        const s = cardState;
+        const next = appNextHole();
+        const entries = appEntries();
+        const st = appStanding();
+        const played = s.order.filter((h) => appIsPlayed(Number(h.hole))).length;
+        const startN = startingHoleNumber(s.startingHole);
+        const firstN = s.order.length ? Number(s.order[0].hole) : null;
+        // The stepper starts at what the hole already holds, else par.
+        if (next && (!appDraft || appDraft.hole !== next.hole)) {
+            const vals = {};
+            entries.forEach((e) => { const v = Number(s.scores[e.key(next.hole)]); vals[e.id] = v > 0 ? v : Number(next.par) || 4; });
+            appDraft = { hole: next.hole, vals };
+        }
+
+        // The dark card. Left: the hole. Right: the team's to-par and place.
+        let left;
+        if (roundLocked) {
+            left = `<div class="ap-cap">Scoring</div><div class="ap-big">${scope.roundStatus === 'closed' ? 'Round closed' : 'Not open yet'}</div>`
+                + `<div class="ap-small">${scope.roundStatus === 'closed' ? 'This round is closed — scores are final' : 'This round is not open for scoring yet'}</div>`;
+        } else if (!next) {
+            left = `<div class="ap-cap">Card complete</div><div class="ap-big">Thru ${played}</div><div class="ap-small">Every hole is saved</div>`;
+        } else {
+            const started = (startN && startN === firstN) ? `You started on ${startN} · ` : '';
+            left = `<div class="ap-cap">Next to play</div><div class="ap-big" id="ap-next-hole">Hole ${next.hole} · Par ${next.par}</div>`
+                + `<div class="ap-small">${started}${played} ${played === 1 ? 'hole' : 'holes'} done</div>`;
+        }
+        const r = st.meRow;
+        const place = r && r.hasScores && r.rank
+            ? `${ordinal(r.rank)} of ${st.rows.length}${st.flightName ? ' in ' + escapeHtml(st.flightName) : ''}`
+            : 'Not started';
+        const who = (s.kind === 'group' && r && st.mine.length > 1) ? escapeHtml((r.teamName || '').split(' ')[0]) : escapeHtml(s.label);
+        const right = `<div style="text-align:right;"><div class="ap-cap">${who}</div>`
+            + `<div class="ap-big" id="ap-topar">${r && r.hasScores ? appToPar(r.toPar) : '—'}</div><div class="ap-small" id="ap-place">${place}</div></div>`;
+        let html = `<div class="ap-card ap-dk"><div class="ap-row"><div>${left}</div>${right}</div></div>`;
+
+        // The score card: one stepper for a scramble, one per golfer otherwise.
+        if (next && !roundLocked) {
+            const step = (e, small) => `<div class="ap-step${small ? ' ap-sm' : ''}">`
+                + `<button type="button" class="ap-minus" aria-label="One fewer" data-e="${escapeHtml(e.id)}" onclick="appStep(this.getAttribute('data-e'), -1)">${APP_MINUS}</button>`
+                + `<div class="ap-n" data-e="${escapeHtml(e.id)}">${appDraft.vals[e.id]}</div>`
+                + `<button type="button" class="ap-plus" aria-label="One more" data-e="${escapeHtml(e.id)}" onclick="appStep(this.getAttribute('data-e'), 1)">+</button></div>`;
+            if (s.kind === 'scramble') {
+                const e = entries[0];
+                html += `<div class="ap-card" id="ap-score"><div class="ap-row"><div><div style="font-size:20px;font-weight:800;">Team score</div>`
+                    + `<div style="font-size:13px;color:#4b6a5f;">${escapeHtml(e.sub)}</div></div>${step(e, false)}</div>`;
+            } else {
+                html += `<div class="ap-card" id="ap-score">` + entries.map((e) => {
+                    const strokes = (s.kind === 'group' && s.netMode) ? playerStrokesOnHole(s.players[e.pid], s.courseData.find((h) => Number(h.hole) === next.hole) || next) : 0;
+                    const dots = strokes > 0 ? `<span class="ap-dots" aria-hidden="true">${'•'.repeat(strokes)}</span>` : '';
+                    return `<div class="ap-golfer ap-row"><div class="ap-gname">${escapeHtml(e.name)}${dots}</div>${step(e, true)}</div>`;
+                }).join('');
+                if (s.kind === 'team-players') {
+                    const team = computeTeamHoleScore(s.format, entries.map((e) => appDraft.vals[e.id]), s.shambleCountBest);
+                    if (team !== null) html += `<div style="font-size:13px;color:#4b6a5f;margin-top:4px;">Team score this hole: <strong>${team}</strong></div>`;
+                }
+            }
+            html += `<div style="margin-top:8px;" id="ap-chip-row"></div></div>`;
+            html += `<button type="button" class="ap-grn" id="ap-save" onclick="appSave()">Save · Next hole ›</button>`;
+            html += `<div class="ap-note">${s.kind === 'group' ? "One tap saves your group's scores." : "One tap saves your team's score."} It sends when you have signal.</div>`;
+        } else {
+            html += `<div class="ap-card" id="ap-chip-row" style="min-height:0;"></div>`;
+        }
+
+        // The leaderboard line and the whole card.
+        const top = st.rows.filter((x) => x.hasScores).slice(0, 3)
+            .map((x) => `${x.rank} ${escapeHtml(x.teamName)} ${appToPar(x.toPar)}`).join(' · ');
+        html += `<button type="button" class="ap-card ap-link" id="ap-board-line" onclick="appOpen('board')"><div class="ap-row"><span style="font-weight:800;">🏆 Leaderboard</span><span class="ap-go">See all ›</span></div>`
+            + `<div style="font-size:13px;color:#4b6a5f;margin-top:4px;">${top || 'No scores yet'}</div></button>`;
+        const nums = s.courseData.map((h) => Number(h.hole));
+        const span = nums.length ? `Holes ${Math.min(...nums)}-${Math.max(...nums)}` : 'Holes';
+        html += `<button type="button" class="ap-card ap-link" id="ap-whole-card" onclick="appOpen('card')"><div class="ap-row"><span style="font-weight:800;">📋 Whole card</span><span class="ap-go">${span} ›</span></div></button>`;
+        document.getElementById('ap-hole').innerHTML = html;
+    }
+
+    function appStep(id, d) {
+        if (!appDraft || !(id in appDraft.vals)) return;
+        appDraft.vals[id] = Math.max(1, Math.min(20, appDraft.vals[id] + d));
+        renderAppView();
+    }
+
+    // SAVE · NEXT HOLE: the website card's writers, one call per stepper, then
+    // the next hole in play order.
+    function appSave() {
+        if (roundLocked || !cardState || !appDraft) return;
+        const next = appNextHole();
+        if (!next || next.hole !== appDraft.hole) return;
+        const hole = next.hole;
+        appPending = hole;
+        appLastSaved = hole;
+        appSaved[hole] = true;
+        const vals = appDraft.vals;
+        appRefusedDraft = { hole: hole, vals: Object.assign({}, vals) };
+        appDraft = null;
+        appEntries().forEach((e) => e.save(hole, String(vals[e.id])));
+        renderAppView();
+        try { window.scrollTo(0, 0); } catch (e) { /* no scroll */ }
+    }
+
+    // A REFUSED OR FAILED SAVE puts its hole back: it is the next to play
+    // again, and the sentence the website card shows stays on screen in red.
+    function appSaveStateChanged(state) {
+        if (state === 'error' && appPending !== null) {
+            delete appSaved[appPending];
+            // the golfer's numbers come back with the hole, not par again
+            if (appRefusedDraft && appRefusedDraft.hole === appPending) appDraft = appRefusedDraft;
+            appPending = null;
+        } else if (state === 'saved') {
+            appPending = null;
+        }
+        if (cardState) renderAppView();
+    }
+
+    // THE CHIP: the website card's own state, read off its own elements - the
+    // red refusal, then J4's "N waiting for signal", then "Hole N saved".
+    function renderAppChip() {
+        const row = document.getElementById('ap-chip-row');
+        if (!row) return;
+        const ss = document.getElementById('save-state');
+        const wait = document.getElementById('score-waiting');
+        let html = '';
+        if (ss && /\berror\b/.test(ss.className || '') && ss.textContent) {
+            html = `<span class="ap-err" id="ap-chip">${escapeHtml(ss.textContent)}</span>`;
+        } else if (wait && wait.style.display !== 'none' && wait.textContent) {
+            html = `<span class="ap-chip ap-am" id="ap-chip">${escapeHtml(wait.textContent)}</span>`;
+        } else if (appLastSaved !== null) {
+            const queued = scoreQueueWaiting() > 0 && (function () {
+                try { return window.OfflineQueue.peek(scoreQueueStore()).filter(isThisCardsOp)
+                    .some((o) => new RegExp('_h' + appLastSaved + '$').test(o.path)); } catch (e) { return false; }
+            })();
+            html = `<span class="ap-chip" id="ap-chip">${queued ? 'Saving hole ' + appLastSaved + '…' : 'Hole ' + appLastSaved + ' saved'}</span>`;
+        }
+        row.innerHTML = html;
+    }
+
+    // ---- T2C: YOUR PLACE FIRST ----------------------------------------------
+    function appBoardRow(r, st) {
+        const isMe = isMeRow(r, st.me);
+        const tp = r.hasScores ? appToPar(r.toPar) : '—';
+        return `<div class="ap-lb${isMe ? ' ap-me' : ''}"><span class="ap-p">${r.rank || '-'}</span>`
+            + `<span>${escapeHtml(r.teamName)}${isMe ? ' (You)' : ''}</span><span class="ap-th">${r.hasScores ? r.thru : '-'}</span>`
+            + `<span class="ap-tp${r.hasScores && r.toPar < 0 ? ' ap-red' : ''}">${tp}</span></div>`;
+    }
+    function renderAppBoard(st, data) {
+        const rows = st.rows;
+        const r = st.meRow;
+        const noun = competitorNoun(data, rows.length);
+        const inFlight = st.flightName ? ` in ${escapeHtml(st.flightName)}` : '';
+        let html;
+        const who = escapeHtml(r ? r.teamName : (cardState ? cardState.label : ''));
+        if (!r || !r.hasScores || !r.rank) {
+            html = `<div class="ap-card ap-dk" style="text-align:center;padding:18px;" id="ap-place-card"><div class="ap-cap">${who} · you</div>`
+                + `<div style="font-size:54px;font-weight:800;line-height:1.05;" id="ap-place-big">—</div>`
+                + `<div style="font-size:16px;font-weight:700;" id="ap-place-line">No score yet${inFlight ? ' · ' + rows.length + ' ' + noun + inFlight : ''}</div></div>`;
+        } else {
+            const leader = rows.find((x) => x.hasScores);
+            const atTop = rows.filter((x) => x.hasScores && x.rank === 1);
+            let gap;
+            if (r.rank === 1) {
+                const second = rows.find((x) => x.hasScores && x.rank > 1);
+                gap = atTop.length > 1 ? 'tied for the lead' : (second ? `leading by ${second.toPar - r.toPar}` : 'leading');
+            } else {
+                gap = `${r.toPar - leader.toPar} back of the lead`;
+            }
+            const level = rows.filter((x) => x.hasScores && x.rank === r.rank && !isMeRow(x, st.me));
+            const tie = !level.length ? ''
+                : (level.length === 1 ? `${escapeHtml(level[0].teamName)} is level with you (${appToPar(r.toPar)})`
+                    : (level.length === 2 ? `${escapeHtml(level[0].teamName)} and ${escapeHtml(level[1].teamName)} are level with you (${appToPar(r.toPar)})`
+                        : `${level.length} ${competitorNoun(data, level.length)} are level with you (${appToPar(r.toPar)})`));
+            html = `<div class="ap-card ap-dk" style="text-align:center;padding:18px;" id="ap-place-card"><div class="ap-cap">${who} · you</div>`
+                + `<div style="font-size:54px;font-weight:800;line-height:1.05;" id="ap-place-big">${ordinal(r.rank)}</div>`
+                + (inFlight ? `<div style="font-size:14px;font-weight:700;opacity:.85;" id="ap-place-flight">${inFlight.trim()}</div>` : '')
+                + `<div style="font-size:16px;font-weight:700;" id="ap-place-line">${appToPar(r.toPar)} thru ${r.thru} · ${gap}</div>`
+                + (tie ? `<div style="font-size:13px;opacity:.85;margin-top:6px;" id="ap-tie">${tie}</div>` : '') + `</div>`;
+        }
+        const at = r ? rows.indexOf(r) : -1;
+        const around = at === -1 ? rows.slice(0, 5) : rows.slice(Math.max(0, at - 2), at + 3);
+        html += `<div class="ap-card" style="padding-bottom:4px;" id="ap-around"><div class="ap-row" style="margin-bottom:4px;"><span class="ap-cap">Around you</span>`
+            + `<span style="font-size:12px;color:#4b6a5f;" id="ap-updated">updated ${appClock(lastSnapshotAt)}</span></div>`
+            + around.map((x) => appBoardRow(x, st)).join('') + `</div>`;
+        if (appBoardAll) {
+            html += `<div class="ap-card" style="padding-bottom:4px;" id="ap-all"><div class="ap-cap" style="margin-bottom:4px;">All ${rows.length} ${noun}${inFlight}</div>`
+                + rows.map((x) => appBoardRow(x, st)).join('') + `</div>`;
+        } else {
+            html += `<button type="button" class="ap-ghost" id="ap-see-all" onclick="appSeeAll()">See all ${rows.length} ${noun}${inFlight}</button>`;
+        }
+        document.getElementById('ap-board').innerHTML = html;
+    }
+
+    function appSeeAll() { appBoardAll = true; renderAppView(); }
+    function appOpen(screen) {
+        appScreen = screen;
+        appBoardAll = false;
+        if (screen === 'card') showTab('scorecard');
+        renderAppView();
+        try { window.scrollTo(0, 0); } catch (e) { /* no scroll */ }
+    }
+    // BACK: the board and the whole card return to the hole; the hole screen
+    // goes back to wherever the app opened it from.
+    function appBack() {
+        if (appScreen !== 'hole') { appOpen('hole'); return; }
+        try { if (history.length > 1) history.back(); } catch (e) { /* nowhere to go */ }
     }
 </script>
 </body>
