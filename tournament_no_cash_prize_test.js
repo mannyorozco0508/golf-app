@@ -26,21 +26,25 @@
 //
 // PART 2 - SOURCE SCAN, DECODED (helpers/decode-escapes.js). tournament.html,
 // tournament-scorecard.html and tournament-engine.js, comments stripped, for the
-// banned words in user-facing text. One sentence is allowed by name: the Desk's
-// "Tick Paid when you have the cash ..." is about ENTRY FEES, not prizes. A
+// banned words in user-facing text, in two tiers. ALWAYS banned: purse,
+// winnings, prize money, payout pool, "spots pay". Banned ON A PRIZE LINE (one
+// that also says prize, place, payout, result, trophy, credit or spot): cash,
+// pays, paid on, pot. Entry fees are not prizes, so the Desk's "Mark cash paid",
+// "Paid (cash)" and "the organizer sees Paid on their desk" are not hits - and a
+// test proves the classifier flags a prize-line "cash" and passes those. A
 // positive assertion proves the scan saw the prize section.
 //
 // SCREENSHOTS: P1A_SHOTS=<dir> writes P1a-organizer-prizes.png and
 // P1a-golfer-prizes.png, 390x844 @2x, scrolled to the prize section.
 //
 // BASELINE against p1-base 48121bea (tournament.html before P1-a):
-//   all 11 tests: 2 PASS / 9 FAIL.
-//   The 2 that pass: both arrivals ran and showed a list (1), payouts.js
-//   byte-identical (1). 2 + 9 = 11. Every wording assertion is red there, and so
+//   all 12 tests: 3 PASS / 9 FAIL.
+//   The 3 that pass: both arrivals ran and showed a list (1), the classifier
+//   test (1, it reads no page), payouts.js byte-identical (1). 3 + 9 = 12. Every wording assertion is red there, and so
 //   is the scan's positive (the new words did not exist yet); the scan's hits
 //   were "spots pay ... prize money", "Results are paid on", "Paid on <b>" and
 //   the engine's two "paid on" reasons.
-// After P1-a (p1-prizes): all 11 tests: 11 PASS / 0 FAIL.
+// After P1-a (p1-prizes): all 12 tests: 12 PASS / 0 FAIL.
 //
 // NEGATIVE CONTROLS (tournament.html mutated, restored by sha from a saved copy):
 //   C1 prizeLabel without "pro shop credit" (a bare "$600")         -> 4 fail
@@ -156,13 +160,14 @@ describe('PART 1: cold arrival, basis picked (Sunday), spots 600/250/0', () => {
 
 describe('PART 2: source scan, decoded, comments stripped', () => {
     const FILES = ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js'];
-    // Entry fees are not prizes: this Desk sentence is about collecting them.
-    const ALLOWED = ['Tick Paid when you have the cash, then approve golfers into the field.'];
+    const ALWAYS = /\bspots? pay\b|\bpurse\b|\bwinnings\b|prize money|payout pool/i;
+    const ON_PRIZE_LINE = /\bcash\b|\bpays\b|\bpaid on\b|\bpot\b/i;
+    const PRIZE_LINE = /prize|place|payout|result|trophy|credit|spot/i;
+    const isHit = (l) => ALWAYS.test(l) || (ON_PRIZE_LINE.test(l) && PRIZE_LINE.test(l));
     function userText(file) {
         let s = decodeEscapes(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'));
         s = s.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
         s = s.split('\n').filter((l) => !/^\s*\/\//.test(l)).map((l) => l.replace(/\s\/\/\s.*$/, '')).join('\n');
-        ALLOWED.forEach((a) => { s = s.split(a).join(' '); });
         return s;
     }
     const TEXT = {};
@@ -176,9 +181,16 @@ describe('PART 2: source scan, decoded, comments stripped', () => {
         assert.match(t, /Prize results coming soon/, 'the golfer sentence stays');
         assert.ok(t.length > 100000, 'the page was read: ' + t.length);
     });
+    test('the classifier is live: a prize-line "cash" is a hit, the entry-fee Desk lines are not', () => {
+        assert.ok(isHit("html += `<div>1st place: $${v} cash</div>`;"));
+        assert.ok(isHit("label.innerHTML = `Paid on <b>${escapeHtml(prize.title)}</b>`;"));
+        assert.ok(isHit("subEl.textContent = 'Ties split whatever prize money their tied spots add up to.';"));
+        assert.ok(!isHit("if (note) note.textContent = 'Tick Paid when you have the cash, then approve golfers into the field.';"));
+        assert.ok(!isHit("showProcessingPanel(\"Stripe emails your receipt when the payment goes through, and the organizer sees Paid on their desk.\");"));
+    });
     test('no banned prize words in any tournament page', () => {
         const hits = [];
-        FILES.forEach((f) => TEXT[f].split('\n').forEach((l, i) => { if (BANNED.test(l)) hits.push(f + ':' + (i + 1) + ': ' + l.trim().slice(0, 140)); }));
+        FILES.forEach((f) => TEXT[f].split('\n').forEach((l, i) => { if (isHit(l)) hits.push(f + ':' + (i + 1) + ': ' + l.trim().slice(0, 140)); }));
         assert.deepEqual(hits, []);
     });
     test('no amount is printed as a bare toFixed dollar in the prize renderer', () => {
