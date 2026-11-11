@@ -88,44 +88,40 @@ function tap(sb, markup, pick) {
 const byId = (id) => (t) => new RegExp('\\bid="' + id + '"').test(t);
 
 describe('E4a. THE GOLFER\'S PHOTOS TAB', () => {
-    test('P1 a keyed team link draws Photos (Scorecard | Board | Photos, the E4a words); a link with no key draws none', () => {
+    // RE-PINNED 2026-11-11 (Manny: EC4 C). Photos are asked for AFTER the round:
+    // no Photos pill, no wall on the card. The E4a controls (the same post path:
+    // resize, no location, pending until the organizer OKs it) sit on the card
+    // as "Round done · Add photos from today?" once every hole is scored and the
+    // link has its key. Report lives on the recap (E4c, rc-report).
+    const FULL = (() => { const o = {}; for (let h = 1; h <= 18; h++) o['team4_h' + h] = PARS[h - 1]; return Object.assign({}, scores, o); })();
+    test('P1 (EC4 C) no Photos pill; the photo block appears only when the card is done and the link has a key', () => {
         const sb = load('tournament-scorecard.html', `?tourney=PH1&team=4&k=${K4}`);
         fire(sb, /^tournaments\/PH1$/, EVENT);
-        assert.equal(shown(sb, 'tab-btn-photos'), true);
-        assert.deepEqual(['scorecard', 'leaderboard', 'photos'].map((k) => el(sb, 'tab-btn-' + k).textContent), ['Scorecard', 'Board', 'Photos']);
-        tap(sb, CARD_HTML, byId('tab-btn-photos'));
-        assert.equal(shown(sb, 'tab-photos'), true);
-        assert.equal(shown(sb, 'tab-scorecard'), false);
-        const panel = plain(CARD_HTML.slice(CARD_HTML.indexOf('<div id="tab-photos"'), CARD_HTML.indexOf('<div class="ph-wall"')));
-        assert.match(panel, /Caption \(optional\) Post to the event wall The organizer approves photos before anyone sees them\. Photos of other golfers: ask first\./);
+        assert.doesNotMatch(CARD_HTML, /id="tab-btn-photos"|id="tab-photos"/, 'no pill, no tab');
+        assert.equal(shown(sb, 'photo-done'), false, '3 holes in: not yet');
+        const done = load('tournament-scorecard.html', `?tourney=PH1&team=4&k=${K4}`);
+        fire(done, /^tournaments\/PH1$/, Object.assign({}, EVENT, { scores: FULL }));
+        assert.equal(shown(done, 'photo-done'), true, 'every hole scored: the block shows');
+        const words = plain(CARD_HTML.slice(CARD_HTML.indexOf('<div class="ph-done"'), CARD_HTML.indexOf('</div>', CARD_HTML.indexOf('id="photo-msg"'))));
+        assert.match(words, /^Round done · Add photos from today\? They go on the event recap once the organizer OKs them\. Location is removed from the photo\. Photos of other golfers: ask first\./);
+        assert.match(words, /Caption \(optional\) Send to the organizer/);
         const bare = load('tournament-scorecard.html', '?tourney=PH1&team=4');
-        fire(bare, /^tournaments\/PH1$/, Object.assign({}, EVENT, { contests: null }));
-        assert.equal(shown(bare, 'tab-btn-photos'), false, 'no key, no Photos tab');
+        fire(bare, /^tournaments\/PH1$/, Object.assign({}, EVENT, { scores: FULL }));
+        assert.equal(shown(bare, 'photo-done'), false, 'no key: no block');
         assert.equal(el(bare, 'tab-btn-leaderboard').textContent, '🏆 Leaderboard', 'two tabs keep their words');
     });
-    test('P2 Post with no photo chosen: a sentence, no upload, no write; opening the tab binds the public wall only', async () => {
+    test('P2 Post with no photo chosen: a sentence, no upload, no write; the card reads no photo node at all', async () => {
         const sb = load('tournament-scorecard.html', `?tourney=PH1&team=4&k=${K4}`);
-        fire(sb, /^tournaments\/PH1$/, EVENT);
-        tap(sb, CARD_HTML, byId('tab-btn-photos'));
+        fire(sb, /^tournaments\/PH1$/, Object.assign({}, EVENT, { scores: FULL }));
         tap(sb, CARD_HTML, byId('photo-post'));
         await settle();
         assert.equal(el(sb, 'photo-msg').textContent, 'Choose a photo first.');
         assert.equal(sb.__dbWrites.length, 0);
-        const paths = sb.__dbHandlers.map((h) => h.path).filter((p) => /tournamentPhotoMeta/.test(p));
-        assert.deepEqual(paths, ['tournamentPhotoMeta/PH1/shown'], 'the golfer reads the shown wall and nothing else');
-        fire(sb, /^tournamentPhotoMeta\/PH1\/shown$/, { '-S0': SHOWN['-S0'] });
-        assert.match(html(sb, 'photo-wall'), /tournamentPhotos%2FPH1%2Fshown%2F-S0\.jpg\?alt=media/);
-        assert.match(plain(html(sb, 'photo-wall')), /Team 1 · Shotgun 8:00 Report/);
+        assert.deepEqual(sb.__dbHandlers.map((h) => h.path).filter((p) => /tournamentPhotoMeta/.test(p)), [], 'EC4 C: no wall on the card, so nothing under tournamentPhotoMeta is read');
     });
-    test('P3 Report on the wall calls reportPhoto with the code and id, and says so', async () => {
-        const sb = load('tournament-scorecard.html', `?tourney=PH1&team=4&k=${K4}`);
-        fire(sb, /^tournaments\/PH1$/, EVENT);
-        tap(sb, CARD_HTML, byId('tab-btn-photos'));
-        fire(sb, /^tournamentPhotoMeta\/PH1\/shown$/, { '-S0': SHOWN['-S0'] });
-        tap(sb, html(sb, 'photo-wall'), (t) => /class="ph-report"/.test(t));
-        await settle(); await settle();
-        assert.deepEqual(sb.__calls, [{ name: 'reportPhoto', data: { code: 'PH1', photoId: '-S0' } }]);
-        assert.equal(sb.__tapEl.textContent, 'Reported');
+    test('P3 (EC4 C) no wall on the card: no #photo-wall, no Report button; the recap keeps Report', () => {
+        assert.doesNotMatch(CARD_HTML, /id="photo-wall"|class="ph-report"/);
+        assert.match(ORG_HTML, /class="rc-report"/, 'positive: the recap page keeps its Report (E4c)');
     });
 });
 
@@ -134,11 +130,13 @@ describe('E4b. THE ORGANIZER\'S QUEUE', () => {
         const sb = load('tournament.html', '?tourney=PH1');
         sb.__auth.setUser(ORGANIZER);
         fire(sb, /^tournaments\/PH1$/, EVENT);
-        tap(sb, ORG_HTML, byId('tab-btn-photos'));
+        // EC4 C (2026-11-11): the queue is the Desk's Photos chip, not a tab.
+        tap(sb, ORG_HTML, byId('tab-btn-desk'));
         fire(sb, /^tournamentPhotoMeta\/PH1\/pending$/, PENDING);
         fire(sb, /^tournamentPhotoMeta\/PH1\/shown$/, SHOWN);
         fire(sb, /^tournamentPhotoMeta\/PH1\/hidden$/, HIDDEN);
         fire(sb, /^tournamentPhotoMeta\/PH1\/reports$/, {});
+        tap(sb, html(sb, 'registration-chips'), byId('desk-photos-chip'));
         return sb;
     }
     test('Q1 the owner taps Photos: "Photos waiting · 3", each with its label, Show and Hide, the counts line; links asked once', async () => {
@@ -181,7 +179,7 @@ describe('E4b. THE ORGANIZER\'S QUEUE', () => {
         const sb = load('tournament.html', '?tourney=PH1');
         sb.__auth.setUser(null);
         fire(sb, /^tournaments\/PH1$/, EVENT);
-        assert.equal((el(sb, 'tab-btn-photos').style || {}).display, 'none');
+        assert.doesNotMatch(ORG_HTML, /id="tab-btn-photos"/, 'no Photos pill in the tree (EC4 C, 2026-11-11)');
         assert.deepEqual(sb.__dbHandlers.map((h) => h.path).filter((p) => /tournamentPhotoMeta/.test(p)), []);
         assert.equal(shown(sb, 'manage-tab-leaderboard'), true, 'positive: the visitor is on the board');
     });

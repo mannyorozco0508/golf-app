@@ -122,7 +122,7 @@ describe('A. THE DEFAULT STATE: no contest holes, the card and console as they w
     test('A1 an event with no contests: no prompt, no Contests tab, no entries read beyond the one listener', () => {
         const sb = arriveCard(teamEvent(), undefined, {});
         assert.equal(shown(sb, 'contest-prompt'), false, 'no prompt');
-        assert.equal(shown(sb, 'tab-btn-contests'), false, 'no Contests tab');
+        assert.doesNotMatch(CARD_HTML, /id="tab-btn-contests"/, 'no Contests pill at all (re-pinned 2026-11-11, EC2 A)');
         // A link with no key has no Photos tab either (E4): two tabs, their old words.
         const plainLink = arriveCard(teamEvent(), '?tourney=CT1&team=4', {});
         assert.notEqual(el(plainLink, 'tab-btn-leaderboard').textContent, 'Board', 'two tabs keep their words');
@@ -250,7 +250,7 @@ describe('B. THE GOLFER: the prompt on the contest hole the card is playing', ()
         const rec = teamEvent({ contests: CONTESTS, eventModel: 'round-v1', rounds: { r1: { id: 'r1', name: 'Sat', status: 'open', format: 'scramble', courseData: COURSE, createdAt: 1, scores: {} } } });
         const sb = arriveCard(rec, `?tourney=CT1&team=4&round=r1&k=${K4}`, {});
         assert.equal(shown(sb, 'contest-prompt'), false);
-        assert.equal(shown(sb, 'tab-btn-contests'), false);
+        assert.doesNotMatch(CARD_HTML, /id="tab-btn-contests"/, 'no pill (EC2 A)');
         assert.ok(shown(sb, 'main-content'), 'positive: the card itself opened');
     });
 });
@@ -262,25 +262,19 @@ describe('C. THE BOARD (E2c), reached by tapping the Contests tab', () => {
         h12: { team4_p0: { name: 'Al Lopez', team: 'team4', kind: 'ld', yards: 287, by: 'typed', at: 1 },
             team7_p0: { name: 'Pat Reyes', team: 'team7', kind: 'ld', yards: 301, by: 'gps', accFt: 9, at: 3 } }
     };
-    test('C1 leaders ranked (KP shortest, drive longest), team labels, GPS pin, through count, and "nothing is paid in the app"', () => {
+    // RE-PINNED 2026-11-11 (Manny: EC2 A). The golfer's Contests board (E2c) went
+    // with its pill: the prompt on the contest hole is the whole of it for a
+    // golfer. The organizer keeps the entries and Make winner (D-tests) and the
+    // recap names confirmed winners. C1 and C2 proved the board's rows; what
+    // stands here proves there is no board to reach, and the prompt still is.
+    test('C1 (EC2 A) no golfer board: no pill, no panel, no board markup; the prompt on 7 still shows', () => {
         const sb = arriveCard(teamEvent({ contests: CONTESTS }), undefined, ENTRIES);
-        tap(sb, CARD_HTML, byId('tab-btn-contests'));
-        assert.equal(shown(sb, 'tab-contests'), true);
-        assert.equal(shown(sb, 'tab-scorecard'), false);
-        assert.deepEqual(['scorecard', 'leaderboard', 'contests'].map((k) => el(sb, 'tab-btn-' + k).textContent), ['Scorecard', 'Board', 'Contests'], 'three tabs: the short words (E4a)');
-        const t = plain(html(sb, 'contest-board'));
-        assert.match(t, /Hole 7 · Closest to the pin 1 Dee Nguyen Team 7 3 ft 1 in 2 Al Lopez Team 4 8 ft 4 in 1 of 2 teams through/);
-        assert.match(t, /Hole 12 · Long drive 1 Pat Reyes 📍 Team 7 301 yds 2 Al Lopez Team 4 287 yds/);
-        assert.match(t, /GPS 📍 = marked/);
-        assert.match(t, /Hole 16 · Closest to the pin No entries yet/);
-        assert.match(t, /Organizer confirms winners at the end\. Prizes are whatever the organizer announces: nothing is paid in the app\./);
-        assert.doesNotMatch(t, /\$\d/, 'no money on the board');
-    });
-    test('C2 a confirmed hole says so and marks the winner', () => {
-        const c = clone(CONTESTS); c.h7 = { kind: 'kp', allowGps: true, winner: 'team7_p0', lockedAt: 5 };
-        const sb = arriveCard(teamEvent({ contests: c }), undefined, ENTRIES);
-        tap(sb, CARD_HTML, byId('tab-btn-contests'));
-        assert.match(plain(html(sb, 'contest-board')), /1 Dee Nguyen Team 7 · Winner ✓ 3 ft 1 in .* Winner confirmed by the organizer/);
+        assert.doesNotMatch(CARD_HTML, /id="tab-btn-contests"/, 'no pill');
+        assert.doesNotMatch(CARD_HTML, /id="tab-contests"/, 'no panel');
+        assert.doesNotMatch(CARD_HTML, /id="contest-board"/, 'no board');
+        assert.doesNotMatch(CARD_HTML, /showTab\('contests'\)/);
+        assert.equal(shown(sb, 'contest-prompt'), true, 'positive: the hole-7 prompt is on the card');
+        assert.match(plain(html(sb, 'contest-prompt')), /Closest to the pin/);
     });
     test('C3 the web card asks for no location: no geolocation, no GPS mark, nothing named a coordinate in the contest code', () => {
         // Code only: comments may (and do) NAME what the page does not use.
@@ -330,7 +324,9 @@ describe('D. THE ORGANIZER (E2d): Contests tab on tournament.html', () => {
     });
     test('D3 + Add a contest hole: par 3 defaults to closest to the pin; Add writes { kind, allowGps: true }', async () => {
         const sb = arriveOwner(teamEvent({ contests: {} }), {});
-        tap(sb, html(sb, 'contest-holes-list'), byId('contest-add-btn'));
+        // 2026-11-11 (EC2 + C): with no contest holes yet the list offers the course's
+        // own suggestion first; "Pick my own" opens the old form.
+        tap(sb, html(sb, 'contest-holes-list'), byId('contest-pick-own'));
         assert.match(html(sb, 'contest-holes-list'), /id="contest-add-form"/);
         el(sb, 'contest-add-hole').value = '7';
         el(sb, 'contest-add-kind').value = 'kp';
@@ -338,6 +334,17 @@ describe('D. THE ORGANIZER (E2d): Contests tab on tournament.html', () => {
         await settle();
         const w = sb.__dbWrites.filter((x) => x.path === 'tournaments/OWN1/contests/h7');
         assert.deepEqual(clone(w.map((x) => [x.op, x.value])), [['set', { kind: 'kp', allowGps: true }]]);
+    });
+    test('D3b (EC2 + C, 2026-11-11) Use these: closest to the pin on every par 3, long drive on the last par 5 (no yardage on this card), ONE update', async () => {
+        const sb = arriveOwner(teamEvent({ contests: {} }), {});
+        assert.match(plain(html(sb, 'contest-holes-list')), /Suggested: closest to the pin on every par 3 \(holes 3, 7, 13, 16\) and long drive on 18\./);
+        tap(sb, html(sb, 'contest-holes-list'), byId('contest-use-suggested'));
+        await settle();
+        const u = updates(sb);
+        assert.equal(u.length, 1, 'one multi-path update');
+        const exp = {}; [3, 7, 13, 16].forEach((h) => { exp[`tournaments/OWN1/contests/h${h}`] = { kind: 'kp', allowGps: true }; });
+        exp['tournaments/OWN1/contests/h18'] = { kind: 'ld', allowGps: true };
+        assert.deepEqual(clone(u[0].value), exp);
     });
     test('D4 Allow GPS marks: tapping "on" turns it off on every contest hole in one update', async () => {
         const sb = arriveOwner(teamEvent({ contests: CONTESTS }), {});

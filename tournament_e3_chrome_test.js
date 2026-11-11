@@ -86,9 +86,9 @@ const db = {
 const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
 const txt = (sel) => `((document.querySelector(${JSON.stringify(sel)}) || {}).innerText || '')`;
 const VIS = `(sel) => { const el = document.querySelector(sel); if (!el) return false; const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; }`;
-const PROBE = `(() => { const vis = ${VIS}; return JSON.stringify({ door: vis('#open-pace'), doorInTree: !!document.getElementById('open-pace'), tool: vis('#manage-tab-pace'),
-    bar: ${txt('#hp-brand')}, sub: ${txt('#pace-sub')}, target: (document.getElementById('pace-target') || {}).value || '', table: vis('#pace-table') ? ${txt('#pace-table')} : '', calls: ${txt('#pace-calls')},
-    foot: vis('#pace-foot') ? ${txt('#pace-foot')} : '', nudgeBtns: document.querySelectorAll('#pace-calls button').length,
+const PROBE = `(() => { const vis = ${VIS}; return JSON.stringify({ door: vis('#open-pace'), doorInTree: !!document.getElementById('open-pace'), toolInTree: !!document.getElementById('manage-tab-pace'),
+    board: vis('#manage-tab-leaderboard'), sw: vis('#pace-on-switch + .toggle-slider'), on: !!(document.getElementById('pace-on-switch') || {}).checked, label: ${txt('#pace-on-label')}, target: (document.getElementById('pace-target') || {}).value || '',
+    needs: Array.from(document.querySelectorAll('#eh-needs-list .eh-need')).map((b) => ({ key: b.dataset.need, text: (b.innerText || '').replace(/\\s+/g, ' ').trim() })),
     writes: (window.__coldWrites || []).filter((w) => /tournaments\\/[A-Z0-9]+\\/(pace|nudges)/.test(w.path)).map((w) => ({ op: w.op, path: w.path, value: w.value })) }); })()`;
 
 async function run(opts) {
@@ -97,34 +97,40 @@ async function run(opts) {
     assert.deepEqual(r.dialogs || [], [], 'no native dialog');
     return { values: (r.value || []).filter((v) => typeof v === 'string' && v[0] === '{').map((v) => JSON.parse(v)), raw: r.value };
 }
-const OPEN = [{ tap: '#tab-btn-leaderboard' }, { sleep: 300 }, { tap: '#open-pace' }, { sleep: 300 }];
+// EC3 C (Manny 2026-11-11): no pace door and no pace tab. The switch and the
+// target are on Setup; a team that is behind is a row on Event day's Needs you,
+// and its button is the E3b nudge. HOME and SETUP open those tabs.
+const HOME = [{ tap: '#tab-btn-home' }, { sleep: 300 }];
+const SETUP = [{ tap: '#tab-btn-setup' }, { sleep: 300 }];
 
-test('P1. DEFAULT: pace is off until the organizer turns it on - no table, no nudge; tapping "off" writes {on: true, targetMin: 255} only', SKIP, async () => {
-    const { values: [v0, v1] } = await run({ url: fileUrl('tournament.html', 'tourney=OFF1'), db, auth: OWNER,
-        steps: [...OPEN, { expression: PROBE }, ...shot('E3a-pace-off-default.png'), { tap: '#pace-switch' }, { sleep: 300 }, { expression: PROBE }] });
-    assert.ok(v0.tool, 'the tool opened');
-    assert.match(v0.bar, /Pace of play/);
-    assert.equal(v0.target, '4:15', 'the default target is 4:15');
-    assert.match(v0.sub, /^From last scored hole only\. No locations\. Target\s*for 18\. Opt-in: off for this event\.$/);
-    assert.equal(v0.table, ''); assert.equal(v0.nudgeBtns, 0); assert.equal(v0.foot, '');
+test('P1. DEFAULT (EC3 C): pace is off until the organizer turns it on - no pace row on Needs you, no door, no tab; the Setup switch writes {on: true, targetMin: 255} only', SKIP, async () => {
+    const { values: [v0, v1, v2] } = await run({ url: fileUrl('tournament.html', 'tourney=OFF1'), db, auth: OWNER,
+        steps: [...HOME, { expression: PROBE }, ...SETUP, { expression: PROBE }, ...shot('E3a-pace-off-default.png'), { tap: '#pace-on-switch + .toggle-slider' }, { sleep: 300 }, { expression: PROBE }] });
+    assert.ok(!v0.door && !v0.doorInTree && !v0.toolInTree, 'no pace door or tab anywhere: ' + JSON.stringify(v0));
+    assert.deepEqual(v0.needs.filter((n) => /^pace-/.test(n.key)), [], 'off: no pace row');
     assert.deepEqual(v0.writes, [], 'arriving writes nothing');
-    assert.deepEqual(v1.writes, [{ op: 'set', path: 'tournaments/OFF1/pace', value: { on: true, targetMin: 255 } }]);
+    assert.equal(v1.sw, true, 'the switch is on Setup');
+    assert.equal(v1.on, false); assert.equal(v1.label, 'Off');
+    assert.equal(v1.target, '4:15', 'the default target is 4:15');
+    assert.deepEqual(v2.writes, [{ op: 'set', path: 'tournaments/OFF1/pace', value: { on: true, targetMin: 255 } }]);
 });
 
-test('P2. pace on: on pace / 22 min behind / no scores yet / — ; the callout names the group ahead; Send a nudge writes {at, tpl, thru}; 4:30 saves 270', SKIP, async () => {
+test('P2. pace on (EC3 C): Needs you names the one team behind (about 2 holes), its button writes the nudge {at, tpl, thru}; a sent note says so; 4:30 saves 270', SKIP, async () => {
     const { values: [v0, v1, v2] } = await run({ url: fileUrl('tournament.html', 'tourney=PACE1'), db, auth: OWNER,
-        steps: [...OPEN, { expression: PROBE }, ...shot('E3a-organizer-pace.png'),
-            { tap: '#pace-calls button' }, { sleep: 300 }, { expression: PROBE },
-            { tap: '#pace-target' }, { cdp: { method: 'Input.dispatchKeyEvent', params: { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 4, commands: ['selectAll'] } } },
-            { cdp: { method: 'Input.insertText', params: { text: '4:30' } } }, { tap: '#pace-table' }, { sleep: 300 }, { expression: PROBE }] });
-    const rows = v0.table.split('\n').map((l) => l.trim()).filter(Boolean).join(' | ');
-    assert.match(rows, /^TEAM \| THRU \| VS TARGET \| Team 9 · started 9 \| 13 \| on pace \| Team 4 · started 4 \| 11 \| on pace \| Team 7 · started 7 \| 6 \| 22 min behind \| Team 12 · started 12 \| 2 \| — \| Team 15 · started 15 \| — \| no scores yet$/i, rows);
-    assert.match(v0.sub, /Opt-in: on for this event\./);
-    assert.equal(v0.nudgeBtns, 1, 'one callout: only Team 7 is behind');
-    assert.match(v0.calls, /^Team 7 is a hole behind Team 9\s*Send a nudge$/);
-    assert.equal(v0.foot, '"Behind" can be wrong when a group simply has not entered scores yet. It is a hint, not a ruling.');
+        steps: [...HOME, { expression: PROBE }, ...shot('E3a-organizer-pace.png'),
+            { tap: '#eh-needs-list .eh-need[data-need="pace-team7"]' }, { sleep: 300 }, { expression: PROBE },
+            ...SETUP, { tap: '#pace-target' }, { cdp: { method: 'Input.dispatchKeyEvent', params: { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 4, commands: ['selectAll'] } } },
+            { cdp: { method: 'Input.insertText', params: { text: '4:30' } } }, { tap: '#pace-on-label' }, { sleep: 300 }, { expression: PROBE }] });
+    const pace = v0.needs.filter((n) => /^pace-/.test(n.key));
+    assert.deepEqual(pace.map((n) => n.key), ['pace-team7'], 'one row: only Team 7 is behind (22 min at 14.2 a hole)');
+    assert.equal(pace[0].text, '2 Team 7 is about 2 holes behind Send a friendly pace note');
     assert.deepEqual(v1.writes, [{ op: 'set', path: 'tournaments/PACE1/nudges/team7', value: { at: { '.sv': 'timestamp' }, tpl: 'pace1', thru: 6 } }]);
     assert.deepEqual(v2.writes.slice(1), [{ op: 'set', path: 'tournaments/PACE1/pace', value: { on: true, targetMin: 270 } }]);
+    const sent = await run({ url: fileUrl('tournament.html', 'tourney=NUDGE1'), db, auth: OWNER,
+        steps: [...HOME, { expression: PROBE }, { tap: '#eh-needs-list .eh-need[data-need="pace-team7"]' }, { sleep: 300 }, { expression: PROBE }] });
+    const row = sent.values[0].needs.find((n) => n.key === 'pace-team7');
+    assert.equal(row && row.text, '2 Team 7 is about 2 holes behind Pace note sent \u00b7 thru 6');
+    assert.deepEqual(sent.values[1].writes, [], 'a sent note is not sent again');
 });
 
 const CARD = `(() => { const vis = ${VIS}; return JSON.stringify({ note: vis('#pace-note') ? ${txt('#pace-note')} : '', foot: vis('#pace-note-foot') ? ${txt('#pace-note-foot')} : '',
@@ -147,8 +153,8 @@ test('N1. the nudged team\'s card: the fixed sentence and the footnote until it 
     assert.equal(plain.values[0].note, '', 'no nudge, no note (default)');
 });
 
-test('N2. a signed-out visitor: no Pace door, no tool; the door is in the tree, hidden', SKIP, async () => {
+test('N2. a signed-out visitor (EC3 C): no pace switch, no door, no tab; the board is there', SKIP, async () => {
     const { values: [v] } = await run({ url: fileUrl('tournament.html', 'tourney=PACE1'), db, auth: 'signed-out', steps: [{ expression: PROBE }] });
-    assert.ok(!v.door && !v.tool, JSON.stringify({ door: v.door, tool: v.tool }));
-    assert.equal(v.doorInTree, true);
+    assert.ok(!v.sw && !v.door && !v.doorInTree && !v.toolInTree, JSON.stringify({ sw: v.sw, door: v.door, doorInTree: v.doorInTree, toolInTree: v.toolInTree }));
+    assert.equal(v.board, true, 'positive: the visitor is on the board');
 });

@@ -114,7 +114,8 @@ test('S1. DEFAULT: a golfer link on an event with no notes shows no banner and n
 test('S2. three notes: the newest on top, "2 earlier from the organizer" opens the rest, a note delivered live replaces the banner; a group link shows it too', SKIP, async () => {
     const newer = Object.assign({}, NOTES, { a4: { text: 'All clear. Resume play at 11:30 AM from where you stopped.', tpl: 'resume', at: at(11, 5), by: 'u-org' } });
     const { values: [v0, v1, v2], raw } = await run({ url: fileUrl('tournament-scorecard.html', 'tourney=NOTES1&team=4'), db,
-        steps: [{ expression: CARD_PROBE }, ...shot('E1a-scorecard-banner.png'), { tap: '#older-notes-link' }, { sleep: 200 }, { expression: CARD_PROBE }, ...shot('E1a-older-notes-open.png'),
+        // EC1 + B for Weather (2026-11-11): the newest note is the weather one, so it holds the screen until Got it; the tap comes first.
+        steps: [{ expression: CARD_PROBE }, ...shot('E1a-scorecard-banner.png'), { tap: '#org-alert-ok' }, { sleep: 150 }, { tap: '#older-notes-link' }, { sleep: 200 }, { expression: CARD_PROBE }, ...shot('E1a-older-notes-open.png'),
             { deliver: { path: 'tournaments/NOTES1', value: Object.assign({}, db.tournaments.NOTES1, { announcements: newer }) } }, { sleep: 300 }, { expression: CARD_PROBE }] });
     assert.ok(v0.note, 'the banner is on screen');
     assert.match(v0.head, /^⚡ FROM THE ORGANIZER · 10:42 AM$/i);
@@ -150,9 +151,8 @@ test('O1. the owner: the door on the board, the tool, the counts, a template, Se
             { tap: '#ann-chips .ann-chip[data-tpl="weather"]' }, { sleep: 200 }, { expression: ORG_PROBE }, ...shot('E1c-organizer-announce.png'),
             { tap: '#ann-send' }, { sleep: 600 }, { expression: ORG_PROBE }, ...shot('E1c-after-send.png')] });
     assert.ok(v0.door && v0.board && !v0.tool, 'the door is on the owner\'s board: ' + JSON.stringify(v0));
-    assert.match(v0.bar, /by Rattle Golf/, 'the bar keeps its company line off the tool');
+    // (2026-11-11: the M6 bar gave way to rename A; no bar line to check.)
     assert.ok(v1.tool && !v1.board, 'the tool opened');
-    assert.match(v1.bar, /HardPan Tournaments\s*Announcements/);
     assert.match(v1.tool_text, /Send to the field/);
     assert.equal(v1.box, ''); assert.equal(v1.send, true, 'Send is off on an empty box');
     assert.equal(v1.meta, '0 / 200 characters · goes to 36 golfers (22 by notification, all on the scorecard banner)');

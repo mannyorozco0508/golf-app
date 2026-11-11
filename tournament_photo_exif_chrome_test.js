@@ -92,7 +92,8 @@ test('1. the fixture is a real phone-style photo: 3000x2250 JPEG whose EXIF carr
 test('2. Photos tab -> choose the photo -> caption -> Post: ONE upload of a re-encoded JPEG (no EXIF, no GPS, 1600 px), THEN one keyed meta update', SKIP, async () => {
     const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
     const b64 = makeFixture().toString('base64');
-    const scores = {}; [4, 5, 6].forEach((h) => { scores['team4_h' + h] = PARS[h - 1]; });
+    // EC4 C (2026-11-11): the block is on the card once every hole is scored.
+    const scores = {}; for (let h = 1; h <= 18; h++) scores['team4_h' + h] = PARS[h - 1];
     const db = { tournaments: { PH1: { name: 'Rattle Classic', format: 'scramble', courseName: 'Papago', createdAt: 1, ownerUid: 'u-org',
         courseData: PARS.map((p, i) => ({ hole: i + 1, par: p, hcpIndex: i + 1 })), scores,
         teams: { team4: { num: 4, name: 'Team 4', players: ['Al Lopez', 'Jo Kim'], startingHole: 4 } } } }, events: {}, trips: {} };
@@ -102,7 +103,7 @@ test('2. Photos tab -> choose the photo -> caption -> Post: ONE upload of a re-e
     const probe = `JSON.stringify({ msg: (document.getElementById('photo-msg') || {}).innerText || '', preview: (() => { const i = document.getElementById('photo-preview'); return i && i.style.display !== 'none' ? [i.naturalWidth, i.naturalHeight] : null; })(),
         uploads: window.__uploads || [], writes: (window.__coldWrites || []).map(w => ({ op: w.op, path: w.path, value: w.value })) })`;
     const r = await arriveCold({ url: fileUrl('tournament-scorecard.html', `tourney=PH1&team=4&k=${K4}`), db, preScript: PRE, settleMs: 4000,
-        steps: [{ tap: '#tab-btn-photos' }, { sleep: 200 }, { expression: choose }, { sleep: 2500 }, { expression: probe },
+        steps: [{ sleep: 200 }, { expression: choose }, { sleep: 2500 }, { expression: probe },
             { tap: '#photo-caption' }, { cdp: { method: 'Input.insertText', params: { text: 'Team 4 on the 7th tee' } } },
             { tap: '#photo-post' }, { sleep: 2500 }, { expression: probe }] });
     assert.ok(r.ok, 'could not run: ' + r.reason);

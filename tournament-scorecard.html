@@ -194,6 +194,20 @@
         .org-note-text { font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
         .older-notes { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: 0 0 12px 0; }
         .older-notes a { color: var(--text-muted); }
+        /* EC1 + B for Weather (2026-11-11): the full-screen weather note. */
+        .org-alert { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 3000; align-items: center; justify-content: center; padding: 20px; }
+        .org-alert.open { display: flex; }
+        .org-alert-box { background: #ffffff; color: #10231c; border-radius: 16px; padding: 18px; max-width: 420px; width: 100%; box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
+        .org-alert-when { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #6b7a72; }
+        .org-alert-title { font-size: 1.3rem; font-weight: 800; margin: 6px 0 8px 0; }
+        .org-alert-text { font-size: 1rem; line-height: 1.4; overflow-wrap: anywhere; }
+        .org-alert-ok { display: block; width: 100%; margin-top: 14px; background: #0f4c3a; color: #ffffff; border: 0; border-radius: 12px; padding: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        /* EC4 C: the after-the-round photo block on the card. */
+        .ph-done { border: 1px solid var(--border-mid); border-radius: 14px; padding: 12px 14px; margin: 0 0 14px 0; background: var(--bg-card); }
+        .ph-done-h { font-weight: 800; font-size: 1.05rem; margin-bottom: 4px; }
+        /* The notes show in the app's hole view too (Phase 1 hides everything but #app-view). */
+        body.app-mode:not([data-app-screen="card"]) #main-content > .org-note, body.app-mode:not([data-app-screen="card"]) #main-content > .pace-note { display: block !important; }
+        body.app-mode:not([data-app-screen="card"]) #main-content > .org-note[style*="display: none"], body.app-mode:not([data-app-screen="card"]) #main-content > .pace-note[style*="display: none"] { display: none !important; }
         .older-list { border: 1px solid var(--border-mid); border-radius: 12px; padding: 4px 12px; margin: 0 0 12px 0; }
         .older-row { padding: 8px 0; font-size: 0.88rem; overflow-wrap: anywhere; }
         .older-row + .older-row { border-top: 1px solid var(--border-faint); }
@@ -258,6 +272,15 @@
 </head>
 <body>
 
+<!-- EC1 + B for Weather (2026-11-11): the weather note, full screen until Got it. -->
+<div class="org-alert" id="org-alert" role="alertdialog" aria-modal="true" aria-labelledby="org-alert-title">
+    <div class="org-alert-box">
+        <div class="org-alert-when" id="org-alert-when"></div>
+        <div class="org-alert-title" id="org-alert-title">⚡ Stop play</div>
+        <div class="org-alert-text" id="org-alert-text"></div>
+        <button type="button" class="org-alert-ok" id="org-alert-ok" onclick="ackOrgAlert()">Got it</button>
+    </div>
+</div>
 <div class="container" id="main-content" style="display:none;">
     <!-- E1a (2026-11-09): the newest organizer note. Read from the same
          tournaments/<code> snapshot as the card; hidden when there is none. -->
@@ -285,10 +308,9 @@
     <div class="top-nav-bar">
         <span class="top-nav-item active" id="tab-btn-scorecard" onclick="showTab('scorecard')">📝 Scorecard</span>
         <span class="top-nav-item" id="tab-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</span>
-        <!-- E2c: shown only when the event has contest holes. -->
-        <span class="top-nav-item" id="tab-btn-contests" style="display:none;" onclick="showTab('contests')">🎯 Contests</span>
-        <!-- E4a: shown on a link that carries its scoring key (posting needs it). -->
-        <span class="top-nav-item" id="tab-btn-photos" style="display:none;" onclick="showTab('photos')">📷 Photos</span>
+        <!-- Manny's picks 2026-11-11: no Contests pill (EC2 A: the prompt on the
+             card is the contest) and no Photos pill (EC4 C: photos are asked for
+             when the card is done, below). -->
     </div>
 
     <div class="event-title" id="event-title"></div>
@@ -316,6 +338,24 @@
         <!-- E2a / E2b: the contest-hole prompt, on the hole this card is playing
              (or has just played) when the organizer made it a contest hole. -->
         <div class="contest-prompt" id="contest-prompt" style="display:none;"></div>
+        <!-- EC4 C (Manny 2026-11-11): photos AFTER the round. The E4a controls,
+             the same post path (resize, no location, pending until the organizer
+             OKs it), shown only when this card has every hole scored and the link
+             can post (its key). No wall on the card: OK'd photos are on the recap. -->
+        <div class="ph-done" id="photo-done" style="display:none;">
+            <div class="ph-done-h">Round done · Add photos from today?</div>
+            <p class="ph-note" style="margin-top:0;">They go on the event recap once the organizer OKs them. Location is removed from the photo. Photos of other golfers: ask first.</p>
+            <label class="ph-pick" id="photo-pick">
+                <img id="photo-preview" alt="" style="display:none;">
+                <span class="ph-empty" id="photo-empty">📷 Tap to choose a photo</span>
+                <span class="ph-tag" id="photo-tag" style="display:none;">Your photo</span>
+                <input type="file" id="photo-file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp" onchange="photoChosen(this)">
+            </label>
+            <label class="ph-cap-label" for="photo-caption">Caption (optional)</label>
+            <input type="text" class="ph-caption" id="photo-caption" maxlength="120">
+            <button type="button" class="ph-post" id="photo-post" onclick="postPhoto()">Send to the organizer</button>
+            <div class="ph-msg" id="photo-msg" aria-live="polite"></div>
+        </div>
         <!-- SAVE STATE. Scores were written fire-and-forget with no confirmation, so a
              golfer on a thin signal had no way to tell a saved hole from a lost one.
              One quiet line that settles back to idle, rather than a toast per keystroke -
@@ -342,27 +382,9 @@
 
     <!-- E2c: the live contest board. Leaders update as entries land; the
          organizer confirms. Nothing is paid in the app. -->
-    <div id="tab-contests" style="display:none;">
-        <div id="contest-board"></div>
-    </div>
-
     <!-- E4a: post a photo to the event wall. It waits for the organizer;
          nothing shows until they say yes. The phone resizes to 1600 px and
          re-encodes it (no location leaves the phone). -->
-    <div id="tab-photos" style="display:none;">
-        <label class="ph-pick" id="photo-pick">
-            <img id="photo-preview" alt="" style="display:none;">
-            <span class="ph-empty" id="photo-empty">📷 Tap to choose a photo</span>
-            <span class="ph-tag" id="photo-tag" style="display:none;">Your photo</span>
-            <input type="file" id="photo-file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp" onchange="photoChosen(this)">
-        </label>
-        <label class="ph-cap-label" for="photo-caption">Caption (optional)</label>
-        <input type="text" class="ph-caption" id="photo-caption" maxlength="120">
-        <button type="button" class="ph-post" id="photo-post" onclick="postPhoto()">Post to the event wall</button>
-        <div class="ph-msg" id="photo-msg" aria-live="polite"></div>
-        <p class="ph-note">The organizer approves photos before anyone sees them.<br>Photos of other golfers: ask first.</p>
-        <div class="ph-wall" id="photo-wall"></div>
-    </div>
 </div>
 
 <div class="container" id="error-content" style="display:none; text-align:center;">
@@ -392,7 +414,7 @@
 
     let boardTabOpen = false;   // the Leaderboard tab is on screen: snapshots re-render it
     // The page's tabs. Contests (E2c) is drawn only on an event with contest holes.
-    const CARD_TABS = ['scorecard', 'leaderboard', 'contests', 'photos'];
+    const CARD_TABS = ['scorecard', 'leaderboard'];   // 2026-11-11: Contests and Photos tabs gone (EC2 A, EC4 C)
     function showTab(tab) {
         boardTabOpen = (tab === 'leaderboard');
         CARD_TABS.forEach((k) => {
@@ -402,8 +424,6 @@
             if (btn) btn.classList.toggle('active', tab === k);
         });
         if (tab === 'leaderboard') renderLeaderboard();
-        if (tab === 'contests') renderContestBoard();
-        if (tab === 'photos') { bindPhotoWall(); renderPhotoWall(); }
     }
 
     // ONE SCORING SURFACE, TWO SCOPES.
@@ -503,6 +523,7 @@
             renderWaitingChip();
             renderOrgNotes();
             renderPaceNote();
+            renderPhotoDone();
             // "Updates live" (A3) is true only if the open board re-renders
             // on each snapshot. Before this it changed only on a tab tap.
             if (boardTabOpen) renderLeaderboard();
@@ -535,12 +556,14 @@
         const box = document.getElementById('org-note');
         if (!box) return;
         if (!notes.length) {
+            renderOrgAlert(null);
             box.style.display = 'none';
             document.getElementById('older-notes').style.display = 'none';
             document.getElementById('older-list').style.display = 'none';
             return;
         }
         const top = notes[0];
+        renderOrgAlert(top);
         box.style.display = 'block';
         document.getElementById('org-note-head').textContent = `${top.tpl === 'weather' ? '⚡ ' : ''}From the organizer · ${orgNoteClock(top.at)}`;
         document.getElementById('org-note-text').textContent = top.text;
@@ -552,6 +575,36 @@
         list.innerHTML = older.map((n) => `<div class="older-row">${orgNoteClock(n.at)} · ${escapeHtml(n.text)}</div>`).join('');
     }
     function toggleOlderNotes() { olderNotesOpen = !olderNotesOpen; renderOrgNotes(); }
+    // EC1 + B for Weather (Manny 2026-11-11): a weather / lightning note takes the
+    // whole screen until the golfer taps Got it; every other template stays the
+    // banner above. The tap is remembered on this phone (by the note's time), so
+    // a reload does not ask again; a NEW weather note asks again.
+    const ORG_ACK_KEY = () => 'hp_orgnote_ack_' + currentCode;
+    function orgNoteAcked(at) { try { return Number(localStorage.getItem(ORG_ACK_KEY())) >= at; } catch (e) { return false; } }
+    function renderOrgAlert(top) {
+        const box = document.getElementById('org-alert');
+        if (!box) return;
+        const show = !!(top && top.tpl === 'weather' && !orgNoteAcked(top.at));
+        box.classList.toggle('open', show);
+        if (!show) return;
+        document.getElementById('org-alert-when').textContent = `From the organizer · ${orgNoteClock(top.at)}`;
+        document.getElementById('org-alert-text').textContent = top.text;
+        box.dataset.at = String(top.at);
+    }
+    function ackOrgAlert() {
+        const box = document.getElementById('org-alert');
+        const at = Number(box && box.dataset.at) || Date.now();
+        try { localStorage.setItem(ORG_ACK_KEY(), String(at)); } catch (e) { /* no storage: it shows again on reload */ }
+        if (box) box.classList.remove('open');
+    }
+    // EC4 C: the photo block appears when this card has every hole scored.
+    function renderPhotoDone() {
+        const el = document.getElementById('photo-done');
+        if (!el) return;
+        const rd = (myRoundId && currentData && currentData.rounds && currentData.rounds[myRoundId]) || currentData || {};
+        const holes = ((rd.courseData || (currentData || {}).courseData || []).length) || 18;
+        el.style.display = (photosOn() && cardThru >= holes) ? 'block' : 'none';
+    }
 
     // ---- E3b: THE PACE NUDGE (mockup approved 2026-11-09) ---------------------
     // nudges/<team{n} | group id> = {at, tpl:'pace1', thru}, owner-written. Shown
@@ -1520,7 +1573,7 @@
     // THE TAB WORDS. Two tabs keep the words they always had. With a third
     // (Contests, Photos) the bar uses the mockups' short words - "Board" for
     // Leaderboard (E4a), no icons - so every tab fits one line at 390 wide.
-    const CARD_TAB_WORDS = { scorecard: ['📝 Scorecard', 'Scorecard'], leaderboard: ['🏆 Leaderboard', 'Board'], contests: ['🎯 Contests', 'Contests'], photos: ['📷 Photos', 'Photos'] };
+    const CARD_TAB_WORDS = { scorecard: ['📝 Scorecard', 'Scorecard'], leaderboard: ['🏆 Leaderboard', 'Board'] };
     function syncCardTabs() {
         const btns = CARD_TABS.map((k) => document.getElementById('tab-btn-' + k)).filter(Boolean);
         const compact = btns.filter((b) => b.style.display !== 'none').length > 2;
@@ -1532,14 +1585,10 @@
         if (bar && bar.classList) bar.classList.toggle('compact', compact);
     }
     function renderContestArea() {
-        const tabBtn = document.getElementById('tab-btn-contests');
-        if (tabBtn) tabBtn.style.display = contestsOn() ? '' : 'none';
-        const photoBtn = document.getElementById('tab-btn-photos');
-        if (photoBtn) photoBtn.style.display = photosOn() ? '' : 'none';
+        // EC2 A (2026-11-11): the prompt on the card is the whole of it for a
+        // golfer; the Contests tab and its pill are gone.
         syncCardTabs();
         renderContestPrompt();
-        const panel = document.getElementById('tab-contests');
-        if (panel && panel.style.display === 'block') renderContestBoard();
     }
     function renderContestPrompt() {
         const box = document.getElementById('contest-prompt');
@@ -1651,8 +1700,6 @@
     //   3. Nothing shows until the organizer taps Show (approvePhoto moves it).
     // The wall below lists shown photos (public), each with Report.
     var photoPick = null;            // { blob, w, h, url } of the resized photo
-    var photoShown = {};
-    var photoWallBound = false;
     const PHOTO_REFUSED = "⚠️ Not posted — this link can't post photos. Ask the organizer for your team's link.";
     function photosOn() { return !!(myScoreKey && currentCode); }
     function photoWho() {
@@ -1736,27 +1783,8 @@
             .catch((err) => photoSay('err', (err && err.code === 'PERMISSION_DENIED') ? PHOTO_REFUSED : '⚠️ Could not post — check your signal and try again.'))
             .then(() => { if (btn) btn.disabled = false; });
     }
-    function bindPhotoWall() {
-        if (photoWallBound || !currentCode) return;
-        photoWallBound = true;
-        db.ref(`tournamentPhotoMeta/${currentCode}/shown`).on('value', (snap) => {
-            photoShown = (snap && snap.val()) || {};
-            renderPhotoWall();
-        }, () => { /* rules not published yet: no wall */ });
-    }
-    function renderPhotoWall() {
-        const el = document.getElementById('photo-wall');
-        if (!el) return;
-        el.innerHTML = TournamentPhotos.ordered(photoShown).map((p) =>
-            `<div class="ph-tile"><img src="${escapeHtml(TournamentPhotos.shownUrl(currentCode, p.id))}" alt="${escapeHtml(TournamentPhotos.photoLabel(currentData, p))}" loading="lazy" onerror="this.style.display='none'"><span class="ph-tag">${escapeHtml(TournamentPhotos.photoLabel(currentData, p))}</span><button type="button" class="ph-report" data-photo="${escapeHtml(p.id)}" onclick="reportShownPhoto(this.dataset.photo, this)">Report</button></div>`).join('');
-    }
-    function reportShownPhoto(id, el) {
-        if (!confirm('Report this photo to the organizer?')) return;
-        return loadScriptOnce('./firebase-functions-compat.js', () => typeof firebase.functions === 'function')
-            .then(() => firebase.functions().httpsCallable('reportPhoto')({ code: currentCode, photoId: id }))
-            .then(() => { if (el) { el.textContent = 'Reported'; el.disabled = true; } })
-            .catch(() => { if (el) el.textContent = 'Try again'; });
-    }
+    // EC4 C (2026-11-11): no wall on the card. The wall's binder, renderer and its
+    // Report went with it; OK'd photos and Report are on the recap page.
 
     // ========================================================================
     // P1-c T1A AND P1-d T2C: THE APP VIEW (Manny's picks, 2026-11-10)

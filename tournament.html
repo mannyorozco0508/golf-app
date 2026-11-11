@@ -395,6 +395,9 @@
         .payout-basis-seg button.on { background:var(--brand-navy); color:#fff; }
         .payout-basis-label { text-align:center; font-size:0.85rem; color:var(--text-main); margin-top:8px; }
         .payout-basis-note { text-align:center; font-size:0.8rem; color:var(--text-muted); margin-top:6px; }
+        /* EC2 + C (2026-11-11): the suggestion sentence takes the row; its two buttons sit under it. */
+        .ct-row.ct-suggest { flex-wrap: wrap; }
+        .ct-row.ct-suggest > span:first-child { flex: 1 1 100%; margin-bottom: 8px; }
 
         /* ---- STRIPE PHASE 1 (2026-11-08, test mode) -----------------------
            THE BRAND BAR (M6): HardPan Tournaments, with Rattle Golf as
@@ -766,7 +769,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <span class="top-nav-item" onclick="showTab('desk')" id="tab-btn-desk">📋 Desk</span>
         <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard">🏆 Leaderboard</span>
         <span class="top-nav-item" onclick="showTab('contests')" id="tab-btn-contests">🎯 Contests</span>
-        <span class="top-nav-item" onclick="showTab('photos')" id="tab-btn-photos">📷 Photos</span>
     </div>
 
     <!-- EVENT DAY HOME (T3B, Manny's pick 2026-11-10). Owner-only, hidden by the
@@ -871,6 +873,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div id="shotgun-assignments-list"></div>
         </div>
 
+
+        <!-- EC3 C (Manny 2026-11-11): pace of play has no screen of its own. The
+             switch and the target live here; a team that is behind shows on
+             Event day's "Needs you", and the note is the E3b nudge on that team's
+             card. Scores only, never a location: the times are the server's own
+             on each score's proof. Off per event until the organizer turns it on. -->
+        <hr class="section-divider">
+        <h3>⏱️ Pace of play</h3>
+        <div class="toggle-row">
+            <label class="toggle-switch">
+                <input type="checkbox" id="pace-on-switch" onchange="setPaceOn(this.checked)">
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label-sm" id="pace-on-label">Off</span>
+            <span style="font-size:0.8rem; color:var(--text-muted); margin-left:10px;">Target <input id="pace-target" inputmode="numeric" style="width:58px; padding:4px 6px; font-size:0.85rem; text-align:center;" onchange="setPaceTarget(this.value)"> for 18</span>
+        </div>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">From each team's last scored hole and its time, never a location. A team about a hole behind shows on Event day under "Needs you", with a Send note button. "Behind" can be wrong when a group simply has not entered scores yet: it is a hint, not a ruling.</p>
 
         <hr class="section-divider">
         <h3>🚩 Flights / Divisions</h3>
@@ -996,6 +1015,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <button class="btn-outline" style="width:auto; margin:0;" onclick="closeRegistrationEdit()">Cancel</button>
         </div>
         <div id="registration-list"></div>
+        <!-- E4b, moved here by EC4 C (Manny 2026-11-11): the organizer's photo
+             queue is the Desk's "Photos" chip. Every photo is checked one at a
+             time - there is no "approve all". Show and Hide run the approvePhoto
+             / hidePhoto callables, which move the file; a reported photo on the
+             recap comes back here. -->
+        <div id="photo-queue-wrap" style="display:none;">
+            <h2 style="font-size:1.1rem; margin:4px 0 10px 0;" id="photo-queue-title">Photos waiting · 0</h2>
+            <div class="pq-grid" id="photo-queue"></div>
+            <div class="pq-count" id="photo-counts"></div>
+            <p class="ct-note"><a href="#" id="photo-recap-link">Open the recap page ›</a></p>
+        </div>
         <!-- CSV, because the field has to leave the phone: a tee sheet, a cart
              sign order, the pro shop's own system. Shown only when there is a
              list to export, and only to the organizer. -->
@@ -1021,16 +1051,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div class="day-card" id="ann-sent" style="display:none; margin-top:14px;"></div>
     </div>
 
-    <!-- E3a (mockup approved 2026-11-09): pace of play. Scores only, never a
-         location: the times are the server's own on each score's proof. Off
-         per event until the organizer turns it on. Owner only. -->
-    <div id="manage-tab-pace" style="display:none;">
-        <h2 class="ev-h">Pace of play</h2>
-        <p class="pace-sub" id="pace-sub"></p>
-        <div class="day-card" id="pace-table" style="display:none;"></div>
-        <div id="pace-calls"></div>
-        <p class="pace-foot" id="pace-foot" style="display:none;">"Behind" can be wrong when a group simply has not entered scores yet. It is a hint, not a ruling.</p>
-    </div>
 
     <div id="manage-tab-leaderboard" style="display:none;">
         <h2 style="text-align:center; font-size:1.3rem;" id="lb-t-name"></h2>
@@ -1044,7 +1064,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              Owner only, hidden in the tree for everyone else. -->
         <div class="ev-tools" id="event-tools-row" style="display:none;">
             <button class="btn-outline" id="open-announce" onclick="showTab('announce')">📣 Announcements</button>
-            <button class="btn-outline" id="open-pace" onclick="showTab('pace')">⏱️ Pace of play</button>
         </div>
         <!-- Only rendered when flights exist. A tournament without them shows exactly
              the leaderboard it always did, with no extra control to ignore. -->
@@ -1127,16 +1146,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <p class="ct-note" id="contest-note">Override: "Make winner" locks the hole; a later entry cannot replace it. Allow GPS marks: <button type="button" class="ct-gps" id="contest-gps-toggle" onclick="toggleContestGps()">on</button></p>
     </div>
 
-    <!-- E4b (approved "as mocked" 2026-11-09): the organizer's photo queue.
-         Gated. Every photo is checked one at a time - there is no "approve
-         all". Show and Hide run the approvePhoto / hidePhoto callables, which
-         move the file; a reported photo on the wall comes back here. -->
-    <div id="manage-tab-photos" style="display:none;">
-        <h2 style="font-size:1.4rem; margin:4px 0 12px 0;" id="photo-queue-title">Photos waiting · 0</h2>
-        <div class="pq-grid" id="photo-queue"></div>
-        <div class="pq-count" id="photo-counts"></div>
-        <p class="ct-note"><a href="#" id="photo-recap-link">Open the recap page ›</a></p>
-    </div>
 
     <div id="tournament-print-view"></div>
 </div>
@@ -2529,6 +2538,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (isMultiRound(currentData || {}) && !prize.available && payoutsAreSet(savedPayoutSpots())) {
             out.push({ key: 'basis', n: 1, title: 'Pick what prizes go by', sub: 'Golfers see "Prize results coming soon" until you do', go: 'basis' });
         }
+        // 5. Pace (EC3 C, 2026-11-11): the E3 arithmetic (paceRows: score times
+        //    against the target, never a location), one row a team that is about
+        //    a hole or more behind. The button is the E3b nudge for that team;
+        //    once sent for this far into the round, the row says so instead.
+        const ps = paceSettings();
+        if (ps.on && paceProofs && st.live && !st.finished) {
+            const per = ps.targetMin / 18;
+            const nudges = (currentData && currentData.nudges) || {};
+            paceRows(currentData || {}, paceProofs, st.rid, ps).filter((u) => u.status === 'behind').forEach((u) => {
+                const holesBehind = Math.max(1, Math.round(u.behindMin / per));
+                const sent = nudges[u.key] && Number.isInteger(nudges[u.key].thru) && nudges[u.key].thru >= u.thru;
+                out.push({ key: 'pace-' + u.key, n: holesBehind, title: `${u.label} is about ${holesBehind} hole${holesBehind === 1 ? '' : 's'} behind`,
+                    sub: sent ? 'Pace note sent · thru ' + u.thru : 'Send a friendly pace note', go: sent ? 'home' : `nudge:${u.key}:${u.thru}` });
+            });
+        }
+        // 6. Photos waiting (EC4 C): the Desk's own queue, checked one at a time.
+        const pq = (typeof photoQueue === 'function') ? photoQueue() : [];
+        if (pq.length) out.push({ key: 'photos', n: pq.length, title: `${pq.length} photo${pq.length === 1 ? '' : 's'} to check`, sub: 'Desk', go: 'photos' });
         return out;
     }
 
@@ -2564,12 +2591,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // Quick actions open the tab that already does the job, at the right place.
     function eventHomeGo(where) {
         const to = (id) => { const el = document.getElementById(id); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' }); };
-        if (where === 'desk' || where === 'unpaid' || where === 'needsteam') {
+        if (where === 'desk' || where === 'unpaid' || where === 'needsteam' || where === 'photos') {
             if (where !== 'desk') registrationFilter = where;
             showTab('desk');
             return;
         }
         if (where === 'setup') { showTab('setup'); return; }
+        if (where === 'home') return;
+        // EC3 C: "nudge:<team key>:<thru>" sends the E3b pace note to that team.
+        const nm = /^nudge:(team[0-9]+|g[a-z0-9]+):([0-9]{1,2})$/.exec(String(where || ''));
+        if (nm) { sendNudge(nm[1], Number(nm[2])); return; }
         showTab('leaderboard');
         if (where === 'qr') to(recordIsIndividual() ? 'group-links-block' : 'team-links-block');
         else if (where === 'basis') to('payout-basis-control');
@@ -3829,9 +3860,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             by.textContent = (owner && evToolTab) ? EV_TOOL_LABELS[evToolTab] : evBrandBy;
         }
         syncFollowersListener(owner);
-        syncProofsListener(owner && evToolTab === 'pace' && paceSettings().on);
+        // EC3 C: the proofs feed Event day's "Needs you" whenever pace is on.
+        syncProofsListener(owner && paceSettings().on);
         if (owner && evToolTab === 'announce') renderAnnounce();
-        if (owner && evToolTab === 'pace') renderPace();
     }
 
     // HOW MANY APP FOLLOWERS: tournamentFollowers/<code>, owner-only to read.
@@ -3975,7 +4006,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         proofsCb = (snap) => {
             if (currentCode !== code) return;
             paceProofs = (snap && snap.val()) || {};
-            if (evToolTab === 'pace') renderPace();
+            renderEventHome();
         };
         db.ref('scoreProofs/' + code).on('value', proofsCb);
         proofsBoundCode = code;
@@ -4045,34 +4076,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return units;
     }
 
-    function renderPace() {
+    // EC3 C (2026-11-11): the Setup switch and target, filled from the record.
+    function renderPaceSetup() {
         const s = paceSettings();
-        const sub = document.getElementById('pace-sub');
-        const table = document.getElementById('pace-table');
-        const calls = document.getElementById('pace-calls');
-        const foot = document.getElementById('pace-foot');
-        if (!sub) return;
-        const active = document.activeElement;
-        if (!(active && active.id === 'pace-target')) {
-            sub.innerHTML = `From last scored hole only. No locations. Target <input id="pace-target" inputmode="numeric" value="${paceMinText(s.targetMin)}" onchange="setPaceTarget(this.value)" aria-label="Target for 18"> for 18. Opt-in: <button type="button" class="pace-switch" id="pace-switch" onclick="setPaceOn(${s.on ? 'false' : 'true'})">${s.on ? 'on' : 'off'}</button> for this event.`;
-        }
-        if (!s.on) {
-            table.style.display = 'none'; table.innerHTML = ''; calls.innerHTML = ''; foot.style.display = 'none';
-            return;
-        }
-        const rows = paceRows(currentData || {}, paceProofs, dayRoundId(), s);
-        const rank = { behind: 0, on: 1, unknown: 2, none: 3 };
-        const shown = rows.slice().sort((a, b) => (b.thru - a.thru) || (rank[a.status] - rank[b.status]) || (a.order - b.order));
-        const vs = (u) => u.status === 'on' ? '<span class="pace-on">on pace</span>'
-            : u.status === 'behind' ? `<span class="pace-behind">${u.behindMin} min behind</span>`
-            : u.status === 'none' ? '<span class="pace-none">no scores yet</span>' : '<span class="pace-none">—</span>';
-        table.style.display = 'block';
-        table.innerHTML = `<div class="pace-grid"><div class="pace-hd">Team</div><div class="pace-hd">Thru</div><div class="pace-hd">vs target</div>`
-            + shown.map((u) => `<div>${escapeHtml(u.label)}${u.start ? ` · started ${u.start}` : ''}</div><div>${u.thru || '—'}</div><div>${vs(u)}</div>`).join('') + `</div>`;
-        calls.innerHTML = rows.filter((u) => u.status === 'behind').map((u) =>
-            `<div class="day-card pace-call"><span><strong>${escapeHtml(u.label)}</strong> is a hole behind ${u.ahead ? escapeHtml(u.ahead.label) : 'the group ahead'}</span>`
-            + `<button class="btn-outline" data-team="${escapeHtml(u.key)}" data-thru="${u.thru}" onclick="sendNudge(this.getAttribute('data-team'), Number(this.getAttribute('data-thru')))">Send a nudge</button></div>`).join('');
-        foot.style.display = 'block';
+        const sw = document.getElementById('pace-on-switch');
+        const lb = document.getElementById('pace-on-label');
+        const tg = document.getElementById('pace-target');
+        if (sw) sw.checked = s.on;
+        if (lb) lb.textContent = s.on ? 'On' : 'Off';
+        if (tg && document.activeElement !== tg) tg.value = paceMinText(s.targetMin);
     }
 
     function setPaceOn(on) {
@@ -4398,8 +4410,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return !regTeam(e);
     }
     function setRegistrationFilter(key) {
-        registrationFilter = deskFilters().some((f) => f.key === key) ? key : 'all';
+        registrationFilter = (key === 'photos' || deskFilters().some((f) => f.key === key)) ? key : 'all';
         renderRegistrationDesk();
+    }
+    // EC4 C (2026-11-11): the Photos chip and the queue under it. Drawn on every
+    // Desk render, with or without signups (photos come from teams, not signups).
+    function photosChipHtml() {
+        const n = (typeof photoQueue === 'function' && currentData) ? photoQueue().length : 0;
+        return `<button class="reg-chip${registrationFilter === 'photos' ? ' active' : ''}" id="desk-photos-chip" onclick="setRegistrationFilter('photos')">Photos ${n}</button>`;
+    }
+    function renderDeskPhotos(on) {
+        const wrap = document.getElementById('photo-queue-wrap');
+        const list = document.getElementById('registration-list');
+        const search = document.getElementById('registration-search');
+        if (wrap) wrap.style.display = on ? 'block' : 'none';
+        if (list) list.style.display = on ? 'none' : '';
+        if (search) search.style.display = on ? 'none' : '';
+        if (on) renderPhotosTab();
     }
     function registrationSearchText() {
         const el = document.getElementById('registration-search');
@@ -4486,6 +4513,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // hands over a file with a header row and nothing under it.
         const showExport = (on) => { if (exportBtn) exportBtn.style.display = on ? 'block' : 'none'; };
         showExport(false);
+        const photosOnDesk = registrationFilter === 'photos';
+        renderDeskPhotos(photosOnDesk);
         if (!registrationAllowed()) {
             // A legacy event (no ownerUid) has no signups to list - the rules
             // refuse the create and nobody could read it - and the page says so
@@ -4494,7 +4523,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 ? 'This event is not taking signups. Signups need an organizer account, and this event does not have one.'
                 : '';
             if (countsEl) countsEl.innerHTML = '';
-            if (chipsEl) chipsEl.innerHTML = '';
+            if (chipsEl) chipsEl.innerHTML = canManage() ? photosChipHtml() : '';
             list.innerHTML = '';
             return;
         }
@@ -4506,7 +4535,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             .sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
         if (all.length === 0) {
             if (countsEl) countsEl.innerHTML = '';
-            if (chipsEl) chipsEl.innerHTML = '';
+            if (chipsEl) chipsEl.innerHTML = photosChipHtml();
             list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No signups yet.</p>`;
             return;
         }
@@ -4514,11 +4543,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const entriesOnly = all.map((x) => x[1]);
         if (countsEl) countsEl.innerHTML = (feesOn ? payTilesHtml(entriesOnly) : '') + registrationCountsHtml(registrationCounts(entriesOnly));
         const filters = deskFilters();
-        if (!filters.some((f) => f.key === registrationFilter)) registrationFilter = 'all';
+        if (!photosOnDesk && !filters.some((f) => f.key === registrationFilter)) registrationFilter = 'all';
         if (chipsEl) chipsEl.innerHTML = filters.filter((f) => !f.teamOnly || !recordIsIndividual()).map((f) => {
             const n = entriesOnly.filter(f.test).length;
             return `<button class="reg-chip${f.key === registrationFilter ? ' active' : ''}" onclick="setRegistrationFilter('${f.key}')">${f.label} ${n}</button>`;
-        }).join('');
+        }).join('') + photosChipHtml();
+        if (photosOnDesk) return;
         const filter = filters.find((f) => f.key === registrationFilter) || filters[0];
         const q = registrationSearchText();
         const shown = all.filter(([, e]) => filter.test(e) && (!q
@@ -6430,7 +6460,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 <button type="button" class="ct-btn" id="contest-add-save" onclick="addContestHole()">Add</button>
                 <button type="button" class="ct-btn" onclick="cancelContestHole()">Cancel</button></div>`;
         } else {
-            html += `<div class="ct-row"><button type="button" class="ct-add" id="contest-add-btn" onclick="startContestHole()">+ Add a contest hole</button></div>`;
+            // EC2 + C (Manny 2026-11-11): with no contest holes yet, suggest the
+            // course's own: closest to the pin on every par 3, long drive on the
+            // longest par 5 (by yardage where the card has it, else the last).
+            const sug = suggestedContests(course);
+            if (!list.length && sug.length) {
+                const kps = sug.filter((c) => c.kind === 'kp').map((c) => c.hole);
+                const ld = sug.find((c) => c.kind === 'ld');
+                const words = [kps.length ? `closest to the pin on every par 3 (hole${kps.length === 1 ? '' : 's'} ${kps.join(', ')})` : '', ld ? `long drive on ${ld.hole}` : ''].filter(Boolean).join(' and ');
+                html += `<div class="ct-row ct-suggest" id="contest-suggest"><span>Suggested: ${escapeHtml(words)}.</span>`
+                    + `<span class="ct-btns"><button type="button" class="ct-btn" id="contest-use-suggested" onclick="useSuggestedContests()">Use these</button>`
+                    + `<button type="button" class="ct-btn" id="contest-pick-own" onclick="startContestHole()">Pick my own</button></span></div>`;
+            } else {
+                html += `<div class="ct-row"><button type="button" class="ct-add" id="contest-add-btn" onclick="startContestHole()">+ Add a contest hole</button></div>`;
+            }
         }
         box.innerHTML = html;
         if (contestAdding && !multi) contestHoleChosen();
@@ -6471,6 +6514,27 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }
         const fw = document.getElementById('contest-add-fw-row');
         if (fw) fw.style.display = kindSel.value === 'ld' ? '' : 'none';
+    }
+    function suggestedContests(course) {
+        const holes = (course || []).map((h) => ({ hole: Number(h.hole), par: Number(h.par), yds: Number(h.yardage || h.yards || h.length) || 0 })).filter((h) => h.hole >= 1 && h.hole <= 18);
+        const out = holes.filter((h) => h.par === 3).map((h) => ({ hole: h.hole, kind: 'kp' }));
+        const fives = holes.filter((h) => h.par === 5);
+        if (fives.length) {
+            const withYds = fives.filter((h) => h.yds > 0);
+            const pick = withYds.length ? withYds.reduce((a, b) => (b.yds > a.yds ? b : a)) : fives[fives.length - 1];
+            out.push({ hole: pick.hole, kind: 'ld' });
+        }
+        return out.sort((a, b) => a.hole - b.hole);
+    }
+    function useSuggestedContests() {
+        if (!canManage() || isMultiRound(currentData)) return;
+        const course = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const sug = suggestedContests(course);
+        if (!sug.length) return;
+        const updates = {};
+        sug.forEach((c) => { updates[`tournaments/${currentCode}/contests/${TournamentContests.holeKey(c.hole)}`] = { kind: c.kind, allowGps: contestGpsOn() }; });
+        contestSelected = TournamentContests.holeKey(sug[0].hole);
+        return db.ref().update(updates).catch((err) => alert(`Error: ${err.message}`));
     }
     function addContestHole() {
         if (!canManage()) return;
@@ -6574,6 +6638,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         document.getElementById('photo-counts').innerHTML = `On the wall: ${shown} · Hidden: ${hidden} <span>every photo is checked</span>`;
         const link = document.getElementById('photo-recap-link');
         if (link) link.href = recapUrl();
+        const chip = document.getElementById('desk-photos-chip');
+        if (chip) chip.textContent = `Photos ${q.length}`;
+        if (typeof renderEventHome === 'function') renderEventHome();
     }
     function photoAction(name, id) {
         if (!canManage() || photoBusy[id]) return;
@@ -6705,6 +6772,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             syncContestEntriesListener();
             renderContestsTab();
             syncPhotoListeners();
+            renderPaceSetup();
             renderEventHome();
             // Last, so it can remove what the renders above filled in. Runs on
             // every snapshot: the record may gain an owner while the page is open.
