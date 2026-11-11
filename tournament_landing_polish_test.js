@@ -92,7 +92,8 @@ const DELIBERATE = [
     {
         why: 'the entry fee box carries a currency adornment beside the input',
         from: '|Entry Fee per Team ($, optional)|',
-        to: '|Entry Fee per Team ($, optional)|$|'
+        // Re-pinned 2026-11-11 (Manny, one fee field): the label is "Entry fee", and the per team / per golfer control follows the box.
+        to: '|Entry fee ($, optional)|$|per team|per golfer|'
     },
     {
         // ADDED 2026-11-07: commit 056517c9 (web-25) renamed the money words on the
@@ -245,7 +246,7 @@ describe('THE FIELDS AND THE PICKER keep every id and every handler', () => {
         assert.match(region, /<input type="text" id="course-search-input" placeholder="-- Search \/ Select Golf Course --" autocomplete="off" oninput="filterCourseDropdown\(this\.value\)" onfocus="openCourseDropdown\(\)">/);
         assert.match(region, /<input type="hidden" id="course-key">/);
         assert.match(region, /<input type="number" id="t-entry-fee" value="0" min="0" placeholder="0">/);
-        assert.match(region, /<label id="t-entry-fee-label">Entry Fee per Team \(\$, optional\)<\/label>/);
+        assert.match(region, /<label id="t-entry-fee-label">Entry fee \(\$, optional\)<\/label>/);   // re-pinned 2026-11-11: one fee field
     });
 
     test('the four format cards keep their handlers, names and descriptions, and only those four sit in the picker', () => {

@@ -171,6 +171,9 @@
         .custom-select-note { padding: 10px 12px; color: var(--text-muted); text-align: center; font-size: 0.85rem; }
         .course-note { font-size: 0.82rem; color: var(--warn-text); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 8px 10px; margin: 8px 0 0 0; line-height: 1.4; }
         .course-note button { display: block; width: auto; margin: 8px 0 0 0; padding: 7px 10px; font-size: 0.8rem; }
+        .course-note.ok { color: var(--brand-green); background: var(--nassau-box-bg); border-color: var(--accent-teal); }
+        .fee-per { margin: 8px 0 0 0; max-width: 260px; }
+        .fee-per button { font-size: 0.8rem; padding: 7px 4px; }
         .course-online-result div:last-child { font-size: 0.74rem; color: var(--text-muted); }
         /* The import confirm panel: the whole card, read-only, and a tee chooser. */
         #course-import-confirm { border: 1px solid var(--brand-green); border-radius: 8px; padding: 12px; margin: 10px 0; font-size: 0.84rem; }
@@ -537,8 +540,15 @@
     </div>
 
     <div class="form-group setup-field">
-        <label id="t-entry-fee-label">Entry Fee per Team ($, optional)</label>
+        <label id="t-entry-fee-label">Entry fee ($, optional)</label>
         <div class="money-input"><span class="money-prefix" aria-hidden="true">$</span><input type="number" id="t-entry-fee" value="0" min="0" placeholder="0"></div>
+        <!-- 2026-11-11 (Manny): ONE fee, and whether it is per team or per golfer.
+             Saved as entryFee + entryFeePer; the format picks the default (per
+             golfer on an individual event, where the control is hidden). -->
+        <div class="payout-basis-seg fee-per" id="t-fee-per" role="group" aria-label="Entry fee is per">
+            <button type="button" class="on" data-per="team" onclick="setCreateFeePer('team')">per team</button>
+            <button type="button" data-per="golfer" onclick="setCreateFeePer('golfer')">per golfer</button>
+        </div>
         <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;" id="t-entry-fee-help">The organizer collects entry fees (cash, Venmo, etc.). Card payments in HardPan are coming.</p>
     </div>
 
@@ -727,7 +737,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                  four below: each box writes its own key on change. Course and format
                  are NOT here - they change how the event is scored (Wave 2). -->
             <div class="form-group" style="margin-bottom:8px;"><label>Event name</label><input type="text" id="ev-name" maxlength="120" onchange="setEventName(this.value)"></div>
-            <div class="form-group" style="margin-bottom:12px;"><label>Entry fee ($)</label><input type="number" id="ev-fee" min="0" step="0.01" onchange="setEntryFee(this.value)"></div>
+            <div class="form-group" style="margin-bottom:12px;"><label>Entry fee ($)</label><input type="number" id="ev-fee" min="0" step="0.01" onchange="setEntryFee(this.value)">
+                <div class="payout-basis-seg fee-per" id="ev-fee-per" role="group" aria-label="Entry fee is per">
+                    <button type="button" data-per="team" onclick="setEntryFeePer('team')">per team</button>
+                    <button type="button" data-per="golfer" onclick="setEntryFeePer('golfer')">per golfer</button>
+                </div></div>
             <p style="font-size:0.78rem; color:var(--text-muted); margin:0 0 10px 0;">The rest are optional. Shown under the event name here and on the Leaderboard when set.</p>
             <div class="form-group" style="margin-bottom:8px;"><label>Date</label><input type="date" id="ev-date" onchange="setEventDetail('eventDate', this.value)"></div>
             <div class="form-group" style="margin-bottom:8px;"><label>Start time</label><input type="time" id="ev-time" onchange="setEventDetail('startTime', this.value)"></div>
@@ -1264,9 +1278,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     // ONE line under the course box, never a dialog (Advisor 2026-11-11). An
     // optional button runs the same online search the dropdown's row runs.
-    function showCourseNote(text, action) {
+    function showCourseNote(text, action, kind) {
         const el = document.getElementById('course-note');
         if (!el) return;
+        el.className = 'course-note' + (kind === 'ok' ? ' ok' : '');   // green for a real card, amber otherwise
         el.textContent = text;
         if (action && action.label) {
             const b = document.createElement('button');
@@ -1348,7 +1363,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (shared) {
                 const sharedName = (globalCourses[sharedKey] || {}).name || name;
                 pickCourseNow(sharedKey, sharedName);
-                showCourseNote(`Scorecard: ${sharedName}, from the shared course list.`);
+                showCourseNote(`Scorecard: ${sharedName}, from the shared course list.`, null, 'ok');
                 return;
             }
         }
@@ -1388,7 +1403,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const card = importCardOrRefuse(chosen.tee);
         const par = card.ok ? card.data.reduce((a, h) => a + h.par, 0) : (chosen.tee.par_total || 0);
         showCourseNote(`Scorecard loaded online: ${courseDisplayName(P.detail)}, ${chosen.tee.tee_name} tees, par ${par}.`,
-            { id: 'course-note-tees', label: 'Change tees', onClick: () => { renderCourseImportPanel(); } });
+            { id: 'course-note-tees', label: 'Change tees', onClick: () => { renderCourseImportPanel(); } }, 'ok');
     }
     function hideCourseNote() {
         const el = document.getElementById('course-note');
@@ -1682,15 +1697,44 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // The helper text promised "once teams are in" on an event that can never
     // have any - a sentence describing something that cannot happen. The words
     // follow the format card the organizer just pressed.
+    // ONE FEE (2026-11-11). The label no longer carries "per Team": the per
+    // team / per golfer control under the box does, and the format sets its
+    // default until the organizer taps it. An individual event has no teams,
+    // so it is per golfer and the control is hidden.
+    let createFeePer = 'team';
+    let createFeePerTouched = false;
+    function setCreateFeePer(per, byFormat) {
+        if (per !== 'team' && per !== 'golfer') return;
+        if (!byFormat) createFeePerTouched = true;
+        createFeePer = per;
+        document.querySelectorAll('#t-fee-per button').forEach((b) => b.classList.toggle('on', b.dataset.per === per));
+    }
     function syncEntryFeeWording(fmt) {
-        const per = (fmt === 'individual') ? 'Golfer' : 'Team';
         const label = document.getElementById('t-entry-fee-label');
         const help = document.getElementById('t-entry-fee-help');
-        if (label) label.textContent = `Entry Fee per ${per} ($, optional)`;
+        if (label) label.textContent = 'Entry fee ($, optional)';
         if (help) {
-            // Manny 2026-11-10: the entry-fee help says who collects the fee.
             help.textContent = 'The organizer collects entry fees (cash, Venmo, etc.). Card payments in HardPan are coming.';
         }
+        const seg = document.getElementById('t-fee-per');
+        if (fmt === 'individual') { setCreateFeePer('golfer', true); if (seg) seg.style.display = 'none'; return; }
+        if (seg) seg.style.display = '';
+        if (!createFeePerTouched) setCreateFeePer('team', true);
+    }
+    // What the record's fee is per: its own key, else the format's meaning
+    // (a team fee on a team event, a golfer fee on an individual one), which is
+    // what every record before 2026-11-11 meant.
+    function feePer(data) {
+        const p = data && data.entryFeePer;
+        if (p === 'team' || p === 'golfer') return p;
+        return (data && data.scoringModel === PLAYER_MODEL) ? 'golfer' : 'team';
+    }
+    // How many the fee is charged to: teams, or every golfer on them.
+    function feeUnits(data) {
+        if (feePer(data) === 'golfer' && data && data.scoringModel !== PLAYER_MODEL) {
+            return Object.values(data.teams || {}).reduce((n, t) => n + ((t && t.players) || []).length, 0);
+        }
+        return competitorCount(data);
     }
 
     function setShambleCount(n) {
@@ -1995,6 +2039,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             activeCourseKey: selectedCourseKey,
             courseData: selectedCourseData,
             entryFee: entryFee,
+            entryFeePer: isIndividual() ? 'golfer' : createFeePer,
             shambleCountBest: shambleCountBest,
             teams: teams,
             createdAt: Date.now(),
@@ -2003,6 +2048,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // The event's own online imports ride with the record so a later round
         // can pick them (Option B). Absent when nothing was imported.
         if (Object.keys(setupImportedCourses).length) payload.importedCourses = setupImportedCourses;
+        // THE VENUE IS THE COURSE (Manny 2026-11-11): filled from the pick, still
+        // editable on Setup > Event details, so nobody types it twice.
+        if (selectedCourseName) payload.venue = String(selectedCourseName).slice(0, 120);
         // S1 A: date, start time and shotgun from the create form. The same keys
         // and the same shapes as the Event details after the save; an empty box
         // writes nothing, so a record made from the website form is as before.
@@ -2282,6 +2330,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const el = document.getElementById(id);
             if (el && document.activeElement !== el) el.value = data[key] == null ? '' : String(data[key]);
         });
+        const seg = document.getElementById('ev-fee-per');
+        if (seg) {
+            seg.style.display = data.scoringModel === PLAYER_MODEL ? 'none' : '';
+            const per = feePer(data);
+            seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.per === per));
+        }
     }
     function setEventDetail(key, value) {
         if (!currentCode || !canManage()) return;
@@ -2301,6 +2355,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const v = String(value == null ? '' : value).trim();
         if (!v || v.length > 120) { renderEventDetails(); return; }
         db.ref(`tournaments/${currentCode}/name`).set(v).catch(err => alert(`Error: ${err.message}`));
+    }
+    function setEntryFeePer(per) {
+        if (!currentCode || !canManage() || (per !== 'team' && per !== 'golfer')) return;
+        db.ref(`tournaments/${currentCode}/entryFeePer`).set(per).catch(err => alert(`Error: ${err.message}`));
     }
     function setEntryFee(value) {
         if (!currentCode || !canManage()) return;
@@ -2707,7 +2765,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // An amount only where the Desk itself can state one: per golfer on an
             // individual event. A team fee is per team and the desk does not know
             // the teams of an unapproved signup.
-            const owed = (fee > 0 && st.individual) ? ' · ' + regDollars(unpaid.length * fee) + ' in entry fees' : '';
+            const owed = (fee > 0 && feePer(currentData) === 'golfer') ? ' · ' + regDollars(unpaid.length * fee) + ' in entry fees' : '';
             out.push({ key: 'unpaid', n: unpaid.length, title: word(unpaid.length, ['golfer', 'golfers']) + ' unpaid', sub: 'Desk' + owed, go: 'unpaid' });
         }
         // 3. Needs a team: the Desk's own rule.
@@ -3151,7 +3209,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                     formatEventDate(data.eventDate),
                     data.courseName,
                     formatLabelFor(data.format),
-                    fee > 0 ? ('$' + (Math.round(fee * 100) % 100 === 0 ? fee.toFixed(0) : fee.toFixed(2)) + ' entry') : ''
+                    fee > 0 ? ('$' + (Math.round(fee * 100) % 100 === 0 ? fee.toFixed(0) : fee.toFixed(2)) + ' entry per ' + feePer(data)) : ''
                 ].filter(Boolean).join(' \u2022 ');
             }
             const taking = !!data.ownerUid;
@@ -3722,7 +3780,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // rather than a number that is wrong by the team size.
         const fee = Number(currentData && currentData.entryFee) || 0;
         if (fee > 0) {
-            if (recordIsIndividual()) lines.push(`<div class="reg-count-line">Fees collected ${regDollars(c.paid * fee)} · ${c.paid} paid × ${regDollars(fee)}</div>`);
+            if (feePer(currentData) === 'golfer') lines.push(`<div class="reg-count-line">Fees collected ${regDollars(c.paid * fee)} · ${c.paid} paid × ${regDollars(fee)} per golfer</div>`);
             else lines.push(`<div class="reg-count-line">${c.paid} paid golfers · ${regDollars(fee)} per team · teams form at approval</div>`);
         }
         return lines.join('');
@@ -4144,7 +4202,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // exactly what the mismatch banner beneath the payout table is for.
     function poolTotal() {
         const fee = currentData.entryFee || 0;
-        return fee * competitorCount(currentData);
+        return fee * feeUnits(currentData);
     }
 
     function renderLeaderboard() {
@@ -4280,7 +4338,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const container = document.getElementById('payout-spot-amounts');
         const subEl = document.getElementById('payout-pool-sub');
         subEl.textContent = pool > 0
-            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many places win a prize — ties split the pro shop credit their tied places add up to.`
+            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${feeUnits(currentData)} ${feePer(currentData) === 'golfer' ? (feeUnits(currentData) === 1 ? 'golfer' : 'golfers') : competitorNoun(currentData, competitorCount(currentData))}). Set how many places win a prize — ties split the pro shop credit their tied places add up to.`
             : `No entry fee set for this tournament — type each place's pro shop credit below.`;
 
         let html = '';
