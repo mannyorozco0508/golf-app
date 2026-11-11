@@ -288,10 +288,9 @@
     }
   ],
   "try_gps": {
-    "file": "/media/screens/try-gps-dobson-7.webp",
-    "used_on": [],
-    "unused_since": "live Esri tiles (2026-11-10)",
-    "note": "The saved Esri World Imagery crop (z19, 610x780) that Try the GPS showed until Nov 10. The box now loads the same 16 tiles live from Esri. Kept on disk, served by no page; deleting it is Manny's call."
+    "file": null,
+    "deleted": "2026-11-10 (Manny typed OK delete saved Esri picture)",
+    "note": "The saved Esri World Imagery crop that Try the GPS showed until Nov 10 was deleted; the box loads the tiles live from Esri."
   },
   "superseded": [
     {

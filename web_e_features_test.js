@@ -248,13 +248,13 @@ describe('4. Try the GPS', () => {
         assert.ok(Math.abs(lat - 33.3718) < 0.0006 && Math.abs(lon + 111.8683) < 0.0006, 'the grid origin is not at the hole: ' + lat + ',' + lon);
         assert.match(html, /\.map \.tile\.err \{ visibility:hidden; \}/, 'a failed tile is not hidden');
         assert.match(JS, /im\.addEventListener\('error', function \(\) \{\s*im\.classList\.add\('err'\)/, 'the script does not hide a failed tile');
-        // the saved picture: served by nothing, still on disk, marked unused
+        // the saved picture: deleted (Manny typed "OK delete saved Esri picture", Nov 10) and served by nothing
         const pages = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html')).concat(fs.readdirSync(path.join(ROOT, 'help')).filter((f) => f.endsWith('.html')).map((f) => 'help/' + f));
         pages.forEach((f) => assert.ok(!read(f).includes('try-gps-dobson-7'), f + ' still serves the saved picture'));
         assert.ok(!/try-gps-dobson-7/.test(JS + read('site-clips.js') + read('sw.js')));
         const man = JSON.parse(read('media/screens/manifest.json'));
-        assert.equal(man.try_gps.file, '/media/screens/try-gps-dobson-7.webp');
-        assert.deepEqual(man.try_gps.used_on, []); assert.match(man.try_gps.unused_since, /live/);
+        assert.equal(man.try_gps.file, null); assert.match(man.try_gps.deleted, /OK delete saved Esri picture/);
+        assert.ok(!fs.existsSync(path.join(ROOT, 'media/screens/try-gps-dobson-7.webp')), 'the saved Esri picture is back on disk');
         // nothing else from outside in the box: the tiles are the only outside URLs in the whole features section
         const outside = [...feat.matchAll(/\b(?:src|href|data-src|poster)="(https?:[^"]+)"/g)].map((m) => m[1]).filter((u) => !/^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/19\//.test(u));
         assert.deepEqual(outside, [], 'an outside URL in the features section');
