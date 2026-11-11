@@ -331,7 +331,7 @@ describe('E. M3: the Desk with fees', () => {
         assert.match(tiles, /\$123\.45 card \(1\)/);
         assert.match(tiles, /\$123\.45 cash \(1\)/);
         assert.match(tiles, /\$123\.45 unpaid \(1\)/);
-        assert.match(tiles, /Card fees are absorbed by Rattle Golf/);
+        assert.match(tiles, /Card fees are absorbed by HardPan/);
         assert.match(tiles, /1 refund: \$123\.45\./);
     });
     test('E5 filters: All / Card / Cash / Unpaid / Refunded, and a chip filters', () => {

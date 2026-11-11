@@ -282,7 +282,9 @@ const PRODUCTS = {
         // HardPan Tournaments icon (brand-green field, cream HP and pin, cream
         // TOURNAMENTS band) and both pages label the home-screen icon
         // Tournaments. A device on v61 keeps the Rattle Golf R icon.
-        cacheName: 'tournament-v62-icon-b',
+        // Moved to v63 FOR PHASE 2 + THE EVENT COMMS PICKS (2026-11-11, Manny OK): see sw.js v399.
+        // A device on v62 keeps the pages without app mode, the one fee field and the comms picks.
+        cacheName: 'tournament-v63-phase2',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

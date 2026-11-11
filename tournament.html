@@ -449,16 +449,7 @@
         .ct-row.ct-suggest { flex-wrap: wrap; }
         .ct-row.ct-suggest > span:first-child { flex: 1 1 100%; margin-bottom: 8px; }
 
-        /* ---- STRIPE PHASE 1 (2026-11-08, test mode) -----------------------
-           THE BRAND BAR (M6): HardPan Tournaments, with Rattle Golf as
-           the company line. The mark is drawn in CSS - a cream ball in a black
-           tile - so no consumer icon file is loaded on a tournament page. */
-        .hp-brand { display: flex; align-items: center; gap: 10px; background: #0f4c3a; color: #ffffff; margin: -12px -12px 12px -12px; padding: 12px 16px; }
-        .hp-brand-mark { width: 30px; height: 30px; border-radius: 8px; background: #0B0F0C; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-        .hp-brand-mark span { width: 13px; height: 13px; border-radius: 50%; background: #efe9d8; display: block; }
-        .hp-brand-word { font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em; white-space: nowrap; }
-        .hp-brand-word .hp-brand-product { color: #d4f28a; }
-        .hp-brand-by { margin-left: auto; font-size: 0.82rem; color: rgba(255,255,255,0.82); white-space: nowrap; }
+        /* ---- STRIPE PHASE 1 (2026-11-08, test mode). The M6 bar left with rename A (2026-11-11). */
         /* M2a: the entry fee and the pay button on the signup form. */
         .fee-box { border: 1px solid var(--border-mid); border-radius: 12px; padding: 12px 14px; margin: 4px 0 12px 0; background: var(--bg-card); }
         .fee-box-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 1rem; padding-bottom: 8px; border-bottom: 1px solid var(--border-faint); }
@@ -811,7 +802,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              server reads the same field and never takes one from this page. -->
         <div class="fee-box" id="reg-fee-box" style="display:none;">
             <div class="fee-box-row"><span>Entry fee</span><strong id="reg-fee-amount"></strong></div>
-            <div class="fee-box-note">Card payments go to Rattle Golf LLC. Refunds by the organizer.</div>
+            <div class="fee-box-note">Card payments go to HardPan. Refunds by the organizer.</div>
         </div>
         <button class="btn-pay" id="reg-pay" style="display:none;" onclick="submitRegistrationAndPay()"></button>
         <button class="btn-primary" id="reg-submit" onclick="submitRegistration()">Sign up</button>
@@ -4062,7 +4053,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             + `<div class="pay-tile"><b id="pay-tile-card">${centsShort(t.cardCents)}</b><span>card (${t.card})</span></div>`
             + `<div class="pay-tile"><b id="pay-tile-cash">${centsShort(t.cashCents)}</b><span>cash (${t.cash})</span></div>`
             + `<div class="pay-tile"><b id="pay-tile-unpaid">${centsShort(t.unpaidCents)}</b><span>unpaid (${t.unpaid})</span></div>`
-            + `</div><p class="pay-note" id="pay-note">Card fees are absorbed by Rattle Golf, so the card total is what golfers paid.${extra.length ? ' ' + extra.join(' ') : ''}</p>`;
+            + `</div><p class="pay-note" id="pay-note">Card fees are absorbed by HardPan, so the card total is what golfers paid.${extra.length ? ' ' + extra.join(' ') : ''}</p>`;
     }
 
     // MARK CASH PAID / UNDO: the owner's own write, paid + paidAt + paidVia
@@ -4103,7 +4094,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const amt = centsText(refundAmountCents(e));
         refundSheet(
             `<h3 id="refund-sheet-title">Refund ${who} ${amt}?</h3>`
-            + `<p>Back to the card they paid with, usually in 5-10 days. Stripe keeps its fee; Rattle Golf absorbs it. You'll be asked next whether to take them out of the field.</p>`
+            + `<p>Back to the card they paid with, usually in 5-10 days. Stripe keeps its fee; HardPan absorbs it. You'll be asked next whether to take them out of the field.</p>`
             + `<p class="checkout-error" id="refund-sheet-error" style="display:none;"></p>`
             + `<button class="btn-danger" id="refund-confirm" onclick="confirmRefund()">Refund ${amt}</button>`
             + `<button class="btn-soft" onclick="closeRefundSheet()">Keep</button>`);
@@ -4258,7 +4249,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             html += `<div class="fees-row"><span><strong>Collect entry fees by card</strong><small>Golfers pay when they sign up</small></span>${feesToggle('fees-card', 'collectByCard', !!(f && f.collectByCard))}</div>`
                 + `<div class="fees-row"><span><strong>Also allow pay at the course</strong><small>Desk marks Paid (cash)</small></span>${feesToggle('fees-cash', 'allowCash', !!(f && f.allowCash))}</div>`
                 + `<div class="fees-stripe" id="fees-stripe"><div class="fees-stripe-head">✓ STRIPE CONNECTED</div>`
-                + `<div><span>Account</span><strong>Rattle Golf LLC</strong></div>`
+                + `<div><span>Account</span><strong>HardPan</strong></div>`
                 + `<div><span>Mode</span><span class="fees-test-mode">TEST MODE</span></div></div>`;
         } else {
             html += `<p class="fees-soon" id="fees-soon">Card payments coming soon. Golfers pay at the course; the Desk marks Paid (cash).</p>`;
