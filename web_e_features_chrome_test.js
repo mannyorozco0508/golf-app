@@ -11,11 +11,14 @@
 //      back to the card, and the Back button closes it too.
 //   3. A clip (Results) plays once when its card is in view: seen mid-play, then
 //      ended on its last frame and still there; with reduce motion, no clip loads.
-//   4. Try the GPS: OPTION D (Nov 10): the OpenStreetMap drawing (course, water,
-//      greens, pin) is on screen with "Map data © OpenStreetMap contributors" and
-//      no Esri credit; the page makes ZERO outside requests (no tile, no picture),
-//      before or after a tap; a tap at a point shows the to-tap and to-middle yards
-//      the map's scale gives for that point; no location is asked for.
+//   4. Try the GPS (Nov 11, Manny): Esri World Imagery with the WEBSITE's key
+//      (site-esri-config.js): the ONLY outside requests are the 16 keyed z19
+//      ibasemaps tiles of the grid, each carrying that key, before or after a tap;
+//      the "Powered by Esri" credit shows; a tap at a point shows the to-tap and
+//      to-middle yards the map's scale gives for that point; no location is asked
+//      for. (Was Option D, Nov 10: an OSM drawing and zero outside requests.)
+//      Whether a tile actually draws depends on the network and on Esri's
+//      referrer lock (hardpangolf.com only), so it is reported, not asserted.
 //   5. Try Just say it: typing a sentence shows the app's setup card, a chip
 //      shows another, an unknown sentence says so - and the page makes NO network
 //      request and writes no storage while you do it.
@@ -251,28 +254,35 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         assert.ok(r.length === 6 && r.every((x) => !x), 'a clip loaded with reduce motion on: ' + JSON.stringify(r));
     });
 
-    // OPTION D (Nov 10): the map is the page's own OpenStreetMap SVG. This checks the box makes NO outside
-    // request at all (and no request for a picture of any kind), the drawing is on screen, the OSM credit
-    // shows and no Esri credit does. Was: 16 live Esri World Imagery tiles, the only outside requests.
-    test('Try the GPS: the OSM credit shows, the OSM drawing is on screen, a tap gives the yards for that point, no location is asked for; the box makes zero outside requests', async () => {
+    // Nov 11 (Manny): the box loads Esri World Imagery with the website's own key. Outside requests: exactly
+    // the 16 keyed tiles of the grid (ibasemaps-api World_Imagery z19), each with the key from site-esri-config.js.
+    const KEY = (/key: '([^']+)'/.exec(fs.readFileSync(path.join(ROOT, 'site-esri-config.js'), 'utf8')) || [])[1];
+    const TILE = /^https:\/\/ibasemaps-api\.arcgis\.com\/arcgis\/rest\/services\/World_Imagery\/MapServer\/tile\/19\/(\d+)\/(\d+)\?token=(.+)$/;
+    const mask = (list) => JSON.stringify(list.map((u) => u.replace(/token=[^&]+/, 'token=<KEY>')));
+    test('Try the GPS: the Esri credit shows, the only outside requests are the 16 keyed tiles of the grid, a tap gives the yards for that point, no location is asked for', async () => {
+        assert.ok(KEY, 'no key in site-esri-config.js');
         tab.requests = [];
         await tab.go(base + '/');
         const box = await tab.eval(`(() => { const m = document.getElementById('tg-map'); m.scrollIntoView({ block: 'center' }); return true; })()`);
         assert.ok(box);
-        await sleep(1500);
+        await sleep(2500);
         const outside = tab.requests.filter((u) => !u.startsWith(base) && !/^data:|^about:|^chrome/.test(u));
-        assert.deepEqual(outside, [], 'the page made an outside request: ' + JSON.stringify(outside));
-        assert.equal(await tab.eval(`document.querySelectorAll('#tg-map img, #tg-map image, #tg-map iframe, #tg-map .tile').length`), 0, 'the map box holds a picture or tile');
-        const d = await tab.eval(`(() => { const s = document.querySelector('#tg-map svg.osm'), r = s.getBoundingClientRect(), m = document.getElementById('tg-map').getBoundingClientRect();
-            const vis = (sel) => [...s.querySelectorAll(sel)].filter((p) => { const b = p.getBoundingClientRect(); return b.width > 4 && b.height > 4 && getComputedStyle(p).visibility !== 'hidden'; }).length;
-            return { cover: Math.abs(r.width - m.width) < 2 && Math.abs(r.height - m.height) < 2, course: vis('.o-course'), water: vis('.o-water'), green: vis('.o-green'), pin: vis('.o-pin'),
-                fill: getComputedStyle(s.querySelector('.o-water')).fill, hole: (() => { const p = document.querySelector('#tg-map svg .o-hole').getBoundingClientRect(); return p.width > 20; })() }; })()`);
-        assert.ok(d.cover && d.course === 1 && d.water >= 1 && d.green >= 1 && d.pin === 1 && d.hole, 'the OSM drawing is not on screen: ' + JSON.stringify(d));
-        assert.notEqual(d.fill, 'none', 'the water is not filled');
+        const tiles = outside.filter((u) => TILE.test(u)), others = outside.filter((u) => !TILE.test(u));
+        assert.deepEqual(others, [], 'the page made an outside request that is not an Esri tile: ' + mask(others));
+        const grid = await tab.eval(`[...document.querySelectorAll('#tg-map .tile')].map((t) => t.dataset.y + '/' + t.dataset.x).sort()`);
+        assert.equal(grid.length, 16, 'the box does not hold 16 tiles');
+        const asked = [...new Set(tiles.map((u) => { const m = TILE.exec(u); return m[1] + '/' + m[2]; }))].sort();
+        assert.deepEqual(asked, grid, 'the tiles requested are not the grid\'s 16');
+        tiles.forEach((u) => assert.equal(decodeURIComponent(TILE.exec(u)[3]), KEY, 'a tile went out without the website key'));
+        const d = await tab.eval(`(() => { const t = document.querySelector('#tg-map .tiles').getBoundingClientRect(), m = document.getElementById('tg-map').getBoundingClientRect();
+            return { cover: Math.abs(t.width - m.width) < 2 && Math.abs(t.height - m.height) < 2, drawn: [...document.querySelectorAll('#tg-map .tile')].filter((i) => i.complete && i.naturalWidth > 0).length,
+                missing: document.getElementById('tg-map').getAttribute('data-tiles'), hole: document.querySelector('#tg-map svg .o-hole').getBoundingClientRect().width > 20 }; })()`);
+        assert.ok(d.cover && d.hole, 'the tiles or the hole outline are not on screen: ' + JSON.stringify(d));
+        console.log('# tiles drawn locally: ' + d.drawn + ' of 16 (missing: ' + d.missing + ')');
         const credit = await tab.eval(`document.getElementById('try-gps').innerText`);
-        assert.match(credit, /Map data © OpenStreetMap contributors/);
-        assert.doesNotMatch(credit, /Esri|Vantor|Earthstar/, 'an Esri credit is still on the box');
-        assert.match(credit, /this box makes no outside requests/);
+        assert.match(credit, /Powered by Esri · Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community · Hole outline © OpenStreetMap contributors/);
+        assert.doesNotMatch(credit, /Map data © OpenStreetMap contributors|no outside requests/, 'the OSM-only wording is still on the box');
+        assert.match(credit, /nothing leaves the page but the requests for the satellite picture, loaded live from Esri/);
         assert.match(credit, /Demo:/);
         // Tap at 50% across, 45% down the picture.
         const r = await tab.eval(`(() => { const m = document.getElementById('tg-map'), b = m.getBoundingClientRect();
@@ -292,8 +302,8 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         assert.match(got.read, new RegExp(a + ' y from you to the target, then ' + b + ' y'));
         assert.equal(got.geo, 0, 'the page asked for a location');
         assert.match(await tab.eval(`document.getElementById('tg-b').innerText`), new RegExp('^' + b + ' y\\s*to middle'), 'the to-middle number is not on screen');
-        const after = tab.requests.filter((u) => !u.startsWith(base) && !/^data:|^about:|^chrome/.test(u));
-        assert.deepEqual(after, [], 'the tap made an outside request');
+        const after = tab.requests.filter((u) => !u.startsWith(base) && !/^data:|^about:|^chrome/.test(u) && !TILE.test(u));
+        assert.deepEqual(after, [], 'the tap made an outside request: ' + mask(after));
     });
 
     test('Try Just say it: shows the setup card, makes no network request and stores nothing', async () => {
@@ -320,9 +330,9 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         const local = await tab.eval('({ ls: localStorage.length, ss: sessionStorage.length, cookie: document.cookie, url: location.href })');
         await sleep(500);
         const lazyImages = tab.requests.filter((u) => /\/media\/screens\/[a-z0-9-]+\.webp$/.test(u));
-        // OPTION D (Nov 10): the Try the GPS box above makes no request any more (was: its 16 Esri tiles
-        // were allowed here).
-        const other = tab.requests.filter((u) => !lazyImages.includes(u));
+        // The Try the GPS box above may still be fetching its 16 keyed Esri tiles (Nov 11): those are allowed
+        // here, nothing else is.
+        const other = tab.requests.filter((u) => !lazyImages.includes(u) && !/^https:\/\/ibasemaps-api\.arcgis\.com\/arcgis\/rest\/services\/World_Imagery\/MapServer\/tile\/19\/\d+\/\d+\?token=/.test(u));
         assert.deepEqual(other, [], 'Just say it made a network request');
         assert.deepEqual([local.ls, local.ss, local.cookie], [0, 0, ''], 'Just say it stored something');
         assert.ok(!/[?#]/.test(local.url.replace(base, '')), 'the form navigated: ' + local.url);

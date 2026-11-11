@@ -14,11 +14,15 @@
 //      the X, Esc, or the phone's Back button (the viewer adds one history
 //      entry and takes it back on close). Focus stays inside while it is open
 //      and returns to the card after.
-//   3. Try the GPS (idea 3): Dobson Ranch hole 7, OPTION D (Nov 10): the map is
-//      an inline SVG drawn from OpenStreetMap data only (course, water, greens,
-//      the pin, nearby buildings; saved once from Overpass into the HTML), on
-//      the same z19 Web Mercator grid the Esri tiles used, so the scale and the
-//      yards are unchanged. No Esri, no tiles, no outside request at all. A tap
+//   3. Try the GPS (idea 3): Dobson Ranch hole 7. Nov 11 (Manny): Esri World
+//      Imagery loaded live with the WEBSITE's own key (site-esri-config.js, the
+//      only file that holds it; referrer-locked to hardpangolf.com), credited
+//      "Powered by Esri" on the box. 16 z19 tiles on the same Web Mercator grid
+//      as before, so the scale and the yards are unchanged; the HTML has no tile
+//      URL, this file builds each one from the config. Was (Option D, Nov 10):
+//      an inline OpenStreetMap SVG with no outside request. A tile that fails
+//      (or a missing key) is hidden and the outline, lines and yards still draw
+//      on the green ground. Nothing else leaves the page. A tap
 //      (or the arrow keys) puts a target there and shows the yards from the
 //      "you" dot (on the tee) to the target and from the target to the middle
 //      of the green, measured on the map (metres per pixel in data-mpp).
@@ -188,8 +192,17 @@
     // ---- 3. TRY THE GPS ----------------------------------------------------------
     var map = $('tg-map');
     if (map) {
-        // Option D (Nov 10): the map is the page's own OpenStreetMap SVG; the Esri tiles and their
-        // load-error handler are gone (nothing else used it).
+        // The Esri tiles (Nov 11): src built from site-esri-config.js (the website's key); one that
+        // fails is hidden (the green ground and the outline stay); data-tiles says how many are missing.
+        var cfg = window.HP_SITE_ESRI, tiles = map.querySelectorAll('.tile');
+        var miss = function () { map.setAttribute('data-tiles', map.querySelectorAll('.tile.err').length + ' of ' + tiles.length + ' missing'); };
+        each(tiles, function (im) {
+            im.addEventListener('error', function () { im.classList.add('err'); miss(); });
+            if (!cfg || !cfg.key || !cfg.tiles) { im.classList.add('err'); return; }
+            im.src = cfg.tiles.replace('{z}', '19').replace('{y}', im.getAttribute('data-y')).replace('{x}', im.getAttribute('data-x'))
+                .replace('{key}', encodeURIComponent(cfg.key));
+        });
+        if (!cfg || !cfg.key) miss();
         var num = function (s) { return s.split(',').map(Number); };
         var MPP = Number(map.getAttribute('data-mpp')), W = Number(map.getAttribute('data-w')), H = Number(map.getAttribute('data-h'));
         var YOU = num(map.getAttribute('data-you')), MID = num(map.getAttribute('data-mid'));

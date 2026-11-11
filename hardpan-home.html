@@ -192,16 +192,12 @@
     .try { max-width:640px; margin:26px 0 4px; background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; }
     .try h3 { font-size:22px; font-weight:900; letter-spacing:-.01em; }
     .try .dl { color:var(--mut); font-size:14px; margin:3px 0 12px; }
-    .map { position:relative; width:100%; max-width:440px; aspect-ratio:610/780; margin:0 auto; border-radius:14px; overflow:hidden; cursor:crosshair; touch-action:manipulation; background:#ece7da; }
-    .map svg { position:absolute; inset:0; width:100%; height:100%; display:block; }
-    /* the OpenStreetMap drawing (Option D): drawn on the page, no outside request */
-    .map .o-land { fill:#ece7da; }
-    .map .o-course { fill:#b7da9c; }
-    .map .o-bldg { fill:#d8cfbd; stroke:#bfb39b; stroke-width:1.5; }
-    .map .o-water { fill:#9fd2ef; stroke:#5ea9d6; stroke-width:2; }
-    .map .o-green { fill:#74c25b; stroke:#4e9a3f; stroke-width:1.5; }
-    .map .o-pin line { stroke:#26332b; stroke-width:2.5; }
-    .map .o-pin polygon { fill:#e0412f; }
+    .map { position:relative; width:100%; max-width:440px; aspect-ratio:610/780; margin:0 auto; border-radius:14px; overflow:hidden; cursor:crosshair; touch-action:manipulation; background:#4d6b3c; }
+    .map svg, .map .tiles { position:absolute; inset:0; width:100%; height:100%; display:block; }
+    /* the Esri World Imagery tiles: no src in the HTML; site-features.js fills it from site-esri-config.js (the website's own key) */
+    .map .tiles { overflow:hidden; background:#4d6b3c; }
+    .map .tile { position:absolute; width:41.967%; height:32.821%; max-width:none; display:block; }   /* 256 of 610 x 780 */
+    .map .tile.err, .map .tile:not([src]) { visibility:hidden; }
     .map:focus-visible { outline:3px solid var(--g); outline-offset:3px; }
     .map .chip { position:absolute; transform:translate(-50%,-50%); background:rgba(17,26,21,.9); color:#fff; border-radius:12px; padding:6px 10px; font-size:12px; font-weight:700; line-height:1.25; white-space:nowrap; pointer-events:none; text-align:left; }
     .map .chip b { display:block; color:var(--lime); font-size:20px; }
@@ -313,23 +309,13 @@
     <div class="wrap trywrap"><section class="try" id="try-gps" aria-labelledby="try-gps-h">
         <h3 id="try-gps-h">Try the GPS</h3>
         <p class="dl">A real hole. Tap anywhere for the yardage.</p>
-        <div class="map" id="tg-map" tabindex="0" role="application" aria-roledescription="yardage demo" aria-label="Hole 7 at Dobson Ranch. Tap the map, or use the arrow keys, to measure." aria-describedby="tg-read"
+        <div class="map" id="tg-map" tabindex="0" role="application" aria-roledescription="yardage demo" aria-label="Hole 7 at Dobson Ranch. Tap the picture, or use the arrow keys, to measure." aria-describedby="tg-read"
              data-mpp="0.24935" data-w="610" data-h="780" data-you="329.8,674.4" data-mid="225.8,123">
-            <svg class="osm" viewBox="0 0 610 780" role="img" aria-label="Map of hole 7 at Dobson Ranch Golf Course, a par 3 with water on the left of the tee shot and the green at the top, drawn on this page from OpenStreetMap data." data-osm-base="2026-11-11T01:54:51Z" data-z="19" data-ox="25401248.34" data-oy="53897197.89" focusable="false">
-                <rect class="o-land" x="0" y="0" width="610" height="780"/>
-                <polygon class="o-course" data-osm="relation/326342" points="-8,788 -8,-8 618,-8 618,608.7 275.7,788"/>
-                <polygon class="o-bldg" data-osm="way/948516755" points="499.2,788 554.3,761 523,696.7 459.6,728 465.6,740.5 452.5,746.7 472.7,788"/>
-                <polygon class="o-bldg" data-osm="way/948516851" points="580,702.1 560.6,711.9 585.6,762.3 618,746.3 618,670.3 574.8,691.8"/>
-                <polygon class="o-water" data-osm="way/32276895" points="107,788 106.4,781.7 125.6,740.1 135.2,695.4 135.2,660.1 109.7,628.1 96.8,596.2 106.4,545 119.2,500.1 106.4,445.8 74.4,410.5 48.8,391.3 45.6,359.3 80.8,301.7 103.2,266.6 148.1,244.2 192.8,253.8 215.2,276.2 221.7,301.7 208.8,333.8 202.4,368.9 208.8,407.3 231.2,436.2 256.8,461.7 272.8,480.9 272.8,512.9 256.8,528.9 231.2,570.5 224.8,596.2 244,618.5 253.6,656.9 253.6,682.5 244,714.6 231.2,768.9 225.5,788"/>
-                <polygon class="o-green" data-osm="way/1566972137" points="539.8,448.7 541.5,456.4 542.3,465.6 540.8,475 537.7,482.6 532.6,491.5 525.4,497.7 518.4,502.5 507.8,506.5 495.3,511.2 481,513.9 469.8,514.2 454.5,511.5 444.8,505.3 436.7,496.6 434.7,489.4 436,484 439.4,480.1 444.5,475 457.2,463.1 464.8,454.7 470,445 474.4,434.1 478.9,424.2 485.9,415.1 496.7,408.9 505.5,408 516,410.3 523.2,415.1 529.7,421.5 533.2,430.1 537.2,438.7"/>
-                <polygon class="o-green" data-osm="way/1566972138" points="247.7,108.6 260.3,111.9 270.3,116.5 278.2,124.6 281.8,136.9 279.7,148 275.2,156.2 267.7,163.7 259.6,168.3 249.9,169.8 240,165.6 227.8,156.7 216.2,146.6 207.3,139.9 192.5,131.1 181.3,123.7 172.7,113.8 169.2,101.2 173.4,87.2 181.5,79.2 192,75.6 201.8,76.5 209.2,80.8 220.6,90.2 227.6,98.6 237.7,105.7"/>
-                <polygon class="o-green" data-osm="way/1567039830" points="44.9,253.7 44.8,264.9 41.2,275 34.2,283.3 22.4,289.5 10.3,294.2 -0.6,296.6 -8,296.2 -8,223.5 1.6,222.7 10.7,224.5 21.7,228.1 32.6,235.5 41.1,243.6"/>
-                <g class="o-pin" data-osm="node/11211780428"><line x1="224.1" y1="123.2" x2="224.1" y2="95"/><polygon points="224.1,95 244,101 224.1,107"/></g>
-            </svg>
+            <div class="tiles" data-z="19" data-ox="25401248.34" data-oy="53897197.89" data-tile="256" role="img" aria-label="Satellite picture of hole 7 at Dobson Ranch Golf Course, a par 3 with water on the left and three bunkers around the outlined green. Imagery from Esri World Imagery, loaded live."><img class="tile" data-y="210535" data-x="99223" style="left:-26.285%;top:-30.498%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210535" data-x="99224" style="left:15.682%;top:-30.498%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210535" data-x="99225" style="left:57.649%;top:-30.498%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210535" data-x="99226" style="left:99.616%;top:-30.498%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210536" data-x="99223" style="left:-26.285%;top:2.322%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210536" data-x="99224" style="left:15.682%;top:2.322%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210536" data-x="99225" style="left:57.649%;top:2.322%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210536" data-x="99226" style="left:99.616%;top:2.322%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210537" data-x="99223" style="left:-26.285%;top:35.143%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210537" data-x="99224" style="left:15.682%;top:35.143%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210537" data-x="99225" style="left:57.649%;top:35.143%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210537" data-x="99226" style="left:99.616%;top:35.143%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210538" data-x="99223" style="left:-26.285%;top:67.963%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210538" data-x="99224" style="left:15.682%;top:67.963%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210538" data-x="99225" style="left:57.649%;top:67.963%" width="256" height="256" loading="lazy" decoding="async" alt=""><img class="tile" data-y="210538" data-x="99226" style="left:99.616%;top:67.963%" width="256" height="256" loading="lazy" decoding="async" alt=""></div>
             <svg viewBox="0 0 610 780" aria-hidden="true" focusable="false">
-                <polygon class="o-hole" points="209.4,80.6 220.6,90 227.7,98.5 237.8,105.6 247.8,108.8 260.1,111.9 270.2,116.3 278,124.4 281.7,136.9 279.5,148 275,156.1 267.6,163.7 259.8,168.6 250.1,169.9 240,165.5 227.7,156.5 216.1,146.7 207.2,140 192.6,131.1 181.5,123.5 172.5,113.7 169.2,101.2 173.3,87.3 181.5,79.3 191.9,75.7 202,76.6" fill="none" stroke="#1f5e2c" stroke-width="3"/>
-                <line id="tg-l1" x1="329.8" y1="674.4" x2="225.8" y2="123" stroke="#f0b400" stroke-width="5"/>
-                <line id="tg-l2" x1="225.8" y1="123" x2="225.8" y2="123" stroke="#1f3d2b" stroke-width="4" stroke-dasharray="10 8"/>
+                <polygon class="o-hole" points="209.4,80.6 220.6,90 227.7,98.5 237.8,105.6 247.8,108.8 260.1,111.9 270.2,116.3 278,124.4 281.7,136.9 279.5,148 275,156.1 267.6,163.7 259.8,168.6 250.1,169.9 240,165.5 227.7,156.5 216.1,146.7 207.2,140 192.6,131.1 181.5,123.5 172.5,113.7 169.2,101.2 173.3,87.3 181.5,79.3 191.9,75.7 202,76.6" fill="rgba(255,255,255,.12)" stroke="#fff" stroke-width="3"/>
+                <line id="tg-l1" x1="329.8" y1="674.4" x2="225.8" y2="123" stroke="#ffcf4a" stroke-width="4"/>
+                <line id="tg-l2" x1="225.8" y1="123" x2="225.8" y2="123" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>
                 <circle cx="225.8" cy="123" r="6" fill="#fff"/>
                 <circle id="tg-t" cx="225.8" cy="123" r="13" fill="#fff" stroke="#ffcf4a" stroke-width="7" visibility="hidden"/>
                 <circle cx="329.8" cy="674.4" r="12" fill="#2f7cf6" stroke="#fff" stroke-width="5"/>
@@ -339,9 +325,9 @@
             <span class="chip yd" id="tg-a" style="left:54.07%;top:51.12%" hidden><b>&ndash;</b>to tap</span>
             <span class="chip yd" id="tg-b" style="left:37.02%;top:24.74%"><b id="tg-bn">153 y</b><span id="tg-bl">to middle</span></span>
         </div>
-        <p class="tread" id="tg-read" aria-live="polite">From the tee: 153 y to the middle of the green. Tap the map to measure.</p>
-        <p class="tnote">Demo: the blue &ldquo;you&rdquo; dot stands on the tee and the yards are measured on this map. This page does not ask for your location, and this box makes no outside requests: the map is drawn right here from OpenStreetMap data. In the app, the dot is you.</p>
-        <p class="cred">Map data &copy; OpenStreetMap contributors</p>
+        <p class="tread" id="tg-read" aria-live="polite">From the tee: 153 y to the middle of the green. Tap the picture to measure.</p>
+        <p class="tnote">Demo: the blue &ldquo;you&rdquo; dot stands on the tee and the yards are measured on this picture. This page does not ask for your location, and nothing leaves the page but the requests for the satellite picture, loaded live from Esri. In the app, the dot is you.</p>
+        <p class="cred">Powered by Esri &middot; Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community &middot; Hole outline &copy; OpenStreetMap contributors</p>
     </section></div>
     <div class="grp" id="g-games">
         <div class="ghd"><h2>Games</h2><span class="gn">6 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="Games: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="Games: more cards">&rsaquo;</button></span></div>
@@ -465,6 +451,7 @@
 </footer>
 
 <script src="/site-clips.js" defer></script>
+<script src="/site-esri-config.js" defer></script>
 <script src="/site-features.js" defer></script>
 <script src="/site-pricing.js"></script>
 <script>

@@ -217,43 +217,52 @@ describe('3. clips', () => {
 describe('4. Try the GPS', () => {
     const map = (/<div class="map" id="tg-map"[^>]*>/.exec(feat) || [''])[0];
     const num = (k) => (/data-[a-z]+/.test(k) ? (new RegExp(k + '="([^"]+)"').exec(map) || [])[1] : null);
-    // OPTION D (Nov 10): the map is drawn on the page from OpenStreetMap data only. Was: Esri World
-    // Imagery loaded live (16 z19 tiles) under an OSM green outline, credited "Powered by Esri ...".
-    test('an OpenStreetMap hole, credited "Map data © OpenStreetMap contributors", labelled as a demo; no Esri anywhere in the features section', () => {
+    // Nov 11 (Manny): Esri World Imagery loaded live with the WEBSITE's own key (site-esri-config.js),
+    // credited "Powered by Esri". Was (Option D, Nov 10): an inline OpenStreetMap SVG, no outside request.
+    const CFG = read('site-esri-config.js');
+    const KEY = (/key: '([^']+)'/.exec(CFG) || [])[1];
+    test('Esri World Imagery with the Esri credit, labelled as a demo; the OpenStreetMap drawing is gone', () => {
         assert.ok(map, 'no map');
-        assert.match(feat, /<p class="cred">Map data &copy; OpenStreetMap contributors<\/p>/);
-        assert.match(feat, /<p class="tnote">Demo: [^<]*does not ask for your location, and this box makes no outside requests: the map is drawn right here from OpenStreetMap data\./);
+        assert.match(feat, /<p class="cred">Powered by Esri &middot; Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community &middot; Hole outline &copy; OpenStreetMap contributors<\/p>/);
+        assert.match(feat, /<p class="tnote">Demo: [^<]*does not ask for your location, and nothing leaves the page but the requests for the satellite picture, loaded live from Esri\./);
         assert.match(feat, /Dobson Ranch &middot; Hole 7 &middot; Par 3/);
-        assert.doesNotMatch(feat, /esri|arcgis|world_imagery|vantor|earthstar/i, 'an Esri name or URL is back in the features section');
-        assert.doesNotMatch(JS, /arcgisonline|World_Imagery/i);
+        assert.doesNotMatch(feat, /<svg class="osm"/, 'the OSM drawing is back');
     });
-    test('the map is an inline SVG of OSM shapes on the page\'s own z19 grid (course, water, greens, the pin); no tiles, no images, no outside URL in the features section', () => {
-        const svg = /<svg class="osm" viewBox="0 0 610 780" role="img" aria-label="Map of hole 7 at Dobson Ranch[^"]*OpenStreetMap data\." data-osm-base="[\dTZ:-]+" data-z="(\d+)" data-ox="([\d.]+)" data-oy="([\d.]+)" focusable="false">([\s\S]*?)<\/svg>/.exec(feat);
-        assert.ok(svg, 'no OSM drawing');
-        const Z = Number(svg[1]), OX = Number(svg[2]), OY = Number(svg[3]), body = svg[4];
+    test('the key: the website\'s own key lives in site-esri-config.js and NOWHERE else in the repo; it is not the app\'s key', () => {
+        assert.ok(KEY && KEY.length > 40, 'no key in site-esri-config.js');
+        assert.match(CFG, /tiles: 'https:\/\/ibasemaps-api\.arcgis\.com\/arcgis\/rest\/services\/World_Imagery\/MapServer\/tile\/\{z\}\/\{y\}\/\{x\}\?token=\{key\}'/);
+        const holders = [];
+        const walk = (d) => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).forEach((e) => {
+            const r = d ? d + '/' + e.name : e.name;
+            if (e.isDirectory()) { if (!/^(\.git|node_modules|gps-beta|android|ios)$/.test(e.name)) walk(r); return; }
+            let t; try { t = fs.readFileSync(path.join(ROOT, r), 'latin1'); } catch (er) { return; }
+            if (t.includes(KEY)) holders.push(r);
+        });
+        walk('');
+        assert.deepEqual(holders, ['site-esri-config.js'], 'the website key is in more than one file');
+        if (fs.existsSync(path.join(ROOT, 'gps-config.js'))) assert.ok(!read('gps-config.js').includes(KEY), 'the website key is the app key');
+        // the homepage loads the config before site-features.js (both deferred, so in this order)
+        assert.match(html, /<script src="\/site-esri-config\.js" defer><\/script>\n<script src="\/site-features\.js" defer><\/script>/);
+    });
+    test('16 z19 tiles on the page\'s own grid at the hole; no tile URL in the HTML (site-features.js builds it from the config); no other outside URL', () => {
+        const tl = /<div class="tiles" data-z="(\d+)" data-ox="([\d.]+)" data-oy="([\d.]+)" data-tile="256" role="img" aria-label="Satellite picture of hole 7 at Dobson Ranch[^"]*Esri World Imagery, loaded live\.">([\s\S]*?)<\/div>/.exec(feat);
+        assert.ok(tl, 'no tiles');
+        const Z = Number(tl[1]), OX = Number(tl[2]), OY = Number(tl[3]);
         assert.equal(Z, 19);
-        // the grid origin is z19 at Dobson Ranch hole 7 (33.3718 N, 111.8683 W, within a few metres)
         const lon = OX / (256 * Math.pow(2, Z)) * 360 - 180, lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * OY / (256 * Math.pow(2, Z))))) * 180 / Math.PI;
         assert.ok(Math.abs(lat - 33.3718) < 0.0006 && Math.abs(lon + 111.8683) < 0.0006, 'the grid origin is not at the hole: ' + lat + ',' + lon);
-        const shapes = [...body.matchAll(/<polygon class="(o-[a-z]+)" data-osm="((?:way|relation)\/\d+)" points="([^"]+)"\/>/g)];
-        const kinds = shapes.map((m) => m[1]);
-        ['o-course', 'o-water', 'o-green'].forEach((k) => assert.ok(kinds.includes(k), 'no ' + k + ' in the drawing'));
-        assert.ok(shapes.some((m) => m[1] === 'o-green' && m[2] === 'way/1566972138'), 'hole 7\'s OSM green (way/1566972138) is not drawn');
-        shapes.forEach((m) => m[3].split(' ').forEach((q) => { const [x, y] = q.split(',').map(Number);
-            assert.ok(x >= -8 && x <= 618 && y >= -8 && y <= 788, m[2] + ' has a point off the map: ' + q); }));
-        // the pin: OSM node 11211780428 (golf=pin, 33.3715900 N, 111.8679410 W) lands where it is drawn
-        const pin = /<g class="o-pin" data-osm="node\/11211780428"><line x1="([\d.]+)" y1="([\d.]+)"/.exec(body);
-        assert.ok(pin, 'no pin');
-        const X = (256 * Math.pow(2, Z)) * (-111.867941 + 180) / 360 - OX;
-        const r = 33.37159 * Math.PI / 180, Y = (256 * Math.pow(2, Z)) * (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 - OY;
-        assert.ok(Math.abs(Number(pin[1]) - X) < 1.5 && Math.abs(Number(pin[2]) - Y) < 1.5, 'the pin is drawn at ' + pin[1] + ',' + pin[2] + ', the grid puts it at ' + X.toFixed(1) + ',' + Y.toFixed(1));
-        const mid = num('data-mid').split(',').map(Number);
-        assert.ok(Math.hypot(mid[0] - X, mid[1] - Y) < 4, 'the middle of the green is not at the hole\'s pin');
-        // no tiles, no pictures, no outside URL: the box draws itself
-        const box = (/<div class="map" id="tg-map"[\s\S]*?<\/div>\s*<p class="tread"/.exec(feat) || [''])[0];
-        assert.ok(box, 'no map box');
-        assert.doesNotMatch(box, /<img|<image|<iframe|<object|<embed|url\(|https?:/i, 'the map box loads something');
-        assert.doesNotMatch(html + JS, /class="tile"|\.tile\b|data-tiles/, 'the Esri tile markup, CSS or error handler is back');
+        const ims = [...tl[4].matchAll(/<img class="tile" data-y="(\d+)" data-x="(\d+)" style="left:(-?[\d.]+)%;top:(-?[\d.]+)%" width="256" height="256" loading="lazy" decoding="async" alt="">/g)];
+        assert.equal(ims.length, 16, '16 tiles expected');
+        ims.forEach((m) => {
+            // each tile sits where the grid puts it: (x*256 - OX) / 610, (y*256 - OY) / 780
+            const L = (Number(m[2]) * 256 - OX) / 610 * 100, T = (Number(m[1]) * 256 - OY) / 780 * 100;
+            assert.ok(Math.abs(L - Number(m[3])) < 0.01 && Math.abs(T - Number(m[4])) < 0.01, 'tile ' + m[1] + '/' + m[2] + ' is off the grid');
+        });
+        assert.doesNotMatch(tl[4], /src=|https?:/, 'a tile URL (or a key) is in the HTML');
+        // site-features.js builds the URL from the config, with the key, at z19
+        assert.match(JS, /var cfg = window\.HP_SITE_ESRI, tiles = map\.querySelectorAll\('\.tile'\);/);
+        assert.match(JS, /im\.src = cfg\.tiles\.replace\('\{z\}', '19'\)\.replace\('\{y\}', im\.getAttribute\('data-y'\)\)\.replace\('\{x\}', im\.getAttribute\('data-x'\)\)\s*\.replace\('\{key\}', encodeURIComponent\(cfg\.key\)\);/);
+        assert.doesNotMatch(JS, /arcgisonline|server\.arcgisonline/i, 'the keyless public tile host is back');
         // the saved picture: deleted (Manny typed "OK delete saved Esri picture", Nov 10) and served by nothing
         const pages = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html')).concat(fs.readdirSync(path.join(ROOT, 'help')).filter((f) => f.endsWith('.html')).map((f) => 'help/' + f));
         pages.forEach((f) => assert.ok(!read(f).includes('try-gps-dobson-7'), f + ' still serves the saved picture'));
