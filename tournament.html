@@ -4251,7 +4251,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const amount = dollars > 0 ? `${centsShort(Math.round(dollars * 100))} per ${per}` : 'not set';
         let html = `<h3 style="margin:0 0 4px 0;">Entry fees</h3>`
             + `<div class="fees-row"><span><strong>Entry fee</strong><small>set under Event details</small></span><strong id="fees-amount">${escReg(amount)}</strong></div>`
-            + (per === 'team' && dollars > 0 ? `<p class="fees-soon" id="fees-per-team">Card payments charge each golfer. This fee is per team, so cards stay off; switch it to per golfer under Event details to collect by card.</p>` : '')
+            // The per-team sentence waits for Stripe (Advisor 2026-11-11 14:17): shown only where card payments are live for this owner.
+            + (paymentsAllowed && per === 'team' && dollars > 0 ? `<p class="fees-soon" id="fees-per-team">Card payments charge each golfer. This fee is per team, so cards stay off; switch it to per golfer under Event details to collect by card.</p>` : '')
             + `<p class="fees-error" id="fees-error" style="display:${keepErr ? 'block' : 'none'};">${escReg(keepErr)}</p>`;
         if (paymentsAllowed) {
             html += `<div class="fees-row"><span><strong>Collect entry fees by card</strong><small>Golfers pay when they sign up</small></span>${feesToggle('fees-card', 'collectByCard', !!(f && f.collectByCard))}</div>`
