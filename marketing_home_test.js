@@ -121,12 +121,15 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         // "a Rattle Golf LLC app". Was: <title>HardPan Golf</title> and a "HardPan Golf" footer.
         assert.match(html, /<title>HardPan: Golf GPS &amp; Games<\/title>/);
         assert.match(html, /<footer>[\s\S]*?<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ<\/div>[\s\S]*?<\/footer>/);
-        // The header keeps the short name next to the logo until Manny picks a layout (choices/41: the
-        // full name does not fit one line next to "Get the app" at 390 px).
-        assert.match(html, /<a class="logo" href="\/"><img src="\/hardpan-icon\.svg" alt="" width="36" height="36">HardPan Golf<\/a>/);
+        // 41A (Manny, Nov 11): the header shows the full name on two lines, "HardPan:" over "Golf GPS & Games".
+        // Was: "HardPan Golf" on one line. Same header on help.html and help/*.html.
+        const HDR41 = /<a class="logo" href="[^"]*"><img src="\/hardpan-icon\.svg" alt="" width="36" height="36"><span class="logo-name"><span class="logo-1">HardPan:<\/span><span class="logo-2">Golf GPS &amp; Games<\/span><\/span><\/a>/;
+        assert.match(html, HDR41);
+        assert.doesNotMatch(html, /<a class="logo"[^>]*>[\s\S]{0,120}HardPan Golf<\/a>/, 'header still says HardPan Golf');
         // the help pages share the footer: same full name there
         ['help.html'].concat(fs.readdirSync(path.join(ROOT, 'help')).filter((f) => f.endsWith('.html')).map((f) => 'help/' + f)).forEach((f) => {
             assert.match(read(f), /<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ/, f + ': footer is not the full name');
+            assert.match(read(f), HDR41, f + ': header is not the 41A two-line name');
         });
         assert.match(html, /Play it\. Run it\./);
         // Not the scorecard, not the front door: no Firebase, no app script.
