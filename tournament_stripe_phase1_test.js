@@ -163,13 +163,18 @@ describe('A. THE DEFAULT STATE: no fees node, today\'s signup form', () => {
 });
 
 describe('B. M2a: the fee and the pay button come from fees.entryFeeCents', () => {
-    test('B1 card fees: pay button + fee box + cash line; Sign up hidden; amount from CENTS, not the old entryFee dollars', async () => {
-        const sb = arriveRegister(record({ entryFee: 50, fees: Object.assign({}, FEES, { entryFeeCents: 12345 }) })); await settle();
+    // Re-pinned 2026-11-11 (Manny: ONE entry fee field): the record's fee is $123.45 per
+    // golfer, and fees.entryFeeCents is its mirror (12345), which the server reads.
+    test('B1 card fees: pay button + fee box + cash line; Sign up hidden; the amount is the one fee, per golfer, as cents', async () => {
+        const sb = arriveRegister(record({ entryFee: 123.45, entryFeePer: 'golfer', fees: Object.assign({}, FEES, { entryFeeCents: 12345 }) })); await settle();
         assert.equal(shown(sb, 'reg-pay'), true); assert.equal(shown(sb, 'reg-fee-box'), true);
         assert.equal(shown(sb, 'reg-cash-line'), true); assert.equal(shown(sb, 'reg-submit'), false);
         assert.equal(el(sb, 'reg-pay').textContent, 'Pay entry fee $123.45 ›');
         assert.equal(el(sb, 'reg-fee-amount').textContent, '$123.45');
         assert.ok(!/\$50/.test(el(sb, 'reg-pay').textContent));
+        // The one field wins over a stale mirror: $50 per golfer with cents still 12345 reads $50.
+        const stale = arriveRegister(record({ entryFee: 50, entryFeePer: 'golfer', fees: Object.assign({}, FEES, { entryFeeCents: 12345 }) })); await settle();
+        assert.equal(el(stale, 'reg-pay').textContent, 'Pay entry fee $50.00 \u203a');
     });
     test('B2 allowCash false: no "Sign up without paying"', async () => {
         const sb = arriveRegister(record({ fees: Object.assign({}, FEES, { allowCash: false }) })); await settle();
@@ -438,19 +443,23 @@ describe('H. M4: the Entry fees card', () => {
         assert.match(plain(card), /Card payments coming soon/);
         assert.match(plain(card), /Entry fees/, 'positive: the card itself is there');
     });
-    test('H3 dollars typed, integer cents stored; 85.555 and 0.50 refused with nothing written', async () => {
-        const sb = arriveOwner(record({ fees: FEES }), { reads: { 'payments/allowedOwners/u-org': true } });
-        await settle(); fireRecord(sb, record({ fees: FEES }));
-        const type = (v) => { el(sb, 'fees-dollars').value = v; tap(sb, html(sb, 'entry-fees-block'), byId('fees-dollars'), 'fees-dollars'); };
+    // RE-PINNED 2026-11-11 (Manny: ONE entry fee field). The card has no box of
+    // its own: it reads entryFee / entryFeePer (Setup > Event details) and mirrors
+    // the integer cents the server reads into fees.entryFeeCents.
+    test('H3 the card reads the one fee: $85.50 per golfer -> "85.50 per golfer" and fees.entryFeeCents 8550 mirrored; a per-team fee turns cards off; no fee box of its own', async () => {
+        const sb = arriveOwner(record({ fees: FEES, entryFee: 85.5, entryFeePer: 'golfer' }), { reads: { 'payments/allowedOwners/u-org': true } });
+        await settle(); fireRecord(sb, record({ fees: FEES, entryFee: 85.5, entryFeePer: 'golfer' }));
+        const card = html(sb, 'entry-fees-block');
+        assert.ok(!/id="fees-dollars"/.test(card), 'no second fee box');
+        assert.match(plain(card), /Entry fee set under Event details \$85\.50 per golfer/);
         const feeWrites = () => sb.__dbWrites.filter((w) => /^tournaments\/OWN1\/fees/.test(w.path));
-        type('85.555'); type('0.50'); type('abc');
-        assert.equal(feeWrites().length, 0);
-        assert.match(String(el(sb, 'fees-error').textContent), /\$1\.00 to \$1,000\.00|dollars and cents/);
-        type('85.50');
-        assert.deepEqual(clone(feeWrites().map((w) => [w.op, w.value])), [['update', { entryFeeCents: 8550, collectByCard: true, allowCash: true }]]);
-        type('$1,000');
-        assert.equal(feeWrites()[1].value.entryFeeCents, 100000);
-        assert.ok(Number.isInteger(feeWrites()[0].value.entryFeeCents));
+        assert.deepEqual(clone(feeWrites().map((w) => [w.op, w.value])), [['update', { entryFeeCents: 8550 }]], 'the cents the server reads, mirrored once');
+        const team = arriveOwner(record({ fees: FEES, entryFee: 400, entryFeePer: 'team' }), { reads: { 'payments/allowedOwners/u-org': true } });
+        await settle(); fireRecord(team, record({ fees: FEES, entryFee: 400, entryFeePer: 'team' }));
+        assert.match(plain(html(team, 'entry-fees-block')), /\$400 per team/);
+        assert.match(plain(html(team, 'entry-fees-block')), /This fee is per team, so cards stay off/);
+        const w = team.__dbWrites.filter((x) => /^tournaments\/OWN1\/fees/.test(x.path));
+        assert.deepEqual(clone(w.map((x) => [x.op, x.value])), [['update', { entryFeeCents: null, collectByCard: false }]]);
     });
     test('H4 the card toggle writes fees/collectByCard only for an allow-listed owner', async () => {
         const ok = arriveOwner(record({ fees: FEES }), { reads: { 'payments/allowedOwners/u-org': true } });
