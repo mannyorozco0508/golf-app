@@ -188,8 +188,9 @@ const FILL_TEAM = { expression: `(function(){ document.getElementById('t-name').
     if (!cam) bail('no-card probe did not parse', c.value);
     // Re-pinned 2026-11-11 (Advisor): a no-card pick is SELECTED on a placeholder card; the note under the box says so and offers the fetch.
     if (!cam.courseKey) failures.push('no-card: the course was not selected (placeholder card expected)');
-    if (!/No scorecard for Mint Valley Golf Course yet\./.test(cam.note || '')) failures.push('no-card: no placeholder note under the box: ' + JSON.stringify(cam.note));
-    if (!/Get the card for "Mint Valley Golf Course" online/.test(cam.note || '')) failures.push('no-card: the fetch is not offered by name: ' + JSON.stringify(cam.note));
+    // ...and (later 2026-11-11) the pick looks the card up by itself; with nothing matched the note says so and offers the lookup again.
+    if (!/Nothing online matched Mint Valley Golf Course\.|Couldn't look up Mint Valley Golf Course online/.test(cam.note || '')) failures.push('no-card: no placeholder note under the box: ' + JSON.stringify(cam.note));
+    if (!/Try the online lookup again/.test(cam.note || '')) failures.push('no-card: the lookup is not offered again: ' + JSON.stringify(cam.note));
     if (cam.api.length !== 0) failures.push('no-card: a request was spent without a tap: ' + JSON.stringify(cam.api));
 
     const verdict = failures.length ? 'FAIL' : 'PASS';

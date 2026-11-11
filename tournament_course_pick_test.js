@@ -1,24 +1,33 @@
 // THE COURSE PICKER, the way an organizer reaches it (Advisor 2026-11-11 12:42,
 // Manny's phone test on the preview: typed "Pap", tapped Papago Golf Club,
-// nothing selected, Save said "Please select a golf course" in a dialog).
+// nothing selected, Save said "Please select a golf course" in a dialog; then
+// Manny: "tapping a course with no card must fetch its real card online
+// automatically - one step, like the HardPan app - the par-4 placeholder only
+// if that fetch fails").
 // Cold arrival at 390x844 (tools/lib/cold-arrival.js), signed in as an
-// organizer, no card for the course anywhere (global_courses empty, no preset),
-// the online search NOT configured (its proxy answers not_configured, as a
-// preview host does). Real taps and keystrokes; no page function is called.
+// organizer, no card for the course anywhere (global_courses empty, no preset).
+// The proxy is REPLACED per test (a preScript wraps window.fetch - the page
+// calls whatever fetch is): the provider's answer, or not_configured as a
+// preview host without the config answers. Real taps and keystrokes; no page
+// function is called.
 //
-//  1 type "pap", tap Papago Golf Club: SELECTED (the box and course-key), the
-//    note under the box says the card is a placeholder and offers the fetch;
-//    no dialog opened
-//  2 ...then a team and Save: the creating write carries the course by name,
-//    courseIndexSynthetic true and eighteen par 4s indexed 1..18; the page
-//    moves to the event
-//  3 Save with no course picked: "Pick a golf course first." under the box, no
+//  1 type "pap", tap Papago Golf Club: ONE search by name and ONE detail fetch,
+//    no tap; the real card is selected (the import key, the provider's name,
+//    Blue tees), the note says so and offers Change tees; no dialog
+//  2 ...then a team and Save: the record carries the imported course by name,
+//    courseIndexSynthetic false, the Blue stroke index, importedCourses
+//  3 the proxy not configured (a preview host): the pick is still selected, on
+//    the placeholder card; the note names the reason and offers the lookup
+//    again; Save works and the record says courseIndexSynthetic true
+//  4 the provider knows nothing by that name: placeholder, "Nothing online
+//    matched", one search and no detail fetch
+//  5 Save with no course picked: "Pick a golf course first." under the box, no
 //    write, no dialog (cold-arrival fails the arrival on any native dialog)
-//  4 money = base: payouts.js, tournament-engine.js, handicap.js are main
+//  6 money = base: payouts.js, tournament-engine.js, handicap.js are main
 //    97698412 byte for byte
 //
-// Baseline against phase2 edfc5e80 (before this fix): all 4 tests: 1 PASS / 3 FAIL.
-// The 1 is test 4. With the fix: all 4 tests: 4 PASS / 0 FAIL.
+// Baseline against phase2 edfc5e80 (before the fix): all 6 tests: 1 PASS / 5 FAIL.
+// The 1 is test 6. With the fix: all 6 tests: 6 PASS / 0 FAIL.
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -29,75 +38,119 @@ const { arriveCold, fileUrl } = require('./tools/lib/cold-arrival.js');
 
 const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
 const empty = () => ({ tournaments: {}, events: {}, trips: {}, global_courses: {} });
-// The proxy, replaced: the preview's answer. The page calls whatever fetch is.
-const PRE = `(function () { const real = window.fetch; window.fetch = function (u, o) {
-    if (/\\/api\\/course-search/.test(String(u))) return Promise.resolve(new Response(JSON.stringify({ status: 'unavailable', reason: 'not_configured' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-    return real.apply(this, arguments); }; })();`;
+// THE PROVIDER'S PAPAGO (the live proxy's own shape, 2026-11-11), plus a decoy
+// that shares the word "club" and nothing else.
+const PARS = [4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 4, 3, 5, 4, 4, 3, 4, 5];
+const holes = (order) => order.map((si, i) => ({ par: PARS[i], yardage: 380, handicap: si }));
+const SI_BLUE = [7, 13, 17, 1, 5, 11, 15, 9, 3, 8, 14, 18, 2, 6, 12, 16, 10, 4];
+const SI_WHITE = [13, 7, 17, 1, 5, 11, 15, 9, 3, 8, 14, 18, 2, 6, 12, 16, 10, 4];
+const PAPAGO = { id: 'hpag0kx6', club_name: 'Papago Golf Course', course_name: 'Papago Golf Course',
+    location: { address: '5595 E Karsten Way, Phoenix, AZ 85008, USA', city: 'Phoenix', state: 'AZ' }, tees: { male: 2, female: 1 } };
+const DECOY = { id: 'zz999', club_name: 'Pinnacle Peak Country Club', course_name: 'Pinnacle Peak Country Club', location: { city: 'Scottsdale', state: 'AZ' }, tees: { male: 1 } };
+const PAPAGO_DETAIL = Object.assign({}, PAPAGO, { tees: {
+    male: [{ tee_name: 'White', course_rating: 70.1, slope_rating: 125, total_yards: 6300, par_total: 72, holes: holes(SI_WHITE) },
+           { tee_name: 'Blue', course_rating: 72.4, slope_rating: 131, total_yards: 6800, par_total: 72, holes: holes(SI_BLUE) }],
+    female: [{ tee_name: 'Red', course_rating: 69.0, slope_rating: 118, total_yards: 5400, par_total: 72, holes: holes(SI_BLUE) }] } });
+const proxy = (search, detail) => `(function () { window.__api = []; const real = window.fetch; const J = (o) => Promise.resolve(new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    window.fetch = function (u, o) { const s = String(u);
+        if (/\\/api\\/course-search/.test(s)) { window.__api.push(s); return J(${JSON.stringify(search)}); }
+        if (/\\/api\\/course\\//.test(s)) { window.__api.push(s); return J(${JSON.stringify(detail)}); }
+        return real.apply(this, arguments); }; })();`;
+const PROVIDER = proxy({ status: 'ok', courses: [DECOY, PAPAGO] }, { status: 'ok', course: PAPAGO_DETAIL });
+const NOT_CONFIGURED = proxy({ status: 'unavailable', reason: 'not_configured' }, { status: 'unavailable', reason: 'not_configured' });
+const NOTHING = proxy({ status: 'ok', courses: [] }, { status: 'unavailable', reason: 'bad_course_id' });
 const READ = { expression: `JSON.stringify((function () {
   var $ = function (s) { return document.querySelector(s); };
   var shown = function (e) { if (!e) return false; if (getComputedStyle(e).display === 'none') return false; var r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   var t = function (s) { var e = $(s); return e ? (e.innerText || '').replace(/\\s+/g, ' ').trim() : null; };
-  return { box: ($('#course-search-input') || {}).value || '', key: ($('#course-key') || {}).value || '', note: shown($('#course-note')) ? t('#course-note') : '', noteBtn: !!$('#course-note-online'),
-    dropdown: shown($('#course-dropdown')), setup: shown($('#setup-screen')), manage: shown($('#manage-screen')), title: t('#ap-m-title'),
+  return { box: ($('#course-search-input') || {}).value || '', key: ($('#course-key') || {}).value || '', note: shown($('#course-note')) ? t('#course-note') : '',
+    noteBtn: (function () { var b = $('#course-note button'); return b ? b.id : null; })(), panel: shown($('#course-import-confirm')), api: window.__api || [],
+    dropdown: shown($('#course-dropdown')), setup: shown($('#setup-screen')),
     writes: (window.__coldWrites || []).map(function (w) { return { op: w.op, path: w.path, value: w.value }; }) };
 })())` };
-const PICK = [{ tap: '#course-search-input' }, { cdp: { method: 'Input.insertText', params: { text: 'pap' } } }, { sleep: 250 }, { tap: '#course-dropdown .custom-select-option' }, { sleep: 400 }];
-const go = async (steps) => {
-    const r = await arriveCold({ url: fileUrl('tournament.html', 'app=1'), db: empty(), auth: OWNER, settleMs: 3000, preScript: PRE, steps });
+const PICK = [{ tap: '#course-search-input' }, { cdp: { method: 'Input.insertText', params: { text: 'pap' } } }, { sleep: 250 }, { tap: '#course-dropdown .custom-select-option' }, { sleep: 700 }];
+const FILL = { expression: `(function () { document.getElementById('t-name').value = 'Hope Foundation Scramble';
+    var p = document.querySelector('#teams-list .team-card .team-name-inputs input'); if (!p) return 'no team input'; p.value = 'Al Lopez'; return 'filled'; })()` };
+// The stand-in database lives in the document: the writes are stored at pagehide
+// and replayed into the next document's stand-in, so the page can move to the
+// event it just created (as tournament_phase2_test.js does).
+const CARRY = `(function () { try {
+    var saved = JSON.parse(sessionStorage.getItem('__cpw') || '[]');
+    saved.forEach(function (x) { var r = firebase.database().ref(x.path); if (x.op === 'set') r.set(x.value); else if (x.op === 'update') r.update(x.value); });
+    window.__coldWrites = [];
+    window.addEventListener('pagehide', function () { try { sessionStorage.setItem('__cpw', JSON.stringify(saved.concat(window.__coldWrites || []))); } catch (e) {} });
+} catch (e) {} })();`;
+const CARRIED = { expression: `(function () { try { return JSON.stringify({ carried: JSON.parse(sessionStorage.getItem('__cpw') || '[]'), search: location.search }); } catch (e) { return 'no storage'; } })()` };
+const go = async (pre, steps) => {
+    const r = await arriveCold({ url: fileUrl('tournament.html', 'app=1'), db: empty(), auth: OWNER, settleMs: 3000, preScript: pre, steps });
     assert.ok(r.ok, r.reason);
-    return r.value.filter((v) => typeof v === 'string' && v[0] === '{').map((v) => JSON.parse(v));
+    return { objs: r.value.filter((v) => typeof v === 'string' && v[0] === '{').map((v) => JSON.parse(v)), raw: r.value };
+};
+const createdRecord = (c) => {
+    const create = c.carried.find((w) => w.op === 'update' && w.path === '' && Object.keys(w.value).some((k) => /^tournaments\/[A-Z2-9]{6}$/.test(k)));
+    assert.ok(create, 'the creating write: ' + JSON.stringify(c.carried.map((w) => w.path)));
+    return create.value[Object.keys(create.value).find((k) => /^tournaments\//.test(k))];
 };
 
-test('1 type "pap", tap Papago Golf Club: selected on a placeholder card, the note says so and offers the fetch; no dialog', async () => {
-    const [a] = await go(PICK.concat([READ]));
+test('1 type "pap", tap Papago Golf Club: one search, one detail fetch, no tap; the real card is selected and the note says so', async () => {
+    const { objs: [a] } = await go(PROVIDER, PICK.concat([READ]));
     assert.equal(a.setup, true, 'positive: the create form');
-    assert.equal(a.key, 'az_papago', 'selected');
-    assert.equal(a.box, 'Papago Golf Club');
+    assert.deepEqual(a.api, ['/api/course-search?q=Papago%20Golf%20Club', '/api/course/hpag0kx6'], 'the search by the directory name, then the matched course (not the decoy)');
+    assert.equal(a.key, 'gca_hpag0kx6', 'the imported course is selected');
+    assert.equal(a.box, 'Papago Golf Course', 'named as the provider names it');
     assert.equal(a.dropdown, false, 'the list closed');
-    assert.match(a.note, /^No scorecard for Papago Golf Club yet\. Pars are set to 4 and the stroke index to 1–18 until a card is loaded, so the event scores gross\. 🌐 Get the card for "Papago Golf Club" online$/);
-    assert.equal(a.noteBtn, true);
+    assert.equal(a.note, 'Scorecard loaded online: Papago Golf Course, Blue tees, par 72. Change tees');
+    assert.equal(a.noteBtn, 'course-note-tees');
+    assert.equal(a.panel, false, 'no tee panel until asked');
     assert.deepEqual(a.writes, [], 'nothing written by a pick');
 });
 
-test('2 ...then a team and Save: the record carries the course by name, the synthetic flag and eighteen par 4s; the page moves on', async () => {
-    const FILL = { expression: `(function () { document.getElementById('t-name').value = 'Hope Foundation Scramble';
-        var p = document.querySelector('#teams-list .team-card .team-name-inputs input'); if (!p) return 'no team input'; p.value = 'Al Lopez'; return 'filled'; })()` };
-    // The stand-in database lives in the document: the writes are stored at
-    // pagehide and replayed into the next document's stand-in, so the page can
-    // move to the event it just created (as tournament_phase2_test.js does).
-    const CARRY = `(function () { try {
-        var saved = JSON.parse(sessionStorage.getItem('__cpw') || '[]');
-        saved.forEach(function (x) { var r = firebase.database().ref(x.path); if (x.op === 'set') r.set(x.value); else if (x.op === 'update') r.update(x.value); });
-        window.__coldWrites = [];
-        window.addEventListener('pagehide', function () { try { sessionStorage.setItem('__cpw', JSON.stringify(saved.concat(window.__coldWrites || []))); } catch (e) {} });
-    } catch (e) {} })();`;
-    const CARRIED = { expression: `(function () { try { return JSON.stringify({ carried: JSON.parse(sessionStorage.getItem('__cpw') || '[]'), search: location.search }); } catch (e) { return 'no storage'; } })()` };
-    const r = await arriveCold({ url: fileUrl('tournament.html', 'app=1'), db: empty(), auth: OWNER, settleMs: 3000, preScript: PRE + CARRY,
-        steps: PICK.concat([FILL, { tap: 'button.btn-primary[onclick^="saveTournament"]' }, { sleep: 3500 }, CARRIED]) });
-    assert.ok(r.ok, r.reason);
-    assert.ok(r.value.includes('filled'));
-    const c = JSON.parse(r.value.filter((v) => typeof v === 'string' && v[0] === '{').pop());
+test('2 ...then a team and Save: the record carries the imported course, its Blue stroke index, and no synthetic flag', async () => {
+    const { raw } = await go(PROVIDER + CARRY, PICK.concat([FILL, { tap: 'button.btn-primary[onclick^="saveTournament"]' }, { sleep: 3500 }, CARRIED]));
+    assert.ok(raw.includes('filled'));
+    const c = JSON.parse(raw.filter((v) => typeof v === 'string' && v[0] === '{').pop());
     assert.match(c.search, /^\?tourney=[A-Z2-9]{6}&app=1$/, 'moved to the new event: ' + c.search);
-    const create = c.carried.find((w) => w.op === 'update' && w.path === '' && Object.keys(w.value).some((k) => /^tournaments\/[A-Z2-9]{6}$/.test(k)));
-    assert.ok(create, 'the creating write: ' + JSON.stringify(c.carried.map((w) => w.path)));
-    const rec = create.value[Object.keys(create.value).find((k) => /^tournaments\//.test(k))];
+    const rec = createdRecord(c);
+    assert.equal(rec.courseName, 'Papago Golf Course');
+    assert.equal(rec.activeCourseKey, 'gca_hpag0kx6');
+    assert.equal(rec.courseIndexSynthetic, false);
+    assert.deepEqual(rec.courseData.map((h) => h.hcpIndex), SI_BLUE, 'the Blue tees\' stroke index');
+    assert.deepEqual(rec.courseData.map((h) => h.par), PARS);
+    assert.equal(rec.importedCourses.gca_hpag0kx6.source.siFrom, 'male/Blue');
+});
+
+test('3 the proxy not configured (a preview host): selected on the placeholder, the note names the reason and offers the lookup again; Save works, flagged synthetic', async () => {
+    const { objs: [a], raw } = await go(NOT_CONFIGURED + CARRY, PICK.concat([READ, FILL, { tap: 'button.btn-primary[onclick^="saveTournament"]' }, { sleep: 3500 }, CARRIED]));
+    assert.equal(a.key, 'az_papago', 'selected on the directory key');
+    assert.equal(a.box, 'Papago Golf Club');
+    assert.equal(a.note, 'Couldn\'t look up Papago Golf Club online: Online search isn\'t set up yet. Pars are set to 4 and the stroke index to 1–18 until a card is loaded, so the event scores gross. 🌐 Try the online lookup again');
+    assert.equal(a.noteBtn, 'course-note-online');
+    assert.deepEqual(a.api, ['/api/course-search?q=Papago%20Golf%20Club'], 'one try, no detail fetch');
+    const c = JSON.parse(raw.filter((v) => typeof v === 'string' && v[0] === '{').pop());
+    const rec = createdRecord(c);
     assert.equal(rec.courseName, 'Papago Golf Club');
     assert.equal(rec.activeCourseKey, 'az_papago');
     assert.equal(rec.courseIndexSynthetic, true);
-    assert.equal(rec.courseData.length, 18);
-    assert.ok(rec.courseData.every((h, i) => h.hole === i + 1 && h.par === 4 && h.hcpIndex === i + 1), 'eighteen par 4s, SI 1..18');
+    assert.ok(rec.courseData.length === 18 && rec.courseData.every((h, i) => h.par === 4 && h.hcpIndex === i + 1), 'eighteen par 4s, SI 1..18');
 });
 
-test('3 Save with no course: "Pick a golf course first." under the box; no write, no dialog', async () => {
-    const FILL = { expression: `(function () { document.getElementById('t-name').value = 'No Course Yet'; var p = document.querySelector('#teams-list .team-card .team-name-inputs input'); p.value = 'Al Lopez'; return 'filled'; })()` };
-    const [a] = await go([FILL, { tap: 'button.btn-primary[onclick^="saveTournament"]' }, { sleep: 400 }, READ]);
+test('4 the provider knows nothing by that name: placeholder, "Nothing online matched", one search and no detail fetch', async () => {
+    const { objs: [a] } = await go(NOTHING, PICK.concat([READ]));
+    assert.equal(a.key, 'az_papago');
+    assert.match(a.note, /^Nothing online matched Papago Golf Club\. Pars are set to 4/);
+    assert.deepEqual(a.api, ['/api/course-search?q=Papago%20Golf%20Club']);
+});
+
+test('5 Save with no course: "Pick a golf course first." under the box; no write, no dialog', async () => {
+    const FILL2 = { expression: `(function () { document.getElementById('t-name').value = 'No Course Yet'; var p = document.querySelector('#teams-list .team-card .team-name-inputs input'); p.value = 'Al Lopez'; return 'filled'; })()` };
+    const { objs: [a] } = await go(NOT_CONFIGURED, [FILL2, { tap: 'button.btn-primary[onclick^="saveTournament"]' }, { sleep: 400 }, READ]);
     assert.equal(a.setup, true, 'still on the form');
     assert.equal(a.note, 'Pick a golf course first.');
     assert.equal(a.key, '');
     assert.deepEqual(a.writes, []);
 });
 
-test('4 money = base: the engines are main 97698412 byte for byte', () => {
+test('6 money = base: the engines are main 97698412 byte for byte', () => {
     const sha = (f) => crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, f))).digest('hex');
     assert.equal(sha('payouts.js'), 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8');
     assert.equal(sha('tournament-engine.js'), '1c659c46d0f91ca3dc61beb231e1356ea0a572fd7c3c40399399d36e2ff89f57');
