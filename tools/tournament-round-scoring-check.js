@@ -219,7 +219,7 @@ function boardProbe(roundLabel) {
   // calculator's "No entry fee set for this tournament — set spot amounts"
   // contains an em-dash. An earlier version of this probe returned those lines
   // and the dash test matched THEM, reporting a board full of scores as empty.
-  const end = lines.findIndex((l, k) => k > i && /^[🏆💰]|Prize Payout|Paid Spots/.test(l));
+  const end = lines.findIndex((l, k) => k > i && /^[🏆💰]|Prize Payout|Paid Spots|Prize Places/.test(l));
   const rows = i >= 0 ? lines.slice(i, end > i ? end : i + 14) : lines.slice(0, 16);
   return JSON.stringify({ found: i >= 0, rows: rows });
 })()`;

@@ -71,7 +71,7 @@ function resolveManifest(dir, page) {
     if (!fs.existsSync(target)) return null;
     try { return JSON.parse(fs.readFileSync(target, 'utf8')); } catch (e) { return null; }
 }
-const isTournamentManifest = m => !!m && m.name === 'Rattle Golf Tournaments'
+const isTournamentManifest = m => !!m && m.name === 'HardPan Tournaments'
     && m.start_url === './tournament.html'
     && Array.isArray(m.icons) && m.icons.length > 0
     && m.icons.every(i => /^tournament-icon-/.test(i.src) && i.purpose === 'any');

@@ -49,7 +49,7 @@ const SHARED_SHELL = [
     // 084: the Rounds I am running list - admin.html, trip.html and (GPS) home.html load it.
     'my-rounds.js',
     'trip-recap-image.js',
-    'grouping.js', 'handicap.js', 'player-tees.js', 'handicap-labels.js', 'aloha-bet.js', 'payouts.js', 'course-data.js', 'score-marks.js',
+    'grouping.js', 'handicap.js', 'player-tees.js', 'handicap-labels.js', 'aloha-bet.js', 'hilo-engine.js', 'payouts.js', 'course-data.js', 'score-marks.js',
     // scorecard-rows.js: the hole-by-hole rows, drawn once. settlement.html
     // (the Receipt) and leaderboard.html (the tap-a-name card) load it.
     'scorecard-rows.js',
@@ -91,6 +91,10 @@ const SHARED_SHELL = [
     'code-issuer.js',
     // One HTML escaper for every page that renders a user-supplied name.
     'text-safe.js',
+    // 2.0 (23): the + Plus chip under every handicap box (index, admin, trip and home load it).
+    'hcp-plus.js',
+    // 2.0.1 shipped these four in GPS blocks; main has none, so they sit here. bbb-engine.js and vegas-engine.js: admin, game, index, leaderboard, season, settlement, sidematches, skins, stats and trip load them. league-engine.js and league-ui.js: settlement loads them.
+    'bbb-engine.js', 'vegas-engine.js', 'league-engine.js', 'league-ui.js',
     // Runtime plumbing. The vendored Firebase SDK, the service-worker boot, and
     // the worker and manifest themselves.
     // product-links.js is the only place that knows the two products may live at
@@ -108,6 +112,16 @@ const SHARED_SHELL = [
     // auth-boot.js on the way to every round they create.
     'organizer-gate.js',
     'sw.js', 'manifest.json',
+    // MOVED HERE FROM CONSUMER 2026-11-10 (Manny OK, tournaments phase 1): tournament.html
+    // now loads it too, for Apple and Google organizer sign-in. FILES_TO_SYNC is SHARED +
+    // CONSUMER, so the phone app ships exactly the same files. NO APOSTROPHES IN THIS BLOCK.
+    // oauth-signin.js (v264): Apple and Google one-tap sign-in, and the uid
+    // guarantee that links a provider to the anonymous organizer so rounds, the
+    // free trial and a founder pass stay put. admin.html calls it through a typeof
+    // guard, so a bundle without it falls back to the email link rather than
+    // breaking - but the email link is the flow that failed on a real phone, so it
+    // ships. NO APOSTROPHES IN THIS BLOCK.
+    'oauth-signin.js',
 ];
 
 // THE ICONS LEFT SHARED IN WAVE 19, and that is the whole point of the wave.
@@ -158,13 +172,6 @@ const CONSUMER_SHELL = [
     // gives the wizard a My Groups button that throws. It ships.
     // NO APOSTROPHES IN THIS BLOCK.
     'my-groups.js',
-    // oauth-signin.js (v264): Apple and Google one-tap sign-in, and the uid
-    // guarantee that links a provider to the anonymous organizer so rounds, the
-    // free trial and a founder pass stay put. admin.html calls it through a typeof
-    // guard, so a bundle without it falls back to the email link rather than
-    // breaking - but the email link is the flow that failed on a real phone, so it
-    // ships. NO APOSTROPHES IN THIS BLOCK.
-    'oauth-signin.js',
     // account-exit.js (v267): sign out, and delete account. App Review 5.1.1(v)
     // asks an app that creates accounts to let somebody delete one from inside it,
     // and Wave 33 made Apple and Google the front door. admin.html calls it through

@@ -254,8 +254,13 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
         const list = html(sb, 'registration-list');
         assert.ok(list && /no signups yet/i.test(list),
             'an empty list is a sentence, not a blank box: ' + list);
-        assert.ok(/Paid/.test(read(PAGE).replace(/<script[\s\S]*?<\/script>/g, ''))
-            || /Paid/.test(list) || /cash|offline/i.test(html(sb, 'registration-section') || ''),
+        // RE-PINNED 2026-11-10 (P1-a, no cash prizes). The first arm used to be
+        // satisfied by the prize calculator's "Paid Spots" label, which is not
+        // the desk at all; that label is now "Prize Places" and the arm went red.
+        // The desk names offline Paid in its own note, which the page writes on
+        // this default arrival - read that element, not the whole markup.
+        const deskNote = sb.document.getElementById('registration-desk-note');
+        assert.match(String((deskNote && deskNote.textContent) || ''), /Tick Paid when you have the cash/,
             'cash/offline Paid is named on the organizer surface');
     });
 
@@ -397,8 +402,9 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
         assert.doesNotMatch(setup, /id="registration-list"/, 'the list has left Setup');
         assert.match(desk, /id="registration-list"/);
         assert.ok(!/id="registration-section"|id="registration-list"/.test(src.slice(b)), 'one of each, nowhere else');
-        // E2d + E4b (2026-11-09) add Contests and Photos to the gate - re-pinned on purpose; Setup and Desk still lead it.
-        assert.match(src, /const GATED_TABS = \['setup', 'desk', 'contests', 'photos'\];/, 'the gate names both tabs, and Contests and Photos');
+        // Re-pinned 2026-11-10 (T3B): the gate also takes the owner-only Event day tab.
+        // Re-pinned 2026-11-11 (event comms picks): Contests is gated too; Photos has no tab (EC4 C).
+        assert.match(src, /const GATED_TABS = \['home', 'setup', 'desk', 'contests'\];/, 'the gate names the tabs');
     });
 });
 

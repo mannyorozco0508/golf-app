@@ -71,7 +71,9 @@
         if (isNativeShell()) return 'skipped-native';
         if (!canRegister()) return 'unsupported';
         try {
-            navigator.serviceWorker.register('sw.js', { scope: './' })
+            // updateViaCache 'none' (website-d): every update check asks the
+            // network for sw.js, never the HTTP cache (see _headers).
+            navigator.serviceWorker.register('sw.js', { scope: './', updateViaCache: 'none' })
                 .then(function (reg) {
                     // NO AUTO-RELOAD ON UPDATE, on purpose.
                     //

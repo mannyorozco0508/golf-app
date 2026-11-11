@@ -271,13 +271,24 @@ const PRODUCTS = {
         // new event is born locked, Setup offers Lock scoring links, and the card
         // sends each keyed score with its proof. A device on v57 keeps a card
         // that cannot score a locked event.
-        cacheName: 'tournament-v59-nov7-build',
-        appName: 'Rattle Golf Tournaments',
+        // Moved to v60 FOR PHASE 1 (2026-11-10). tournament.html, tournament-scorecard.html
+        // and tournament-engine.js changed: in-app card and board, Apple/Google organizer
+        // sign-in, no cash prize wording. A device on v59 keeps cash prize wording.
+        // Moved to v61 FOR THE HARDPAN RENAME (2026-11-11, Manny picked option A).
+        // tournament.html, tournament-scorecard.html and the manifest now say
+        // HardPan Tournaments, and tournament.html gains the organizer Event day
+        // tab (T3B). A device on v60 keeps the Rattle Golf header and no Event day.
+        // Moved to v62 FOR ICON B (2026-11-11, Manny): the install icons are the
+        // HardPan Tournaments icon (brand-green field, cream HP and pin, cream
+        // TOURNAMENTS band) and both pages label the home-screen icon
+        // Tournaments. A device on v61 keeps the Rattle Golf R icon.
+        cacheName: 'tournament-v62-icon-b',
+        appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
         startUrl: './tournament.html',
-        // ITS OWN FILES, AND "any" ONLY. The picture is the Rattle Golf banner
-        // (cream field, green R, RATTLE GOLF / TOURNAMENTS). Purpose stays
+        // ITS OWN FILES, AND "any" ONLY. The picture is icon B (2026-11-11): HP and
+        // the pin on brand green over a cream TOURNAMENTS band. Purpose stays
         // "any": on the 1024 master TOURNAMENTS spans past the inner 80%
         // circle, and a maskable crop reads URNAMEN.
         icons: [

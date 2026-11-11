@@ -213,7 +213,8 @@ describe('THE TOURNAMENT TRANSITION IS OUTBOUND, AND CONFIGURED', () => {
 describe('THE BRANDING SEAM IS SMALL AND THE TWO PRODUCTS ARE INDEPENDENT', () => {
     test('each product declares its own identity', () => {
         assert.match(BUILD, /appName: 'HardPan',[\s\S]{0,80}shortName: 'HardPan',/);
-        assert.match(BUILD, /appName: 'Rattle Golf Tournaments',/);
+        // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
+        assert.match(BUILD, /appName: 'HardPan Tournaments',/);
     });
 
     test('NEGATIVE CONTROL — renaming Consumer must not rename Tournament', () => {

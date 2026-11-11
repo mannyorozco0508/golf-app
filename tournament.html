@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rattle Golf Tournaments</title>
+    <title>HardPan Tournaments</title>
     <!-- THE HOME-SCREEN ICON WHEN A GOLFER ADDS THIS TO THEIR HOME SCREEN.
          iOS does not read the web manifest for the icon; without this tag it
          takes a SCREENSHOT OF THE PAGE and uses that. Every page in this repo
@@ -12,6 +12,8 @@
          the home screen and the installed PWA cannot show two different marks. -->
     <link rel="icon" href="tournament-icon-192.png" type="image/png">
     <link rel="apple-touch-icon" href="tournament-icon-180.png">
+    <!-- Home-screen label (Manny 2026-11-11, icon B): "Tournaments", not the title cut off as "HardPan Tou..." -->
+    <meta name="apple-mobile-web-app-title" content="Tournaments">
     <!-- THE INSTALL IDENTITY OF THIS PRODUCT, and deliberately NOT manifest.json.
          The live deployment is still the combined repo root, where manifest.json
          is the OTHER product - a different name and a start_url pointing at its
@@ -29,9 +31,14 @@
     <script src="./qrcode.min.js"></script>
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
-    <!-- auth-compat, 9.22.2: the organizer console will sign in; the scorecard a
-         golfer opens never loads this. No auth call exists on this page yet. -->
+    <!-- auth-compat, 9.22.2: the organizer console signs in; the scorecard a
+         golfer opens never loads this. -->
     <script src="./firebase-auth-compat.js"></script>
+    <!-- Apple and Google sign-in (P1-b, 2026-11-10): the SAME module admin.html
+         uses - popup or redirect by host, the uid rules, the native seam for the
+         app. Loaded before the inline script, because firebaseConfig reads
+         authDomainFor from it. -->
+    <script src="oauth-signin.js"></script>
     <script src="course-data.js"></script>
     <!-- The pure half of online course search, shared with admin.html: what a valid
          card is, the canonical tee, every refusal sentence. Loaded before the inline
@@ -93,6 +100,26 @@
         .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .top-nav-bar::-webkit-scrollbar { display: none; }
         .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; cursor: pointer; white-space: nowrap; }
+        /* Event day home (T3B). */
+        .eh-head { margin:0 0 12px; }
+        .eh-name { font-size:1.25rem; font-weight:800; color:var(--text-main); }
+        .eh-sub { font-size:0.8rem; color:var(--text-muted); margin-top:2px; }
+        .eh-live { display:inline-block; background:var(--accent-red); color:#fff; font-size:0.65rem; font-weight:800; letter-spacing:.04em; padding:1px 5px; border-radius:4px; vertical-align:1px; }
+        .eh-status { background:var(--brand-green); color:#fff; border-radius:14px; padding:14px 16px; margin-bottom:12px; }
+        .eh-status-k { font-size:0.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; opacity:.85; }
+        .eh-status-big { font-size:1.6rem; font-weight:800; line-height:1.2; margin:2px 0; }
+        .eh-status-sub { font-size:0.85rem; opacity:.9; }
+        .eh-needs { border:1px solid var(--border-light); border-radius:14px; padding:10px 14px 4px; margin-bottom:12px; background:var(--bg-card); }
+        .eh-needs-k { font-size:0.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); padding-bottom:6px; border-bottom:1px solid var(--border-faint); }
+        .eh-need { display:flex; gap:10px; align-items:flex-start; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--border-faint); padding:10px 0; cursor:pointer; color:var(--text-main); font:inherit; }
+        .eh-need:last-child { border-bottom:0; }
+        .eh-need-n { flex:0 0 24px; height:24px; border-radius:12px; background:var(--warn-bg); color:var(--warn-text); font-weight:800; font-size:0.8rem; display:flex; align-items:center; justify-content:center; }
+        .eh-need-t { font-weight:700; font-size:0.92rem; }
+        .eh-need-s { font-size:0.78rem; color:var(--text-muted); margin-top:2px; }
+        .eh-none { font-size:0.85rem; color:var(--text-muted); padding:10px 0; }
+        .eh-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .eh-act { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 6px; border:1px solid var(--border-light); border-radius:14px; background:var(--bg-card); color:var(--text-main); font-weight:700; font-size:0.85rem; cursor:pointer; }
+        .eh-act-i { font-size:1.3rem; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
 
         .lobby-logo { font-size: 3rem; text-align: center; margin-bottom: 4px; }
@@ -180,7 +207,7 @@
         .tourney-hero-body { position: relative; padding: 56px 20px 22px 20px; }
         .tourney-wordmark { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; column-gap: 16px; row-gap: 6px; align-items: center; width: max-content; line-height: 1; }
         .tourney-wordmark .wm-disc { grid-column: 1; grid-row: 1; justify-self: center; width: 72px; height: 72px; border-radius: 50%; background: #0B0F0C; display: flex; align-items: center; justify-content: center; }
-        .tourney-wordmark .wm-mark { width: 56px; height: 56px; display: block; }
+        .tourney-wordmark .wm-mark { width: 56px; height: 28px; display: block; }
         .tourney-wordmark .wm-rattle { grid-column: 1; grid-row: 2; justify-self: center; white-space: nowrap; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; color: rgba(244,247,245,0.78); }
         .tourney-wordmark .wm-product { grid-column: 2; grid-row: 1; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.01em; color: #ffffff; }
         .tourney-hero-line { margin: 12px 0 0 0; font-size: 0.95rem; line-height: 1.45; color: rgba(244,247,245,0.92); max-width: 34em; }
@@ -189,7 +216,7 @@
             .tourney-hero-body { padding: 80px 28px 30px 28px; }
             .tourney-wordmark { column-gap: 20px; }
             .tourney-wordmark .wm-disc { width: 84px; height: 84px; }
-            .tourney-wordmark .wm-mark { width: 64px; height: 64px; }
+            .tourney-wordmark .wm-mark { width: 64px; height: 32px; }
             .tourney-wordmark .wm-product { font-size: 2.6rem; }
             .tourney-hero-line { font-size: 1.05rem; }
         }
@@ -464,19 +491,17 @@
     </style>
 </head>
 <body>
-<!-- M6 (Stripe Phase 1, 2026-11-08, mockup M6b approved): the HardPan
-     Tournaments bar. Rattle Golf stays as the company line. The mark is CSS -
-     a cream ball in a black tile - so no consumer icon file is loaded here. -->
-<header class="hp-brand" id="hp-brand"><span class="hp-brand-mark" aria-hidden="true"><span></span></span><span class="hp-brand-word">HardPan <span class="hp-brand-product">Tournaments</span></span><span class="hp-brand-by">by Rattle Golf</span></header>
 
 <div class="container" id="setup-screen">
     <!-- THE HERO BAND (polish wave, 2026-09-16; mark lockup 2026-09-18).
          Presentation only: the sign-in line and panel below keep their ids and
          are rendered by the same renderSignedInAs/renderSignInPanels. Dark mode
          left this product on 2026-09-18; there is no toggle in the band.
-         Lockup: the ball (logo-mark.png, no word on it) on the left, the words
-         Rattle Golf under the mark, Tournaments large on the right. The PNG is
-         the mark - not a big uppercase text stand-in. This hostname serves the
+         Lockup (rename option A, Manny 2026-11-11, replaces the 09-23 "Tournaments
+         are Rattle Golf" lock): the HardPan mark (HP and the pin, the shapes of the
+         consumer app icon drawn inline, without its GOLF GPS GAMES line, so no
+         consumer file is loaded here) in the dark disc, the word HardPan under it, Tournaments large
+         on the right. This hostname serves the
          WHOLE site: / is the round app. The band says which product this page
          is. tournaments.rattlegolf.com stays the hostname.
          The imagery is assets/tournament-hero.svg, a local brand-green fairway
@@ -486,7 +511,7 @@
         <div class="tourney-hero-art" aria-hidden="true"></div>
         <div class="tourney-hero-shade" aria-hidden="true"></div>
         <div class="tourney-hero-body">
-            <div class="tourney-wordmark" aria-label="Rattle Golf Tournaments"><span class="wm-disc"><img class="wm-mark" src="logo-mark.png" alt="" width="56" height="56"></span><span class="wm-rattle">Rattle Golf</span><span class="wm-product">Tournaments</span></div>
+            <div class="tourney-wordmark" aria-label="HardPan Tournaments"><span class="wm-disc"><svg class="wm-mark" viewBox="4 24 92 46" width="56" height="28" aria-hidden="true" focusable="false"><g fill="#f5f2ea"><rect x="6" y="28" width="8.5" height="30" rx="1"/><rect x="26" y="28" width="8.5" height="30" rx="1"/><rect x="12" y="40.5" width="16" height="7"/><rect x="40" y="28" width="8.5" height="30" rx="1"/><path d="M46 28 H54 A11 11 0 0 1 54 50 H46 Z"/></g><path d="M48.5 34.5 H53.5 A4.5 4.5 0 0 1 53.5 43.5 H48.5 Z" fill="#0B0F0C"/><path d="M79 64.5 C75.15 55.7 68 50.75 68 42.5 A11 11 0 1 1 90 42.5 C90 50.75 82.85 55.7 79 64.5Z" fill="#2e7d4f"/><circle cx="79" cy="42.5" r="7.92" fill="#f5f2ea" stroke="#2e7d4f" stroke-width="1"/></svg></span><span class="wm-rattle">HardPan</span><span class="wm-product">Tournaments</span></div>
             <p class="tourney-hero-line">Live scoring + registration for charity, member-guest, and club events.</p>
         </div>
     </header>
@@ -583,7 +608,7 @@
     <div class="form-group setup-field">
         <label id="t-entry-fee-label">Entry Fee per Team ($, optional)</label>
         <div class="money-input"><span class="money-prefix" aria-hidden="true">$</span><input type="number" id="t-entry-fee" value="0" min="0" placeholder="0"></div>
-        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;" id="t-entry-fee-help">The total in and results are calculated for you once teams are in — this is just the calculator, square up for real however your event normally does.</p>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:4px 0 0 0;" id="t-entry-fee-help">The organizer collects entry fees (cash, Venmo, etc.). Card payments in HardPan are coming.</p>
     </div>
 
     <!-- MOVED HERE FROM #manage-screen, wave 9. Same fault as
@@ -736,11 +761,40 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <div id="signed-in-as" style="text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;"></div>
     <div id="signin-panel-manage" class="signin-panel" style="display:none;"></div>
     <div class="top-nav-bar">
+        <span class="top-nav-item" onclick="showTab('home')" id="tab-btn-home">🏁 Event day</span>
         <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup">⚙️ Setup &amp; Links</span>
         <span class="top-nav-item" onclick="showTab('desk')" id="tab-btn-desk">📋 Desk</span>
         <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard">🏆 Leaderboard</span>
         <span class="top-nav-item" onclick="showTab('contests')" id="tab-btn-contests">🎯 Contests</span>
         <span class="top-nav-item" onclick="showTab('photos')" id="tab-btn-photos">📷 Photos</span>
+    </div>
+
+    <!-- EVENT DAY HOME (T3B, Manny's pick 2026-11-10). Owner-only, hidden by the
+         manage gate with Setup and Desk. Live status, a "Needs you" list and
+         quick actions. Every number is read from what the other tabs already
+         compute (the board's rows, the Desk's unpaid filter, the prize basis):
+         nothing here writes, and nothing here has its own arithmetic.
+         renderEventHome() fills it on every record and registrations snapshot. -->
+    <div id="manage-tab-home" style="display:none;">
+        <div class="eh-head">
+            <div class="eh-name" id="eh-name"></div>
+            <div class="eh-sub"><span class="eh-live" id="eh-live" style="display:none;">LIVE</span> <span id="eh-code-line"></span></div>
+        </div>
+        <div class="eh-status" id="eh-status">
+            <div class="eh-status-k" id="eh-status-k"></div>
+            <div class="eh-status-big" id="eh-status-big"></div>
+            <div class="eh-status-sub" id="eh-status-sub"></div>
+        </div>
+        <div class="eh-needs">
+            <div class="eh-needs-k">Needs you</div>
+            <div id="eh-needs-list"></div>
+        </div>
+        <div class="eh-actions" id="eh-actions">
+            <button type="button" class="eh-act" id="eh-act-qr" onclick="eventHomeGo('qr')"><span class="eh-act-i">🔳</span><span id="eh-act-qr-label">Team QR</span></button>
+            <button type="button" class="eh-act" id="eh-act-desk" onclick="eventHomeGo('desk')"><span class="eh-act-i">📋</span>Desk</button>
+            <button type="button" class="eh-act" id="eh-act-board" onclick="eventHomeGo('board')"><span class="eh-act-i">🏆</span>Board</button>
+            <button type="button" class="eh-act" id="eh-act-setup" onclick="eventHomeGo('setup')"><span class="eh-act-i">⚙️</span>Setup</button>
+        </div>
     </div>
 
     <div id="manage-tab-setup">
@@ -1008,7 +1062,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <!-- THE WATCH LINK (Wave 1, A3). The board itself, for family and the
              clubhouse TV. Shown to everyone: a watcher forwarding it is the point. -->
         <button class="btn-outline" id="lb-watch-share" onclick="openShareModal(leaderboardWatchUrl(), (currentData && currentData.name) || 'Event', 'leaderboard')">📣 Share live leaderboard</button>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-4px; text-align:center;">Anyone with this link can watch the board as scores come in.</p>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:8px; text-align:center;">Anyone with this link can watch the board as scores come in.</p>
 
         <hr class="section-divider">
         <!-- THE CALCULATOR IS THE ORGANIZER'S (Wave 1, A3/A4). Hidden for everyone
@@ -1016,12 +1070,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              sets are SAVED on the record as payoutSpots and everyone reads those. -->
         <div id="payout-owner-controls" style="display:none;">
         <h3>🏆 Prize Results Calculator</h3>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many spots pay — this maps straight onto the standings above. Ties split whatever prize money their tied spots add up to.</p>
+        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many places win a prize — this maps straight onto the standings above. Ties split the pro shop credit their tied places add up to.</p>
         <!-- RESULTS ARE PAID ON (audit #1, A1): multi-round only, filled by
              renderPayoutBasis. Saved as payoutBasis; every phone reads it. -->
         <div id="payout-basis-control" style="display:none;"></div>
         <div class="form-group" style="margin-bottom:8px;">
-            <label>Paid Spots</label>
+            <label>Prize Places</label>
             <input type="number" id="payout-spots-input" min="1" max="20" value="3" oninput="renderPayoutSpotInputs()" onchange="savePayoutSpots()">
         </div>
         <div id="payout-spot-amounts"></div>
@@ -1109,9 +1163,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
 
 <script>
+    // authDomain is decided by oauth-signin.js authDomainFor, exactly as on
+    // admin.html: the page's own host where functions/_middleware.js proxies
+    // /__/auth/ (hardpangolf.com, golf-app-5a5.pages.dev), firebaseapp.com
+    // everywhere else - tournaments.rattlegolf.com, previews, the app shell.
+    // The rest of the config is admin.html's, so the signed-in user Firebase
+    // keeps for this origin is the same one on both pages.
     const firebaseConfig = {
       apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
-      authDomain: "golfapp-9fb21.firebaseapp.com",
+      authDomain: (window.oauthSignin && typeof window.oauthSignin.authDomainFor === 'function')
+          ? window.oauthSignin.authDomainFor(location.hostname) : "golfapp-9fb21.firebaseapp.com",
       databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
       projectId: "golfapp-9fb21",
       storageBucket: "golfapp-9fb21.firebasestorage.app",
@@ -1570,14 +1631,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // follow the format card the organizer just pressed.
     function syncEntryFeeWording(fmt) {
         const per = (fmt === 'individual') ? 'Golfer' : 'Team';
-        const noun = (fmt === 'individual') ? 'golfers' : 'teams';
         const label = document.getElementById('t-entry-fee-label');
         const help = document.getElementById('t-entry-fee-help');
         if (label) label.textContent = `Entry Fee per ${per} ($, optional)`;
         if (help) {
-            help.textContent = `The total in and results are calculated for you once ${noun} are in`
-                + ' — this is just the calculator, square up for real however your event'
-                + ' normally does.';
+            // Manny 2026-11-10: the entry-fee help says who collects the fee.
+            help.textContent = 'The organizer collects entry fees (cash, Venmo, etc.). Card payments in HardPan are coming.';
         }
     }
 
@@ -2364,13 +2423,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // The three manage tabs. Setup and Desk are the GATED pair: applyManageGate
     // HIDES both for anyone who is not the owner of an owned tournament, and
     // shows both on sign-in. Leaderboard is always there.
-    // E1c (2026-11-09): the event tools are gated tabs with no pill of their
-    // own - their door is #event-tools-row on the Leaderboard, owner only.
-    // Kept in their own list so the Setup/Desk gate above is unchanged.
-    // E2d adds Contests and E4b Photos, gated with Setup/Desk (owner only).
-    const EV_GATED_TABS = ['announce', 'pace'];
-    const MANAGE_TABS = ['setup', 'desk', 'leaderboard', 'contests', 'photos'].concat(EV_GATED_TABS);
-    const GATED_TABS = ['setup', 'desk', 'contests', 'photos'];
+    // E1c (2026-11-09): Announcements is a gated tab with no pill of its own -
+    // its door is #event-tools-row on the Leaderboard, owner only. Kept in its
+    // own list so the Setup/Desk gate above is unchanged. E2d adds Contests,
+    // gated with Setup/Desk (owner only). T3B (main) adds Event day first.
+    // Manny's picks 2026-11-11: pace has no tab (EC3 C: it lives on Event day's
+    // Needs you) and photos have no tab (EC4 C: the queue is a Desk chip).
+    const EV_GATED_TABS = ['announce'];
+    const MANAGE_TABS = ['home', 'setup', 'desk', 'leaderboard', 'contests'].concat(EV_GATED_TABS);
+    const GATED_TABS = ['home', 'setup', 'desk', 'contests'];
     function showTab(tab) {
         // A gated tab is hidden for a non-owner (applyManageGate). Asking for it
         // then lands on the leaderboard - the tab is in the tree, so "is the
@@ -2386,10 +2447,132 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
         if (tab === 'leaderboard') renderLeaderboard();
         if (tab === 'desk') renderRegistrationDesk();
+        if (tab === 'home') renderEventHome();
         if (tab === 'contests') renderContestsTab();
-        if (tab === 'photos') { syncPhotoListeners(); renderPhotosTab(); }
         evToolTab = EV_TOOL_LABELS[tab] ? tab : null;
         renderEventTools();
+    }
+
+    // ---- EVENT DAY HOME (T3B) ---------------------------------------------
+    // Reads only what the other tabs already compute: the board's rows
+    // (resolveLeaderboardView), the Desk's own Unpaid filter (REG_FILTERS) and
+    // the prize basis (resolvePrizeView + savedPayoutSpots). No writes, no new
+    // arithmetic, no money: a prize amount never appears here.
+    //
+    // WHICH ROUND IS "TODAY". A single-round event has one. A multi-round event
+    // shows the LAST round (in play order) with a score posted; with none posted
+    // anywhere, the first round. The round's own board, never the event total,
+    // because "N of M scoring" is a question about the round being played.
+    //
+    // NOT HERE YET: "quiet 40+ min" (needs a score time the page does not read),
+    // Announce and Pace (event-tools, not on main). Each joins when its data does.
+    function eventHomeState() {
+        const data = currentData || {};
+        const multi = isMultiRound(data);
+        const ids = multi ? orderedRoundIds(data) : [];
+        let rid = null, view = null;
+        if (multi && ids.length) {
+            const views = ids.map((id) => ({ id, v: resolveLeaderboardView(data, id, null) }));
+            const played = views.filter((x) => (x.v.rows || []).some((r) => r.hasScores));
+            const pick = played.length ? played[played.length - 1] : views[0];
+            rid = pick.id; view = pick.v;
+        } else {
+            view = resolveLeaderboardView(data, null, null);
+        }
+        const rows = (view && view.rows) || [];
+        const scoring = rows.filter((r) => r.hasScores);
+        const round = rid ? ((data.rounds || {})[rid] || {}) : data;
+        const holes = ((round.courseData || data.courseData || []).length) || 18;
+        const finished = rows.length > 0 && rows.every((r) => r.hasScores && r.thru >= holes);
+        const leaders = scoring.filter((r) => r.rank === 1);
+        return {
+            individual: data.scoringModel === PLAYER_MODEL,
+            multi, rid, roundName: rid ? (round.name || 'Round') : '',
+            rows, scoring, leaders, holes, finished,
+            live: scoring.length > 0,
+            notStarted: rows.filter((r) => !r.hasScores)
+        };
+    }
+
+    const eventHomeToPar = (n) => (n === 0 ? 'E' : (n > 0 ? '+' + n : String(n)));
+
+    function eventHomeNeeds(st) {
+        const out = [];
+        const unit = st.individual ? ['golfer', 'golfers'] : ['team', 'teams'];
+        const word = (n, w) => n + ' ' + (n === 1 ? w[0] : w[1]);
+        // 1. Who has not posted a score, once others have: their link has not
+        //    reached them, or the card is not being kept.
+        if (st.live && !st.finished && st.notStarted.length) {
+            const names = st.notStarted.slice(0, 3).map((r) => r.teamName).join(', ') + (st.notStarted.length > 3 ? ', ...' : '');
+            out.push({ key: 'nostart', n: st.notStarted.length, title: word(st.notStarted.length, unit) + ' with no score yet',
+                sub: names + ' · Send their link', go: 'qr' });
+        }
+        // 2. Unpaid: the Desk's own Unpaid chip, the same entries and the same count.
+        const unpaidTest = (REG_FILTERS.find((f) => f.key === 'unpaid') || {}).test;
+        const entries = Object.values(registrationData || {}).filter((e) => e && typeof e === 'object');
+        const unpaid = unpaidTest ? entries.filter(unpaidTest) : [];
+        if (unpaid.length) {
+            const fee = Number(currentData && currentData.entryFee) || 0;
+            // An amount only where the Desk itself can state one: per golfer on an
+            // individual event. A team fee is per team and the desk does not know
+            // the teams of an unapproved signup.
+            const owed = (fee > 0 && st.individual) ? ' · ' + regDollars(unpaid.length * fee) + ' in entry fees' : '';
+            out.push({ key: 'unpaid', n: unpaid.length, title: word(unpaid.length, ['golfer', 'golfers']) + ' unpaid', sub: 'Desk' + owed, go: 'unpaid' });
+        }
+        // 3. Needs a team: the Desk's own rule.
+        const needTeam = entries.filter((e) => regNeedsTeam(e));
+        if (needTeam.length) {
+            out.push({ key: 'needsteam', n: needTeam.length, title: word(needTeam.length, ['golfer needs', 'golfers need']) + ' a team', sub: 'Desk', go: 'needsteam' });
+        }
+        // 4. The prize basis, exactly when golfers read "Prize results coming soon".
+        const prize = resolvePrizeView(currentData || {});
+        if (isMultiRound(currentData || {}) && !prize.available && payoutsAreSet(savedPayoutSpots())) {
+            out.push({ key: 'basis', n: 1, title: 'Pick what prizes go by', sub: 'Golfers see "Prize results coming soon" until you do', go: 'basis' });
+        }
+        return out;
+    }
+
+    function renderEventHome() {
+        const panel = document.getElementById('manage-tab-home');
+        if (!panel || !currentCode || !currentData || !Object.keys(currentData).length) return;
+        const st = eventHomeState();
+        const set = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+        set('eh-name', currentData.name || '');
+        set('eh-code-line', 'You run this · code ' + currentCode);
+        const live = document.getElementById('eh-live');
+        if (live) live.style.display = st.live && !st.finished ? '' : 'none';
+        const unitMany = st.individual ? 'golfers' : 'teams';
+        const total = st.rows.length;
+        const where = st.roundName ? ' · ' + st.roundName : '';
+        set('eh-status-k', (st.finished ? 'All in' : (st.live ? 'Live now' : 'Not started')) + where);
+        set('eh-status-big', st.finished ? `${total} of ${total} ${unitMany} finished` : `${st.scoring.length} of ${total} ${unitMany} scoring`);
+        const bits = [];
+        if (st.leaders.length === 1) bits.push(`Leader ${st.leaders[0].teamName} ${eventHomeToPar(st.leaders[0].toPar)}`);
+        else if (st.leaders.length > 1) bits.push(`${st.leaders.length} tied for the lead at ${eventHomeToPar(st.leaders[0].toPar)}`);
+        const t = formatStartTime(currentData.startTime);
+        if (t) bits.push((currentData.startType === 'shotgun' ? 'Shotgun ' : 'First tee ') + t);
+        set('eh-status-sub', bits.join(' · '));
+        set('eh-act-qr-label', st.individual ? 'Group QR' : 'Team QR');
+        const list = document.getElementById('eh-needs-list');
+        if (!list) return;
+        const needs = eventHomeNeeds(st);
+        list.innerHTML = needs.length
+            ? needs.map((x) => `<button type="button" class="eh-need" data-need="${x.key}" onclick="eventHomeGo('${x.go}')"><span class="eh-need-n">${x.n}</span><span><div class="eh-need-t">${escapeHtml(x.title)}</div><div class="eh-need-s">${escapeHtml(x.sub)}</div></span></button>`).join('')
+            : `<div class="eh-none">Nothing needs you right now.</div>`;
+    }
+
+    // Quick actions open the tab that already does the job, at the right place.
+    function eventHomeGo(where) {
+        const to = (id) => { const el = document.getElementById(id); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' }); };
+        if (where === 'desk' || where === 'unpaid' || where === 'needsteam') {
+            if (where !== 'desk') registrationFilter = where;
+            showTab('desk');
+            return;
+        }
+        if (where === 'setup') { showTab('setup'); return; }
+        showTab('leaderboard');
+        if (where === 'qr') to(recordIsIndividual() ? 'group-links-block' : 'team-links-block');
+        else if (where === 'basis') to('payout-basis-control');
     }
 
     // ---- SIGN-IN AND THE MANAGE GATE -------------------------------------
@@ -2505,8 +2688,72 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             out.href = '#'; out.textContent = 'Sign out';
             out.onclick = (e) => { if (e && e.preventDefault) e.preventDefault(); signOutNow(); };
             el.appendChild(out);
+            // SIGNED IN, BUT NOT AS THIS EVENT'S ORGANIZER (P1-b). Apple, Google
+            // and email are three different accounts unless Firebase linked them,
+            // so an organizer who set the event up with email and then tapped
+            // Apple lands here with no Setup tab and nothing saying why - the
+            // event looks as if it vanished. ownerUid is never moved; the line
+            // says which way back in there is. Manage screen only: the setup
+            // screen has no event to belong to.
+            if (id === 'signed-in-as' && currentData && currentData.ownerUid && !canManage()) {
+                const why = document.createElement('div');
+                why.id = 'signed-in-other-account';
+                why.textContent = NOT_THIS_ORGANIZER;
+                el.appendChild(why);
+            }
         });
         renderSignInPanels();
+    }
+
+    // ---- APPLE, GOOGLE, THEN EMAIL (P1-b, 2026-11-10) ---------------------
+    //
+    // THE SAME BUTTONS, ORDER AND WORDING AS admin.html's live sign-in card:
+    // "Continue with Apple" (primary), "Continue with Google" (outline), the
+    // answer under them, then "Use email instead". Here the email option is
+    // this page's own email + password - the account every organizer made
+    // before this wave - so nothing about it changed except that it is one
+    // tap away, as admin.html's email option is.
+    //
+    // ONE BUILDER. The tap goes through window.oauthSignin.signIn, the module
+    // admin.html uses: popup or redirect by host, planOauth's uid rules, and
+    // the Capacitor seam (nativeCredential) when the page runs inside the app.
+    // Nothing about HOW to sign in is decided on this page.
+    //
+    // ONE SENTENCE IS THIS PAGE'S OWN: auth/account-exists-with-different-
+    // credential. Firebase raises it when the Apple or Google email already
+    // has an account it will not merge on its own - here, an organizer's
+    // email + password account. The module's sentence for an unmapped code is
+    // "Could not finish sign-in... (code)", and admin.html has no password
+    // form, so the honest answer ("sign in with your password") only exists
+    // on this page. The credential Firebase put on the error is kept, and the
+    // next email + password sign-in to THAT email links it - the account the
+    // events belong to gains Google or Apple, and ownerUid never moves.
+    const NOT_THIS_ORGANIZER = 'This event belongs to a different organizer account. If you set it up with another sign-in (email and password, Apple or Google), sign out and sign in that way.';
+    const signinUi = { emailShown: {}, busy: {}, note: {} };
+    let pendingOauthLink = null;   // { which, email, credential } from account-exists
+
+    function providerName(which) { return which === 'apple' ? 'Apple' : 'Google'; }
+
+    function accountExistsSentence(which, linkable) {
+        return 'This email already has an organizer account that signs in with a password, and your events are on that account. '
+            + 'Sign in with your email and password below.'
+            + (linkable ? ' ' + providerName(which) + ' is then added to that account, so next time Continue with ' + providerName(which) + ' opens it too.' : '');
+    }
+
+    function oauthFailureSentence(err, which) {
+        const O = window.oauthSignin;
+        if (err && err.code === 'auth/account-exists-with-different-credential') {
+            let cred = err.credential || null;
+            try {
+                if (!cred && firebase.auth.OAuthProvider && typeof firebase.auth.OAuthProvider.credentialFromError === 'function') {
+                    cred = firebase.auth.OAuthProvider.credentialFromError(err);
+                }
+            } catch (e) { cred = null; }
+            const email = String(err.email || (err.customData && err.customData.email) || '').trim().toLowerCase();
+            pendingOauthLink = (cred && email) ? { which: which, email: email, credential: cred } : null;
+            return accountExistsSentence(which, !!pendingOauthLink);
+        }
+        return (O && typeof O.messageFor === 'function') ? O.messageFor(err) : 'Could not finish sign-in. Nothing changed - try again, or use email instead.';
     }
 
     function renderSignInPanels() {
@@ -2515,16 +2762,96 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (!el) return;
             if (authUser) { el.style.display = 'none'; el.innerHTML = ''; return; }
             el.style.display = 'block';
+            const shown = !!signinUi.emailShown[id];
+            const busy = signinUi.busy[id];
             el.innerHTML = `
                 <div class="signin-card">
                     <div class="signin-card-note">Organizers sign in to set up and edit a tournament. Golfers never need to - a scoring link is all they get.</div>
-                    <div class="signin-card-row">
+                    <button type="button" id="${id}-apple" class="btn-primary"${busy ? ' disabled' : ''} onclick="oauthTapTournament('${id}', 'apple')">${busy === 'apple' ? '⏳ Opening…' : '&#63743;&nbsp; Continue with Apple'}</button>
+                    <button type="button" id="${id}-google" class="btn-outline"${busy ? ' disabled' : ''} onclick="oauthTapTournament('${id}', 'google')">${busy === 'google' ? '⏳ Opening…' : 'Continue with Google'}</button>
+                    <p id="${id}-oauth-status" class="signin-card-error" role="status"></p>
+                    <button type="button" id="${id}-email-toggle" class="btn-outline" onclick="toggleTournamentEmail('${id}')">${shown ? 'Hide the email option' : 'Use email instead'}</button>
+                    <div class="signin-card-row" id="${id}-email-row" style="display:${shown ? 'grid' : 'none'}; margin-top:8px;">
                         <input type="email" id="${id}-email" placeholder="Email" autocomplete="username">
                         <input type="password" id="${id}-password" placeholder="Password" autocomplete="current-password">
                         <button class="btn-outline" onclick="signInNow('${id}')">Sign in</button>
                     </div>
                     <div id="${id}-error" class="signin-card-error"></div>
                 </div>`;
+            // Written as text, never into the markup: the sentence can carry an
+            // error message from Firebase.
+            const status = document.getElementById(id + '-oauth-status');
+            if (status) status.textContent = signinUi.note[id] || '';
+            if (shown && pendingOauthLink) {
+                const box = document.getElementById(id + '-email');
+                if (box && !box.value) box.value = pendingOauthLink.email;
+            }
+        });
+    }
+
+    function toggleTournamentEmail(panelId) {
+        signinUi.emailShown[panelId] = !signinUi.emailShown[panelId];
+        renderSignInPanels();
+        const box = signinUi.emailShown[panelId] && document.getElementById(panelId + '-email');
+        if (box && typeof box.focus === 'function') { try { box.focus(); } catch (e) { /* not focusable */ } }
+    }
+
+    function oauthTapTournament(panelId, which) {
+        const O = window.oauthSignin;
+        signinUi.note[panelId] = '';
+        if (!O || typeof O.signIn !== 'function') {
+            signinUi.note[panelId] = 'Sign-in is not ready yet. Wait a moment and try again.';
+            renderSignInPanels();
+            return;
+        }
+        signinUi.busy[panelId] = which;
+        renderSignInPanels();
+        // BY REDIRECT where this host can (oauth-signin.js decides; the popup
+        // otherwise, and the native sheet inside the app). A redirect resolves
+        // { redirecting } and the page leaves; resumeTournamentOauth answers
+        // when it comes back. A sign-in that worked needs no sentence here: the
+        // auth listener hides this card and names the account.
+        O.signIn(which, { redirect: true }).then((r) => {
+            if (r && r.redirecting) return;
+            signinUi.busy[panelId] = null;
+            renderSignInPanels();
+        }, (err) => {
+            signinUi.busy[panelId] = null;
+            signinUi.note[panelId] = oauthFailureSentence(err, which);
+            if (pendingOauthLink) signinUi.emailShown[panelId] = true;
+            renderSignInPanels();
+        });
+    }
+
+    // BACK FROM GOOGLE OR APPLE after a redirect (hardpangolf.com and
+    // golf-app-5a5.pages.dev only). A load that started no redirect asks
+    // Firebase nothing - oauth-signin.js reads its own sessionStorage note.
+    function resumeTournamentOauth() {
+        const O = window.oauthSignin;
+        if (!O || typeof O.redirectPending !== 'function' || !O.redirectPending()) return;
+        O.resumeRedirect().then(null, (err) => {
+            const which = (err && err.which) || 'google';
+            const sentence = oauthFailureSentence(err, which);
+            ['signin-panel-manage', 'signin-panel-setup'].forEach((id) => {
+                signinUi.note[id] = sentence;
+                if (pendingOauthLink) signinUi.emailShown[id] = true;
+            });
+            renderSignInPanels();
+        });
+    }
+
+    // THE PENDING LINK, after the password sign-in it was waiting for. Only to
+    // the SAME email the Apple or Google account carries: a different address
+    // typed into the box is a different organizer, and attaching this
+    // provider to it would be the stray-account defect the other way round.
+    function linkPendingOauth(user) {
+        const p = pendingOauthLink;
+        pendingOauthLink = null;
+        if (!p || !user || typeof user.linkWithCredential !== 'function') return Promise.resolve(null);
+        if (String(user.email || '').trim().toLowerCase() !== p.email) return Promise.resolve(null);
+        return Promise.resolve(user.linkWithCredential(p.credential)).then(() => p.which, (e) => {
+            try { console.error('tournament sign-in: linking ' + p.which + ' failed: ' + String((e && e.code) || 'no-code')); } catch (x) { /* no console */ }
+            return null;
         });
     }
 
@@ -2533,7 +2860,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const password = (document.getElementById(panelId + '-password') || {}).value || '';
         const err = document.getElementById(panelId + '-error');
         if (err) err.textContent = '';
-        firebase.auth().signInWithEmailAndPassword(email.trim(), password).catch((e) => {
+        firebase.auth().signInWithEmailAndPassword(email.trim(), password).then((cred) => {
+            if (pendingOauthLink) return linkPendingOauth(cred && cred.user);
+            return null;
+        }).catch((e) => {
             if (err) err.textContent = (e && e.message) ? String(e.message) : 'Sign-in failed.';
         });
     }
@@ -2556,6 +2886,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         applyManageGate();
         renderSignedInAs();
     });
+    // Once per load, after the listener is in, so a redirect that came back
+    // signed in is shown by the listener like any other sign-in.
+    try { resumeTournamentOauth(); } catch (e) { /* never blocks the page */ }
 
     // ---- REGISTRATION (Wave 1) -------------------------------------------
     //
@@ -2861,6 +3194,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (currentCode !== code) return;
             registrationData = snap.val() || {};
             renderRegistrationList();
+            renderEventHome();
         };
         db.ref('registrations/' + code).on('value', registrationCb);
         registrationBoundCode = code;
@@ -4640,6 +4974,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
     }
     const payoutsAreSet = (spots) => spots.some((v) => v > 0);
+    // NO CASH PRIZES (Manny, 2026-11-10: "Never show cash prizes - our prizes are
+    // trophies and pro shop credit only"). The amount an organizer types for a
+    // place IS pro shop credit, so every place reads "$600 pro shop credit", and
+    // a place with no amount reads "Trophy". Wording only: payouts.js and the
+    // allocation are untouched (tournament_no_cash_prize_test.js).
+    const prizeLabel = (v) => (v > 0 ? `$${v % 1 === 0 ? v : v.toFixed(2)} pro shop credit` : 'Trophy');
 
     function payoutSpotCount() {
         const spotsInput = document.getElementById('payout-spots-input');
@@ -4678,8 +5018,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const container = document.getElementById('payout-spot-amounts');
         const subEl = document.getElementById('payout-pool-sub');
         subEl.textContent = pool > 0
-            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many spots pay — ties split whatever their tied spots add up to.`
-            : `No entry fee set for this tournament — set spot amounts manually if you're running a separate total.`;
+            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${competitorCount(currentData)} ${competitorNoun(currentData, competitorCount(currentData))}). Set how many places win a prize — ties split the pro shop credit their tied places add up to.`
+            : `No entry fee set for this tournament — type each place's pro shop credit below.`;
 
         let html = '';
         let focusedAt = -1, focusedValue = '';
@@ -4690,7 +5030,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // not an amount.
             const val = i < saved.length ? saved[i] : '';
             html += `<div class="form-group" style="margin-bottom:6px;">
-                <label>${ordinal(i + 1)} Place ($)</label>
+                <label>${ordinal(i + 1)} Place — pro shop credit $ (0 = Trophy)</label>
                 <input type="number" id="payout-spot-${i}" min="0" value="${val}" placeholder="0" oninput="renderPayoutResults()" onchange="savePayoutSpots()">
             </div>`;
         }
@@ -4726,7 +5066,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const choices = [['event', 'Event total']].concat(ids.map((rid) => [rid, rounds[rid].name || 'Round']));
         if (owner) {
             ctl.style.display = 'block';
-            ctl.innerHTML = `<div class="payout-basis-head">Results are paid on</div><div class="payout-basis-seg" role="group" aria-label="Results are paid on">`
+            ctl.innerHTML = `<div class="payout-basis-head">Prizes go by</div><div class="payout-basis-seg" role="group" aria-label="Prizes go by">`
                 + choices.map(([v, name]) => `<button type="button" class="${prize.basis === v ? 'on' : ''}" aria-pressed="${prize.basis === v}" onclick="setPayoutBasis('${v}')">${escapeHtml(name)}</button>`).join('')
                 + `</div>`;
         } else {
@@ -4737,7 +5077,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const listed = prize.available && (owner || payoutsAreSet(savedPayoutSpots()));
         if (!owner && listed) {
             label.style.display = 'block';
-            label.innerHTML = `Paid on <b>${escapeHtml(prize.title || '')}</b>`;
+            label.innerHTML = `Prizes go by <b>${escapeHtml(prize.title || '')}</b>`;
         } else {
             label.style.display = 'none'; label.innerHTML = '';
         }
@@ -4762,7 +5102,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const pub = document.getElementById('payout-public-amounts');
         if (pub) {
             pub.innerHTML = owner ? '' : (payoutsAreSet(spotAmounts)
-                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${spotAmounts.map((v, i) => `${ordinal(i + 1)} $${v.toFixed(2)}`).join(' \u00b7 ')}</div>`
+                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${spotAmounts.map((v, i) => `${ordinal(i + 1)} ${prizeLabel(v)}`).join(' \u00b7 ')}</div>`
                 : `<div class="payout-spot-readonly" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Results not set yet.</div>`);
         }
         // ONE BASIS FOR EVERY PHONE (audit #1, A1). The data decides - the
@@ -4793,7 +5133,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // Printing those made a finished-looking table of $0.00 rows - every
         // scored team at fee 0, every unpaid rank with a pool. Only rows with
         // money are rows; "Paid Spots" already says how many there are.
-        const payouts = computeTournamentPayouts(prizeRows, spotAmounts).filter((p) => p.amount > 0);
+        // P1-a, 2026-11-10 (no cash prizes): a place INSIDE the organizer's
+        // "Prize Places" count with no amount is a trophy place, and its winner
+        // is named, reading "Trophy". Ranks past that count stay filtered out,
+        // and nothing shows until an amount is set, exactly as before.
+        const placesSet = payoutsAreSet(spotAmounts);
+        const payouts = computeTournamentPayouts(prizeRows, spotAmounts)
+            .filter((p) => p.amount > 0 || (placesSet && p.rank <= spotAmounts.length));
         const totalAllocated = spotAmounts.reduce((s, v) => s + v, 0);
         const pool = poolTotal();
 
@@ -4802,21 +5148,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // that disagrees with the pool.
         if (owner && payoutsAreSet(spotAmounts) && pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--accent-red); background:var(--danger-box-bg); border:1px solid var(--accent-red); border-radius:6px; padding:8px; margin-bottom:10px;">
-                ⚠️ Result amounts add up to $${totalAllocated.toFixed(2)}, but the total in is $${pool.toFixed(2)}.
+                ⚠️ Pro shop credit adds up to $${totalAllocated.toFixed(2)}, but the total in is $${pool.toFixed(2)}.
             </div>`;
         }
 
-        // Three sentences, each reachable. "No paid spots reached yet." had never
+        // Three sentences, each reachable. "No prize places reached yet." had never
         // rendered before the filter: the list was empty only with no scores, and
         // that case returns above. Now it is the case where amounts are set but
         // the only scored ranks sit on $0 spots.
+        // P1-a, 2026-11-10: a $0 place inside the count is now a "Trophy" row, so
+        // with a scored team 1st is always listed and this sentence is a
+        // fallback that no fixture reaches. Kept, not deleted (wording only).
         if (!spotAmounts.some((v) => v > 0)) {
             html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Enter spot amounts above to see results.</div>`;
         } else if (payouts.length === 0) {
-            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No paid spots reached yet.</div>`;
+            html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No prize places reached yet.</div>`;
         } else {
             payouts.forEach(p => {
-                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${escapeHtml(p.teamName)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">$${p.amount.toFixed(2)}</span></div>`;
+                html += `<div class="ledger-row"><span>${ordinal(p.rank)} — ${escapeHtml(p.teamName)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">${prizeLabel(p.amount)}</span></div>`;
             });
         }
         resultsContainer.innerHTML = html;
@@ -6356,7 +6705,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             syncContestEntriesListener();
             renderContestsTab();
             syncPhotoListeners();
-            renderPhotosTab();
+            renderEventHome();
             // Last, so it can remove what the renders above filled in. Runs on
             // every snapshot: the record may gain an owner while the page is open.
             applyManageGate();

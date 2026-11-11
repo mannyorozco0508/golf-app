@@ -4512,9 +4512,31 @@
 // Moved to v381-2.0 (chat seat move): round-chat.js - This is me, move chat to this phone; the organizer's Free this seat; the Players link on /leaderboard. A device on v380-2.0 keeps the old files: a golfer on a new phone stays locked out, and may keep the round-chat.js that ignores /leaderboard.
 // Moved to v382-2.0 (no self-serve seat move, Manny): round-chat.js - the This is me, move chat to this phone button and its confirm are gone; the organizer's Free this seat stays; a round ended on the server says so; Loading fills in by itself. A device on v381-2.0 keeps the self-serve button (and its call to a function that is not deployed).
 // Moved to v383-2.0 (web sign-in by redirect): oauth-signin.js + admin.html - Continue with / Link Apple and Google go by redirect on hardpangolf.com and golf-app-5a5.pages.dev (authDomain is the page's own host there, /__/auth/ proxied by functions/_middleware.js), the popup stays everywhere else; and this worker leaves /__/ to the network. A device on v382-2.0 keeps the popup-only oauth-signin.js and the firebaseapp.com authDomain, which still works there as before (popup only).
-// Moved to v384-2.0 (tournament scorecard lock): tournament.html + tournament-scorecard.html - a team/group link carries &k= and each score is written with its keyed proof in the same update (rules live since 2026-11-07 9:49 AM). A device on v383-2.0 keeps the unkeyed scorecard, whose score writes the live rules now refuse on a locked event.
-// Moved to v385-2.0 (tournaments nov7 build): tournament.html + tournament-scorecard.html + tournament-engine.js - scores saved on the phone before sending (offline queue), prize results from one saved basis on every phone, shotgun next hole, flights/Event golfer board, "N waiting for signal" chip. A device on v384-2.0 keeps a scorecard that loses unsent scores when closed.
-const CACHE_VERSION = 'golfapp-v385-2.0';
+// Moved to v385-2.0 (tournament scorecard lock): tournament.html + tournament-scorecard.html - a team/group link carries &k= and each score is written with its keyed proof in the same update (rules live since 2026-11-07 9:49 AM). A device on v383-2.0 keeps the unkeyed scorecard, whose score writes the live rules now refuse on a locked event.
+// Moved to v393-2.0 (website-c, Manny Nov 10): instructions.html (How it works without betting words) + trip.html, trip-pots.js (panel "Trip Settlement"). A device on v385-2.0 keeps the old wording until it reloads.
+// Moved to v394-2.0 (website-d, Manny Nov 10): hardpangolf.com/ is the homepage now and the web app is /app. A bare / answers the homepage, so this worker (1) never stores a response marked X-HardPan-Page: home, (2) stores the precached app shell under ./index.html AND under / and /app, so an offline /?game=CODE still opens the app, and (3) refuses a homepage answer to its install fetch. Also the web pages lost the Dark Mode button (light only on the web). A device on v393-2.0 would cache the homepage under / on its first plain visit - and an offline game link would then open the homepage; this bump replaces that worker and drops its cache.
+
+// THE HOMEPAGE IS NOT THE APP (website-d). functions/_front-door.js marks its
+// homepage answer with this header. Such a response is served, never cached:
+// the offline fallback for every app link is the cached `/`, and that entry
+// must only ever hold index.html.
+const HOMEPAGE_HEADER = 'x-hardpan-page';
+function isHomepageResponse(res) {
+    try { return !!(res && res.headers && String(res.headers.get(HOMEPAGE_HEADER) || '').toLowerCase() === 'home'); }
+    catch (e) { return false; }
+}
+// The precached index.html is ALSO the answer for these, offline: `/` with a
+// query (every share link Cloudflare has ever 308ed from /index.html?game=...)
+// and /app (the web app's address since website-d).
+const APP_SHELL_ALIASES = ['./', './app'];
+// Moved to v395-2.0 (tournaments nov7 build, merged with phase 1): tournament.html + tournament-scorecard.html + tournament-engine.js - scores saved on the phone before sending (offline queue), prize results from one saved basis on every phone, shotgun next hole, flights/Event golfer board, "N waiting for signal" chip. A device on v394-2.0 keeps a scorecard that loses unsent scores when closed.
+//   and (tournaments phase 1): tournament.html + tournament-scorecard.html + tournament-engine.js - in-app card and board (app mode), Apple/Google organizer sign-in, prizes read pro shop credit / Trophy, entry-fee help, Share note gap. A device on v394-2.0 keeps cash prize wording and email-only organizer sign-in.
+// Moved to v396-2.0 (tournaments renamed HardPan Tournaments, option A, plus the T3B Event day tab, Manny 2026-11-11): tournament.html + tournament-scorecard.html + tournament-manifest.json.
+// A device on v395-2.0 keeps the Rattle Golf header and fee line.
+// Moved to v397-2.0 (tournaments icon B, Manny 2026-11-11): tournament.html + tournament-scorecard.html label the home-screen icon Tournaments.
+// A device on v396-2.0 keeps the pages without the label.
+// Moved to v398-2.0 (Nov 11, Manny OK fix results winner line): text-safe.js - a $0 2v2 match's Results line names the side that won (team names compared ignoring spaces); an installed device on v397 keeps crediting the losing side.
+const CACHE_VERSION = 'golfapp-v398-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4815,12 +4837,22 @@ self.addEventListener('install', (event) => {
         caches.open(CACHE_VERSION).then((cache) => Promise.all(
             SHELL_FILES.map((file) => fetch(file, { cache: 'reload' }).then(async (res) => {
                 if (!res || !res.ok) throw new Error('HTTP ' + (res && res.status));
+                // A homepage answer is not a shell file. Not cached at all, so a
+                // routing mistake costs offline support for one page, not every
+                // game link (which would open the homepage with no signal).
+                if (isHomepageResponse(res)) throw new Error('homepage answered for ' + file);
                 const body = await res.blob();
                 const mk = () => new Response(body, {
                     status: res.status, statusText: res.statusText, headers: res.headers
                 });
                 const urls = [new URL(file, self.location.href).href];
                 if (res.redirected && res.url && urls.indexOf(res.url) === -1) urls.push(res.url);
+                if (file === './index.html') {
+                    APP_SHELL_ALIASES.forEach((a) => {
+                        const u = new URL(a, self.location.href).href;
+                        if (urls.indexOf(u) === -1) urls.push(u);
+                    });
+                }
                 return Promise.all(urls.map((u) => cache.put(new Request(u), mk())));
             }).catch((err) => {
                 // Logged rather than swallowed, so a broken entry is findable in
@@ -4966,6 +4998,13 @@ self.addEventListener('fetch', (event) => {
             response = await fetch(request);
         } catch (e) {
             return fromCacheOrOffline();
+        }
+
+        // The homepage (a bare `/` since website-d) is served and NOT stored:
+        // stored under `/` it would become the offline answer to every
+        // /?game= link (ignoreSearch, above).
+        if (isHomepageResponse(response)) {
+            return response.redirected ? clean(response) : response;
         }
 
         if (!response.redirected) {

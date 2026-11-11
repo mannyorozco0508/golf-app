@@ -213,7 +213,19 @@ function sideMatchResultTally(receipt, complete) {
         t.total += 1;
         if (!seg.winner && !complete) { t.live += 1; return; }
         if (!seg.winner && /^all square/i.test(String(seg.result || ''))) { t.halved += 1; return; }
-        if (seg.winner) { if (seg.winner === receipt.nameA) t.a += 1; else t.b += 1; return; }
+        // WINNER NAMES COME IN TWO SPELLINGS (fix, Manny OK Nov 11): the match engine names a team
+        // "Sam/Josh" (settlement-engine.js calc.t1Name), the receipt "Sam / Josh" (nameA). An exact
+        // compare credited side B with every game side A won on a $0 2v2 match. Compare with spaces
+        // removed; a winner that matches neither side falls back to the engine's own toSideA.
+        if (seg.winner) {
+            const sp = s => String(s || '').replace(/\s+/g, '');
+            const w = sp(seg.winner);
+            if (w === sp(receipt.nameA)) t.a += 1;
+            else if (w === sp(receipt.nameB)) t.b += 1;
+            else if (seg.toSideA) t.a += 1;
+            else t.b += 1;
+            return;
+        }
         if (seg.toSideA) t.a += 1; else t.b += 1;
     });
     return t;

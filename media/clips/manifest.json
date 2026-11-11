@@ -1,0 +1,123 @@
+{
+  "_about": "Clips for the website feature tiles (/home and /) and Help (/help). CUT (clips 2.0.5, from the 2.0.4 App Preview recording, Manny Nov 10 \"Clips: use the 11 now\", then \"keep option 1\"): gps, add-a-game, group-scoring, games-live-board, results, tournaments. Each poster of these six is the clip's own first frame, and each clip plays ONCE and holds on its last frame (no loop). Poster only (not cut, or held back): just-say-it (the recording has no Ask HardPan moment; the add-a-game cut is not used for it), weekly-code, chat, my-bag-stats, start-round, add-golfers, join-with-a-code, erase-a-round. Format: H.264 MP4, muted (no audio track), portrait, 590x1280 or smaller (posters are 295x640), about 150-400 KB each. Until a file exists its poster shows; nothing else changes when it is added. The play badge on a tile shows seconds rounded to whole seconds (0:04 for 3.5). WEBSITE-E (Manny 37B + 38C, Nov 10): the homepage tiles became 25 cards in five rows; the six cut clips play on their cards (add-a-game now on \"Every game your group plays.\"), and just-say-it, weekly-code, chat and my-bag-stats are no longer used on any page (unused_since: website-e; their cards show stills from media/screens/).",
+  "folder": "/media/clips/",
+  "posters": "/media/posters/<name>.jpg",
+  "clips": [
+    {
+      "file": "gps.mp4",
+      "seconds": 3,
+      "poster": "/media/posters/gps.jpg",
+      "used_on": [
+        "/home card: Every yard. Every hole. (Play row)",
+        "/help and /help/gps-basics"
+      ]
+    },
+    {
+      "file": "just-say-it.mp4",
+      "seconds": 6,
+      "poster": "/media/posters/just-say-it.jpg",
+      "used_on": [],
+      "unused_since": "website-e",
+      "note": "The website-e homepage card for this feature shows a still from media/screens/, not this slot. Kept here, with its poster, for when a clip is cut."
+    },
+    {
+      "file": "group-scoring.mp4",
+      "seconds": 3,
+      "poster": "/media/posters/group-scoring.jpg",
+      "used_on": [
+        "/home card: Score the whole group in one tap. (Games row)",
+        "/help and /help/score-your-group"
+      ]
+    },
+    {
+      "file": "games-live-board.mp4",
+      "seconds": 3,
+      "poster": "/media/posters/games-live-board.jpg",
+      "used_on": [
+        "/home card: Every game, as it happens. (Games row)"
+      ]
+    },
+    {
+      "file": "results.mp4",
+      "seconds": 3.5,
+      "poster": "/media/posters/results.jpg",
+      "used_on": [
+        "/home card: The final word, ready to share. (Games row)"
+      ]
+    },
+    {
+      "file": "tournaments.mp4",
+      "seconds": 3.5,
+      "poster": "/media/posters/tournaments.jpg",
+      "used_on": [
+        "/home card: Run the day from your phone. (Organize row)",
+        "/help and /help/run-a-tournament"
+      ]
+    },
+    {
+      "file": "weekly-code.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/weekly-code.jpg",
+      "used_on": [],
+      "unused_since": "website-e",
+      "note": "The website-e homepage card for this feature shows a still from media/screens/, not this slot. Kept here, with its poster, for when a clip is cut."
+    },
+    {
+      "file": "chat.mp4",
+      "seconds": 3,
+      "poster": "/media/posters/chat.jpg",
+      "used_on": [],
+      "unused_since": "website-e",
+      "note": "The website-e homepage card for this feature shows a still from media/screens/, not this slot. Kept here, with its poster, for when a clip is cut."
+    },
+    {
+      "file": "my-bag-stats.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/my-bag-stats.jpg",
+      "used_on": [],
+      "unused_since": "website-e",
+      "note": "The website-e homepage card for this feature shows a still from media/screens/, not this slot. Kept here, with its poster, for when a clip is cut."
+    },
+    {
+      "file": "start-round.mp4",
+      "seconds": 5,
+      "poster": "/media/posters/start-round.jpg",
+      "used_on": [
+        "/help and /help/start-round"
+      ]
+    },
+    {
+      "file": "add-golfers.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/add-golfers.jpg",
+      "used_on": [
+        "/help and /help/add-golfers"
+      ]
+    },
+    {
+      "file": "add-a-game.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/add-a-game.jpg",
+      "used_on": [
+        "/home card: Every game your group plays. (Games row)",
+        "/help and /help/add-a-game"
+      ]
+    },
+    {
+      "file": "join-with-a-code.mp4",
+      "seconds": 3,
+      "poster": "/media/posters/join-with-a-code.jpg",
+      "used_on": [
+        "/help and /help/join-with-a-code"
+      ]
+    },
+    {
+      "file": "erase-a-round.mp4",
+      "seconds": 4,
+      "poster": "/media/posters/erase-a-round.jpg",
+      "used_on": [
+        "/help and /help/erase-a-round"
+      ]
+    }
+  ]
+}

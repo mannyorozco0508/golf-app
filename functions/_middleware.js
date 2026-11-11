@@ -22,6 +22,9 @@
 //     site_block_tfweb2_test.js.
 // ============================================================================
 
+import { isHomepageQuery, serveApp } from './_front-door.js';
+import { isTournamentsRequest } from './index.js';
+
 // Top-level folders that are not the site (some exist only on other branches).
 export const BLOCKED_DIRS = [
     'tools', 'helpers', 'docs', 'scripts', 'android', 'ios', 'gps-beta',
@@ -33,7 +36,11 @@ export const BLOCKED_DIRS = [
 export const BLOCKED_FILES = [
     'package.json', 'package-lock.json', 'firebase.json', 'build-shell.js',
     'sync-mobile-web.js', 'global_courses_snapshot.json', 'capacitor.config.ts',
-    '.gitignore'
+    '.gitignore',
+    // HELD OFF THE SITE until Stripe is live (Manny, Nov 10 2026): the
+    // entry-fee refund page describes card payments that are not live yet.
+    // The file stays in the repo; take these two lines out to put it back.
+    'refunds', 'refunds.html'
 ];
 
 // Top-level file patterns that are not the site.
@@ -126,7 +133,26 @@ export async function authProxy(request, fetchImpl) {
     return new Response(method === 'HEAD' ? null : res.body, { status: res.status, statusText: res.statusText, headers: out });
 }
 
+// BARE /index.html AND /index ARE THE APP, NOT THE HOMEPAGE (website-d).
+// Pages' Pretty URLs 308 /index.html to `/`, and a bare `/` is now the
+// homepage - so a bookmark of hardpangolf.com/index.html, or the service
+// worker's own install fetch of ./index.html, would have landed on the
+// homepage. These two spellings with no app query get index.html straight
+// from the asset server (200, no redirect). WITH an app query they are left
+// alone: /index.html?game=X 308s to /?game=X as it always has, and `/` with
+// that query is the app (functions/index.js). On the Tournaments host they are
+// left alone too: there the 308 lands on `/`, which goes to /tournament.
+export function isBareAppDocument(url) {
+    let u;
+    try { u = new URL(url); } catch (e) { return false; }
+    return (u.pathname === '/index.html' || u.pathname === '/index') && isHomepageQuery(u.search);
+}
+
 export async function onRequest(context) {
+    if (isBareAppDocument(context.request.url) && !isTournamentsRequest(context.request)) {
+        const app = await serveApp(context);
+        if (app) return app;
+    }
     let pathname = '/';
     try { pathname = new URL(context.request.url).pathname; } catch (e) { /* treat as / */ }
     if (isAuthProxyPath(pathname)) return authProxy(context.request);

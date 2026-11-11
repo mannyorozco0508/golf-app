@@ -211,22 +211,25 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.ok(bone > 0, 'the master has no bone');
     });
 
-    test('tournament icons are the Rattle Golf banner, not the HardPan ball', () => {
-        // Restored 2026-09-23 from the banner that says RATTLE GOLF / TOURNAMENTS.
-        // They stay separate files from the native HardPan ball.
+    test('tournament icons are icon B (HardPan Tournaments), not the HardPan app icon', () => {
+        // Icon B, Manny 2026-11-11 (replaced the 09-23 Rattle Golf banner): HP and
+        // the pin on brand green over a cream TOURNAMENTS band. They stay separate
+        // files from the native HardPan icon.
         assert.notEqual(sha('tournament-icon-1024.png'), sha('icon-1024.png'),
             'the tournament master is a copy of the native master');
         const img = readPng(path.join(__dirname, 'tournament-icon-1024.png'));
         const corner = px(img, 0, 0);
-        assert.ok(corner[0] > 200 && corner[1] > 200 && corner[2] > 180,
-            'tournament icon corner should be the cream banner field, got ' + corner);
+        assert.ok(Math.abs(corner[0] - 0x0f) < 12 && Math.abs(corner[1] - 0x4c) < 12 && Math.abs(corner[2] - 0x3a) < 12,
+            'tournament icon corner should be the brand-green field #0f4c3a, got ' + corner);
         assert.notDeepEqual(corner, [0x0B, 0x0F, 0x0C]);
-        let green = 0;
+        let cream = 0;
         for (let i = 0; i < img.data.length; i += 4) {
             const r = img.data[i], g = img.data[i + 1], b = img.data[i + 2];
-            if (r < 40 && g > 70 && g < 140 && b < 80) green++;
+            if (r > 235 && g > 230 && b > 220) cream++;
         }
-        assert.ok(green > 1000, 'the Rattle Golf banner has no green R');
+        // The cream HP and the TOURNAMENTS band cover well over a fifth of the
+        // 1024 master (1,048,576 px); the band alone is 20% of the height.
+        assert.ok(cream > 200000, 'icon B has its cream HP and TOURNAMENTS band: ' + cream + ' cream px');
     });
 
     test('the native display name in the repo is HardPan', () => {
@@ -265,19 +268,14 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.ok(green > 0, 'the splash has no forest-green ground');
     });
 
-    test('tournaments say Rattle Golf beside the ball mark', () => {
+    test('tournaments say HardPan beside the inline HardPan mark (no consumer file)', () => {
+        // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
         const t = read('tournament.html');
-        assert.match(t, /<img class="wm-mark" src="logo-mark\.png"/);
-        assert.match(t, /<span class="wm-rattle">Rattle Golf<\/span>/);
+        assert.match(t, /<svg class="wm-mark" viewBox="4 24 92 46"/);
+        assert.match(t, /<span class="wm-rattle">HardPan<\/span>/);
         assert.match(t, /<span class="wm-product">Tournaments<\/span>/);
-        // RE-PINNED 2026-11-08 (Stripe Phase 1, M6, mockup M6b approved): the
-        // HardPan Tournaments bar is the one place; the wordmark above is
-        // unchanged and still says Rattle Golf beside the ball.
-        const bar = /<header class="hp-brand" id="hp-brand">[\s\S]*?<\/header>/;
-        assert.match(t, bar, 'positive: the M6 bar is there');
-        const rest = t.replace(bar, '').replace(/<!-- M6 \(Stripe Phase 1[\s\S]*?-->/, '')
-            .replace(/THE BRAND BAR \(M6\): HardPan Tournaments/, '');
-        assert.ok(!/HardPan/.test(rest), 'the tournament page says HardPan only in the M6 bar');
+        // Re-pinned 2026-11-11: rename A (main, Manny's pick) replaced the M6 bar; the pages say HardPan and never Rattle Golf.
+        assert.ok(!/Rattle Golf/.test(t.replace(/<!--[\s\S]*?-->/g, '')), 'the tournament page no longer says Rattle Golf');
     });
 
     test('the lobby still has the email-link card', () => {

@@ -1,0 +1,346 @@
+{
+  "_about": "The still screens behind the website-e homepage feature cards (hardpan-home.html, 25 cards in five rows) and the Try the GPS picture. Each card has two WebP sizes: 400 wide (the card) and the full capture (the full-screen viewer). RE-CAPTURE (Nov 10, 2026): hazards, range, my-bag and weekly-code were re-shot from the 2.0.5 web app code (release-205, 42ec9711) in headless Chrome at 390x844, deviceScaleFactor 3, on the repo's own Firebase stand-in and IAP stand-in (nothing live): demo golfers Sam, Josh, Bob, Paul; no amounts. Their older files stay in this folder, listed under superseded, and nothing serves them. Not part of the app: not in sw.js's shell list, not in the native bundle. LIVE ESRI (Manny, Nov 10): the Try the GPS picture is Esri World Imagery loaded live (16 z19 tiles in hardpan-home.html); the saved try-gps-dobson-7.webp is served by nothing (kept on disk, see try_gps). Strokes Gained, the Practice card and the Aim tip ship on Android 2.0.4 as on iPhone (Manny, Nov 10): no Coming soon on those cards, and none was pinned.",
+  "folder": "/media/screens/",
+  "screens": [
+    {
+      "key": "gps",
+      "card": "f-gps",
+      "headline": "Every yard. Every hole.",
+      "files": [
+        "/media/screens/gps-400.webp",
+        "/media/screens/gps-886.webp"
+      ],
+      "width": 886,
+      "height": 1920
+    },
+    {
+      "key": "plays-like",
+      "card": "f-plays-like",
+      "headline": "Hit the number it plays.",
+      "files": [
+        "/media/screens/plays-like-400.webp",
+        "/media/screens/plays-like-940.webp"
+      ],
+      "width": 940,
+      "height": 2040
+    },
+    {
+      "key": "hazards",
+      "card": "f-hazards",
+      "headline": "Know what you can carry.",
+      "files": [
+        "/media/screens/hazards-400.webp",
+        "/media/screens/hazards-1170.webp"
+      ],
+      "width": 1170,
+      "height": 2532,
+      "captured": "release-205 (42ec9711) index.html on the GPS map, Menu › Hazards: Talking Stick South hole 8 (the app's own GolfAPI course data with hazard points), golfer Sam on the tee, Firebase stand-in (tools/sim/lib/phone.js), IAP stand-in Pro-active, headless Chrome 390x844 @3x",
+      "recaptured": "2026-11-10 (website-e re-capture)"
+    },
+    {
+      "key": "best-miss",
+      "card": "f-best-miss",
+      "headline": "Miss on the right side.",
+      "files": [
+        "/media/screens/best-miss-400.webp",
+        "/media/screens/best-miss-940.webp"
+      ],
+      "width": 940,
+      "height": 2040
+    },
+    {
+      "key": "offline",
+      "card": "f-offline",
+      "headline": "No signal? Still every yard.",
+      "files": [
+        "/media/screens/offline-400.webp",
+        "/media/screens/offline-780.webp"
+      ],
+      "width": 780,
+      "height": 1704
+    },
+    {
+      "key": "my-bag",
+      "card": "f-bag",
+      "headline": "Your real carries.",
+      "files": [
+        "/media/screens/my-bag-400.webp",
+        "/media/screens/my-bag-1170.webp"
+      ],
+      "width": 1170,
+      "height": 2532,
+      "captured": "release-205 (42ec9711) home.html (tools/lib/journey.js), signed in as Sam, Home › My bag, headless Chrome 390x844 @3x",
+      "recaptured": "2026-11-10 (website-e re-capture)"
+    },
+    {
+      "key": "set-up-card",
+      "card": "f-say",
+      "headline": "Set up the game in one sentence.",
+      "files": [
+        "/media/screens/set-up-card-400.webp",
+        "/media/screens/set-up-card-886.webp"
+      ],
+      "width": 886,
+      "height": 1920
+    },
+    {
+      "key": "add-a-game",
+      "card": "f-allgames",
+      "headline": "Every game your group plays.",
+      "files": [
+        "/media/screens/add-a-game-400.webp",
+        "/media/screens/add-a-game-886.webp"
+      ],
+      "width": 886,
+      "height": 1920
+    },
+    {
+      "key": "group-scoring",
+      "card": "f-group",
+      "headline": "Score the whole group in one tap.",
+      "files": [
+        "/media/screens/group-scoring-400.webp",
+        "/media/screens/group-scoring-886.webp"
+      ],
+      "width": 886,
+      "height": 1920
+    },
+    {
+      "key": "live-games",
+      "card": "f-games",
+      "headline": "Every game, as it happens.",
+      "files": [
+        "/media/screens/live-games-400.webp",
+        "/media/screens/live-games-886.webp"
+      ],
+      "width": 886,
+      "height": 1920
+    },
+    {
+      "key": "results",
+      "card": "f-results",
+      "headline": "The final word, ready to share.",
+      "files": [
+        "/media/screens/results-400.webp",
+        "/media/screens/results-886.webp"
+      ],
+      "width": 886,
+      "height": 1920
+    },
+    {
+      "key": "settle",
+      "card": "f-settle",
+      "headline": "Who owes who, done.",
+      "files": [
+        "/media/screens/settle-400.webp",
+        "/media/screens/settle-786.webp"
+      ],
+      "width": 786,
+      "height": 900
+    },
+    {
+      "key": "weekly-code",
+      "card": "f-weekly",
+      "headline": "Same game. Same code. Every week.",
+      "files": [
+        "/media/screens/weekly-code-400.webp",
+        "/media/screens/weekly-code-1170.webp"
+      ],
+      "width": 1170,
+      "height": 2532,
+      "captured": "release-205 (42ec9711) home.html (tools/sim/lib/phone.js): the Tuesday weekly game at Papago with its join code QNXF83 under the card, headless Chrome 390x844 @3x",
+      "recaptured": "2026-11-10 (website-e re-capture)"
+    },
+    {
+      "key": "chat",
+      "card": "f-chat",
+      "headline": "Talk to the round.",
+      "files": [
+        "/media/screens/chat-400.webp",
+        "/media/screens/chat-940.webp"
+      ],
+      "width": 940,
+      "height": 2040
+    },
+    {
+      "key": "play-again",
+      "card": "f-play-again",
+      "headline": "Same group? One tap.",
+      "files": [
+        "/media/screens/play-again-400.webp",
+        "/media/screens/play-again-786.webp"
+      ],
+      "width": 786,
+      "height": 1704
+    },
+    {
+      "key": "trip",
+      "card": "f-trip",
+      "headline": "One board for the whole trip.",
+      "files": [
+        "/media/screens/trip-400.webp",
+        "/media/screens/trip-786.webp"
+      ],
+      "width": 786,
+      "height": 1704
+    },
+    {
+      "key": "history",
+      "card": "f-history",
+      "headline": "Every round you’ve played.",
+      "files": [
+        "/media/screens/history-400.webp",
+        "/media/screens/history-786.webp"
+      ],
+      "width": 786,
+      "height": 1704
+    },
+    {
+      "key": "tournaments",
+      "card": "f-tourney",
+      "headline": "Run the day from your phone.",
+      "files": [
+        "/media/screens/tournaments-400.webp",
+        "/media/screens/tournaments-886.webp"
+      ],
+      "width": 886,
+      "height": 1920
+    },
+    {
+      "key": "create-event",
+      "card": "f-create-event",
+      "headline": "A tournament in four questions.",
+      "files": [
+        "/media/screens/create-event-400.webp",
+        "/media/screens/create-event-786.webp"
+      ],
+      "width": 786,
+      "height": 1704
+    },
+    {
+      "key": "join-event",
+      "card": "f-join-event",
+      "headline": "Join the tournament.",
+      "files": [
+        "/media/screens/join-event-400.webp",
+        "/media/screens/join-event-940.webp"
+      ],
+      "width": 940,
+      "height": 2040
+    },
+    {
+      "key": "event-board",
+      "card": "f-event-board",
+      "headline": "Every group. One board.",
+      "files": [
+        "/media/screens/event-board-400.webp",
+        "/media/screens/event-board-940.webp"
+      ],
+      "width": 940,
+      "height": 2040
+    },
+    {
+      "key": "prizes",
+      "card": "f-prizes",
+      "headline": "Every flight, live.",
+      "files": [
+        "/media/screens/prizes-400.webp",
+        "/media/screens/prizes-780.webp"
+      ],
+      "width": 780,
+      "height": 1100,
+      "note": "Card 22 reworded Nov 10 (Manny): \"Every flight, live.\" - the live leaderboard and flights; was \"Prizes, sorted.\". The screen (the real tournament board) is unchanged; no amounts on it."
+    },
+    {
+      "key": "strokes-gained",
+      "card": "f-strokes-gained",
+      "headline": "See where shots go.",
+      "files": [
+        "/media/screens/strokes-gained-400.webp",
+        "/media/screens/strokes-gained-940.webp"
+      ],
+      "width": 940,
+      "height": 2040
+    },
+    {
+      "key": "range",
+      "card": "f-range",
+      "headline": "Practice what costs you.",
+      "files": [
+        "/media/screens/range-400.webp",
+        "/media/screens/range-1170.webp"
+      ],
+      "width": 1170,
+      "height": 2532,
+      "captured": "release-205 (42ec9711) home.html cold (tools/lib/cold-arrival.js): My stats › Practice card › Practice this on the Range, Sam, three typed 7-iron carries, headless Chrome 390x844 @3x",
+      "recaptured": "2026-11-10 (website-e re-capture)"
+    },
+    {
+      "key": "ask-caddie",
+      "card": "f-ask-caddie",
+      "headline": "Ask what it plays.",
+      "files": [
+        "/media/screens/ask-caddie-400.webp",
+        "/media/screens/ask-caddie-786.webp"
+      ],
+      "width": 786,
+      "height": 460
+    }
+  ],
+  "try_gps": {
+    "file": null,
+    "deleted": "2026-11-10 (Manny typed OK delete saved Esri picture)",
+    "note": "The saved Esri World Imagery crop that Try the GPS showed until Nov 10 was deleted; the box loads the tiles live from Esri."
+  },
+  "superseded": [
+    {
+      "file": "/media/screens/hazards-400-superseded.webp",
+      "was": "hazards",
+      "used_on": [],
+      "unused_since": "website-e re-capture (2026-11-10)",
+      "note": "The 400-wide file this card served before the re-capture, kept under this name because the re-capture took its name (hazards-400.webp). Older capture: the old dark Hazards sheet (gps-clean build). Replaced by hazards-400 / hazards-1170 from release-205. Kept in place, nothing serves it."
+    },
+    {
+      "file": "/media/screens/hazards-786.webp",
+      "was": "hazards",
+      "used_on": [],
+      "unused_since": "website-e re-capture (2026-11-10)",
+      "note": "Older capture: the old dark Hazards sheet (gps-clean build). Replaced by hazards-400 / hazards-1170 from release-205. Kept in place, nothing serves it."
+    },
+    {
+      "file": "/media/screens/my-bag-400-superseded.webp",
+      "was": "my-bag",
+      "used_on": [],
+      "unused_since": "website-e re-capture (2026-11-10)",
+      "note": "The 400-wide file this card served before the re-capture, kept under this name because the re-capture took its name (my-bag-400.webp). Older capture: My bag cropped below its title. Replaced by my-bag-400 / my-bag-1170 from release-205. Kept in place, nothing serves it."
+    },
+    {
+      "file": "/media/screens/my-bag-786.webp",
+      "was": "my-bag",
+      "used_on": [],
+      "unused_since": "website-e re-capture (2026-11-10)",
+      "note": "Older capture: My bag cropped below its title. Replaced by my-bag-400 / my-bag-1170 from release-205. Kept in place, nothing serves it."
+    },
+    {
+      "file": "/media/screens/range-400-superseded.webp",
+      "was": "range",
+      "used_on": [],
+      "unused_since": "website-e re-capture (2026-11-10)",
+      "note": "The 400-wide file this card served before the re-capture, kept under this name because the re-capture took its name (range-400.webp). Older capture: the old dark Range sheet. Replaced by range-400 / range-1170 from release-205. Kept in place, nothing serves it."
+    },
+    {
+      "file": "/media/screens/range-786.webp",
+      "was": "range",
+      "used_on": [],
+      "unused_since": "website-e re-capture (2026-11-10)",
+      "note": "Older capture: the old dark Range sheet. Replaced by range-400 / range-1170 from release-205. Kept in place, nothing serves it."
+    },
+    {
+      "file": "/media/screens/weekly-code-295.webp",
+      "was": "weekly-code",
+      "used_on": [],
+      "unused_since": "website-e re-capture (2026-11-10)",
+      "note": "Older capture: a soft 295 px poster. Replaced by weekly-code-400 / weekly-code-1170 from release-205. Kept in place, nothing serves it."
+    }
+  ]
+}
