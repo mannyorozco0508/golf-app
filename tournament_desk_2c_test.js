@@ -110,7 +110,8 @@ describe('1. THE DESK IS ITS OWN TAB, and the gate takes it with Setup', () => {
         const nav = SRC.slice(SRC.indexOf('<div class="top-nav-bar">'), SRC.indexOf('</div>', SRC.indexOf('<div class="top-nav-bar">')));
         const ids = [...nav.matchAll(/id="tab-btn-([a-z]+)"/g)].map(m => m[1]);
         // Re-pinned 2026-11-10 (T3B): the owner-only Event day tab sits first. Desk still sits between Setup and Leaderboard.
-        assert.deepEqual(ids, ['home', 'setup', 'desk', 'leaderboard']);
+        // Re-pinned 2026-11-11 (event comms picks): Contests after Leaderboard (E2d); no Photos pill (EC4 C: the queue is a Desk chip).
+        assert.deepEqual(ids, ['home', 'setup', 'desk', 'leaderboard', 'contests']);
         assert.match(nav, /showTab\('desk'\)/);
         const setupA = SRC.indexOf('<div id="manage-tab-setup">');
         const deskA = SRC.indexOf('<div id="manage-tab-desk"');

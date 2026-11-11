@@ -274,6 +274,7 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.match(t, /<svg class="wm-mark" viewBox="4 24 92 46"/);
         assert.match(t, /<span class="wm-rattle">HardPan<\/span>/);
         assert.match(t, /<span class="wm-product">Tournaments<\/span>/);
+        // Re-pinned 2026-11-11: rename A (main, Manny's pick) replaced the M6 bar; the pages say HardPan and never Rattle Golf.
         assert.ok(!/Rattle Golf/.test(t.replace(/<!--[\s\S]*?-->/g, '')), 'the tournament page no longer says Rattle Golf');
     });
 

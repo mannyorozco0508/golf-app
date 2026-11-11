@@ -1,0 +1,63 @@
+rules_version = '2';
+// FIREBASE STORAGE RULES - project golfapp-9fb21, default bucket golfapp-9fb21.firebasestorage.app
+// (the bucket Storage was turned on with, 2026-11-03; the web config's storageBucket). NOT PUBLISHED by
+// this branch. iOS publishes, `firebase deploy --only storage`, only on Manny's typed OK.
+//
+// ONE FILE FOR THE WHOLE BUCKET. Publishing replaces every rule in it, so this file carries:
+//   1. ROUND CHAT 2.1a (LIVE since 2026-11-03, per the shared CHANGELOG) - copied UNCHANGED from
+//      storage.rules.chat21-proposed (golf-app branch chat-photos-prep d9626e05). The live text could
+//      not be read from here: diff this block against the console before publishing.
+//   2. TOURNAMENT PHOTO WALL (E4, approved "as mocked" 2026-11-09) - new.
+//   3. Everything else closed.
+//
+// E4, THE DESIGN. Storage rules cannot read the Realtime Database, so they cannot tell an organizer or a
+// team's key holder from anyone else. So:
+//   - a phone may only CREATE a JPEG (<= 5 MB) in tournamentPhotos/<code>/pending/ while signed in (the
+//     scorecard's anonymous session counts) - never overwrite, read, list or delete anything there;
+//   - the pending file means nothing until its meta exists: tournamentPhotoMeta/<code>/pending/<id>,
+//     which the DATABASE rules accept only with the team's key proof in the same write;
+//   - the organizer sees a pending photo through photoLinks (10-minute signed links, owner checked by the
+//     callable), and Show runs approvePhoto, which moves the file to shown/ with the Admin SDK;
+//   - shown/ is public to GET one file by exact name (the recap link), never to list.
+// A stranger with no key can at most park a JPEG in pending/ that nobody can open and nothing points at.
+service firebase.storage {
+  match /b/{bucket}/o {
+    // ---- 1. ROUND CHAT 2.1a (unchanged) ------------------------------------------------------------
+    match /chat/{code}/{file} {
+      allow read: if false;
+      allow create: if request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && resource == null                       // a new file only: an existing photo is never replaced
+        && code.matches('^[A-Za-z0-9_-]{3,40}$')
+        && file.matches('^-?[A-Za-z0-9_-]{1,40}[.]jpg$')
+        && request.resource.size > 0
+        && request.resource.size < 1.5 * 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
+      allow update, delete: if false;
+    }
+
+    // ---- 2. TOURNAMENT PHOTO WALL (E4) ------------------------------------------------------------
+    match /tournamentPhotos/{code}/pending/{file} {
+      allow read: if false;
+      allow create: if request.auth != null
+        && resource == null                       // never overwrite another golfer's upload
+        && code.matches('^[A-Za-z0-9]{3,12}$')
+        && file.matches('^-?[A-Za-z0-9_-]{1,40}[.]jpg$')
+        && request.resource.size > 0
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType == 'image/jpeg';
+      allow update, delete: if false;
+    }
+    match /tournamentPhotos/{code}/shown/{file} {
+      allow get: if true;                         // the recap link: one file by its exact name
+      allow list: if false;
+      allow write: if false;                      // only approvePhoto (Admin SDK) puts a file here
+    }
+    // hidden/ and anything else under tournamentPhotos: no client access (the catch-all below).
+
+    // ---- 3. everything else ---------------------------------------------------------------------
+    match /{all=**} {
+      allow read, write: if false;
+    }
+  }
+}

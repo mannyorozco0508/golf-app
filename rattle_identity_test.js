@@ -191,6 +191,7 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
         // Golf again. The landing wordmark is Rattle Golf + Tournaments. The
         // engine stays product-neutral. The scorecard carries the product
         // name only in its title.
+        // Re-pinned 2026-11-11: rename A (main, Manny's pick) replaced the M6 bar; the pages say HardPan and never Rattle Golf.
         // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
         const noComments = (s) => s.replace(/<!--[\s\S]*?-->/g, '');
         ['tournament.html', 'tournament-scorecard.html', 'tournament-manifest.json']
@@ -201,9 +202,12 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
         assert.match(read('tournament.html'), /aria-label="HardPan Tournaments"/);
         assert.ok(!/Rattle/.test(read('tournament-engine.js')),
             'the engine stays product-neutral');
-        const scorecard = read('tournament-scorecard.html').replace(/<title>[^<]*<\/title>/, '');
+        // M6 (2026-11-08): the bar's company line "by Rattle Golf" is the one
+        // other place; it is held exactly above, so it is removed before this.
+        const scorecard = read('tournament-scorecard.html').replace(/<title>[^<]*<\/title>/, '')
+            .replace(BAR, '').replace(/<!-- M6 \(Stripe Phase 1[\s\S]*?-->/, '');
         assert.ok(!/Rattle/.test(scorecard),
-            'the scorecard carries the product name only in the title');
+            'the scorecard carries the product name only in the title and the M6 bar');
         const t = read('tournament.html');
         assert.match(t, /<svg class="wm-mark" viewBox="4 24 92 46"/,
             'the HardPan mark, inline, with no word on it');

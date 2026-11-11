@@ -2034,6 +2034,31 @@ question index.html asks. Guard `tournament_offline_queue_test.js`; Chrome + emu
 the Desktop). `cold-arrival.js` gained opt-in `closeBrowser` - a SIGTERM'd headless
 Chrome with the real SDK connected lost localStorage written 5 s+ after load.
 
+### Stripe Phase 1 server, TEST MODE (2026-11-08, branch stripe-1-server, local only)
+
+Entry fees only. Contract `~/Desktop/claude-mailbox-shared/tournaments/STRIPE-CONTRACT.md`.
+**Nothing deployed, no keys, no rules published.** New Firebase Functions codebase
+`tournaments-stripe` in `stripe-functions/` (2nd gen, nodejs22, us-central1):
+`createEntryCheckout`, `refundEntry` (onCall), `stripeWebhook` (onRequest). Pure rules in
+`stripe-core.js`; `handlers.js` takes db + stripe injected; `index.js` is thin. The server
+reads `tournaments/<code>/fees/entryFeeCents` and never an amount from the client. Extra
+server-only path: `payments/checkoutAttempts/<code>/<entryId>` (max 5 sessions). Contract
+Addendum 2026-11-08: `registrationStatus/<code>/<entryId> = {paid, paidVia, at}`, written by
+the webhook with the registration, readable by exact id only (the signed-out M2c page).
+- **firebase.json now has a `functions` array with ONLY `tournaments-stripe`.** Release
+  branches carry a `gps-live` entry: at merge the array must hold BOTH (each its own
+  `codebase`). Deploy only `--only functions:tournaments-stripe`. See `stripe-functions/README.md`.
+- `stripe-functions/` is blocked from the public site (`functions/_middleware.js`
+  BLOCKED_DIRS + `_routes.json`), like `firebase-functions/`.
+- Rules block (registrations Stripe fields + lock, `tournaments/<code>/fees`, `payments`,
+  `stripeEvents`, `registrationStatus`): built on LIVE by `tools/stripe-rules-candidate.js`, proven in the DB
+  emulator by `stripe_rules_emulator_test.js`, handed off in
+  `~/Desktop/claude-mailbox/inbox/TOURNAMENTS-STRIPE-RULES-BLOCK.md`. The repo
+  `database.rules.json` was NOT changed (it is behind live).
+- Guards: `stripe_core_test.js` (pure), `stripe_webhook_test.js` (handlers + index.js on the
+  DB emulator, real `stripe` signature helper, mocked Stripe network), the rules test. The
+  last two SKIP without `npm --prefix stripe-functions ci` / Java + emulator jar.
+
 ## Dark mode is gone from the Tournament product (Option B, 2026-09-18)
 
 **What decided it: the shared key.** Both tournament pages read and wrote

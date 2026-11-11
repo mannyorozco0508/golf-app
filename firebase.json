@@ -1,5 +1,16 @@
 {
   "database": {
     "rules": "database.rules.json"
-  }
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": [
+    {
+      "source": "stripe-functions",
+      "codebase": "tournaments-stripe",
+      "runtime": "nodejs22",
+      "ignore": ["node_modules", ".git", "*.log"]
+    }
+  ]
 }

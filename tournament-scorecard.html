@@ -39,6 +39,11 @@
          Approve button copies it into the field that every page renders. -->
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <!-- E2 contest holes: the one ranking and entry builder this page and
+         tournament.html share (tournament-contests.js). -->
+    <script src="tournament-contests.js"></script>
+    <!-- E4: the photo wall's paths and builders (tournament-photos.js). -->
+    <script src="tournament-photos.js"></script>
     <!-- Scores typed with no signal are kept in this phone's storage until the
          server confirms them, so closing the tab cannot lose them. The shared
          queue, unmodified; the page files it under its own storage key. -->
@@ -66,6 +71,7 @@
         .top-nav-bar { display: flex; gap: 6px; margin-bottom: 14px; }
         .top-nav-item { flex: 1; padding: 10px; text-align: center; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; cursor: pointer; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
+        .top-nav-bar.compact .top-nav-item { padding: 10px 2px; font-size: 0.8rem; white-space: nowrap; }
 
         .event-title { text-align: center; font-size: 1.3rem; font-weight: bold; color: var(--brand-green); margin-bottom: 2px; }
         .event-sub { text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 4px; }
@@ -129,6 +135,88 @@
         .lb-seg button { flex: 1; border: 0; background: transparent; color: var(--text-muted); font-weight: bold; font-size: 0.85rem; padding: 8px 0; border-radius: 8px; cursor: pointer; font-family: inherit; }
         .lb-seg button.on { background: var(--brand-navy); color: #ffffff; }
         .lb-note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
+        /* E2 (approved "as mocked" 2026-11-09): the contest-hole prompt and the
+           Contests board. Typed distances only on the web - no GPS mark here. */
+        .contest-prompt { border: 2px solid #d4a017; border-radius: 14px; padding: 14px; margin: 0 0 14px 0; background: var(--bg-card); }
+        .cp-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+        .cp-title { font-weight: 800; font-size: 1.05rem; color: var(--text-main); }
+        .cp-meta { font-size: 0.8rem; font-weight: bold; color: var(--text-muted); white-space: nowrap; }
+        .cp-sub { font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 10px 0; }
+        .cp-who { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .cp-chip { border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--brand-navy); border-radius: 999px; padding: 7px 12px; font-weight: bold; font-size: 0.82rem; cursor: pointer; font-family: inherit; }
+        .cp-chip.on { background: var(--brand-navy); border-color: var(--brand-navy); color: #ffffff; }
+        .cp-inputs { display: flex; gap: 10px; }
+        .cp-box { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; border: 2px solid var(--brand-navy); border-radius: 10px; padding: 8px; }
+        .cp-box input { width: 64px; border: 0; font-size: 1.3rem; font-weight: 800; text-align: right; background: transparent; color: var(--text-main); font-family: inherit; }
+        .cp-box input:focus { outline: none; }
+        .cp-box span { font-size: 1.15rem; font-weight: 800; }
+        .cp-save { width: 100%; margin-top: 10px; background: var(--brand-navy); color: #ffffff; border: 0; border-radius: 12px; padding: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .cp-msg { min-height: 16px; text-align: center; font-size: 0.8rem; font-weight: bold; margin-top: 8px; }
+        .cp-msg.ok { color: var(--brand-green); }
+        .cp-msg.err { color: var(--accent-red); }
+        .cp-skip { display: block; margin: 6px auto 0 auto; background: none; border: 0; color: var(--text-muted); text-decoration: underline; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
+        .cb-card { border: 1px solid var(--border-mid); border-radius: 14px; padding: 10px 14px; margin-bottom: 12px; background: var(--bg-card); }
+        .cb-head { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #444; padding: 4px 0 8px 0; border-bottom: 1px solid var(--border-faint); }
+        .cb-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border-faint); font-size: 0.95rem; }
+        .cb-row .cb-team { color: var(--text-muted); font-size: 0.82rem; }
+        .cb-row .cb-val { font-weight: 800; white-space: nowrap; }
+        .cb-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 0.8rem; color: var(--text-muted); padding: 8px 0 2px 0; }
+        .cb-note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 4px; }
+        /* E4a photo post (approved "as mocked" 2026-11-09). */
+        .ph-pick { position: relative; display: flex; align-items: center; justify-content: center; height: 220px; border-radius: 14px; overflow: hidden; background: linear-gradient(135deg, #7aab68, #2f6e4f); cursor: pointer; margin-bottom: 12px; }
+        .ph-pick img { width: 100%; height: 100%; object-fit: cover; }
+        .ph-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .ph-empty { color: #ffffff; font-weight: bold; font-size: 1rem; }
+        .ph-tag { position: absolute; left: 8px; bottom: 8px; background: rgba(20, 40, 25, 0.85); color: #ffffff; font-weight: bold; font-size: 0.82rem; border-radius: 8px; padding: 4px 8px; }
+        .ph-cap-label { display: block; font-size: 0.85rem; font-weight: bold; color: #555; margin-bottom: 6px; }
+        .ph-caption { width: 100%; box-sizing: border-box; border: 1px solid var(--border-mid); border-radius: 12px; padding: 12px; font-size: 1rem; font-family: inherit; margin-bottom: 10px; }
+        .ph-post { width: 100%; background: var(--brand-navy); color: #ffffff; border: 0; border-radius: 12px; padding: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .ph-post:disabled { opacity: 0.5; }
+        .ph-msg { min-height: 16px; text-align: center; font-size: 0.82rem; font-weight: bold; margin-top: 8px; }
+        .ph-msg.ok { color: var(--brand-green); }
+        .ph-msg.err { color: var(--accent-red); }
+        .ph-note { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: 8px 0 14px 0; }
+        .ph-wall { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .ph-tile { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 4 / 3; background: var(--nav-bg); }
+        .ph-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .ph-report { position: absolute; right: 6px; top: 6px; background: rgba(255,255,255,0.85); border: 0; border-radius: 8px; font-size: 0.72rem; padding: 3px 6px; cursor: pointer; color: #444; font-family: inherit; }
+        /* M6: the HardPan Tournaments bar (same rules as tournament.html). */
+        .hp-brand { display: flex; align-items: center; gap: 10px; background: #0f4c3a; color: #ffffff; margin: -12px -12px 12px -12px; padding: 12px 16px; }
+        .hp-brand-mark { width: 30px; height: 30px; border-radius: 8px; background: #0B0F0C; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+        .hp-brand-mark span { width: 13px; height: 13px; border-radius: 50%; background: #efe9d8; display: block; }
+        .hp-brand-word { font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em; white-space: nowrap; }
+        .hp-brand-word .hp-brand-product { color: #d4f28a; }
+        .hp-brand-by { margin-left: auto; font-size: 0.82rem; color: rgba(255,255,255,0.82); white-space: nowrap; }
+        /* E1a (mockup approved 2026-11-09): the organizer's newest note on top
+           of the card until the next one. One-way: nothing here takes a reply. */
+        .org-note { background: #7c2d12; color: #ffffff; border-radius: 14px; padding: 12px 14px; margin: 0 0 12px 0; }
+        .org-note-head { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.88; margin-bottom: 4px; }
+        .org-note-text { font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
+        .older-notes { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: 0 0 12px 0; }
+        .older-notes a { color: var(--text-muted); }
+        /* EC1 + B for Weather (2026-11-11): the full-screen weather note. */
+        .org-alert { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 3000; align-items: center; justify-content: center; padding: 20px; }
+        .org-alert.open { display: flex; }
+        .org-alert-box { background: #ffffff; color: #10231c; border-radius: 16px; padding: 18px; max-width: 420px; width: 100%; box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
+        .org-alert-when { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #6b7a72; }
+        .org-alert-title { font-size: 1.3rem; font-weight: 800; margin: 6px 0 8px 0; }
+        .org-alert-text { font-size: 1rem; line-height: 1.4; overflow-wrap: anywhere; }
+        .org-alert-ok { display: block; width: 100%; margin-top: 14px; background: #0f4c3a; color: #ffffff; border: 0; border-radius: 12px; padding: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        /* EC4 C: the after-the-round photo block on the card. */
+        .ph-done { border: 1px solid var(--border-mid); border-radius: 14px; padding: 12px 14px; margin: 0 0 14px 0; background: var(--bg-card); }
+        .ph-done-h { font-weight: 800; font-size: 1.05rem; margin-bottom: 4px; }
+        /* The notes show in the app's hole view too (Phase 1 hides everything but #app-view). */
+        body.app-mode:not([data-app-screen="card"]) #main-content > .org-note, body.app-mode:not([data-app-screen="card"]) #main-content > .pace-note { display: block !important; }
+        body.app-mode:not([data-app-screen="card"]) #main-content > .org-note[style*="display: none"], body.app-mode:not([data-app-screen="card"]) #main-content > .pace-note[style*="display: none"] { display: none !important; }
+        .older-list { border: 1px solid var(--border-mid); border-radius: 12px; padding: 4px 12px; margin: 0 0 12px 0; }
+        .older-row { padding: 8px 0; font-size: 0.88rem; overflow-wrap: anywhere; }
+        .older-row + .older-row { border-top: 1px solid var(--border-faint); }
+        /* E3b (mockup approved 2026-11-09): the organizer's pace nudge, on THIS
+           team's card only, until it scores the next hole. Fixed words. */
+        .pace-note { background: var(--brand-navy); color: #ffffff; border-radius: 14px; padding: 12px 14px; margin: 0 0 12px 0; }
+        .pace-note-head { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.88; margin-bottom: 4px; }
+        .pace-note-text { font-size: 1rem; line-height: 1.35; }
+        .pace-note-foot { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: 0 0 12px 0; }
 
         /* ---- P1-c / P1-d: THE APP LAYOUT (T1A card, T2C board; Manny's picks
            2026-11-10). Sizes and colours are the mockups' (2.0.4 light style).
@@ -184,7 +272,28 @@
 </head>
 <body>
 
+<!-- EC1 + B for Weather (2026-11-11): the weather note, full screen until Got it. -->
+<div class="org-alert" id="org-alert" role="alertdialog" aria-modal="true" aria-labelledby="org-alert-title">
+    <div class="org-alert-box">
+        <div class="org-alert-when" id="org-alert-when"></div>
+        <div class="org-alert-title" id="org-alert-title">⚡ Stop play</div>
+        <div class="org-alert-text" id="org-alert-text"></div>
+        <button type="button" class="org-alert-ok" id="org-alert-ok" onclick="ackOrgAlert()">Got it</button>
+    </div>
+</div>
 <div class="container" id="main-content" style="display:none;">
+    <!-- E1a (2026-11-09): the newest organizer note. Read from the same
+         tournaments/<code> snapshot as the card; hidden when there is none. -->
+    <div class="org-note" id="org-note" style="display:none;" role="status">
+        <div class="org-note-head" id="org-note-head"></div>
+        <div class="org-note-text" id="org-note-text"></div>
+    </div>
+    <!-- E3b (2026-11-09): tournaments/<code>/nudges/<this card's team or
+         group>, shown until the card has scored past the nudge's thru. -->
+    <div class="pace-note" id="pace-note" style="display:none;" role="status">
+        <div class="pace-note-head">⏱️ Friendly pace note</div>
+        <div class="pace-note-text">You're about a hole behind the group ahead. Ready golf helps everyone. Thanks!</div>
+    </div>
     <!-- P1-c / P1-d: THE APP LAYOUT. Filled by renderAppView() from the same
          snapshot, the same card state and the same score writers as the card
          below; shown only in app mode (APP_MODE). The website never shows it. -->
@@ -199,6 +308,9 @@
     <div class="top-nav-bar">
         <span class="top-nav-item active" id="tab-btn-scorecard" onclick="showTab('scorecard')">📝 Scorecard</span>
         <span class="top-nav-item" id="tab-btn-leaderboard" onclick="showTab('leaderboard')">🏆 Leaderboard</span>
+        <!-- Manny's picks 2026-11-11: no Contests pill (EC2 A: the prompt on the
+             card is the contest) and no Photos pill (EC4 C: photos are asked for
+             when the card is done, below). -->
     </div>
 
     <div class="event-title" id="event-title"></div>
@@ -223,6 +335,27 @@
             <div class="status-main" id="status-main">Thru 0</div>
             <div class="status-sub" id="status-sub"></div>
         </div>
+        <!-- E2a / E2b: the contest-hole prompt, on the hole this card is playing
+             (or has just played) when the organizer made it a contest hole. -->
+        <div class="contest-prompt" id="contest-prompt" style="display:none;"></div>
+        <!-- EC4 C (Manny 2026-11-11): photos AFTER the round. The E4a controls,
+             the same post path (resize, no location, pending until the organizer
+             OKs it), shown only when this card has every hole scored and the link
+             can post (its key). No wall on the card: OK'd photos are on the recap. -->
+        <div class="ph-done" id="photo-done" style="display:none;">
+            <div class="ph-done-h">Round done · Add photos from today?</div>
+            <p class="ph-note" style="margin-top:0;">They go on the event recap once the organizer OKs them. Location is removed from the photo. Photos of other golfers: ask first.</p>
+            <label class="ph-pick" id="photo-pick">
+                <img id="photo-preview" alt="" style="display:none;">
+                <span class="ph-empty" id="photo-empty">📷 Tap to choose a photo</span>
+                <span class="ph-tag" id="photo-tag" style="display:none;">Your photo</span>
+                <input type="file" id="photo-file" accept="image/jpeg,image/png,image/heic,image/heif,image/webp" onchange="photoChosen(this)">
+            </label>
+            <label class="ph-cap-label" for="photo-caption">Caption (optional)</label>
+            <input type="text" class="ph-caption" id="photo-caption" maxlength="120">
+            <button type="button" class="ph-post" id="photo-post" onclick="postPhoto()">Send to the organizer</button>
+            <div class="ph-msg" id="photo-msg" aria-live="polite"></div>
+        </div>
         <!-- SAVE STATE. Scores were written fire-and-forget with no confirmation, so a
              golfer on a thin signal had no way to tell a saved hole from a lost one.
              One quiet line that settles back to idle, rather than a toast per keystroke -
@@ -232,6 +365,10 @@
              the server. Hidden at zero, and hidden while a send is merely in
              flight on a good signal - see renderWaitingChip. -->
         <div class="waiting-row"><span class="waiting-chip" id="score-waiting" style="display:none;"></span></div>
+        <!-- E1a: "Older notes" opens the earlier ones. Shown only when there are. -->
+        <div class="older-notes" id="older-notes" style="display:none;">Older notes: <a href="#" id="older-notes-link" onclick="toggleOlderNotes(); return false;"></a></div>
+        <div class="older-list" id="older-list" style="display:none;"></div>
+        <div class="pace-note-foot" id="pace-note-foot" style="display:none;">Only your team sees this. It goes away after you score the next hole.</div>
         <div id="holes-list"></div>
         <div class="play-order-note" id="play-order-note" style="display:none;"></div>
     </div>
@@ -242,6 +379,12 @@
         <div id="leaderboard-list"></div>
         <div class="lb-note" id="lb-note" style="display:none;"></div>
     </div>
+
+    <!-- E2c: the live contest board. Leaders update as entries land; the
+         organizer confirms. Nothing is paid in the app. -->
+    <!-- E4a: post a photo to the event wall. It waits for the organizer;
+         nothing shows until they say yes. The phone resizes to 1600 px and
+         re-encodes it (no location leaves the phone). -->
 </div>
 
 <div class="container" id="error-content" style="display:none; text-align:center;">
@@ -270,12 +413,16 @@
     // This page never touches the browser's stored theme preference.
 
     let boardTabOpen = false;   // the Leaderboard tab is on screen: snapshots re-render it
+    // The page's tabs. Contests (E2c) is drawn only on an event with contest holes.
+    const CARD_TABS = ['scorecard', 'leaderboard'];   // 2026-11-11: Contests and Photos tabs gone (EC2 A, EC4 C)
     function showTab(tab) {
         boardTabOpen = (tab === 'leaderboard');
-        document.getElementById('tab-scorecard').style.display = tab === 'scorecard' ? 'block' : 'none';
-        document.getElementById('tab-leaderboard').style.display = tab === 'leaderboard' ? 'block' : 'none';
-        document.getElementById('tab-btn-scorecard').classList.toggle('active', tab === 'scorecard');
-        document.getElementById('tab-btn-leaderboard').classList.toggle('active', tab === 'leaderboard');
+        CARD_TABS.forEach((k) => {
+            const panel = document.getElementById('tab-' + k);
+            const btn = document.getElementById('tab-btn-' + k);
+            if (panel) panel.style.display = tab === k ? 'block' : 'none';
+            if (btn) btn.classList.toggle('active', tab === k);
+        });
         if (tab === 'leaderboard') renderLeaderboard();
     }
 
@@ -374,12 +521,102 @@
             lastSnapshotAt = Date.now();
             if (group) renderGroup(group); else renderAll();
             renderWaitingChip();
+            renderOrgNotes();
+            renderPaceNote();
+            renderPhotoDone();
             // "Updates live" (A3) is true only if the open board re-renders
             // on each snapshot. Before this it changed only on a tab tap.
             if (boardTabOpen) renderLeaderboard();
             if (APP_MODE) renderAppView();
         });
         armScoreQueue();
+        // E2: the event's contest entries (public, like the board). The prompt
+        // reads it to know who on this card has entered; the board ranks it.
+        db.ref(`contestEntries/${currentCode}`).on('value', (snap) => {
+            contestEntries = (snap && snap.val()) || {};
+            renderContestArea();
+        });
+    }
+
+    // ---- E1a: THE ORGANIZER'S NOTES (mockup approved 2026-11-09) -----------
+    // tournaments/<code>/announcements/<id> = {text, tpl, at, by, pushed?},
+    // owner-written, public to read like the board. The newest sits on top of
+    // the card until the next one; "Older notes" lists the rest, newest first.
+    // One-way by design: no reply, no field chat - nothing here writes.
+    var olderNotesOpen = false;   // var: read by the snapshot listener, registered above
+    function orgNotesSorted(data) {
+        const a = (data && data.announcements) || {};
+        return Object.keys(a).map((id) => a[id])
+            .filter((x) => x && typeof x.text === 'string' && x.text.trim() && typeof x.at === 'number')
+            .sort((x, y) => y.at - x.at);
+    }
+    function orgNoteClock(ms) { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+    function renderOrgNotes() {
+        const notes = orgNotesSorted(currentData);
+        const box = document.getElementById('org-note');
+        if (!box) return;
+        if (!notes.length) {
+            renderOrgAlert(null);
+            box.style.display = 'none';
+            document.getElementById('older-notes').style.display = 'none';
+            document.getElementById('older-list').style.display = 'none';
+            return;
+        }
+        const top = notes[0];
+        renderOrgAlert(top);
+        box.style.display = 'block';
+        document.getElementById('org-note-head').textContent = `${top.tpl === 'weather' ? '⚡ ' : ''}From the organizer · ${orgNoteClock(top.at)}`;
+        document.getElementById('org-note-text').textContent = top.text;
+        const older = notes.slice(1);
+        document.getElementById('older-notes').style.display = older.length ? 'block' : 'none';
+        document.getElementById('older-notes-link').textContent = `${older.length} earlier from the organizer`;
+        const list = document.getElementById('older-list');
+        list.style.display = (older.length && olderNotesOpen) ? 'block' : 'none';
+        list.innerHTML = older.map((n) => `<div class="older-row">${orgNoteClock(n.at)} · ${escapeHtml(n.text)}</div>`).join('');
+    }
+    function toggleOlderNotes() { olderNotesOpen = !olderNotesOpen; renderOrgNotes(); }
+    // EC1 + B for Weather (Manny 2026-11-11): a weather / lightning note takes the
+    // whole screen until the golfer taps Got it; every other template stays the
+    // banner above. The tap is remembered on this phone (by the note's time), so
+    // a reload does not ask again; a NEW weather note asks again.
+    const ORG_ACK_KEY = () => 'hp_orgnote_ack_' + currentCode;
+    function orgNoteAcked(at) { try { return Number(localStorage.getItem(ORG_ACK_KEY())) >= at; } catch (e) { return false; } }
+    function renderOrgAlert(top) {
+        const box = document.getElementById('org-alert');
+        if (!box) return;
+        const show = !!(top && top.tpl === 'weather' && !orgNoteAcked(top.at));
+        box.classList.toggle('open', show);
+        if (!show) return;
+        document.getElementById('org-alert-when').textContent = `From the organizer · ${orgNoteClock(top.at)}`;
+        document.getElementById('org-alert-text').textContent = top.text;
+        box.dataset.at = String(top.at);
+    }
+    function ackOrgAlert() {
+        const box = document.getElementById('org-alert');
+        const at = Number(box && box.dataset.at) || Date.now();
+        try { localStorage.setItem(ORG_ACK_KEY(), String(at)); } catch (e) { /* no storage: it shows again on reload */ }
+        if (box) box.classList.remove('open');
+    }
+    // EC4 C: the photo block appears when this card has every hole scored.
+    function renderPhotoDone() {
+        const el = document.getElementById('photo-done');
+        if (!el) return;
+        const rd = (myRoundId && currentData && currentData.rounds && currentData.rounds[myRoundId]) || currentData || {};
+        const holes = ((rd.courseData || (currentData || {}).courseData || []).length) || 18;
+        el.style.display = (photosOn() && cardThru >= holes) ? 'block' : 'none';
+    }
+
+    // ---- E3b: THE PACE NUDGE (mockup approved 2026-11-09) ---------------------
+    // nudges/<team{n} | group id> = {at, tpl:'pace1', thru}, owner-written. Shown
+    // on this card only while the card's own Thru (the count its status line
+    // reads, set by renderAll / renderGroup) has not passed the nudge's thru.
+    var cardThru = 0;   // var: written by the renderers the snapshot listener calls
+    function renderPaceNote() {
+        const key = myGroupId ? myGroupId : ('team' + myTeamNum);
+        const n = ((currentData && currentData.nudges) || {})[key];
+        const show = !!(n && n.tpl === 'pace1' && Number.isInteger(n.thru) && cardThru <= n.thru);
+        document.getElementById('pace-note').style.display = show ? 'block' : 'none';
+        document.getElementById('pace-note-foot').style.display = show ? 'block' : 'none';
     }
 
     // computeTeamHoleScore and computeTournamentLeaderboard now live in tournament-engine.js
@@ -1096,6 +1333,7 @@
         // has finished, so it can never disagree with the hole it says is next.
         const isPlayed = (n) => groupHolePlayed(scores, ids, n);
         const played = order.filter(h => isPlayed(Number(h.hole))).length;
+        cardThru = played;
         const next = nextHoleInPlayOrder({ holes: courseData, startingHole: group.startingHole, isScored: isPlayed });
         applyPlayState(order, isPlayed, roundLocked ? null : next);
         if (!roundLocked) scrollToNextHole(order, next);
@@ -1119,6 +1357,10 @@
         if (roundLocked) {
             document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
         }
+        // E2: who on this card can enter a contest - each golfer by player id.
+        contestCtx = { order: order, isPlayed: isPlayed, next: roundLocked ? null : next,
+            golfers: ids.map(pid => ({ entryKey: pid, who: pid, team: pid, name: competitorDisplayName(players[pid]) || 'Golfer' })) };
+        renderContestArea();
         if (currentData.roundName) {
             document.getElementById('event-sub').textContent =
                 `${currentData.courseName} • ${currentData.roundName} • Individual Stroke Play • ${netMode ? 'Net' : 'Gross'}`;
@@ -1230,6 +1472,7 @@
         }
 
         const isPlayed = (n) => !!playedHoles[n];
+        cardThru = thru;
         const next = nextHoleInPlayOrder({ holes: courseData, startingHole: team.startingHole, isScored: isPlayed });
         applyPlayState(order, isPlayed, roundLocked ? null : next);
         if (!roundLocked) scrollToNextHole(order, next);
@@ -1265,7 +1508,283 @@
         if (roundLocked) {
             document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
         }
+        // E2: who on this card can enter a contest - each golfer by index.
+        contestCtx = { order: order, isPlayed: isPlayed, next: roundLocked ? null : next,
+            golfers: (team.players || []).map((name, i) => ({ entryKey: `team${myTeamNum}_p${i}`, who: `team${myTeamNum}`, team: `team${myTeamNum}`, name: String(name || '') || `Golfer ${i + 1}` })) };
+        renderContestArea();
     }
+
+    // ===== E2: CONTEST HOLES ON THE CARD (approved "as mocked" 2026-11-09) =====
+    //
+    // THE PROMPT (E2a closest to the pin, E2b long drive) shows on the hole this
+    // card is playing - the next hole in its play order - or the hole it has just
+    // finished, when the organizer made that hole a contest hole and has not yet
+    // confirmed a winner. It goes once every golfer on the card has an entry, or
+    // when "Not on the green" is tapped.
+    //
+    // TYPED ONLY ON THE WEB. The app's GPS mark (the shared Mark button: gps-kp.js /
+    // gps-longdrive.js) is not on this page: the tournament record carries no
+    // link to a mapped GPS course (gps_links / gps_courses), those records need
+    // a signed-in reader, and this page has no sign-in and no GPS code. So no
+    // "Mark with GPS" box is drawn here, and nothing here asks for a location.
+    // A GPS-marked entry from the app shows on the board with its pin.
+    //
+    // THE WRITE IS A SCORE'S WRITE: one update, the entry and (on a keyed link)
+    // its proof {who, k, t: now}, built by TournamentContests.entryUpdate. Only a
+    // distance and a time are written - never a position.
+    var contestEntries = {};
+    var contestCtx = null;
+    var contestPick = {};          // hole -> the golfer chosen on this card
+    var contestMsg = {};           // hole -> { cls, text } after a save
+    var contestShape = '';
+    const CONTEST_REFUSED = "⚠️ Not saved — this link can't enter for this card. Ask the organizer for your team's link.";
+
+    function contestsOn() {
+        const data = currentData || {};
+        return !isMultiRound(data) && TournamentContests.contestList(data).length > 0;
+    }
+    function contestSkipKey(hole) {
+        return `rattle_contest_skip_${currentCode}_${hole}_${myGroupId || myTeamNum}`;
+    }
+    function contestSkipped(hole) {
+        if (contestSkippedNow[hole]) return true;
+        try { return localStorage.getItem(contestSkipKey(hole)) === '1'; } catch (e) { return false; }
+    }
+    // The contest this card is on now: the next hole, else the hole just played.
+    function contestHoleNow() {
+        if (!contestCtx || !contestsOn()) return null;
+        const data = currentData || {};
+        const order = contestCtx.order || [];
+        const cands = [];
+        if (contestCtx.next) {
+            cands.push(Number(contestCtx.next.hole));
+            const at = order.findIndex(h => Number(h.hole) === Number(contestCtx.next.hole));
+            if (at > 0 && contestCtx.isPlayed(Number(order[at - 1].hole))) cands.push(Number(order[at - 1].hole));
+        }
+        for (const hole of cands) {
+            const c = TournamentContests.contestFor(data, hole);
+            if (!c || c.lockedAt || contestSkipped(hole)) continue;
+            const got = contestEntries[c.key] || {};
+            if (contestCtx.golfers.length && contestCtx.golfers.every(g => got[g.entryKey])) continue;
+            return c;
+        }
+        return null;
+    }
+    // THE TAB WORDS. Two tabs keep the words they always had. With a third
+    // (Contests, Photos) the bar uses the mockups' short words - "Board" for
+    // Leaderboard (E4a), no icons - so every tab fits one line at 390 wide.
+    const CARD_TAB_WORDS = { scorecard: ['📝 Scorecard', 'Scorecard'], leaderboard: ['🏆 Leaderboard', 'Board'] };
+    function syncCardTabs() {
+        const btns = CARD_TABS.map((k) => document.getElementById('tab-btn-' + k)).filter(Boolean);
+        const compact = btns.filter((b) => b.style.display !== 'none').length > 2;
+        CARD_TABS.forEach((k) => {
+            const b = document.getElementById('tab-btn-' + k);
+            if (b && CARD_TAB_WORDS[k]) b.textContent = CARD_TAB_WORDS[k][compact ? 1 : 0];
+        });
+        const bar = btns.length ? btns[0].parentNode : null;
+        if (bar && bar.classList) bar.classList.toggle('compact', compact);
+    }
+    function renderContestArea() {
+        // EC2 A (2026-11-11): the prompt on the card is the whole of it for a
+        // golfer; the Contests tab and its pill are gone.
+        syncCardTabs();
+        renderContestPrompt();
+    }
+    function renderContestPrompt() {
+        const box = document.getElementById('contest-prompt');
+        if (!box) return;
+        const c = contestHoleNow();
+        if (!c) { box.style.display = 'none'; box.innerHTML = ''; contestShape = ''; return; }
+        const got = contestEntries[c.key] || {};
+        const golfers = contestCtx.golfers;
+        const open = golfers.filter(g => !got[g.entryKey]);
+        if (golfers.length === 1) contestPick[c.hole] = golfers[0].entryKey;
+        const pick = contestPick[c.hole] || null;
+        const msg = contestMsg[c.hole] || null;
+        // Rebuilt only when what it shows changes, so a snapshot cannot wipe a
+        // distance being typed.
+        const shape = JSON.stringify([c.key, c.kind, pick, golfers.map(g => [g.entryKey, !!got[g.entryKey]]), msg]);
+        box.style.display = 'block';
+        if (shape === contestShape) return;
+        contestShape = shape;
+        const kp = c.kind === 'kp';
+        const meta = kp ? `Par ${c.par || 3}` : `Par ${c.par || ''}${c.fairwayOnly ? ' · fairway only' : ''}`;
+        let html = `<div class="cp-head"><span class="cp-title">${TournamentContests.KIND_ICON[c.kind]} Hole ${c.hole} · ${TournamentContests.KIND_LABEL[c.kind]}</span><span class="cp-meta">${escapeHtml(meta)}</span></div>`;
+        html += `<div class="cp-sub">${kp ? 'On the green in one? Enter how far from the cup.' : (c.fairwayOnly ? 'In the fairway? Enter your drive.' : 'Enter your drive.')}</div>`;
+        if (golfers.length > 1) {
+            html += `<div class="cp-who" role="group" aria-label="Whose ball?">` + golfers.map(g => {
+                const e = got[g.entryKey];
+                const first = escapeHtml(String(g.name).split(' ')[0]);
+                return e
+                    ? `<span class="cp-chip" aria-disabled="true">${first} ✓ ${escapeHtml(TournamentContests.valueText(e))}</span>`
+                    : `<button type="button" class="cp-chip${pick === g.entryKey ? ' on' : ''}" data-entry="${escapeHtml(g.entryKey)}" onclick="pickContestGolfer(${c.hole}, this.dataset.entry)">${first}</button>`;
+            }).join('') + `</div>`;
+        }
+        html += kp
+            ? `<div class="cp-inputs"><label class="cp-box"><input id="cp-ft" type="number" inputmode="numeric" min="0" max="100" aria-label="Feet"><span>ft</span></label><label class="cp-box"><input id="cp-in" type="number" inputmode="numeric" min="0" max="11" aria-label="Inches"><span>in</span></label></div>`
+            : `<div class="cp-inputs"><label class="cp-box"><input id="cp-yds" type="number" inputmode="numeric" min="${TournamentContests.LD_MIN_YD}" max="${TournamentContests.LD_MAX_YD}" aria-label="Yards"><span>yds</span></label></div>`;
+        html += `<button type="button" class="cp-save" id="cp-save" onclick="saveContestEntry(${c.hole})">${kp ? 'Save my KP' : 'Save my drive'}</button>`;
+        html += `<div class="cp-msg${msg ? ' ' + msg.cls : ''}" id="cp-msg" aria-live="polite">${msg ? escapeHtml(msg.text) : ''}</div>`;
+        if (kp) html += `<button type="button" class="cp-skip" id="cp-skip" onclick="skipContestHole(${c.hole})">Not on the green</button>`;
+        box.innerHTML = html;
+        if (open.length === 0) box.style.display = 'none';
+    }
+    function pickContestGolfer(hole, entryKey) {
+        contestPick[hole] = entryKey;
+        contestMsg[hole] = null;
+        renderContestPrompt();
+    }
+    function skipContestHole(hole) {
+        try { localStorage.setItem(contestSkipKey(hole), '1'); } catch (e) { /* private window: hides until reload */ }
+        contestSkippedNow[hole] = true;
+        renderContestPrompt();
+    }
+    var contestSkippedNow = {};
+    function saveContestEntry(hole) {
+        const data = currentData || {};
+        const c = TournamentContests.contestFor(data, hole);
+        if (!c || !contestCtx) return;
+        const g = contestCtx.golfers.find(x => x.entryKey === contestPick[hole]);
+        const say = (cls, text) => { contestMsg[hole] = { cls, text }; contestShape = ''; renderContestPrompt(); };
+        if (!g) { say('err', 'Tap whose ball it is first.'); return; }
+        const val = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+        const o = { code: currentCode, hole: c.hole, kind: c.kind, entryKey: g.entryKey, who: g.who, team: g.team, name: g.name, k: myScoreKey };
+        if (c.kind === 'kp') {
+            o.inches = TournamentContests.kpInches(val('cp-ft'), val('cp-in'));
+            if (o.inches === null) { say('err', 'Enter feet and inches (up to 100 ft).'); return; }
+        } else {
+            o.yards = TournamentContests.ldYards(val('cp-yds'));
+            if (o.yards === null) { say('err', `Enter yards from ${TournamentContests.LD_MIN_YD} to ${TournamentContests.LD_MAX_YD}.`); return; }
+        }
+        const update = TournamentContests.entryUpdate(o, firebase.database.ServerValue.TIMESTAMP);
+        contestMsg[hole] = { cls: '', text: 'Saving…' };
+        return db.ref().update(update)
+            .then(() => { contestMsg[hole] = { cls: 'ok', text: `✓ Saved: ${String(g.name).split(' ')[0]} ${TournamentContests.valueText(o)}` }; contestPick[hole] = null; contestShape = ''; renderContestPrompt(); })
+            .catch((err) => say('err', (err && err.code === 'PERMISSION_DENIED') ? CONTEST_REFUSED : '⚠️ Could not save — check your signal and try again.'));
+    }
+
+    // E2c: THE BOARD. Every contest hole, its leaders, and who has played it.
+    function renderContestBoard() {
+        const el = document.getElementById('contest-board');
+        if (!el) return;
+        const data = currentData || {};
+        const list = contestsOn() ? TournamentContests.contestList(data) : [];
+        let gpsLegend = false;
+        el.innerHTML = list.map((c) => {
+            const rows = TournamentContests.ranked(contestEntries[c.key] || {}, c.kind).slice(0, 3);
+            const thru = TournamentContests.throughCount(data, c.hole);
+            const anyGps = rows.some(r => r.by === 'gps');
+            const legend = anyGps && !gpsLegend ? (gpsLegend = true, '<span>GPS 📍 = marked</span>') : '';
+            const body = rows.length ? rows.map((r, i) => {
+                const team = TournamentContests.teamLabel(data, r.team);
+                const won = c.winner === r.key ? ' <span class="cb-team">· Winner ✓</span>' : '';
+                return `<div class="cb-row"><span><strong>${i + 1}</strong> ${escapeHtml(r.name || '')}${r.by === 'gps' ? ' 📍' : ''}${team ? ` <span class="cb-team">${escapeHtml(team)}</span>` : ''}${won}</span><span class="cb-val">${escapeHtml(TournamentContests.valueText(r))}</span></div>`;
+            }).join('') : `<div class="cb-row"><span class="cb-team">No entries yet</span></div>`;
+            const foot = c.winner ? 'Winner confirmed by the organizer' : `${thru.done} of ${thru.total} ${thru.noun} through`;
+            return `<div class="cb-card"><div class="cb-head">${TournamentContests.KIND_ICON[c.kind]} Hole ${c.hole} · ${TournamentContests.KIND_LABEL[c.kind]}</div>${body}<div class="cb-foot"><span>${foot}</span>${legend}</div></div>`;
+        }).join('') + (list.length ? `<p class="cb-note" id="contest-board-note">Organizer confirms winners at the end. Prizes are whatever the organizer announces: nothing is paid in the app.</p>` : '');
+    }
+
+    // ===== E4a: POST A PHOTO TO THE EVENT WALL (approved "as mocked" 2026-11-09) =====
+    //
+    // The tab is drawn on a link that carries its scoring key: the database
+    // takes a photo's meta only with that key's proof (as a score). The flow:
+    //   1. pick -> resized on THIS phone to 1600 px and re-encoded as JPEG by a
+    //      canvas. A canvas carries no EXIF, so the photo's location (a phone
+    //      photo has GPS in its EXIF) never leaves the phone.
+    //   2. Post -> an anonymous Firebase session (loaded only now), the JPEG
+    //      uploaded to Storage tournamentPhotos/<code>/pending/<id>.jpg (REST,
+    //      as round chat does), THEN one database update: the pending meta and
+    //      its proof (TournamentPhotos.metaUpdate). The file first, so a meta
+    //      never points at a missing file.
+    //   3. Nothing shows until the organizer taps Show (approvePhoto moves it).
+    // The wall below lists shown photos (public), each with Report.
+    var photoPick = null;            // { blob, w, h, url } of the resized photo
+    const PHOTO_REFUSED = "⚠️ Not posted — this link can't post photos. Ask the organizer for your team's link.";
+    function photosOn() { return !!(myScoreKey && currentCode); }
+    function photoWho() {
+        if (myTeamNum) return `team${myTeamNum}`;
+        return (contestCtx && contestCtx.golfers && contestCtx.golfers[0]) ? contestCtx.golfers[0].who : null;
+    }
+    function photoSay(cls, text) {
+        const el = document.getElementById('photo-msg');
+        if (el) { el.className = 'ph-msg' + (cls ? ' ' + cls : ''); el.textContent = text; }
+    }
+    function resizePhoto(file) {
+        return new Promise((resolve, reject) => {
+            const src = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = () => {
+                const fit = TournamentPhotos.fitWithin(img.naturalWidth, img.naturalHeight);
+                if (!fit) { URL.revokeObjectURL(src); reject(new Error('not an image')); return; }
+                const c = document.createElement('canvas');
+                c.width = fit.w; c.height = fit.h;
+                c.getContext('2d').drawImage(img, 0, 0, fit.w, fit.h);
+                URL.revokeObjectURL(src);
+                c.toBlob((blob) => blob ? resolve({ blob: blob, w: fit.w, h: fit.h, url: URL.createObjectURL(blob) }) : reject(new Error('encode failed')), 'image/jpeg', 0.85);
+            };
+            img.onerror = () => { URL.revokeObjectURL(src); reject(new Error('not an image')); };
+            img.src = src;
+        });
+    }
+    function photoChosen(input) {
+        const file = input && input.files && input.files[0];
+        if (!file) return;
+        photoSay('', 'Getting your photo ready…');
+        return resizePhoto(file).then((p) => {
+            if (photoPick && photoPick.url) URL.revokeObjectURL(photoPick.url);
+            photoPick = p;
+            const img = document.getElementById('photo-preview');
+            img.src = p.url; img.style.display = 'block';
+            document.getElementById('photo-empty').style.display = 'none';
+            document.getElementById('photo-tag').style.display = '';
+            photoSay('', '');
+        }).catch(() => photoSay('err', "That file isn't a photo this page can read. Try another."));
+    }
+    function loadScriptOnce(src, ready) {
+        if (ready()) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.onload = () => ready() ? resolve() : reject(new Error(src + ' missing'));
+            s.onerror = () => reject(new Error(src + ' did not load'));
+            document.head.appendChild(s);
+        });
+    }
+    function photoIdToken() {
+        return loadScriptOnce('./firebase-auth-compat.js', () => typeof firebase.auth === 'function')
+            .then(() => firebase.auth().currentUser ? null : firebase.auth().signInAnonymously())
+            .then(() => firebase.auth().currentUser.getIdToken());
+    }
+    function postPhoto() {
+        const who = photoWho();
+        if (!photosOn() || !who) { photoSay('err', PHOTO_REFUSED); return; }
+        if (!photoPick) { photoSay('err', 'Choose a photo first.'); return; }
+        if (photoPick.blob.size > TournamentPhotos.MAX_BYTES) { photoSay('err', 'That photo is too big to post.'); return; }
+        const btn = document.getElementById('photo-post');
+        if (btn) btn.disabled = true;
+        photoSay('', 'Posting…');
+        const id = db.ref().push().key;
+        const pick = photoPick;
+        const caption = (document.getElementById('photo-caption') || {}).value || '';
+        return photoIdToken()
+            .then((tok) => fetch(TournamentPhotos.uploadUrl(currentCode, id), { method: 'POST', headers: { 'Content-Type': 'image/jpeg', Authorization: 'Firebase ' + tok }, body: pick.blob }))
+            .then((r) => { if (!r.ok) throw Object.assign(new Error('upload ' + r.status), { code: r.status === 403 ? 'PERMISSION_DENIED' : 'upload' }); })
+            .then(() => db.ref().update(TournamentPhotos.metaUpdate({ code: currentCode, id: id, who: who, k: myScoreKey, caption: caption, w: pick.w, h: pick.h },
+                firebase.database.ServerValue.TIMESTAMP)))
+            .then(() => {
+                photoPick = null;
+                document.getElementById('photo-preview').style.display = 'none';
+                document.getElementById('photo-empty').style.display = '';
+                document.getElementById('photo-tag').style.display = 'none';
+                const cap = document.getElementById('photo-caption'); if (cap) cap.value = '';
+                photoSay('ok', '✓ Sent. It goes on the wall when the organizer approves it.');
+            })
+            .catch((err) => photoSay('err', (err && err.code === 'PERMISSION_DENIED') ? PHOTO_REFUSED : '⚠️ Could not post — check your signal and try again.'))
+            .then(() => { if (btn) btn.disabled = false; });
+    }
+    // EC4 C (2026-11-11): no wall on the card. The wall's binder, renderer and its
+    // Report went with it; OK'd photos and Report are on the recap page.
 
     // ========================================================================
     // P1-c T1A AND P1-d T2C: THE APP VIEW (Manny's picks, 2026-11-10)

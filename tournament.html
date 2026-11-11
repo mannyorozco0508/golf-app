@@ -63,6 +63,10 @@
          Approve button copies it into the field that every page renders. -->
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <!-- E2: contest holes - the ranking and labels the golfer's card uses too. -->
+    <script src="tournament-contests.js"></script>
+    <!-- E4: the photo wall's paths and labels (tournament-photos.js). -->
+    <script src="tournament-photos.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -252,6 +256,47 @@
         #main-format-picker .format-card.active .fmt-icon { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.35); }
         #main-format-picker .format-card.active::after { content: '✓'; position: absolute; top: 12px; right: 14px; color: #ffffff; font-weight: 700; }
 
+        /* E2d contest holes (approved "as mocked" 2026-11-09). */
+        .ct-card { border: 1px solid var(--border-mid); border-radius: 14px; padding: 6px 14px; margin-bottom: 12px; background: var(--bg-card); }
+        .ct-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--border-faint); font-size: 1rem; }
+        .ct-row:last-child { border-bottom: 0; }
+        .ct-hole { background: none; border: 0; padding: 0; font: inherit; color: var(--text-main); cursor: pointer; text-align: left; }
+        .ct-hole.on strong { text-decoration: underline; }
+        .ct-pill { border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; font-weight: bold; white-space: nowrap; }
+        .ct-pill.kp { background: #e3f3ec; color: #0f4c3a; }
+        .ct-pill.ld { background: #ece8fb; color: #5b33c9; }
+        .ct-add { background: none; border: 0; padding: 12px 0; font: inherit; color: var(--text-muted); cursor: pointer; }
+        .ct-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0; }
+        .ct-form select { padding: 8px; border-radius: 8px; border: 1px solid var(--border-mid); font-size: 0.95rem; }
+        .ct-head { font-size: 0.8rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #555; padding: 10px 0 8px 0; border-bottom: 1px solid var(--border-faint); }
+        .ct-btns { display: flex; gap: 6px; flex: 0 0 auto; }
+        .ct-btn { border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--brand-navy); border-radius: 10px; padding: 7px 9px; font-weight: bold; font-size: 0.82rem; cursor: pointer; font-family: inherit; white-space: nowrap; }
+        .ct-btn.rm { border-color: #f3b4b8; color: #b3261e; }
+        .ct-note { text-align: center; font-size: 0.85rem; color: var(--text-muted); }
+        .ct-gps { background: none; border: 0; padding: 0; font: inherit; font-weight: bold; color: var(--text-main); cursor: pointer; text-decoration: underline; }
+        /* E4b photo queue + E4c recap (approved "as mocked" 2026-11-09). */
+        .pq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        .pq-tile { position: relative; border-radius: 14px; overflow: hidden; aspect-ratio: 4 / 3; background: linear-gradient(135deg, #cfe3d6, #7aa58b); }
+        .pq-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .pq-grid > :nth-child(4n+2) .pq-tile, .pq-grid > .pq-tile:nth-child(4n+2) { background: linear-gradient(135deg, #f1d08f, #c48a3a); }
+        .pq-grid > :nth-child(4n+3) .pq-tile, .pq-grid > .pq-tile:nth-child(4n+3) { background: linear-gradient(135deg, #9fc3e3, #3f6fa8); }
+        .pq-grid > :nth-child(4n) .pq-tile, .pq-grid > .pq-tile:nth-child(4n) { background: linear-gradient(135deg, #e3b893, #a4623a); }
+        .pq-tag { position: absolute; left: 8px; bottom: 8px; background: rgba(20, 40, 25, 0.85); color: #ffffff; font-weight: bold; font-size: 0.8rem; border-radius: 8px; padding: 4px 8px; max-width: 85%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .pq-flag { position: absolute; right: 8px; top: 8px; background: #b3261e; color: #ffffff; font-weight: bold; font-size: 0.72rem; border-radius: 8px; padding: 3px 7px; }
+        .pq-acts { display: flex; gap: 6px; margin-top: 6px; }
+        .pq-acts button { flex: 1; border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--brand-navy); border-radius: 12px; padding: 10px 4px; font-weight: bold; font-size: 0.95rem; cursor: pointer; font-family: inherit; }
+        .pq-acts button.hide { border-color: #f3b4b8; color: #b3261e; }
+        .pq-count { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--border-mid); border-radius: 14px; padding: 14px; background: var(--bg-card); font-size: 1rem; }
+        .pq-count span { color: var(--text-muted); font-size: 0.85rem; }
+        .rc-title { font-size: 1.6rem; margin: 6px 0 4px 0; color: var(--text-main); }
+        .rc-sub { color: var(--text-muted); margin: 0 0 14px 0; font-size: 1rem; }
+        .rc-card { border: 1px solid var(--border-mid); border-radius: 14px; padding: 4px 14px; margin-bottom: 12px; background: var(--bg-card); }
+        .rc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border-faint); }
+        .rc-row:last-child { border-bottom: 0; }
+        .rc-row strong { text-align: right; }
+        .rc-share { width: 100%; background: #e3e9f3; color: var(--brand-navy); border: 0; border-radius: 14px; padding: 16px; font-size: 1.1rem; font-weight: bold; cursor: pointer; font-family: inherit; }
+        .rc-report { position: absolute; right: 6px; top: 6px; background: rgba(255,255,255,0.85); border: 0; border-radius: 8px; font-size: 0.72rem; padding: 3px 6px; cursor: pointer; color: #444; font-family: inherit; }
+        .rc-msg { text-align: center; font-size: 0.85rem; color: var(--text-muted); min-height: 16px; }
         .team-card { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: var(--nassau-box-bg); }
         .team-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .team-card-header .team-label { font-weight: bold; color: var(--brand-green); }
@@ -395,6 +440,102 @@
         .move-sheet-body .move-to { display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; }
         .move-sheet-body .move-to:disabled { opacity: .5; cursor: default; }
         .move-note { font-size: 0.78rem; color: var(--text-muted); margin: 8px 0 0; }
+        /* EC2 + C (2026-11-11): the suggestion sentence takes the row; its two buttons sit under it. */
+        .ct-row.ct-suggest { flex-wrap: wrap; }
+        .ct-row.ct-suggest > span:first-child { flex: 1 1 100%; margin-bottom: 8px; }
+
+        /* ---- STRIPE PHASE 1 (2026-11-08, test mode) -----------------------
+           THE BRAND BAR (M6): HardPan Tournaments, with Rattle Golf as
+           the company line. The mark is drawn in CSS - a cream ball in a black
+           tile - so no consumer icon file is loaded on a tournament page. */
+        .hp-brand { display: flex; align-items: center; gap: 10px; background: #0f4c3a; color: #ffffff; margin: -12px -12px 12px -12px; padding: 12px 16px; }
+        .hp-brand-mark { width: 30px; height: 30px; border-radius: 8px; background: #0B0F0C; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+        .hp-brand-mark span { width: 13px; height: 13px; border-radius: 50%; background: #efe9d8; display: block; }
+        .hp-brand-word { font-weight: 800; font-size: 1.05rem; letter-spacing: -0.01em; white-space: nowrap; }
+        .hp-brand-word .hp-brand-product { color: #d4f28a; }
+        .hp-brand-by { margin-left: auto; font-size: 0.82rem; color: rgba(255,255,255,0.82); white-space: nowrap; }
+        /* M2a: the entry fee and the pay button on the signup form. */
+        .fee-box { border: 1px solid var(--border-mid); border-radius: 12px; padding: 12px 14px; margin: 4px 0 12px 0; background: var(--bg-card); }
+        .fee-box-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 1rem; padding-bottom: 8px; border-bottom: 1px solid var(--border-faint); }
+        .fee-box-row strong { font-size: 1.05rem; }
+        .fee-box-note { font-size: 0.8rem; color: var(--text-muted); margin-top: 8px; line-height: 1.4; }
+        .btn-pay { width: 100%; background: var(--brand-navy); color: #ffffff; border: none; padding: 15px; font-size: 1.08rem; font-weight: 800; border-radius: 12px; cursor: pointer; margin-top: 6px; }
+        .btn-pay[disabled] { opacity: 0.6; }
+        .reg-cash-line { text-align: center; font-size: 0.85rem; color: var(--text-muted); margin: 10px 0 0 0; }
+        .link-btn { background: none; border: none; padding: 0; margin: 0; width: auto; color: var(--text-muted); text-decoration: underline; font: inherit; cursor: pointer; }
+        /* M2c: back from Stripe. */
+        .checkout-panel { text-align: center; padding: 24px 4px 8px 4px; }
+        .checkout-tick { width: 64px; height: 64px; border-radius: 50%; background: #e3f1ea; color: #0f4c3a; font-size: 2rem; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto; }
+        .checkout-title { font-size: 1.45rem; font-weight: 800; margin: 0 0 8px 0; }
+        .checkout-line { font-size: 0.92rem; color: var(--text-muted); margin: 2px 0; line-height: 1.4; }
+        .checkout-card { border: 1px solid var(--border-mid); border-radius: 12px; margin: 16px 0; text-align: left; }
+        .checkout-card div { display: flex; justify-content: space-between; padding: 10px 14px; font-size: 0.92rem; }
+        .checkout-card div + div { border-top: 1px solid var(--border-faint); }
+        .checkout-note { font-size: 0.8rem; color: var(--text-muted); margin-top: 12px; line-height: 1.4; }
+        .checkout-error { font-size: 0.88rem; color: var(--accent-red); margin-top: 10px; line-height: 1.4; }
+        /* M3: the desk's money tiles, payment badges and the refund sheet. */
+        .pay-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 6px 0; }
+        .pay-tile { border: 1px solid var(--border-mid); border-radius: 12px; padding: 8px 4px; text-align: center; }
+        .pay-tile b { display: block; font-size: 1.05rem; }
+        .pay-tile span { font-size: 0.74rem; color: var(--text-muted); }
+        .pay-note { font-size: 0.74rem; color: var(--text-muted); text-align: center; margin: 0 0 6px 0; line-height: 1.4; }
+        .reg-state-stripe { background: #ece6fb; color: #4b2aa8; border: 1px solid #b7a6ea; }
+        .reg-state-cash { background: #e6f4ea; color: #1b5e20; border: 1px solid #7fc48a; }
+        .reg-state-refunded, .reg-state-pending { background: #eef0f2; color: #3c4650; border: 1px solid #c5ccd3; }
+        .reg-state-disputed { background: #fdecea; color: #b00020; border: 1px solid #e57373; }
+        .reg-pay-btn { width: auto; padding: 6px 10px; font-size: 0.78rem; margin: 0; }
+        .reg-refund-btn { color: #b3261e; border-color: #e3a6a1; }
+        .pay-sheet { align-items: flex-end; padding: 0; }
+        .pay-sheet .modal-content { max-width: 520px; border-radius: 18px 18px 0 0; padding: 20px 18px 24px 18px; }
+        .pay-sheet h3 { color: var(--text-main); font-size: 1.2rem; margin: 0 0 8px 0; }
+        .pay-sheet p { font-size: 0.9rem; color: var(--text-muted); line-height: 1.45; margin: 0 0 14px 0; }
+        .btn-danger { width: 100%; background: #b3261e; color: #ffffff; border: none; padding: 14px; font-size: 1.02rem; font-weight: 800; border-radius: 12px; cursor: pointer; margin-top: 6px; }
+        .btn-soft { width: 100%; background: #e3e9f3; color: var(--brand-navy); border: none; padding: 14px; font-size: 1.02rem; font-weight: 800; border-radius: 12px; cursor: pointer; margin-top: 8px; }
+        /* M4: the Entry fees card on Setup. */
+        .fees-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-faint); }
+        .fees-row:last-child { border-bottom: none; }
+        .fees-row small { display: block; font-weight: normal; color: var(--text-muted); font-size: 0.78rem; }
+        .fees-row input[type="text"] { width: 7.5em; text-align: right; }
+        .fees-error { font-size: 0.8rem; color: var(--accent-red); margin: 4px 0 0 0; }
+        .fees-stripe { border: 2px solid var(--brand-green); border-radius: 12px; padding: 10px 14px; margin-top: 10px; font-size: 0.88rem; }
+        .fees-stripe-head { font-weight: 800; letter-spacing: 0.06em; color: var(--brand-green); font-size: 0.78rem; margin-bottom: 4px; }
+        .fees-stripe div { display: flex; justify-content: space-between; padding: 4px 0; }
+        .fees-test-mode { background: #fbecd0; color: #8a5a00; font-weight: 800; font-size: 0.74rem; border-radius: 10px; padding: 2px 8px; }
+        .fees-soon { font-size: 0.82rem; color: var(--text-muted); margin: 8px 0 0 0; }
+        /* M1: the organizer's event-day panel on the board. */
+        .day-card { border: 1px solid var(--border-mid); border-radius: 12px; padding: 10px 14px; margin: 0 0 12px 0; }
+        .day-head { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.08em; color: var(--text-muted); text-transform: uppercase; padding-bottom: 6px; border-bottom: 1px solid var(--border-faint); }
+        .day-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; font-size: 0.88rem; }
+        .day-row + .day-row { border-top: 1px solid var(--border-faint); }
+        .day-quiet { background: #fbecd0; color: #8a5a00; font-weight: 800; font-size: 0.76rem; border-radius: 10px; padding: 2px 8px; white-space: nowrap; }
+        .day-text { width: auto; margin: 0; padding: 5px 10px; font-size: 0.78rem; text-decoration: none; display: inline-block; }
+        /* E1c + E3a (event tools, mockups approved 2026-11-09): announcements
+           and pace of play. Owner only; hidden in the tree for everyone else. */
+        .ev-tools { display: flex; gap: 8px; margin: 0 0 12px 0; }
+        .ev-tools .btn-outline { margin: 0; padding: 10px 8px; font-size: 0.88rem; }
+        .ev-h { font-size: 1.6rem; margin: 4px 0 10px 0; color: var(--text-main); }
+        .ann-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px 0; }
+        .ann-chip { border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--brand-navy); border-radius: 999px; padding: 8px 14px; font-weight: bold; font-size: 0.9rem; cursor: pointer; font-family: inherit; }
+        .ann-chip.on { background: var(--brand-navy); border-color: var(--brand-navy); color: #ffffff; }
+        .ann-text { width: 100%; box-sizing: border-box; min-height: 96px; border: 1px solid var(--border-mid); border-radius: 12px; padding: 12px; font-size: 1rem; font-family: inherit; resize: vertical; background: var(--bg-card); color: var(--text-main); }
+        .ann-meta { font-size: 0.82rem; color: var(--text-muted); margin: 6px 0 10px 0; }
+        .ann-send:disabled { opacity: 0.45; cursor: default; }
+        .ann-row { display: flex; gap: 8px; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 0.92rem; }
+        .ann-row + .ann-row { border-top: 1px solid var(--border-faint); }
+        .ann-row-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+        .ann-row-bell { color: var(--text-muted); white-space: nowrap; font-size: 0.88rem; }
+        .pace-sub { font-size: 0.86rem; color: var(--text-muted); margin: 0 0 12px 0; }
+        .pace-sub input { width: 3.2em; font: inherit; color: var(--text-main); border: 0; border-bottom: 1px dashed var(--text-muted); background: transparent; padding: 0; text-align: center; border-radius: 0; }
+        .pace-sub .pace-switch { font: inherit; font-weight: bold; color: var(--text-main); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+        .pace-grid { display: grid; grid-template-columns: 1fr 3.4em 6.6em; column-gap: 8px; align-items: center; }
+        .pace-grid > div { padding: 9px 0; border-top: 1px solid var(--border-faint); font-size: 0.9rem; }
+        .pace-grid > .pace-hd { border-top: 0; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; }
+        .pace-on { color: var(--brand-green); font-weight: bold; }
+        .pace-behind { color: #b42318; font-weight: bold; }
+        .pace-none { color: var(--text-muted); font-size: 0.82rem; }
+        .pace-call { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.92rem; }
+        .pace-call .btn-outline { width: auto; margin: 0; padding: 8px 12px; color: var(--brand-navy); border: 1px solid var(--border-mid); white-space: nowrap; }
+        .pace-foot { text-align: center; font-size: 0.86rem; color: var(--text-muted); margin: 10px 0 0 0; }
     </style>
 </head>
 <body>
@@ -647,9 +788,37 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <label><input type="checkbox" id="reg-sponsor"> I'd like to sponsor a hole</label>
             <input type="text" id="reg-sponsor-name" placeholder="Sponsor name (optional)" maxlength="120" style="margin-top:6px;">
         </div>
+        <!-- M2a (Stripe Phase 1, test mode): shown ONLY when the event's fees
+             say collectByCard with a whole-cent fee. With no fees node the form
+             is exactly the form it was - these three stay hidden and Sign up
+             stays the button. The amount is the record's entryFeeCents; the
+             server reads the same field and never takes one from this page. -->
+        <div class="fee-box" id="reg-fee-box" style="display:none;">
+            <div class="fee-box-row"><span>Entry fee</span><strong id="reg-fee-amount"></strong></div>
+            <div class="fee-box-note">Card payments go to Rattle Golf LLC. Refunds by the organizer.</div>
+        </div>
+        <button class="btn-pay" id="reg-pay" style="display:none;" onclick="submitRegistrationAndPay()"></button>
         <button class="btn-primary" id="reg-submit" onclick="submitRegistration()">Sign up</button>
+        <p class="reg-cash-line" id="reg-cash-line" style="display:none;">Paying cash at the course? <button class="link-btn" id="reg-cash-signup" onclick="submitRegistration()">Sign up without paying</button></p>
         <p id="reg-status" style="font-size:0.85rem; color:var(--brand-green); margin-top:10px; text-align:center;"></p>
     </div>
+    <!-- M2c: back from Stripe Checkout (?checkout=done|cancel&entry=ID).
+         "Paid" is shown only when the RECORD says paid by Stripe - the
+         webhook writes it; the redirect URL proves nothing. -->
+    <div id="reg-checkout" class="checkout-panel" style="display:none;"></div>
+</div>
+
+<!-- E4c (approved "as mocked" 2026-11-09): the RECAP, ?tourney=CODE&recap=1.
+     Read-only and public: the results, the contest winners the organizer
+     confirmed, and the photos the organizer showed. No organizer control is
+     drawn here, whoever opens it. Each photo has Report. -->
+<div class="container" id="recap-screen" style="display:none;">
+    <h1 class="rc-title" id="recap-title"></h1>
+    <p class="rc-sub" id="recap-sub"></p>
+    <div class="rc-card" id="recap-winners" style="display:none;"></div>
+    <div class="pq-grid" id="recap-photos"></div>
+    <button type="button" class="rc-share" id="recap-share" onclick="shareRecap()">Share recap link</button>
+    <p class="rc-msg" id="recap-msg" aria-live="polite"></p>
 </div>
 
 <div class="container" id="manage-screen" style="display:none;">
@@ -664,6 +833,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup">⚙️ Setup &amp; Links</span>
         <span class="top-nav-item" onclick="showTab('desk')" id="tab-btn-desk">📋 Desk</span>
         <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard">🏆 Leaderboard</span>
+        <span class="top-nav-item" onclick="showTab('contests')" id="tab-btn-contests">🎯 Contests</span>
     </div>
 
     <!-- EVENT DAY HOME (T3B, Manny's pick 2026-11-10). Owner-only, hidden by the
@@ -730,6 +900,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
         <!-- SCORING LINKS LOCK (scorecard-lock wave). Owner only; hidden otherwise,
              in the tree. renderLockPanel decides the sentence and the button. -->
+        <!-- M4 (Stripe Phase 1): the Entry fees card. tournaments/<code>/fees,
+             owner-written, integer cents. The card-collection switch is drawn
+             only when payments/allowedOwners/<uid> reads true for the signed-in
+             organizer; everyone else reads "Card payments coming soon". -->
+        <div class="team-card" id="entry-fees-block" style="display:none; margin-top:12px;"></div>
         <div class="team-card" id="lock-links-block" style="display:none; margin-top:12px;">
             <div class="team-card-header"><span class="team-label">🔑 Scoring links</span></div>
             <p id="lock-links-state" style="font-size:0.8rem; color:var(--text-muted); margin:0 0 8px 0;"></p>
@@ -776,6 +951,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <button class="btn-outline" id="send-all-links-btn" style="display:none;" onclick="sendAllTeamLinks()">📤 Send all scorecard links</button>
         <p id="start-links-note" style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0; display:none;">Send opens your phone's share sheet, one team at a time. Each link opens that team's card and nothing else.</p>
 
+
+        <!-- EC3 C (Manny 2026-11-11): pace of play has no screen of its own. The
+             switch and the target live here; a team that is behind shows on
+             Event day's "Needs you", and the note is the E3b nudge on that team's
+             card. Scores only, never a location: the times are the server's own
+             on each score's proof. Off per event until the organizer turns it on. -->
+        <hr class="section-divider">
+        <h3>⏱️ Pace of play</h3>
+        <div class="toggle-row">
+            <label class="toggle-switch">
+                <input type="checkbox" id="pace-on-switch" onchange="setPaceOn(this.checked)">
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label-sm" id="pace-on-label">Off</span>
+            <span style="font-size:0.8rem; color:var(--text-muted); margin-left:10px;">Target <input id="pace-target" inputmode="numeric" style="width:58px; padding:4px 6px; font-size:0.85rem; text-align:center;" onchange="setPaceTarget(this.value)"> for 18</span>
+        </div>
+        <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">From each team's last scored hole and its time, never a location. A team about a hole behind shows on Event day under "Needs you", with a Send note button. "Behind" can be wrong when a group simply has not entered scores yet: it is a hint, not a ruling.</p>
 
         <hr class="section-divider">
         <h3>🚩 Flights / Divisions</h3>
@@ -901,16 +1093,56 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <button class="btn-outline" style="width:auto; margin:0;" onclick="closeRegistrationEdit()">Cancel</button>
         </div>
         <div id="registration-list"></div>
+        <!-- E4b, moved here by EC4 C (Manny 2026-11-11): the organizer's photo
+             queue is the Desk's "Photos" chip. Every photo is checked one at a
+             time - there is no "approve all". Show and Hide run the approvePhoto
+             / hidePhoto callables, which move the file; a reported photo on the
+             recap comes back here. -->
+        <div id="photo-queue-wrap" style="display:none;">
+            <h2 style="font-size:1.1rem; margin:4px 0 10px 0;" id="photo-queue-title">Photos waiting · 0</h2>
+            <div class="pq-grid" id="photo-queue"></div>
+            <div class="pq-count" id="photo-counts"></div>
+            <p class="ct-note"><a href="#" id="photo-recap-link">Open the recap page ›</a></p>
+        </div>
         <!-- CSV, because the field has to leave the phone: a tee sheet, a cart
              sign order, the pro shop's own system. Shown only when there is a
              list to export, and only to the organizer. -->
         <button class="btn-outline" id="registration-export" style="display:none;" onclick="exportRegistrationsCsv()">⬇️ Export CSV</button>
     </div>
 
+    <!-- E1c (mockup approved 2026-11-09): send to the field. A template fills
+         the box, the organizer edits, Send writes the note (the scorecard
+         banner) and asks sendAnnouncement to notify app followers. Owner only:
+         a gated tab, hidden in the tree for everyone else. -->
+    <div id="manage-tab-announce" style="display:none;">
+        <h2 class="ev-h">Send to the field</h2>
+        <div class="ann-chips" id="ann-chips">
+            <button type="button" class="ann-chip" data-tpl="start" onclick="pickAnnTemplate('start')">Start time</button>
+            <button type="button" class="ann-chip" data-tpl="weather" onclick="pickAnnTemplate('weather')">Weather / lightning</button>
+            <button type="button" class="ann-chip" data-tpl="resume" onclick="pickAnnTemplate('resume')">Resume play</button>
+            <button type="button" class="ann-chip" data-tpl="results" onclick="pickAnnTemplate('results')">Results time</button>
+            <button type="button" class="ann-chip" data-tpl="custom" onclick="pickAnnTemplate('custom')">Custom</button>
+        </div>
+        <textarea class="ann-text" id="ann-text" maxlength="200" oninput="renderAnnounceMeta()"></textarea>
+        <p class="ann-meta" id="ann-meta"></p>
+        <button class="btn-pay ann-send" id="ann-send" onclick="sendToField()">Send to everyone</button>
+        <div class="day-card" id="ann-sent" style="display:none; margin-top:14px;"></div>
+    </div>
+
+
     <div id="manage-tab-leaderboard" style="display:none;">
         <h2 style="text-align:center; font-size:1.3rem;" id="lb-t-name"></h2>
         <p style="text-align:center; color:var(--text-muted); font-size:0.85rem; margin-top:-10px;" id="lb-t-sub"></p>
         <div class="t-details" id="lb-t-details" style="display:none;"></div>
+        <!-- M1 (web part): the organizer's event-day panel. Owner only, hidden
+             in the tree for everyone else. Reads the same rows as the board and
+             the same prize view as Prize Results; it computes no money. -->
+        <div id="event-day-panel" style="display:none;"></div>
+        <!-- E1c / E3a (2026-11-09): the doors to the two event-day tools.
+             Owner only, hidden in the tree for everyone else. -->
+        <div class="ev-tools" id="event-tools-row" style="display:none;">
+            <button class="btn-outline" id="open-announce" onclick="showTab('announce')">📣 Announcements</button>
+        </div>
         <!-- Only rendered when flights exist. A tournament without them shows exactly
              the leaderboard it always did, with no extra control to ignore. -->
         <!-- Only rendered for a multi-round event. A single-round tournament shows the
@@ -981,10 +1213,29 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
     </div>
 
+    <!-- E2d (approved "as mocked" 2026-11-09): the organizer's contest holes.
+         Gated like Setup and Desk. Marks holes (closest to the pin, long drive),
+         shows the entries, confirms a winner ("Make winner" locks the hole) or
+         removes a bad entry. Nothing is paid in the app. -->
+    <div id="manage-tab-contests" style="display:none;">
+        <h2 style="font-size:1.4rem; margin:4px 0 12px 0;">Contest holes</h2>
+        <div class="ct-card" id="contest-holes-list"></div>
+        <div class="ct-card" id="contest-entries" style="display:none;"></div>
+        <p class="ct-note" id="contest-note">Override: "Make winner" locks the hole; a later entry cannot replace it. Allow GPS marks: <button type="button" class="ct-gps" id="contest-gps-toggle" onclick="toggleContestGps()">on</button></p>
+    </div>
+
+
     <div id="tournament-print-view"></div>
 </div>
 
 <!-- Share Team Link Modal -->
+<!-- M3: the refund sheet. refundEntry runs on the server; this page never
+     changes paid on a Stripe entry. After the refund it asks, separately,
+     whether to take the golfer out of the field. -->
+<div class="modal-overlay pay-sheet" id="refund-sheet">
+    <div class="modal-content" id="refund-sheet-body"></div>
+</div>
+
 <div class="modal-overlay" id="share-link-modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -2455,13 +2706,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // The three manage tabs. Setup and Desk are the GATED pair: applyManageGate
     // HIDES both for anyone who is not the owner of an owned tournament, and
     // shows both on sign-in. Leaderboard is always there.
-    const MANAGE_TABS = ['home', 'setup', 'desk', 'leaderboard'];
-    const GATED_TABS = ['home', 'setup', 'desk'];
+    // E1c (2026-11-09): Announcements is a gated tab with no pill of its own -
+    // its door is #event-tools-row on the Leaderboard, owner only. Kept in its
+    // own list so the Setup/Desk gate above is unchanged. E2d adds Contests,
+    // gated with Setup/Desk (owner only). T3B (main) adds Event day first.
+    // Manny's picks 2026-11-11: pace has no tab (EC3 C: it lives on Event day's
+    // Needs you) and photos have no tab (EC4 C: the queue is a Desk chip).
+    const EV_GATED_TABS = ['announce'];
+    const MANAGE_TABS = ['home', 'setup', 'desk', 'leaderboard', 'contests'].concat(EV_GATED_TABS);
+    const GATED_TABS = ['home', 'setup', 'desk', 'contests'];
     function showTab(tab) {
         // A gated tab is hidden for a non-owner (applyManageGate). Asking for it
         // then lands on the leaderboard - the tab is in the tree, so "is the
         // element there" is not the test; canManage() is.
         if (GATED_TABS.includes(tab) && !canManage()) tab = 'leaderboard';
+        if (EV_GATED_TABS.includes(tab) && !canManage()) tab = 'leaderboard';
         if (!document.getElementById('manage-tab-' + tab)) tab = 'leaderboard';
         MANAGE_TABS.forEach((k) => {
             const panel = document.getElementById('manage-tab-' + k);
@@ -2472,6 +2731,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (tab === 'leaderboard') renderLeaderboard();
         if (tab === 'desk') renderRegistrationDesk();
         if (tab === 'home') renderEventHome();
+        if (tab === 'contests') renderContestsTab();
+        evToolTab = EV_TOOL_LABELS[tab] ? tab : null;
+        renderEventTools();
     }
 
     // ---- EVENT DAY HOME (T3B) ---------------------------------------------
@@ -2550,6 +2812,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (isMultiRound(currentData || {}) && !prize.available && payoutsAreSet(savedPayoutSpots())) {
             out.push({ key: 'basis', n: 1, title: 'Pick what prizes go by', sub: 'Golfers see "Prize results coming soon" until you do', go: 'basis' });
         }
+        // 5. Pace (EC3 C, 2026-11-11): the E3 arithmetic (paceRows: score times
+        //    against the target, never a location), one row a team that is about
+        //    a hole or more behind. The button is the E3b nudge for that team;
+        //    once sent for this far into the round, the row says so instead.
+        const ps = paceSettings();
+        if (ps.on && paceProofs && st.live && !st.finished) {
+            const per = ps.targetMin / 18;
+            const nudges = (currentData && currentData.nudges) || {};
+            paceRows(currentData || {}, paceProofs, st.rid, ps).filter((u) => u.status === 'behind').forEach((u) => {
+                const holesBehind = Math.max(1, Math.round(u.behindMin / per));
+                const sent = nudges[u.key] && Number.isInteger(nudges[u.key].thru) && nudges[u.key].thru >= u.thru;
+                out.push({ key: 'pace-' + u.key, n: holesBehind, title: `${u.label} is about ${holesBehind} hole${holesBehind === 1 ? '' : 's'} behind`,
+                    sub: sent ? 'Pace note sent · thru ' + u.thru : 'Send a friendly pace note', go: sent ? 'home' : `nudge:${u.key}:${u.thru}` });
+            });
+        }
+        // 6. Photos waiting (EC4 C): the Desk's own queue, checked one at a time.
+        const pq = (typeof photoQueue === 'function') ? photoQueue() : [];
+        if (pq.length) out.push({ key: 'photos', n: pq.length, title: `${pq.length} photo${pq.length === 1 ? '' : 's'} to check`, sub: 'Desk', go: 'photos' });
         return out;
     }
 
@@ -2585,12 +2865,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // Quick actions open the tab that already does the job, at the right place.
     function eventHomeGo(where) {
         const to = (id) => { const el = document.getElementById(id); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' }); };
-        if (where === 'desk' || where === 'unpaid' || where === 'needsteam') {
+        if (where === 'desk' || where === 'unpaid' || where === 'needsteam' || where === 'photos') {
             if (where !== 'desk') registrationFilter = where;
             showTab('desk');
             return;
         }
         if (where === 'setup') { showTab('setup'); return; }
+        if (where === 'home') return;
+        // EC3 C: "nudge:<team key>:<thru>" sends the E3b pace note to that team.
+        const nm = /^nudge:(team[0-9]+|g[a-z0-9]+):([0-9]{1,2})$/.exec(String(where || ''));
+        if (nm) { sendNudge(nm[1], Number(nm[2])); return; }
         showTab('leaderboard');
         if (where === 'qr') to(recordIsIndividual() ? 'group-links-block' : 'team-links-block');
         else if (where === 'basis') to('payout-basis-control');
@@ -2691,6 +2975,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         syncKeysListener();
         renderLockPanel();
         renderRegistrationList();
+        renderEntryFeesCard();
+        renderEventTools();
     }
 
     // "Signed in as <email>" - a fact about the session, never a claim about
@@ -2997,6 +3283,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // key regardless. Team preference is ALSO gated by "is a team event".
             // Set in code, not only in markup, so the default is the page's decision.
             applyRegistrationFields(data);
+            // M2a/M2c (Stripe Phase 1). No fees node: nothing below changes
+            // the form. Back from Checkout: the result panel replaces it.
+            applyRegistrationFees(data);
+            const back = new URLSearchParams(window.location.search);
+            const checkout = back.get('checkout');
+            const entry = back.get('entry');
+            if ((checkout === 'done' || checkout === 'cancel') && entry) showCheckoutReturn(registerCode, entry, checkout);
         }).catch(() => {
             const form = document.getElementById('reg-form');
             const closed = document.getElementById('reg-closed');
@@ -3140,7 +3433,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const code = (err && (err.code || (err.message && String(err.message).split(':')[0]))) || 'unknown';
         setRegistrationStatus('error', REG_REFUSAL, String(code));
     }
+    // THE M2a BUTTON: the same signup write, then Checkout. A flag rather than
+    // an argument, read and cleared on entry, so Sign up and "Sign up without
+    // paying" (both plain submitRegistration()) can never inherit it.
+    var regWantsPay = false;
+    function submitRegistrationAndPay() { regWantsPay = true; submitRegistration(); }
     function submitRegistration() {
+        const pay = regWantsPay === true && !!(feesOf(registerEvent) || {}).collectByCard;
+        regWantsPay = false;
         if (!registerCode || !registerEvent || !registerEvent.ownerUid) {
             alert('This event is not taking signups.');
             return;
@@ -3151,7 +3451,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!regPendingId) regPendingId = mintId('e');
         const entryId = regPendingId;
         const payload = built.payload;
-        const button = document.getElementById('reg-submit');
+        const button = document.getElementById(pay ? 'reg-pay' : 'reg-submit');
         const attempt = ++regAttempt;
         if (button) button.disabled = true;
         setRegistrationStatus('pending', 'Sending\u2026');
@@ -3165,6 +3465,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             settled = true; clearTimeout(timer);
             if (attempt !== regAttempt && regPendingId !== entryId) return;   // an older tap for an entry already confirmed
             regPendingId = null;
+            // SIGNED UP FIRST, THEN PAID: the entry exists before Checkout is
+            // asked for, so a closed tab or a failed card leaves a golfer
+            // Registered and Unpaid - never paid with no entry.
+            if (pay) { if (button) button.disabled = false; startCheckout(registerCode, entryId); return; }
             ['reg-name', 'reg-email', 'reg-phone', 'reg-handicap', 'reg-dinner', 'reg-team-pref', 'reg-sponsor-name'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
             const shirt = document.getElementById('reg-shirt'); if (shirt) shirt.value = '';
             const box = document.getElementById('reg-sponsor'); if (box) box.checked = false;
@@ -3199,6 +3503,882 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         };
         db.ref('registrations/' + code).on('value', registrationCb);
         registrationBoundCode = code;
+    }
+
+
+    // ===== STRIPE PHASE 1, TEST MODE (2026-11-08) ===========================
+    //
+    // THE CONTRACT IS STRIPE-CONTRACT.md (claude-mailbox-shared/tournaments).
+    // This page never sets an amount, never marks a card payment paid, and
+    // never changes paid on an entry whose paidVia is 'stripe'. It:
+    //   - shows the fee from tournaments/<code>/fees.entryFeeCents (integer
+    //     cents, owner-written) and writes the signup FIRST, then asks the
+    //     createEntryCheckout callable for a Checkout URL and goes there;
+    //   - on the way back waits on the RECORD (the webhook writes paid,
+    //     paidVia 'stripe'), never on the redirect URL;
+    //   - on the Desk shows who paid how, and asks the refundEntry callable for
+    //     a refund - removing the golfer from the field is a separate owner
+    //     write, made only when the organizer says yes;
+    //   - lets the owner write the fees node; the card switch is drawn only
+    //     when payments/allowedOwners/<uid> reads true for that owner.
+    // WITH NO fees NODE the signup form and the desk are exactly what they were.
+    //
+    // `var`, not `let`: the auth listener above can reach syncPaymentsAllowed
+    // before this point of the script has run, and a `let` would still be in
+    // its temporal dead zone.
+    var paymentsAllowed = false;      // payments/allowedOwners/<uid> === true, read as that uid
+    var paymentsAllowedUid = null;    // whose answer paymentsAllowed is
+    var fnSdkPromise = null;          // the functions SDK, loaded once on first need
+    var refundSheetEntry = null;      // the entry the refund sheet is open on
+    var refundInFlight = false;
+
+    var FEE_MIN_CENTS = 100;
+    var FEE_MAX_CENTS = 100000;
+
+    // THE ONE READER OF THE fees NODE. null = no fees (the default state).
+    // cents is null unless it is an integer in the contract's range, and card
+    // collection is off without a valid fee - a fee the server would refuse
+    // ('bad-fee') is never offered as a button.
+    function feesOf(data) {
+        const f = data && data.fees;
+        if (!f || typeof f !== 'object') return null;
+        const c = f.entryFeeCents;
+        const valid = Number.isInteger(c) && c >= FEE_MIN_CENTS && c <= FEE_MAX_CENTS;
+        return { cents: valid ? c : null, collectByCard: valid && f.collectByCard === true, allowCash: f.allowCash === true };
+    }
+    // Cents to "$100.00" - integer arithmetic, no float on the way in.
+    function centsText(c) {
+        const n = Math.abs(Math.trunc(Number(c) || 0));
+        const dollars = Math.floor(n / 100), cents = n % 100;
+        return '$' + dollars.toLocaleString('en-US') + '.' + String(cents).padStart(2, '0');
+    }
+    // "$3,200" when whole, "$3,200.50" otherwise - the desk tiles.
+    function centsShort(c) {
+        const n = Math.abs(Math.trunc(Number(c) || 0));
+        return n % 100 === 0 ? '$' + (n / 100).toLocaleString('en-US') : centsText(n);
+    }
+
+    // ---- THE CALLABLES -----------------------------------------------------
+    // firebase-functions-compat.js 9.22.2 is vendored beside the other SDK
+    // files and loaded on first need, not as a blocking tag: only a golfer who
+    // taps Pay or an organizer who taps Refund needs it, and both need signal
+    // anyway. It is NOT in the shell precache (sw.js is not this wave's).
+    function loadFunctionsSdk() {
+        if (typeof firebase.functions === 'function') return Promise.resolve();
+        if (fnSdkPromise) return fnSdkPromise;
+        fnSdkPromise = new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = './firebase-functions-compat.js';
+            s.onload = () => (typeof firebase.functions === 'function') ? resolve() : reject(Object.assign(new Error('functions SDK missing'), { code: 'functions/unavailable' }));
+            s.onerror = () => { fnSdkPromise = null; reject(Object.assign(new Error('functions SDK did not load'), { code: 'functions/unavailable' })); };
+            document.head.appendChild(s);
+        });
+        return fnSdkPromise;
+    }
+    function stripeCall(name, data) {
+        return loadFunctionsSdk().then(() => firebase.functions().httpsCallable(name)(data));
+    }
+    function callReason(err) {
+        return (err && err.details && typeof err.details.reason === 'string') ? err.details.reason : '';
+    }
+
+    // EVERY REASON createEntryCheckout CAN GIVE, AS A SENTENCE A GOLFER CAN ACT
+    // ON. The keys are the contract's details.reason strings, exactly.
+    var CHECKOUT_REASON_TEXT = {
+        'not-found': "We couldn't find your sign-up on the organizer's list. Reload this page and sign up again.",
+        'already-paid': "This entry is already paid. There is nothing more to pay.",
+        'not-collecting': "This event isn't taking card payments right now. Your spot is saved; pay the organizer at the course.",
+        'not-allowed-owner': "Card payments aren't switched on for this organizer yet. Your spot is saved; pay the organizer at the course.",
+        'too-many-attempts': "Too many payment attempts on this entry. Wait a few minutes, then tap Pay again.",
+        'bad-fee': "The entry fee on this event isn't set up right. Your spot is saved; text the organizer."
+    };
+    var CHECKOUT_FALLBACK_TEXT = "Checkout didn't open. Check your signal and tap Pay again.";
+    function checkoutRefusalText(err) {
+        return CHECKOUT_REASON_TEXT[callReason(err)] || CHECKOUT_FALLBACK_TEXT;
+    }
+
+    // ---- M2a: THE SIGNUP FORM ----------------------------------------------
+    function applyRegistrationFees(data) {
+        const f = feesOf(data);
+        const card = !!(f && f.collectByCard);
+        const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+        show('reg-fee-box', card);
+        show('reg-pay', card);
+        show('reg-submit', !card);
+        show('reg-cash-line', card && f.allowCash);
+        if (card) {
+            const amt = document.getElementById('reg-fee-amount');
+            if (amt) amt.textContent = centsText(f.cents);
+            const pay = document.getElementById('reg-pay');
+            if (pay) pay.textContent = 'Pay entry fee ' + centsText(f.cents) + ' ›';
+        }
+    }
+
+    // The signup is written; now the server builds the Checkout session from
+    // the record's own fee and hands back its URL.
+    function startCheckout(code, entryId) {
+        if (!requireOnlineForSignup('CHECKOUT NOT OPENED', 'Reconnect and tap Pay again.')) return Promise.resolve();
+        setRegistrationStatus('pending', 'Opening secure checkout…');
+        const pay = document.getElementById('reg-pay'); if (pay) pay.disabled = true;
+        const again = document.getElementById('reg-pay-again'); if (again) again.disabled = true;
+        return stripeCall('createEntryCheckout', { code: code, entryId: entryId }).then((res) => {
+            const url = res && res.data && res.data.url;
+            if (typeof url !== 'string' || !/^https:\/\//.test(url)) throw Object.assign(new Error('no checkout url'), { details: { reason: '' } });
+            window.location.href = url;
+        }).catch((err) => {
+            if (pay) pay.disabled = false;
+            if (again) again.disabled = false;
+            showRegisteredUnpaid(code, entryId, checkoutRefusalText(err), callReason(err));
+        });
+    }
+
+    // ---- M2c: BACK FROM STRIPE ---------------------------------------------
+    function checkoutPanel(html) {
+        const form = document.getElementById('reg-form');
+        const panel = document.getElementById('reg-checkout');
+        if (form) form.style.display = 'none';
+        if (panel) { panel.style.display = 'block'; panel.innerHTML = html; }
+    }
+    function eventLine(data) {
+        return [escReg((data && data.name) || ''), escReg(formatEventDate(data && data.eventDate))].filter(Boolean).join(' · ');
+    }
+    function teeTimeText(data) {
+        const t = formatStartTime(data && data.startTime);
+        if (!t) return '';
+        return (data.startType === 'shotgun' ? 'Shotgun ' : 'Tee time ') + t;
+    }
+    function showRegisteredUnpaid(code, entryId, why, reason) {
+        const f = feesOf(registerEvent);
+        const owed = f && f.cents ? centsText(f.cents) : '';
+        const canPay = reason !== 'already-paid' && reason !== 'not-collecting' && reason !== 'not-allowed-owner' && !!(f && f.collectByCard);
+        checkoutPanel(
+            `<h2 class="checkout-title" id="reg-checkout-title">Registered · Unpaid</h2>`
+            + `<p class="checkout-line">${eventLine(registerEvent)}</p>`
+            + `<p class="checkout-line">Your spot is saved.${owed ? ' The ' + owed + ' entry fee is still owed.' : ''}</p>`
+            + (why ? `<p class="checkout-error" id="reg-checkout-error">${escReg(why)}</p>` : '')
+            + (canPay ? `<button class="btn-pay" id="reg-pay-again" data-code="${escReg(code)}" data-entry="${escReg(entryId)}" onclick="startCheckout(this.dataset.code, this.dataset.entry)">Pay again</button>` : '')
+            + (f && f.allowCash ? `<p class="checkout-note">Or pay cash at the course.</p>` : '')
+            + `<p id="reg-status" style="font-size:0.85rem; color:var(--brand-green); margin-top:10px; text-align:center;"></p>`);
+    }
+    function showPaidPanel(rec) {
+        const f = feesOf(registerEvent);
+        const cents = Number.isInteger(rec && rec.amountCents) ? rec.amountCents : (f && f.cents);
+        // rec is registrationStatus/<code>/<entryId> ({paid, paidVia, at}):
+        // no email, no team. Stripe sends the receipt (Manny, 2026-11-08).
+        const email = rec && rec.email ? ' · receipt sent to ' + escReg(rec.email) : ' · Stripe emails your receipt';
+        const team = rec && rec.teamNum && registerEvent && registerEvent.teams && registerEvent.teams['team' + rec.teamNum]
+            ? escReg(registerEvent.teams['team' + rec.teamNum].name || ('Team ' + rec.teamNum)) : 'Organizer assigns';
+        const tee = teeTimeText(registerEvent);
+        checkoutPanel(
+            `<div class="checkout-tick" aria-hidden="true">✓</div>`
+            + `<h2 class="checkout-title" id="reg-checkout-title">You're registered · Paid</h2>`
+            + `<p class="checkout-line">${eventLine(registerEvent)}</p>`
+            + `<p class="checkout-line" id="reg-checkout-amount">${cents ? centsText(cents) + ' paid by card' : 'Paid by card'}${email}</p>`
+            + `<div class="checkout-card">`
+            + (eventIsIndividual(registerEvent) ? '' : `<div><span>Team</span><strong>${team}</strong></div>`)
+            + (tee ? `<div><span>Tee time</span><strong>${escReg(tee)}</strong></div>` : '')
+            + `</div>`);
+    }
+    function showProcessingPanel(extra) {
+        checkoutPanel(
+            `<h2 class="checkout-title" id="reg-checkout-title">Payment processing…</h2>`
+            + `<p class="checkout-line">${eventLine(registerEvent)}</p>`
+            + (extra ? `<p class="checkout-note" id="reg-checkout-wait">${escReg(extra)}</p>` : '')
+            + `<p class="checkout-note">If this page says "Payment processing", it turns Paid by itself; nothing to tap again.</p>`);
+    }
+    // Only paid === true AND paidVia === 'stripe' is Paid. The webhook writes
+    // both in one update; anything else keeps the page waiting.
+    function entryIsCardPaid(rec) { return !!(rec && rec.paid === true && rec.paidVia === 'stripe'); }
+    function showCheckoutReturn(code, entryId, mode) {
+        if (mode === 'cancel') { showRegisteredUnpaid(code, entryId, '', ''); return; }
+        showProcessingPanel('');
+        // registrationStatus, not registrations: the golfer is signed out and
+        // registrations/<code> is owner-only. The webhook writes this mirror in
+        // the same update as the entry (STRIPE-CONTRACT.md Addendum 2026-11-08).
+        const ref = db.ref(`registrationStatus/${code}/${entryId}`);
+        ref.on('value', (snap) => {
+            const rec = snap && snap.val ? snap.val() : null;
+            if (entryIsCardPaid(rec)) { try { ref.off('value'); } catch (e) { /* stub */ } showPaidPanel(rec); }
+        }, () => {
+            // The read was refused (rules not published yet, or offline).
+            // Said plainly, rather than a page that waits forever.
+            showProcessingPanel("This page can't check the payment from here, so it can't turn Paid by itself. Stripe emails your receipt when the payment goes through, and the organizer sees Paid on their desk.");
+        });
+    }
+
+    // ---- M3: THE DESK ------------------------------------------------------
+    // One word for how an entry stands on money. Refund and dispute states win
+    // over paid: a refunded entry is not a paid one.
+    function payState(e) {
+        if (!e) return 'unpaid';
+        if (e.disputedAt) return 'disputed';
+        if (e.refundedAt) return 'refunded';
+        if (e.refundPendingAt) return 'refund-pending';
+        if (e.paid === true && e.paidVia === 'stripe') return 'stripe';
+        if (e.paid === true) return 'cash';
+        return 'unpaid';
+    }
+    // AN ENTRY STRIPE HAS TOUCHED. Its paid is the server's: no checkbox, no
+    // Undo, no Mark cash paid - only Refund, which goes through the server.
+    function entryPaidByServer(e) {
+        return !!(e && (e.paidVia === 'stripe' || e.ref || e.amountCents || e.refundPendingAt || e.refundedAt || e.disputedAt));
+    }
+    function deskFeesOn() {
+        const f = feesOf(currentData);
+        return !!(f && f.cents);
+    }
+    function shortDate(ms) {
+        const d = new Date(Number(ms) || 0);
+        return isNaN(d.getTime()) ? '' : `${EV_MONTHS[d.getMonth()]} ${d.getDate()}`;
+    }
+    function payBadgeHtml(e) {
+        const st = payState(e);
+        const amt = Number.isInteger(e.amountCents) ? ' ' + centsShort(e.amountCents) : '';
+        if (st === 'stripe') return `<span class="reg-state reg-state-stripe">Paid (Stripe)${amt}</span>`;
+        if (st === 'cash') return `<span class="reg-state reg-state-cash">Paid (cash)</span>`;
+        if (st === 'refunded') {
+            const r = Number.isInteger(e.refundCents) ? ' ' + centsShort(e.refundCents) : '';
+            const when = shortDate(e.refundedAt);
+            return `<span class="reg-state reg-state-refunded">Refunded${r}${when ? ' · ' + when : ''}</span>`;
+        }
+        if (st === 'refund-pending') return `<span class="reg-state reg-state-pending">Refund pending</span>`;
+        if (st === 'disputed') return `<span class="reg-state reg-state-disputed">Disputed</span>`;
+        return `<span class="reg-state reg-state-unpaid">Unpaid</span>`;
+    }
+    // THE PAY CONTROL FOR ONE ROW. Refund only for the signed-in owner and only
+    // on a card payment that is not already being refunded. Undo only on cash.
+    function payControlHtml(id, e) {
+        const st = payState(e);
+        const eid = escReg(id);
+        if (st === 'stripe') return canManage() ? `<button class="btn-outline reg-pay-btn reg-refund-btn" onclick="openRefundSheet('${eid}')">Refund</button>` : '';
+        if (entryPaidByServer(e)) return '';
+        if (st === 'cash') return `<button class="btn-outline reg-pay-btn reg-undo-btn" onclick="setCashPaid('${eid}', false)">Undo</button>`;
+        return `<button class="btn-outline reg-pay-btn reg-cash-btn" onclick="setCashPaid('${eid}', true)">Mark cash paid</button>`;
+    }
+    var PAY_FILTERS = [
+        { key: 'all', label: 'All', test: () => true },
+        { key: 'card', label: 'Card', test: (e) => payState(e) === 'stripe' },
+        { key: 'cash', label: 'Cash', test: (e) => payState(e) === 'cash' },
+        { key: 'unpaid', label: 'Unpaid', test: (e) => payState(e) === 'unpaid' },
+        { key: 'refunded', label: 'Refunded', test: (e) => ['refunded', 'refund-pending', 'disputed'].indexOf(payState(e)) !== -1 }
+    ];
+    // With fees on, the money chips replace All / Unpaid / Paid; the field
+    // chips stay after them.
+    function deskFilters() {
+        if (!deskFeesOn()) return REG_FILTERS;
+        return PAY_FILTERS.concat(REG_FILTERS.filter((f) => ['all', 'unpaid', 'paid'].indexOf(f.key) === -1));
+    }
+    // THE TILES. Card is what the server recorded (amountCents); cash and
+    // unpaid are counts times the fee. All integer cents until the text.
+    function payTotals(entries) {
+        const f = feesOf(currentData);
+        const fee = (f && f.cents) || 0;
+        const t = { cardCents: 0, card: 0, cash: 0, unpaid: 0, refunds: 0, refundTotal: 0, pending: 0, disputed: 0 };
+        entries.forEach((e) => {
+            const st = payState(e);
+            if (st === 'stripe') { t.card++; t.cardCents += Number.isInteger(e.amountCents) ? e.amountCents : fee; }
+            else if (st === 'cash') t.cash++;
+            else if (st === 'unpaid') t.unpaid++;
+            else if (st === 'refunded') { t.refunds++; t.refundTotal += Number.isInteger(e.refundCents) ? e.refundCents : 0; }
+            else if (st === 'refund-pending') t.pending++;
+            else if (st === 'disputed') t.disputed++;
+        });
+        t.cashCents = t.cash * fee;
+        t.unpaidCents = t.unpaid * fee;
+        return t;
+    }
+    function payTilesHtml(entries) {
+        const t = payTotals(entries);
+        const extra = [];
+        if (t.refunds) extra.push(`${t.refunds} ${t.refunds === 1 ? 'refund' : 'refunds'}: ${centsShort(t.refundTotal)}.`);
+        if (t.pending) extra.push(`${t.pending} refund${t.pending === 1 ? '' : 's'} pending.`);
+        if (t.disputed) extra.push(`${t.disputed} disputed.`);
+        return `<div class="pay-tiles" id="pay-tiles">`
+            + `<div class="pay-tile"><b id="pay-tile-card">${centsShort(t.cardCents)}</b><span>card (${t.card})</span></div>`
+            + `<div class="pay-tile"><b id="pay-tile-cash">${centsShort(t.cashCents)}</b><span>cash (${t.cash})</span></div>`
+            + `<div class="pay-tile"><b id="pay-tile-unpaid">${centsShort(t.unpaidCents)}</b><span>unpaid (${t.unpaid})</span></div>`
+            + `</div><p class="pay-note" id="pay-note">Card fees are absorbed by Rattle Golf, so the card total is what golfers paid.${extra.length ? ' ' + extra.join(' ') : ''}</p>`;
+    }
+
+    // MARK CASH PAID / UNDO: the owner's own write, paid + paidAt + paidVia
+    // 'cash' together, or all three cleared. Refused on a Stripe entry here
+    // and, per the contract, by the rules.
+    function setCashPaid(entryId, on) {
+        if (!currentCode || !canManage()) return;
+        const e = (registrationData || {})[entryId];
+        if (!e || entryPaidByServer(e)) return;
+        const patch = on ? { paid: true, paidAt: Date.now(), paidVia: 'cash' } : { paid: false, paidAt: null, paidVia: null };
+        db.ref(`registrations/${currentCode}/${entryId}`).update(patch)
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+
+    // ---- THE REFUND SHEET --------------------------------------------------
+    function refundSheet(html) {
+        const sheet = document.getElementById('refund-sheet');
+        const body = document.getElementById('refund-sheet-body');
+        if (body) body.innerHTML = html;
+        if (sheet) sheet.classList.add('open');
+    }
+    function closeRefundSheet() {
+        const sheet = document.getElementById('refund-sheet');
+        if (sheet) sheet.classList.remove('open');
+        refundSheetEntry = null;
+    }
+    function refundAmountCents(e) {
+        if (e && Number.isInteger(e.amountCents)) return e.amountCents;
+        const f = feesOf(currentData);
+        return (f && f.cents) || 0;
+    }
+    function openRefundSheet(entryId) {
+        if (!currentCode || !canManage()) return;
+        const e = (registrationData || {})[entryId];
+        if (!e || payState(e) !== 'stripe') return;
+        refundSheetEntry = entryId;
+        const who = escReg(String(e.fullName || e.name || 'this golfer').trim());
+        const amt = centsText(refundAmountCents(e));
+        refundSheet(
+            `<h3 id="refund-sheet-title">Refund ${who} ${amt}?</h3>`
+            + `<p>Back to the card they paid with, usually in 5-10 days. Stripe keeps its fee; Rattle Golf absorbs it. You'll be asked next whether to take them out of the field.</p>`
+            + `<p class="checkout-error" id="refund-sheet-error" style="display:none;"></p>`
+            + `<button class="btn-danger" id="refund-confirm" onclick="confirmRefund()">Refund ${amt}</button>`
+            + `<button class="btn-soft" onclick="closeRefundSheet()">Keep</button>`);
+    }
+    function confirmRefund() {
+        const entryId = refundSheetEntry;
+        if (!entryId || refundInFlight || !currentCode || !canManage()) return;
+        const e = (registrationData || {})[entryId];
+        if (!e || payState(e) !== 'stripe') return;
+        if (!requireOnlineForSignup('REFUND NOT SENT', 'Reconnect and tap Refund again - nothing was changed.')) return;
+        refundInFlight = true;
+        const btn = document.getElementById('refund-confirm');
+        if (btn) { btn.disabled = true; btn.textContent = 'Refunding…'; }
+        const code = currentCode;
+        stripeCall('refundEntry', { code: code, entryId: entryId }).then(() => {
+            refundInFlight = false;
+            askRemoveFromField(entryId);
+        }).catch((err) => {
+            refundInFlight = false;
+            if (btn) { btn.disabled = false; btn.textContent = 'Refund ' + centsText(refundAmountCents(e)); }
+            const msg = document.getElementById('refund-sheet-error');
+            const reason = callReason(err) || (err && err.code) || 'unknown';
+            if (msg) { msg.style.display = 'block'; msg.textContent = "The refund didn't go through. Nothing was changed. Check your signal and try again (" + reason + ')'; }
+        });
+    }
+    // THE SECOND QUESTION, ASKED EVERY TIME (Manny's decision). A golfer who
+    // is not in the field has nothing to be removed from, so it is not asked.
+    function askRemoveFromField(entryId) {
+        const e = (registrationData || {})[entryId] || {};
+        const who = escReg(String(e.fullName || e.name || 'this golfer').trim());
+        refundSheetEntry = entryId;
+        if (!regInField(e)) {
+            refundSheet(`<h3 id="refund-sheet-title">Refund started</h3><p>${who} shows Refund pending until Stripe confirms it.</p>`
+                + `<button class="btn-soft" onclick="closeRefundSheet()">Done</button>`);
+            return;
+        }
+        refundSheet(`<h3 id="refund-sheet-title">Also remove from the field?</h3>`
+            + `<p>Refund started. ${who} shows Refund pending until Stripe confirms it. They are still in the field.</p>`
+            + `<p class="checkout-error" id="refund-sheet-error" style="display:none;"></p>`
+            + `<button class="btn-danger" id="refund-remove-yes" onclick="removeRefundedFromField()">Remove from the field</button>`
+            + `<button class="btn-soft" id="refund-remove-no" onclick="closeRefundSheet()">Keep in the field</button>`);
+    }
+    // ONE OWNER WRITE, ONLY ON YES. An individual golfer is WITHDRAWN (the id
+    // and any scores stay - the page's own rule). A team golfer's name comes
+    // off the team list, which is only safe while the team has no scores:
+    // per-golfer scores are keyed by position on the list.
+    function removeRefundedFromField() {
+        const entryId = refundSheetEntry;
+        if (!entryId || !currentCode || !canManage()) return;
+        const e = (registrationData || {})[entryId] || {};
+        const say = (t) => { const m = document.getElementById('refund-sheet-error'); if (m) { m.style.display = 'block'; m.textContent = t; } };
+        if (e.playerId && (currentData.players || {})[e.playerId]) {
+            db.ref(`tournaments/${currentCode}/players/${e.playerId}/status`).set(COMPETITOR_WITHDRAWN)
+                .then(closeRefundSheet, (err) => say(`Error: ${err.message}`));
+            return;
+        }
+        const team = e.teamNum ? (currentData.teams || {})['team' + e.teamNum] : null;
+        if (!team) { say('Not on a team any more - nothing to remove.'); return; }
+        if (teamHasScores(team.num)) { say('Their team has posted scores, so the name stays on the card. Change the team on Setup.'); return; }
+        const name = String(e.fullName || e.name || '').trim().toLowerCase();
+        const players = (team.players || []).slice();
+        const at = players.findIndex((p) => String(p || '').trim().toLowerCase() === name);
+        if (at === -1) { say('That name is not on the team list - change the team on Setup.'); return; }
+        players.splice(at, 1);
+        db.ref(`tournaments/${currentCode}/teams/team${team.num}/players`).set(players)
+            .then(closeRefundSheet, (err) => say(`Error: ${err.message}`));
+    }
+
+    // ---- M4: THE ENTRY FEES CARD ------------------------------------------
+    // WHOSE ANSWER: the signed-in owner's. canManage() is true only when the
+    // signed-in uid IS the record's ownerUid, so that is the uid read - the
+    // page's one auth seam is not read a second time here.
+    function syncPaymentsAllowed() {
+        const uid = (currentData && currentData.ownerUid && canManage()) ? currentData.ownerUid : null;
+        if (uid === paymentsAllowedUid) return;
+        paymentsAllowedUid = uid;
+        paymentsAllowed = false;
+        if (!uid) return;
+        db.ref('payments/allowedOwners/' + uid).once('value').then((snap) => {
+            if (paymentsAllowedUid !== uid) return;
+            paymentsAllowed = !!(snap && snap.val && snap.val() === true);
+            renderEntryFeesCard();
+        }).catch(() => { /* not readable = not allowed */ });
+    }
+    // DOLLARS TYPED, CENTS STORED. "100", "100.5", "$1,250.00" are accepted;
+    // anything with more than two decimals, or outside $1.00..$1,000.00, is
+    // refused with a sentence and nothing is written.
+    function parseFeeDollars(raw) {
+        const t = String(raw == null ? '' : raw).trim().replace(/^\$/, '').replace(/,/g, '');
+        if (t === '') return { blank: true };
+        if (!/^\d{1,4}(\.\d{1,2})?$/.test(t)) return { error: 'Type dollars and cents, like 100 or 85.50.' };
+        const parts = t.split('.');
+        const cents = Number(parts[0]) * 100 + Number(((parts[1] || '') + '00').slice(0, 2));
+        if (!Number.isInteger(cents) || cents < FEE_MIN_CENTS || cents > FEE_MAX_CENTS) return { error: 'The entry fee must be from $1.00 to $1,000.00.' };
+        return { cents: cents };
+    }
+    function feesError(text) {
+        const el = document.getElementById('fees-error');
+        if (el) { el.textContent = text || ''; el.style.display = text ? 'block' : 'none'; }
+    }
+    function setFeeDollars(raw) {
+        if (!currentCode || !canManage()) return;
+        const p = parseFeeDollars(raw);
+        const f = feesOf(currentData);
+        if (p.blank) {
+            if (f && f.collectByCard) { feesError('Turn off card payments before clearing the fee.'); return; }
+            feesError('');
+            db.ref(`tournaments/${currentCode}/fees`).remove().catch((err) => feesError(`Error: ${err.message}`));
+            return;
+        }
+        if (p.error) { feesError(p.error); return; }
+        feesError('');
+        const cur = (currentData && currentData.fees) || {};
+        db.ref(`tournaments/${currentCode}/fees`).update({
+            entryFeeCents: p.cents,
+            collectByCard: cur.collectByCard === true,
+            allowCash: cur.allowCash !== false
+        }).catch((err) => feesError(`Error: ${err.message}`));
+    }
+    function setFeesFlag(key, on) {
+        if (!currentCode || !canManage()) return;
+        if (key !== 'collectByCard' && key !== 'allowCash') return;
+        const f = feesOf(currentData);
+        if (!f || !f.cents) { renderEntryFeesCard(); feesError('Set the entry fee first.'); return; }
+        if (key === 'collectByCard' && !paymentsAllowed) { renderEntryFeesCard(); return; }
+        db.ref(`tournaments/${currentCode}/fees/${key}`).set(!!on).catch((err) => feesError(`Error: ${err.message}`));
+    }
+    function feesToggle(id, key, on) {
+        return `<label class="toggle-switch"><input type="checkbox" id="${id}"${on ? ' checked' : ''} onchange="setFeesFlag('${key}', this.checked)"><span class="toggle-slider"></span></label>`;
+    }
+    function renderEntryFeesCard() {
+        const block = document.getElementById('entry-fees-block');
+        if (!block) return;
+        syncPaymentsAllowed();
+        const show = !!(currentCode && currentData && currentData.ownerUid && canManage());
+        block.style.display = show ? 'block' : 'none';
+        if (!show) { block.innerHTML = ''; return; }
+        const f = feesOf(currentData);
+        const typed = f && f.cents ? (f.cents % 100 === 0 ? String(f.cents / 100) : centsText(f.cents).slice(1).replace(/,/g, '')) : '';
+        const err = document.getElementById('fees-error');
+        const keepErr = err ? err.textContent : '';
+        let html = `<h3 style="margin:0 0 4px 0;">Entry fees</h3>`
+            + `<div class="fees-row"><span><strong>Entry fee</strong><small>per golfer</small></span>`
+            + `<span class="money-input"><span class="money-prefix" aria-hidden="true">$</span><input type="text" inputmode="decimal" id="fees-dollars" value="${escReg(typed)}" placeholder="0.00" onchange="setFeeDollars(this.value)"></span></div>`
+            + `<p class="fees-error" id="fees-error" style="display:${keepErr ? 'block' : 'none'};">${escReg(keepErr)}</p>`;
+        if (paymentsAllowed) {
+            html += `<div class="fees-row"><span><strong>Collect entry fees by card</strong><small>Golfers pay when they sign up</small></span>${feesToggle('fees-card', 'collectByCard', !!(f && f.collectByCard))}</div>`
+                + `<div class="fees-row"><span><strong>Also allow pay at the course</strong><small>Desk marks Paid (cash)</small></span>${feesToggle('fees-cash', 'allowCash', !!(f && f.allowCash))}</div>`
+                + `<div class="fees-stripe" id="fees-stripe"><div class="fees-stripe-head">✓ STRIPE CONNECTED</div>`
+                + `<div><span>Account</span><strong>Rattle Golf LLC</strong></div>`
+                + `<div><span>Mode</span><span class="fees-test-mode">TEST MODE</span></div></div>`;
+        } else {
+            html += `<p class="fees-soon" id="fees-soon">Card payments coming soon. Golfers pay at the course; the Desk marks Paid (cash).</p>`;
+        }
+        block.innerHTML = html;
+    }
+
+    // ---- M1 (web part): THE EVENT-DAY PANEL --------------------------------
+    // QUIET IS WHAT THIS PHONE SAW. Score writes carry no time a page can read
+    // (the proofs are not readable), so each competitor's posted-hole count is
+    // remembered with the moment THIS PAGE saw it change, kept per event in
+    // localStorage so a reload does not reset the clock. Quiet = posting, not
+    // finished, and no new hole seen for 40 minutes.
+    var QUIET_MS = 40 * 60 * 1000;
+    var daySeen = null;          // { code, map: { entryKey: { thru, at } } }
+    var dayTimer = null;
+    function daySeenFor(code) {
+        if (daySeen && daySeen.code === code) return daySeen.map;
+        let map = {};
+        try { map = JSON.parse(localStorage.getItem('hpEventDaySeen:' + code) || '{}') || {}; } catch (e) { map = {}; }
+        daySeen = { code: code, map: map };
+        return map;
+    }
+    function daySeenSave() {
+        try { localStorage.setItem('hpEventDaySeen:' + daySeen.code, JSON.stringify(daySeen.map)); } catch (e) { /* this phone only */ }
+    }
+    function dayRoundId() {
+        if (!isMultiRound(currentData)) return null;
+        if (lbRoundId && lbRoundId !== 'event' && (currentData.rounds || {})[lbRoundId]) return lbRoundId;
+        const ids = orderedRoundIds(currentData);
+        return ids.find((rid) => roundStatus(currentData.rounds[rid]) === ROUND_OPEN) || ids[0] || null;
+    }
+    function clockText(ms) {
+        const d = new Date(ms);
+        const h = d.getHours(), m = d.getMinutes();
+        return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')}`;
+    }
+    function teamPhones(num) {
+        return Object.keys(registrationData || {}).map((id) => registrationData[id] || {})
+            .filter((e) => e.teamNum === num && e.phone).map((e) => String(e.phone).replace(/[^\d+]/g, ''))
+            .filter(Boolean);
+    }
+    function renderEventDayPanel() {
+        const panel = document.getElementById('event-day-panel');
+        if (!panel) return;
+        const show = !!(currentCode && currentData && currentData.ownerUid && canManage());
+        panel.style.display = show ? 'block' : 'none';
+        if (!show) { panel.innerHTML = ''; return; }
+        const now = Date.now();
+        const rid = dayRoundId();
+        const view = resolveLeaderboardView(currentData, rid, null);
+        const rows = (view && view.available ? view.rows : []) || [];
+        const holes = ((rid ? (currentData.rounds[rid] || {}).courseData : currentData.courseData) || []).length || 18;
+        const seen = daySeenFor(currentCode);
+        const keyOf = (r) => String(r.entryKey || r.teamName);
+        rows.forEach((r) => {
+            const prev = seen[keyOf(r)];
+            if (!prev || prev.thru !== (r.thru || 0)) seen[keyOf(r)] = { thru: r.thru || 0, at: now };
+        });
+        daySeenSave();
+        const individual = recordIsIndividual();
+        const noun = individual ? 'golfers' : 'teams';
+        const posting = rows.filter((r) => (r.thru || 0) > 0);
+        const quiet = posting.filter((r) => r.thru < holes && now - seen[keyOf(r)].at >= QUIET_MS);
+        const silent = posting.length ? rows.filter((r) => !(r.thru > 0)) : [];
+        const textBtn = (r) => {
+            if (individual || !r.num) return '';
+            const phones = teamPhones(r.num);
+            return phones.length ? `<a class="btn-outline day-text" href="sms:${phones.join(',')}">Text team</a>` : '';
+        };
+        let scores = `<div class="day-card" id="day-scores"><div class="day-head">Scores by ${individual ? 'golfer' : 'team'}</div>`
+            + `<div class="day-row"><span id="day-posting">${posting.length} of ${rows.length} ${noun} posting</span>`
+            + (quiet.length ? `<span class="day-quiet" id="day-quiet">${quiet.length} quiet 40+ min</span>` : '') + `</div>`;
+        quiet.forEach((r) => {
+            scores += `<div class="day-row"><span>${escapeHtml(r.teamName)} · last score ${clockText(seen[keyOf(r)].at)}, thru ${r.thru}</span>${textBtn(r)}</div>`;
+        });
+        silent.forEach((r) => { scores += `<div class="day-row"><span>${escapeHtml(r.teamName)} · no scores yet</span>${textBtn(r)}</div>`; });
+        scores += `</div>`;
+        // PRIZES: the same resolvePrizeView and computeTournamentPayouts the
+        // Prize Results list uses, with the SAVED amounts. Nothing computed here.
+        const prize = resolvePrizeView(currentData || {});
+        const spots = savedPayoutSpots();
+        let prizes = `<div class="day-card" id="day-prizes"><div class="day-head">Prize results${prize.available && prize.title ? ' · paid on ' + escapeHtml(prize.title) : ''}</div>`;
+        if (!payoutsAreSet(spots)) prizes += `<div class="day-row"><span>Results not set yet.</span></div>`;
+        else if (!prize.available) prizes += `<div class="day-row"><span>${escapeHtml(prize.reason || '')}</span></div>`;
+        else {
+            const paid = computeTournamentPayouts(prize.rows || [], spots).filter((p) => p.amount > 0);
+            if (!paid.length) prizes += `<div class="day-row"><span>No paid spots reached yet.</span></div>`;
+            paid.forEach((p) => { prizes += `<div class="day-row"><span>${ordinal(p.rank)} ${escapeHtml(p.teamName)}</span><strong>$${p.amount.toFixed(2)}</strong></div>`; });
+        }
+        prizes += `</div>`;
+        // THE DESK, IN NUMBERS. There is no check-in field in the registration
+        // schema, so "in the field" is the count the desk already keeps.
+        const entries = Object.keys(registrationData || {}).map((id) => registrationData[id] || {});
+        const c = registrationCounts(entries);
+        const desk = `<div class="day-card" id="day-desk"><div class="day-head">Desk</div>`
+            + `<div class="day-row"><span id="day-desk-counts">${c.inField} of ${c.signups} in the field · ${c.paid} paid · ${c.signups - c.paid} unpaid</span></div></div>`;
+        panel.innerHTML = scores + prizes + desk;
+        // A minute tick so "quiet" turns on without a new snapshot. unref'd
+        // where the host allows it, so a test runner is never held open.
+        if (!dayTimer && typeof setInterval === 'function') {
+            dayTimer = setInterval(() => { renderEventDayPanel(); }, 60000);
+            if (dayTimer && typeof dayTimer.unref === 'function') dayTimer.unref();
+        }
+    }
+
+    // ===== E1c: ANNOUNCEMENTS (mockup approved 2026-11-09, plan section 1) ====
+    //
+    // tournaments/<code>/announcements/<id> = {text<=200, tpl, at, by}. The
+    // owner writes it (rules block E1); every scorecard reads it in the same
+    // snapshot as the board and shows the newest as its banner. Then
+    // sendAnnouncement({code, id}) - the server - notifies app followers and
+    // writes pushed: n back. The bell count in the history is that n, never a
+    // number this page made up.
+    //
+    // The four template sentences are the plan's, approved as written. A
+    // {time} / {place} the template leaves for the organizer keeps Send
+    // disabled until it is filled in; Start time takes the event's start time.
+    var evToolTab = null;            // 'announce' while that tool is on screen
+    var EV_TOOL_LABELS = { announce: 'Announcements', pace: 'Pace of play' };
+    var evBrandBy = null;            // the bar's company line, read once from the markup
+    var ANNOUNCE_TEMPLATES = {
+        start: 'Shotgun start at {time}. Head to your starting hole. Good luck!',
+        weather: 'Lightning in the area. Horn sounded: stop play, mark your ball, head to the clubhouse.',
+        resume: 'All clear. Resume play at {time} from where you stopped.',
+        results: 'Results and awards at {time} in the {place}.',
+        custom: ''
+    };
+    var ANNOUNCE_MAX = 200;
+    // var, not let: showTab and the gate can reach renderEventTools from a
+    // listener registered above this line.
+    var annTpl = 'custom';
+    var followerCount = 0;
+    var followersBoundCode = null, followersCb = null;
+
+    function renderEventTools() {
+        const owner = !!(currentCode && currentData && currentData.ownerUid && canManage());
+        const row = document.getElementById('event-tools-row');
+        if (row) row.style.display = owner ? 'flex' : 'none';
+        const by = document.querySelector ? document.querySelector('#hp-brand .hp-brand-by') : null;
+        if (by) {
+            if (evBrandBy === null) evBrandBy = by.textContent;
+            by.textContent = (owner && evToolTab) ? EV_TOOL_LABELS[evToolTab] : evBrandBy;
+        }
+        syncFollowersListener(owner);
+        // EC3 C: the proofs feed Event day's "Needs you" whenever pace is on.
+        syncProofsListener(owner && paceSettings().on);
+        if (owner && evToolTab === 'announce') renderAnnounce();
+    }
+
+    // HOW MANY APP FOLLOWERS: tournamentFollowers/<code>, owner-only to read.
+    // An upper bound on "by notification": a follower whose phone has no token,
+    // or who turned essentials off, is counted here and not notified.
+    function syncFollowersListener(owner) {
+        const wanted = owner ? currentCode : null;
+        if (followersBoundCode === wanted) return;
+        if (followersBoundCode && followersCb) {
+            try { db.ref('tournamentFollowers/' + followersBoundCode).off('value', followersCb); } catch (e) { /* stub */ }
+        }
+        followersBoundCode = null; followersCb = null; followerCount = 0;
+        if (!wanted) return;
+        const code = wanted;
+        followersCb = (snap) => {
+            if (currentCode !== code) return;
+            followerCount = Object.keys((snap && snap.val()) || {}).length;
+            if (evToolTab === 'announce') renderAnnounceMeta();
+        };
+        db.ref('tournamentFollowers/' + code).on('value', followersCb);
+        followersBoundCode = code;
+    }
+
+    // GOLFERS IN THE FIELD, for "goes to N golfers": every golfer on a team,
+    // or every golfer on an individual event who has not withdrawn.
+    function fieldGolferCount() {
+        const d = currentData || {};
+        if (recordIsIndividual()) return Object.values(d.players || {}).filter((p) => p && p.status !== 'withdrawn').length;
+        return Object.values(d.teams || {}).reduce((n, t) => n + ((t && t.players) || []).filter((p) => String(p || '').trim()).length, 0);
+    }
+
+    function annFill(tpl) {
+        let text = ANNOUNCE_TEMPLATES[tpl] || '';
+        const t = formatStartTime(currentData && currentData.startTime);
+        if (tpl === 'start' && t) text = text.replace('{time}', t);
+        return text;
+    }
+    function annHasBlank(text) { return /\{time\}|\{place\}/.test(text); }
+
+    function pickAnnTemplate(tpl) {
+        if (!Object.prototype.hasOwnProperty.call(ANNOUNCE_TEMPLATES, tpl)) return;
+        annTpl = tpl;
+        const box = document.getElementById('ann-text');
+        if (box) box.value = annFill(tpl);
+        renderAnnounce();
+        if (box && typeof box.focus === 'function') box.focus();
+    }
+
+    function renderAnnounceMeta() {
+        const box = document.getElementById('ann-text');
+        const meta = document.getElementById('ann-meta');
+        const send = document.getElementById('ann-send');
+        const text = box ? String(box.value || '') : '';
+        const n = fieldGolferCount();
+        if (meta) meta.textContent = `${text.length} / ${ANNOUNCE_MAX} characters · goes to ${n} golfers (${followerCount} by notification, all on the scorecard banner)`;
+        if (send) send.disabled = !text.trim() || text.length > ANNOUNCE_MAX || annHasBlank(text);
+    }
+
+    function announcementsSorted(data) {
+        const a = (data && data.announcements) || {};
+        return Object.keys(a).map((id) => Object.assign({ id: id }, a[id]))
+            .filter((x) => x && typeof x.text === 'string' && typeof x.at === 'number')
+            .sort((x, y) => y.at - x.at);
+    }
+    function annClock(ms) { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+
+    function renderAnnounce() {
+        document.querySelectorAll('#ann-chips .ann-chip').forEach((b) => b.classList.toggle('on', b.getAttribute('data-tpl') === annTpl));
+        renderAnnounceMeta();
+        const sent = document.getElementById('ann-sent');
+        if (!sent) return;
+        const list = announcementsSorted(currentData);
+        if (!list.length) { sent.style.display = 'none'; sent.innerHTML = ''; return; }
+        sent.style.display = 'block';
+        sent.innerHTML = `<div class="day-head">Sent</div>` + list.map((a) =>
+            `<div class="ann-row"><span class="ann-row-text">${annClock(a.at)} · ${escapeHtml(a.text)}</span>`
+            + (typeof a.pushed === 'number' ? `<span class="ann-row-bell">${a.pushed} 🔔</span>` : '') + `</div>`).join('');
+    }
+
+    // SEND: the note first (the banner every scorecard shows), then the push.
+    // A refused or failed push leaves the note up and no bell on its row -
+    // the row says what went out, and nothing claims a phone was reached.
+    function newAnnouncementId() {
+        return 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+    function sendToField() {
+        if (!canManage()) return;   // canManage: signed in AS the owner, so by = ownerUid
+        const box = document.getElementById('ann-text');
+        const text = box ? String(box.value || '').trim() : '';
+        if (!text || text.length > ANNOUNCE_MAX || annHasBlank(text)) { renderAnnounceMeta(); return; }
+        const code = currentCode, id = newAnnouncementId();
+        const send = document.getElementById('ann-send');
+        if (send) send.disabled = true;
+        db.ref(`tournaments/${code}/announcements/${id}`).set({
+            text: text, tpl: annTpl, at: firebase.database.ServerValue.TIMESTAMP, by: currentData.ownerUid
+        }).then(() => {
+            if (box) box.value = '';
+            annTpl = 'custom';
+            renderAnnounce();
+            return loadFunctionsSdk().then(() => firebase.functions().httpsCallable('sendAnnouncement')({ code: code, id: id }))
+                .catch(() => { /* the note is up; the row shows no bell */ });
+        }).catch((err) => { alert(`Error: ${err.message}`); renderAnnounceMeta(); });
+    }
+
+    // ===== E3a: PACE OF PLAY (mockup approved 2026-11-09, plan section 3) ====
+    //
+    // tournaments/<code>/pace = {on, targetMin}: OFF until the organizer turns
+    // it on (absent = off), target 4:15 (255 min) by default, editable.
+    // SCORES ONLY, NEVER A LOCATION. The only score times that exist are the
+    // server's own t on each score's proof (scoreProofs/<code>, owner-readable
+    // under rules block E3), so a team's pace is read from its LAST SCORED
+    // HOLE: it finished `thru` holes by that time, against the target of
+    // thru x targetMin/18 minutes from the start (event date + start time; a
+    // shotgun is one start for everyone). A team a full hole's target or more
+    // behind reads "N min behind"; less is "on pace". A team with scores but
+    // no proof time (an unlocked event) reads "—": no time, no claim.
+    //
+    // Group ahead: on a shotgun, the team that started on the nearest later
+    // hole (it plays that hole while this one plays its own); on a tee-time
+    // start, the team before it in order.
+    //
+    // A nudge is tournaments/<code>/nudges/<team> = {at, tpl:'pace1', thru}:
+    // the fixed sentence on that team's card until it scores past `thru`.
+    var PACE_DEFAULT_MIN = 255;
+    var paceProofs = null;
+    var proofsBoundCode = null, proofsCb = null;
+
+    function paceSettings() {
+        const p = (currentData && currentData.pace) || {};
+        const t = Number(p.targetMin);
+        return { on: p.on === true, targetMin: (Number.isInteger(t) && t >= 120 && t <= 360) ? t : PACE_DEFAULT_MIN };
+    }
+    function syncProofsListener(wanted) {
+        const code = wanted ? currentCode : null;
+        if (proofsBoundCode === code) return;
+        if (proofsBoundCode && proofsCb) {
+            try { db.ref('scoreProofs/' + proofsBoundCode).off('value', proofsCb); } catch (e) { /* stub */ }
+        }
+        proofsBoundCode = null; proofsCb = null; paceProofs = null;
+        if (!code) return;
+        proofsCb = (snap) => {
+            if (currentCode !== code) return;
+            paceProofs = (snap && snap.val()) || {};
+            renderEventHome();
+        };
+        db.ref('scoreProofs/' + code).on('value', proofsCb);
+        proofsBoundCode = code;
+    }
+    function paceMinText(min) { return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`; }
+    function paceStartMs(data) {
+        if (!EVENT_DETAIL_KEYS.startTime.test((data && data.startTime) || '')) return null;
+        const [h, m] = data.startTime.split(':').map(Number);
+        const d = EVENT_DETAIL_KEYS.eventDate.test(data.eventDate || '') ? data.eventDate.split('-').map(Number) : null;
+        const now = new Date();
+        return (d ? new Date(d[0], d[1] - 1, d[2], h, m, 0) : new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0)).getTime();
+    }
+
+    // One row per team (team event) or scoring group (individual event), in
+    // the round on screen (dayRoundId, the event-day panel's round).
+    function paceUnits(data, proofsAll, rid) {
+        const view = rid ? (roundView(data, rid) || {}) : data;
+        const holes = ((view.courseData || []).map((h) => Number(h.hole))).sort((a, b) => a - b);
+        const scores = view.scores || {};
+        const proofs = (rid ? ((proofsAll || {}).r || {})[rid] : proofsAll) || {};
+        const lastT = (prefixes) => Object.keys(proofs).reduce((best, k) => {
+            const p = proofs[k];
+            return (k !== 'r' && p && typeof p.t === 'number' && prefixes.some((x) => k.indexOf(x) === 0) && p.t > best) ? p.t : best;
+        }, 0) || null;
+        const shotgun = data.startType === 'shotgun';
+        const units = [];
+        if (recordIsIndividual()) {
+            const groups = view.scoringGroups || {};
+            Object.keys(groups).forEach((gid) => {
+                const g = groups[gid] || {};
+                const ids = (g.playerIds || []).filter(Boolean);
+                const thru = holes.filter((h) => ids.length > 0 && ids.every((pid) => (scores[`${pid}_h${h}`] || 0) > 0)).length;
+                units.push({ key: gid, label: g.name || 'Group', start: shotgun ? (Number(g.startingHole) || null) : null, thru, lastT: lastT(ids.map((pid) => pid + '_')), order: units.length });
+            });
+        } else {
+            const format = view.format || data.format || 'scramble';
+            Object.values(view.teams || data.teams || {}).filter((t) => t && t.num).sort((a, b) => a.num - b.num).forEach((t) => {
+                const n = t.num;
+                const thru = holes.filter((h) => {
+                    if (format === 'scramble') return (scores[`team${n}_h${h}`] || 0) > 0;
+                    const hs = (t.players || []).map((p, i) => Number(scores[`team${n}_p${i}_h${h}`]) || 0).filter((v) => v > 0);
+                    return computeTeamHoleScore(format, hs, view.shambleCountBest || data.shambleCountBest || 1) !== null;
+                }).length;
+                units.push({ key: 'team' + n, label: t.name || ('Team ' + n), start: shotgun ? (Number(t.startingHole) || null) : null, thru, lastT: lastT(['team' + n + '_']), order: units.length });
+            });
+        }
+        return units;
+    }
+    function paceRows(data, proofsAll, rid, settings) {
+        const per = settings.targetMin / 18;
+        const start = paceStartMs(data);
+        const units = paceUnits(data, proofsAll, rid);
+        units.forEach((u) => {
+            if (!u.thru) { u.status = 'none'; return; }
+            if (!u.lastT || !start) { u.status = 'unknown'; return; }
+            u.behindMin = Math.round((u.lastT - start) / 60000 - u.thru * per);
+            u.status = u.behindMin >= per ? 'behind' : 'on';
+        });
+        units.forEach((u) => {
+            let ahead = null;
+            if (u.start) {
+                let best = 99;
+                units.forEach((o) => { if (o !== u && o.start) { const d = (o.start - u.start + 18) % 18; if (d > 0 && d < best) { best = d; ahead = o; } } });
+            } else if (u.order > 0) ahead = units[u.order - 1];
+            u.ahead = ahead;
+        });
+        return units;
+    }
+
+    // EC3 C (2026-11-11): the Setup switch and target, filled from the record.
+    function renderPaceSetup() {
+        const s = paceSettings();
+        const sw = document.getElementById('pace-on-switch');
+        const lb = document.getElementById('pace-on-label');
+        const tg = document.getElementById('pace-target');
+        if (sw) sw.checked = s.on;
+        if (lb) lb.textContent = s.on ? 'On' : 'Off';
+        if (tg && document.activeElement !== tg) tg.value = paceMinText(s.targetMin);
+    }
+
+    function setPaceOn(on) {
+        if (!canManage()) return;
+        db.ref(`tournaments/${currentCode}/pace`).set({ on: !!on, targetMin: paceSettings().targetMin })
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+    // "4:15" or "255". Anything outside 2:00..6:00 puts the saved value back.
+    function setPaceTarget(v) {
+        if (!canManage()) return;
+        const m = /^\s*(\d{1,2}):([0-5]\d)\s*$/.exec(String(v || '')) ;
+        const min = m ? Number(m[1]) * 60 + Number(m[2]) : (/^\s*\d{3}\s*$/.test(String(v || '')) ? Number(v) : NaN);
+        if (!(Number.isInteger(min) && min >= 120 && min <= 360)) { const el = document.getElementById('pace-target'); if (el) el.value = paceMinText(paceSettings().targetMin); return; }
+        db.ref(`tournaments/${currentCode}/pace`).set({ on: paceSettings().on, targetMin: min })
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+    function sendNudge(key, thru) {
+        if (!canManage() || !/^(team[0-9]+|g[a-z0-9]+)$/.test(String(key || '')) || !(Number.isInteger(thru) && thru >= 0 && thru <= 18)) return;
+        db.ref(`tournaments/${currentCode}/nudges/${key}`).set({ at: firebase.database.ServerValue.TIMESTAMP, tpl: 'pace1', thru: thru })
+            .catch((err) => alert(`Error: ${err.message}`));
     }
 
     // ===== SCORING-LINK KEYS (scorecard-lock wave, 2026-10-06) ===============
@@ -3451,6 +4631,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function renderRegistrationList() {
         renderRegistrationSetupRow();
         renderRegistrationDesk();
+        renderEventDayPanel();
     }
 
     function registrationAllowed() {
@@ -3504,8 +4685,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return !regTeam(e);
     }
     function setRegistrationFilter(key) {
-        registrationFilter = REG_FILTERS.some((f) => f.key === key) ? key : 'all';
+        registrationFilter = (key === 'photos' || deskFilters().some((f) => f.key === key)) ? key : 'all';
         renderRegistrationDesk();
+    }
+    // EC4 C (2026-11-11): the Photos chip and the queue under it. Drawn on every
+    // Desk render, with or without signups (photos come from teams, not signups).
+    function photosChipHtml() {
+        const n = (typeof photoQueue === 'function' && currentData) ? photoQueue().length : 0;
+        return `<button class="reg-chip${registrationFilter === 'photos' ? ' active' : ''}" id="desk-photos-chip" onclick="setRegistrationFilter('photos')">Photos ${n}</button>`;
+    }
+    function renderDeskPhotos(on) {
+        const wrap = document.getElementById('photo-queue-wrap');
+        const list = document.getElementById('registration-list');
+        const search = document.getElementById('registration-search');
+        if (wrap) wrap.style.display = on ? 'block' : 'none';
+        if (list) list.style.display = on ? 'none' : '';
+        if (search) search.style.display = on ? 'none' : '';
+        if (on) renderPhotosTab();
     }
     function registrationSearchText() {
         const el = document.getElementById('registration-search');
@@ -3551,7 +4747,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // there is NO total - the line gives the count, the fee and the reason,
         // rather than a number that is wrong by the team size.
         const fee = Number(currentData && currentData.entryFee) || 0;
-        if (fee > 0) {
+        if (fee > 0 && !deskFeesOn()) {
             if (recordIsIndividual()) lines.push(`<div class="reg-count-line">Fees collected ${regDollars(c.paid * fee)} · ${c.paid} paid × ${regDollars(fee)}</div>`);
             else lines.push(`<div class="reg-count-line">${c.paid} paid golfers · ${regDollars(fee)} per team · teams form at approval</div>`);
         }
@@ -3592,6 +4788,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // hands over a file with a header row and nothing under it.
         const showExport = (on) => { if (exportBtn) exportBtn.style.display = on ? 'block' : 'none'; };
         showExport(false);
+        const photosOnDesk = registrationFilter === 'photos';
+        renderDeskPhotos(photosOnDesk);
         if (!registrationAllowed()) {
             // A legacy event (no ownerUid) has no signups to list - the rules
             // refuse the create and nobody could read it - and the page says so
@@ -3600,27 +4798,33 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 ? 'This event is not taking signups. Signups need an organizer account, and this event does not have one.'
                 : '';
             if (countsEl) countsEl.innerHTML = '';
-            if (chipsEl) chipsEl.innerHTML = '';
+            if (chipsEl) chipsEl.innerHTML = canManage() ? photosChipHtml() : '';
             list.innerHTML = '';
             return;
         }
-        if (note) note.textContent = 'Tick Paid when you have the cash, then approve golfers into the field.';
+        const feesOn = deskFeesOn();
+        if (note) note.textContent = feesOn
+            ? 'Card payments mark themselves Paid. Mark cash paid when you have the cash, then approve golfers into the field.'
+            : 'Tick Paid when you have the cash, then approve golfers into the field.';
         const all = Object.keys(registrationData || {}).map((id) => [id, registrationData[id] || {}])
             .sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
         if (all.length === 0) {
             if (countsEl) countsEl.innerHTML = '';
-            if (chipsEl) chipsEl.innerHTML = '';
+            if (chipsEl) chipsEl.innerHTML = photosChipHtml();
             list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No signups yet.</p>`;
             return;
         }
         showExport(true);
         const entriesOnly = all.map((x) => x[1]);
-        if (countsEl) countsEl.innerHTML = registrationCountsHtml(registrationCounts(entriesOnly));
-        if (chipsEl) chipsEl.innerHTML = REG_FILTERS.filter((f) => !f.teamOnly || !recordIsIndividual()).map((f) => {
+        if (countsEl) countsEl.innerHTML = (feesOn ? payTilesHtml(entriesOnly) : '') + registrationCountsHtml(registrationCounts(entriesOnly));
+        const filters = deskFilters();
+        if (!photosOnDesk && !filters.some((f) => f.key === registrationFilter)) registrationFilter = 'all';
+        if (chipsEl) chipsEl.innerHTML = filters.filter((f) => !f.teamOnly || !recordIsIndividual()).map((f) => {
             const n = entriesOnly.filter(f.test).length;
             return `<button class="reg-chip${f.key === registrationFilter ? ' active' : ''}" onclick="setRegistrationFilter('${f.key}')">${f.label} ${n}</button>`;
-        }).join('');
-        const filter = REG_FILTERS.find((f) => f.key === registrationFilter) || REG_FILTERS[0];
+        }).join('') + photosChipHtml();
+        if (photosOnDesk) return;
+        const filter = filters.find((f) => f.key === registrationFilter) || filters[0];
         const q = registrationSearchText();
         const shown = all.filter(([, e]) => filter.test(e) && (!q
             || String(e.fullName || e.name || '').toLowerCase().indexOf(q) !== -1
@@ -3661,7 +4865,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // THE STATE, AS A WORD: the payment badge beside the name; "In the field"
             // (the pinned words, once) as a badge in place of the button; "Needs a
             // team" beside it when regNeedsTeam says so. The checkbox stays the control.
-            const payBadge = e.paid === true ? `<span class="reg-state reg-state-paid">Paid</span>` : `<span class="reg-state reg-state-unpaid">Unpaid</span>`;
+            // STRIPE PHASE 1: with fees set, or on any entry Stripe has touched,
+            // the badge names HOW it was paid and the checkbox gives way to one
+            // control - Mark cash paid, Undo (cash only) or Refund (card only).
+            const moneyRow = feesOn || entryPaidByServer(e);
+            const payBadge = moneyRow ? payBadgeHtml(e)
+                : (e.paid === true ? `<span class="reg-state reg-state-paid">Paid</span>` : `<span class="reg-state reg-state-unpaid">Unpaid</span>`);
+            const payControl = moneyRow ? payControlHtml(id, e)
+                : `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`;
             const approve = inField
                 ? `<span class="reg-state reg-state-field">In the field</span>${regTeam(e) ? `<span class="reg-state reg-state-team">${escReg(regTeam(e).name || ('Team ' + regTeam(e).num))}</span>` : ''}${regNeedsTeam(e) ? `<span class="reg-state reg-state-needs">Needs a team</span>` : ''}`
                 : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`;
@@ -3674,7 +4885,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return `<div class="reg-row" data-entry-id="${escReg(id)}">`
                 + `<span class="reg-name">${escReg(e.fullName || e.name || '')}</span>`
                 + payBadge
-                + `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`
+                + payControl
                 + dest
                 + approve
                 + fix
@@ -3839,6 +5050,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     function setRegistrationPaid(entryId, paid) {
         if (!currentCode || !canManage()) return;
+        // A card entry's paid is the server's (Phase 1): never here.
+        if (entryPaidByServer((registrationData || {})[entryId])) return;
         const patch = { paid: !!paid };
         patch.paidAt = paid ? Date.now() : null;
         db.ref(`registrations/${currentCode}/${entryId}`).update(patch)
@@ -5469,6 +6682,314 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return true;
     }
 
+    // ===== E2d: CONTEST HOLES, THE ORGANIZER'S SIDE (approved 2026-11-09) =====
+    //
+    // tournaments/<code>/contests/h<N> = { kind, fairwayOnly?, allowGps, winner?, lockedAt? }
+    // is the owner's (the rules: tournaments/<code> is owner-written). Entries
+    // are contestEntries/<code>/h<N>/<entryKey>, written by the golfer's card
+    // with its key. "Make winner" writes winner + lockedAt in one update; after
+    // that the rules refuse new entries on the hole, so a later entry cannot
+    // replace it. "Remove" deletes one entry (owner). Nothing is paid here.
+    // ONE-ROUND EVENTS ONLY for now: a contest is per hole, and a two-day event
+    // plays each hole twice - the card hides contests on a multi-round event.
+    let contestEntriesAll = {};
+    let contestEntriesCode = null;
+    let contestSelected = null;     // the hole whose entries are open
+    let contestAdding = false;
+    function syncContestEntriesListener() {
+        if (!currentCode || contestEntriesCode === currentCode) return;
+        contestEntriesCode = currentCode;
+        const code = currentCode;
+        db.ref(`contestEntries/${code}`).on('value', (snap) => {
+            if (currentCode !== code) return;
+            contestEntriesAll = (snap && snap.val()) || {};
+            renderContestsTab();
+        });
+    }
+    function contestGpsOn() {
+        const list = TournamentContests.contestList(currentData || {});
+        return list.length ? list.every((c) => c.allowGps) : contestGpsDefault;
+    }
+    let contestGpsDefault = true;   // "allow GPS marks", default on (plan section 2)
+    function renderContestsTab() {
+        const box = document.getElementById('contest-holes-list');
+        if (!box || !currentData) return;
+        const list = TournamentContests.contestList(currentData);
+        const multi = isMultiRound(currentData);
+        const course = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        if (!list.some((c) => c.key === contestSelected)) contestSelected = list.length ? list[0].key : null;
+        let html = list.map((c) => {
+            const pill = c.kind === 'kp' ? 'Closest to the pin' : ('Long drive' + (c.fairwayOnly ? ' · fairway only' : ''));
+            return `<div class="ct-row"><button type="button" class="ct-hole${c.key === contestSelected ? ' on' : ''}" data-hole="${c.key}" onclick="openContestHole(this.dataset.hole)"><strong>Hole ${c.hole}</strong>${c.par ? ` par ${c.par}` : ''}</button><span class="ct-pill ${c.kind}">${pill}</span></div>`;
+        }).join('');
+        if (multi) {
+            html += `<div class="ct-row"><span style="color:var(--text-muted); font-size:0.9rem;">Contest holes are for one-round events.</span></div>`;
+        } else if (contestAdding) {
+            const used = list.map((c) => c.hole);
+            const opts = course.filter((h) => used.indexOf(Number(h.hole)) === -1)
+                .map((h) => `<option value="${h.hole}">Hole ${h.hole} · par ${h.par}</option>`).join('');
+            html += `<div class="ct-form" id="contest-add-form">
+                <select id="contest-add-hole" aria-label="Hole" onchange="contestHoleChosen()">${opts}</select>
+                <select id="contest-add-kind" aria-label="Contest" onchange="contestHoleChosen(true)"><option value="kp">Closest to the pin</option><option value="ld">Long drive</option></select>
+                <label id="contest-add-fw-row" style="font-size:0.9rem;"><input type="checkbox" id="contest-add-fw"> fairway only</label>
+                <button type="button" class="ct-btn" id="contest-add-save" onclick="addContestHole()">Add</button>
+                <button type="button" class="ct-btn" onclick="cancelContestHole()">Cancel</button></div>`;
+        } else {
+            // EC2 + C (Manny 2026-11-11): with no contest holes yet, suggest the
+            // course's own: closest to the pin on every par 3, long drive on the
+            // longest par 5 (by yardage where the card has it, else the last).
+            const sug = suggestedContests(course);
+            if (!list.length && sug.length) {
+                const kps = sug.filter((c) => c.kind === 'kp').map((c) => c.hole);
+                const ld = sug.find((c) => c.kind === 'ld');
+                const words = [kps.length ? `closest to the pin on every par 3 (hole${kps.length === 1 ? '' : 's'} ${kps.join(', ')})` : '', ld ? `long drive on ${ld.hole}` : ''].filter(Boolean).join(' and ');
+                html += `<div class="ct-row ct-suggest" id="contest-suggest"><span>Suggested: ${escapeHtml(words)}.</span>`
+                    + `<span class="ct-btns"><button type="button" class="ct-btn" id="contest-use-suggested" onclick="useSuggestedContests()">Use these</button>`
+                    + `<button type="button" class="ct-btn" id="contest-pick-own" onclick="startContestHole()">Pick my own</button></span></div>`;
+            } else {
+                html += `<div class="ct-row"><button type="button" class="ct-add" id="contest-add-btn" onclick="startContestHole()">+ Add a contest hole</button></div>`;
+            }
+        }
+        box.innerHTML = html;
+        if (contestAdding && !multi) contestHoleChosen();
+        renderContestEntries(list);
+        const gps = document.getElementById('contest-gps-toggle');
+        if (gps) gps.textContent = contestGpsOn() ? 'on' : 'off';
+    }
+    function renderContestEntries(list) {
+        const box = document.getElementById('contest-entries');
+        if (!box) return;
+        const c = list.find((x) => x.key === contestSelected);
+        if (!c) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        const rows = TournamentContests.ranked(contestEntriesAll[c.key] || {}, c.kind);
+        let html = `<div class="ct-head">Hole ${c.hole} entries</div>`;
+        html += rows.length ? rows.map((r) => {
+            const who = `${escapeHtml(r.name || '')} ${escapeHtml(TournamentContests.valueText(r))}${r.by === 'gps' ? ' 📍' : ''}`;
+            const btns = c.winner === r.key
+                ? `<button type="button" class="ct-btn" data-hole="${c.key}" onclick="clearContestWinner(this.dataset.hole)">Winner ✓</button>`
+                : `<button type="button" class="ct-btn" data-hole="${c.key}" data-entry="${escapeHtml(r.key)}" onclick="makeContestWinner(this.dataset.hole, this.dataset.entry)">Make winner</button><button type="button" class="ct-btn rm" data-hole="${c.key}" data-entry="${escapeHtml(r.key)}" onclick="removeContestEntry(this.dataset.hole, this.dataset.entry)">Remove</button>`;
+            return `<div class="ct-row"><span>${who}</span><span class="ct-btns">${btns}</span></div>`;
+        }).join('') : `<div class="ct-row"><span style="color:var(--text-muted);">No entries yet.</span><button type="button" class="ct-btn rm" data-hole="${c.key}" onclick="removeContestHole(this.dataset.hole)">Remove hole</button></div>`;
+        box.innerHTML = html;
+        box.style.display = 'block';
+    }
+    function contestsRef(key) { return db.ref(`tournaments/${currentCode}/contests/${key}`); }
+    function openContestHole(key) { contestSelected = key; renderContestsTab(); }
+    function startContestHole() { contestAdding = true; renderContestsTab(); }
+    function cancelContestHole() { contestAdding = false; renderContestsTab(); }
+    // KP on par 3s, long drive on 4s and 5s - the default the kind follows
+    // until the organizer picks one.
+    function contestHoleChosen(kindTouched) {
+        const holeSel = document.getElementById('contest-add-hole');
+        const kindSel = document.getElementById('contest-add-kind');
+        if (!holeSel || !kindSel) return;
+        if (!kindTouched) {
+            const h = (currentData.courseData || []).find((x) => String(x.hole) === String(holeSel.value));
+            kindSel.value = h && Number(h.par) === 3 ? 'kp' : (h ? 'ld' : 'kp');
+        }
+        const fw = document.getElementById('contest-add-fw-row');
+        if (fw) fw.style.display = kindSel.value === 'ld' ? '' : 'none';
+    }
+    function suggestedContests(course) {
+        const holes = (course || []).map((h) => ({ hole: Number(h.hole), par: Number(h.par), yds: Number(h.yardage || h.yards || h.length) || 0 })).filter((h) => h.hole >= 1 && h.hole <= 18);
+        const out = holes.filter((h) => h.par === 3).map((h) => ({ hole: h.hole, kind: 'kp' }));
+        const fives = holes.filter((h) => h.par === 5);
+        if (fives.length) {
+            const withYds = fives.filter((h) => h.yds > 0);
+            const pick = withYds.length ? withYds.reduce((a, b) => (b.yds > a.yds ? b : a)) : fives[fives.length - 1];
+            out.push({ hole: pick.hole, kind: 'ld' });
+        }
+        return out.sort((a, b) => a.hole - b.hole);
+    }
+    function useSuggestedContests() {
+        if (!canManage() || isMultiRound(currentData)) return;
+        const course = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const sug = suggestedContests(course);
+        if (!sug.length) return;
+        const updates = {};
+        sug.forEach((c) => { updates[`tournaments/${currentCode}/contests/${TournamentContests.holeKey(c.hole)}`] = { kind: c.kind, allowGps: contestGpsOn() }; });
+        contestSelected = TournamentContests.holeKey(sug[0].hole);
+        return db.ref().update(updates).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function addContestHole() {
+        if (!canManage()) return;
+        const hole = Number((document.getElementById('contest-add-hole') || {}).value);
+        const kind = (document.getElementById('contest-add-kind') || {}).value === 'ld' ? 'ld' : 'kp';
+        if (!(hole >= 1 && hole <= 18)) return;
+        const rec = { kind: kind, allowGps: contestGpsOn() };
+        if (kind === 'ld' && (document.getElementById('contest-add-fw') || {}).checked) rec.fairwayOnly = true;
+        contestAdding = false;
+        contestSelected = TournamentContests.holeKey(hole);
+        return contestsRef(contestSelected).set(rec).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function removeContestHole(key) {
+        if (!canManage()) return;
+        if (Object.keys(contestEntriesAll[key] || {}).length) return;
+        if (!confirm('Remove this contest hole?')) return;
+        return contestsRef(key).remove().catch((err) => alert(`Error: ${err.message}`));
+    }
+    function makeContestWinner(key, entryKey) {
+        if (!canManage()) return;
+        return contestsRef(key).update({ winner: entryKey, lockedAt: firebase.database.ServerValue.TIMESTAMP })
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+    function clearContestWinner(key) {
+        if (!canManage()) return;
+        if (!confirm('Unlock this hole? Golfers can enter again and you can pick another winner.')) return;
+        return contestsRef(key).update({ winner: null, lockedAt: null }).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function removeContestEntry(key, entryKey) {
+        if (!canManage()) return;
+        if (!confirm('Remove this entry?')) return;
+        return db.ref(`contestEntries/${currentCode}/${key}/${entryKey}`).remove().catch((err) => alert(`Error: ${err.message}`));
+    }
+    function toggleContestGps() {
+        if (!canManage()) return;
+        const next = !contestGpsOn();
+        contestGpsDefault = next;
+        const list = TournamentContests.contestList(currentData || {});
+        if (!list.length) { renderContestsTab(); return; }
+        const changes = {};
+        list.forEach((c) => { changes[`tournaments/${currentCode}/contests/${c.key}/allowGps`] = next; });
+        return db.ref().update(changes).catch((err) => alert(`Error: ${err.message}`));
+    }
+
+    // ===== E4b: THE ORGANIZER'S PHOTO QUEUE (approved "as mocked" 2026-11-09) =====
+    //
+    // Pending photos are unreadable to every client in Storage, so the owner
+    // sees them through photoLinks (10-minute signed links, owner checked on
+    // the server). Show = approvePhoto (moves the file to shown/, public);
+    // Hide = hidePhoto (to hidden/, deleted by hand 7 days after the event).
+    // A REPORTED photo on the wall comes back into this queue with a flag;
+    // Show there keeps it up and clears the reports. One photo at a time,
+    // deliberately: there is no "approve all".
+    const photoMeta = { pending: {}, shown: {}, hidden: {}, reports: {} };
+    let photoMetaCode = null;
+    let photoLinkUrls = {};          // id -> signed url (pending, reported)
+    let photoLinkAsked = {};
+    let photoBusy = {};
+    function syncPhotoListeners() {
+        if (!currentCode || !canManage() || photoMetaCode === currentCode) return;
+        photoMetaCode = currentCode;
+        const code = currentCode;
+        Object.keys(photoMeta).forEach((k) => {
+            db.ref(`tournamentPhotoMeta/${code}/${k}`).on('value', (snap) => {
+                if (currentCode !== code) return;
+                photoMeta[k] = (snap && snap.val()) || {};
+                fetchPhotoLinks();
+                renderPhotosTab();
+            }, () => { /* rules not published yet: nothing to show */ });
+        });
+    }
+    function photoQueue() {
+        const pending = TournamentPhotos.ordered(photoMeta.pending).map((p) => Object.assign(p, { state: 'pending' }));
+        const reported = TournamentPhotos.ordered(photoMeta.shown).filter((p) => photoMeta.reports[p.id])
+            .map((p) => Object.assign(p, { state: 'shown', reports: Number(photoMeta.reports[p.id].count) || 1 }));
+        return pending.concat(reported);
+    }
+    function fetchPhotoLinks() {
+        const want = photoQueue().filter((p) => !photoLinkUrls[p.id] && !photoLinkAsked[p.id]);
+        if (!want.length || !canManage()) return;
+        want.forEach((p) => { photoLinkAsked[p.id] = true; });
+        return stripeCall('photoLinks', { code: currentCode })
+            .then((res) => { Object.assign(photoLinkUrls, (res && res.data && res.data.links) || {}); renderPhotosTab(); })
+            .catch(() => { want.forEach((p) => { delete photoLinkAsked[p.id]; }); });
+    }
+    function renderPhotosTab() {
+        const grid = document.getElementById('photo-queue');
+        if (!grid || !currentData) return;
+        const q = photoQueue();
+        document.getElementById('photo-queue-title').textContent = `Photos waiting · ${q.length}`;
+        grid.innerHTML = q.map((p) => {
+            const url = photoLinkUrls[p.id] || (p.state === 'shown' ? TournamentPhotos.shownUrl(currentCode, p.id) : '');
+            const label = TournamentPhotos.photoLabel(currentData, p);
+            const busy = photoBusy[p.id] ? ' disabled' : '';
+            return `<div class="pq-item" data-photo="${escapeHtml(p.id)}"><div class="pq-tile">${url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(label)}" onerror="this.style.display='none'">` : ''}`
+                + `${label ? `<span class="pq-tag">${escapeHtml(label)}</span>` : ''}${p.state === 'shown' ? `<span class="pq-flag">Reported · ${p.reports}</span>` : ''}</div>`
+                + `<div class="pq-acts"><button type="button" class="show" data-photo="${escapeHtml(p.id)}" onclick="showPhoto(this.dataset.photo)"${busy}>✓ Show</button>`
+                + `<button type="button" class="hide" data-photo="${escapeHtml(p.id)}" onclick="hidePhoto(this.dataset.photo)"${busy}>Hide</button></div></div>`;
+        }).join('');
+        const shown = Object.keys(photoMeta.shown).length, hidden = Object.keys(photoMeta.hidden).length;
+        document.getElementById('photo-counts').innerHTML = `On the wall: ${shown} · Hidden: ${hidden} <span>every photo is checked</span>`;
+        const link = document.getElementById('photo-recap-link');
+        if (link) link.href = recapUrl();
+        const chip = document.getElementById('desk-photos-chip');
+        if (chip) chip.textContent = `Photos ${q.length}`;
+        if (typeof renderEventHome === 'function') renderEventHome();
+    }
+    function photoAction(name, id) {
+        if (!canManage() || photoBusy[id]) return;
+        photoBusy[id] = true;
+        renderPhotosTab();
+        return stripeCall(name, { code: currentCode, photoId: id })
+            .catch((err) => alert(name === 'approvePhoto' ? 'Could not show that photo. Try again.' : 'Could not hide that photo. Try again.'))
+            .then(() => { delete photoBusy[id]; renderPhotosTab(); });
+    }
+    function showPhoto(id) { return photoAction('approvePhoto', id); }
+    function hidePhoto(id) { return photoAction('hidePhoto', id); }
+
+    // ===== E4c: THE RECAP, ?tourney=CODE&recap=1 (read-only, public) =====
+    function recapUrl() { return shareBaseUrl() + 'tournament.html?tourney=' + encodeURIComponent(currentCode) + '&recap=1'; }
+    let recapEntries = {}, recapShown = {};
+    function openRecap(code) {
+        currentCode = code;
+        ['setup-screen', 'manage-screen', 'register-screen'].forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+        document.getElementById('recap-screen').style.display = 'block';
+        db.ref(`tournaments/${code}`).on('value', (snap) => { currentData = (snap && snap.val()) || null; renderRecap(); });
+        db.ref(`contestEntries/${code}`).on('value', (snap) => { recapEntries = (snap && snap.val()) || {}; renderRecap(); }, () => {});
+        db.ref(`tournamentPhotoMeta/${code}/shown`).on('value', (snap) => { recapShown = (snap && snap.val()) || {}; renderRecap(); }, () => {});
+    }
+    function recapDate(d) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))) return '';
+        const [y, m, day] = d.split('-').map(Number);
+        const dt = new Date(y, m - 1, day);
+        return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).replace(',', '');
+    }
+    function renderRecap() {
+        const data = currentData;
+        if (!data) { document.getElementById('recap-title').textContent = 'No tournament found with that code.'; return; }
+        document.getElementById('recap-title').textContent = `${data.name || 'Tournament'} recap`;
+        const n = competitorCount(data);
+        document.getElementById('recap-sub').textContent = [recapDate(data.eventDate), data.courseName, n ? `${n} ${competitorNoun(data, n)}` : ''].filter(Boolean).join(' · ');
+        const rows = [];
+        const view = resolveLeaderboardView(data, isMultiRound(data) ? 'event' : null, null);
+        const top = (view.rows || []).filter((r) => r.rank === 1);
+        if (top.length) {
+            const toPar = (v) => v === 0 ? 'E' : (v > 0 ? `+${v}` : String(v));
+            const names = top.map((r) => {
+                const t = r.entryType === 'team' ? ((data.teams || {})[r.entryKey] || {}) : null;
+                const who = t && (t.players || []).length ? ` · ${(t.players || []).map((p) => String(p).trim().split(' ').pop()).join(' / ')}` : '';
+                return `${r.teamName || r.name || ''}${who} ${toPar(r.toPar)}`;
+            }).join(', ');
+            rows.push(['🏆 Winners', names]);
+        }
+        const won = TournamentContests.confirmedWinners(data, recapEntries);
+        const kp = won.filter((w) => w.kind === 'kp'), ld = won.filter((w) => w.kind === 'ld');
+        if (kp.length) rows.push([`⛳ KP ${kp.map((w) => w.hole).join(' / ')}`, kp.map((w) => w.name).join(' · ')]);
+        ld.forEach((w) => rows.push([`🏌️ Long drive ${w.hole}`, `${w.name} ${w.value}`]));
+        const card = document.getElementById('recap-winners');
+        card.innerHTML = rows.map(([a, b]) => `<div class="rc-row"><span>${escapeHtml(a)}</span><strong>${escapeHtml(b)}</strong></div>`).join('');
+        card.style.display = rows.length ? 'block' : 'none';
+        document.getElementById('recap-photos').innerHTML = TournamentPhotos.ordered(recapShown).map((p) => {
+            const label = TournamentPhotos.photoLabel(data, p);
+            return `<div class="pq-tile"><img src="${escapeHtml(TournamentPhotos.shownUrl(currentCode, p.id))}" alt="${escapeHtml(label)}" loading="lazy" onerror="this.style.display='none'">${label ? `<span class="pq-tag">${escapeHtml(label)}</span>` : ''}`
+                + `<button type="button" class="rc-report" data-photo="${escapeHtml(p.id)}" onclick="reportRecapPhoto(this.dataset.photo, this)">Report</button></div>`;
+        }).join('');
+    }
+    function shareRecap() {
+        const url = recapUrl();
+        const say = (t) => { document.getElementById('recap-msg').textContent = t; };
+        if (navigator.share) return navigator.share({ title: (currentData && currentData.name) || 'Recap', url }).catch(() => {});
+        if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(url).then(() => say('Link copied.'), () => say(url));
+        say(url);
+    }
+    function reportRecapPhoto(id, el) {
+        if (!confirm('Report this photo to the organizer?')) return;
+        return stripeCall('reportPhoto', { code: currentCode, photoId: id })
+            .then(() => { if (el) { el.textContent = 'Reported'; el.disabled = true; } document.getElementById('recap-msg').textContent = 'Thanks. The organizer will look at it.'; })
+            .catch(() => { if (el) el.textContent = 'Try again'; });
+    }
+
     function loadTournament(code) {
         db.ref(`tournaments/${code}`).on('value', (snap) => {
             currentData = snap.val();
@@ -5492,6 +7013,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 const ts = document.getElementById('ap-m-sub'); if (ts) ts.textContent = `${currentData.courseName || ''} • code ${code}`;
             }
             if (canManage()) rememberMyEvent(code, currentData.name);
+            renderEntryFeesCard();
 
             // A tournament created before this feature existed has no startType field at all —
             // treated as 'normal' automatically, no migration needed.
@@ -5526,6 +7048,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderLeaderboardFlightFilter();
             renderTripLinkStatus();
             renderLeaderboard();
+            renderEventDayPanel();
+            syncContestEntriesListener();
+            renderContestsTab();
+            syncPhotoListeners();
+            renderPaceSetup();
             renderEventHome();
             // Last, so it can remove what the renders above filled in. Runs on
             // every snapshot: the record may gain an owner while the page is open.
@@ -5540,6 +7067,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     renderMyEvents();   // Phase 2, P2-0: this phone's events, app mode only (hidden otherwise)
     if (registerParam) {
         openRegisterScreen(registerParam.toUpperCase());
+    } else if (tourneyParam && urlParams.get('recap') === '1') {
+        // E4c: the read-only recap. Never the console, whoever opens it.
+        openRecap(tourneyParam.toUpperCase());
     } else if (tourneyParam) {
         currentCode = tourneyParam.toUpperCase();
         loadTournament(currentCode);

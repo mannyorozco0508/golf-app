@@ -28,7 +28,7 @@ import { isTournamentsRequest } from './index.js';
 // Top-level folders that are not the site (some exist only on other branches).
 export const BLOCKED_DIRS = [
     'tools', 'helpers', 'docs', 'scripts', 'android', 'ios', 'gps-beta',
-    'firebase-functions', 'functions', 'test-runs', 'dist', 'www',
+    'firebase-functions', 'functions', 'stripe-functions', 'test-runs', 'dist', 'www',
     'node_modules', '.github', '.wrangler', '.git'
 ];
 
@@ -50,6 +50,7 @@ export const BLOCKED_PATTERNS = [
     /\.fixture\.json$/i,      // test fixtures
     /\.tests-data\.json$/i,
     /^database\.rules.*\.json$/i,   // rules (live and rollback copies)
+    /\.rules$/i,              // storage.rules (E4 photo wall, 2026-11-09)
     /\.md$/i,                 // notes and plans
     /\.mjs$/i,
     /\.ts$/i,

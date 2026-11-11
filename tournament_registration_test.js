@@ -403,18 +403,25 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
         assert.match(desk, /id="registration-list"/);
         assert.ok(!/id="registration-section"|id="registration-list"/.test(src.slice(b)), 'one of each, nowhere else');
         // Re-pinned 2026-11-10 (T3B): the gate also takes the owner-only Event day tab.
-        assert.match(src, /const GATED_TABS = \['home', 'setup', 'desk'\];/, 'the gate names the tabs');
+        // Re-pinned 2026-11-11 (event comms picks): Contests is gated too; Photos has no tab (EC4 C).
+        assert.match(src, /const GATED_TABS = \['home', 'setup', 'desk', 'contests'\];/, 'the gate names the tabs');
     });
 });
 
 // ===========================================================================
 describe('LIVE SCORING AND PRODUCT BOUNDARY — this wave does not touch them', () => {
 
-    test('tournament-scorecard.html still has no registrations path and no auth SDK', () => {
+    // RE-PINNED ON PURPOSE (E4, approved 2026-11-09): the auth SDK may appear
+    // only inside photoIdToken, the anonymous session a photo post makes - see
+    // tournament_signin_gate_test.js (g) for the full statement.
+    test('tournament-scorecard.html still has no registrations path, and no auth SDK outside the photo post', () => {
         const src = read('tournament-scorecard.html');
         assert.doesNotMatch(src, /registrations/);
-        assert.doesNotMatch(src, /firebase-auth-compat/);
-        assert.doesNotMatch(src, /firebase\.auth\(/);
+        const at = src.indexOf('function photoIdToken(');
+        assert.ok(at > -1, 'positive: the photo post path exists');
+        const outside = src.slice(0, at) + src.slice(src.indexOf('\n    function ', at + 30));
+        assert.doesNotMatch(outside, /firebase-auth-compat/);
+        assert.doesNotMatch(outside, /firebase\.auth\(/);
     });
 
     test('tournament-engine.js does not grow a registration reader — scoring stays a score reader', () => {
