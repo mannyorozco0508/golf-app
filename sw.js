@@ -4533,7 +4533,9 @@ const APP_SHELL_ALIASES = ['./', './app'];
 //   and (tournaments phase 1): tournament.html + tournament-scorecard.html + tournament-engine.js - in-app card and board (app mode), Apple/Google organizer sign-in, prizes read pro shop credit / Trophy, entry-fee help, Share note gap. A device on v394-2.0 keeps cash prize wording and email-only organizer sign-in.
 // Moved to v396-2.0 (tournaments renamed HardPan Tournaments, option A, plus the T3B Event day tab, Manny 2026-11-11): tournament.html + tournament-scorecard.html + tournament-manifest.json.
 // A device on v395-2.0 keeps the Rattle Golf header and fee line.
-const CACHE_VERSION = 'golfapp-v396-2.0';
+// Moved to v397-2.0 (tournaments icon B, Manny 2026-11-11): tournament.html + tournament-scorecard.html label the home-screen icon Tournaments.
+// A device on v396-2.0 keeps the pages without the label.
+const CACHE_VERSION = 'golfapp-v397-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

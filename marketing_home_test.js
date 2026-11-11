@@ -466,8 +466,8 @@ describe('4. THE SERVICE WORKER: unchanged, and the app still opens offline', ()
     test('CACHE_VERSION and the shell list did not move (no shell file changed)', () => {
         // v393-2.0 (Nov 10): moved for How it works + Trip Settlement, not for the marketing pages.
         // website-d re-pin: v394-2.0, moved FOR the homepage at / (see sw.js "Moved to v394").
-        // Re-pinned 2026-11-11: v396-2.0, the HardPan Tournaments rename (option A) moved it.
-        assert.match(src, /const CACHE_VERSION = 'golfapp-v396-2\.0';/);
+        // Re-pinned 2026-11-11: v397-2.0, icon B moved it.
+        assert.match(src, /const CACHE_VERSION = 'golfapp-v397-2\.0';/);
         const shell = src.slice(src.indexOf('const SHELL_FILES = ['), src.indexOf('];', src.indexOf('const SHELL_FILES = [')));
         assert.match(shell, /'\.\/index\.html'/, 'positive: the slice holds the shell list');
         assert.doesNotMatch(shell, /hardpan-home|refunds|site-pricing|app-store-badge/, 'the marketing page joined the app shell');

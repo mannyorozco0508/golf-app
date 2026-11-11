@@ -333,8 +333,8 @@ describe('6. served, static, not the app', () => {
         assert.ok(shell.length > 200, 'positive: the shell list was found');
         assert.doesNotMatch(shell, /site-features|media\/|hardpan-home/);
         assert.doesNotMatch(read('sync-mobile-web.js'), /site-features|media\/screens/);
-        // Re-pinned 2026-11-11: v396-2.0, the HardPan Tournaments rename (A) + T3B merge moved it.
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v396-2\.0';/);
+        // Re-pinned 2026-11-11: v397-2.0, icon B moved it.
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v397-2\.0';/);
     });
     test('first load stays light: nothing in the rows loads eagerly', () => {
         assert.doesNotMatch(feat, /<img(?![^>]*loading="lazy")[^>]*>/, 'an image in the rows loads up front');

@@ -74,14 +74,15 @@ describe('THE TOURNAMENT APP ICON ASSET SEAM', () => {
 
     test('the master is full-bleed — no baked rounded corners, no white margin', () => {
         // iOS applies its own corner mask. Artwork that arrives pre-rounded on white
-        // shows white fringes outside that mask. The four corners must be the cream
-        // field, not white and not transparent.
+        // shows white fringes outside that mask. The four corners must be the
+        // brand-green field (icon B, Manny 2026-11-11; was the cream field), not
+        // white and not transparent.
         const px = corners(path.join(__dirname, MASTER));
         assert.ok(px.length === 4, 'all four corners must be readable');
         px.forEach(([name, [r, g, b]]) => {
             const isWhite = r > 250 && g > 250 && b > 250;
             assert.ok(!isWhite, `${name} corner is white (${r},${g},${b}) — artwork must bleed to the edge`);
-            assert.ok(r > 200 && g > 200 && b > 180, `${name} corner should be the cream field, got (${r},${g},${b})`);
+            assert.ok(Math.abs(r - 0x0f) < 12 && Math.abs(g - 0x4c) < 12 && Math.abs(b - 0x3a) < 12, `${name} corner should be the brand-green field #0f4c3a, got (${r},${g},${b})`);
         });
     });
 
@@ -247,7 +248,7 @@ describe('THE TOURNAMENT APP ICON ASSET SEAM', () => {
         // installed device keeps serving the old mark and a page whose head has
         // no manifest link in it at all.
         const block = BUILD.slice(BUILD.indexOf('tournament: {'));
-        assert.match(block, /cacheName: 'tournament-v61-hardpan'/);
+        assert.match(block, /cacheName: 'tournament-v62-icon-b'/);
     });
 
     // Minimal PNG corner reader — same approach as rattle_identity_test.js, kept

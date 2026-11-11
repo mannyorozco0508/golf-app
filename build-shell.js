@@ -278,13 +278,17 @@ const PRODUCTS = {
         // tournament.html, tournament-scorecard.html and the manifest now say
         // HardPan Tournaments, and tournament.html gains the organizer Event day
         // tab (T3B). A device on v60 keeps the Rattle Golf header and no Event day.
-        cacheName: 'tournament-v61-hardpan',
+        // Moved to v62 FOR ICON B (2026-11-11, Manny): the install icons are the
+        // HardPan Tournaments icon (brand-green field, cream HP and pin, cream
+        // TOURNAMENTS band) and both pages label the home-screen icon
+        // Tournaments. A device on v61 keeps the Rattle Golf R icon.
+        cacheName: 'tournament-v62-icon-b',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
         startUrl: './tournament.html',
-        // ITS OWN FILES, AND "any" ONLY. The picture is the Rattle Golf banner
-        // (cream field, green R, RATTLE GOLF / TOURNAMENTS). Purpose stays
+        // ITS OWN FILES, AND "any" ONLY. The picture is icon B (2026-11-11): HP and
+        // the pin on brand green over a cream TOURNAMENTS band. Purpose stays
         // "any": on the 1024 master TOURNAMENTS spans past the inner 80%
         // circle, and a maskable crop reads URNAMEN.
         icons: [
