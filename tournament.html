@@ -94,6 +94,26 @@
         .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .top-nav-bar::-webkit-scrollbar { display: none; }
         .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; cursor: pointer; white-space: nowrap; }
+        /* Event day home (T3B). */
+        .eh-head { margin:0 0 12px; }
+        .eh-name { font-size:1.25rem; font-weight:800; color:var(--text-main); }
+        .eh-sub { font-size:0.8rem; color:var(--text-muted); margin-top:2px; }
+        .eh-live { display:inline-block; background:var(--accent-red); color:#fff; font-size:0.65rem; font-weight:800; letter-spacing:.04em; padding:1px 5px; border-radius:4px; vertical-align:1px; }
+        .eh-status { background:var(--brand-green); color:#fff; border-radius:14px; padding:14px 16px; margin-bottom:12px; }
+        .eh-status-k { font-size:0.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; opacity:.85; }
+        .eh-status-big { font-size:1.6rem; font-weight:800; line-height:1.2; margin:2px 0; }
+        .eh-status-sub { font-size:0.85rem; opacity:.9; }
+        .eh-needs { border:1px solid var(--border-light); border-radius:14px; padding:10px 14px 4px; margin-bottom:12px; background:var(--bg-card); }
+        .eh-needs-k { font-size:0.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); padding-bottom:6px; border-bottom:1px solid var(--border-faint); }
+        .eh-need { display:flex; gap:10px; align-items:flex-start; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--border-faint); padding:10px 0; cursor:pointer; color:var(--text-main); font:inherit; }
+        .eh-need:last-child { border-bottom:0; }
+        .eh-need-n { flex:0 0 24px; height:24px; border-radius:12px; background:var(--warn-bg); color:var(--warn-text); font-weight:800; font-size:0.8rem; display:flex; align-items:center; justify-content:center; }
+        .eh-need-t { font-weight:700; font-size:0.92rem; }
+        .eh-need-s { font-size:0.78rem; color:var(--text-muted); margin-top:2px; }
+        .eh-none { font-size:0.85rem; color:var(--text-muted); padding:10px 0; }
+        .eh-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .eh-act { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 6px; border:1px solid var(--border-light); border-radius:14px; background:var(--bg-card); color:var(--text-main); font-weight:700; font-size:0.85rem; cursor:pointer; }
+        .eh-act-i { font-size:1.3rem; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
 
         .lobby-logo { font-size: 3rem; text-align: center; margin-bottom: 4px; }
@@ -571,9 +591,38 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <div id="signed-in-as" style="text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;"></div>
     <div id="signin-panel-manage" class="signin-panel" style="display:none;"></div>
     <div class="top-nav-bar">
+        <span class="top-nav-item" onclick="showTab('home')" id="tab-btn-home">🏁 Event day</span>
         <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup">⚙️ Setup &amp; Links</span>
         <span class="top-nav-item" onclick="showTab('desk')" id="tab-btn-desk">📋 Desk</span>
         <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard">🏆 Leaderboard</span>
+    </div>
+
+    <!-- EVENT DAY HOME (T3B, Manny's pick 2026-11-10). Owner-only, hidden by the
+         manage gate with Setup and Desk. Live status, a "Needs you" list and
+         quick actions. Every number is read from what the other tabs already
+         compute (the board's rows, the Desk's unpaid filter, the prize basis):
+         nothing here writes, and nothing here has its own arithmetic.
+         renderEventHome() fills it on every record and registrations snapshot. -->
+    <div id="manage-tab-home" style="display:none;">
+        <div class="eh-head">
+            <div class="eh-name" id="eh-name"></div>
+            <div class="eh-sub"><span class="eh-live" id="eh-live" style="display:none;">LIVE</span> <span id="eh-code-line"></span></div>
+        </div>
+        <div class="eh-status" id="eh-status">
+            <div class="eh-status-k" id="eh-status-k"></div>
+            <div class="eh-status-big" id="eh-status-big"></div>
+            <div class="eh-status-sub" id="eh-status-sub"></div>
+        </div>
+        <div class="eh-needs">
+            <div class="eh-needs-k">Needs you</div>
+            <div id="eh-needs-list"></div>
+        </div>
+        <div class="eh-actions" id="eh-actions">
+            <button type="button" class="eh-act" id="eh-act-qr" onclick="eventHomeGo('qr')"><span class="eh-act-i">🔳</span><span id="eh-act-qr-label">Team QR</span></button>
+            <button type="button" class="eh-act" id="eh-act-desk" onclick="eventHomeGo('desk')"><span class="eh-act-i">📋</span>Desk</button>
+            <button type="button" class="eh-act" id="eh-act-board" onclick="eventHomeGo('board')"><span class="eh-act-i">🏆</span>Board</button>
+            <button type="button" class="eh-act" id="eh-act-setup" onclick="eventHomeGo('setup')"><span class="eh-act-i">⚙️</span>Setup</button>
+        </div>
     </div>
 
     <div id="manage-tab-setup">
@@ -2128,8 +2177,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // The three manage tabs. Setup and Desk are the GATED pair: applyManageGate
     // HIDES both for anyone who is not the owner of an owned tournament, and
     // shows both on sign-in. Leaderboard is always there.
-    const MANAGE_TABS = ['setup', 'desk', 'leaderboard'];
-    const GATED_TABS = ['setup', 'desk'];
+    const MANAGE_TABS = ['home', 'setup', 'desk', 'leaderboard'];
+    const GATED_TABS = ['home', 'setup', 'desk'];
     function showTab(tab) {
         // A gated tab is hidden for a non-owner (applyManageGate). Asking for it
         // then lands on the leaderboard - the tab is in the tree, so "is the
@@ -2144,6 +2193,129 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
         if (tab === 'leaderboard') renderLeaderboard();
         if (tab === 'desk') renderRegistrationDesk();
+        if (tab === 'home') renderEventHome();
+    }
+
+    // ---- EVENT DAY HOME (T3B) ---------------------------------------------
+    // Reads only what the other tabs already compute: the board's rows
+    // (resolveLeaderboardView), the Desk's own Unpaid filter (REG_FILTERS) and
+    // the prize basis (resolvePrizeView + savedPayoutSpots). No writes, no new
+    // arithmetic, no money: a prize amount never appears here.
+    //
+    // WHICH ROUND IS "TODAY". A single-round event has one. A multi-round event
+    // shows the LAST round (in play order) with a score posted; with none posted
+    // anywhere, the first round. The round's own board, never the event total,
+    // because "N of M scoring" is a question about the round being played.
+    //
+    // NOT HERE YET: "quiet 40+ min" (needs a score time the page does not read),
+    // Announce and Pace (event-tools, not on main). Each joins when its data does.
+    function eventHomeState() {
+        const data = currentData || {};
+        const multi = isMultiRound(data);
+        const ids = multi ? orderedRoundIds(data) : [];
+        let rid = null, view = null;
+        if (multi && ids.length) {
+            const views = ids.map((id) => ({ id, v: resolveLeaderboardView(data, id, null) }));
+            const played = views.filter((x) => (x.v.rows || []).some((r) => r.hasScores));
+            const pick = played.length ? played[played.length - 1] : views[0];
+            rid = pick.id; view = pick.v;
+        } else {
+            view = resolveLeaderboardView(data, null, null);
+        }
+        const rows = (view && view.rows) || [];
+        const scoring = rows.filter((r) => r.hasScores);
+        const round = rid ? ((data.rounds || {})[rid] || {}) : data;
+        const holes = ((round.courseData || data.courseData || []).length) || 18;
+        const finished = rows.length > 0 && rows.every((r) => r.hasScores && r.thru >= holes);
+        const leaders = scoring.filter((r) => r.rank === 1);
+        return {
+            individual: data.scoringModel === PLAYER_MODEL,
+            multi, rid, roundName: rid ? (round.name || 'Round') : '',
+            rows, scoring, leaders, holes, finished,
+            live: scoring.length > 0,
+            notStarted: rows.filter((r) => !r.hasScores)
+        };
+    }
+
+    const eventHomeToPar = (n) => (n === 0 ? 'E' : (n > 0 ? '+' + n : String(n)));
+
+    function eventHomeNeeds(st) {
+        const out = [];
+        const unit = st.individual ? ['golfer', 'golfers'] : ['team', 'teams'];
+        const word = (n, w) => n + ' ' + (n === 1 ? w[0] : w[1]);
+        // 1. Who has not posted a score, once others have: their link has not
+        //    reached them, or the card is not being kept.
+        if (st.live && !st.finished && st.notStarted.length) {
+            const names = st.notStarted.slice(0, 3).map((r) => r.teamName).join(', ') + (st.notStarted.length > 3 ? ', ...' : '');
+            out.push({ key: 'nostart', n: st.notStarted.length, title: word(st.notStarted.length, unit) + ' with no score yet',
+                sub: names + ' · Send their link', go: 'qr' });
+        }
+        // 2. Unpaid: the Desk's own Unpaid chip, the same entries and the same count.
+        const unpaidTest = (REG_FILTERS.find((f) => f.key === 'unpaid') || {}).test;
+        const entries = Object.values(registrationData || {}).filter((e) => e && typeof e === 'object');
+        const unpaid = unpaidTest ? entries.filter(unpaidTest) : [];
+        if (unpaid.length) {
+            const fee = Number(currentData && currentData.entryFee) || 0;
+            // An amount only where the Desk itself can state one: per golfer on an
+            // individual event. A team fee is per team and the desk does not know
+            // the teams of an unapproved signup.
+            const owed = (fee > 0 && st.individual) ? ' · ' + regDollars(unpaid.length * fee) + ' in entry fees' : '';
+            out.push({ key: 'unpaid', n: unpaid.length, title: word(unpaid.length, ['golfer', 'golfers']) + ' unpaid', sub: 'Desk' + owed, go: 'unpaid' });
+        }
+        // 3. Needs a team: the Desk's own rule.
+        const needTeam = entries.filter((e) => regNeedsTeam(e));
+        if (needTeam.length) {
+            out.push({ key: 'needsteam', n: needTeam.length, title: word(needTeam.length, ['golfer needs', 'golfers need']) + ' a team', sub: 'Desk', go: 'needsteam' });
+        }
+        // 4. The prize basis, exactly when golfers read "Prize results coming soon".
+        const prize = resolvePrizeView(currentData || {});
+        if (isMultiRound(currentData || {}) && !prize.available && payoutsAreSet(savedPayoutSpots())) {
+            out.push({ key: 'basis', n: 1, title: 'Pick what prizes go by', sub: 'Golfers see "Prize results coming soon" until you do', go: 'basis' });
+        }
+        return out;
+    }
+
+    function renderEventHome() {
+        const panel = document.getElementById('manage-tab-home');
+        if (!panel || !currentCode || !currentData || !Object.keys(currentData).length) return;
+        const st = eventHomeState();
+        const set = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+        set('eh-name', currentData.name || '');
+        set('eh-code-line', 'You run this · code ' + currentCode);
+        const live = document.getElementById('eh-live');
+        if (live) live.style.display = st.live && !st.finished ? '' : 'none';
+        const unitMany = st.individual ? 'golfers' : 'teams';
+        const total = st.rows.length;
+        const where = st.roundName ? ' · ' + st.roundName : '';
+        set('eh-status-k', (st.finished ? 'All in' : (st.live ? 'Live now' : 'Not started')) + where);
+        set('eh-status-big', st.finished ? `${total} of ${total} ${unitMany} finished` : `${st.scoring.length} of ${total} ${unitMany} scoring`);
+        const bits = [];
+        if (st.leaders.length === 1) bits.push(`Leader ${st.leaders[0].teamName} ${eventHomeToPar(st.leaders[0].toPar)}`);
+        else if (st.leaders.length > 1) bits.push(`${st.leaders.length} tied for the lead at ${eventHomeToPar(st.leaders[0].toPar)}`);
+        const t = formatStartTime(currentData.startTime);
+        if (t) bits.push((currentData.startType === 'shotgun' ? 'Shotgun ' : 'First tee ') + t);
+        set('eh-status-sub', bits.join(' · '));
+        set('eh-act-qr-label', st.individual ? 'Group QR' : 'Team QR');
+        const list = document.getElementById('eh-needs-list');
+        if (!list) return;
+        const needs = eventHomeNeeds(st);
+        list.innerHTML = needs.length
+            ? needs.map((x) => `<button type="button" class="eh-need" data-need="${x.key}" onclick="eventHomeGo('${x.go}')"><span class="eh-need-n">${x.n}</span><span><div class="eh-need-t">${escapeHtml(x.title)}</div><div class="eh-need-s">${escapeHtml(x.sub)}</div></span></button>`).join('')
+            : `<div class="eh-none">Nothing needs you right now.</div>`;
+    }
+
+    // Quick actions open the tab that already does the job, at the right place.
+    function eventHomeGo(where) {
+        const to = (id) => { const el = document.getElementById(id); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' }); };
+        if (where === 'desk' || where === 'unpaid' || where === 'needsteam') {
+            if (where !== 'desk') registrationFilter = where;
+            showTab('desk');
+            return;
+        }
+        if (where === 'setup') { showTab('setup'); return; }
+        showTab('leaderboard');
+        if (where === 'qr') to(recordIsIndividual() ? 'group-links-block' : 'team-links-block');
+        else if (where === 'basis') to('payout-basis-control');
     }
 
     // ---- SIGN-IN AND THE MANAGE GATE -------------------------------------
@@ -2180,6 +2352,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // signed out. The gate runs on BOTH the record's value handler and
     // onAuthStateChanged, because a browser delivers those in either order.
     let authUser = null;
+    let homeLandedFor = null;   // the event the owner has already been landed on (event home, T3B)
     let gateHidden = false;   // the gated pair is currently hidden (so a sign-in knows to show Setup)
 
     function canManage() {
@@ -2234,7 +2407,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // on Setup only when this call is the one that un-hid them (a later
             // snapshot must not yank the owner off the Leaderboard).
             present.forEach((p) => { if (p.tab) p.tab.style.display = ''; });
-            if (gateHidden) { gateHidden = false; showTab('setup'); }
+            // EVENT DAY LANDS ON THE EVENT HOME (T3B). Once per event per page
+            // load: an owner arriving while scores are coming in starts on the
+            // event home; before the first score they start on Setup, as before.
+            // Never again after that, so a snapshot cannot yank the owner off a tab.
+            if (gateHidden) { gateHidden = false; homeLandedFor = currentCode; showTab(eventHomeState().live ? 'home' : 'setup'); }
+            else if (homeLandedFor !== currentCode) { homeLandedFor = currentCode; if (eventHomeState().live) showTab('home'); }
         }
         renderSignedInAs();
         syncRegistrationListener();
@@ -2745,6 +2923,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (currentCode !== code) return;
             registrationData = snap.val() || {};
             renderRegistrationList();
+            renderEventHome();
         };
         db.ref('registrations/' + code).on('value', registrationCb);
         registrationBoundCode = code;
@@ -5069,6 +5248,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderLeaderboardFlightFilter();
             renderTripLinkStatus();
             renderLeaderboard();
+            renderEventHome();
             // Last, so it can remove what the renders above filled in. Runs on
             // every snapshot: the record may gain an owner while the page is open.
             applyManageGate();
