@@ -11,8 +11,9 @@
 //  2 create, individual: the per control is hidden; Save writes entryFeePer
 //    'golfer' (there are no teams to charge)
 //  3 an owned team event with entryFee 400 and no entryFeePer (every record
-//    before today): Event details read per team; the Desk line says per team;
-//    tapping per golfer writes entryFeePer 'golfer' and nothing else
+//    before today): Event details read per team, and the empty Venue shows the
+//    course name; the Desk line says per team; tapping per golfer writes
+//    entryFeePer 'golfer' and nothing else
 //  4 the note is green when a real card loads (online), amber for the
 //    placeholder; one fee box on the create form and one under Event details
 //  5 money = base: payouts.js, tournament-engine.js, handicap.js are main
@@ -113,6 +114,7 @@ test('3 a team event with entryFee 400 and no entryFeePer: per team everywhere; 
     assert.ok(r.ok, r.reason);
     const [a, b, d] = objs(r);
     assert.equal(a.evFee, '400'); assert.equal(a.evPer, 'team', 'a record from before today means per team');
+    assert.equal(a.evVenue, 'Papago', 'no venue on the record: the box shows the course (Advisor 14:17)');
     assert.match(b.desk, /\$400 per team/, 'the Desk line follows the per');
     assert.deepEqual(d.writes, [{ op: 'set', path: 'tournaments/SCR/entryFeePer', value: 'golfer' }]);
 });
