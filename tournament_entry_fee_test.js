@@ -116,7 +116,8 @@ test('3 a team event with entryFee 400 and no entryFeePer: per team everywhere; 
     assert.equal(a.evFee, '400'); assert.equal(a.evPer, 'team', 'a record from before today means per team');
     assert.equal(a.evVenue, 'Papago', 'no venue on the record: the box shows the course (Advisor 14:17)');
     assert.match(b.desk, /\$400 per team/, 'the Desk line follows the per');
-    assert.deepEqual(d.writes, [{ op: 'set', path: 'tournaments/SCR/entryFeePer', value: 'golfer' }]);
+    // P2-6 (2026-11-11): opening an owned event also writes the account pointer; it is not this test's subject.
+    assert.deepEqual(d.writes.filter((w) => !/^organizers\//.test(w.path)), [{ op: 'set', path: 'tournaments/SCR/entryFeePer', value: 'golfer' }]);
 });
 
 test('4 the note is green when a real card loads, amber for the placeholder', async () => {

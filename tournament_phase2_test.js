@@ -74,16 +74,17 @@ test('1 app mode, no event, touches nothing: app bar + My events, no hero; date,
     assert.equal(a.hero, false, 'the hero band is the website\'s');
     assert.equal(a.barSetup, true);
     assert.equal(a.myEvents, true);
-    assert.match(a.myEventsText, /^MY EVENTS No events on this phone yet\./);
+    assert.match(a.myEventsText, /^MY EVENTS No events yet\./);   // re-pinned 2026-11-11 (P2-6): the list follows the account too
     assert.deepEqual([a.date, a.time, a.shotgun], [true, true, true]);
 });
 
-test('2 the website, touches nothing: hero, no app bar, no My events; the same boxes', async () => {
+test('2 the website, touches nothing: hero, no app bar; My events for the signed-in organizer (P2-6); the same boxes', async () => {
     const [a] = await go(empty(), '', OWNER);
     assert.equal(a.app, false);
     assert.equal(a.hero, true);
     assert.equal(a.barSetup, false);
-    assert.equal(a.myEvents, false);
+    // Re-pinned 2026-11-11 (P2-6, Advisor 16:19): the website lists the signed-in organizer's events too (tournament_my_events_test.js).
+    assert.equal(a.myEvents, true);
     assert.deepEqual([a.date, a.time, a.shotgun], [true, true, true]);
 });
 
@@ -192,7 +193,7 @@ test('7 a team with scores: the sheet offers nothing and says why', async () => 
     assert.equal(a.sheet, true);
     assert.deepEqual(a.moveTo, []);
     assert.match(a.sheetBody, /Team 4 has scores, so its golfers stay put\./);
-    assert.equal(a.writes.filter((x) => x.op === 'update').length, 0, 'nothing written');
+    assert.equal(a.writes.filter((x) => x.op === 'update' && !/^organizers\//.test(x.path)).length, 0, 'nothing written (the account pointer aside, P2-6)');
 });
 
 test('8 a golfer (not the owner) in app mode: the app bar, no Setup tab, no chips', async () => {

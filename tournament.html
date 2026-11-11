@@ -410,6 +410,8 @@
            the tree for everyone and are shown only in app mode. */
         .app-only { display: none; }
         body.app-mode .app-only { display: block; }
+        /* P2-6: My events is not app-only any more; its own renderer decides (signed in, or the app). */
+        #app-my-events.app-only { display: block; }
         body.app-mode .tourney-hero { display: none; }
         body.app-mode { background: #eef2f0; }
         body.app-mode .container { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
@@ -1317,16 +1319,57 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         try { localStorage.setItem(MY_EVENTS_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) { /* storage full or off */ }
         renderMyEvents();
     }
+    // THE ACCOUNT'S EVENTS (P2-6, Advisor 2026-11-11 16:19): organizers/<uid>/
+    // tournaments/<code> = {at, name, course}, written by the owner's own page
+    // (rememberOwnedEvent) and readable only by that uid. The rules block is a
+    // CANDIDATE until the iOS lane publishes it (tools/my-events-rules-candidate.js);
+    // until then the write is refused and caught, and the read answers nothing,
+    // so the list falls back to this device's own.
+    let accountEvents = null;          // null = not read (signed out, or refused)
+    let accountEventsUid = null;
+    const rememberedCodes = {};        // code -> true once this page wrote its pointer
+    function loadAccountEvents() {
+        const uid = authUser && authUser.uid;
+        if (!uid) { accountEvents = null; accountEventsUid = null; renderMyEvents(); return; }
+        if (accountEventsUid === uid) return;
+        accountEventsUid = uid;
+        db.ref('organizers/' + uid + '/tournaments').on('value', (snap) => {
+            if (accountEventsUid !== uid) return;
+            const v = (snap && snap.val()) || {};
+            accountEvents = Object.keys(v).filter((c) => v[c] && typeof v[c] === 'object').map((c) => ({ code: c, name: String(v[c].name || c), at: Number(v[c].at) || 0, account: true }));
+            renderMyEvents();
+        }, () => { accountEvents = null; renderMyEvents(); });
+    }
+    function rememberOwnedEvent(code, name, course) {
+        const uid = authUser && authUser.uid;
+        if (!uid || !code || rememberedCodes[code]) return;
+        rememberedCodes[code] = true;
+        const p = { at: Date.now(), name: String(name || code).slice(0, 80) };
+        if (course) p.course = String(course).slice(0, 80);
+        db.ref('organizers/' + uid + '/tournaments/' + code).update(p).catch(() => { /* not published yet: this device's list still has it */ });
+    }
+    // One list, newest first: the account's events (any device) and this
+    // device's (events it created or opened), the account winning a tie.
+    function myEventsList() {
+        const seen = {}, out = [];
+        (accountEvents || []).concat(readMyEvents()).forEach((e) => { if (!seen[e.code]) { seen[e.code] = true; out.push(e); } });
+        return out.sort((a, b) => (b.at || 0) - (a.at || 0));
+    }
     function renderMyEvents() {
         const box = document.getElementById('app-my-events');
         if (!box) return;
-        if (!APP_MODE) { box.style.display = 'none'; return; }
-        const list = readMyEvents();
+        // On the website the list needs a signed-in organizer; in the app it is
+        // always there (this device's events at least).
+        if (!APP_MODE && !authUser) { box.style.display = 'none'; return; }
+        const list = myEventsList();
         box.style.display = 'block';
+        const note = accountEvents
+            ? 'Events you run, on any device you sign in on' + (APP_MODE ? ', and events this phone opened.' : '.')
+            : (APP_MODE ? 'Events this phone created or opened as the organizer.' : 'Events this browser created or opened as the organizer.');
         box.innerHTML = `<div class="my-events-k">My events</div>` + (list.length
             ? list.map((e) => `<button type="button" class="my-event" data-code="${escapeHtml(e.code)}" onclick="openMyEvent(this.dataset.code)"><span class="me-n">${escapeHtml(e.name)}</span><span class="me-c">${escapeHtml(e.code)} ›</span></button>`).join('')
-              + `<p class="my-events-note">Events this phone created or opened as the organizer.</p>`
-            : `<p class="my-events-note">No events on this phone yet. Create one below, or open an event you run from its link.</p>`);
+              + `<p class="my-events-note">${note}</p>`
+            : `<p class="my-events-note">No events yet. Create one below, or open an event you run from its link.</p>`);
     }
     function openMyEvent(code) {
         if (!code) return;
@@ -2337,6 +2380,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         createWrite.then(() => {
             localStorage.setItem('lastTournamentCode', currentCode);
             rememberMyEvent(currentCode, name);
+            rememberOwnedEvent(currentCode, name, selectedCourseName);
             if (isMultiRoundSetup) {
                 // ROUND 1 IS THE EVENT AS CONFIGURED. Everything the organizer just
                 // filled in describes the first round, so it becomes one rather than
@@ -3413,6 +3457,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // ownerUid on the server for the same reason.
     firebase.auth().onAuthStateChanged((user) => {
         authUser = (user && !user.isAnonymous) ? user : null;
+        loadAccountEvents();   // P2-6: the account's events, on any device
         applyManageGate();
         renderSignedInAs();
     });
@@ -7281,7 +7326,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 const tt = document.getElementById('ap-m-title'); if (tt) tt.textContent = currentData.name || 'Tournament';
                 const ts = document.getElementById('ap-m-sub'); if (ts) ts.textContent = `${currentData.courseName || ''} • code ${code}`;
             }
-            if (canManage()) rememberMyEvent(code, currentData.name);
+            if (canManage()) { rememberMyEvent(code, currentData.name); rememberOwnedEvent(code, currentData.name, currentData.courseName); }
             renderEntryFeesCard();
 
             // A tournament created before this feature existed has no startType field at all —
