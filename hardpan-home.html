@@ -36,6 +36,17 @@
     clip = media/clips/<name>.mp4, see media/clips/manifest.json). site-clips.js
     loads a clip only in view, pauses it out of view, and keeps the poster when
     the file is missing. Help (28A) is /help and /help/<topic>.
+  WEBSITE-E (Manny's picks 37B + 38C, Nov 10): the nine tiles became 25 cards in
+    five rows (Play, Games, Your group, Organize, Get better) that swipe sideways;
+    each card is a caption on top (tag, headline, one line) over a phone frame with
+    a real screen: a sharp still from media/screens/ (WebP, 400w + full size, lazy),
+    or for the six features with a clip, that still until the clip plays once and
+    holds (site-clips.js, unchanged). A tap opens the full-screen viewer; "Try the
+    GPS" (a real Esri hole, Dobson Ranch 7, OSM green) and "Try Just say it" (the
+    app parser's cards for a few sentences) sit under Play and Games. All of it is
+    site-features.js. The feature section between the two markers below is
+    generated (scratch tools/gen.js); the cards, sources and alt text are listed in
+    the website-e report. Not in sw.js's shell list, not in the native bundle.
   STILL TO FILL (grep data-todo):
     data-todo="copy-approve"    claims Grok flagged for Manny's wording OK
   Prices: none in this file. site-pricing.js fills every data-price slot.
@@ -121,11 +132,7 @@
         footer .wrap { flex-direction:column; }
     }
 
-    /* website-c: feature grid (27A) and Help (28A). Clip slots: poster now, clip when the file exists (site-clips.js). */
-    .clip { position:relative; overflow:hidden; border-radius:18px; background:#dfe8e4; box-shadow:0 0 0 4px #10231c, 0 10px 24px rgba(0,0,0,.18); }
-    .clip video { width:100%; height:100%; object-fit:cover; display:block; }
-    .clip .cb { display:none; position:absolute; left:8px; bottom:8px; background:rgba(16,35,28,.86); color:#fff; font-size:12px; font-weight:700; border-radius:8px; padding:3px 8px; }
-    .clip.has-clip .cb { display:block; }
+    /* website-c: Help (28A) and the badges. */
     .store-google { display:inline-block; line-height:0; }
     /* Google's badge PNG carries its own clear space (41 of 250 px top and bottom), so the image is
        drawn 250/168 x 44 px high and pulled in by that padding: the black badge itself is 44 px, the same as Apple's. */
@@ -134,24 +141,127 @@
     .hero { padding-bottom:18px; }
     .hb { justify-content:center; margin-top:18px; }
     .ftitle { font-size:13px; font-weight:800; letter-spacing:.14em; color:var(--g); text-align:center; margin:6px 0 16px; }
-    .fa { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; padding-bottom:50px; }
-    .fa .t { display:flex; gap:16px; align-items:center; background:#fff; border:1px solid var(--line); border-radius:20px; padding:14px; }
-    .fa .clip { flex:0 0 112px; height:170px; border-radius:14px; box-shadow:0 0 0 3px #10231c; }
-    .fa h3 { font-size:19px; margin-bottom:4px; }
-    .fa p { font-size:14.5px; color:var(--mut); line-height:1.4; }
     @media (max-width:700px) {
         .hero { padding:18px 16px 12px; }
         .hero h1 { font-size:30px; }
         .hero .sub { font-size:15px; margin-top:8px; }
         .hb { margin-top:12px; }
         .hero .webapp { margin-top:10px; font-size:14px; }
-        .fa { gap:8px; }
-        .fa .t { flex-direction:column; align-items:stretch; gap:6px; padding:6px; border-radius:14px; }
-        .fa .clip { flex:none; height:128px; border-radius:10px; }
-        .fa h3 { font-size:13.5px; margin:0 2px; line-height:1.2; }
-        .fa p { display:none; }
-        .fa .cb { font-size:10px; padding:2px 5px; left:5px; bottom:5px; }
         .ftitle { margin:4px 0 10px; }
+    }
+    /* website-e (Manny's picks 37B + 38C): EVERYTHING IN THE APP as five rows of
+       App-Store-style cards that swipe sideways (the next card peeks), a full-screen
+       viewer, Try the GPS and Try Just say it. site-features.js; clips: site-clips.js. */
+    .feat { padding:4px 0 46px; }
+    .fsub { text-align:center; color:var(--mut); font-size:15px; margin:-8px 16px 4px; }
+    .grp { max-width:1180px; margin:0 auto; padding:24px 28px 4px; }
+    .ghd { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .ghd h2 { font-size:30px; font-weight:900; letter-spacing:-.02em; }
+    .gn { display:none; font-size:13px; color:var(--g); font-weight:700; white-space:nowrap; }
+    .arrows { display:flex; gap:8px; }
+    .ga { width:38px; height:38px; border-radius:50%; background:#fff; border:1px solid var(--line); color:var(--ink); font-size:24px; font-weight:800; line-height:1; cursor:pointer; }
+    .ga:hover { border-color:var(--g); }
+    .gln { color:var(--mut); font-size:15px; line-height:1.4; margin:4px 0 14px; }
+    .row { list-style:none; display:flex; gap:12px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none; padding:2px 0 2px; }
+    .row::-webkit-scrollbar { display:none; }
+    .fc { flex:0 0 272px; scroll-snap-align:start; height:520px; overflow:hidden; border-radius:24px; background:linear-gradient(180deg,var(--g),var(--g2)); color:#fff; padding:18px 16px 0; text-align:center; display:flex; flex-direction:column; align-items:center; cursor:pointer; }
+    .fc .cap { width:100%; }
+    .eb { display:inline-block; font-size:11.5px; font-weight:800; letter-spacing:.14em; color:var(--lime); border:1.5px solid rgba(217,240,122,.5); border-radius:999px; padding:3px 10px; }
+    .clipchip { display:inline-block; font-size:11.5px; font-weight:800; color:var(--g); background:var(--lime); border-radius:999px; padding:4px 9px; margin-left:4px; vertical-align:top; }
+    .fsoon { display:table; margin:0 auto 8px; font-size:11px; font-weight:800; letter-spacing:.08em; color:var(--ink); background:#ffd76a; border-radius:8px; padding:4px 8px; }
+    .fc h3 { font-size:22px; font-weight:900; line-height:1.12; letter-spacing:-.02em; margin:9px 0 5px; }
+    .fc p { font-size:13px; color:#cfe0d6; line-height:1.38; }
+    .ph { display:block; flex:0 0 auto; width:206px; margin-top:14px; padding:7px; border:0; border-radius:34px; background:#0b0f0d; box-shadow:0 18px 40px rgba(0,0,0,.35); cursor:pointer; }
+    .ph:focus-visible, .ga:focus-visible, .chipb:focus-visible, .go:focus-visible { outline:3px solid var(--lime); outline-offset:3px; }
+    .ph .s { display:block; position:relative; width:100%; aspect-ratio:886/1920; border-radius:27px; overflow:hidden; background:#dfe8e4; }
+    .ph img, .ph video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
+    .ph .s.fit img { object-fit:contain; object-position:top; }
+    .ph img { z-index:1; transition:opacity .25s; }
+    .ph .s.has-clip img { opacity:0; }
+    .ph .cb { display:none; position:absolute; z-index:2; left:8px; bottom:8px; background:rgba(16,35,28,.86); color:#fff; font-size:12px; font-weight:700; border-radius:8px; padding:3px 8px; }
+    .ph .s.has-clip .cb { display:block; }
+    .dots { display:flex; gap:5px; justify-content:center; padding:12px 0 0; }
+    .dots i { width:6px; height:6px; border-radius:50%; background:#c9c4b4; }
+    .dots i.on { width:18px; border-radius:3px; background:var(--g); }
+
+    .trywrap { max-width:1180px; }
+    .try { max-width:640px; margin:26px 0 4px; background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; }
+    .try h3 { font-size:22px; font-weight:900; letter-spacing:-.01em; }
+    .try .dl { color:var(--mut); font-size:14px; margin:3px 0 12px; }
+    .map { position:relative; width:100%; max-width:440px; aspect-ratio:610/780; margin:0 auto; border-radius:14px; overflow:hidden; cursor:crosshair; touch-action:manipulation; background:#4d6b3c; }
+    .map img, .map svg { position:absolute; inset:0; width:100%; height:100%; display:block; }
+    .map:focus-visible { outline:3px solid var(--g); outline-offset:3px; }
+    .map .chip { position:absolute; transform:translate(-50%,-50%); background:rgba(17,26,21,.9); color:#fff; border-radius:12px; padding:6px 10px; font-size:12px; font-weight:700; line-height:1.25; white-space:nowrap; pointer-events:none; text-align:left; }
+    .map .chip b { display:block; color:var(--lime); font-size:20px; }
+    .map .chip.nm { left:10px; top:10px; transform:none; }
+    .map .you { position:absolute; transform:translate(-50%,16px); background:#2f7cf6; color:#fff; font-size:11px; font-weight:800; border-radius:6px; padding:1px 6px; pointer-events:none; }
+    .tread { font-size:14px; font-weight:700; margin-top:10px; line-height:1.4; }
+    .tnote, .try .cred { font-size:12px; color:var(--mut); margin-top:6px; line-height:1.45; }
+    .ts-form { display:flex; flex-direction:column; gap:8px; }
+    #ts-in { width:100%; border:2px solid var(--g); border-radius:12px; padding:11px 12px; font:inherit; font-size:16px; background:#f7faf5; color:var(--ink); }
+    .try .go { border:0; border-radius:12px; padding:12px; background:var(--lime); color:var(--g); font:inherit; font-size:15px; font-weight:800; cursor:pointer; }
+    .who { font-size:13px; color:var(--mut); margin:12px 0 6px; }
+    .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
+    .chipb { border:1px solid var(--line); background:var(--cream); color:var(--ink); border-radius:999px; padding:6px 10px; font:inherit; font-size:12.5px; text-align:left; cursor:pointer; }
+    .out { background:#eef1ec; border-radius:14px; padding:12px; }
+    .ak-head { display:flex; gap:10px; align-items:center; margin-bottom:10px; }
+    .ak-back { width:34px; height:34px; flex:0 0 34px; border-radius:10px; background:#dfe5dc; color:var(--g); display:flex; align-items:center; justify-content:center; font-size:24px; }
+    .ak-t { font-size:18px; font-weight:800; color:var(--g); }
+    .ak-t small { display:block; font-size:12px; font-weight:600; color:var(--mut); }
+    .ak-card { background:#fff; border-radius:14px; padding:14px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+    .ak-ck { font-size:11px; font-weight:800; letter-spacing:.12em; color:var(--mut); }
+    .ak-ct { font-size:22px; font-weight:900; color:var(--g); margin:2px 0 8px; }
+    .ak-line { display:grid; grid-template-columns:96px 1fr 12px; gap:8px; align-items:center; padding:10px 0; border-top:1px solid #eef0ea; font-size:14px; }
+    .ak-line span { color:var(--mut); }
+    .ak-line i { font-style:normal; color:var(--mut); }
+    .ak-note { font-size:12px; color:var(--mut); margin:6px 0 10px; }
+    .ak-btns { display:flex; gap:8px; }
+    .ak-chg, .ak-go { flex:1; text-align:center; border-radius:12px; padding:11px; font-size:15px; font-weight:800; }
+    .ak-chg { border:2px solid var(--g); color:var(--g); }
+    .ak-go { background:var(--lime); color:var(--g); }
+    .ts-miss { font-size:14px; line-height:1.45; padding:4px 2px; }
+    .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+    .fv { position:fixed; inset:0; z-index:50; background:#0b0f0d; color:#fff; display:flex; flex-direction:column; }
+    .fv[hidden] { display:none; }
+    html.fv-open, html.fv-open body { overflow:hidden; }
+    .fv-top { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; font-size:14px; font-weight:700; }
+    .fv-x { width:40px; height:40px; border-radius:50%; border:0; background:#26302b; color:#fff; font-size:17px; cursor:pointer; }
+    .fv-sp { width:40px; }
+    .fv-stage { position:relative; flex:1; min-height:0; }
+    .fv-track { list-style:none; display:flex; height:100%; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; }
+    .fv-track::-webkit-scrollbar { display:none; }
+    .fv-s { flex:0 0 100%; height:100%; scroll-snap-align:center; display:flex; align-items:center; justify-content:center; padding:4px 16px; }
+    .fv-img { position:relative; height:100%; max-width:100%; aspect-ratio:886/1920; border-radius:22px; overflow:hidden; background:#1b2320; touch-action:pan-x pan-y pinch-zoom; cursor:zoom-in; }
+    .fv-img img, .fv-img video { width:100%; height:100%; object-fit:contain; display:block; }
+    .fv-img.fit img { object-position:top; }
+    .fv-img.zoom { overflow:auto; cursor:zoom-out; }
+    .fv-img.zoom img { width:200%; height:auto; max-width:none; }
+    .fv-ar { position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:50%; border:0; background:rgba(255,255,255,.2); color:#fff; font-size:28px; line-height:1; cursor:pointer; }
+    .fv-prev { left:10px; } .fv-next { right:10px; }
+    .fv-ar:disabled { opacity:.25; cursor:default; }
+    .fv button:focus-visible { outline:3px solid var(--lime); outline-offset:2px; }
+    .fv-cap { text-align:center; padding:10px 16px 20px; }
+    .fv-cap b { display:block; font-size:18px; }
+    .fv-cap small { color:#aab7b0; font-size:12.5px; }
+    @media (min-width:900px) {
+        .try { max-width:none; display:grid; grid-template-columns:440px 1fr; column-gap:36px; align-content:start; padding:24px; }
+        .try > * { grid-column:2; }
+        .try .map, .try .out { grid-column:1; grid-row:1 / span 7; align-self:start; margin:0; }
+        .try h3 { font-size:26px; }
+    }
+    @media (max-width:700px) {
+        .grp { padding:18px 0 4px; }
+        .ghd, .gln { padding:0 16px; }
+        .ghd h2 { font-size:24px; }
+        .gn { display:inline; }
+        .arrows { display:none; }
+        .gln { font-size:13.5px; margin:2px 0 10px; }
+        .row { padding:2px 16px; scroll-padding:0 16px; }
+        .fc { flex-basis:272px; height:500px; }
+        .try { padding:16px; margin-top:22px; }
+        .fv-ar { width:36px; height:36px; font-size:22px; }
+        .fv-prev { left:4px; } .fv-next { right:4px; }
     }
 </style>
 </head>
@@ -178,20 +288,86 @@
     <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
 </section>
 
-<section class="wrap" id="features">
+<!-- website-e features (generated) -->
+<section class="feat" id="features">
     <h2 class="ftitle">EVERYTHING IN THE APP</h2>
-    <div class="fa">
-        <div class="t" id="f-gps"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/gps.jpg" data-src="/media/clips/gps.mp4" style="object-position:top" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></div><div><h3>GPS</h3><p>Satellite yardages to the front, middle and back of every green, plus Plays like for slope and weather.</p></div></div>
-        <div class="t" id="f-say"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/just-say-it.jpg" data-src="/media/clips/just-say-it.mp4" style="object-position:top" aria-hidden="true"></video><span class="cb">&#9654; 0:06</span></div><div><h3>Just say it</h3><p>Type the round in one line. HardPan sets up the course, the golfers and the games.</p></div></div>
-        <div class="t" id="f-group"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/group-scoring.jpg" data-src="/media/clips/group-scoring.mp4" style="object-position:bottom" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></div><div><h3>Group scoring</h3><p>Everyone starts at par. Tap &minus; or +, and one tap saves the whole group.</p></div></div>
-        <div class="t" id="f-games"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/games-live-board.jpg" data-src="/media/clips/games-live-board.mp4" style="object-position:center" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></div><div><h3>Games &amp; live board</h3><p>Skins, Nassau, Match play, Vegas and more, with a leaderboard that moves every hole.</p></div></div>
-        <div class="t" id="f-results"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/results.jpg" data-src="/media/clips/results.mp4" style="object-position:top" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></div><div><h3>Results</h3><p>Final scores, net and gross, and every game&rsquo;s result, ready to share.</p></div></div>
-        <div class="t" id="f-tourney"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/tournaments.jpg" data-src="/media/clips/tournaments.mp4" style="object-position:center" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></div><div><h3>Tournaments</h3><p>Create one in four questions. Golfers join with one code.</p></div></div>
-        <div class="t" id="f-weekly"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/weekly-code.jpg" data-src="/media/clips/weekly-code.mp4" style="object-position:50% 45%" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></div><div><h3>Weekly code</h3><p>Your weekly game keeps the same join code, every week.</p></div></div>
-        <div class="t" id="f-chat"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/chat.jpg" data-src="/media/clips/chat.mp4" style="object-position:top" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></div><div><h3>Chat</h3><p>Talk with the whole round, or just your group.</p></div></div>
-        <div class="t" id="f-bag"><div class="clip"><video muted playsinline preload="none" poster="/media/posters/my-bag-stats.jpg" data-src="/media/clips/my-bag-stats.mp4" style="object-position:top" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></div><div><h3>My bag &amp; stats</h3><p>Your real carries, Strokes Gained and every past round.</p></div></div>
+    <p class="fsub">Swipe each row. Tap a card to see it full screen.</p>
+    <div class="grp" id="g-play">
+        <div class="ghd"><h2>Play</h2><span class="gn">6 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="Play: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="Play: more cards">&rsaquo;</button></span></div>
+        <p class="gln">GPS that knows the course, and your clubs.</p>
+        <ul class="row" aria-label="Play features"><li class="fc" id="f-gps" data-key="gps"><div class="cap"><span class="eb">GPS</span> <span class="clipchip">&#9654; clip 0:03</span><h3>Every yard. Every hole.</h3><p>Front, middle and back of every green on a real satellite map.</p></div><button type="button" class="ph" data-open="gps" aria-label="See Every yard. Every hole full screen"><span class="s clipslot"><img src="/media/screens/gps-400.webp" srcset="/media/screens/gps-400.webp 400w, /media/screens/gps-886.webp 886w" sizes="(max-width:700px) 200px, 206px" width="886" height="1920" loading="lazy" decoding="async" alt="The HardPan GPS map on a par 4: 215 yards to the middle of the green, with front and back numbers over the satellite picture."><video muted playsinline preload="none" data-src="/media/clips/gps.mp4" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></span></button></li><li class="fc" id="f-plays-like" data-key="plays-like"><div class="cap"><span class="eb">PLAYS LIKE</span><h3>Hit the number it plays.</h3><p>Wind and elevation in one yardage, plus an aim tip from your own misses.</p></div><button type="button" class="ph" data-open="plays-like" aria-label="See Hit the number it plays full screen"><span class="s"><img src="/media/screens/plays-like-400.webp" srcset="/media/screens/plays-like-400.webp 400w, /media/screens/plays-like-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="The GPS map on hole 14 at Papago: 150 to the middle, Plays like 155 with an 8-iron, and the aim tip 8 yards left."></span></button></li><li class="fc" id="f-hazards" data-key="hazards"><div class="cap"><span class="eb">HAZARDS</span><h3>Know what you can carry.</h3><p>Reach and carry for every bunker, and where to lay up, from where you stand.</p></div><button type="button" class="ph" data-open="hazards" aria-label="See Know what you can carry full screen"><span class="s"><img src="/media/screens/hazards-400.webp" srcset="/media/screens/hazards-400.webp 400w, /media/screens/hazards-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="1704" loading="lazy" decoding="async" alt="The Hazards sheet on hole 10: reach and carry yards for each bunker, and lay-up distances with a club for each."></span></button></li><li class="fc" id="f-best-miss" data-key="best-miss"><div class="cap"><span class="eb">BEST MISS</span><h3>Miss on the right side.</h3><p>Green slope from lidar, and the safe side to miss.</p></div><button type="button" class="ph" data-open="best-miss" aria-label="See Miss on the right side full screen"><span class="s"><img src="/media/screens/best-miss-400.webp" srcset="/media/screens/best-miss-400.webp 400w, /media/screens/best-miss-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="The GPS map on a par 3 with the green’s slope arrows on, and Best miss: short."></span></button></li><li class="fc" id="f-offline" data-key="offline"><div class="cap"><div class="fsoon">COMING SOON · iPHONE 2.0.5</div><span class="eb">OFFLINE MAPS</span><h3>No signal? Still every yard.</h3><p>Save a course before you go. The map works with zero bars.</p></div><button type="button" class="ph" data-open="offline" aria-label="See No signal? Still every yard full screen"><span class="s"><img src="/media/screens/offline-400.webp" srcset="/media/screens/offline-400.webp 400w, /media/screens/offline-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1704" loading="lazy" decoding="async" alt="The course picker with a Download for offline button for Dobson Ranch Golf Course."></span></button></li><li class="fc" id="f-bag" data-key="my-bag"><div class="cap"><span class="eb">MY BAG</span><h3>Your real carries.</h3><p>Type your yardages once. HardPan picks the club from them.</p></div><button type="button" class="ph" data-open="my-bag" aria-label="See Your real carries full screen"><span class="s"><img src="/media/screens/my-bag-400.webp" srcset="/media/screens/my-bag-400.webp 400w, /media/screens/my-bag-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="1608" loading="lazy" decoding="async" alt="My bag: a carry yardage for each club, Driver 245, 3-wood 225, 5-wood 210, with a switch to keep each club in the bag."></span></button></li></ul>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="wrap trywrap"><section class="try" id="try-gps" aria-labelledby="try-gps-h">
+        <h3 id="try-gps-h">Try the GPS</h3>
+        <p class="dl">A real hole. Tap anywhere for the yardage.</p>
+        <div class="map" id="tg-map" tabindex="0" role="application" aria-roledescription="yardage demo" aria-label="Hole 7 at Dobson Ranch. Tap the picture, or use the arrow keys, to measure." aria-describedby="tg-read"
+             data-mpp="0.24935" data-w="610" data-h="780" data-you="329.8,674.4" data-mid="225.8,123">
+            <img src="/media/screens/try-gps-dobson-7.webp" width="610" height="780" loading="lazy" decoding="async" alt="Satellite picture of hole 7 at Dobson Ranch Golf Course, a par 3 with water on the left and three bunkers around the outlined green.">
+            <svg viewBox="0 0 610 780" aria-hidden="true" focusable="false">
+                <polygon points="209.4,80.6 220.6,90 227.7,98.5 237.8,105.6 247.8,108.8 260.1,111.9 270.2,116.3 278,124.4 281.7,136.9 279.5,148 275,156.1 267.6,163.7 259.8,168.6 250.1,169.9 240,165.5 227.7,156.5 216.1,146.7 207.2,140 192.6,131.1 181.5,123.5 172.5,113.7 169.2,101.2 173.3,87.3 181.5,79.3 191.9,75.7 202,76.6" fill="rgba(255,255,255,.12)" stroke="#fff" stroke-width="3"/>
+                <line id="tg-l1" x1="329.8" y1="674.4" x2="225.8" y2="123" stroke="#ffcf4a" stroke-width="4"/>
+                <line id="tg-l2" x1="225.8" y1="123" x2="225.8" y2="123" stroke="#fff" stroke-width="4" stroke-dasharray="10 8"/>
+                <circle cx="225.8" cy="123" r="6" fill="#fff"/>
+                <circle id="tg-t" cx="225.8" cy="123" r="13" fill="#fff" stroke="#ffcf4a" stroke-width="7" visibility="hidden"/>
+                <circle cx="329.8" cy="674.4" r="12" fill="#2f7cf6" stroke="#fff" stroke-width="5"/>
+            </svg>
+            <span class="chip nm">Dobson Ranch &middot; Hole 7 &middot; Par 3</span>
+            <span class="you" style="left:54.07%;top:86.46%">you</span>
+            <span class="chip yd" id="tg-a" style="left:54.07%;top:51.12%" hidden><b>&ndash;</b>to tap</span>
+            <span class="chip yd" id="tg-b" style="left:37.02%;top:24.74%"><b id="tg-bn">153 y</b><span id="tg-bl">to middle</span></span>
+        </div>
+        <p class="tread" id="tg-read" aria-live="polite">From the tee: 153 y to the middle of the green. Tap the picture to measure.</p>
+        <p class="tnote">Demo: the blue &ldquo;you&rdquo; dot stands on the tee and the yards are measured on this picture. This page does not ask for your location, and nothing leaves the page. In the app, the dot is you.</p>
+        <p class="cred">Powered by Esri &middot; Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community &middot; Hole outline &copy; OpenStreetMap contributors</p>
+    </section></div>
+    <div class="grp" id="g-games">
+        <div class="ghd"><h2>Games</h2><span class="gn">6 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="Games: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="Games: more cards">&rsaquo;</button></span></div>
+        <p class="gln">Any game your group plays, scored as you go.</p>
+        <ul class="row" aria-label="Games features"><li class="fc" id="f-say" data-key="set-up-card"><div class="cap"><span class="eb">JUST SAY IT</span><h3>Set up the game in one sentence.</h3><p>Type it the way you’d say it. HardPan fills in one card. Tap Start.</p></div><button type="button" class="ph" data-open="set-up-card" aria-label="See Set up the game in one sentence full screen"><span class="s"><img src="/media/screens/set-up-card-400.webp" srcset="/media/screens/set-up-card-400.webp 400w, /media/screens/set-up-card-886.webp 886w" sizes="(max-width:700px) 200px, 206px" width="886" height="1920" loading="lazy" decoding="async" alt="The setup card HardPan made from one sentence: 2 v 2 Best Ball, Sam and Josh against Bob and Paul, scored net from hole 4."></span></button></li><li class="fc" id="f-allgames" data-key="add-a-game"><div class="cap"><span class="eb">ALL THE GAMES</span> <span class="clipchip">&#9654; clip 0:04</span><h3>Every game your group plays.</h3><p>Match play, Nassau, Hi-Lo, Vegas, Best ball, Scramble, Skins and more.</p></div><button type="button" class="ph" data-open="add-a-game" aria-label="See Every game your group plays full screen"><span class="s clipslot"><img src="/media/screens/add-a-game-400.webp" srcset="/media/screens/add-a-game-400.webp 400w, /media/screens/add-a-game-886.webp 886w" sizes="(max-width:700px) 200px, 206px" width="886" height="1920" loading="lazy" decoding="async" alt="Add a game: a box to describe the game, and the list of games, Match play, Nassau, Hi-Lo, Stroke play, Vegas, Best ball and Scramble."><video muted playsinline preload="none" data-src="/media/clips/add-a-game.mp4" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></span></button></li><li class="fc" id="f-group" data-key="group-scoring"><div class="cap"><span class="eb">GROUP SCORING</span> <span class="clipchip">&#9654; clip 0:03</span><h3>Score the whole group in one tap.</h3><p>Everyone starts at par. Tap − or +, then Save.</p></div><button type="button" class="ph" data-open="group-scoring" aria-label="See Score the whole group in one tap full screen"><span class="s clipslot"><img src="/media/screens/group-scoring-400.webp" srcset="/media/screens/group-scoring-400.webp 400w, /media/screens/group-scoring-886.webp 886w" sizes="(max-width:700px) 200px, 206px" width="886" height="1920" loading="lazy" decoding="async" alt="The score sheet for hole 4: Sam, Josh, Bob and Paul each at 4 with minus and plus buttons, and one Save button."><video muted playsinline preload="none" data-src="/media/clips/group-scoring.mp4" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></span></button></li><li class="fc" id="f-games" data-key="live-games"><div class="cap"><span class="eb">LIVE GAMES</span> <span class="clipchip">&#9654; clip 0:03</span><h3>Every game, as it happens.</h3><p>Matches update hole by hole for everyone in the round.</p></div><button type="button" class="ph" data-open="live-games" aria-label="See Every game, as it happens full screen"><span class="s clipslot"><img src="/media/screens/live-games-400.webp" srcset="/media/screens/live-games-400.webp 400w, /media/screens/live-games-886.webp 886w" sizes="(max-width:700px) 200px, 206px" width="886" height="1920" loading="lazy" decoding="async" alt="The GPS map on hole 5 before the live games board slides up over it."><video muted playsinline preload="none" data-src="/media/clips/games-live-board.mp4" aria-hidden="true"></video><span class="cb">&#9654; 0:03</span></span></button></li><li class="fc" id="f-results" data-key="results"><div class="cap"><span class="eb">RESULTS</span> <span class="clipchip">&#9654; clip 0:04</span><h3>The final word, ready to share.</h3><p>Net and gross, and every game’s result, in one receipt.</p></div><button type="button" class="ph" data-open="results" aria-label="See The final word, ready to share full screen"><span class="s clipslot"><img src="/media/screens/results-400.webp" srcset="/media/screens/results-400.webp 400w, /media/screens/results-886.webp 886w" sizes="(max-width:700px) 200px, 206px" width="886" height="1920" loading="lazy" decoding="async" alt="The round receipt: final scores out, in, gross and net for four golfers, then the skins results."><video muted playsinline preload="none" data-src="/media/clips/results.mp4" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></span></button></li><li class="fc" id="f-settle" data-key="settle"><div class="cap"><span class="eb">SETTLE UP</span><h3>Who owes who, done.</h3><p>HardPan does the math. Tick each line off when it’s squared.</p></div><button type="button" class="ph" data-open="settle" aria-label="See Who owes who, done full screen"><span class="s fit" style="background:#f2f5ef"><img src="/media/screens/settle-400.webp" srcset="/media/screens/settle-400.webp 400w, /media/screens/settle-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="900" loading="lazy" decoding="async" alt="The settle-up lines in points: Bob owes Al 20 points, Dee owes Al 4 points, Dee owes Cy 11 points."></span></button></li></ul>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="wrap trywrap"><section class="try" id="try-say" aria-labelledby="try-say-h">
+        <h3 id="try-say-h">Try Just say it</h3>
+        <p class="dl">Type your round the way you&rsquo;d say it.</p>
+        <form id="ts-form" class="ts-form" autocomplete="off">
+            <label class="sr" for="ts-in">Describe your game</label>
+            <input id="ts-in" type="text" maxlength="140" enterkeyhint="go" spellcheck="false" value="Me &amp; Josh vs Bob &amp; Paul, best ball for fun">
+            <button type="submit" class="go">Set it up</button>
+        </form>
+        <p class="who">In this demo you&rsquo;re Sam, playing with Josh, Bob and Paul, on hole 4. Try one of these:</p>
+        <div class="chips"><button type="button" class="chipb" data-say="Me &amp; Josh vs Bob &amp; Paul, best ball for fun">Me &amp; Josh vs Bob &amp; Paul, best ball for fun</button><button type="button" class="chipb" data-say="Me vs Josh, Nassau, for fun">Me vs Josh, Nassau, for fun</button><button type="button" class="chipb" data-say="Skins for everyone, for fun">Skins for everyone, for fun</button><button type="button" class="chipb" data-say="Me vs Bob, match play, gross, from hole 1, for fun">Me vs Bob, match play, gross, from hole 1, for fun</button><button type="button" class="chipb" data-say="Me &amp; Josh vs Bob &amp; Paul, Hi-Lo for fun">Me &amp; Josh vs Bob &amp; Paul, Hi-Lo for fun</button></div>
+        <div class="out" id="ts-out" aria-live="polite"><div class="ak-head"><span class="ak-back" aria-hidden="true">&lsaquo;</span><div class="ak-t">Add a game<small>From what you described</small></div></div><div class="ak-card"><div class="ak-ck">HERE&rsquo;S WHAT I&rsquo;LL SET UP</div><div class="ak-ct">2 v 2 Best Ball</div><div class="ak-line"><span>Sides</span><b>Sam + Josh vs Bob + Paul</b><i aria-hidden="true">&rsaquo;</i></div><div class="ak-line"><span>Amount</span><b>No amount</b><i aria-hidden="true">&rsaquo;</i></div><div class="ak-line"><span>Presses</span><b>Off</b><i aria-hidden="true">&rsaquo;</i></div><div class="ak-line"><span>Scoring</span><b>Net</b><i aria-hidden="true">&rsaquo;</i></div><div class="ak-line"><span>Counts from</span><b>Hole 4 (now)</b><i aria-hidden="true">&rsaquo;</i></div><div class="ak-note">Not quite right? Tap any line to change it.</div><div class="ak-btns" aria-hidden="true"><span class="ak-chg">Change</span><span class="ak-go">Start game</span></div></div></div>
+        <p class="cred">Nothing is saved and nothing is sent: this demo runs only on this page. Get the app to start the round.</p>
+    </section></div>
+    <div class="grp" id="g-group">
+        <div class="ghd"><h2>Your group</h2><span class="gn">5 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="Your group: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="Your group: more cards">&rsaquo;</button></span></div>
+        <p class="gln">The same friends, week after week.</p>
+        <ul class="row" aria-label="Your group features"><li class="fc" id="f-weekly" data-key="weekly-code"><div class="cap"><span class="eb">WEEKLY GAME</span><h3>Same game. Same code. Every week.</h3><p>Your weekly game keeps one join code and starts in one tap.</p></div><button type="button" class="ph" data-open="weekly-code" aria-label="See Same game. Same code. Every week full screen"><span class="s"><img src="/media/screens/weekly-code-295.webp" srcset="/media/screens/weekly-code-295.webp 295w" sizes="(max-width:700px) 200px, 206px" width="295" height="640" loading="lazy" decoding="async" alt="Home with the Tuesday weekly game at Papago, a Start this week button, and its join code that stays the same every week."></span></button></li><li class="fc" id="f-chat" data-key="chat"><div class="cap"><span class="eb">ROUND CHAT</span><h3>Talk to the round.</h3><p>Chat with your group without leaving the map.</p></div><button type="button" class="ph" data-open="chat" aria-label="See Talk to the round full screen"><span class="s"><img src="/media/screens/chat-400.webp" srcset="/media/screens/chat-400.webp 400w, /media/screens/chat-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="Round chat over the GPS map: messages from Ray, Joe and Marcus, with birdies and the skin on 12 posted in the chat."></span></button></li><li class="fc" id="f-play-again" data-key="play-again"><div class="cap"><span class="eb">PLAY AGAIN</span><h3>Same group? One tap.</h3><p>Start your last group’s round again, right from Home.</p></div><button type="button" class="ph" data-open="play-again" aria-label="See Same group? One tap full screen"><span class="s"><img src="/media/screens/play-again-400.webp" srcset="/media/screens/play-again-400.webp 400w, /media/screens/play-again-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="1704" loading="lazy" decoding="async" alt="Home with a Play again card for today at Papago Golf Club and a Start button."></span></button></li><li class="fc" id="f-trip" data-key="trip"><div class="cap"><span class="eb">TRIPS</span><h3>One board for the whole trip.</h3><p>Every day of a golf trip on one leaderboard.</p></div><button type="button" class="ph" data-open="trip" aria-label="See One board for the whole trip full screen"><span class="s"><img src="/media/screens/trip-400.webp" srcset="/media/screens/trip-400.webp 400w, /media/screens/trip-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="1704" loading="lazy" decoding="async" alt="The Road Trip page: one leaderboard across every day of a trip, with Start a New Trip and Open Trip."></span></button></li><li class="fc" id="f-history" data-key="history"><div class="cap"><span class="eb">HISTORY</span><h3>Every round you’ve played.</h3><p>Past rounds, scores and results, saved on your phone.</p></div><button type="button" class="ph" data-open="history" aria-label="See Every round you’ve played full screen"><span class="s"><img src="/media/screens/history-400.webp" srcset="/media/screens/history-400.webp 400w, /media/screens/history-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="1704" loading="lazy" decoding="async" alt="History: a past round at Dobson Ranch Golf Course with its golfers and final scores."></span></button></li></ul>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="grp" id="g-organize">
+        <div class="ghd"><h2>Organize</h2><span class="gn">5 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="Organize: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="Organize: more cards">&rsaquo;</button></span></div>
+        <p class="gln">Run a tournament from your phone.</p>
+        <ul class="row" aria-label="Organize features"><li class="fc" id="f-tourney" data-key="tournaments"><div class="cap"><span class="eb">TOURNAMENTS</span> <span class="clipchip">&#9654; clip 0:04</span><h3>Run the day from your phone.</h3><p>Tournaments sit right on Home. Keep score, open the board.</p></div><button type="button" class="ph" data-open="tournaments" aria-label="See Run the day from your phone full screen"><span class="s clipslot"><img src="/media/screens/tournaments-400.webp" srcset="/media/screens/tournaments-400.webp 400w, /media/screens/tournaments-886.webp 886w" sizes="(max-width:700px) 200px, 206px" width="886" height="1920" loading="lazy" decoding="async" alt="HardPan Home with the Golf GPS card for Grayhawk Golf Club and a Tournaments card below it."><video muted playsinline preload="none" data-src="/media/clips/tournaments.mp4" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></span></button></li><li class="fc" id="f-create-event" data-key="create-event"><div class="cap"><span class="eb">QUICK START</span><h3>A tournament in four questions.</h3><p>Name, course, when and format. You get a join code to share.</p></div><button type="button" class="ph" data-open="create-event" aria-label="See A tournament in four questions full screen"><span class="s"><img src="/media/screens/create-event-400.webp" srcset="/media/screens/create-event-400.webp 400w, /media/screens/create-event-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="1704" loading="lazy" decoding="async" alt="Creating a tournament, question four: pick the format, Scramble, Best ball, Shamble or Individual."></span></button></li><li class="fc" id="f-join-event" data-key="join-event"><div class="cap"><span class="eb">JOIN CODE</span><h3>Join the tournament.</h3><p>Type the event code, find your team, and you’re in.</p></div><button type="button" class="ph" data-open="join-event" aria-label="See Join the tournament full screen"><span class="s"><img src="/media/screens/join-event-400.webp" srcset="/media/screens/join-event-400.webp 400w, /media/screens/join-event-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="Joining the Papago Fall Scramble: Which team are you on?, with Teams 1 to 8 and their starting holes."></span></button></li><li class="fc" id="f-event-board" data-key="event-board"><div class="cap"><span class="eb">LEADERBOARD</span><h3>Every group. One board.</h3><p>Net or gross, all groups or by flight, with skins as they happen.</p></div><button type="button" class="ph" data-open="event-board" aria-label="See Every group. One board full screen"><span class="s"><img src="/media/screens/event-board-400.webp" srcset="/media/screens/event-board-400.webp 400w, /media/screens/event-board-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="A tournament leaderboard, net, with every group on one board: Andy leads at 4 under through 13."></span></button></li><li class="fc" id="f-prizes" data-key="prizes"><div class="cap"><span class="eb">PRIZES</span><h3>Prizes, sorted.</h3><p>Flights, places and prize results that match on every phone.</p></div><button type="button" class="ph" data-open="prizes" aria-label="See Prizes, sorted full screen"><span class="s fit" style="background:#eef3f1"><img src="/media/screens/prizes-400.webp" srcset="/media/screens/prizes-400.webp 400w, /media/screens/prizes-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1100" loading="lazy" decoding="async" alt="The tournament leaderboard in the app: Team 4 in 1st at 3 under through 4, and the teams around it."></span></button></li></ul>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="grp" id="g-better">
+        <div class="ghd"><h2>Get better</h2><span class="gn">3 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="Get better: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="Get better: more cards">&rsaquo;</button></span></div>
+        <p class="gln">See where your shots go, then practice that.</p>
+        <ul class="row" aria-label="Get better features"><li class="fc" id="f-strokes-gained" data-key="strokes-gained"><div class="cap"><span class="eb">STROKES GAINED</span><h3>See where shots go.</h3><p>Strokes Gained by area, and a practice card for what cost you most.</p></div><button type="button" class="ph" data-open="strokes-gained" aria-label="See See where shots go full screen"><span class="s"><img src="/media/screens/strokes-gained-400.webp" srcset="/media/screens/strokes-gained-400.webp 400w, /media/screens/strokes-gained-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="My stats: a practice card for putting, and Strokes Gained against a 10 handicap, plus 1.9 shots a round."></span></button></li><li class="fc" id="f-range" data-key="range"><div class="cap"><span class="eb">RANGE</span><h3>Practice what costs you.</h3><p>Today’s drill from your last round, and every ball you mark.</p></div><button type="button" class="ph" data-open="range" aria-label="See Practice what costs you full screen"><span class="s"><img src="/media/screens/range-400.webp" srcset="/media/screens/range-400.webp 400w, /media/screens/range-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="1704" loading="lazy" decoding="async" alt="The Range sheet with today’s drill, a distance ladder, and club buttons to mark each ball."></span></button></li><li class="fc" id="f-ask-caddie" data-key="ask-caddie"><div class="cap"><div class="fsoon">COMING SOON</div><span class="eb">ASK CADDIE</span><h3>Ask what it plays.</h3><p>What it plays, what club, and what you hit here last time.</p></div><button type="button" class="ph" data-open="ask-caddie" aria-label="See Ask what it plays full screen"><span class="s fit" style="background:#1c3827"><img src="/media/screens/ask-caddie-400.webp" srcset="/media/screens/ask-caddie-400.webp 400w, /media/screens/ask-caddie-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="460" loading="lazy" decoding="async" alt="The Ask panel over the GPS map: What club?, Last time here?, and the answer Plays like 138 yards to the middle of the green."></span></button></li></ul>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div>
     </div>
 </section>
+
+<div class="fv" id="fv" role="dialog" aria-modal="true" aria-labelledby="fv-title" hidden>
+    <div class="fv-top"><button type="button" class="fv-x" id="fv-x" aria-label="Close">&#10005;</button><span class="fv-n" id="fv-n"></span><span class="fv-sp"></span></div>
+    <div class="fv-stage"><ul class="fv-track" id="fv-track"></ul>
+        <button type="button" class="fv-ar fv-prev" id="fv-prev" aria-label="Previous feature">&lsaquo;</button>
+        <button type="button" class="fv-ar fv-next" id="fv-next" aria-label="Next feature">&rsaquo;</button></div>
+    <div class="fv-cap"><b id="fv-title"></b><small>Pinch or tap to zoom &middot; swipe for the next feature</small></div>
+</div>
+<!-- /website-e features -->
 
 <section class="wrap split">
     <div class="panel play" id="golfers">
@@ -267,6 +443,7 @@
 </footer>
 
 <script src="/site-clips.js" defer></script>
+<script src="/site-features.js" defer></script>
 <script src="/site-pricing.js"></script>
 <script>
     if (typeof window.HardPanSitePricingFill === 'function') window.HardPanSitePricingFill(document);

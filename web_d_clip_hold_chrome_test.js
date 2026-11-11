@@ -160,16 +160,18 @@ describe('a clip plays once and holds its last frame (real Chrome)', { skip: !CA
         assertHeld(await watchToEnd(tab, 'video[data-src="/media/clips/gps.mp4"]'), 'help/gps-basics');
     });
 
-    test('Homepage: the Results tile - results.mp4 ends on its last frame and stays', async () => {
+    test('Homepage: the Results card - results.mp4 ends on its last frame and stays', async () => {
         await tab.go(base + '/home');
         assertHeld(await watchToEnd(tab, '#f-results video'), 'home Results tile');
     });
 
-    test('a slot with no clip file (Just say it) keeps its poster: no src, marked missing', async () => {
-        await tab.go(base + '/home');
-        await tab.eval(`document.querySelector('#f-say video').scrollIntoView({ block: 'center' }), true`);
+    // website-e re-pin: the homepage's Just say it card is a still now (no clip slot), so
+    // the poster-only slot is checked where one remains, Help's Start a round. Was: #f-say on /home.
+    test('a slot with no clip file (Help: Start a round) keeps its poster: no src, marked missing', async () => {
+        await tab.go(base + '/help/start-round');
+        await tab.eval(`document.querySelector('video[data-src="/media/clips/start-round.mp4"]').scrollIntoView({ block: 'center' }), true`);
         let s;
-        for (let i = 0; i < 25; i++) { await sleep(200); s = await tab.eval(READ('#f-say video')); if (s.state === 'missing') break; }
+        for (let i = 0; i < 25; i++) { await sleep(200); s = await tab.eval(READ('video[data-src="/media/clips/start-round.mp4"]')); if (s.state === 'missing') break; }
         assert.equal(s.state, 'missing', 'the missing clip was not given up');
         assert.equal(s.src, null, 'a broken player is left where the poster should show');
         assert.ok(s.shown && s.w > 50, 'the poster is not on screen');

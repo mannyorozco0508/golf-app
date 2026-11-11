@@ -70,6 +70,15 @@
 // that remains is that only a BARE / reaches it), and CACHE_VERSION v394-2.0.
 // The full link inventory, the SW install/online/offline tests and their
 // negative controls live in web_d_homepage_root_test.js.
+//
+// WEBSITE-E (Manny's picks 37B + 38C, Nov 10): the nine tiles became 25 cards in
+// five rows (web_e_features_test.js + web_e_features_chrome_test.js check them).
+// Re-pinned here, each saying so: the "Coming soon" test (two feature cards say it
+// on purpose, in <div class="fsoon">; Android never does), the grid test (now the
+// five rows), the clip-slot and badge counts (home 6, was 9), and the manifest test
+// (four homepage-only slots are marked unused_since website-e). site-features.js
+// joins the "static, not the app shell" test. Before the re-pin, the website-e page
+// failed exactly six tests here (measured); after it, all pass.
 // ============================================================================
 
 const { test, describe, before } = require('node:test');
@@ -179,8 +188,11 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
     test('no hand-drawn store badge is left, and no "Coming soon" Android tile anywhere on the site', () => {
         assert.doesNotMatch(html, /class="badge"/, 'a hand-drawn badge is back');
         assert.doesNotMatch(html, /class="soon"|data-todo="play-store-url"/, 'the Android placeholder tile is back');
+        // website-e re-pin (Manny's 37B pick): two FEATURE cards say "Coming soon" on purpose
+        // (Offline maps, Ask caddie), each in its own <div class="fsoon">. Android never does.
         ['hardpan-home.html', 'help.html', 'support.html', 'refunds.html', 'terms.html', 'privacy.html'].forEach((f) =>
-            assert.doesNotMatch(stripComments(read(f)), /Coming soon/i, f + ' still says Android is coming soon'));
+            assert.doesNotMatch(stripComments(read(f)).replace(/<div class="fsoon">COMING SOON(?: · iPHONE 2\.0\.5)?<\/div>/g, ''), /Coming soon/i, f + ' still says Android is coming soon'));
+        assert.equal((read('hardpan-home.html').match(/<div class="fsoon">/g) || []).length, 2, 'positive: the two feature cards');
     });
 
     test('every Google Play badge is Google\'s official artwork, linking to the Play listing, after Apple\'s', () => {
@@ -503,15 +515,18 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
     const manifest = JSON.parse(read('media/clips/manifest.json'));
     const manifestFiles = manifest.clips.map((c) => '/media/clips/' + c.file);
 
-    test('the homepage has "EVERYTHING IN THE APP" with the nine tiles, in order, right after the hero', () => {
+    // website-e re-pin (Manny's picks 37B + 38C): the nine tiles became 25 cards in five
+    // rows; six of them carry a clip, the rest a sharp still. The full card checks are
+    // web_e_features_test.js. Was: nine tiles, each a clip slot.
+    test('the homepage has "EVERYTHING IN THE APP" with the five rows of cards, right after the hero', () => {
         const at = home.indexOf('id="features"');
-        assert.ok(at > home.indexOf('class="wrap hero"') && at < home.indexOf('class="wrap split"'), 'the grid is not between the hero and the panels');
+        assert.ok(at > home.indexOf('class="wrap hero"') && at < home.indexOf('class="wrap split"'), 'the rows are not between the hero and the panels');
         assert.match(home, /EVERYTHING IN THE APP/);
-        const sec = /<section class="wrap" id="features">([\s\S]*?)<\/section>/.exec(home)[1];
-        const titles = (sec.match(/<h3>([^<]*)<\/h3>/g) || []).map((t) => t.replace(/<\/?h3>/g, '').replace('&amp;', '&'));
-        assert.deepEqual(titles, ['GPS', 'Just say it', 'Group scoring', 'Games & live board', 'Results',
-            'Tournaments', 'Weekly code', 'Chat', 'My bag & stats']);
-        assert.equal(videos(sec).length, 9, 'each tile is a clip slot');
+        const sec = /<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(home)[1];
+        assert.deepEqual((sec.match(/<div class="grp" id="g-[a-z]+">\s*<div class="ghd"><h2>([^<]*)<\/h2>/g) || []).map((t) => />([^<]*)<\/h2>/.exec(t)[1]),
+            ['Play', 'Games', 'Your group', 'Organize', 'Get better']);
+        assert.equal((sec.match(/<li class="fc"/g) || []).length, 25);
+        assert.equal(videos(sec).length, 6, 'the six features with a clip');
     });
 
     // website-d re-pin (Manny "keep option 1"): no `loop` - a clip plays once and
@@ -525,6 +540,10 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
             assert.doesNotMatch(v, /\bloop\b/, f + ': a looping clip jumps back to its first frame');
             assert.match(v, /preload="none"/, f + ': a clip would download before it is seen');
             assert.doesNotMatch(v, /(?<![-\w])src="|autoplay|controls/, f + ': the clip must start from data-src, in view, with no player chrome');
+            // website-e re-pin: a homepage card's still is its own sharp <img> (media/screens/), drawn
+            // over the video until the clip plays; a poster attribute there would download ~40 KB per
+            // card up front for a picture nobody sees. Help keeps its posters. Was: a poster on every slot.
+            if (f === PAGE) { assert.doesNotMatch(v, /poster=/, f + ': a hidden poster downloads up front'); return; }
             const poster = /poster="\/(media\/posters\/[a-z0-9-]+\.jpg)"/.exec(v);
             assert.ok(poster, f + ': no poster');
             assert.ok(exists(poster[1]), poster[1] + ' is missing');
@@ -533,16 +552,22 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
             const clip = /data-src="(\/media\/clips\/[a-z0-9-]+\.mp4)"/.exec(v);
             assert.ok(clip && manifestFiles.includes(clip[1]), f + ': ' + (clip && clip[1]) + ' is not in media/clips/manifest.json');
         }));
-        assert.equal(n, 9 + 8 + 8, 'home 9 + help list 8 + one per topic page');
+        assert.equal(n, 6 + 8 + 8, 'home 6 (website-e: the clip cards; was 9 tiles) + help list 8 + one per topic page');
         all.forEach((f) => assert.match(read(f), /<script src="\/site-clips\.js" defer><\/script>/, f + ' does not load the clip script'));
     });
 
-    test('the clips manifest names every expected file with a length, and nothing unused', () => {
+    // website-e re-pin: the four homepage-only slots (just-say-it, weekly-code, chat,
+    // my-bag-stats) are no longer on any page - their cards show stills. They stay in the
+    // manifest, marked unused_since website-e, with their posters. Was: every entry used.
+    test('the clips manifest names every expected file with a length; an entry no page uses says so', () => {
         assert.equal(manifest.folder, '/media/clips/');
         const used = new Set();
         [PAGE].concat(helpPages).forEach((f) => videos(read(f)).forEach((v) => used.add(/data-src="([^"]+)"/.exec(v)[1])));
-        assert.deepEqual([...used].sort(), manifestFiles.slice().sort());
-        manifest.clips.forEach((c) => assert.ok(c.seconds >= 2 && c.seconds <= 10 && c.used_on.length >= 1, c.file));
+        [...used].forEach((u) => assert.ok(manifestFiles.includes(u), u + ' is not in the manifest'));
+        const unused = manifest.clips.filter((c) => !used.has('/media/clips/' + c.file));
+        assert.deepEqual(unused.map((c) => c.file).sort(), ['chat.mp4', 'just-say-it.mp4', 'my-bag-stats.mp4', 'weekly-code.mp4']);
+        unused.forEach((c) => { assert.equal(c.unused_since, 'website-e', c.file); assert.deepEqual(c.used_on, [], c.file); assert.ok(exists(c.poster.slice(1)), c.poster); });
+        manifest.clips.filter((c) => used.has('/media/clips/' + c.file)).forEach((c) => assert.ok(c.seconds >= 2 && c.seconds <= 10 && c.used_on.length >= 1, c.file));
     });
 
     test('site-clips.js: loads in view, pauses out of view, keeps the poster when a clip is missing, honours reduce motion', () => {
@@ -642,7 +667,7 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
                 assert.equal(Number(m[2]), Math.floor(secs[m[1]] + 0.5), f + ': ' + m[1] + ' badge 0:' + m[2]);
             }
         });
-        assert.equal(n, 9 + 8 + 8, 'positive: every badge was read');
+        assert.equal(n, 6 + 8 + 8, 'positive: every badge was read (website-e: 6 homepage clip cards, was 9 tiles)');
     });
     test('website-d: the clips are served (not blocked, not routed to a Function)', async () => {
         const MW = await import(pathToFileURL(path.join(ROOT, 'functions', '_middleware.js')).href);
@@ -656,11 +681,11 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
 
     test('the new pages and media are static: no Function, no rewrite, not in the app shell or the native bundle', () => {
         const inc = JSON.parse(read('_routes.json')).include;
-        ['/help', '/help/*', '/media/*', '/site-clips.js', '/google-play-badge.png'].forEach((p) => assert.ok(!inc.includes(p), p));
+        ['/help', '/help/*', '/media/*', '/site-clips.js', '/site-features.js', '/google-play-badge.png'].forEach((p) => assert.ok(!inc.includes(p), p));
         assert.deepEqual(redirectsProblems(read('_redirects')).rules.map((r) => r[0]), ['/home', '/home/']);
         const shell = read('sw.js');
         assert.doesNotMatch(shell.slice(shell.indexOf('const SHELL_FILES = ['), shell.indexOf('];', shell.indexOf('const SHELL_FILES = ['))),
-            /help|media\/|site-clips|google-play-badge/);
-        assert.doesNotMatch(read('sync-mobile-web.js'), /help\.html|media\/|site-clips|google-play-badge/);
+            /help|media\/|site-clips|site-features|google-play-badge/);
+        assert.doesNotMatch(read('sync-mobile-web.js'), /help\.html|media\/|site-clips|site-features|google-play-badge/);
     });
 });
