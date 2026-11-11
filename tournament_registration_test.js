@@ -402,7 +402,8 @@ describe('ORGANIZER LIST — arrived via ?tourney= as the owner, page\'s own lis
         assert.doesNotMatch(setup, /id="registration-list"/, 'the list has left Setup');
         assert.match(desk, /id="registration-list"/);
         assert.ok(!/id="registration-section"|id="registration-list"/.test(src.slice(b)), 'one of each, nowhere else');
-        assert.match(src, /const GATED_TABS = \['setup', 'desk'\];/, 'the gate names both tabs');
+        // Re-pinned 2026-11-10 (T3B): the gate also takes the owner-only Event day tab.
+        assert.match(src, /const GATED_TABS = \['home', 'setup', 'desk'\];/, 'the gate names the tabs');
     });
 });
 

@@ -2352,7 +2352,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // signed out. The gate runs on BOTH the record's value handler and
     // onAuthStateChanged, because a browser delivers those in either order.
     let authUser = null;
-    let homeLandedFor = null;   // the event the owner has already been landed on (event home, T3B)
     let gateHidden = false;   // the gated pair is currently hidden (so a sign-in knows to show Setup)
 
     function canManage() {
@@ -2407,12 +2406,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // on Setup only when this call is the one that un-hid them (a later
             // snapshot must not yank the owner off the Leaderboard).
             present.forEach((p) => { if (p.tab) p.tab.style.display = ''; });
-            // EVENT DAY LANDS ON THE EVENT HOME (T3B). Once per event per page
-            // load: an owner arriving while scores are coming in starts on the
-            // event home; before the first score they start on Setup, as before.
-            // Never again after that, so a snapshot cannot yank the owner off a tab.
-            if (gateHidden) { gateHidden = false; homeLandedFor = currentCode; showTab(eventHomeState().live ? 'home' : 'setup'); }
-            else if (homeLandedFor !== currentCode) { homeLandedFor = currentCode; if (eventHomeState().live) showTab('home'); }
+            if (gateHidden) { gateHidden = false; showTab('setup'); }
         }
         renderSignedInAs();
         syncRegistrationListener();

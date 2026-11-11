@@ -3,9 +3,10 @@
 // touch nothing (tools/lib/cold-arrival.js). No page function is called; the
 // checks read innerText and visibility, and tap real elements.
 //
-//  1 owner, live event, touches nothing: lands on Event day; status, leader,
+//  1 owner, live event, taps the Event day pill (the only tap): status, leader,
 //    start time; Needs you = teams with no score + golfers unpaid (the Desk's count)
-//  2 owner, nothing scored yet: lands on Setup as before; Event day reads
+//  2 owner, nothing scored, touches nothing: lands on Setup as before (landing on
+//    Event day is Manny's call, not built); Event day reads
 //    "Not started", "0 of N", and Needs you is empty
 //  3 a golfer (not the owner): no Event day pill, no panel
 //  4 tapping "golfers unpaid" opens the Desk on its Unpaid chip
@@ -48,10 +49,11 @@ const regs = () => ({ SCR: {
     e3: { name: 'Ed Ruiz', paid: true, approvedAt: 1, teamNum: 4 } } });
 const liveDb = () => Object.assign(F.scrambleDb({ ownerUid: 'u-org' }), { registrations: regs() });
 
-test('1 owner, live event, touches nothing: lands on Event day with status and Needs you', async () => {
-    const [a] = await go(liveDb(), 'SCR', OWNER);
+const OPEN = [{ tap: '#tab-btn-home' }, { sleep: 200 }];
+test('1 owner, live event, taps Event day: status and Needs you', async () => {
+    const [a] = await go(liveDb(), 'SCR', OWNER, OPEN.concat([READ]));
     assert.equal(a.pill, true, 'the Event day pill is there for the owner');
-    assert.equal(a.home, true, 'landed on Event day');
+    assert.equal(a.home, true, 'Event day is open');
     assert.equal(a.setup, false);
     assert.equal(a.live, true);
     assert.equal(a.k, 'LIVE NOW', 'innerText is the rendered, upper-cased label');
@@ -83,7 +85,7 @@ test('3 a golfer (not the owner) never sees Event day', async () => {
 });
 
 test('4 tapping "golfers unpaid" opens the Desk on its Unpaid chip', async () => {
-    const [, b] = await go(liveDb(), 'SCR', OWNER, [READ, { tap: '#eh-needs-list .eh-need[data-need="unpaid"]' }, { sleep: 300 }, READ]);
+    const [, b] = await go(liveDb(), 'SCR', OWNER, OPEN.concat([READ, { tap: '#eh-needs-list .eh-need[data-need="unpaid"]' }, { sleep: 300 }, READ]));
     assert.equal(b.desk, true);
     assert.equal(b.home, false);
     assert.equal(b.chip, 'Unpaid 2', 'the same 2 the home counted');
@@ -92,8 +94,8 @@ test('4 tapping "golfers unpaid" opens the Desk on its Unpaid chip', async () =>
 test('5 multi-round, prize amounts saved, no usable basis: the home asks, and its tap reaches the basis control', async () => {
     const db = F.groupDb();
     Object.assign(db.tournaments.FLT, { ownerUid: 'u-org', payoutSpots: [100], payoutBasis: 'rGone' });
-    const [a, b] = await go(db, 'FLT', OWNER, [READ, { tap: '#eh-needs-list .eh-need[data-need="basis"]' }, { sleep: 300 }, READ]);
-    assert.equal(a.home, true, 'scores are in: landed on Event day');
+    const [a, b] = await go(db, 'FLT', OWNER, OPEN.concat([READ, { tap: '#eh-needs-list .eh-need[data-need="basis"]' }, { sleep: 300 }, READ]));
+    assert.equal(a.home, true);
     assert.ok(a.needs.some((n) => n === '1 Pick what prizes go by Golfers see "Prize results coming soon" until you do'), JSON.stringify(a.needs));
     assert.equal(b.board, true);
     assert.ok(b.basisTop !== null && b.basisTop >= -2 && b.basisTop < 844, 'the basis control is on screen: top ' + b.basisTop);
@@ -101,7 +103,7 @@ test('5 multi-round, prize amounts saved, no usable basis: the home asks, and it
 
 test('6 money = base; the home shows no prize amount', async () => {
     execFileSync('git', ['diff', '--quiet', '09a51a93', '--', 'payouts.js', 'tournament-engine.js', 'handicap.js'], { cwd: __dirname });
-    const [a] = await go(liveDb(), 'SCR', OWNER);
+    const [a] = await go(liveDb(), 'SCR', OWNER, OPEN.concat([READ]));
     assert.ok(a.homeText && a.homeText.includes('teams scoring'), 'positive: the home rendered');
     assert.doesNotMatch(a.homeText, /\$|pro shop|credit/);
 });
