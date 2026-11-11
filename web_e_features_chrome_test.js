@@ -12,10 +12,12 @@
 //   3. A clip (Results) plays once when its card is in view: seen mid-play, then
 //      ended on its last frame and still there; with reduce motion, no clip loads.
 //   4. Try the GPS: the credit is on screen; a tap at a point shows the yards the
-//      picture's scale gives for that point; no location is asked for.
+//      picture's scale gives for that point; no location is asked for. LIVE ESRI
+//      (Nov 10): the box's only outside requests are its 16 Esri World Imagery
+//      z19 tiles, each loaded (offline: each hidden, the drawing still there).
 //   5. Try Just say it: typing a sentence shows the app's setup card, a chip
 //      shows another, an unknown sentence says so - and the page makes NO network
-//      request and writes no storage while you do it.
+//      request (beyond the GPS box's Esri tiles) and writes no storage while you do it.
 //   6. No "IDEA" mockup tag and no money word in what a visitor reads.
 // --use-mock-keychain: without it Chrome on this Mac waits on the login keychain
 // for any http navigation (website-d, measured).
@@ -248,11 +250,36 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         assert.ok(r.length === 6 && r.every((x) => !x), 'a clip loaded with reduce motion on: ' + JSON.stringify(r));
     });
 
-    test('Try the GPS: the credit shows, a tap gives the yards for that point, no location is asked for', async () => {
+    // LIVE ESRI (Manny, Nov 10): the picture is 16 Esri World Imagery z19 tiles loaded live. This checks that
+    // the box asks for exactly those 16 tiles and nothing else from outside, and that each loaded; when this
+    // machine is offline (none loaded) it checks the fallback instead - every tile hidden, the outline and
+    // the yards still drawn - and says so. Was: a saved picture, no network.
+    test('Try the GPS: the credit shows, a tap gives the yards for that point, no location is asked for; the 16 live Esri tiles are the only outside requests', async (t) => {
+        tab.requests = [];
         await tab.go(base + '/');
         const box = await tab.eval(`(() => { const m = document.getElementById('tg-map'); m.scrollIntoView({ block: 'center' }); return true; })()`);
         assert.ok(box);
         await sleep(700);
+        for (let i = 0; i < 120; i++) {   // the tiles: all 16 settled (loaded or failed) - up to 30 s, a first https connection here can be slow
+            const st = await tab.eval(`[...document.querySelectorAll('#tg-map .tile')].map((i) => i.complete ? (i.naturalWidth > 0 ? 1 : 0) : -1)`);
+            if (st.length === 16 && st.every((x) => x >= 0)) break;
+            await sleep(250);
+        }
+        const TILE = /^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/19\/\d+\/\d+$/;
+        const outside = tab.requests.filter((u) => !u.startsWith(base) && !/^data:|^about:|^chrome/.test(u));
+        assert.ok(outside.length >= 16 && outside.every((u) => TILE.test(u)), 'an outside request that is not an Esri tile: ' + JSON.stringify(outside.filter((u) => !TILE.test(u))));
+        assert.equal(new Set(outside).size, 16, 'not the 16 tiles: ' + outside.length);
+        const tiles = await tab.eval(`[...document.querySelectorAll('#tg-map .tile')].map((i) => ({ ok: i.naturalWidth > 0, err: i.classList.contains('err'), src: i.src }))`);
+        assert.equal(tiles.length, 16);
+        assert.deepEqual(tiles.map((x) => x.src).sort(), [...new Set(outside)].sort(), 'the tiles on the page are the tiles requested');
+        const loaded = tiles.filter((x) => x.ok).length;
+        if (loaded === 16) t.diagnostic('live Esri tiles: 16 of 16 loaded');
+        else if (loaded === 0) {   // offline here: the fallback
+            assert.ok(tiles.every((x) => x.err), 'a tile that did not load is not hidden');
+            assert.match(await tab.eval(`document.getElementById('tg-map').getAttribute('data-tiles')`), /^16 of 16 missing$/);
+            t.diagnostic('OFFLINE: no Esri tile loaded; the fallback (hidden tiles, the OSM drawing on the green ground) was checked instead');
+        } else assert.fail(loaded + ' of 16 tiles loaded (a partial picture)');
+        assert.ok(await tab.eval(`(() => { const p = document.querySelector('#tg-map svg polygon'); const r = p.getBoundingClientRect(); return r.width > 20 && getComputedStyle(p).visibility !== 'hidden'; })()`), 'the OSM green outline is not drawn');
         const credit = await tab.eval(`document.getElementById('try-gps').innerText`);
         assert.match(credit, /Powered by Esri · Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community · Hole outline © OpenStreetMap contributors/);
         assert.match(credit, /Demo:/);
@@ -296,7 +323,10 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         const local = await tab.eval('({ ls: localStorage.length, ss: sessionStorage.length, cookie: document.cookie, url: location.href })');
         await sleep(500);
         const lazyImages = tab.requests.filter((u) => /\/media\/screens\/[a-z0-9-]+\.webp$/.test(u));
-        const other = tab.requests.filter((u) => !lazyImages.includes(u));
+        // LIVE ESRI (Nov 10): the Try the GPS box above this one loads its 16 Esri tiles when it scrolls near;
+        // those are its (checked above), not Just say it's.
+        const esriTiles = tab.requests.filter((u) => /^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/19\/\d+\/\d+$/.test(u));
+        const other = tab.requests.filter((u) => !lazyImages.includes(u) && !esriTiles.includes(u));
         assert.deepEqual(other, [], 'Just say it made a network request');
         assert.deepEqual([local.ls, local.ss, local.cookie], [0, 0, ''], 'Just say it stored something');
         assert.ok(!/[?#]/.test(local.url.replace(base, '')), 'the form navigated: ' + local.url);

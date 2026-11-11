@@ -14,12 +14,16 @@
 //      the X, Esc, or the phone's Back button (the viewer adds one history
 //      entry and takes it back on close). Focus stays inside while it is open
 //      and returns to the card after.
-//   3. Try the GPS (idea 3): a real Esri satellite picture of Dobson Ranch
-//      hole 7 with its OpenStreetMap green. A tap (or the arrow keys) puts a
+//   3. Try the GPS (idea 3): Dobson Ranch hole 7 with its OpenStreetMap green.
+//      The satellite picture is Esri World Imagery loaded LIVE (Manny, Nov 10):
+//      16 z19 tiles on the page's own grid (plain <img>s in the HTML, lazy, no
+//      referrer, no key, no saved copy served). A tap (or the arrow keys) puts a
 //      target there and shows the yards from the "you" dot (on the tee) to the
 //      target and from the target to the middle of the green. The yards are
 //      measured on the picture (Web Mercator, metres per pixel in data-mpp).
-//      No location is asked for and nothing is sent.
+//      No location is asked for; nothing leaves the page but those tile
+//      requests. A tile that fails is hidden, and the OSM outline, the lines
+//      and the yards still draw over the green ground (offline, or blocked).
 //   4. Try Just say it (idea 4): the sentence typed is matched against a small
 //      table of sentences, and the card shown is the one the app's own parser
 //      (ask-hardpan.js askParse, dev-204) builds for that sentence for the
@@ -185,6 +189,15 @@
     // ---- 3. TRY THE GPS ----------------------------------------------------------
     var map = $('tg-map');
     if (map) {
+        // The live Esri tiles: one that fails to load is hidden (the green ground and the OSM drawing
+        // stay); data-tiles says how many are missing, for a check or a curious reader.
+        var tiles = map.querySelectorAll('.tile');
+        each(tiles, function (im) {
+            im.addEventListener('error', function () {
+                im.classList.add('err');
+                map.setAttribute('data-tiles', map.querySelectorAll('.tile.err').length + ' of ' + tiles.length + ' missing');
+            });
+        });
         var num = function (s) { return s.split(',').map(Number); };
         var MPP = Number(map.getAttribute('data-mpp')), W = Number(map.getAttribute('data-w')), H = Number(map.getAttribute('data-h'));
         var YOU = num(map.getAttribute('data-you')), MID = num(map.getAttribute('data-mid'));

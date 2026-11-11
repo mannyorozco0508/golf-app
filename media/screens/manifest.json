@@ -1,5 +1,5 @@
 {
-  "_about": "The still screens behind the website-e homepage feature cards (hardpan-home.html, 25 cards in five rows) and the Try the GPS picture. Each card has two WebP sizes: 400 wide (the card) and the full capture (the full-screen viewer). RE-CAPTURE (Nov 10, 2026): hazards, range, my-bag and weekly-code were re-shot from the 2.0.5 web app code (release-205, 42ec9711) in headless Chrome at 390x844, deviceScaleFactor 3, on the repo's own Firebase stand-in and IAP stand-in (nothing live): demo golfers Sam, Josh, Bob, Paul; no amounts. Their older files stay in this folder, listed under superseded, and nothing serves them. Not part of the app: not in sw.js's shell list, not in the native bundle.",
+  "_about": "The still screens behind the website-e homepage feature cards (hardpan-home.html, 25 cards in five rows) and the Try the GPS picture. Each card has two WebP sizes: 400 wide (the card) and the full capture (the full-screen viewer). RE-CAPTURE (Nov 10, 2026): hazards, range, my-bag and weekly-code were re-shot from the 2.0.5 web app code (release-205, 42ec9711) in headless Chrome at 390x844, deviceScaleFactor 3, on the repo's own Firebase stand-in and IAP stand-in (nothing live): demo golfers Sam, Josh, Bob, Paul; no amounts. Their older files stay in this folder, listed under superseded, and nothing serves them. Not part of the app: not in sw.js's shell list, not in the native bundle. LIVE ESRI (Manny, Nov 10): the Try the GPS picture is Esri World Imagery loaded live (16 z19 tiles in hardpan-home.html); the saved try-gps-dobson-7.webp is served by nothing (kept on disk, see try_gps). Strokes Gained, the Practice card and the Aim tip ship on Android 2.0.4 as on iPhone (Manny, Nov 10): no Coming soon on those cards, and none was pinned.",
   "folder": "/media/screens/",
   "screens": [
     {
@@ -242,13 +242,14 @@
     {
       "key": "prizes",
       "card": "f-prizes",
-      "headline": "Prizes, sorted.",
+      "headline": "Every flight, live.",
       "files": [
         "/media/screens/prizes-400.webp",
         "/media/screens/prizes-780.webp"
       ],
       "width": 780,
-      "height": 1100
+      "height": 1100,
+      "note": "Card 22 reworded Nov 10 (Manny): \"Every flight, live.\" - the live leaderboard and flights; was \"Prizes, sorted.\". The screen (the real tournament board) is unchanged; no amounts on it."
     },
     {
       "key": "strokes-gained",
@@ -288,9 +289,9 @@
   ],
   "try_gps": {
     "file": "/media/screens/try-gps-dobson-7.webp",
-    "used_on": [
-      "/home Try the GPS"
-    ]
+    "used_on": [],
+    "unused_since": "live Esri tiles (2026-11-10)",
+    "note": "The saved Esri World Imagery crop (z19, 610x780) that Try the GPS showed until Nov 10. The box now loads the same 16 tiles live from Esri. Kept on disk, served by no page; deleting it is Manny's call."
   },
   "superseded": [
     {
