@@ -492,7 +492,8 @@ describe('I. M1 web part: the organizer\'s event-day panel', () => {
     test('I3 the prize summary is the Prize Results list a watcher reads (same engine, same saved spots)', () => {
         const watcher = arriveOwner(day(), { user: null });
         const fromResults = plain(html(watcher, 'payout-results')).replace(/ — /g, ' ');
-        assert.match(fromResults, /1st Team 9 \$600\.00 2nd Team 7 \$250\.00/);
+        // Re-pinned 2026-11-11: prizes read as pro shop credit (main, no cash prizes).
+        assert.match(fromResults, /1st Team 9 \$600 pro shop credit 2nd Team 7 \$250 pro shop credit/);
         const owner = arriveOwner(day());
         assert.ok(plain(html(owner, 'event-day-panel')).indexOf(fromResults) !== -1, 'the panel carries the same lines');
     });
