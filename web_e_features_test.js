@@ -114,9 +114,40 @@ describe('1. the 25 cards', () => {
             // the old tile ids that tests and links use stay on their feature
         });
         ['f-gps', 'f-say', 'f-group', 'f-games', 'f-results', 'f-tourney', 'f-weekly', 'f-chat', 'f-bag'].forEach((id) => assert.ok(ids.has(id), id + ' is gone'));
-        // a sharp screen: the large size is at least 2x a 390-wide phone's card (and every screen but one is)
+        // a sharp screen: the large size is at least 2x a 390-wide phone's card. RE-CAPTURE re-pin (Nov 10):
+        // every one of the 25 (was 24: the weekly-code card showed a 295 px poster until its re-capture).
         const wide = cards.filter((c) => Number(/\bwidth="(\d+)"/.exec(c.img)[1]) >= 780).length;
-        assert.ok(wide >= 24, 'only ' + wide + ' of 25 screens are 2x or sharper');
+        assert.equal(wide, 25, 'only ' + wide + ' of 25 screens are 2x or sharper');
+    });
+
+    // RE-CAPTURE (Nov 10): hazards, range, my-bag and weekly-code were re-shot from the 2.0.5 web app
+    // (release-205) in headless Chrome at 390x844 @3x - 1170x2532, light sheets, demo golfer Sam. The older
+    // files (a dark sheet, a cropped title, a 295 px poster; the three old -400 files as -400-superseded) stay in
+    // media/screens/ and nothing serves them;
+    // media/screens/manifest.json lists every screen and marks those files superseded.
+    test('the four re-captured screens are the 3x captures; the screens manifest lists all 25 and marks the old files unused', () => {
+        const manifest = JSON.parse(read('media/screens/manifest.json'));
+        assert.equal(manifest.folder, '/media/screens/');
+        assert.equal(manifest.screens.length, 25);
+        assert.deepEqual(manifest.screens.map((s) => s.key), cards.map((c) => c.key), 'the manifest lists the cards in page order');
+        ['hazards', 'range', 'my-bag', 'weekly-code'].forEach((k) => {
+            const c = cards.find((x) => x.key === k);
+            assert.match(c.img, new RegExp('src="/media/screens/' + k + '-400\\.webp" srcset="/media/screens/' + k + '-400\\.webp 400w, /media/screens/' + k + '-1170\\.webp 1170w"'), k + ': not the 400 + 1170 pair');
+            assert.match(c.img, /\bwidth="1170" height="2532"/, k + ': not a 390x844 @3x capture');
+            const m = manifest.screens.find((s) => s.key === k);
+            assert.ok(m && /release-205/.test(m.captured) && m.recaptured, k + ': the manifest does not say where it came from');
+            assert.deepEqual(m.files, ['/media/screens/' + k + '-400.webp', '/media/screens/' + k + '-1170.webp']);
+        });
+        manifest.screens.forEach((s) => s.files.forEach((f) => assert.ok(exists(f.slice(1)), f + ' is missing')));
+        // the superseded files: still here, listed, and served by no page
+        const old = ['/media/screens/hazards-400-superseded.webp', '/media/screens/hazards-786.webp', '/media/screens/my-bag-400-superseded.webp', '/media/screens/my-bag-786.webp', '/media/screens/range-400-superseded.webp', '/media/screens/range-786.webp', '/media/screens/weekly-code-295.webp'];
+        assert.deepEqual(manifest.superseded.map((s) => s.file).sort(), old);
+        manifest.superseded.forEach((s) => { assert.ok(exists(s.file.slice(1)), s.file + ' was deleted'); assert.deepEqual(s.used_on, []); assert.match(s.unused_since, /re-capture/); });
+        const pages = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html')).concat(fs.readdirSync(path.join(ROOT, 'help')).map((f) => 'help/' + f)).filter((f) => f.endsWith('.html'));
+        pages.forEach((f) => old.forEach((o) => assert.ok(!read(f).includes(o), f + ' still serves ' + o)));
+        assert.ok(!/-786\.webp|-295\.webp|-superseded\.webp/.test(read('site-features.js')));
+        // no "Test" golfer, no amount on the captures' alt text (the demo golfers are Sam, Josh, Bob, Paul)
+        ['hazards', 'range', 'my-bag', 'weekly-code'].forEach((k) => { const alt = /\balt="([^"]*)"/.exec(cards.find((x) => x.key === k).img)[1]; assert.doesNotMatch(alt, /\bTest\b|\$/, k); });
     });
 
     test('each card opens the viewer: the screen is a real button with a name', () => {
