@@ -1304,18 +1304,64 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
         return bestScore > 0 ? best : null;
     }
+    // THE QUERIES, in order (the provider's search is literal - measured
+    // 2026-11-11: "Papago Golf Club" finds nothing, "papago" finds Papago Golf
+    // Course): the name as typed, then its distinctive words, then the first
+    // of them. admin.html sends variants the same way (courseQueryVariants).
+    function courseLookupQueries(name) {
+        const out = [];
+        const add = (q) => { const t = String(q || '').trim(); if (t && !out.some((o) => o.toLowerCase() === t.toLowerCase())) out.push(t); };
+        const core = courseNameTokens(name);
+        add(name);
+        add(core.join(' '));
+        if (core.length > 1) add(core[0]);
+        return out;
+    }
+    // THE SHARED LIST BY NAME: the HardPan app's own course records
+    // (global_courses) are keyed by whatever imported them, so a card for this
+    // course can sit under a key the directory does not use. The best name
+    // match with a card wins; a stub with no card is fetched (ensureCard).
+    function bestSharedCourseKey(name) {
+        const want = courseNameTokens(name);
+        let best = null, bestScore = 0;
+        Object.keys(globalCourses || {}).forEach((k) => {
+            const have = courseNameTokens((globalCourses[k] || {}).name);
+            const score = want.filter((w) => have.indexOf(w) !== -1).length;
+            if (score > bestScore || (score === bestScore && best && !resolveCourseCard(best) && resolveCourseCard(k))) { best = k; bestScore = score; }
+        });
+        return bestScore > 0 && bestScore >= Math.ceil(want.length / 2) ? best : null;
+    }
     async function autoFetchCourseCard(key, name) {
         const token = ++autoFetchToken;
         const stillWanted = () => token === autoFetchToken && document.getElementById('course-key').value === key;
-        showCourseNote(`Looking up the scorecard for ${name} online\u2026`);
+        showCourseNote(`Looking up the scorecard for ${name}\u2026`);
         const fail = (why) => {
             if (!stillWanted()) return;
             showCourseNote(why + PLACEHOLDER_TAIL, { id: 'course-note-online', label: '🌐 Try the online lookup again', onClick: () => autoFetchCourseCard(key, name) });
         };
-        let search;
-        try { const res = await fetch('/api/course-search?q=' + encodeURIComponent(name)); search = await res.json(); }
-        catch (e) { search = { status: 'unavailable', reason: 'network' }; }
-        if (!stillWanted()) return;
+        // 1. The shared course list, by name.
+        const sharedKey = bestSharedCourseKey(name);
+        if (sharedKey) {
+            try { await courseIndex.ensureCard(sharedKey); } catch (e) { /* no card there */ }
+            if (!stillWanted()) return;
+            const shared = resolveCourseCard(sharedKey);
+            if (shared) {
+                const sharedName = (globalCourses[sharedKey] || {}).name || name;
+                pickCourseNow(sharedKey, sharedName);
+                showCourseNote(`Scorecard: ${sharedName}, from the shared course list.`);
+                return;
+            }
+        }
+        // 2. The provider, with query variants.
+        let search = null;
+        const queries = courseLookupQueries(name);
+        for (let i = 0; i < queries.length; i++) {
+            try { const res = await fetch('/api/course-search?q=' + encodeURIComponent(queries[i])); search = await res.json(); }
+            catch (e) { search = { status: 'unavailable', reason: 'network' }; }
+            if (!stillWanted()) return;
+            if (!search || search.status !== 'ok') break;
+            if (bestCourseMatch(name, search.courses)) break;
+        }
         if (!search || search.status !== 'ok') { fail(`Couldn't look up ${name} online: ${courseImportMessage((search && search.reason) || 'upstream_error')}`); return; }
         const match = bestCourseMatch(name, search.courses);
         if (!match) { fail(`Nothing online matched ${name}.`); return; }
