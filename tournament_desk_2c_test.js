@@ -109,7 +109,8 @@ describe('1. THE DESK IS ITS OWN TAB, and the gate takes it with Setup', () => {
     test('static markup: a Desk tab between Setup and Leaderboard, a Desk panel that holds the list; Setup keeps the switches and the link', () => {
         const nav = SRC.slice(SRC.indexOf('<div class="top-nav-bar">'), SRC.indexOf('</div>', SRC.indexOf('<div class="top-nav-bar">')));
         const ids = [...nav.matchAll(/id="tab-btn-([a-z]+)"/g)].map(m => m[1]);
-        assert.deepEqual(ids, ['setup', 'desk', 'leaderboard']);
+        // Re-pinned 2026-11-10 (T3B): the owner-only Event day tab sits first. Desk still sits between Setup and Leaderboard.
+        assert.deepEqual(ids, ['home', 'setup', 'desk', 'leaderboard']);
         assert.match(nav, /showTab\('desk'\)/);
         const setupA = SRC.indexOf('<div id="manage-tab-setup">');
         const deskA = SRC.indexOf('<div id="manage-tab-desk"');
