@@ -194,8 +194,8 @@ describe('a returning visitor with the v393 (live main) worker gets website-d on
         });
 
         test('the v394 worker takes over by itself and the v393 cache is deleted', async () => {
-            const s = await tab.waitFor((x) => x.caches.length === 1 && x.caches[0] === 'golfapp-v395-2.0', 20000);
-            assert.deepEqual(s.caches, ['golfapp-v395-2.0'], 'old caches left: ' + s.caches.join(','));
+            const s = await tab.waitFor((x) => x.caches.length === 1 && x.caches[0] === 'golfapp-v396-2.0', 20000);
+            assert.deepEqual(s.caches, ['golfapp-v396-2.0'], 'old caches left: ' + s.caches.join(','));
         });
 
         test('second visit to /, then /app, a ?game= link and /home: each is the right page, no moon', async () => {

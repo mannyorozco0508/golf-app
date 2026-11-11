@@ -209,7 +209,8 @@ describe('THE TOURNAMENT APP ICON ASSET SEAM', () => {
         // Read as JSON, not matched as a string. The name, the start_url and the
         // icons are what an install prompt actually shows.
         const m = JSON.parse(read('tournament-manifest.json'));
-        assert.equal(m.name, 'Rattle Golf Tournaments');
+        // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
+        assert.equal(m.name, 'HardPan Tournaments');
         assert.equal(m.start_url, './tournament.html');
         assert.ok(m.icons.length >= 2);
         m.icons.forEach(i => {
@@ -246,7 +247,7 @@ describe('THE TOURNAMENT APP ICON ASSET SEAM', () => {
         // installed device keeps serving the old mark and a page whose head has
         // no manifest link in it at all.
         const block = BUILD.slice(BUILD.indexOf('tournament: {'));
-        assert.match(block, /cacheName: 'tournament-v60-phase1'/);
+        assert.match(block, /cacheName: 'tournament-v61-hardpan'/);
     });
 
     // Minimal PNG corner reader — same approach as rattle_identity_test.js, kept

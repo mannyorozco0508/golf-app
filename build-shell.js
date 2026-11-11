@@ -274,8 +274,11 @@ const PRODUCTS = {
         // Moved to v60 FOR PHASE 1 (2026-11-10). tournament.html, tournament-scorecard.html
         // and tournament-engine.js changed: in-app card and board, Apple/Google organizer
         // sign-in, no cash prize wording. A device on v59 keeps cash prize wording.
-        cacheName: 'tournament-v60-phase1',
-        appName: 'Rattle Golf Tournaments',
+        // Moved to v61 FOR THE HARDPAN RENAME (2026-11-11, Manny picked option A).
+        // tournament.html, tournament-scorecard.html and the manifest now say
+        // HardPan Tournaments. A device on v60 keeps the Rattle Golf header.
+        cacheName: 'tournament-v61-hardpan',
+        appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
         startUrl: './tournament.html',

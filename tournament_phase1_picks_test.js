@@ -1,7 +1,7 @@
 // Phase 1 picks (Manny, 2026-11-10), reached the way a user reaches them.
 //
 //  1. Entry-fee help: "The organizer collects entry fees (cash, Venmo, etc.).
-//     Card payments in Rattle Golf are coming." A signed-in organizer arriving cold
+//     Card payments in HardPan are coming." A signed-in organizer arriving cold
 //     at tournament.html sees it with no tap (the default state), and after
 //     pressing the Individual format card (which rewrites the help).
 //  2. Leaderboard Share note, option A: the "Anyone with this link..." note
@@ -24,7 +24,7 @@ const { arriveCold, REPO_ROOT } = require('./tools/lib/cold-arrival.js');
 const { decodeEscapes } = require('./helpers/decode-escapes.js');
 
 const PAGE = path.join(REPO_ROOT, 'tournament.html');
-const HELP = 'The organizer collects entry fees (cash, Venmo, etc.). Card payments in Rattle Golf are coming.';
+const HELP = 'The organizer collects entry fees (cash, Venmo, etc.). Card payments in HardPan are coming.';
 const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
 const CODE = 'PICKS1';
 const SI = [12, 8, 14, 6, 2, 16, 4, 10, 18, 15, 13, 9, 5, 7, 3, 1, 17, 11];

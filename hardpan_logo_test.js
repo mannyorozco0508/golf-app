@@ -265,12 +265,13 @@ describe('NATIVE ICONS ARE THE HARDPAN BALL', () => {
         assert.ok(green > 0, 'the splash has no forest-green ground');
     });
 
-    test('tournaments say Rattle Golf beside the ball mark', () => {
+    test('tournaments say HardPan beside the inline HardPan mark (no consumer file)', () => {
+        // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
         const t = read('tournament.html');
-        assert.match(t, /<img class="wm-mark" src="logo-mark\.png"/);
-        assert.match(t, /<span class="wm-rattle">Rattle Golf<\/span>/);
+        assert.match(t, /<svg class="wm-mark" viewBox="4 24 92 46"/);
+        assert.match(t, /<span class="wm-rattle">HardPan<\/span>/);
         assert.match(t, /<span class="wm-product">Tournaments<\/span>/);
-        assert.ok(!/HardPan/.test(t), 'the tournament page must not say HardPan');
+        assert.ok(!/Rattle Golf/.test(t.replace(/<!--[\s\S]*?-->/g, '')), 'the tournament page no longer says Rattle Golf');
     });
 
     test('the lobby still has the email-link card', () => {
