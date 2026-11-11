@@ -355,7 +355,7 @@ describe('5. THE SERVICE WORKER LEAVES /__/ ALONE', () => {
     });
     test('the version moved, with its Moved to line', () => {
         const sw = read('sw.js');
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v395-2\.0';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v396-2\.0';/);
         assert.match(sw, /\/\/ Moved to v383-2\.0 \(web sign-in by redirect\)/);
     });
 });

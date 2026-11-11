@@ -170,10 +170,9 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
 
     test('the Tournament shell keeps its own independent identity', () => {
         const tournament = BUILD.slice(BUILD.indexOf('tournament: {'));
-        assert.ok(!/HardPan/.test(tournament),
-            'Tournament shell identity is Rattle Golf Tournaments, not HardPan');
-        assert.match(tournament, /appName: 'Rattle Golf Tournaments'/,
-            'Tournament web product is Rattle Golf Tournaments');
+        // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
+        assert.match(tournament, /appName: 'HardPan Tournaments'/,
+            'Tournament web product is HardPan Tournaments');
         assert.ok(!/appName: 'HardPan',/.test(tournament),
             'Tournament must not reuse the consumer name literal');
     });
@@ -191,22 +190,24 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
         // Golf again. The landing wordmark is Rattle Golf + Tournaments. The
         // engine stays product-neutral. The scorecard carries the product
         // name only in its title.
-        ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js', 'tournament-manifest.json']
-            .forEach(f => assert.ok(!/HardPan/.test(read(f)), `${f} must not say HardPan`));
-        assert.match(read('tournament-manifest.json'), /Rattle Golf Tournaments/);
-        assert.match(read('tournament.html'), /<title>Rattle Golf Tournaments<\/title>/);
-        assert.match(read('tournament-scorecard.html'), /<title>Rattle Golf Tournaments<\/title>/);
-        assert.match(read('tournament.html'), /aria-label="Rattle Golf Tournaments"/);
+        // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
+        const noComments = (s) => s.replace(/<!--[\s\S]*?-->/g, '');
+        ['tournament.html', 'tournament-scorecard.html', 'tournament-manifest.json']
+            .forEach(f => assert.ok(!/Rattle Golf/.test(noComments(read(f))), `${f} must not say Rattle Golf`));
+        assert.match(read('tournament-manifest.json'), /"name": "HardPan Tournaments"/);
+        assert.match(read('tournament.html'), /<title>HardPan Tournaments<\/title>/);
+        assert.match(read('tournament-scorecard.html'), /<title>HardPan Tournaments<\/title>/);
+        assert.match(read('tournament.html'), /aria-label="HardPan Tournaments"/);
         assert.ok(!/Rattle/.test(read('tournament-engine.js')),
             'the engine stays product-neutral');
         const scorecard = read('tournament-scorecard.html').replace(/<title>[^<]*<\/title>/, '');
         assert.ok(!/Rattle/.test(scorecard),
             'the scorecard carries the product name only in the title');
         const t = read('tournament.html');
-        assert.match(t, /<img class="wm-mark" src="logo-mark\.png"/,
-            'the mark file has no word on it');
-        assert.match(t, /<span class="wm-rattle">Rattle Golf<\/span>/,
-            'Rattle Golf sits with the mark');
+        assert.match(t, /<svg class="wm-mark" viewBox="4 24 92 46"/,
+            'the HardPan mark, inline, with no word on it');
+        assert.match(t, /<span class="wm-rattle">HardPan<\/span>/,
+            'HardPan sits with the mark');
         assert.match(t, /<span class="wm-product">Tournaments<\/span>/,
             'Tournaments is the product word');
         assert.ok(!/wm-slash/.test(t), 'the slash wordmark is gone');
@@ -251,7 +252,7 @@ describe('COMPATIBILITY IDENTIFIERS SURVIVED THE RENAME', () => {
     });
 
     test('the cache version moved for this batch', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v395-2.0';/,
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v396-2.0';/,
             'visible identity files changed, so an installed PWA must drop its old shell');
     });
 });
@@ -577,14 +578,15 @@ describe('THE BRAND MARK ASSET', () => {
         const tournament = /const TOURNAMENT_SHELL = \[([\s\S]*?)\];/.exec(sync)[1];
         assert.ok(!shared.includes('logo-mark.png'), 'not shared');
         assert.ok(!tournament.includes('logo-mark.png'), 'not Tournament');
-        assert.match(read('tournament.html'), /src="logo-mark\.png"/,
-            'the landing hero uses the parent brand mark');
+        // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock. The hero no longer loads logo-mark.png at all.
+        assert.ok(!/src="logo-mark\.png"/.test(read('tournament.html')),
+            'the landing hero draws the HardPan mark inline, not the old ball file');
     });
 
     test('the cache moved — the header changed and installed devices must see it', () => {
-        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v395-2.0';/);
+        assert.match(read('sw.js'), /const CACHE_VERSION = 'golfapp-v396-2.0';/);
         assert.match(BUILD, /cacheName: 'consumer-v165-new-logo'/);
-        assert.match(BUILD, /cacheName: 'tournament-v60-phase1'/,
+        assert.match(BUILD, /cacheName: 'tournament-v61-hardpan'/,
             'Tournament cache moved because the product name is Rattle Golf again');
     });
 });

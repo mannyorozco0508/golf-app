@@ -74,7 +74,8 @@ const DELIBERATE = [
     {
         why: 'the trophy glyph, the bare title and the old subtitle become the hero band',
         from: '|🏆|Tournament|Multi-team events with a shared leaderboard — built for benefit tournaments, member-guests, and club events.|',
-        to: '|Rattle Golf|Tournaments|' + HERO_LINE + '|'
+        // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
+        to: '|HardPan|Tournaments|' + HERO_LINE + '|'
     },
     {
         why: 'the Individual card gets the same icon slot as the other three instead of an emoji inside its name',
@@ -92,8 +93,8 @@ const DELIBERATE = [
         // Copy only; the same wave's payout tests were re-pinned in a838f5a0.
         why: 'web-25 wording: no pool / payouts / settle up',
         from: '|Pool and payouts are calculated for you once teams are in \u2014 this is just the calculator, settle up for real however your event normally does.|',
-        // RE-PINNED 2026-11-10 (Manny's wording, phase 1; "Rattle Golf" per the 09-23 lock, Manny picked): the help says who collects the fee.
-        to: '|The organizer collects entry fees (cash, Venmo, etc.). Card payments in Rattle Golf are coming.|'
+        // RE-PINNED 2026-11-10 (Manny wording, phase 1), then 2026-11-11 for rename option A: the help says who collects the fee.
+        to: '|The organizer collects entry fees (cash, Venmo, etc.). Card payments in HardPan are coming.|'
     }
 ];
 
@@ -135,10 +136,11 @@ describe('THE HERO BAND', () => {
         const at = region.indexOf('id="tourney-hero"');
         assert.ok(at > 0, 'no #tourney-hero on the setup screen');
         const hero = region.slice(at, region.indexOf('id="signin-panel-setup"'));
-        assert.match(hero, /<img class="wm-mark" src="logo-mark\.png" alt="" width="56" height="56">/,
-            'the parent brand is the mark file');
-        assert.match(hero, /<span class="wm-rattle">Rattle Golf<\/span>/,
-            'Rattle Golf sits with the mark');
+        // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
+        assert.match(hero, /<svg class="wm-mark" viewBox="4 24 92 46" width="56" height="28" aria-hidden="true" focusable="false">/,
+            'the HardPan mark, inline');
+        assert.match(hero, /<span class="wm-rattle">HardPan<\/span>/,
+            'HardPan sits with the mark');
         assert.match(hero, /<span class="wm-product">Tournaments<\/span>/,
             'Tournaments is the product word on the right');
         assert.ok(!/wm-slash/.test(hero), 'the slash wordmark must not return');
