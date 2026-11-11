@@ -186,9 +186,10 @@ const FILL_TEAM = { expression: `(function(){ document.getElementById('t-name').
     if (cMissed.length) bail('a step found nothing (no-card arm)', cMissed);
     const cam = J(c, 6);
     if (!cam) bail('no-card probe did not parse', c.value);
-    if (cam.courseKey) failures.push('no-card: a course with no card was selected: ' + cam.courseKey);
-    if (!cam.rows.some(r => /No card for Mint Valley Golf Course yet\./.test(r))) failures.push('no-card: no "No card" note: ' + JSON.stringify(cam.rows));
-    if (!cam.onlineRect || cam.onlineRect.h === 0 || !cam.rows.some(r => /Get the card for "Mint Valley Golf Course" online/.test(r))) failures.push('no-card: the fetch row is not offered by name: ' + JSON.stringify(cam.rows));
+    // Re-pinned 2026-11-11 (Advisor): a no-card pick is SELECTED on a placeholder card; the note under the box says so and offers the fetch.
+    if (!cam.courseKey) failures.push('no-card: the course was not selected (placeholder card expected)');
+    if (!/No scorecard for Mint Valley Golf Course yet\./.test(cam.note || '')) failures.push('no-card: no placeholder note under the box: ' + JSON.stringify(cam.note));
+    if (!/Get the card for "Mint Valley Golf Course" online/.test(cam.note || '')) failures.push('no-card: the fetch is not offered by name: ' + JSON.stringify(cam.note));
     if (cam.api.length !== 0) failures.push('no-card: a request was spent without a tap: ' + JSON.stringify(cam.api));
 
     const verdict = failures.length ? 'FAIL' : 'PASS';

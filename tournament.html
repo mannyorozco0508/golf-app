@@ -173,6 +173,8 @@
         .custom-select-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
         .custom-select-group { background: var(--nav-bg); font-weight: bold; font-size: 0.75rem; padding: 6px 12px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-faint); }
         .custom-select-note { padding: 10px 12px; color: var(--text-muted); text-align: center; font-size: 0.85rem; }
+        .course-note { font-size: 0.82rem; color: var(--warn-text); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 8px 10px; margin: 8px 0 0 0; line-height: 1.4; }
+        .course-note button { display: block; width: auto; margin: 8px 0 0 0; padding: 7px 10px; font-size: 0.8rem; }
         .course-online-result div:last-child { font-size: 0.74rem; color: var(--text-muted); }
         /* The import confirm panel: the whole card, read-only, and a tee chooser. */
         #course-import-confirm { border: 1px solid var(--brand-green); border-radius: 8px; padding: 12px; margin: 10px 0; font-size: 0.84rem; }
@@ -592,6 +594,10 @@
         <input type="hidden" id="course-key">
         <!-- The online import's confirm panel is built here (course search, 2026-09-17). -->
         <div id="course-import-host"></div>
+        <!-- 2026-11-11 (Advisor, Manny): what the picker has to say, under the box and
+             never in a dialog: a course with no card (selected on a placeholder, with
+             the fetch one tap away) or "pick a course first" from Save. -->
+        <p id="course-note" class="course-note" style="display:none;" role="status"></p>
     </div>
     <!-- PHASE 2, S1 A (2026-11-11): date and start ON THE CREATE FORM. The same
          keys the manage screen's Event details write after the save (eventDate
@@ -1469,15 +1475,25 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function pickCourseNow(key, name) {
         const card = resolveCourseCard(key);
         if (!card) {
-            // NO CARD ANYWHERE. Not selected - the event would score on fiction.
-            // Offer the fetch, by the course's name, and say why.
-            selectedCourseKey = ""; selectedCourseName = ""; selectedCourseData = null; selectedCourseIsSynthetic = false;
-            document.getElementById('course-key').value = '';
-            const dropdown = document.getElementById('course-dropdown');
-            dropdown.innerHTML = '';
-            dropdown.appendChild(pickerNote(`No card for ${name} yet.`));
-            dropdown.appendChild(pickerOnlineRow(name, `🌐 Get the card for "${name}" online`));
-            dropdown.style.display = 'block';
+            // NO CARD ANYWHERE (re-decided 2026-11-11; Manny through the Advisor:
+            // "this needs to work like the GPS and games app"). The course IS
+            // selected, on a placeholder card - eighteen par 4s, stroke index 1..18 -
+            // and the page says so under the box, with the online fetch one tap
+            // away. Wave 38's SILENT fallback is not back: the words are on screen,
+            // and courseIndexSynthetic rides on the record as before, which keeps
+            // Net off an invented index. Measured on the preview 2026-11-11: with
+            // this branch refusing, an organizer could not create an event at all
+            // where the online search is not configured.
+            selectedCourseKey = key;
+            selectedCourseName = name;
+            selectedCourseData = placeholderCard();
+            selectedCourseIsSynthetic = true;
+            document.getElementById('course-search-input').value = name;
+            document.getElementById('course-key').value = key;
+            document.getElementById('course-dropdown').style.display = 'none';
+            removeCourseImportPanel();
+            showCourseNote(`No scorecard for ${name} yet. Pars are set to 4 and the stroke index to 1–18 until a card is loaded, so the event scores gross.`,
+                { id: 'course-note-online', label: `🌐 Get the card for "${name}" online`, query: name });
             return;
         }
         selectedCourseKey = key;
@@ -1488,6 +1504,31 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         document.getElementById('course-key').value = key;
         document.getElementById('course-dropdown').style.display = 'none';
         removeCourseImportPanel();
+        hideCourseNote();
+    }
+    // The placeholder card: what the page scores on until a real card arrives.
+    // Built fresh each time so nothing can edit a shared copy.
+    function placeholderCard() {
+        return Array.from({ length: 18 }, (_, i) => ({ hole: i + 1, par: 4, hcpIndex: i + 1 }));
+    }
+    // ONE line under the course box, never a dialog (Advisor 2026-11-11). An
+    // optional button runs the same online search the dropdown's row runs.
+    function showCourseNote(text, action) {
+        const el = document.getElementById('course-note');
+        if (!el) return;
+        el.textContent = text;
+        if (action && action.label) {
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'btn-outline'; b.id = action.id || 'course-note-action';
+            b.textContent = action.label;
+            b.onclick = () => { runTournamentOnlineSearch(action.query, b); };
+            el.appendChild(b);
+        }
+        el.style.display = 'block';
+    }
+    function hideCourseNote() {
+        const el = document.getElementById('course-note');
+        if (el) { el.style.display = 'none'; el.textContent = ''; }
     }
 
     // ---- THE SEARCH. FIRED BY A TAP AND NOTHING ELSE. ----
@@ -1994,7 +2035,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return;
         }
         const name = document.getElementById('t-name').value.trim() || "Golf Tournament";
-        if (!selectedCourseData) { alert("⚠️ Please select a golf course."); return; }
+        if (!selectedCourseData) {
+            // Inline, never a dialog (Advisor 2026-11-11), and the box comes into view.
+            showCourseNote('Pick a golf course first.');
+            const box = document.getElementById('course-search-input');
+            if (box && box.scrollIntoView) box.scrollIntoView({ block: 'center' });
+            return;
+        }
 
         const teamBlocks = document.querySelectorAll('#teams-list .team-card');
         const teams = {};

@@ -387,17 +387,28 @@ describe('4. CONFIRM INLINES THE CARD - INTO THE EVENT, NEVER global_courses', (
 });
 
 // ===========================================================================
-describe('5. THE SILENT FALLBACK IS GONE', () => {
-    test('a directory course with no card anywhere is NOT selected; the row offers the online fetch by name', async () => {
+describe('5. THE SILENT FALLBACK IS GONE - and the LOUD one is what a no-card pick gets (re-pinned 2026-11-11)', () => {
+    // RE-PINNED 2026-11-11 (Advisor; Manny: "this needs to work like the GPS and
+    // games app"). Wave 38 refused the pick; measured on the preview, that left an
+    // organizer unable to create an event wherever the online search is not
+    // configured. Now the pick is SELECTED on a placeholder card (18 par 4s, SI
+    // 1..18, courseIndexSynthetic), the page SAYS so under the box, and the
+    // online fetch is still one tap away - offered, not spent.
+    test('a directory course with no card anywhere is selected on a placeholder card; the note under the box says so and offers the online fetch by name', async () => {
         const sb = arrive();
         stubFetch(sb, OK([]));
         typeCourse(sb, 'cameron');
         await pick(sb, 'cameron', 'Cameron');
-        assert.equal(sb.document.getElementById('course-key').value || '', '', 'no card, no selection');
-        const t = rows(sb).map(rowText).join(' | ');
-        assert.match(t, /No card for Cameron yet\./);
-        const r = onlineRow(sb);
-        assert.ok(r && /Get the card for "Cameron" online/.test(rowText(r)));
+        assert.equal(sb.document.getElementById('course-key').value, 'cameron', 'selected');
+        assert.equal(sb.document.getElementById('course-search-input').value, 'Cameron');
+        // The placeholder card and courseIndexSynthetic are page-local `let`s, out of
+        // this sandbox's reach; tournament_course_pick_test.js (Chrome) reads them off
+        // the record a real Save writes.
+        const note = sb.document.getElementById('course-note');
+        assert.equal((note.style || {}).display, 'block', 'the note is shown');
+        assert.match(String(note.textContent), /^No scorecard for Cameron yet\. Pars are set to 4 and the stroke index to 1–18 until a card is loaded, so the event scores gross\./);
+        const b = (note.children || []).find((c) => c.id === 'course-note-online');
+        assert.ok(b && /Get the card for "Cameron" online/.test(String(b.textContent)), 'the fetch is offered by name');
         assert.equal(apiCalls(sb).length, 0, 'offered, not spent');
     });
     test('the fetch row for a card-less pick searches the course NAME', async () => {
@@ -405,7 +416,10 @@ describe('5. THE SILENT FALLBACK IS GONE', () => {
         stubFetch(sb, OK([]));
         typeCourse(sb, 'cameron');
         await pick(sb, 'cameron', 'Cameron');
-        onlineRow(sb).click(); await settle();
+        // Re-pinned 2026-11-11: the fetch is the note's button under the box (the list closed on the pick).
+        const b = (sb.document.getElementById('course-note').children || []).find((c) => c.id === 'course-note-online');
+        assert.ok(b, 'the note offers the fetch');
+        b.onclick(); await settle();
         assert.equal(apiCalls(sb)[0], '/api/course-search?q=Cameron');
     });
     test('a directory course WITH a preset still selects at once, no request', async () => {
@@ -431,7 +445,11 @@ describe('5. THE SILENT FALLBACK IS GONE', () => {
         const alerts = []; sb.alert = (m) => alerts.push(String(m));
         sb.document.getElementById('t-name').value = 'No Course';
         await sb.saveTournament(); await settle();
-        assert.ok(alerts.some(m => /select a golf course/i.test(m)));
+        // Re-pinned 2026-11-11 (Advisor): the refusal is a line under the course box, never a dialog.
+        assert.deepEqual(alerts, [], 'no dialog');
+        const note = sb.document.getElementById('course-note');
+        assert.equal((note.style || {}).display, 'block');
+        assert.equal(String(note.textContent), 'Pick a golf course first.');
         assert.equal(sb.__dbWrites.filter(w => /^tournaments\//.test(w.path)).length, 0);
     });
 });
