@@ -2581,6 +2581,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const el = document.getElementById(id);
             if (el && document.activeElement !== el) el.value = data[key] == null ? '' : String(data[key]);
         });
+        // THE VENUE IS THE COURSE until the organizer says otherwise (Manny
+        // 2026-11-11): an event made before today has no venue on the record,
+        // so the box SHOWS the course name - a display, not a write; editing it
+        // writes, as before. The header's own line already names the course.
+        const venueEl = document.getElementById('ev-venue');
+        if (venueEl && document.activeElement !== venueEl && !String(data.venue || '').trim() && data.courseName) venueEl.value = String(data.courseName);
         const seg = document.getElementById('ev-fee-per');
         if (seg) {
             seg.style.display = data.scoringModel === PLAYER_MODEL ? 'none' : '';
