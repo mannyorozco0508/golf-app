@@ -284,7 +284,8 @@ const PRODUCTS = {
         // Tournaments. A device on v61 keeps the Rattle Golf R icon.
         // Moved to v63 FOR PHASE 2 + THE EVENT COMMS PICKS (2026-11-11, Manny OK): see sw.js v399.
         // A device on v62 keeps the pages without app mode, the one fee field and the comms picks.
-        cacheName: 'tournament-v63-phase2',
+        // Moved to v64 FOR THE KEYED SETUP LINKS (2026-11-11, Manny OK): see sw.js v400.
+        cacheName: 'tournament-v64-keyed-links',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

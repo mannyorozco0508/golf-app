@@ -4537,7 +4537,8 @@ const APP_SHELL_ALIASES = ['./', './app'];
 // A device on v396-2.0 keeps the pages without the label.
 // Moved to v398-2.0 (Nov 11, Manny OK fix results winner line): text-safe.js - a $0 2v2 match's Results line names the side that won (team names compared ignoring spaces); an installed device on v397 keeps crediting the losing side.
 // Moved to v399-2.0 (Tournaments Phase 2 + event comms picks, Manny OK 2026-11-11): tournament.html (app mode, create form date/start/shotgun, one entry fee with per team / per golfer, venue from the course, move sheet, start-and-links list, one-step course lookup, Event day pace rows, Desk Photos chip, contests suggestion) and tournament-scorecard.html (weather note full screen, photos after the round, no Contests/Photos tabs); an installed device on v398 keeps the old pages.
-const CACHE_VERSION = 'golfapp-v399-2.0';
+// Moved to v400-2.0 (keyed links, Advisor 2026-11-11 15:09, Manny OK): tournament.html redraws the Setup team cards when the scoring keys arrive, so their Share / QR links carry the team's key; a device on v399 keeps the keyless Setup cards.
+const CACHE_VERSION = 'golfapp-v400-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
