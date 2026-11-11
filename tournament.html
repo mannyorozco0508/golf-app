@@ -3802,8 +3802,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         else if (!prize.available) prizes += `<div class="day-row"><span>${escapeHtml(prize.reason || '')}</span></div>`;
         else {
             const paid = computeTournamentPayouts(prize.rows || [], spots).filter((p) => p.amount > 0);
-            if (!paid.length) prizes += `<div class="day-row"><span>No paid spots reached yet.</span></div>`;
-            paid.forEach((p) => { prizes += `<div class="day-row"><span>${ordinal(p.rank)} ${escapeHtml(p.teamName)}</span><strong>$${p.amount.toFixed(2)}</strong></div>`; });
+            // 2026-11-11: the same credit/Trophy label as the Prize Results list (no cash prizes, main).
+            if (!paid.length) prizes += `<div class="day-row"><span>No prize spots reached yet.</span></div>`;
+            paid.forEach((p) => { prizes += `<div class="day-row"><span>${ordinal(p.rank)} ${escapeHtml(p.teamName)}</span><strong>${escapeHtml(prizeLabel(p.amount))}</strong></div>`; });
         }
         prizes += `</div>`;
         // THE DESK, IN NUMBERS. There is no check-in field in the registration
