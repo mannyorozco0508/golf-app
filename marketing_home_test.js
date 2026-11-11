@@ -117,7 +117,17 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
     const a = anchors(html);
 
     test('it is the marketing page, not the app', () => {
-        assert.match(html, /<title>HardPan Golf<\/title>/);
+        // Full name (Nov 10): the title and the footer say "HardPan: Golf GPS & Games"; the footer keeps
+        // "a Rattle Golf LLC app". Was: <title>HardPan Golf</title> and a "HardPan Golf" footer.
+        assert.match(html, /<title>HardPan: Golf GPS &amp; Games<\/title>/);
+        assert.match(html, /<footer>[\s\S]*?<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ<\/div>[\s\S]*?<\/footer>/);
+        // The header keeps the short name next to the logo until Manny picks a layout (choices/41: the
+        // full name does not fit one line next to "Get the app" at 390 px).
+        assert.match(html, /<a class="logo" href="\/"><img src="\/hardpan-icon\.svg" alt="" width="36" height="36">HardPan Golf<\/a>/);
+        // the help pages share the footer: same full name there
+        ['help.html'].concat(fs.readdirSync(path.join(ROOT, 'help')).filter((f) => f.endsWith('.html')).map((f) => 'help/' + f)).forEach((f) => {
+            assert.match(read(f), /<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ/, f + ': footer is not the full name');
+        });
         assert.match(html, /Play it\. Run it\./);
         // Not the scorecard, not the front door: no Firebase, no app script.
         assert.doesNotMatch(html, /firebase|auth-boot|pwa-boot|sw\.js/i,

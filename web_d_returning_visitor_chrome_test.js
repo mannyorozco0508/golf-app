@@ -189,7 +189,7 @@ describe('a returning visitor with the v393 (live main) worker gets website-d on
             state.mode = 'new';
             const s = await tab.go(O + '/', 3000);
             assert.equal(s.path, '/', 'the visitor was sent somewhere else: ' + s.path);
-            assert.equal(s.title, 'HardPan Golf', 'first visit after the deploy showed: ' + s.title + ' / ' + s.text);
+            assert.equal(s.title, 'HardPan: Golf GPS & Games', 'first visit after the deploy showed: ' + s.title + ' / ' + s.text);
             assert.match(s.text, /HardPan/, 'the page is blank');
         });
 
@@ -200,7 +200,7 @@ describe('a returning visitor with the v393 (live main) worker gets website-d on
 
         test('second visit to /, then /app, a ?game= link and /home: each is the right page, no moon', async () => {
             const again = await tab.go(O + '/', 2500);
-            assert.equal(again.title, 'HardPan Golf');
+            assert.equal(again.title, 'HardPan: Golf GPS & Games');   // was 'HardPan Golf' (full name, Nov 10)
             const app = await tab.go(O + '/app', 3500);
             assert.equal(app.title, 'Trip & Round Setup - Home', '/app did not open the app front door');
             assert.equal(app.path, '/admin');
@@ -209,7 +209,7 @@ describe('a returning visitor with the v393 (live main) worker gets website-d on
             assert.equal(game.title, 'Live Scorecard');
             assert.equal(game.path, '/?game=TEST&group=1');
             const home = await tab.go(O + '/home', 2500);
-            assert.equal(home.title, 'HardPan Golf');
+            assert.equal(home.title, 'HardPan: Golf GPS & Games');   // was 'HardPan Golf' (full name, Nov 10)
             const after = await tab.screen();
             assert.ok(after.controlled, 'positive: the visitor is still controlled by a worker (v394)');
         });

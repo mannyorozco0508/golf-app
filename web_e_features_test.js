@@ -20,13 +20,13 @@
 //      "Coming soon" only on Offline maps and Ask caddie.
 //   3. Clips: exactly the six cards with a clip have one, each muted, inline,
 //      preload="none", no loop, its poster and file in the manifest.
-//   4. Try the GPS: the Esri + OpenStreetMap credit, a demo label, the hole's
-//      tee-to-middle distance from the picture's scale matches the hole's own
-//      OSM line (140 m = 153 y), and the script never asks for a location.
-//      LIVE ESRI (Manny, Nov 10): the picture is 16 Esri World Imagery z19 tiles
-//      on the page's own grid (lazy, no referrer, no key), covering the box; the
-//      saved picture is served by nothing (kept on disk, marked unused in
-//      media/screens/manifest.json), and no other outside URL is in the box.
+//   4. Try the GPS: OPTION D (Nov 10): the map is an inline SVG drawn from
+//      OpenStreetMap data only (course, water, greens, the hole's pin) on the
+//      page's own z19 grid; credit "Map data © OpenStreetMap contributors"; no
+//      Esri name or URL, no tile, no image and no outside URL anywhere in the
+//      features section; a demo label; the hole's tee-to-middle distance from
+//      the map's scale matches the hole's own OSM line (140 m = 153 y); the
+//      script never asks for a location. (Was: 16 live Esri tiles, Nov 10.)
 //   5. Try Just say it: says nothing is saved; the script has no fetch, XHR,
 //      beacon, socket, storage or form submit; every canned card is the app's
 //      own parser output (ask-hardpan.js on dev-204, when that branch is here).
@@ -217,37 +217,43 @@ describe('3. clips', () => {
 describe('4. Try the GPS', () => {
     const map = (/<div class="map" id="tg-map"[^>]*>/.exec(feat) || [''])[0];
     const num = (k) => (/data-[a-z]+/.test(k) ? (new RegExp(k + '="([^"]+)"').exec(map) || [])[1] : null);
-    test('a real satellite hole with the Esri and OpenStreetMap credit, labelled as a demo', () => {
+    // OPTION D (Nov 10): the map is drawn on the page from OpenStreetMap data only. Was: Esri World
+    // Imagery loaded live (16 z19 tiles) under an OSM green outline, credited "Powered by Esri ...".
+    test('an OpenStreetMap hole, credited "Map data © OpenStreetMap contributors", labelled as a demo; no Esri anywhere in the features section', () => {
         assert.ok(map, 'no map');
-        assert.match(feat, /<p class="cred">Powered by Esri &middot; Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community &middot; Hole outline &copy; OpenStreetMap contributors<\/p>/);
-        assert.match(feat, /<p class="tnote">Demo: [^<]*does not ask for your location, and nothing leaves the page but the request for the satellite picture, loaded live from Esri\./);
+        assert.match(feat, /<p class="cred">Map data &copy; OpenStreetMap contributors<\/p>/);
+        assert.match(feat, /<p class="tnote">Demo: [^<]*does not ask for your location, and this box makes no outside requests: the map is drawn right here from OpenStreetMap data\./);
         assert.match(feat, /Dobson Ranch &middot; Hole 7 &middot; Par 3/);
+        assert.doesNotMatch(feat, /esri|arcgis|world_imagery|vantor|earthstar/i, 'an Esri name or URL is back in the features section');
+        assert.doesNotMatch(JS, /arcgisonline|World_Imagery/i);
     });
-    // LIVE ESRI (Manny, Nov 10). Was: the saved picture /media/screens/try-gps-dobson-7.webp.
-    test('the picture is Esri World Imagery loaded live: 16 z19 tiles on the page\'s own grid, lazy, no referrer, covering the box; the saved picture is served by nothing', () => {
-        const box = /<div class="tiles" data-z="(\d+)" data-ox="([\d.]+)" data-oy="([\d.]+)" data-tile="256" role="img" aria-label="Satellite picture of hole 7 at Dobson Ranch[^"]*Esri World Imagery, loaded live\.">([\s\S]*?)<\/div>/.exec(feat);
-        assert.ok(box, 'no live tile box');
-        const Z = Number(box[1]), OX = Number(box[2]), OY = Number(box[3]), W = Number(num('data-w')), H = Number(num('data-h'));
+    test('the map is an inline SVG of OSM shapes on the page\'s own z19 grid (course, water, greens, the pin); no tiles, no images, no outside URL in the features section', () => {
+        const svg = /<svg class="osm" viewBox="0 0 610 780" role="img" aria-label="Map of hole 7 at Dobson Ranch[^"]*OpenStreetMap data\." data-osm-base="[\dTZ:-]+" data-z="(\d+)" data-ox="([\d.]+)" data-oy="([\d.]+)" focusable="false">([\s\S]*?)<\/svg>/.exec(feat);
+        assert.ok(svg, 'no OSM drawing');
+        const Z = Number(svg[1]), OX = Number(svg[2]), OY = Number(svg[3]), body = svg[4];
         assert.equal(Z, 19);
-        const tiles = [...box[4].matchAll(/<img class="tile" src="([^"]+)" style="left:(-?[\d.]+)%;top:(-?[\d.]+)%" width="256" height="256" loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="">/g)];
-        assert.equal(tiles.length, 16, 'the box is 4 x 4 tiles');
-        assert.equal((box[4].match(/<img/g) || []).length, 16, 'an <img> in the box is not a tile');
-        const cover = new Set();
-        tiles.forEach((t) => {
-            const m = /^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/(\d+)\/(\d+)\/(\d+)$/.exec(t[1]);
-            assert.ok(m, t[1] + ' is not an Esri World Imagery tile');
-            assert.equal(Number(m[1]), Z);
-            const ty = Number(m[2]), tx = Number(m[3]);
-            // the tile sits where its Web Mercator pixel corner falls on the picture
-            assert.ok(Math.abs(Number(t[2]) - 100 * (tx * 256 - OX) / W) < 0.01 && Math.abs(Number(t[3]) - 100 * (ty * 256 - OY) / H) < 0.01, 'tile ' + ty + '/' + tx + ' is off its grid position');
-            for (let x = Math.max(0, tx * 256 - OX); x < Math.min(W, tx * 256 - OX + 256); x += 1) for (let y = Math.max(0, ty * 256 - OY); y < Math.min(H, ty * 256 - OY + 256); y += 1) cover.add((x | 0) + ',' + (y | 0));
-        });
-        assert.equal(cover.size, W * H, 'the tiles do not cover the whole box');
-        // the picture's origin is z19 at Dobson Ranch hole 7 (33.3718 N, 111.8683 W, within a few metres)
+        // the grid origin is z19 at Dobson Ranch hole 7 (33.3718 N, 111.8683 W, within a few metres)
         const lon = OX / (256 * Math.pow(2, Z)) * 360 - 180, lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * OY / (256 * Math.pow(2, Z))))) * 180 / Math.PI;
         assert.ok(Math.abs(lat - 33.3718) < 0.0006 && Math.abs(lon + 111.8683) < 0.0006, 'the grid origin is not at the hole: ' + lat + ',' + lon);
-        assert.match(html, /\.map \.tile\.err \{ visibility:hidden; \}/, 'a failed tile is not hidden');
-        assert.match(JS, /im\.addEventListener\('error', function \(\) \{\s*im\.classList\.add\('err'\)/, 'the script does not hide a failed tile');
+        const shapes = [...body.matchAll(/<polygon class="(o-[a-z]+)" data-osm="((?:way|relation)\/\d+)" points="([^"]+)"\/>/g)];
+        const kinds = shapes.map((m) => m[1]);
+        ['o-course', 'o-water', 'o-green'].forEach((k) => assert.ok(kinds.includes(k), 'no ' + k + ' in the drawing'));
+        assert.ok(shapes.some((m) => m[1] === 'o-green' && m[2] === 'way/1566972138'), 'hole 7\'s OSM green (way/1566972138) is not drawn');
+        shapes.forEach((m) => m[3].split(' ').forEach((q) => { const [x, y] = q.split(',').map(Number);
+            assert.ok(x >= -8 && x <= 618 && y >= -8 && y <= 788, m[2] + ' has a point off the map: ' + q); }));
+        // the pin: OSM node 11211780428 (golf=pin, 33.3715900 N, 111.8679410 W) lands where it is drawn
+        const pin = /<g class="o-pin" data-osm="node\/11211780428"><line x1="([\d.]+)" y1="([\d.]+)"/.exec(body);
+        assert.ok(pin, 'no pin');
+        const X = (256 * Math.pow(2, Z)) * (-111.867941 + 180) / 360 - OX;
+        const r = 33.37159 * Math.PI / 180, Y = (256 * Math.pow(2, Z)) * (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 - OY;
+        assert.ok(Math.abs(Number(pin[1]) - X) < 1.5 && Math.abs(Number(pin[2]) - Y) < 1.5, 'the pin is drawn at ' + pin[1] + ',' + pin[2] + ', the grid puts it at ' + X.toFixed(1) + ',' + Y.toFixed(1));
+        const mid = num('data-mid').split(',').map(Number);
+        assert.ok(Math.hypot(mid[0] - X, mid[1] - Y) < 4, 'the middle of the green is not at the hole\'s pin');
+        // no tiles, no pictures, no outside URL: the box draws itself
+        const box = (/<div class="map" id="tg-map"[\s\S]*?<\/div>\s*<p class="tread"/.exec(feat) || [''])[0];
+        assert.ok(box, 'no map box');
+        assert.doesNotMatch(box, /<img|<image|<iframe|<object|<embed|url\(|https?:/i, 'the map box loads something');
+        assert.doesNotMatch(html + JS, /class="tile"|\.tile\b|data-tiles/, 'the Esri tile markup, CSS or error handler is back');
         // the saved picture: deleted (Manny typed "OK delete saved Esri picture", Nov 10) and served by nothing
         const pages = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html')).concat(fs.readdirSync(path.join(ROOT, 'help')).filter((f) => f.endsWith('.html')).map((f) => 'help/' + f));
         pages.forEach((f) => assert.ok(!read(f).includes('try-gps-dobson-7'), f + ' still serves the saved picture'));
@@ -255,9 +261,10 @@ describe('4. Try the GPS', () => {
         const man = JSON.parse(read('media/screens/manifest.json'));
         assert.equal(man.try_gps.file, null); assert.match(man.try_gps.deleted, /OK delete saved Esri picture/);
         assert.ok(!fs.existsSync(path.join(ROOT, 'media/screens/try-gps-dobson-7.webp')), 'the saved Esri picture is back on disk');
-        // nothing else from outside in the box: the tiles are the only outside URLs in the whole features section
-        const outside = [...feat.matchAll(/\b(?:src|href|data-src|poster)="(https?:[^"]+)"/g)].map((m) => m[1]).filter((u) => !/^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/World_Imagery\/MapServer\/tile\/19\//.test(u));
+        // no outside URL anywhere in the whole features section
+        const outside = [...feat.matchAll(/\b(?:src|href|data-src|poster|xlink:href|srcset)="([^"]*https?:[^"]*)"/g)].map((m) => m[1]);
         assert.deepEqual(outside, [], 'an outside URL in the features section');
+        assert.doesNotMatch(feat, /https?:\/\//, 'an outside URL in the features section');
     });
     test('the yards: tee to the middle of the green measured on the picture is the hole\'s own 140 m (153 y)', () => {
         const mpp = Number(num('data-mpp')), you = num('data-you').split(',').map(Number), mid = num('data-mid').split(',').map(Number);
