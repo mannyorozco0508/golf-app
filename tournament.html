@@ -3767,12 +3767,43 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // cents is null unless it is an integer in the contract's range, and card
     // collection is off without a valid fee - a fee the server would refuse
     // ('bad-fee') is never offered as a button.
+    // ONE FEE FIELD (Manny 2026-11-11): the amount is the record's entryFee (Setup
+    // > Event details), per team or per golfer (entryFeePer). Card payments are
+    // charged per golfer, so the card amount exists only when the fee is per
+    // golfer; the server reads fees.entryFeeCents, which the owner's page
+    // mirrors from the dollars (syncFeesCents) whenever fees is in play.
+    function derivedFeeCents(data) {
+        if (!data || feePerOf(data) !== 'golfer') return null;
+        const c = Math.round((Number(data.entryFee) || 0) * 100);
+        return (Number.isInteger(c) && c >= FEE_MIN_CENTS && c <= FEE_MAX_CENTS) ? c : null;
+    }
+    function feePerOf(data) {
+        const p = data && data.entryFeePer;
+        if (p === 'team' || p === 'golfer') return p;
+        return (data && data.scoringModel === PLAYER_MODEL) ? 'golfer' : 'team';
+    }
+    // The one field wins once it is set (entryFee > 0); a record whose fee lived
+    // only in fees.entryFeeCents (before 2026-11-11) is read as it was.
+    function oneFeeSet(data) { return (Number(data && data.entryFee) || 0) > 0; }
     function feesOf(data) {
         const f = data && data.fees;
         if (!f || typeof f !== 'object') return null;
-        const c = f.entryFeeCents;
+        const c = oneFeeSet(data) ? derivedFeeCents(data) : f.entryFeeCents;
         const valid = Number.isInteger(c) && c >= FEE_MIN_CENTS && c <= FEE_MAX_CENTS;
         return { cents: valid ? c : null, collectByCard: valid && f.collectByCard === true, allowCash: f.allowCash === true };
+    }
+    let feesMirrored = null;   // 'code:cents' last written, so a re-render never writes twice
+    function syncFeesCents() {
+        if (!currentCode || !currentData || !canManage() || !currentData.fees || typeof currentData.fees !== 'object' || !oneFeeSet(currentData)) return;
+        const want = derivedFeeCents(currentData);
+        const have = currentData.fees.entryFeeCents;
+        if (want === (Number.isInteger(have) ? have : null)) return;
+        const stamp = currentCode + ':' + String(want);
+        if (feesMirrored === stamp) return;
+        feesMirrored = stamp;
+        const upd = { entryFeeCents: want };
+        if (want === null) upd.collectByCard = false;   // no per-golfer amount: nothing to charge
+        db.ref('tournaments/' + currentCode + '/fees').update(upd).catch((err) => feesError('Error: ' + err.message));
     }
     // Cents to "$100.00" - integer arithmetic, no float on the way in.
     function centsText(c) {
@@ -4204,13 +4235,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const show = !!(currentCode && currentData && currentData.ownerUid && canManage());
         block.style.display = show ? 'block' : 'none';
         if (!show) { block.innerHTML = ''; return; }
+        syncFeesCents();
         const f = feesOf(currentData);
-        const typed = f && f.cents ? (f.cents % 100 === 0 ? String(f.cents / 100) : centsText(f.cents).slice(1).replace(/,/g, '')) : '';
+        const dollars = Number(currentData.entryFee) || 0;
+        const per = feePerOf(currentData);
         const err = document.getElementById('fees-error');
         const keepErr = err ? err.textContent : '';
+        // The amount is read, not typed, here: ONE field, on Event details above.
+        const amount = dollars > 0 ? `${centsShort(Math.round(dollars * 100))} per ${per}` : 'not set';
         let html = `<h3 style="margin:0 0 4px 0;">Entry fees</h3>`
-            + `<div class="fees-row"><span><strong>Entry fee</strong><small>per golfer</small></span>`
-            + `<span class="money-input"><span class="money-prefix" aria-hidden="true">$</span><input type="text" inputmode="decimal" id="fees-dollars" value="${escReg(typed)}" placeholder="0.00" onchange="setFeeDollars(this.value)"></span></div>`
+            + `<div class="fees-row"><span><strong>Entry fee</strong><small>set under Event details</small></span><strong id="fees-amount">${escReg(amount)}</strong></div>`
+            + (per === 'team' && dollars > 0 ? `<p class="fees-soon" id="fees-per-team">Card payments charge each golfer. This fee is per team, so cards stay off; switch it to per golfer under Event details to collect by card.</p>` : '')
             + `<p class="fees-error" id="fees-error" style="display:${keepErr ? 'block' : 'none'};">${escReg(keepErr)}</p>`;
         if (paymentsAllowed) {
             html += `<div class="fees-row"><span><strong>Collect entry fees by card</strong><small>Golfers pay when they sign up</small></span>${feesToggle('fees-card', 'collectByCard', !!(f && f.collectByCard))}</div>`
