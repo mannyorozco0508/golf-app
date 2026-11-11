@@ -75,7 +75,14 @@ const DELIBERATE = [
         why: 'the trophy glyph, the bare title and the old subtitle become the hero band',
         from: '|🏆|Tournament|Multi-team events with a shared leaderboard — built for benefit tournaments, member-guests, and club events.|',
         // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
-        to: '|HardPan|Tournaments|' + HERO_LINE + '|'
+        // Re-pinned 2026-11-11 (Phase 2, P2-0): the app's own top bar follows the hero in the tree (shown in app mode only).
+        to: '|HardPan|Tournaments|' + HERO_LINE + '|\u2039|New tournament|HardPan Tournaments|'
+    },
+    {
+        // ADDED 2026-11-11 (Phase 2, S1 A): date, start time and shotgun on the create form, before Format.
+        why: 'Phase 2 S1: date, start time and a shotgun switch join the create form',
+        from: '|Format|',
+        to: '|Date (optional)|Start time (optional)|Shotgun start \u2014 teams start on assigned holes, all at once|Format|'
     },
     {
         why: 'the Individual card gets the same icon slot as the other three instead of an emoji inside its name',
