@@ -480,7 +480,8 @@ describe('I. M1 web part: the organizer\'s event-day panel', () => {
         assert.match(p, /1 quiet 40\+ min/);
         assert.match(p, /Team 7 · last score \d+:\d\d, thru 3/);
         assert.match(p, /Team 15 · no scores yet/);
-        assert.match(p, /1st Team 9 \$600\.00/); assert.match(p, /2nd Team 7 \$250\.00/);
+        // Re-pinned 2026-11-11: prizes read as pro shop credit (main, no cash prizes).
+        assert.match(p, /1st Team 9 \$600 pro shop credit/); assert.match(p, /2nd Team 7 \$250 pro shop credit/);
         assert.match(p, /1 of 1 in the field · 1 paid · 0 unpaid/);
         assert.match(html(sb, 'event-day-panel'), /href="sms:6025550100"/);
     });
