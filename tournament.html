@@ -350,6 +350,51 @@
         .payout-basis-seg button.on { background:var(--brand-navy); color:#fff; }
         .payout-basis-label { text-align:center; font-size:0.85rem; color:var(--text-main); margin-top:8px; }
         .payout-basis-note { text-align:center; font-size:0.8rem; color:var(--text-muted); margin-top:6px; }
+
+        /* ---- PHASE 2: THE APP MODE (Manny's picks 2026-11-11: S1 A, S2 A + C's
+           move sheet, S3 A shotgun / B tee times + C's QR). Every rule here is
+           scoped to body.app-mode, which only the Capacitor app (or ?app=1)
+           sets, so the website is untouched by this block. The hero band is the
+           website's product header; the app has its own chrome, so the band
+           goes and a back control takes its place. .app-only elements exist in
+           the tree for everyone and are shown only in app mode. */
+        .app-only { display: none; }
+        body.app-mode .app-only { display: block; }
+        body.app-mode .tourney-hero { display: none; }
+        body.app-mode { background: #eef2f0; }
+        body.app-mode .container { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
+        .ap-top { align-items: center; gap: 10px; padding: 4px 0 12px; }
+        body.app-mode .ap-top { display: flex; }
+        .setup-field input[type="date"], .setup-field input[type="time"], .tee-times-box input { width: 100%; box-sizing: border-box; padding: 11px 12px; border-radius: 10px; border: 1.5px solid var(--border-mid); background: var(--bg-card); font: inherit; }
+        .t-check, .setup-field .t-check { text-transform: none; letter-spacing: normal; font-weight: normal; }
+        .ap-bk { width: 34px; height: 34px; flex: none; border-radius: 50%; background: #fff; border: 1px solid #dfe8e4; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; color: #10231c; font-family: inherit; }
+        .ap-tt { font-size: 19px; font-weight: 800; line-height: 1.1; color: #10231c; }
+        .ap-ts { font-size: 12.5px; color: #4b6a5f; margin-top: 2px; }
+        /* My events (P2-0): the events this phone created or opened as owner. */
+        .my-events { margin: 0 0 16px; }
+        .my-events-k { font-size: 0.72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+        .my-event { display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; font: inherit; color: inherit; cursor: pointer; }
+        .my-event .me-n { font-weight: 800; }
+        .my-event .me-c { font-size: 0.78rem; color: var(--text-muted); }
+        .my-events-note { font-size: 0.75rem; color: var(--text-muted); margin: 4px 0 0; }
+        /* Date and start on the create form (S1 A): two boxes side by side. */
+        .setup-when { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .t-check { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: normal; }
+        .t-check input { width: auto; margin: 0; }
+        /* Start and links (S3): one row a team - its hole or tee time, Send, QR. */
+        .sl-row { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--accent-teal); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+        .sl-when { font-weight: 800; font-size: 0.85rem; }
+        .sl-when input { width: 56px; padding: 6px; font-size: 0.85rem; text-align: center; }
+        .sl-team { font-size: 0.9rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sl-acts { display: flex; gap: 6px; }
+        .sl-acts button { width: auto; padding: 6px 10px; font-size: 0.75rem; margin: 0; }
+        .tee-times-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 10px; }
+        .tee-times-box label { font-size: 0.75rem; }
+        /* Golfer chips on the Setup team card (S2 A + C): tap one to move it. */
+        .golfer-chip { display: inline-block; border: 1px solid var(--border-mid); border-radius: 999px; padding: 3px 9px; font-size: 0.78rem; margin: 2px 4px 2px 0; background: var(--bg-card); color: inherit; font-family: inherit; cursor: pointer; }
+        .move-sheet-body .move-to { display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; }
+        .move-sheet-body .move-to:disabled { opacity: .5; cursor: default; }
+        .move-note { font-size: 0.78rem; color: var(--text-muted); margin: 8px 0 0; }
     </style>
 </head>
 <body>
@@ -377,6 +422,12 @@
             <p class="tourney-hero-line">Live scoring + registration for charity, member-guest, and club events.</p>
         </div>
     </header>
+    <!-- PHASE 2, P2-0: the app's own top bar and "My events". Shown only in app
+         mode (.app-only). My events is this PHONE's list (localStorage), filled
+         by renderMyEvents(): events it created, and owned events it opened. An
+         account-wide list is P2-6 (a rules change) and is not built. -->
+    <div class="ap-top app-only" id="ap-top-setup"><button type="button" class="ap-bk" onclick="appBack()" aria-label="Back">‹</button><div><div class="ap-tt">New tournament</div><div class="ap-ts">HardPan Tournaments</div></div></div>
+    <div class="my-events app-only" id="app-my-events" style="display:none;"></div>
     <div id="signed-in-as-setup" style="text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;"></div>
     <div id="signin-panel-setup" class="signin-panel" style="display:none;"></div>
 
@@ -400,6 +451,18 @@
         <input type="hidden" id="course-key">
         <!-- The online import's confirm panel is built here (course search, 2026-09-17). -->
         <div id="course-import-host"></div>
+    </div>
+    <!-- PHASE 2, S1 A (2026-11-11): date and start ON THE CREATE FORM. The same
+         keys the manage screen's Event details write after the save (eventDate
+         "YYYY-MM-DD", startTime "HH:MM", startType 'shotgun'), read once by
+         saveTournament and validated by the same EVENT_DETAIL_KEYS shapes. Both
+         optional: an empty box writes no key, exactly as before this wave. -->
+    <div class="form-group setup-field setup-when">
+        <div><label>Date (optional)</label><input type="date" id="t-date"></div>
+        <div><label>Start time (optional)</label><input type="time" id="t-time"></div>
+    </div>
+    <div class="form-group setup-field">
+        <label class="t-check"><input type="checkbox" id="t-shotgun"> Shotgun start — teams start on assigned holes, all at once</label>
     </div>
 
     <div class="form-group setup-field">
@@ -590,6 +653,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 </div>
 
 <div class="container" id="manage-screen" style="display:none;">
+    <!-- PHASE 2, P2-0: the app's top bar. Filled by loadTournament; app mode only. -->
+    <div class="ap-top app-only" id="ap-top-manage"><button type="button" class="ap-bk" onclick="appBack()" aria-label="Back">‹</button><div><div class="ap-tt" id="ap-m-title"></div><div class="ap-ts" id="ap-m-sub"></div></div></div>
     <!-- WHO IS SIGNED IN, AS A FACT. No word that promises a lock: the sign-in
          gates what this page renders, not what the database accepts. -->
     <div id="signed-in-as" style="text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;"></div>
@@ -695,8 +760,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div id="shotgun-assignments-box" style="display:none; margin-top:12px;">
             <button class="btn-outline" onclick="autoAssignShotgunHoles()">🔀 Auto-Assign Starting Holes</button>
             <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 10px 0;">Fills every hole once before doubling any of them up — edit any team's assignment below afterward if you want it different.</p>
-            <div id="shotgun-assignments-list"></div>
         </div>
+        <!-- PHASE 2, S3 (Manny 2026-11-11: A for shotgun, B for tee times, C's QR
+             on every row). ONE LIST for the start and the link: each team's hole
+             (shotgun; the input is the same updateTeamStartingHole write) or its
+             tee time (first tee + interval, teeTimes on the record, display
+             only), then Send and QR. The link is teamScorecardUrl's, the same
+             keyed link the Leaderboard tab's rows and the tee sheet carry.
+             Replaces #shotgun-assignments-list (its rows are these rows now). -->
+        <div id="tee-times-box" class="tee-times-box" style="display:none;">
+            <div><label>First tee</label><input type="time" id="tee-first" onchange="setTeeTimes('first', this.value)"></div>
+            <div><label>Every (minutes)</label><input type="number" id="tee-every" min="5" max="20" step="1" placeholder="10" onchange="setTeeTimes('every', this.value)"></div>
+        </div>
+        <div id="start-links-list"></div>
+        <button class="btn-outline" id="send-all-links-btn" style="display:none;" onclick="sendAllTeamLinks()">📤 Send all scorecard links</button>
+        <p id="start-links-note" style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0; display:none;">Send opens your phone's share sheet, one team at a time. Each link opens that team's card and nothing else.</p>
 
 
         <hr class="section-divider">
@@ -939,6 +1017,59 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // ---- PHASE 2, P2-0: APP MODE (2026-11-11) ------------------------------
+    // On inside the Capacitor app, or with ?app=1 (tests and previews). Same
+    // detection as tournament-scorecard.html. Everything the page does - the
+    // record, the writers, the gate - is the website's; app mode adds a top bar,
+    // hides the hero band and keeps this phone's list of events. appHref keeps
+    // ?app=1 on the links the page builds to itself, so a preview stays a
+    // preview; inside the app the native check carries instead.
+    const APP_PARAM = (function () { try { return new URLSearchParams(window.location.search).get('app') === '1'; } catch (e) { return false; } })();
+    const APP_MODE = (function () {
+        try {
+            const C = window.Capacitor;
+            if (C && typeof C.isNativePlatform === 'function' && C.isNativePlatform()) return true;
+        } catch (e) { /* not native */ }
+        return APP_PARAM;
+    })();
+    if (APP_MODE && document.body && document.body.classList) document.body.classList.add('app-mode');
+    function appHref(url) { return APP_PARAM ? url + (url.indexOf('?') >= 0 ? '&' : '?') + 'app=1' : url; }
+    function appBack() {
+        try { if (history.length > 1) { history.back(); return; } } catch (e) { /* nowhere to go */ }
+        window.location.href = appHref('tournament.html');
+    }
+    // THIS PHONE'S EVENTS. {code, name, at}, newest first, at most 20. Written
+    // when this phone creates an event and when it opens one it owns, so an
+    // event made on the website shows up here the first time it is opened in
+    // the app. Not an account list: see P2-6 in the plan.
+    const MY_EVENTS_KEY = 'hp_my_tournaments';
+    function readMyEvents() {
+        try { const v = JSON.parse(localStorage.getItem(MY_EVENTS_KEY) || '[]'); return Array.isArray(v) ? v.filter((e) => e && typeof e.code === 'string') : []; }
+        catch (e) { return []; }
+    }
+    function rememberMyEvent(code, name) {
+        if (!code) return;
+        const list = readMyEvents().filter((e) => e.code !== code);
+        list.unshift({ code: code, name: String(name || code).slice(0, 120), at: Date.now() });
+        try { localStorage.setItem(MY_EVENTS_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) { /* storage full or off */ }
+        renderMyEvents();
+    }
+    function renderMyEvents() {
+        const box = document.getElementById('app-my-events');
+        if (!box) return;
+        if (!APP_MODE) { box.style.display = 'none'; return; }
+        const list = readMyEvents();
+        box.style.display = 'block';
+        box.innerHTML = `<div class="my-events-k">My events</div>` + (list.length
+            ? list.map((e) => `<button type="button" class="my-event" data-code="${escapeHtml(e.code)}" onclick="openMyEvent(this.dataset.code)"><span class="me-n">${escapeHtml(e.name)}</span><span class="me-c">${escapeHtml(e.code)} ›</span></button>`).join('')
+              + `<p class="my-events-note">Events this phone created or opened as the organizer.</p>`
+            : `<p class="my-events-note">No events on this phone yet. Create one below, or open an event you run from its link.</p>`);
+    }
+    function openMyEvent(code) {
+        if (!code) return;
+        window.location.href = appHref('tournament.html?tourney=' + encodeURIComponent(code));
+    }
 
     // NO DARK MODE ON THIS PRODUCT (2026-09-18, Option B). The toggle, the
     // handler and the load-time read are gone, and this page never touches the
@@ -1702,6 +1833,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // The event's own online imports ride with the record so a later round
         // can pick them (Option B). Absent when nothing was imported.
         if (Object.keys(setupImportedCourses).length) payload.importedCourses = setupImportedCourses;
+        // S1 A: date, start time and shotgun from the create form. The same keys
+        // and the same shapes as the Event details after the save; an empty box
+        // writes nothing, so a record made from the website form is as before.
+        const tDate = (document.getElementById('t-date') || {}).value || '';
+        const tTime = (document.getElementById('t-time') || {}).value || '';
+        if (EVENT_DETAIL_KEYS.eventDate.test(tDate)) payload.eventDate = tDate;
+        if (EVENT_DETAIL_KEYS.startTime.test(tTime)) payload.startTime = tTime;
+        if ((document.getElementById('t-shotgun') || {}).checked) payload.startType = 'shotgun';
 
         if (isMultiRoundSetup) {
             // DECLARED, NEVER INFERRED - the same rule scoringModel follows. The
@@ -1737,6 +1876,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             : db.ref(`tournaments/${currentCode}`).set(payload);
         createWrite.then(() => {
             localStorage.setItem('lastTournamentCode', currentCode);
+            rememberMyEvent(currentCode, name);
             if (isMultiRoundSetup) {
                 // ROUND 1 IS THE EVENT AS CONFIGURED. Everything the organizer just
                 // filled in describes the first round, so it becomes one rather than
@@ -1773,7 +1913,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 });
             }
         }).then(() => {
-            window.location.href = `tournament.html?tourney=${currentCode}`;
+            // appHref keeps ?app=1 on a preview; the app itself needs nothing.
+            window.location.href = appHref(`tournament.html?tourney=${currentCode}`);
         }).catch(err => alert(`Error saving tournament: ${err.message}`));
     }
 
@@ -1818,7 +1959,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const isShotgun = currentData.startType === 'shotgun';
         const roundId = (opts && opts.roundId) || null;
         const url = teamScorecardUrl(t, roundId);
-        const names = (t.players || []).join(', ');
+        // S2 (2026-11-11): on the editable Setup card each golfer is a chip that
+        // opens the move sheet; the public link row keeps the plain list.
+        const names = editable
+            ? (t.players || []).map((p, i) => `<button type="button" class="golfer-chip" data-team="${t.num}" data-idx="${i}" onclick="openMoveSheet(this.dataset.team, this.dataset.idx)">${escapeHtml(p)}</button>`).join('')
+            : escapeHtml((t.players || []).join(', '));
         const teamName = t.name || `Team ${t.num}`;
         const hcp = (t.handicap !== undefined && t.handicap !== null) ? t.handicap : 0;
         const startBadge = (isShotgun && t.startingHole) ? `<span style="background:var(--nassau-box-bg); color:var(--brand-green); border-radius:6px; padding:2px 8px; font-size:0.75rem; font-weight:bold; margin-left:6px;">🚀 Hole ${t.startingHole}</span>` : '';
@@ -1836,7 +1981,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // string a quote in it closed the string and the rest became code.
         const qrBox = editable ? '' : `<span class="team-qr" data-team="${t.num}"${roundId ? ` data-round="${escapeHtml(roundId)}"` : ''} data-url="${escapeHtml(url)}" data-fallback="QR unavailable"></span>`;
         return `<div class="team-link-row" style="flex-wrap:wrap;">
-            <span>🏌️ ${escapeHtml(teamName)}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${escapeHtml(names)}</span></span>
+            <span>🏌️ ${escapeHtml(teamName)}${startBadge} <span style="font-weight:normal; color:var(--text-muted);">— ${names}</span></span>
             <span style="display:flex; align-items:center; gap:6px;">
                 ${hcpInput}${qrBox}
                 <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-share-url="${escapeHtml(url)}" data-share-name="${escapeHtml(teamName)}" onclick="openShareModal(this.dataset.shareUrl, this.dataset.shareName)">📤 Share</button>
@@ -2032,27 +2177,156 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         db.ref(`tournaments/${currentCode}/teams/team${teamNum}/startingHole`).set(val.trim()).catch(err => alert(`Error: ${err.message}`));
     }
 
+    // PHASE 2, S3 (2026-11-11). The shotgun list became the START AND LINKS list:
+    // one row a team with its hole (shotgun: the same input and the same
+    // updateTeamStartingHole write as before) or its tee time (B: first tee +
+    // interval from the record's teeTimes, in team order, DISPLAY ONLY - no
+    // per-team time is stored, and the golfer's card does not read it), then
+    // Send (the phone's share sheet, or the share modal where there is none)
+    // and QR (the share modal, which draws one). The link is teamScorecardUrl's.
+    // Team events only: an individual event has the group links instead.
+    const TEE_TIMES_SHAPE = { first: /^([01]\d|2[0-3]):[0-5]\d$/, every: /^(?:[5-9]|1\d|20)$/ };
+    function teeTimeFor(index) {
+        const tt = (currentData && currentData.teeTimes) || {};
+        if (!TEE_TIMES_SHAPE.first.test(tt.first || '')) return '';
+        const every = TEE_TIMES_SHAPE.every.test(String(tt.every || '')) ? Number(tt.every) : 10;
+        const [h, m] = String(tt.first).split(':').map(Number);
+        const total = h * 60 + m + index * every;
+        if (total >= 24 * 60) return '';
+        return formatStartTime(`${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`);
+    }
+    function setTeeTimes(field, value) {
+        if (!currentCode || !canManage()) return;
+        const v = String(value == null ? '' : value).trim();
+        if (!TEE_TIMES_SHAPE[field]) return;
+        if (v && !TEE_TIMES_SHAPE[field].test(v)) { renderShotgunAssignments(); return; }
+        db.ref(`tournaments/${currentCode}/teeTimes/${field}`).set(v ? (field === 'every' ? Number(v) : v) : null).catch(err => alert(`Error: ${err.message}`));
+    }
+    function startRowHtml(t, index) {
+        const isShotgun = currentData.startType === 'shotgun';
+        const teamName = t.name || `Team ${t.num}`;
+        const url = teamScorecardUrl(t);
+        const when = isShotgun
+            ? `<input type="text" value="${escapeHtml(t.startingHole || '')}" placeholder="Hole" aria-label="Starting hole" onchange="updateTeamStartingHole(${t.num}, this.value)">`
+            : `<span class="sl-tee">${escapeHtml(teeTimeFor(index) || '—')}</span>`;
+        return `<div class="sl-row" data-team="${t.num}">
+            <span class="sl-when">${when}</span>
+            <span class="sl-team">🏌️ ${escapeHtml(teamName)}</span>
+            <span class="sl-acts">
+                <button type="button" class="btn-primary sl-send" data-share-url="${escapeHtml(url)}" data-share-name="${escapeHtml(teamName)}" onclick="sendTeamLink(this.dataset.shareUrl, this.dataset.shareName)">Send</button>
+                <button type="button" class="btn-outline sl-qr" data-share-url="${escapeHtml(url)}" data-share-name="${escapeHtml(teamName)}" onclick="openShareModal(this.dataset.shareUrl, this.dataset.shareName)">QR</button>
+            </span>
+        </div>`;
+    }
     function renderShotgunAssignments() {
         const box = document.getElementById('shotgun-assignments-box');
-        const list = document.getElementById('shotgun-assignments-list');
+        const list = document.getElementById('start-links-list');
+        const teeBox = document.getElementById('tee-times-box');
+        const sendAll = document.getElementById('send-all-links-btn');
+        const note = document.getElementById('start-links-note');
         const isShotgun = currentData.startType === 'shotgun';
-        box.style.display = isShotgun ? 'block' : 'none';
-        if (!isShotgun) return;
+        const individual = recordIsIndividual();
+        if (box) box.style.display = isShotgun && !individual ? 'block' : 'none';
+        if (teeBox) {
+            teeBox.style.display = !isShotgun && !individual ? 'grid' : 'none';
+            const tt = currentData.teeTimes || {};
+            [['tee-first', tt.first], ['tee-every', tt.every]].forEach(([id, v]) => {
+                const el = document.getElementById(id);
+                if (el && document.activeElement !== el) el.value = v == null ? '' : String(v);
+            });
+        }
+        if (!list) return;
+        if (individual) { list.innerHTML = ''; if (sendAll) sendAll.style.display = 'none'; if (note) note.style.display = 'none'; return; }
+        const teams = sortedTeams();
+        list.innerHTML = teams.map((t, i) => startRowHtml(t, i)).join('') || NO_TEAMS;
+        if (sendAll) sendAll.style.display = teams.length ? '' : 'none';
+        if (note) note.style.display = teams.length ? '' : 'none';
+    }
+    // SEND: the phone's share sheet when the browser has one (the app, Safari,
+    // Chrome on Android), the share modal with the QR and Copy otherwise. The
+    // url is handed over exactly as built: the &k= key is what lets the card
+    // save, so nothing here rewrites it.
+    function sendTeamLink(url, teamName) {
+        if (navigator.share) {
+            return navigator.share({ title: `${teamName} — scorecard`, text: `${teamName}: your scorecard for ${currentData.name || 'the tournament'}`, url: url })
+                .catch(() => { /* the organizer closed the sheet */ });
+        }
+        openShareModal(url, teamName);
+        return Promise.resolve();
+    }
+    async function sendAllTeamLinks() {
+        const rows = Array.from(document.querySelectorAll('#start-links-list .sl-send'));
+        if (!rows.length) return;
+        if (!navigator.share) { alert('This browser has no share sheet. Use Send or QR on each row.'); return; }
+        for (const b of rows) {
+            try { await navigator.share({ title: `${b.dataset.shareName} — scorecard`, text: `${b.dataset.shareName}: your scorecard for ${currentData.name || 'the tournament'}`, url: b.dataset.shareUrl }); }
+            catch (e) { return; }   // closed the sheet: stop here, the rest can be sent one by one
+        }
+    }
 
+    // ---- PHASE 2, S2: MOVE A GOLFER (A + C's sheet, 2026-11-11) --------------
+    // A golfer on a Setup team card is a chip; tapping it opens the sheet with
+    // every other team that has an open slot, and New team. The move writes the
+    // two players arrays in one update (and a new team with its key, like
+    // saveNewTeam). ONLY WHILE NEITHER TEAM HAS A SCORE: per-golfer scores are
+    // keyed by the golfer's INDEX on the team (team{n}_p{i}_h{h}), so moving a
+    // name after a score exists would hand that score to someone else. The
+    // sheet says so and offers nothing on such a team. Team handicaps are the
+    // organizer's own numbers and are NOT recomputed: the sheet says to check
+    // both.
+    let moveFrom = null;
+    function openMoveSheet(teamNum, idx) {
+        if (!currentCode || !canManage() || recordIsIndividual()) return;
         const teams = currentData.teams || {};
-        const teamIds = Object.keys(teams).sort((a, b) => teams[a].num - teams[b].num);
-        list.innerHTML = teamIds.map(tid => {
-            const t = teams[tid];
-            const teamName = t.name || `Team ${t.num}`;
-            const startVal = t.startingHole || '';
-            return `<div class="team-link-row">
-                <span>🏌️ ${escapeHtml(teamName)}</span>
-                <span style="display:flex; align-items:center; gap:6px;">
-                    <span style="font-size:0.75rem; color:var(--text-muted);">Hole</span>
-                    <input type="text" value="${startVal}" placeholder="—" style="width:52px; padding:6px; font-size:0.85rem; text-align:center;" onchange="updateTeamStartingHole(${t.num}, this.value)">
-                </span>
-            </div>`;
-        }).join('') || `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">No teams yet.</div>`;
+        const from = teams['team' + teamNum];
+        const name = from && (from.players || [])[idx];
+        if (!name) return;
+        moveFrom = { num: Number(teamNum), idx: Number(idx), name: name };
+        const title = document.getElementById('move-sheet-title');
+        const body = document.getElementById('move-sheet-body');
+        if (!title || !body) return;
+        title.textContent = `Move ${name} to…`;
+        if (teamHasScores(from.num)) {
+            body.innerHTML = `<p class="move-note">${escapeHtml(from.name || 'Team ' + from.num)} has scores, so its golfers stay put. Scores belong to the golfer's place on the card.</p>`;
+        } else {
+            const others = sortedTeams().filter((t) => t.num !== from.num);
+            body.innerHTML = others.map((t) => {
+                const n = (t.players || []).length;
+                const full = n >= 4, scored = teamHasScores(t.num);
+                const why = scored ? 'has scores' : (full ? 'full' : `${n} golfer${n === 1 ? '' : 's'}`);
+                return `<button type="button" class="move-to" data-to="${t.num}" ${full || scored ? 'disabled' : ''} onclick="moveGolfer(this.dataset.to)">${escapeHtml(t.name || 'Team ' + t.num)} <span style="color:var(--text-muted); font-size:0.8rem;">· ${why}</span></button>`;
+            }).join('') + `<button type="button" class="move-to" data-to="new" onclick="moveGolfer('new')">New team</button>`
+              + `<p class="move-note">Check both team handicaps after the move.</p>`;
+        }
+        document.getElementById('move-sheet').classList.add('open');
+    }
+    function closeMoveSheet() { moveFrom = null; document.getElementById('move-sheet').classList.remove('open'); }
+    function moveGolfer(to) {
+        if (!moveFrom || !currentCode || !canManage()) return;
+        const teams = currentData.teams || {};
+        const from = teams['team' + moveFrom.num];
+        if (!from || (from.players || [])[moveFrom.idx] !== moveFrom.name || teamHasScores(from.num)) { closeMoveSheet(); return; }
+        const fromPlayers = (from.players || []).filter((_, i) => i !== moveFrom.idx);
+        const updates = {};
+        if (to === 'new') {
+            const nextNum = Object.values(teams).reduce((max, t) => Math.max(max, t.num), 0) + 1;
+            updates[`tournaments/${currentCode}/teams/team${nextNum}`] = { num: nextNum, name: `Team ${nextNum}`, players: [moveFrom.name], handicap: 0 };
+            const k = keysWritable() ? newScoringKey() : null;
+            if (k) updates[`${keysBase()}/t/team${nextNum}`] = k;
+        } else {
+            const dest = teams['team' + Number(to)];
+            if (!dest || (dest.players || []).length >= 4 || teamHasScores(dest.num)) { closeMoveSheet(); return; }
+            updates[`tournaments/${currentCode}/teams/team${dest.num}/players`] = (dest.players || []).concat([moveFrom.name]);
+        }
+        updates[`tournaments/${currentCode}/teams/team${from.num}/players`] = fromPlayers;
+        if (!fromPlayers.length) {
+            // The last golfer left: the team goes with its key, as removeTeam does.
+            updates[`tournaments/${currentCode}/teams/team${from.num}`] = null;
+            delete updates[`tournaments/${currentCode}/teams/team${from.num}/players`];
+            if (keysWritable()) updates[`${keysBase()}/t/team${from.num}`] = null;
+        }
+        db.ref().update(updates).catch(err => alert(`Error: ${err.message}`));
+        closeMoveSheet();
     }
 
     function updateTeamHandicap(teamNum, val) {
@@ -2970,6 +3244,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             scoringKeys = snap.val() || {};
             renderTeamLinks();
             renderGroupLinks();
+            renderShotgunAssignments();   // the start-and-links rows carry the keyed link too (Phase 2, S3)
             renderLockPanel();
         };
         db.ref('tournamentKeys/' + code).on('value', keysCb);
@@ -5199,7 +5474,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             currentData = snap.val();
             if (!currentData) {
                 alert("Tournament not found.");
-                window.location.href = "tournament.html";
+                window.location.href = appHref("tournament.html");   // keeps ?app=1 on a preview (Phase 2)
                 return;
             }
             document.getElementById('setup-screen').style.display = 'none';
@@ -5212,6 +5487,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
             document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
             renderEventDetails();
+            if (APP_MODE) {
+                const tt = document.getElementById('ap-m-title'); if (tt) tt.textContent = currentData.name || 'Tournament';
+                const ts = document.getElementById('ap-m-sub'); if (ts) ts.textContent = `${currentData.courseName || ''} • code ${code}`;
+            }
+            if (canManage()) rememberMyEvent(code, currentData.name);
 
             // A tournament created before this feature existed has no startType field at all —
             // treated as 'normal' automatically, no migration needed.
@@ -5257,6 +5537,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     const tourneyParam = urlParams.get('tourney');
     const registerParam = urlParams.get('register');
     tripLinkCode = urlParams.get('trip');
+    renderMyEvents();   // Phase 2, P2-0: this phone's events, app mode only (hidden otherwise)
     if (registerParam) {
         openRegisterScreen(registerParam.toUpperCase());
     } else if (tourneyParam) {
@@ -5270,6 +5551,18 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
     }
 </script>
+<!-- PHASE 2, S2 (A + C's "Move to..." sheet). Opened by a tap on a golfer chip
+     on the Setup team card; lists the other teams with an open slot, and New
+     team. moveGolfer writes both players arrays in one update. -->
+<div class="modal-overlay" id="move-sheet">
+    <div class="modal-content">
+        <div class="modal-header">
+            <span id="move-sheet-title">Move</span>
+            <button class="close-modal" onclick="closeMoveSheet()" aria-label="Close">&times;</button>
+        </div>
+        <div class="move-sheet-body" id="move-sheet-body"></div>
+    </div>
+</div>
 <div id="paste-players-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:900; padding:20px; overflow:auto;">
     <div style="background:var(--bg-card); border-radius:12px; padding:18px; max-width:520px; margin:0 auto;">
         <h3 style="margin-top:0;">📋 Paste Player List</h3>

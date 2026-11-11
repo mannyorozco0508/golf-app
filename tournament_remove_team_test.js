@@ -101,7 +101,8 @@ describe('no scores: the team is removed and the Desk flags its golfers', () => 
         tapRemove(sb, 2);
         const after = applyWrites(rec(), sb.__dbWrites, 'tournaments/RT1');
         sb.__fire(/tournaments\/RT1$/, after);
-        const shotgun = html(sb, 'shotgun-assignments-list');
+        // Re-pinned 2026-11-11 (Phase 2, S3): the shotgun rows are the start-and-links rows now (#start-links-list), same hole input, same write.
+        const shotgun = html(sb, 'start-links-list');
         assert.match(shotgun, /Eagles/); assert.match(shotgun, /Owls/);
         assert.doesNotMatch(shotgun, /Team 2|value="7"/);
         vm.runInContext('window.print = function () {}; print = window.print; printTournamentTeeSheet();', sb);

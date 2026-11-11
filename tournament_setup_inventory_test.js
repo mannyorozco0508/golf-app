@@ -102,9 +102,10 @@ describe('TEAM MODE - the Setup tab, signed in as the owner', () => {
         assert.equal(count(cards, /🚀 Hole/g), 2, 'two teams have a hole, one does not');
     });
 
-    test('the shotgun assignment list has one starting-hole input per team', () => {
+    test('the start-and-links list has one starting-hole input per team (shotgun)', () => {
+        // Re-pinned 2026-11-11 (Phase 2, S3): #shotgun-assignments-list became #start-links-list; the input and its write are unchanged.
         const sb = arrive(teamRecord());
-        const s = html(sb, 'shotgun-assignments-list');
+        const s = html(sb, 'start-links-list');
         assert.equal(count(s, /onchange="updateTeamStartingHole\((1|2|3), this\.value\)"/g), 3);
     });
 
