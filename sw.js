@@ -4531,7 +4531,7 @@ function isHomepageResponse(res) {
 const APP_SHELL_ALIASES = ['./', './app'];
 // Moved to v395-2.0 (tournaments nov7 build, merged with phase 1): tournament.html + tournament-scorecard.html + tournament-engine.js - scores saved on the phone before sending (offline queue), prize results from one saved basis on every phone, shotgun next hole, flights/Event golfer board, "N waiting for signal" chip. A device on v394-2.0 keeps a scorecard that loses unsent scores when closed.
 //   and (tournaments phase 1): tournament.html + tournament-scorecard.html + tournament-engine.js - in-app card and board (app mode), Apple/Google organizer sign-in, prizes read pro shop credit / Trophy, entry-fee help, Share note gap. A device on v394-2.0 keeps cash prize wording and email-only organizer sign-in.
-// Moved to v396-2.0 (tournaments renamed HardPan Tournaments, option A, Manny 2026-11-11): tournament.html + tournament-scorecard.html + tournament-manifest.json.
+// Moved to v396-2.0 (tournaments renamed HardPan Tournaments, option A, plus the T3B Event day tab, Manny 2026-11-11): tournament.html + tournament-scorecard.html + tournament-manifest.json.
 // A device on v395-2.0 keeps the Rattle Golf header and fee line.
 const CACHE_VERSION = 'golfapp-v396-2.0';
 

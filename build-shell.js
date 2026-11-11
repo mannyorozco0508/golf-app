@@ -276,7 +276,8 @@ const PRODUCTS = {
         // sign-in, no cash prize wording. A device on v59 keeps cash prize wording.
         // Moved to v61 FOR THE HARDPAN RENAME (2026-11-11, Manny picked option A).
         // tournament.html, tournament-scorecard.html and the manifest now say
-        // HardPan Tournaments. A device on v60 keeps the Rattle Golf header.
+        // HardPan Tournaments, and tournament.html gains the organizer Event day
+        // tab (T3B). A device on v60 keeps the Rattle Golf header and no Event day.
         cacheName: 'tournament-v61-hardpan',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
