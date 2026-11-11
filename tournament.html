@@ -3797,7 +3797,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // Prize Results list uses, with the SAVED amounts. Nothing computed here.
         const prize = resolvePrizeView(currentData || {});
         const spots = savedPayoutSpots();
-        let prizes = `<div class="day-card" id="day-prizes"><div class="day-head">Prize results${prize.available && prize.title ? ' · paid on ' + escapeHtml(prize.title) : ''}</div>`;
+        let prizes = `<div class="day-card" id="day-prizes"><div class="day-head">Prize results${prize.available && prize.title ? ' · go by ' + escapeHtml(prize.title) : ''}</div>`;
         if (!payoutsAreSet(spots)) prizes += `<div class="day-row"><span>Results not set yet.</span></div>`;
         else if (!prize.available) prizes += `<div class="day-row"><span>${escapeHtml(prize.reason || '')}</span></div>`;
         else {

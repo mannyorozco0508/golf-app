@@ -337,8 +337,12 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
             'tournament.html must load auth-compat after app-compat');
         const others = DATA_PAGES.filter(p => p !== 'tournament.html');
         assert.ok(others.length >= 9, 'sanity: the other data pages were enumerated');
-        others.forEach(p => assert.ok(!/firebase-auth-compat/.test(read(p)),
-            p + ' loads the auth SDK; only the organizer console may'));
+        // Re-pinned 2026-11-11 (E4a photos): the scorecard FETCHES the SDK only when a
+        // golfer posts a photo (loadScriptOnce, a Storage upload needs a token), never
+        // at load. No page but the console may carry a <script src> for it.
+        others.forEach(p => assert.ok(!/<script[^>]*src="\.?\/?firebase-auth-compat\.js"/.test(read(p)),
+            p + ' loads the auth SDK at load; only the organizer console may'));
+        assert.match(read('tournament-scorecard.html'), /loadScriptOnce\('\.\/firebase-auth-compat\.js'/, 'positive: the card fetches it lazily, for a photo post');
         // Step 1 of the auth wave vendored the file with no caller; step 2 added
         // the caller. What must stay true is the split: the console calls it,
         // the scorecard never does.

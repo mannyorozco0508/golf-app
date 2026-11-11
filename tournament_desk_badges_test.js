@@ -167,7 +167,9 @@ describe('4. THE CHIPS AND THE COUNTS', () => {
         const sb = arrive(individualRecord(), deskEntries('individual'));
         assert.doesNotMatch(html(sb, 'registration-chips'), /Needs a team/);
         assert.doesNotMatch(html(sb, 'registration-counts'), /needs a team/);
-        assert.equal(count(html(sb, 'registration-chips'), /reg-chip/g), 5);
+        // Re-pinned 2026-11-11 (EC4 C): the Photos chip is the sixth; no Needs-a-team chip on an individual event.
+        assert.equal(count(html(sb, 'registration-chips'), /reg-chip/g), 6);
+        assert.match(html(sb, 'registration-chips'), /Photos 0/);
     });
 });
 
