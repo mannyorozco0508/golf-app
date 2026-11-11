@@ -5,7 +5,8 @@
 // instructions, legal pages). The iOS bundle identifier is com.rattlegolf.app
 // and is permanent. The native display name in the repo is HardPan. Do not
 // archive a new iOS binary while 1.0.3 is in review. Tournaments on the web
-// are Rattle Golf Tournaments again. tournaments.rattlegolf.com stays the hostname.
+// are Rattle Golf Tournaments again (until 2026-11-11: Manny picked rename A, HardPan
+// Tournaments). tournaments.rattlegolf.com stays the hostname.
 //
 // This file pins the identity surfaces that a golfer or the App Store actually
 // sees, and pins the boundary that keeps Tournament from being dragged along
