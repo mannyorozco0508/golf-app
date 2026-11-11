@@ -189,7 +189,8 @@ describe('4. THE NAME MATCHER compares the COMPOSED name', () => {
 
 describe('5. tournament.html composes the same way', () => {
     test('its detail path and stored record use courseDisplayName (source)', () => {
-        const at = TOURN.indexOf('function confirmCourseImport()');
+        // Re-pinned 2026-11-11: the import is applied by applyCourseImport (confirm and the one-step lookup both call it).
+        const at = TOURN.indexOf('function applyCourseImport(');
         const fn = TOURN.slice(at, TOURN.indexOf('\n    }', at));
         assert.match(fn, /const name = courseDisplayName\(detail\)/);
         const d = TOURN.indexOf('async function openTournamentCourseDetail(');

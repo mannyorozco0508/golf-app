@@ -154,7 +154,9 @@ describe('3. THE SETUP BLOCK - per-key writes, the startType shape', () => {
         assert.equal(el(sb, 'ev-venue').value, 'V');
         assert.equal(el(sb, 'ev-beneficiary').value, 'B');
         const sb2 = arrive(record(), ORGANIZER);
-        ['ev-date', 'ev-time', 'ev-venue', 'ev-beneficiary'].forEach((id) => assert.equal(el(sb2, id).value, '', id + ' empty when unset'));
+        ['ev-date', 'ev-time', 'ev-beneficiary'].forEach((id) => assert.equal(el(sb2, id).value, '', id + ' empty when unset'));
+        // 2026-11-11 (Manny): an unset venue SHOWS the course name (a display; editing writes).
+        assert.equal(el(sb2, 'ev-venue').value, 'Camas Meadows', 'the venue box shows the course when unset');
     });
     test('each key writes its own path with the machine value; an empty value removes the key', () => {
         const sb = arrive(record(), ORGANIZER);
