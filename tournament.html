@@ -1241,8 +1241,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             document.getElementById('course-key').value = key;
             document.getElementById('course-dropdown').style.display = 'none';
             removeCourseImportPanel();
-            showCourseNote(`No scorecard for ${name} yet. Pars are set to 4 and the stroke index to 1–18 until a card is loaded, so the event scores gross.`,
-                { id: 'course-note-online', label: `🌐 Get the card for "${name}" online`, query: name });
+            // ONE STEP (Manny 2026-11-11): the real card is fetched online now,
+            // by the course's name; the placeholder above stands only if that
+            // fails, and the note says which happened.
+            autoFetchCourseCard(key, name);
             return;
         }
         selectedCourseKey = key;
@@ -1270,10 +1272,77 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const b = document.createElement('button');
             b.type = 'button'; b.className = 'btn-outline'; b.id = action.id || 'course-note-action';
             b.textContent = action.label;
-            b.onclick = () => { runTournamentOnlineSearch(action.query, b); };
+            b.onclick = action.onClick || (() => { runTournamentOnlineSearch(action.query, b); });
             el.appendChild(b);
         }
         el.style.display = 'block';
+    }
+    // THE ONE-STEP LOOKUP (Manny 2026-11-11: "fetch its real card online
+    // automatically, like the HardPan app"). The same two proxy calls the
+    // dropdown's online row makes, the same canonical tee, the same
+    // importCardOrRefuse and the same record confirmCourseImport writes - only
+    // the taps are gone. A later pick cancels an older lookup (the token and the
+    // course-key check), so a slow answer never lands on a different course.
+    // Every failure keeps the placeholder and names its reason in the note, with
+    // the lookup one tap away again. Nothing here writes to global_courses.
+    const PLACEHOLDER_TAIL = ' Pars are set to 4 and the stroke index to 1\u201318 until a card is loaded, so the event scores gross.';
+    let autoFetchToken = 0;
+    const COURSE_STOP_WORDS = { golf: 1, club: 1, course: 1, country: 1, the: 1, gc: 1, cc: 1, links: 1, resort: 1, at: 1, of: 1, and: 1, '&': 1 };
+    function courseNameTokens(s) {
+        return String(s || '').toLowerCase().replace(/[^a-z0-9& ]+/g, ' ').split(/\s+/).filter((w) => w && !COURSE_STOP_WORDS[w]);
+    }
+    // The result that shares the most distinctive words with the directory name;
+    // none shared means no match (a search for "Papago Golf Club" must not take
+    // the first course that happens to have "club" in it).
+    function bestCourseMatch(name, courses) {
+        const want = courseNameTokens(name);
+        let best = null, bestScore = 0;
+        (courses || []).forEach((c) => {
+            const have = courseNameTokens((c.club_name || '') + ' ' + (c.course_name || ''));
+            const score = want.filter((w) => have.indexOf(w) !== -1).length;
+            if (score > bestScore) { best = c; bestScore = score; }
+        });
+        return bestScore > 0 ? best : null;
+    }
+    async function autoFetchCourseCard(key, name) {
+        const token = ++autoFetchToken;
+        const stillWanted = () => token === autoFetchToken && document.getElementById('course-key').value === key;
+        showCourseNote(`Looking up the scorecard for ${name} online\u2026`);
+        const fail = (why) => {
+            if (!stillWanted()) return;
+            showCourseNote(why + PLACEHOLDER_TAIL, { id: 'course-note-online', label: '🌐 Try the online lookup again', onClick: () => autoFetchCourseCard(key, name) });
+        };
+        let search;
+        try { const res = await fetch('/api/course-search?q=' + encodeURIComponent(name)); search = await res.json(); }
+        catch (e) { search = { status: 'unavailable', reason: 'network' }; }
+        if (!stillWanted()) return;
+        if (!search || search.status !== 'ok') { fail(`Couldn't look up ${name} online: ${courseImportMessage((search && search.reason) || 'upstream_error')}`); return; }
+        const match = bestCourseMatch(name, search.courses);
+        if (!match) { fail(`Nothing online matched ${name}.`); return; }
+        let detail;
+        try { const res = await fetch('/api/course/' + encodeURIComponent(match.id)); detail = await res.json(); }
+        catch (e) { detail = { status: 'unavailable', reason: 'network' }; }
+        if (!stillWanted()) return;
+        if (!detail || detail.status !== 'ok' || !detail.course) { fail(`Couldn't fetch the card for ${courseDisplayName(match)}: ${courseImportMessage((detail && detail.reason) || 'upstream_error')}`); return; }
+        const d = detail.course, tees = allTeeSets(d), canonical = pickCanonicalTee(d);
+        if (!canonical || !tees.length) { fail(`${courseDisplayName(d)} has no tee data from the provider.`); return; }
+        const pick = Math.max(0, tees.findIndex((t) => t.gender === canonical.gender && t.tee === canonical.tee));
+        const card = importCardOrRefuse(tees[pick].tee);
+        if (!card.ok) { fail(`${courseDisplayName(d)}, ${tees[pick].tee.tee_name} tees: ${card.reason}`); return; }
+        pendingCourseImport = { course: match, detail: d, tees: tees, pick: pick };
+        applyCourseImport(true);
+        noteCourseLoaded();
+    }
+    // "Scorecard loaded online: X, Blue tees, par 72. Change tees" - the panel
+    // with the tee chips opens on the button; Confirm there re-applies.
+    function noteCourseLoaded() {
+        const P = pendingCourseImport;
+        if (!P) return;
+        const chosen = P.tees[P.pick];
+        const card = importCardOrRefuse(chosen.tee);
+        const par = card.ok ? card.data.reduce((a, h) => a + h.par, 0) : (chosen.tee.par_total || 0);
+        showCourseNote(`Scorecard loaded online: ${courseDisplayName(P.detail)}, ${chosen.tee.tee_name} tees, par ${par}.`,
+            { id: 'course-note-tees', label: 'Change tees', onClick: () => { renderCourseImportPanel(); } });
     }
     function hideCourseNote() {
         const el = document.getElementById('course-note');
@@ -1468,11 +1537,19 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     // ---- THE SELECTION. Into the event only; nothing shared is written. ----
     function confirmCourseImport() {
+        if (!applyCourseImport(true)) return;
+        noteCourseLoaded();
+        removeCourseImportPanel();
+    }
+    // The import, applied: the same record as before 2026-11-11, from the
+    // confirm button or from the one-step lookup. With keepPending the tee
+    // chooser can still be opened from the note ("Change tees").
+    function applyCourseImport(keepPending) {
         const P = pendingCourseImport;
-        if (!P) return;
+        if (!P) return false;
         const chosen = P.tees[P.pick];
         const card = importCardOrRefuse(chosen.tee);
-        if (!card.ok) return;
+        if (!card.ok) return false;
         const detail = P.detail;
         const key = 'gca_' + detail.id;
         const name = courseDisplayName(detail);
@@ -1488,8 +1565,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         document.getElementById('course-search-input').value = name;
         document.getElementById('course-key').value = key;
         document.getElementById('course-dropdown').style.display = 'none';
-        pendingCourseImport = null;
-        removeCourseImportPanel();
+        if (!keepPending) { pendingCourseImport = null; removeCourseImportPanel(); }
+        return true;
     }
 
     // A card, or null. global_courses is the live source of truth for real hole

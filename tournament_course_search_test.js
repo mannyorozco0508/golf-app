@@ -394,11 +394,15 @@ describe('5. THE SILENT FALLBACK IS GONE - and the LOUD one is what a no-card pi
     // configured. Now the pick is SELECTED on a placeholder card (18 par 4s, SI
     // 1..18, courseIndexSynthetic), the page SAYS so under the box, and the
     // online fetch is still one tap away - offered, not spent.
-    test('a directory course with no card anywhere is selected on a placeholder card; the note under the box says so and offers the online fetch by name', async () => {
+    // 2026-11-11, later the same day (Manny): the pick FETCHES the card itself, one
+    // step; the placeholder stands only when that fails. Here the search answers
+    // an empty list, so the note says nothing matched and offers the lookup again.
+    test('a directory course with no card anywhere is selected; its card is looked up online at once; nothing matched -> placeholder card, the note says so and offers the lookup again', async () => {
         const sb = arrive();
         stubFetch(sb, OK([]));
         typeCourse(sb, 'cameron');
         await pick(sb, 'cameron', 'Cameron');
+        await settle(); await settle(); await settle();
         assert.equal(sb.document.getElementById('course-key').value, 'cameron', 'selected');
         assert.equal(sb.document.getElementById('course-search-input').value, 'Cameron');
         // The placeholder card and courseIndexSynthetic are page-local `let`s, out of
@@ -406,21 +410,22 @@ describe('5. THE SILENT FALLBACK IS GONE - and the LOUD one is what a no-card pi
         // the record a real Save writes.
         const note = sb.document.getElementById('course-note');
         assert.equal((note.style || {}).display, 'block', 'the note is shown');
-        assert.match(String(note.textContent), /^No scorecard for Cameron yet\. Pars are set to 4 and the stroke index to 1–18 until a card is loaded, so the event scores gross\./);
+        assert.match(String(note.textContent), /^Nothing online matched Cameron\. Pars are set to 4 and the stroke index to 1–18 until a card is loaded, so the event scores gross\./);
         const b = (note.children || []).find((c) => c.id === 'course-note-online');
-        assert.ok(b && /Get the card for "Cameron" online/.test(String(b.textContent)), 'the fetch is offered by name');
-        assert.equal(apiCalls(sb).length, 0, 'offered, not spent');
+        assert.ok(b && /Try the online lookup again/.test(String(b.textContent)), 'the lookup is offered again');
+        assert.deepEqual(apiCalls(sb), ['/api/course-search?q=Cameron'], 'one step: the search was made by the pick, by the course NAME');
     });
-    test('the fetch row for a card-less pick searches the course NAME', async () => {
+    test('a card-less pick looks the course up by NAME; the note\'s button looks it up again', async () => {
         const sb = arrive();
         stubFetch(sb, OK([]));
         typeCourse(sb, 'cameron');
         await pick(sb, 'cameron', 'Cameron');
-        // Re-pinned 2026-11-11: the fetch is the note's button under the box (the list closed on the pick).
-        const b = (sb.document.getElementById('course-note').children || []).find((c) => c.id === 'course-note-online');
-        assert.ok(b, 'the note offers the fetch');
-        b.onclick(); await settle();
+        await settle(); await settle(); await settle();
         assert.equal(apiCalls(sb)[0], '/api/course-search?q=Cameron');
+        const b = (sb.document.getElementById('course-note').children || []).find((c) => c.id === 'course-note-online');
+        assert.ok(b, 'the note offers the lookup again');
+        b.onclick(); await settle(); await settle(); await settle();
+        assert.deepEqual(apiCalls(sb), ['/api/course-search?q=Cameron', '/api/course-search?q=Cameron']);
     });
     test('a directory course WITH a preset still selects at once, no request', async () => {
         const sb = arrive();
