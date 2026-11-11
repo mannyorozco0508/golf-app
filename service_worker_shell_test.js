@@ -348,8 +348,15 @@ describe('KNOWN LIMITATION: FIREBASE IS STILL REMOTE', () => {
         // the scorecard never does.
         assert.match(read('tournament.html'), /firebase\.auth\(\)\.onAuthStateChanged/,
             'tournament.html is the page that signs in; it must listen for the auth state');
-        assert.ok(!/firebase\.auth\(/.test(read('tournament-scorecard.html')),
-            'the scorecard must never call firebase.auth()');
+        // Re-pinned 2026-11-11 (E4a photos): the card calls firebase.auth() in ONE
+        // place, photoIdToken, for the anonymous token a photo upload needs; it never
+        // listens for an auth state and never signs an organizer in.
+        const card = read('tournament-scorecard.html');
+        assert.ok(!/onAuthStateChanged/.test(card), 'the scorecard never listens for an auth state');
+        const fnAt = card.indexOf('function photoIdToken()');
+        const fn = card.slice(fnAt, card.indexOf('\n    function ', fnAt + 30));
+        assert.ok(fnAt > 0 && /firebase\.auth\(\)/.test(fn), 'positive: photoIdToken is where the token comes from');
+        assert.equal((card.match(/firebase\.auth\(/g) || []).length, (fn.match(/firebase\.auth\(/g) || []).length, 'and nowhere else on the card');
     });
 
     test('THE REMAINING LIMITATION: SDK availability is not data availability', () => {
