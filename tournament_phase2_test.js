@@ -137,7 +137,8 @@ test('3 create: course, name, date, time, shotgun, one team, Save: lands on the 
     assert.equal(a.app, true);
     assert.equal(a.barManage, true);
     assert.equal(a.title, 'Hope Foundation Scramble');
-    assert.equal(a.details, 'Sat, Nov 21, 2026 \u2022 8:00 AM');
+    // Re-pinned 2026-11-11 (Manny): the venue auto-fills from the picked course, so the details line carries it.
+    assert.equal(a.details, 'Sat, Nov 21, 2026 \u2022 8:00 AM Papago Golf Club');
     assert.equal(a.rows, 1, 'one team, one start row');
     assert.deepEqual(a.whens, ['input:'], 'shotgun: a hole input, not yet assigned');
     assert.equal(a.shotgunBox, true);
