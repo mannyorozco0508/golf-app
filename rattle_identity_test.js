@@ -202,12 +202,10 @@ describe('TOURNAMENT IS A SEPARATE PRODUCT AND WAS NOT RENAMED', () => {
         assert.match(read('tournament.html'), /aria-label="HardPan Tournaments"/);
         assert.ok(!/Rattle/.test(read('tournament-engine.js')),
             'the engine stays product-neutral');
-        // M6 (2026-11-08): the bar's company line "by Rattle Golf" is the one
-        // other place; it is held exactly above, so it is removed before this.
-        const scorecard = read('tournament-scorecard.html').replace(/<title>[^<]*<\/title>/, '')
-            .replace(BAR, '').replace(/<!-- M6 \(Stripe Phase 1[\s\S]*?-->/, '');
+        // Re-pinned 2026-11-11: the M6 bar is gone (rename A); the scorecard says Rattle nowhere outside its title.
+        const scorecard = read('tournament-scorecard.html').replace(/<title>[^<]*<\/title>/, '');
         assert.ok(!/Rattle/.test(scorecard),
-            'the scorecard carries the product name only in the title and the M6 bar');
+            'the scorecard carries the product name only in the title');
         const t = read('tournament.html');
         assert.match(t, /<svg class="wm-mark" viewBox="4 24 92 46"/,
             'the HardPan mark, inline, with no word on it');
