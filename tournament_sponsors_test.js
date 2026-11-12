@@ -21,7 +21,7 @@
 // Not proven here: the logo file -> 96 px data URL path (a file input cannot
 // be driven cold); it is read by hand on the preview.
 //
-// Baseline against main 03231f51 (before the build): all 6 tests: 2 PASS / 4 FAIL
+// Baseline against main 0f11073c (re-measured after the rebase; before the build): all 6 tests: 2 PASS / 4 FAIL
 // (tests 2 and 6). With the build: 6 PASS / 0 FAIL.
 'use strict';
 const { test } = require('node:test');
