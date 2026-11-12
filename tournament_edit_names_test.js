@@ -19,6 +19,8 @@
 // Baseline against main 3119e847 (before the build): all 6 tests: 2 PASS / 4 FAIL.
 // The 2 are test 6 (no Edit button for a golfer, before or after) and test 7.
 // With the build: all 6 tests: 6 PASS / 0 FAIL. (Tests 1 and 2 are one test.)
+// Rebased onto main 03231f51 (2026-11-12): against 03231f51's tournament.html
+// (swapped in by cp, restored by sha) the same 2 PASS / 4 FAIL; with the build 6 / 0.
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
