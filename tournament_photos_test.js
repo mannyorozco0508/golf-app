@@ -201,7 +201,8 @@ describe('E4c. THE RECAP: tournament.html?tourney=CODE&recap=1', () => {
         assert.equal(el(sb, 'recap-title').textContent, 'Rattle Classic recap');
         assert.equal(el(sb, 'recap-sub').textContent, 'Sat Nov 21 · Papago · 18 teams');
         const w = plain(html(sb, 'recap-winners'));
-        assert.match(w, /🏆 Winners Team 9 · Ruiz \/ Park -6/);
+        // Re-pinned 2026-11-12 (bug hunt #7): mid-round the recap says Leading with the holes played; Winners once every scored card is through 18.
+        assert.match(w, /⏳ Leading Team 9 · Ruiz \/ Park -6 · thru \d+/);
         assert.match(w, /⛳ KP 7 \/ 16 Dee Nguyen · Sam Ortiz/);
         assert.match(w, /🏌️ Long drive 12 Pat Reyes 301 yds/);
         assert.doesNotMatch(w, /Al Lopez/, 'hole 3 has no confirmed winner: not on the recap');

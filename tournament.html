@@ -229,6 +229,7 @@
         /* The organizer sign-in: a compact card, secondary to the band above it.
            Same ids, same button, same sentence; the class does the styling that an
            inline border used to. */
+        .org-signin-hint { text-align: center; font-size: 0.82rem; font-weight: 700; color: var(--brand-green); padding: 8px 0 10px; cursor: pointer; }
         .signin-panel { margin-bottom: 18px; }
         .signin-card { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px 14px; background: var(--nav-bg); }
         .signin-card-note { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4; }
@@ -433,6 +434,7 @@
         .open-code label { font-size: 0.75rem; font-weight: 700; margin: 0 0 4px; display: block; }
         .open-code-row { display: flex; gap: 8px; }
         .open-code-row input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .08em; padding: 8px 10px; font-size: 0.95rem; margin: 0; }
+        .open-code-row input::placeholder { text-transform: none; letter-spacing: normal; }   /* bug hunt #13: "e.g.", not "E.G." */
         .open-code-row button { width: auto; padding: 8px 16px; margin: 0; }
         .open-code-err { color: var(--accent-red); font-size: 0.78rem; margin: 4px 0 0; }
         /* Date and start on the create form (S1 A): two boxes side by side. */
@@ -585,6 +587,9 @@
          by renderMyEvents(): events it created, and owned events it opened. An
          account-wide list is P2-6 (a rules change) and is not built. -->
     <div class="ap-top app-only" id="ap-top-setup"><button type="button" class="ap-bk" onclick="appBack()" aria-label="Back">‹</button><div><div class="ap-tt">New tournament</div><div class="ap-ts">HardPan Tournaments</div></div></div>
+    <!-- BUG HUNT #8 (Manny OK 2026-11-12): an unknown event code used to pop a
+         native alert and bounce; now the page stays and this line says so. -->
+    <p id="not-found-note" class="course-note" role="alert" style="display:none;"></p>
     <div class="my-events app-only" id="app-my-events" style="display:none;"><div id="my-events-list"></div>
         <!-- Advisor 2026-11-11 18:05: open an event you run by its code. Static
              markup, outside the list the account snapshot redraws, so a half-typed
@@ -865,7 +870,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <!-- WHO IS SIGNED IN, AS A FACT. No word that promises a lock: the sign-in
          gates what this page renders, not what the database accepts. -->
     <div id="signed-in-as" style="text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;"></div>
-    <div id="signin-panel-manage" class="signin-panel" style="display:none;"></div>
+    <!-- BUG HUNT #3 (Manny OK 2026-11-12): a spectator opening the board link
+         used to meet the organizer sign-in card first. The card now sits at the
+         bottom of this screen; this one line is the door to it. -->
+    <div id="org-signin-hint" class="org-signin-hint" style="display:none;" role="button" tabindex="0" onclick="scrollToOrganizerSignIn()" onkeydown="if (event.key === 'Enter' || event.key === ' ') scrollToOrganizerSignIn()">Organizer? Sign in ›</div>
     <div class="top-nav-bar">
         <span class="top-nav-item" onclick="showTab('home')" id="tab-btn-home">🏁 Event day</span>
         <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup">⚙️ Setup &amp; Links</span>
@@ -1267,6 +1275,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     </div>
 
 
+    <!-- Bug hunt #3: the organizer sign-in card, below the board for anyone not signed in. -->
+    <div id="signin-panel-manage" class="signin-panel" style="display:none;"></div>
     <div id="tournament-print-view"></div>
 </div>
 
@@ -1664,13 +1674,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // match with a card wins; a stub with no card is fetched (ensureCard).
     function bestSharedCourseKey(name) {
         const want = courseNameTokens(name);
-        let best = null, bestScore = 0;
+        if (!want.length) return null;
+        // EVERY distinctive word of the picked name must be in the shared name
+        // (bug hunt #1, 2026-11-12: half the words was enough, so "The Boulders
+        // (North)" took "Troon North Monument" on the one shared word, and every
+        // par on the event would have been Troon's). Extra words on the shared
+        // side are fine ("Papago" still finds "Papago Golf Course"); the record
+        // with the fewest extra words wins, and one with a card beats one without.
+        let best = null, bestExtra = Infinity;
         Object.keys(globalCourses || {}).forEach((k) => {
             const have = courseNameTokens((globalCourses[k] || {}).name);
-            const score = want.filter((w) => have.indexOf(w) !== -1).length;
-            if (score > bestScore || (score === bestScore && best && !resolveCourseCard(best) && resolveCourseCard(k))) { best = k; bestScore = score; }
+            if (!want.every((w) => have.indexOf(w) !== -1)) return;
+            const extra = have.length - want.length;
+            if (extra < bestExtra || (extra === bestExtra && best && !resolveCourseCard(best) && resolveCourseCard(k))) { best = k; bestExtra = extra; }
         });
-        return bestScore > 0 && bestScore >= Math.ceil(want.length / 2) ? best : null;
+        return best;
     }
     async function autoFetchCourseCard(key, name) {
         const token = ++autoFetchToken;
@@ -3486,6 +3504,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 if (box && !box.value) box.value = pendingOauthLink.email;
             }
         });
+        // Bug hunt #3: the door at the top follows the manage card (shown for
+        // anyone not signed in, hidden for the organizer) - read off the card,
+        // so the one auth seam stays the one seam.
+        const hint = document.getElementById('org-signin-hint');
+        const card = document.getElementById('signin-panel-manage');
+        if (hint && card) hint.style.display = card.style.display === 'none' ? 'none' : 'block';
+    }
+    function scrollToOrganizerSignIn() {
+        const card = document.getElementById('signin-panel-manage');
+        if (card) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }
 
     function toggleTournamentEmail(panelId) {
@@ -7400,7 +7428,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 const who = t && (t.players || []).length ? ` · ${(t.players || []).map((p) => String(p).trim().split(' ').pop()).join(' / ')}` : '';
                 return `${r.teamName || r.name || ''}${who} ${toPar(r.toPar)}`;
             }).join(', ');
-            rows.push(['🏆 Winners', names]);
+            // BUG HUNT #7 (Manny OK 2026-11-12): "Winners" only once the field is
+            // done - every card that has scores is through the last hole (an event:
+            // every entry has all its rounds). Until then the row reads "Leading"
+            // with the holes played, so a recap opened mid-round does not crown
+            // anyone. A card that never scored does not hold the recap open.
+            const holes = (data.courseData || []).length || 18;
+            const scored = (view.rows || []).filter((r) => r.hasScores);
+            const done = scored.length > 0 && (view.kind === 'event' ? scored.every((r) => r.completedAll) : scored.every((r) => Number(r.thru) >= holes));
+            const thru = view.kind === 'event' ? `${top[0].roundsComplete}/${top[0].countableRounds} rounds` : `thru ${top[0].thru}`;
+            rows.push(done ? ['🏆 Winners', names] : ['⏳ Leading', `${names} · ${thru}`]);
         }
         const won = TournamentContests.confirmedWinners(data, recapEntries);
         const kp = won.filter((w) => w.kind === 'kp'), ld = won.filter((w) => w.kind === 'ld');
@@ -7429,27 +7466,61 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             .catch(() => { if (el) el.textContent = 'Try again'; });
     }
 
+    // BUG HUNT #5 (Manny OK 2026-11-12): a multi-round event keeps its course on
+    // each round, not on the event, so the header read "undefined • ...". The
+    // event's course, else the latest round's, else the format alone.
+    function eventCourseName() {
+        if (currentData && currentData.courseName) return currentData.courseName;
+        const rounds = (currentData && currentData.rounds) || {};
+        const ids = Object.keys(rounds).sort((a, b) => ((rounds[b] || {}).createdAt || 0) - ((rounds[a] || {}).createdAt || 0));
+        for (const rid of ids) if (rounds[rid] && rounds[rid].courseName) return rounds[rid].courseName;
+        return '';
+    }
+    function eventSubLine() {
+        const c = eventCourseName(), f = formatLabelFor(currentData.format);
+        return c ? `${c} • ${f}` : f;
+    }
+    // BUG HUNT #8 (Manny OK 2026-11-12): the sentence replaces a native alert
+    // and a bounce to the empty page. The setup screen stays (it is the page a
+    // person was sent to), the code is left in the Open-by-code box to fix, the
+    // same sentence sits in that box's own error line and under the hero (the
+    // website shows no code box when signed out), and the address drops the
+    // bad code so a reload does not ask again.
+    function showCodeNotFound(code) {
+        const msg = `No event matches the code ${code}. Check the code and try again.`;
+        currentData = {};
+        const setup = document.getElementById('setup-screen'), manage = document.getElementById('manage-screen');
+        if (manage) manage.style.display = 'none';
+        if (setup) setup.style.display = 'block';
+        const note = document.getElementById('not-found-note');
+        if (note) { note.textContent = msg; note.style.display = 'block'; }
+        const input = document.getElementById('open-code-input');
+        if (input && !input.value) input.value = code;
+        const err = document.getElementById('open-code-err');
+        if (err) { err.textContent = msg; err.style.display = 'block'; }
+        try { history.replaceState(null, '', appHref('tournament.html')); } catch (e) { /* the address keeps the code */ }
+        try { db.ref(`tournaments/${code}`).off('value'); } catch (e) { /* listener stays */ }
+    }
     function loadTournament(code) {
         db.ref(`tournaments/${code}`).on('value', (snap) => {
             currentData = snap.val();
             if (!currentData) {
-                alert("Tournament not found.");
-                window.location.href = appHref("tournament.html");   // keeps ?app=1 on a preview (Phase 2)
+                showCodeNotFound(code);   // bug hunt #8: a sentence on the page, no dialog, no bounce
                 return;
             }
             document.getElementById('setup-screen').style.display = 'none';
             document.getElementById('manage-screen').style.display = 'block';
             document.getElementById('manage-room-badge').textContent = code;
             document.getElementById('manage-t-name').textContent = `🏆 ${currentData.name}`;
-            document.getElementById('manage-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
+            document.getElementById('manage-t-sub').textContent = eventSubLine();   // bug hunt #5
             const pool = poolTotal();
             document.getElementById('manage-t-pool').textContent = pool > 0 ? `📊 Total in: $${pool.toFixed(2)}` : '';
             document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
-            document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
+            document.getElementById('lb-t-sub').textContent = eventSubLine();   // bug hunt #5
             renderEventDetails();
             if (APP_MODE) {
                 const tt = document.getElementById('ap-m-title'); if (tt) tt.textContent = currentData.name || 'Tournament';
-                const ts = document.getElementById('ap-m-sub'); if (ts) ts.textContent = `${currentData.courseName || ''} • code ${code}`;
+                const ts = document.getElementById('ap-m-sub'); if (ts) ts.textContent = `${eventCourseName() ? eventCourseName() + ' • ' : ''}code ${code}`;   // bug hunt #5
             }
             if (canManage()) { rememberMyEvent(code, currentData.name); rememberOwnedEvent(code, currentData.name, currentData.courseName); }
             renderEntryFeesCard();
