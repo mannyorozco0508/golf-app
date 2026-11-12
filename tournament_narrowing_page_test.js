@@ -45,6 +45,7 @@ const settle = () => new Promise((r) => setImmediate(r)).then(() => new Promise(
 // RE-PINNED, scorecard-lock wave (2026-10-06, Manny's wording): a refusal now
 // most often means a link without this team's key, so the sentence says so.
 const REFUSED = "⚠️ Not saved — this link can't score this card. Ask the organizer for your team's link.";
+const KEYLESS_REFUSED = "⚠️ Not saved — This link is missing its scoring key. Ask your organizer for your team’s link; the leaderboard still works.";   // bug hunt #2 (2026-11-12): a link with no key
 const SIGNAL = '⚠️ Could not save — check your signal and re-enter that hole';
 
 // A team scramble the scorecard can score, with the stub's set() shaped per test.
@@ -82,7 +83,10 @@ describe('1. THE GOLFER\'S REFUSAL SENTENCE (tournament-scorecard.html)', () => 
         sb.saveHoleScore(1, '5');
         await settle();
         const s = saveState(sb);
-        assert.equal(s.text, REFUSED);
+        // Re-pinned 2026-11-12 (bug hunt #2): this card has no key in its link, so a
+        // refusal now names the missing key and locks the card; REFUSED is kept
+        // for a link that carries a key.
+        assert.equal(s.text, KEYLESS_REFUSED);
         assert.equal(s.cls, 'save-state error');
     });
     test('any other failure keeps the signal sentence', async () => {

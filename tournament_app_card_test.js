@@ -144,7 +144,8 @@ describe('T1A scramble - one hole at a time', { skip: SKIP }, () => {
         const a = parse(v[3]), ws = writesOf(v[4]);
         assert.deepEqual(ws.map((w) => [w.op, w.path, w.value]), [['set', 'tournaments/SCR/scores/team4_h7', 5]],
             'no key: the plain set the website card makes');
-        assert.equal(a.chip, "⚠️ Not saved — this link can't score this card. Ask the organizer for your team's link.");
+        // Re-pinned 2026-11-12 (bug hunt #2): a keyless link's refusal names the missing key.
+        assert.equal(a.chip, "⚠️ Not saved — This link is missing its scoring key. Ask your organizer for your team’s link; the leaderboard still works.");
         assert.equal(a.next, 'Hole 7 · Par 4', 'the refused hole is the next to play again');
         assert.match(a.dark, /3 holes done/);
         assert.deepEqual(a.steppers, ['5'], 'the golfer\'s number comes back with the hole, not par');
