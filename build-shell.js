@@ -289,7 +289,8 @@ const PRODUCTS = {
         // Moved to v66 FOR GET HARDPAN A + B (2026-11-12, Manny OK): see sw.js v402.
         // Moved to v67 FOR EDIT NAMES B (2026-11-12, Manny OK): see sw.js v403.
         // Moved to v68 FOR THE BUG-HUNT FIXES (2026-11-12, Manny OK): see sw.js v404.
-        cacheName: 'tournament-v68-bugfixes',
+        // Moved to v69 FOR UI3: TAB STRIP, SHARED COURSES, DATE ROW (2026-11-12, Manny OK): see sw.js v405.
+        cacheName: 'tournament-v69-ui3',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
