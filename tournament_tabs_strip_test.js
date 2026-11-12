@@ -15,9 +15,9 @@
 //  4 money = base
 //
 // Baseline against main 0f11073c (before the build, the page swapped in by cp
-// and restored by sha): all 4 tests: 1 PASS / 3 FAIL (test 4; the old pills are 35 px tall,
-// so the non-owner test fails there too). With the
-// build: all 4 tests: 4 PASS / 0 FAIL.
+// and restored by sha, final file): all 4 tests: 2 PASS / 2 FAIL (tests 2 and 4: the
+// desktop strip already fit; the old pills are 35 px tall, so tests 1 and 3 fail).
+// With the build: all 4 tests: 4 PASS / 0 FAIL.
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
