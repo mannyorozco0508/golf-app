@@ -200,13 +200,14 @@ describe('THE RULES (targaryen on database.rules.json)', () => {
 describe('THE SEAM (tournament.html, comments stripped)', () => {
     const code = stripComments(read('tournament.html'));
     test('onAuthStateChanged stores a non-anonymous user or null - the one seam', () => {
-        assert.match(code, /firebase\.auth\(\)\.onAuthStateChanged\(\(user\) => \{\s*authUser = \(user && !user\.isAnonymous\) \? user : null;\s*applyManageGate\(\);\s*renderSignedInAs\(\);\s*\}\);/);
+        assert.match(code, /firebase\.auth\(\)\.onAuthStateChanged\(\(user\) => \{\s*authUser = \(user && !user\.isAnonymous\) \? user : null;\s*loadAccountEvents\(\);\s*applyManageGate\(\);\s*renderSignedInAs\(\);\s*\}\);/);
         assert.equal((code.match(/isAnonymous/g) || []).length, 1);
     });
     test('every organizer check reads authUser; nothing reads the SDK\'s user directly; the anonymous user is never signed out', () => {
         assert.ok(!/currentUser/.test(code), 'no currentUser reader');
         assert.equal((code.match(/firebase\.auth\(\)/g) || []).length, 3, 'signInWithEmailAndPassword, signOut (the button), onAuthStateChanged');
-        assert.equal((code.match(/\bauthUser\b/g) || []).length, 11, 'the declaration, the seam, the Save gate, the ownerUid write, canManage (2), renderSignedInAs (3 + 1), renderSignInPanels');
+        // Re-pinned 2026-11-12 (My events by account): + loadAccountEvents (1), rememberOwnedEvent (1), renderMyEvents (1) - the organizer's own pointer, still read through the one seam.
+        assert.equal((code.match(/\bauthUser\b/g) || []).length, 16, 'the declaration, the seam, the Save gate, the ownerUid write, canManage (2), renderSignedInAs (3 + 1), renderSignInPanels, loadAccountEvents, rememberOwnedEvent, renderMyEvents');
         assert.match(code, /if \(!authUser\) \{\s*alert\('Sign in to create a tournament/);
         assert.match(code, /ownerUid: authUser\.uid/);
         assert.match(code, /return !!\(authUser && authUser\.uid === owner\);/);

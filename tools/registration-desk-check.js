@@ -129,9 +129,11 @@ const SEEN = `(function(){
         correctButton: first.correct, removeButton: first.remove,
         exportShown: first.exportShown,
         editorOpened: afterOpen.editorShown, editorPrefilled: afterOpen.editName,
-        sentAfterSave: afterSave.sent,
+        // 2026-11-12 (My events by account): the owner's page writes its own
+        // organizers/<uid>/tournaments pointer on open; that is not a desk write.
+        sentAfterSave: afterSave.sent.filter(function (w) { return !/^organizers\//.test(w.path); }),
         confirmAsked: afterRemove.confirms,
-        sentAfterRemove: afterRemove.sent.slice(afterSave.sent.length)
+        sentAfterRemove: afterRemove.sent.slice(afterSave.sent.length).filter(function (w) { return !/^organizers\//.test(w.path); })
     };
     const tappable = (b) => !!b && b.w >= 44 && b.h >= 28;
     out.ok = first.rows === 3

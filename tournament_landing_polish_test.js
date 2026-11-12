@@ -85,6 +85,13 @@ const DELIBERATE = [
         to: '|Date (optional)|Start time (optional)|Shotgun start \u2014 teams start on assigned holes, all at once|Format|'
     },
     {
+        // ADDED 2026-11-12 (My events by account, Advisor 18:05): the "Open an event
+        // by code" box sits under My events, before the trip banner.
+        why: 'open an event by code: a label and an Open button under My events',
+        from: '|\u{1F9F3} Setting Up A Tournament For|',
+        to: '|Open an event by code|Open|\u{1F9F3} Setting Up A Tournament For|'
+    },
+    {
         why: 'the Individual card gets the same icon slot as the other three instead of an emoji inside its name',
         from: '|🏌️ Individual Stroke Play|',
         to: '|🏌️|Individual Stroke Play|'

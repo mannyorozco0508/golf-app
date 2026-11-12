@@ -116,7 +116,9 @@ function tap(sb, markup, pick) {
 }
 const byId = (id) => (t) => new RegExp('\\bid="' + id + '"').test(t);
 const byText = (sbHtml, text) => (t) => { const i = sbHtml.indexOf(t); return i > -1 && sbHtml.slice(i + t.length).replace(/<[^>]+>[\s\S]*$/, '').trim().startsWith(text); };
-const updates = (sb) => sb.__dbWrites.filter((w) => w.op === 'update');
+// 2026-11-12 (My events by account): the owner's page also writes its own
+// organizers/<uid>/tournaments pointer on open; a contests count leaves it out.
+const updates = (sb) => sb.__dbWrites.filter((w) => w.op === 'update' && !/^organizers\//.test(w.path));
 
 describe('A. THE DEFAULT STATE: no contest holes, the card and console as they were', () => {
     test('A1 an event with no contests: no prompt, no Contests tab, no entries read beyond the one listener', () => {
