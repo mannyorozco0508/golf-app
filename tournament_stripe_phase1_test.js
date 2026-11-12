@@ -35,6 +35,12 @@
 //   on stripe-1-web after the build: 42 tests - 42 pass / 0 fail.
 //   registrationStatus switch (stripe-1, 2026-11-08): 42 tests - 42 pass / 0 fail;
 //   control (tournament.html put back to the registrations/ read): 40 pass / 2 fail.
+//   H6 + H7 added 2026-11-12 (the one-fee record with no fees node): 44 tests.
+//   Against main a1eb177a (tournament.html sha256 46930dc412e3cbcb…, the page
+//   swapped in by cp, restored by sha): 42 pass / 2 fail (H6, H7). With the
+//   fix on preview-fees-card: 44 pass / 0 fail. Controls: the node-creation
+//   branch removed -> H6 + H7 red; the per-team sentence replaced by the old
+//   refusal -> H7 red; the flag set alone without the cents -> H6 red.
 // NEGATIVE CONTROLS (each mutated in tournament.html, restored by sha from a
 // saved copy): pay button with collectByCard false -> A2; card toggle for a
 // not-allow-listed owner -> H2; Refund for a non-owner with the desk gate
@@ -466,6 +472,51 @@ describe('H. M4: the Entry fees card', () => {
         await settle(); fireRecord(ok, record({ fees: FEES }));
         el(ok, 'fees-card').checked = false; tap(ok, html(ok, 'entry-fees-block'), byId('fees-card'), 'fees-card');
         assert.deepEqual(clone(ok.__dbWrites.filter((w) => /fees\/collectByCard$/.test(w.path)).map((w) => w.value)), [false]);
+    });
+    // ADDED 2026-11-12 (Advisor 16:36, LIVE on R7SK48, blocking Stripe step 4):
+    // the ONE fee field (Nov 11) writes entryFee + entryFeePer and never creates
+    // the fees node, so the card switch met feesOf() === null and refused with
+    // "Set the entry fee first." on an event whose fee was set. The organizer's
+    // tap now creates the node in ONE update, the cents the server reads beside
+    // the flag. Created on the TAP only: the contract keeps an event with no
+    // fees node on today's signup form and Desk until the organizer asks.
+    test('H6 one fee $5 per golfer and NO fees node: the card switch creates fees {entryFeeCents 500, collectByCard true} in one update, no refusal', async () => {
+        const rec = record({ entryFee: 5, entryFeePer: 'golfer' });
+        assert.equal(rec.fees, undefined, 'positive: the fixture has no fees node');
+        const sb = arriveOwner(rec, { reads: { 'payments/allowedOwners/u-org': true } });
+        await settle(); fireRecord(sb, record({ entryFee: 5, entryFeePer: 'golfer' }));
+        const card = html(sb, 'entry-fees-block');
+        assert.match(plain(card), /\$5 per golfer/, 'positive: the card reads the one fee');
+        assert.match(card, /id="fees-card"/, 'positive: the switch is drawn');
+        el(sb, 'fees-card').checked = true; tap(sb, card, byId('fees-card'), 'fees-card');
+        const fees = sb.__dbWrites.filter((w) => /^tournaments\/OWN1\/fees/.test(w.path));
+        assert.deepEqual(clone(fees.map((w) => [w.op, w.path, w.value])), [['update', 'tournaments/OWN1/fees', { entryFeeCents: 500, collectByCard: true }]], 'one update, the node created with the cents and the flag');
+        assert.equal(String(el(sb, 'fees-error').textContent || ''), '', 'no refusal sentence');
+        fireRecord(sb, record({ entryFee: 5, entryFeePer: 'golfer', fees: { entryFeeCents: 500, collectByCard: true } }));
+        assert.match(html(sb, 'entry-fees-block'), /id="fees-card" checked/, 'the next snapshot draws the switch On');
+        // The cash switch takes the same road.
+        const cash = arriveOwner(record({ entryFee: 5, entryFeePer: 'golfer' }), { reads: { 'payments/allowedOwners/u-org': true } });
+        await settle(); fireRecord(cash, record({ entryFee: 5, entryFeePer: 'golfer' }));
+        el(cash, 'fees-cash').checked = true; tap(cash, html(cash, 'entry-fees-block'), byId('fees-cash'), 'fees-cash');
+        assert.deepEqual(clone(cash.__dbWrites.filter((w) => /^tournaments\/OWN1\/fees/.test(w.path)).map((w) => [w.op, w.value])), [['update', { entryFeeCents: 500, allowCash: true }]]);
+    });
+    test('H7 a per-team fee and no fees node: the switch refuses with the per-team sentence, not "Set the entry fee first", and writes nothing', async () => {
+        const sb = arriveOwner(record({ entryFee: 400, entryFeePer: 'team' }), { reads: { 'payments/allowedOwners/u-org': true } });
+        await settle(); fireRecord(sb, record({ entryFee: 400, entryFeePer: 'team' }));
+        const card = html(sb, 'entry-fees-block');
+        assert.match(plain(card), /\$400 per team/, 'positive: the card reads the one fee');
+        el(sb, 'fees-card').checked = true; tap(sb, card, byId('fees-card'), 'fees-card');
+        assert.deepEqual(sb.__dbWrites.filter((w) => /^tournaments\/OWN1\/fees/.test(w.path)), [], 'nothing written for a per-team fee');
+        // The refusal is the error element's text (mini-dom's innerHTML is a string; the element is read directly).
+        const text = String(el(sb, 'fees-error').textContent || '');
+        assert.match(text, /^This fee is per team\. Card payments charge each golfer: switch the fee to per golfer under Event details first\.$/);
+        assert.equal(text.indexOf('Set the entry fee first'), -1);
+        // No fee at all still says so.
+        const none = arriveOwner(record({ entryFee: 0 }), { reads: { 'payments/allowedOwners/u-org': true } });
+        await settle(); fireRecord(none, record({ entryFee: 0 }));
+        el(none, 'fees-card').checked = true; tap(none, html(none, 'entry-fees-block'), byId('fees-card'), 'fees-card');
+        assert.equal(String(el(none, 'fees-error').textContent || ''), 'Set the entry fee first.');
+        assert.deepEqual(none.__dbWrites.filter((w) => /^tournaments\/OWN1\/fees/.test(w.path)), []);
     });
     test('H5 a visitor sees no fees card', () => {
         const sb = arriveOwner(record({ fees: FEES }), { user: null });
