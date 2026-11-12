@@ -3808,6 +3808,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // non-owner (empty). The sign-in shows Setup; these draw what goes with it.
         renderSponsorsSetup();
         renderTvLink();
+        // 58A (Manny 2026-11-12, iPad): the record can arrive before the sign-in,
+        // and its snapshot drew the owner-only offer block for a non-owner
+        // (empty). The sign-in shows Setup; this draws the block that goes with it.
+        renderOfferSetup();
         renderSignedInAs();
     });
     // Once per load, after the listener is in, so a redirect that came back

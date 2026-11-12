@@ -23,10 +23,13 @@
 //  7 app mode: nothing of it
 //  8 no flag in the database: site-pricing.js decides (founding open today)
 //  9 money = base
+// 10 the owner signs in AFTER the record arrived (Manny's iPad, R7SK48): the
+//    block draws with the switch Off and no offer record (added 2026-11-12)
 //
-// Baseline against main 03231f51 (before the build): all 9 tests: 3 PASS / 6 FAIL
-// (tests 6, 7 and 9: without the build nothing ever shows). With the build:
-// all 9 tests: 9 PASS / 0 FAIL.
+// Baseline against main 03231f51 (before the build), the first 9 tests:
+// 3 PASS / 6 FAIL (tests 6, 7 and 9: without the build nothing ever shows).
+// All 10 tests against preview-58 1be4e5bc (page swapped in by cp, restored by
+// sha): 9 PASS / 1 FAIL (test 10, the block empty). With the fix: 10 PASS / 0 FAIL.
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -162,4 +165,26 @@ test('9 money = base', () => {
     assert.equal(sha('payouts.js'), 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8');
     assert.equal(sha('tournament-engine.js'), '1c659c46d0f91ca3dc61beb231e1356ea0a572fd7c3c40399399d36e2ff89f57');
     assert.equal(sha('handicap.js'), '2d3b2f7fd916a4b83a10491e822ece946203d2bbb11264962e7d888a7b450f17');
+});
+
+// 10 (Manny 2026-11-12, iPad, owner of R7SK48: the heading showed with nothing
+// under it). The record can arrive BEFORE the sign-in: its snapshot drew the
+// block for a non-owner (empty), and the sign-in showed the Setup tab without
+// drawing the block again. Arrive signed out, the owner signs in through the
+// stand-in's door (no page function), tap Setup: the switch Off, its label,
+// the off sentence, the note; no code box. No offer record at all.
+test('10 the owner signs in AFTER the record arrived: the block draws, switch Off', async () => {
+    const r = await arriveCold({ url: fileUrl('tournament.html', 'tourney=SCR'), db: fixture(null, true), auth: 'signed-out', settleMs: 3500,
+        steps: [{ expression: `window.__signInAs(${JSON.stringify(OWNER)})` }, { sleep: 600 }, { tap: '#tab-btn-setup' }, { sleep: 300 }, sc('#offer-setup'), { sleep: 200 }, ORG,
+            { expression: `(document.getElementById('offer-setup').innerText || '').replace(/\\s+/g, ' ').trim()` }] });
+    assert.ok(r.ok, r.reason);
+    const o = JSON.parse(r.value.filter((v) => typeof v === 'string' && v[0] === '{').pop());
+    const text = r.value[r.value.length - 1];
+    assert.equal(o.block, true, 'positive: the block is on Setup and drew');
+    assert.equal(o.sw, false, 'the switch is there and Off: ' + JSON.stringify(o));
+    assert.equal(o.label, 'Off');
+    assert.equal(o.code, false);
+    assert.match(text, /Off for every event until you turn it on\./);
+    assert.match(text, /founding flag/);
+    assert.deepEqual(o.writes, [], 'drawing the block writes nothing');
 });
