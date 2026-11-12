@@ -4543,7 +4543,8 @@ const APP_SHELL_ALIASES = ['./', './app'];
 // Moved to v403-2.0 (Edit names after Save, option B, Manny OK 2026-11-12): tournament.html's Setup team cards gain Edit (team name, golfers, team handicap; one update, same link, key and scores); a device on v402 keeps the cards without it.
 // Moved to v404-2.0 (bug-hunt fixes, Manny OK 2026-11-12): tournament.html (course picker matches the whole name, the board first for a non-owner, multi-round header, recap Leading/Winners, wrong code inline, placeholder) and tournament-scorecard.html (a keyless link's refused write locks the card and says why; a closed round says so); a device on v403 keeps the old pages.
 // Moved to v405-2.0 (ui3, Manny OK 2026-11-12): tournament.html's five-column tab strip, shared courses in the course dropdown with a nines chooser for 27-hole records, and the create form's Date / Start time row fixed for iOS WebKit and level on a phone; a device on v404 keeps the old strip, list and row.
-const CACHE_VERSION = 'golfapp-v405-2.0';
+// Moved to v406-2.0 (57 + 52a, Manny OK 2026-11-12): tournament.html gains Setup → Sponsors and the Board tab's TV link (both drawn on a late sign-in), tournament-scorecard.html the hole sponsor line and Presented by, tournament-tv.html the read-only TV board; hardpan-home.html seven real Organize cards, Start a tournament, and the Ask Caddie card re-shot without Coming soon; a device on v405 keeps the pages without them.
+const CACHE_VERSION = 'golfapp-v406-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
