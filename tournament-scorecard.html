@@ -606,6 +606,7 @@
             document.getElementById('main-content').style.display = 'block';
             roundScope = view;   // for a single-round record this IS currentData
             roundLocked = (status !== 'open');
+            renderLinkTruth(status);   // bug hunt #6
             // THE ROUND IS KNOWN, AND WHETHER IT IS OPEN: anything this phone
             // queued for this card goes now. Before the render, so a render that
             // throws cannot also strand the scores.
@@ -1176,6 +1177,17 @@
     // The round view this card is scoring, and whether it accepts writes.
     let roundScope = null;
     let roundLocked = false;
+    // BUG HUNT #6 (Manny OK 2026-11-12): the who-can-score line follows the
+    // round. A closed round or one still in setup has every box disabled, so
+    // "Anyone with this link can score this card." was false there. (Statuses
+    // are setup | open | closed; anything else reads as setup.) A keyless
+    // refusal (#2) owns the line once it has fired.
+    function renderLinkTruth(status) {
+        const el = document.getElementById('link-truth');
+        if (!el || keylessRefused) return;
+        el.textContent = status === 'closed' ? 'This round is closed; scores are final.'
+            : (status !== 'open' ? 'This round isn\u2019t open for scoring yet.' : 'Anyone with this link can score this card.');
+    }
 
     function scorePath(suffix) {
         // Round identity lives in the PATH, not in the key - so the score key shape is
