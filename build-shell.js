@@ -287,7 +287,8 @@ const PRODUCTS = {
         // Moved to v64 FOR THE KEYED SETUP LINKS (2026-11-11, Manny OK): see sw.js v400.
         // Moved to v65 FOR MY EVENTS BY ACCOUNT + OPEN BY CODE (2026-11-12, Manny OK): see sw.js v401.
         // Moved to v66 FOR GET HARDPAN A + B (2026-11-12, Manny OK): see sw.js v402.
-        cacheName: 'tournament-v66-get-hardpan',
+        // Moved to v67 FOR EDIT NAMES B (2026-11-12, Manny OK): see sw.js v403.
+        cacheName: 'tournament-v67-edit-names',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
