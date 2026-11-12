@@ -434,6 +434,7 @@
         .open-code label { font-size: 0.75rem; font-weight: 700; margin: 0 0 4px; display: block; }
         .open-code-row { display: flex; gap: 8px; }
         .open-code-row input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .08em; padding: 8px 10px; font-size: 0.95rem; margin: 0; }
+        .open-code-row input::placeholder { text-transform: none; letter-spacing: normal; }   /* bug hunt #13: "e.g.", not "E.G." */
         .open-code-row button { width: auto; padding: 8px 16px; margin: 0; }
         .open-code-err { color: var(--accent-red); font-size: 0.78rem; margin: 4px 0 0; }
         /* Date and start on the create form (S1 A): two boxes side by side. */
