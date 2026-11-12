@@ -4539,7 +4539,8 @@ const APP_SHELL_ALIASES = ['./', './app'];
 // Moved to v399-2.0 (Tournaments Phase 2 + event comms picks, Manny OK 2026-11-11): tournament.html (app mode, create form date/start/shotgun, one entry fee with per team / per golfer, venue from the course, move sheet, start-and-links list, one-step course lookup, Event day pace rows, Desk Photos chip, contests suggestion) and tournament-scorecard.html (weather note full screen, photos after the round, no Contests/Photos tabs); an installed device on v398 keeps the old pages.
 // Moved to v400-2.0 (keyed links, Advisor 2026-11-11 15:09, Manny OK): tournament.html redraws the Setup team cards when the scoring keys arrive, so their Share / QR links carry the team's key; a device on v399 keeps the keyless Setup cards.
 // Moved to v401-2.0 (My events by account + open by code, Manny OK 2026-11-12): tournament.html lists the signed-in organizer's events on any device (organizers/<uid>/tournaments) and on the website, and opens an event by its code; a device on v400 keeps the per-device list with no code box.
-const CACHE_VERSION = 'golfapp-v401-2.0';
+// Moved to v402-2.0 (Get HardPan A + B, Manny OK 2026-11-12): tournament-scorecard.html shows the Get HardPan line under the pills and the reasons card after the holes and under the board, browser only; a device on v401 keeps the card without them.
+const CACHE_VERSION = 'golfapp-v402-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at

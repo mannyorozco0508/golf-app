@@ -286,7 +286,8 @@ const PRODUCTS = {
         // A device on v62 keeps the pages without app mode, the one fee field and the comms picks.
         // Moved to v64 FOR THE KEYED SETUP LINKS (2026-11-11, Manny OK): see sw.js v400.
         // Moved to v65 FOR MY EVENTS BY ACCOUNT + OPEN BY CODE (2026-11-12, Manny OK): see sw.js v401.
-        cacheName: 'tournament-v65-my-events',
+        // Moved to v66 FOR GET HARDPAN A + B (2026-11-12, Manny OK): see sw.js v402.
+        cacheName: 'tournament-v66-get-hardpan',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

@@ -184,7 +184,7 @@ describe('THE CLUB/TOURNAMENT IMPLEMENTATION SURVIVED — DO NOT DELETE THIS COD
         const build = read('build-shell.js');
         // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
         assert.match(build, /appName: 'HardPan Tournaments'/, 'Tournament identity is HardPan Tournaments');
-        assert.match(build, /cacheName: 'tournament-v65-my-events'/,
+        assert.match(build, /cacheName: 'tournament-v66-get-hardpan'/,
             'the Tournament manifest is precached, so the key must move with it');
         assert.ok(!/appName: 'HardPan',/.test(build.slice(build.indexOf('tournament: {'))),
             'Tournament must not take the consumer name literal');
