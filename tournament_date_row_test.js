@@ -23,9 +23,21 @@
 //    (track list is minmax(0, 1fr) minmax(0, 1fr); both boxes min-width 0px and
 //    width = cell width)
 //  2 money = base
+//  3 (Manny 2026-11-12, phone: "START TIME (OPTIONAL)" wrapped and dropped its
+//    box below Date) at 320, 360, 375, 390 and 430 px: both boxes' tops and
+//    bottoms level, both labels the same height. Measured before: at 320 the
+//    time box sat 13 px lower (label 26 px against 13).
 //
-// Baseline against main 0f11073c (the page swapped in by cp, restored by sha):
-// all 2 tests: 1 PASS / 1 FAIL (test 2). With the build: 2 PASS / 0 FAIL.
+// Baseline (the page swapped in by cp, restored by sha), all 3 tests:
+//   main 0f11073c:          1 PASS / 2 FAIL (tests 1 and 3)
+//   preview-ui3 1855b406:   2 PASS / 1 FAIL (test 3)
+//   with the build:         3 PASS / 0 FAIL
+// Controls on test 3: the long "Start time (optional)" label back -> red
+// (labels 26 vs 13 px); the fixed 48 px height removed -> red (the time box
+// draws 46.8 px against the date's 44 in Chrome, tops 2 px apart); the row's
+// align-items: end removed -> inert, as expected: with short labels the boxes
+// already sit level, and the bottom edge is the backstop for a label that
+// still wraps at a large text size, which this file does not set.
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -62,6 +74,29 @@ test('1 four widths: no overlap, inside the row, tall enough; the tracks are min
         assert.deepEqual(a.appearance, ['none', 'none'], 'iOS WebKit: appearance none hands the width back to CSS');
         assert.deepEqual(a.display, ['block', 'block']);
         assert.ok(Math.abs(a.date.w - a.cells[0].w) <= 1 && Math.abs(a.time.w - a.cells[1].w) <= 1, `each box fills its cell at ${vp[0]}: ${JSON.stringify([a.date.w, a.cells[0].w, a.time.w, a.cells[1].w])}`);
+    }
+});
+
+const LEVEL = { expression: `JSON.stringify((function () {
+  var d = document.getElementById('t-date'), t = document.getElementById('t-time');
+  var ld = d.previousElementSibling, lt = t.previousElementSibling;
+  var lh = function (e) { var r = e.getClientRects(); return r.length; };
+  return { vw: window.innerWidth, dTop: Math.round(d.getBoundingClientRect().top), tTop: Math.round(t.getBoundingClientRect().top),
+    dBot: Math.round(d.getBoundingClientRect().bottom), tBot: Math.round(t.getBoundingClientRect().bottom),
+    labels: [ld.innerText, lt.innerText], lines: [lh(ld), lh(lt)], lhH: [Math.round(ld.getBoundingClientRect().height), Math.round(lt.getBoundingClientRect().height)] };
+})())` };
+
+test('3 phone widths: the two boxes sit level and each label is one line', async () => {
+    for (const w of [320, 360, 375, 390, 430]) {
+        const r = await arriveCold({ url: fileUrl('tournament.html', ''), db: { tournaments: {}, events: {}, trips: {}, global_courses: {} }, auth: OWNER, viewport: { width: w, height: 844 }, settleMs: 2500, steps: [LEVEL] });
+        assert.ok(r.ok, r.reason);
+        const a = JSON.parse(r.value.filter((v) => typeof v === 'string' && v[0] === '{')[0]);
+        assert.equal(a.vw, w);
+        assert.ok(/date/i.test(a.labels[0]) && /start time/i.test(a.labels[1]), `positive: both labels drew at ${w}: ${JSON.stringify(a.labels)}`);
+        assert.ok(a.dBot - a.dTop >= 40, `positive: the date box drew at ${w}`);
+        assert.equal(a.dTop, a.tTop, `boxes level at ${w}: date top ${a.dTop}, time top ${a.tTop}, labels ${JSON.stringify(a.labels)} ${JSON.stringify(a.lhH)}`);
+        assert.equal(a.dBot, a.tBot, `bottoms level at ${w}`);
+        assert.equal(a.lhH[0], a.lhH[1], `labels the same height at ${w}: ${JSON.stringify(a.lhH)}`);
     }
 });
 

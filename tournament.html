@@ -461,7 +461,12 @@
            and Safari on an iPad gives a type=time box an intrinsic width that
            pushed it past the right edge over the date. minmax(0, 1fr) and
            min-width: 0 let each box shrink to its column. */
-        .setup-when { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+        /* Level boxes (Manny 2026-11-12, phone): "START TIME (OPTIONAL)" wrapped to
+           two lines and dropped its box 13 px below Date at 320 px. Short labels,
+           the cells sit on the row's bottom edge so a label that still wraps
+           (large text) moves up, not its box, and both boxes take one fixed
+           height (the time box drew 46.8 px against the date's 44 in Chrome). */
+        .setup-when { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: end; }
         .setup-when > div { min-width: 0; }
         .setup-when input { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
         /* iOS WebKit (measured on an iPad Pro 11 simulator, iPadOS 26.5, 834 px,
@@ -470,7 +475,7 @@
            the form's edge over the date. appearance: none hands the width back
            to CSS; display: block and the min-height keep the box a tappable row
            when iOS draws an empty value as zero-height text. */
-        .setup-when input[type="date"], .setup-when input[type="time"] { -webkit-appearance: none; appearance: none; display: block; min-height: 44px; }
+        .setup-when input[type="date"], .setup-when input[type="time"] { -webkit-appearance: none; appearance: none; display: block; min-height: 44px; height: 48px; }
         .setup-when input::-webkit-date-and-time-value { text-align: left; min-height: 1.3em; }
         .t-check { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: normal; }
         .t-check input { width: auto; margin: 0; }
@@ -668,8 +673,8 @@
          saveTournament and validated by the same EVENT_DETAIL_KEYS shapes. Both
          optional: an empty box writes no key, exactly as before this wave. -->
     <div class="form-group setup-field setup-when">
-        <div><label>Date (optional)</label><input type="date" id="t-date"></div>
-        <div><label>Start time (optional)</label><input type="time" id="t-time"></div>
+        <div><label>Date</label><input type="date" id="t-date"></div>
+        <div><label>Start time</label><input type="time" id="t-time"></div>
     </div>
     <div class="form-group setup-field">
         <label class="t-check"><input type="checkbox" id="t-shotgun"> Shotgun start — teams start on assigned holes, all at once</label>
