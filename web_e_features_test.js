@@ -138,24 +138,26 @@ describe('1. the 25 cards', () => {
         assert.equal(manifest.folder, '/media/screens/');
         assert.equal(manifest.screens.length, 32);   // 52A batch 1 re-pin (2026-11-12): 25 + 7 Tournaments screens
         assert.deepEqual(manifest.screens.map((s) => s.key), cards.map((c) => c.key), 'the manifest lists the cards in page order');
-        ['hazards', 'range', 'my-bag', 'weekly-code'].forEach((k) => {
+        ['hazards', 'range', 'my-bag', 'weekly-code', 'ask-caddie'].forEach((k) => {
             const c = cards.find((x) => x.key === k);
             assert.match(c.img, new RegExp('src="/media/screens/' + k + '-400\\.webp" srcset="/media/screens/' + k + '-400\\.webp 400w, /media/screens/' + k + '-1170\\.webp 1170w"'), k + ': not the 400 + 1170 pair');
             assert.match(c.img, /\bwidth="1170" height="2532"/, k + ': not a 390x844 @3x capture');
             const m = manifest.screens.find((s) => s.key === k);
-            assert.ok(m && /release-205/.test(m.captured) && m.recaptured, k + ': the manifest does not say where it came from');
+            assert.ok(m && /release-20[56]/.test(m.captured) && m.recaptured, k + ': the manifest does not say where it came from');
             assert.deepEqual(m.files, ['/media/screens/' + k + '-400.webp', '/media/screens/' + k + '-1170.webp']);
         });
         manifest.screens.forEach((s) => s.files.forEach((f) => assert.ok(exists(f.slice(1)), f + ' is missing')));
         // the superseded files: still here, listed, and served by no page
-        const old = ['/media/screens/hazards-400-superseded.webp', '/media/screens/hazards-786.webp', '/media/screens/my-bag-400-superseded.webp', '/media/screens/my-bag-786.webp', '/media/screens/range-400-superseded.webp', '/media/screens/range-786.webp', '/media/screens/weekly-code-295.webp'];
+        const old = ['/media/screens/hazards-400-superseded.webp', '/media/screens/hazards-786.webp', '/media/screens/my-bag-400-superseded.webp', '/media/screens/my-bag-786.webp', '/media/screens/range-400-superseded.webp', '/media/screens/range-786.webp', '/media/screens/weekly-code-295.webp',
+            // Re-pinned 2026-11-12 (Manny, preview-52a): Ask caddie re-captured on a real hole; its old pair kept, unserved.
+            '/media/screens/ask-caddie-400-superseded.webp', '/media/screens/ask-caddie-786.webp'].sort();
         assert.deepEqual(manifest.superseded.map((s) => s.file).sort(), old);
         manifest.superseded.forEach((s) => { assert.ok(exists(s.file.slice(1)), s.file + ' was deleted'); assert.deepEqual(s.used_on, []); assert.match(s.unused_since, /re-capture/); });
         const pages = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html')).concat(fs.readdirSync(path.join(ROOT, 'help')).map((f) => 'help/' + f)).filter((f) => f.endsWith('.html'));
         pages.forEach((f) => old.forEach((o) => assert.ok(!read(f).includes(o), f + ' still serves ' + o)));
         assert.ok(!/-786\.webp|-295\.webp|-superseded\.webp/.test(read('site-features.js')));
         // no "Test" golfer, no amount on the captures' alt text (the demo golfers are Sam, Josh, Bob, Paul)
-        ['hazards', 'range', 'my-bag', 'weekly-code'].forEach((k) => { const alt = /\balt="([^"]*)"/.exec(cards.find((x) => x.key === k).img)[1]; assert.doesNotMatch(alt, /\bTest\b|\$/, k); });
+        ['hazards', 'range', 'my-bag', 'weekly-code', 'ask-caddie'].forEach((k) => { const alt = /\balt="([^"]*)"/.exec(cards.find((x) => x.key === k).img)[1]; assert.doesNotMatch(alt, /\bTest\b|\$/, k); });
     });
 
     test('each card opens the viewer: the screen is a real button with a name', () => {
@@ -181,11 +183,12 @@ describe('2. words', () => {
         assert.doesNotMatch(JS, /\bIDEA\b/);
     });
 
-    test('"Coming soon" is on Offline maps and Ask caddie, and nowhere else', () => {
+    test('"Coming soon" is on Offline maps only, and nowhere else', () => {
         const soon = cards.filter((c) => c.soon).map((c) => [c.h, c.soon]);
-        assert.deepEqual(soon, [['No signal? Still every yard.', 'COMING SOON · iPHONE 2.0.5'], ['Ask what it plays.', 'COMING SOON']]);
+        // Re-pinned 2026-11-12 (Manny): Ask caddie shipped (release-204 on, 2.0.6 live), so its tag is gone.
+        assert.deepEqual(soon, [['No signal? Still every yard.', 'COMING SOON · iPHONE 2.0.5']]);
         const rest = html.replace(/<div class="fsoon">[^<]*<\/div>/g, '');
-        assert.doesNotMatch(rest, /coming soon/i, 'a Coming soon outside those two cards');
+        assert.doesNotMatch(rest, /coming soon/i, 'a Coming soon outside that card');
     });
 
     test('co-organizers and the season page stay out', () => {

@@ -205,7 +205,8 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         // (Offline maps, Ask caddie), each in its own <div class="fsoon">. Android never does.
         ['hardpan-home.html', 'help.html', 'support.html', 'refunds.html', 'terms.html', 'privacy.html'].forEach((f) =>
             assert.doesNotMatch(stripComments(read(f)).replace(/<div class="fsoon">COMING SOON(?: · iPHONE 2\.0\.5)?<\/div>/g, ''), /Coming soon/i, f + ' still says Android is coming soon'));
-        assert.equal((read('hardpan-home.html').match(/<div class="fsoon">/g) || []).length, 2, 'positive: the two feature cards');
+        // Re-pinned 2026-11-12 (Manny): Ask caddie shipped, its tag is gone; Offline maps keeps one.
+        assert.equal((read('hardpan-home.html').match(/<div class="fsoon">/g) || []).length, 1, 'positive: the one feature card');
     });
 
     test('every Google Play badge is Google\'s official artwork, linking to the Play listing, after Apple\'s', () => {

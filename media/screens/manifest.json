@@ -372,10 +372,12 @@
       "headline": "Ask what it plays.",
       "files": [
         "/media/screens/ask-caddie-400.webp",
-        "/media/screens/ask-caddie-786.webp"
+        "/media/screens/ask-caddie-1170.webp"
       ],
-      "width": 786,
-      "height": 460
+      "width": 1170,
+      "height": 2532,
+      "captured": "release-206 (0b51812d, 2.0.6) index.html on the GPS map: Talking Stick Piipaash hole 1 (the app's bundled gps-courses.js geometry), golfer Sam 160 yds out with a My bag, Esri World Imagery tiles live (the app's own key, read-only GETs); the golfer taps Hole, Ask, then What club? (CDP taps, no page function). Firebase stand-in, IAP stand-in Pro-active, headless Chrome 390x844 @3x",
+      "recaptured": "2026-11-12 (Manny: the old picture was mostly an empty dark screen)"
     }
   ],
   "try_gps": {
@@ -432,6 +434,20 @@
       "used_on": [],
       "unused_since": "website-e re-capture (2026-11-10)",
       "note": "Older capture: a soft 295 px poster. Replaced by weekly-code-400 / weekly-code-1170 from release-205. Kept in place, nothing serves it."
+    },
+    {
+      "file": "/media/screens/ask-caddie-400-superseded.webp",
+      "was": "ask-caddie",
+      "used_on": [],
+      "unused_since": "ask-caddie re-capture (2026-11-12)",
+      "note": "The 400-wide file this card served before the re-capture, kept under this name because the re-capture took its name (ask-caddie-400.webp). Older capture: a 786x460 crop of the Ask panel on a dark map. Kept in place, nothing serves it."
+    },
+    {
+      "file": "/media/screens/ask-caddie-786.webp",
+      "was": "ask-caddie",
+      "used_on": [],
+      "unused_since": "ask-caddie re-capture (2026-11-12)",
+      "note": "Older capture: a 786x460 crop of the Ask panel on a dark map. Replaced by ask-caddie-400 / ask-caddie-1170 from release-206. Kept in place, nothing serves it."
     }
   ]
 }

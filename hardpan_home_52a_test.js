@@ -16,10 +16,17 @@
 //    there are seven)
 //  5 no horizontal scroll at 390 px; the Organize row's count reads 12
 //  6 the screens manifest lists the 7 new screens in page order with their files
+//  7 (added 2026-11-12) Ask caddie: no Coming soon (positive: its eyebrow drew),
+//    its picture a 1170x2532 phone screen that loads, the 400 file 400x866
 //
 // Baseline against main 0f11073c (hardpan-home.html + manifest swapped in by
 // cp, restored by sha): all 6 tests: 1 PASS / 5 FAIL (test 3: main agrees with
 // itself). With the build: all 6 tests: 6 PASS / 0 FAIL.
+// Test 7, the finished 7-test file against the batch-1 head 58e31e9e (page,
+// manifest and ask-caddie-400.webp swapped in by cp, restored by sha):
+// 6 PASS / 1 FAIL (test 7). With the re-capture: 7 PASS / 0 FAIL. Controls:
+// the tag put back -> red; the old 400 file back -> red; the eyebrow cut -> red
+// (the positive assertion).
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -114,4 +121,42 @@ test('6 the screens manifest lists the seven new screens in page order with thei
         s.files.forEach((f) => assert.ok(fs.existsSync(path.join(__dirname, f.replace(/^\//, ''))), f));
         assert.equal(s.width, 780); assert.equal(s.height, 1688);
     });
+});
+
+// 7 ASK CADDIE (Manny 2026-11-12, preview-52a): the card's picture was a 786x460
+// crop that read as an empty dark screen; it is now a full phone screen on a real
+// hole (release-206, Talking Stick Piipaash #1, satellite, the Ask answer showing).
+// Ask caddie ships in the app (gps-ask-caddie.js on release-204, -205, -206; 2.0.6
+// released on the App Store 2026-11-12), so the card no longer says Coming soon.
+// Arrived cold at 390 px, touch nothing: the card's innerText and its loaded image.
+const ASK = { expression: `JSON.stringify((function () {
+  var li = document.getElementById('f-ask-caddie'); if (!li) return { missing: true };
+  li.scrollIntoView({ block: 'center' });
+  var img = li.querySelector('img'); var src = img.getAttribute('src') || '';
+  var srcset = img.getAttribute('srcset') || '';
+  window.__ask400 = new Image(); window.__ask400.src = 'media/screens/ask-caddie-400.webp';
+  img.loading = 'eager'; if (src.charAt(0) === '/') { img.setAttribute('srcset', srcset.split('/media/').join('media/')); img.src = src.slice(1); }
+  return { text: li.innerText.replace(/\\s+/g, ' ').trim(), src: src, srcset: srcset, w: img.getAttribute('width'), h: img.getAttribute('height'), fit: li.querySelector('.s').className };
+})())` };
+const ASK_IMG = { expression: `JSON.stringify((function () { var i = document.querySelector('#f-ask-caddie img'), f = window.__ask400; return { complete: i.complete, nw: i.naturalWidth, nh: i.naturalHeight, f400: [f.naturalWidth, f.naturalHeight] }; })())` };
+test('7 Ask caddie: no Coming soon, and its picture is a full 390x844 phone screen that loads', async () => {
+    const r = await arriveCold({ url: fileUrl('hardpan-home.html', ''), db: {}, auth: 'signed-out', settleMs: 1500, steps: [ASK, { sleep: 1200 }, ASK_IMG] });
+    assert.ok(r.ok, r.reason);
+    const v = r.value.filter((x) => typeof x === 'string' && x[0] === '{');
+    const a = JSON.parse(v[0]), im = JSON.parse(v[v.length - 1]);
+    assert.ok(!a.missing, 'the Ask caddie card exists');
+    assert.match(a.text, /ASK CADDIE/, 'positive: the card drew its eyebrow');
+    assert.match(a.text, /Ask what it plays\./);
+    assert.doesNotMatch(a.text, /coming soon/i, 'Ask caddie shipped: no Coming soon on its card');
+    assert.equal(a.src, '/media/screens/ask-caddie-400.webp');
+    assert.match(a.srcset, /\/media\/screens\/ask-caddie-1170\.webp 1170w/);
+    // srcset hands the card the 1170 file here; the 400 file (phones at 1x-2x) is loaded on its own and judged too.
+    assert.deepEqual(im.f400, [400, 866], 'ask-caddie-400.webp is the 400-wide phone screen');
+    assert.deepEqual([a.w, a.h], ['1170', '2532'], 'a 390x844 @3x capture, not the old 786x460 crop');
+    // naturalWidth is density-corrected under srcset (the 400 file at 2x reads 200), so judge the shape:
+    // loaded, and as tall as a 390x844 phone screen (866 / 400), not the old crop (460 / 786).
+    assert.ok(im.complete && im.nw > 0 && Math.abs(im.nh / im.nw - 866 / 400) < 0.02, 'the picture loads as a phone screen: ' + JSON.stringify(im));
+    assert.equal(a.fit, 's', 'no letterbox: the picture fills the card like its neighbours');
+    const big = path.join(__dirname, 'media/screens/ask-caddie-1170.webp');
+    assert.ok(fs.existsSync(big) && fs.statSync(big).size < 300 * 1024, 'ask-caddie-1170.webp missing or over 300 KB');
 });
