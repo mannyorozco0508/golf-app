@@ -1664,13 +1664,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // match with a card wins; a stub with no card is fetched (ensureCard).
     function bestSharedCourseKey(name) {
         const want = courseNameTokens(name);
-        let best = null, bestScore = 0;
+        if (!want.length) return null;
+        // EVERY distinctive word of the picked name must be in the shared name
+        // (bug hunt #1, 2026-11-12: half the words was enough, so "The Boulders
+        // (North)" took "Troon North Monument" on the one shared word, and every
+        // par on the event would have been Troon's). Extra words on the shared
+        // side are fine ("Papago" still finds "Papago Golf Course"); the record
+        // with the fewest extra words wins, and one with a card beats one without.
+        let best = null, bestExtra = Infinity;
         Object.keys(globalCourses || {}).forEach((k) => {
             const have = courseNameTokens((globalCourses[k] || {}).name);
-            const score = want.filter((w) => have.indexOf(w) !== -1).length;
-            if (score > bestScore || (score === bestScore && best && !resolveCourseCard(best) && resolveCourseCard(k))) { best = k; bestScore = score; }
+            if (!want.every((w) => have.indexOf(w) !== -1)) return;
+            const extra = have.length - want.length;
+            if (extra < bestExtra || (extra === bestExtra && best && !resolveCourseCard(best) && resolveCourseCard(k))) { best = k; bestExtra = extra; }
         });
-        return bestScore > 0 && bestScore >= Math.ceil(want.length / 2) ? best : null;
+        return best;
     }
     async function autoFetchCourseCard(key, name) {
         const token = ++autoFetchToken;
