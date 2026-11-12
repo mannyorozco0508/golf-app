@@ -185,6 +185,13 @@
         .custom-select-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
         .custom-select-group { background: var(--nav-bg); font-weight: bold; font-size: 0.75rem; padding: 6px 12px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-faint); }
         .custom-select-note { padding: 10px 12px; color: var(--text-muted); text-align: center; font-size: 0.85rem; }
+        /* Bug hunt #11 A: the nines chooser under the course box for a 27-hole record. */
+        .course-nines { background: #e8f5ee; border: 1px solid #b9dcc8; border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+        .course-nines-h { font-weight: 800; font-size: 0.9rem; color: var(--brand-green); }
+        .course-nines-q { font-size: 0.82rem; color: var(--text-main); margin: 2px 0 8px; }
+        .course-nines-row { display: flex; gap: 6px; flex-wrap: wrap; }
+        .course-nines-btn { width: auto; margin: 0; padding: 9px 12px; font-size: 0.82rem; font-weight: 700; border: 1.5px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); border-radius: 9px; cursor: pointer; min-height: 40px; }
+        .course-nines-btn.on { background: var(--brand-green); color: #fff; }
         .course-note { font-size: 0.82rem; color: var(--warn-text); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 8px 10px; margin: 8px 0 0 0; line-height: 1.4; }
         .course-note button { display: block; width: auto; margin: 8px 0 0 0; padding: 7px 10px; font-size: 0.8rem; }
         .course-note.ok { color: var(--brand-green); background: var(--nassau-box-bg); border-color: var(--accent-teal); }
@@ -1549,12 +1556,111 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return courseDirectory.some(g => g.items.some(item => item.name.toLowerCase().includes(t)));
     }
 
+    // SHARED COURSES IN THE DROPDOWN (bug hunt #11, option A, Manny 2026-11-12).
+    // A course imported online for an earlier event lives in the shared list
+    // with its real card, but the picker offered only the directory, so typing
+    // its name ended at "Search online" (and the provider's literal search can
+    // miss it). The typed words must each START a word of the shared name -
+    // never one shared word in the middle (bug #1's lesson). The card is used
+    // as is; a 27-hole record asks which two nines (see pickSharedCourse).
+    function sharedCourseMatches(typed) {
+        const words = String(typed || '').toLowerCase().replace(/[^a-z0-9& ]+/g, ' ').split(/\s+/).filter(Boolean);
+        if (!words.length) return [];
+        const out = [];
+        Object.keys(globalCourses || {}).forEach((key) => {
+            const rec = globalCourses[key] || {};
+            const name = String(rec.name || '').trim();
+            if (!name) return;
+            const have = name.toLowerCase().replace(/[^a-z0-9& ]+/g, ' ').split(/\s+/).filter(Boolean);
+            const ok = words.every((w) => have.some((h) => h.indexOf(w) === 0)) || name.toLowerCase().indexOf(words.join(' ')) === 0;
+            if (!ok) return;
+            const holes = Array.isArray(rec.data) ? rec.data.length : 0;
+            const at = Number(rec.source && rec.source.importedAt) || Number(rec.importedAt) || 0;
+            out.push({ key, name, holes, at });
+        });
+        return out.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    function sharedRowLabel(m) {
+        const when = m.at ? new Date(m.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+        return m.name + (m.holes ? ` \u00b7 ${m.holes} holes` : '') + (when ? ` \u00b7 imported ${when}` : '');
+    }
+    // The two nines of a 27-hole record, chosen under the box before Save:
+    // holes 1-9 (A), 10-18 (B), 19-27 (C) in the record's own numbering.
+    const NINE_PAIRS = [['A', 'B'], ['A', 'C'], ['B', 'C']];
+    const NINE_LABEL = { A: '1\u20139', B: '10\u201318', C: '19\u201327' };
+    let sharedNinesPending = null;   // { key, name, card } while a 27-hole pick waits for its pair
+    let selectedCourseNines = '';    // 'A+B' once chosen; written to the record
+    function pickSharedCourse(key, name) {
+        const go = () => {
+            const card = resolveCourseCard(key);
+            if (!card) { pickCourse(key, name); return; }
+            const n = (card.data || []).length;
+            pickCourseNow(key, name);
+            selectedCourseNines = '';
+            if (n === 27) {
+                sharedNinesPending = { key, name, card };
+                selectedCourseData = null;   // not usable until the pair is picked
+                renderNinesChooser();
+                showCourseNote(`${name} has 27 holes: pick which two nines the event plays.`);
+                return;
+            }
+            removeNinesChooser();
+            showCourseNote(`Scorecard: ${name}${n === 9 ? ', 9 holes' : ''}, from the shared course list.`, null, 'ok');
+        };
+        if (resolveCourseCard(key)) go(); else courseIndex.ensureCard(key).then(go, go);
+    }
+    function renderNinesChooser() {
+        removeNinesChooser();
+        const host = document.getElementById('course-import-host');
+        if (!host || !sharedNinesPending) return;
+        const box = document.createElement('div');
+        box.id = 'course-nines';
+        box.className = 'course-nines';
+        box.innerHTML = `<div class="course-nines-h">${escapeHtml(sharedNinesPending.name)} \u00b7 27 holes</div><div class="course-nines-q">Which two nines does the event play?</div><div class="course-nines-row"></div>`;
+        const row = box.querySelector('.course-nines-row');
+        NINE_PAIRS.forEach(([x, y]) => {
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'course-nines-btn'; b.dataset.pair = x + '+' + y;
+            b.textContent = `${NINE_LABEL[x]} + ${NINE_LABEL[y]}`;
+            b.onclick = () => chooseNines(x + '+' + y);
+            row.appendChild(b);
+        });
+        host.appendChild(box);
+    }
+    function removeNinesChooser() { const el = document.getElementById('course-nines'); if (el) el.remove(); }
+    function chooseNines(pair) {
+        const P = sharedNinesPending;
+        if (!P) return;
+        const data = (P.card.data || []).slice().sort((a, b) => Number(a.hole) - Number(b.hole));
+        const nine = { A: data.slice(0, 9), B: data.slice(9, 18), C: data.slice(18, 27) };
+        const [x, y] = pair.split('+');
+        const holes = nine[x].concat(nine[y]);
+        if (holes.length !== 18) return;
+        // Renumbered 1..18 in play order; the record's own hole number rides as
+        // srcHole. The stroke index is re-ranked 1..18 in the same order the
+        // record gave the 27 (a 27-hole card indexes across all three nines, so
+        // the chosen two keep their relative order and net stays allocatable).
+        const order = holes.map((h, i) => ({ i, si: Number(h.hcpIndex) || 99 })).sort((p, q) => p.si - q.si || p.i - q.i);
+        const rank = []; order.forEach((o, r) => { rank[o.i] = r + 1; });
+        selectedCourseData = holes.map((h, i) => Object.assign({}, h, { hole: i + 1, srcHole: Number(h.hole), hcpIndex: rank[i] }));
+        selectedCourseNines = pair;
+        document.querySelectorAll('#course-nines .course-nines-btn').forEach((b) => b.classList.toggle('on', b.dataset.pair === pair));
+        showCourseNote(`Scorecard: ${P.name}, nines ${NINE_LABEL[x]} + ${NINE_LABEL[y]}, from the shared course list.`, null, 'ok');
+    }
+
     function filterCourseDropdown(filterText) {
         const dropdown = document.getElementById('course-dropdown');
         const typed = String(filterText || '').trim();
         const q = typed.toLowerCase();
         dropdown.innerHTML = '';
         let any = false;
+        // Bug hunt #11 A: the shared list first, when something is typed.
+        const shared = typed ? sharedCourseMatches(typed) : [];
+        if (shared.length) {
+            any = true;
+            dropdown.appendChild(pickerRow('From the shared list', 'custom-select-group', null));
+            shared.forEach((m) => { const r = pickerRow(sharedRowLabel(m), 'custom-select-option course-shared-row', () => pickSharedCourse(m.key, m.name)); r.dataset.key = m.key; dropdown.appendChild(r); });
+        }
         courseDirectory.forEach(g => {
             const matches = g.items.filter(item => item.name.toLowerCase().includes(q));
             if (matches.length > 0) {
@@ -1592,6 +1698,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     function pickCourseNow(key, name) {
+        if (key !== (sharedNinesPending || {}).key) { sharedNinesPending = null; selectedCourseNines = ''; removeNinesChooser(); }
         const card = resolveCourseCard(key);
         if (!card) {
             // NO CARD ANYWHERE (re-decided 2026-11-11; Manny through the Advisor:
@@ -2315,6 +2422,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return;
         }
         const name = document.getElementById('t-name').value.trim() || "Golf Tournament";
+        if (!selectedCourseData && sharedNinesPending) {
+            showCourseNote('Pick which two nines the event plays.');
+            const el = document.getElementById('course-nines');
+            if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+            return;
+        }
         if (!selectedCourseData) {
             // Inline, never a dialog (Advisor 2026-11-11), and the box comes into view.
             showCourseNote('Pick a golf course first.');
@@ -2409,6 +2522,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             createdAt: Date.now(),
             ownerUid: authUser.uid
         };
+        if (selectedCourseNines) payload.courseNines = selectedCourseNines;   // bug #11 A: which two nines of a 27-hole record
         // The event's own online imports ride with the record so a later round
         // can pick them (Option B). Absent when nothing was imported.
         if (Object.keys(setupImportedCourses).length) payload.importedCourses = setupImportedCourses;
