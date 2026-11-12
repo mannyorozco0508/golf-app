@@ -168,15 +168,15 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         if (srv) { srv.closeAllConnections(); srv.close(); }
     });
 
-    test('25 cards render in five rows, each with its headline and a described screen', async () => {
+    test('32 cards render in five rows, each with its headline and a described screen', async () => {
         await tab.go(base + '/');
         const r = await tab.eval(`(() => { const cs = [...document.querySelectorAll('#features .fc')];
             return { n: cs.length, rows: [...document.querySelectorAll('#features .row')].map((r) => r.children.length),
               bad: cs.filter((c) => !c.querySelector('h3').textContent.trim() || !c.querySelector('p').textContent.trim() || !(c.querySelector('.ph img').alt || '').trim()).map((c) => c.id),
               sideways: document.documentElement.scrollWidth > window.innerWidth,
               text: document.body.innerText }; })()`);
-        assert.equal(r.n, 25);
-        assert.deepEqual(r.rows, [6, 6, 5, 5, 3]);
+        assert.equal(r.n, 32);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12
+        assert.deepEqual(r.rows, [6, 6, 5, 12, 3]);
         assert.deepEqual(r.bad, []);
         assert.equal(r.sideways, false, 'the page scrolls sideways at 390');
         assert.doesNotMatch(r.text, /\bIDEA\b/, 'a mockup IDEA tag is on the page');

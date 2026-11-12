@@ -538,7 +538,7 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
         const sec = /<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(home)[1];
         assert.deepEqual((sec.match(/<div class="grp" id="g-[a-z]+">\s*<div class="ghd"><h2>([^<]*)<\/h2>/g) || []).map((t) => />([^<]*)<\/h2>/.exec(t)[1]),
             ['Play', 'Games', 'Your group', 'Organize', 'Get better']);
-        assert.equal((sec.match(/<li class="fc"/g) || []).length, 25);
+        assert.equal((sec.match(/<li class="fc"/g) || []).length, 32);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12
         assert.equal(videos(sec).length, 6, 'the six features with a clip');
     });
 

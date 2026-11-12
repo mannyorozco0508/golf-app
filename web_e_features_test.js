@@ -78,17 +78,20 @@ const HEADLINES = {
     'Play': ['Every yard. Every hole.', 'Hit the number it plays.', 'Know what you can carry.', 'Miss on the right side.', 'No signal? Still every yard.', 'Your real carries.'],
     'Games': ['Set up the game in one sentence.', 'Every game your group plays.', 'Score the whole group in one tap.', 'Every game, as it happens.', 'The final word, ready to share.', 'Who owes who, done.'],
     'Your group': ['Same game. Same code. Every week.', 'Talk to the round.', 'Same group? One tap.', 'One board for the whole trip.', 'Every round you’ve played.'],
-    'Organize': ['Run the day from your phone.', 'A tournament in four questions.', 'Join the tournament.', 'Every group. One board.', 'Every flight, live.'],   // card 22 reworded Nov 10 (was Prizes, sorted.)
+    'Organize': ['Run the day from your phone.', 'A tournament in four questions.', 'Join the tournament.', 'Every group. One board.', 'Every flight, live.',
+        // 52A batch 1 (2026-11-12): seven Tournaments cards
+        'Every team gets its own link.', 'Your events, on any device.', 'Your card and the board, one link.', 'Closest to the pin, long drive.', 'Photos when the round is done.', 'A note on every card.', 'Sign-ups and check-in, one desk.'],   // card 22 reworded Nov 10 (was Prizes, sorted.)
     'Get better': ['See where shots go.', 'Practice what costs you.', 'Ask what it plays.']
 };
 // $, betting words, and price shapes (a number per month/year, "free trial" days).
 const MONEY = /\$|\b(bet|bets|betting|wager\w*|gambl\w*|pot|pots|buy-?ins?|stake|stakes|dollars?|bucks|price|prices|priced)\b|\d+\s*\/\s*(mo|month|yr|year)\b|\bper (month|year)\b/i;
 
 describe('1. the 25 cards', () => {
-    test('five rows in order, 6 + 6 + 5 + 5 + 3 cards, right after the hero', () => {
+    test('five rows in order, 6 + 6 + 5 + 12 + 3 cards, right after the hero', () => {
         assert.deepEqual(groups.map((g) => g.name), Object.keys(HEADLINES));
-        assert.deepEqual(groups.map((g) => g.n), [6, 6, 5, 5, 3]);
-        assert.equal(cards.length, 25);
+        // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12, 32 cards.
+        assert.deepEqual(groups.map((g) => g.n), [6, 6, 5, 12, 3]);
+        assert.equal(cards.length, 32);
         const at = html.indexOf('id="features"');
         assert.ok(at > html.indexOf('class="wrap hero"') && at < html.indexOf('class="wrap split"'), 'the rows are not between the hero and the golfer/organizer panels');
         assert.match(html, /EVERYTHING IN THE APP/);
@@ -121,7 +124,8 @@ describe('1. the 25 cards', () => {
         // a sharp screen: the large size is at least 2x a 390-wide phone's card. RE-CAPTURE re-pin (Nov 10):
         // every one of the 25 (was 24: the weekly-code card showed a 295 px poster until its re-capture).
         const wide = cards.filter((c) => Number(/\bwidth="(\d+)"/.exec(c.img)[1]) >= 780).length;
-        assert.equal(wide, 25, 'only ' + wide + ' of 25 screens are 2x or sharper');
+        // 52A batch 1 re-pin (2026-11-12): seven Tournaments cards joined the Organize row, each a 780-wide @2x capture.
+        assert.equal(wide, 32, 'only ' + wide + ' of 32 screens are 2x or sharper');
     });
 
     // RE-CAPTURE (Nov 10): hazards, range, my-bag and weekly-code were re-shot from the 2.0.5 web app
@@ -132,7 +136,7 @@ describe('1. the 25 cards', () => {
     test('the four re-captured screens are the 3x captures; the screens manifest lists all 25 and marks the old files unused', () => {
         const manifest = JSON.parse(read('media/screens/manifest.json'));
         assert.equal(manifest.folder, '/media/screens/');
-        assert.equal(manifest.screens.length, 25);
+        assert.equal(manifest.screens.length, 32);   // 52A batch 1 re-pin (2026-11-12): 25 + 7 Tournaments screens
         assert.deepEqual(manifest.screens.map((s) => s.key), cards.map((c) => c.key), 'the manifest lists the cards in page order');
         ['hazards', 'range', 'my-bag', 'weekly-code'].forEach((k) => {
             const c = cards.find((x) => x.key === k);

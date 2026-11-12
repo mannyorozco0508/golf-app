@@ -252,6 +252,97 @@
       "note": "Card 22 reworded Nov 10 (Manny): \"Every flight, live.\" - the live leaderboard and flights; was \"Prizes, sorted.\". The screen (the real tournament board) is unchanged; no amounts on it."
     },
     {
+      "key": "team-qr-links",
+      "card": "f-team-links",
+      "headline": "Every team gets its own link.",
+      "files": [
+        "/media/screens/team-qr-links-400.webp",
+        "/media/screens/team-qr-links-780.webp"
+      ],
+      "width": 780,
+      "height": 1688,
+      "captured": "main 0f11073c tournament.html / tournament-scorecard.html on the repo’s Firebase stand-in (nothing live), headless Chrome 390x844 @2x, sample event Hope Foundation Scramble at Papago; WebP by sharp (400 q82, 780 q80)",
+      "added": "2026-11-12 (52A batch 1)"
+    },
+    {
+      "key": "my-events",
+      "card": "f-my-events",
+      "headline": "Your events, on any device.",
+      "files": [
+        "/media/screens/my-events-400.webp",
+        "/media/screens/my-events-780.webp"
+      ],
+      "width": 780,
+      "height": 1688,
+      "captured": "main 0f11073c tournament.html / tournament-scorecard.html on the repo’s Firebase stand-in (nothing live), headless Chrome 390x844 @2x, sample event Hope Foundation Scramble at Papago; WebP by sharp (400 q82, 780 q80)",
+      "added": "2026-11-12 (52A batch 1)"
+    },
+    {
+      "key": "card-board",
+      "card": "f-card-board",
+      "headline": "Your card and the board, one link.",
+      "files": [
+        "/media/screens/card-board-400.webp",
+        "/media/screens/card-board-780.webp"
+      ],
+      "width": 780,
+      "height": 1688,
+      "captured": "main 0f11073c tournament.html / tournament-scorecard.html on the repo’s Firebase stand-in (nothing live), headless Chrome 390x844 @2x, sample event Hope Foundation Scramble at Papago; WebP by sharp (400 q82, 780 q80)",
+      "added": "2026-11-12 (52A batch 1)"
+    },
+    {
+      "key": "contests",
+      "card": "f-contests",
+      "headline": "Closest to the pin, long drive.",
+      "files": [
+        "/media/screens/contests-400.webp",
+        "/media/screens/contests-780.webp"
+      ],
+      "width": 780,
+      "height": 1688,
+      "captured": "main 0f11073c tournament.html / tournament-scorecard.html on the repo’s Firebase stand-in (nothing live), headless Chrome 390x844 @2x, sample event Hope Foundation Scramble at Papago; WebP by sharp (400 q82, 780 q80)",
+      "added": "2026-11-12 (52A batch 1)"
+    },
+    {
+      "key": "photos-after",
+      "card": "f-photos",
+      "headline": "Photos when the round is done.",
+      "files": [
+        "/media/screens/photos-after-400.webp",
+        "/media/screens/photos-after-780.webp"
+      ],
+      "width": 780,
+      "height": 1688,
+      "captured": "main 0f11073c tournament.html / tournament-scorecard.html on the repo’s Firebase stand-in (nothing live), headless Chrome 390x844 @2x, sample event Hope Foundation Scramble at Papago; WebP by sharp (400 q82, 780 q80)",
+      "added": "2026-11-12 (52A batch 1)"
+    },
+    {
+      "key": "announcements",
+      "card": "f-announce",
+      "headline": "A note on every card.",
+      "files": [
+        "/media/screens/announcements-400.webp",
+        "/media/screens/announcements-780.webp"
+      ],
+      "width": 780,
+      "height": 1688,
+      "captured": "main 0f11073c tournament.html / tournament-scorecard.html on the repo’s Firebase stand-in (nothing live), headless Chrome 390x844 @2x, sample event Hope Foundation Scramble at Papago; WebP by sharp (400 q82, 780 q80)",
+      "added": "2026-11-12 (52A batch 1)"
+    },
+    {
+      "key": "registration-desk",
+      "card": "f-desk",
+      "headline": "Sign-ups and check-in, one desk.",
+      "files": [
+        "/media/screens/registration-desk-400.webp",
+        "/media/screens/registration-desk-780.webp"
+      ],
+      "width": 780,
+      "height": 1688,
+      "captured": "main 0f11073c tournament.html / tournament-scorecard.html on the repo’s Firebase stand-in (nothing live), headless Chrome 390x844 @2x, sample event Hope Foundation Scramble at Papago; WebP by sharp (400 q82, 780 q80)",
+      "added": "2026-11-12 (52A batch 1)"
+    },
+    {
       "key": "strokes-gained",
       "card": "f-strokes-gained",
       "headline": "See where shots go.",
