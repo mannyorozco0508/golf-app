@@ -36,7 +36,7 @@ const READ = { expression: `JSON.stringify((function () {
   var shown = function (e) { if (!e) return false; if (getComputedStyle(e).display === 'none') return false; var r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
   var t = function (s) { var e = $(s); return e && shown(e) ? (e.innerText || '').replace(/\\s+/g, ' ').trim() : null; };
   var box = $('#open-code-input');
-  return { setup: shown($('#setup-screen')), manage: shown($('#manage-screen')), note: t('#not-found-note'), err: t('#open-code-err'), code: box ? box.value : null, search: location.search,
+  return { setup: shown($('#setup-screen')), manage: shown($('#manage-screen')), codeBox: shown($('#app-my-events')), note: t('#not-found-note'), err: t('#open-code-err'), code: box ? box.value : null, search: location.search,
     ph: box ? box.getAttribute('placeholder') : null, phTransform: box ? getComputedStyle(box, '::placeholder').textTransform : null, boxTransform: box ? getComputedStyle(box).textTransform : null };
 })())` };
 const go = async (query, auth, steps) => {
@@ -58,7 +58,7 @@ test('2 (#8) an unknown code, signed out on the website: the sentence under the 
     const [a] = await go('tourney=NOPE', 'signed-out');
     assert.equal(a.setup, true);
     assert.equal(a.note, 'No event matches the code NOPE. Check the code and try again.');
-    assert.equal(a.code, null, 'positive: no code box on the website when signed out');
+    assert.equal(a.codeBox, false, 'positive: the My events / code box is hidden on the website when signed out, so the hero note is the only place');
 });
 
 test('3 (#13) the placeholder is not upper-cased; a typed code still is', async () => {
