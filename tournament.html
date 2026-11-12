@@ -316,6 +316,24 @@
         .rc-title { font-size: 1.6rem; margin: 6px 0 4px 0; color: var(--text-main); }
         .rc-sub { color: var(--text-muted); margin: 0 0 14px 0; font-size: 1rem; }
         .rc-card { border: 1px solid var(--border-mid); border-radius: 14px; padding: 4px 14px; margin-bottom: 12px; background: var(--bg-card); }
+        /* 57: sponsors (Setup) and the TV link (Board). */
+        .sp-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-faint); font-size: 0.88rem; }
+        .sp-row .sp-h { width: 58px; color: var(--text-muted); font-size: 0.78rem; font-weight: 700; flex: none; }
+        .sp-row .sp-n { flex: 1; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sp-row img { height: 22px; width: auto; max-width: 60px; border-radius: 4px; border: 1px solid var(--border-faint); }
+        .sp-row .sp-x { background: none; border: 0; color: var(--accent-red); font-weight: 800; font-size: 1rem; width: 32px; height: 32px; padding: 0; margin: 0; cursor: pointer; }
+        .sp-logo-btn { font-size: 0.72rem; color: var(--brand-green); font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .sp-logo-btn input { display: none; }
+        .sp-add { display: grid; grid-template-columns: 84px 1fr auto; gap: 6px; align-items: center; margin-top: 8px; }
+        .sp-add input, .sp-add select, .sp-event input { padding: 8px 10px; font-size: 0.9rem; margin: 0; width: 100%; box-sizing: border-box; }
+        .sp-add button { width: auto; margin: 0; padding: 8px 14px; }
+        .sp-event { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; margin: 6px 0 10px; }
+        .sp-note { font-size: 0.72rem; color: var(--text-muted); margin: 8px 0 0; }
+        .sp-err { font-size: 0.8rem; color: var(--accent-red); margin: 6px 0 0; }
+        .tv-link { background: #13261d; color: #fff; border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; font-size: 0.82rem; line-height: 1.35; }
+        .tv-link b { color: #d4f28a; }
+        .tv-link .tv-url { display: block; font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; word-break: break-all; color: #fff; margin: 4px 0 6px; }
+        .tv-link button { width: auto; margin: 0 6px 0 0; padding: 6px 12px; font-size: 0.78rem; }
         .rc-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border-faint); }
         .rc-row:last-child { border-bottom: 0; }
         .rc-row strong { text-align: right; }
@@ -897,6 +915,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <h1 class="rc-title" id="recap-title"></h1>
     <p class="rc-sub" id="recap-sub"></p>
     <div class="rc-card" id="recap-winners" style="display:none;"></div>
+    <div class="rc-card" id="recap-sponsors" style="display:none;"></div>
     <div class="pq-grid" id="recap-photos"></div>
     <button type="button" class="rc-share" id="recap-share" onclick="shareRecap()">Share recap link</button>
     <p class="rc-msg" id="recap-msg" aria-live="polite"></p>
@@ -1059,6 +1078,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
         <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">From each team's last scored hole and its time, never a location. A team about a hole behind shows on Event day under "Needs you", with a Send note button. "Behind" can be wrong when a group simply has not entered scores yet: it is a hint, not a ruling.</p>
 
+        <!-- 57, SPONSORS (Manny 2026-11-12): names and an optional small logo per
+             hole and for the event. Shown as one grey line on that hole's row of
+             the team card, on the TV board's last page and on the recap. Nothing
+             is billed or collected here. -->
+        <hr class="section-divider">
+        <h3>🤝 Sponsors</h3>
+        <div id="sponsors-setup"></div>
         <hr class="section-divider">
         <h3>🚩 Flights / Divisions</h3>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Optional. Split the field into divisions — Championship, A, B, Senior, whatever you call them — and the leaderboard can be viewed by flight as well as overall. Teams you don't assign still appear in Overall.</p>
@@ -1237,6 +1263,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              the leaderboard it always did, with no extra control to ignore. -->
         <!-- Only rendered for a multi-round event. A single-round tournament shows the
              leaderboard it always showed, with no extra control to ignore. -->
+        <!-- 57, TV BOARD (Manny 2026-11-12): the clubhouse TV page, owner only. -->
+        <div class="tv-link" id="tv-link-row" style="display:none;"></div>
         <div id="lb-round-filter" style="display:none; text-align:center; margin-bottom:10px;"></div>
         <!-- A record with no ownerUid (created before organizer sign-in, 2026-09-12)
              is frozen by the narrowed rules: nobody can change its setup and there
@@ -3759,6 +3787,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         authUser = (user && !user.isAnonymous) ? user : null;
         loadAccountEvents();   // P2-6: the account's events, on any device
         applyManageGate();
+        // 57 (2026-11-12): the record can arrive before the sign-in, and its
+        // snapshot drew the owner-only Sponsors block and TV link for a
+        // non-owner (empty). The sign-in shows Setup; these draw what goes with it.
+        renderSponsorsSetup();
+        renderTvLink();
         renderSignedInAs();
     });
     // Once per load, after the listener is in, so a redirect that came back
@@ -4966,6 +4999,112 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (sw) sw.checked = s.on;
         if (lb) lb.textContent = s.on ? 'On' : 'Off';
         if (tg && document.activeElement !== tg) tg.value = paceMinText(s.targetMin);
+    }
+
+    // ---- 57, SPONSORS + THE TV BOARD (Manny 2026-11-12) ---------------------
+    // tournaments/CODE/sponsors = { event: {name, logo?}, holes: {"7": {name, logo?}} }.
+    // The owner writes it under its own record (the live rules already allow
+    // that); every reader of the record sees it. A logo is a small data URL
+    // made here from the chosen image (96 px, <= 24 KB): no file storage.
+    // Names and logos only: nothing is billed or collected anywhere.
+    function sponsorsOf(d) { return (d && d.sponsors && typeof d.sponsors === 'object') ? d.sponsors : {}; }
+    function sponsorHoleList(sp) {
+        const h = (sp && sp.holes) || {};
+        return Object.keys(h).filter((k) => h[k] && h[k].name).sort((a, b) => Number(a) - Number(b)).map((k) => ({ hole: k, name: h[k].name, logo: h[k].logo || '' }));
+    }
+    let sponsorErr = '';
+    function renderSponsorsSetup() {
+        const box = document.getElementById('sponsors-setup');
+        if (!box) return;
+        if (!canManage()) { box.innerHTML = ''; return; }
+        // A snapshot must not eat a half-typed name.
+        if (document.activeElement && box.contains(document.activeElement)) return;
+        const sp = sponsorsOf(currentData);
+        const ev = sp.event || {};
+        const holes = sponsorHoleList(sp);
+        const n = (currentData.courseData || []).length || 18;
+        let opts = '';
+        for (let i = 1; i <= n; i++) if (!(sp.holes || {})[String(i)]) opts += `<option value="${i}">Hole ${i}</option>`;
+        box.innerHTML = `<label style="font-size:0.75rem; margin:0 0 3px;">Event sponsor (optional)</label>
+            <div class="sp-event"><input type="text" id="sp-event-name" maxlength="60" placeholder="e.g. Desert Ridge Auto" value="${escapeHtml(ev.name || '')}" onchange="setEventSponsor(this.value)">
+                ${ev.name ? `<span style="display:flex; align-items:center; gap:8px;">${ev.logo ? `<img src="${escapeHtml(ev.logo)}" alt="" style="height:22px; width:auto; max-width:60px; border-radius:4px;">` : ''}<label class="sp-logo-btn">${ev.logo ? 'Change logo' : '+ Logo'}<input type="file" accept="image/*" onchange="setSponsorLogo('event', this.files[0])"></label><button type="button" class="sp-x" aria-label="Remove the event sponsor" onclick="removeSponsor('event')">\u2715</button></span>` : '<span></span>'}
+            </div>
+            <div style="font-size:0.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); margin-top:4px;">Hole sponsors</div>
+            ${holes.map((h) => `<div class="sp-row" data-hole="${h.hole}"><span class="sp-h">Hole ${h.hole}</span><span class="sp-n">${escapeHtml(h.name)}</span>${h.logo ? `<img src="${escapeHtml(h.logo)}" alt="">` : ''}<label class="sp-logo-btn">${h.logo ? 'Change' : '+ Logo'}<input type="file" accept="image/*" onchange="setSponsorLogo('${h.hole}', this.files[0])"></label><button type="button" class="sp-x" data-hole="${h.hole}" aria-label="Remove the sponsor of hole ${h.hole}" onclick="removeSponsor(this.dataset.hole)">\u2715</button></div>`).join('')
+              || '<p class="sp-note" style="margin-top:4px;">No hole sponsors yet.</p>'}
+            ${opts ? `<div class="sp-add"><select id="sp-hole" aria-label="Hole">${opts}</select><input type="text" id="sp-name" maxlength="60" placeholder="Sponsor name" onkeydown="if (event.key === 'Enter') addHoleSponsor()"><button type="button" class="btn-primary" id="sp-add" onclick="addHoleSponsor()">Add</button></div>` : ''}
+            ${sponsorErr ? `<p class="sp-err" id="sp-err">${escapeHtml(sponsorErr)}</p>` : ''}
+            <p class="sp-note">A name and an optional logo, shown on that hole's row of the team card, on the TV board and on the recap. Nothing is billed or collected here.</p>`;
+    }
+    function setEventSponsor(v) {
+        if (!currentCode || !canManage()) return;
+        const name = String(v || '').trim().slice(0, 60);
+        sponsorErr = '';
+        const ref = db.ref(`tournaments/${currentCode}/sponsors/event`);
+        (name ? ref.update({ name }) : ref.remove()).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function addHoleSponsor() {
+        if (!currentCode || !canManage()) return;
+        const hole = String((document.getElementById('sp-hole') || {}).value || '');
+        const name = String((document.getElementById('sp-name') || {}).value || '').trim().slice(0, 60);
+        if (!/^\d{1,2}$/.test(hole)) return;
+        if (!name) { sponsorErr = 'Type the sponsor\u2019s name.'; if (document.activeElement) document.activeElement.blur(); renderSponsorsSetup(); return; }
+        sponsorErr = '';
+        if (document.activeElement) document.activeElement.blur();
+        db.ref(`tournaments/${currentCode}/sponsors/holes/${hole}`).set({ name }).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function removeSponsor(which) {
+        if (!currentCode || !canManage()) return;
+        const path = which === 'event' ? 'event' : `holes/${String(which).replace(/\D/g, '')}`;
+        db.ref(`tournaments/${currentCode}/sponsors/${path}`).remove().catch((err) => alert(`Error: ${err.message}`));
+    }
+    // The chosen image becomes a 96 px PNG data URL (JPEG if that is smaller);
+    // over 24 KB it is refused with a sentence, so the record stays small.
+    function setSponsorLogo(which, file) {
+        if (!currentCode || !canManage() || !file) return;
+        const path = which === 'event' ? 'event' : `holes/${String(which).replace(/\D/g, '')}`;
+        sponsorLogoDataUrl(file, (url, why) => {
+            if (!url) { sponsorErr = why || 'That image could not be used.'; renderSponsorsSetup(); return; }
+            sponsorErr = '';
+            db.ref(`tournaments/${currentCode}/sponsors/${path}`).update({ logo: url }).catch((err) => alert(`Error: ${err.message}`));
+        });
+    }
+    function sponsorLogoDataUrl(file, cb) {
+        try {
+            const img = new Image();
+            const reader = new FileReader();
+            reader.onerror = () => cb(null, 'That image could not be read.');
+            reader.onload = () => {
+                img.onerror = () => cb(null, 'That file is not an image this browser can open.');
+                img.onload = () => {
+                    const max = 96, k = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
+                    const c = document.createElement('canvas');
+                    c.width = Math.max(1, Math.round((img.width || 1) * k)); c.height = Math.max(1, Math.round((img.height || 1) * k));
+                    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+                    let out = c.toDataURL('image/png');
+                    const jpg = c.toDataURL('image/jpeg', 0.82);
+                    if (jpg.length < out.length) out = jpg;
+                    if (out.length > 24000) return cb(null, 'That logo is too detailed for a small image. Try a simpler one.');
+                    cb(out);
+                };
+                img.src = String(reader.result);
+            };
+            reader.readAsDataURL(file);
+        } catch (e) { cb(null, 'That image could not be used.'); }
+    }
+    // THE TV BOARD LINK, owner only: tournament-tv.html?tourney=CODE on the
+    // product's own host, read-only, paging one flight at a time.
+    function tvBoardUrl() { return `${shareBaseUrl()}tournament-tv.html?tourney=${encodeURIComponent(currentCode)}`; }
+    function renderTvLink() {
+        const row = document.getElementById('tv-link-row');
+        if (!row) return;
+        if (!currentCode || !canManage()) { row.style.display = 'none'; row.innerHTML = ''; return; }
+        row.style.display = 'block';
+        row.innerHTML = `<b>\uD83D\uDCFA Clubhouse TV</b> \u00b7 open this link in the TV\u2019s browser: big type, one flight a page, a QR to follow on a phone, read-only.<span class="tv-url" id="tv-url">${escapeHtml(tvBoardUrl())}</span><button type="button" class="btn-outline" id="tv-copy" onclick="copyTvLink()">Copy link</button><a class="btn-outline" id="tv-open" href="${escapeHtml(tvBoardUrl())}" target="_blank" rel="noopener" style="display:inline-block; width:auto; margin:0; padding:6px 12px; font-size:0.78rem; text-decoration:none;">Open</a><span id="tv-copied" style="font-size:0.78rem; margin-left:8px;"></span>`;
+    }
+    function copyTvLink() {
+        const done = (ok) => { const s = document.getElementById('tv-copied'); if (s) s.textContent = ok ? 'Copied.' : 'Select the address above and copy it.'; };
+        try { navigator.clipboard.writeText(tvBoardUrl()).then(() => done(true), () => done(false)); } catch (e) { done(false); }
     }
 
     function setPaceOn(on) {
@@ -7593,6 +7732,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const card = document.getElementById('recap-winners');
         card.innerHTML = rows.map(([a, b]) => `<div class="rc-row"><span>${escapeHtml(a)}</span><strong>${escapeHtml(b)}</strong></div>`).join('');
         card.style.display = rows.length ? 'block' : 'none';
+        // 57: thanks to the sponsors, when the organizer added any.
+        const spc = document.getElementById('recap-sponsors');
+        if (spc) {
+            const sp = sponsorsOf(data);
+            const srows = [];
+            if (sp.event && sp.event.name) srows.push(['Event sponsor', sp.event.name, sp.event.logo]);
+            sponsorHoleList(sp).forEach((h) => srows.push([`Hole ${h.hole}`, h.name, h.logo]));
+            spc.innerHTML = srows.length ? `<div class="rc-row" style="border-bottom:0; padding-bottom:4px;"><span style="font-size:0.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted);">Thanks to our sponsors</span></div>`
+                + srows.map(([a, b, logo]) => `<div class="rc-row"><span>${escapeHtml(a)}</span><strong>${logo ? `<img src="${escapeHtml(logo)}" alt="" style="height:20px; width:auto; vertical-align:middle; margin-right:6px; border-radius:4px;">` : ''}${escapeHtml(b)}</strong></div>`).join('') : '';
+            spc.style.display = srows.length ? 'block' : 'none';
+        }
         document.getElementById('recap-photos').innerHTML = TournamentPhotos.ordered(recapShown).map((p) => {
             const label = TournamentPhotos.photoLabel(data, p);
             return `<div class="pq-tile"><img src="${escapeHtml(TournamentPhotos.shownUrl(currentCode, p.id))}" alt="${escapeHtml(label)}" loading="lazy" onerror="this.style.display='none'">${label ? `<span class="pq-tag">${escapeHtml(label)}</span>` : ''}`
@@ -7710,6 +7860,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderContestsTab();
             syncPhotoListeners();
             renderPaceSetup();
+            renderSponsorsSetup();   // 57
+            renderTvLink();          // 57
             renderEventHome();
             // Last, so it can remove what the renders above filled in. Runs on
             // every snapshot: the record may gain an owner while the page is open.

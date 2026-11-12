@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HardPan Tournaments · TV board</title>
+    <!-- THE CLUBHOUSE TV BOARD (57, TV option A; Manny 2026-11-12). One page,
+         tournament-tv.html?tourney=CODE, opened on the bar TV in any browser.
+         Read-only: it shows what the board already knows (the same engine
+         resolution as the organizer's Board tab and the golfer's card), in big
+         type, one flight a page, paging on its own; the last page thanks the
+         sponsors when the organizer has added any; a QR in the corner follows
+         the event on a phone. Nothing here writes to the database.
+         ?every=N sets the seconds a page stays (3..60, default 10). -->
+    <link rel="icon" href="tournament-icon-192.png" type="image/png">
+    <script src="./firebase-app-compat.js"></script>
+    <script src="./firebase-database-compat.js"></script>
+    <script src="./firebase-auth-compat.js"></script>
+    <script src="handicap.js"></script>
+    <script src="payouts.js"></script>
+    <script src="text-safe.js"></script>
+    <script src="tournament-engine.js"></script>
+    <script src="./qrcode.min.js"></script>
+    <style>
+        :root { --bg: #0b1d16; --panel: #10281f; --line: rgba(255,255,255,.12); --ink: #ffffff; --mute: #a9c2b6; --lime: #d4f28a; --red: #ff6b6b; --live: #c0392b; }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+        body { display: flex; flex-direction: column; padding: 2.2vh 3vw 1.6vh; }
+        .hd { display: flex; align-items: flex-end; justify-content: space-between; gap: 2vw; border-bottom: 2px solid var(--line); padding-bottom: 1.2vh; }
+        .ev { font-size: 4.2vh; font-weight: 800; line-height: 1.1; letter-spacing: -.01em; }
+        .sub { font-size: 2.3vh; color: var(--mute); margin-top: .6vh; }
+        .sub b { color: var(--lime); font-weight: 700; }
+        .liv { display: flex; align-items: center; gap: 1vw; font-size: 2.3vh; color: var(--mute); white-space: nowrap; }
+        .liv .pill { background: var(--live); color: #fff; font-weight: 800; font-size: 1.9vh; padding: .3vh 1vw; border-radius: .8vh; letter-spacing: .06em; }
+        .liv.stale .pill { background: #6b5d1a; }
+        .main { flex: 1; min-height: 0; display: flex; gap: 2vw; padding-top: 1.4vh; }
+        .board { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .ttl { display: flex; justify-content: space-between; align-items: baseline; font-size: 2.6vh; color: var(--mute); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 0 0 .8vh; }
+        .ttl .n { color: var(--lime); }
+        .row { display: grid; grid-template-columns: minmax(44px, 6vw) minmax(0, 1fr) minmax(56px, 10vw) minmax(64px, 12vw); align-items: center; padding: .55vh 1vw; border-top: 1px solid var(--line); font-size: 3.9vh; line-height: 1.1; }
+        .row.h { font-size: 2vh; color: var(--mute); letter-spacing: .1em; text-transform: uppercase; border-top: 0; padding-bottom: .4vh; }
+        .row .pos { font-weight: 800; color: var(--mute); }
+        .row.lead .pos { color: var(--lime); }
+        .row .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .row .nm small { font-size: .55em; color: var(--mute); font-weight: 600; margin-left: .6em; }
+        .row .nm2 { display: block; font-size: 1.9vh; color: var(--mute); font-weight: 500; line-height: 1.15; margin-top: .2vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .row .th { text-align: center; color: var(--mute); }
+        .row .tp { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .row .tp.under { color: var(--lime); } .row .tp.over { color: var(--red); }
+        .empty { color: var(--mute); font-size: 3vh; padding: 4vh 1vw; }
+        /* The QR lives in the footer's right end (the table has the whole width). */
+        .ftq { display: flex; align-items: center; gap: 1vw; }
+        .qr { background: #fff; padding: .6vh; border-radius: 1vh; }
+        .qr canvas, .qr img { display: block; width: 8.5vh !important; height: 8.5vh !important; }
+        .qrt { font-size: 1.8vh; color: var(--mute); text-align: left; line-height: 1.3; }
+        .qrt b { display: block; color: var(--ink); font-size: 2vh; }
+        .ft { display: flex; align-items: center; justify-content: space-between; gap: 2vw; border-top: 2px solid var(--line); padding-top: .9vh; font-size: 2.1vh; color: var(--mute); }
+        .ftl { display: flex; flex-direction: column; gap: .4vh; }
+        .wait { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 1.6vh; }
+        .wait .w1 { font-size: 6vh; font-weight: 800; }
+        .wait .wi { font-size: 2.8vh; color: var(--mute); }
+        .wait .w2 { font-size: 2.2vh; color: var(--mute); }
+        /* The field while waiting (Manny 2026-11-12): one line a team, board type. */
+        .wait .wl { width: 100%; text-align: left; margin: .6vh 0; }
+        .wait .wt { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; gap: 1.6vw; align-items: baseline; padding: .55vh 1vw; border-top: 1px solid var(--line); font-size: 3.9vh; line-height: 1.1; }
+        .wait .wt .a { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 34vw; }
+        .wait .wt .b { color: var(--mute); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .wait .wt .c { font-weight: 800; color: var(--lime); white-space: nowrap; }
+        @media (max-width: 700px) {
+            html, body { overflow: auto; height: auto; }
+            body { padding: 10px 12px 16px; min-height: 100vh; }
+            .qr { display: none; }
+            .ev { font-size: 22px; } .sub, .liv, .ttl, .ft { font-size: 12px; }
+            .row { font-size: 18px; padding: 6px 4px; grid-template-columns: 32px minmax(0, 1fr) 44px 56px; }
+            .row.h { font-size: 11px; letter-spacing: .04em; }
+            .row .nm2 { font-size: 11px; }
+            .qr canvas, .qr img { width: 72px !important; height: 72px !important; }
+            .qrt b { font-size: 12px; } .qrt { font-size: 11px; }
+            .dots i { width: 14px; height: 4px; }
+            .hd { flex-wrap: wrap; align-items: flex-start; }
+        }
+        @media (max-width: 480px) {
+            .row { grid-template-columns: 32px minmax(0, 1fr) 56px; }
+            .row .th { display: none; }
+        }
+        .dots { display: flex; gap: .8vw; }
+        .dots i { width: 3.2vw; height: .9vh; border-radius: .5vh; background: rgba(255,255,255,.18); }
+        .dots i.on { background: var(--lime); }
+        .sp { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 2.4vh; }
+        .sp .k { font-size: 2.6vh; letter-spacing: .18em; text-transform: uppercase; color: var(--mute); font-weight: 700; }
+        .sp .ev-sp { font-size: 6.4vh; font-weight: 800; display: flex; align-items: center; gap: 2vw; }
+        .sp .ev-sp img, .sp .hs img { height: 7vh; width: auto; border-radius: 1vh; background: #fff; padding: .6vh; }
+        .sp .hs img { height: 4.6vh; }
+        .sp .grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.6vh 3vw; max-width: 90vw; }
+        .sp .hs { background: var(--panel); border: 1px solid var(--line); border-radius: 1.6vh; padding: 1.6vh 2.4vw; font-size: 3.2vh; font-weight: 700; display: flex; align-items: center; gap: 1.2vw; }
+        .sp .hs small { display: block; font-size: .6em; color: var(--mute); font-weight: 600; }
+        .err { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 3.4vh; color: var(--mute); text-align: center; padding: 4vw; }
+        .hide { display: none !important; }
+    </style>
+</head>
+<body>
+    <div class="hd">
+        <div><div class="ev" id="tv-name">HardPan Tournaments</div><div class="sub" id="tv-sub"></div></div>
+        <div class="liv" id="tv-live" style="display:none;"><span class="pill">LIVE</span><span id="tv-updated"></span></div>
+    </div>
+    <div class="main" id="tv-main">
+        <div class="board" id="tv-board"><div class="err" id="tv-msg">Loading the board…</div></div>
+    </div>
+    <div class="ft" id="tv-foot" style="display:none;">
+        <span class="ftl"><span id="tv-page-label"></span><span id="tv-next-label"></span></span>
+        <span class="dots" id="tv-dots"></span>
+        <span class="ftq" id="tv-side"><span class="qr" id="tv-qr"></span><span class="qrt"><b>Follow on your phone</b><span id="tv-follow"></span></span></span>
+    </div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyB5sBBd-pdnrdp-nu60lHTMBUUd5Kwjfyk",
+      authDomain: "golfapp-9fb21.firebaseapp.com",
+      databaseURL: "https://golfapp-9fb21-default-rtdb.firebaseio.com",
+      projectId: "golfapp-9fb21",
+      storageBucket: "golfapp-9fb21.firebasestorage.app",
+      messagingSenderId: "761739328763",
+      appId: "1:761739328763:web:08ac41351578565c94045e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const params = new URLSearchParams(window.location.search);
+    const CODE = String(params.get('tourney') || '').trim().toUpperCase();
+    const EVERY = Math.min(60, Math.max(3, parseInt(params.get('every'), 10) || 10)) * 1000;
+    const PAGE_ROWS = 8;
+    // The follow link is the public board on the product's own host, whatever
+    // host this TV page was opened from (a preview, the Pages host).
+    const FOLLOW_URL = 'https://tournaments.rattlegolf.com/tournament?tourney=' + encodeURIComponent(CODE);
+    const FOLLOW_TEXT = 'tournaments.rattlegolf.com';
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    let data = null, pages = [], pageIdx = 0, timer = null, updatedAt = null;
+
+    function toParText(r) { return !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? '+' + r.toPar : String(r.toPar))); }
+    function toParClass(r) { return !r.hasScores ? '' : (r.toPar < 0 ? 'under' : (r.toPar > 0 ? 'over' : '')); }
+    function clock(d) { let h = d.getHours(), m = d.getMinutes(); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap; }
+    function fmtName(s) { return String(s || '').replace(/^\w/, (c) => c.toUpperCase()); }
+
+    // ONE PAGE PER FLIGHT (TV A). No flights: pages of ten. A multi-round event
+    // pages its combined standings when the engine allows them, otherwise one
+    // page per round; the sentence the engine gives is shown, never a blank.
+    function buildPages(d) {
+        const out = [];
+        const flights = d.flights || {};
+        const fids = Object.keys(flights).sort((a, b) => (flights[a].createdAt || 0) - (flights[b].createdAt || 0) || String(flights[a].name || '').localeCompare(String(flights[b].name || '')));
+        const multi = typeof isMultiRound === 'function' && isMultiRound(d);
+        const selections = [];
+        if (multi) {
+            const ev = resolveLeaderboardView(d, 'event', null);
+            if (ev.available) selections.push({ sel: 'event', title: ev.title || 'Event total' });
+            else Object.keys(d.rounds || {}).forEach((rid) => selections.push({ sel: rid, title: (d.rounds[rid] && d.rounds[rid].name) || 'Round' }));
+        } else selections.push({ sel: null, title: '' });
+        selections.forEach(({ sel, title }) => {
+            const scopes = fids.length ? fids.map((f) => ({ fid: f, name: flights[f].name || 'Flight' })) : [{ fid: null, name: '' }];
+            scopes.forEach(({ fid, name }) => {
+                const v = resolveLeaderboardView(d, sel, fid);
+                const rows = v.available ? v.rows : [];
+                const label = [title, name].filter(Boolean).join(' · ');
+                if (!rows.length) { out.push({ kind: 'board', label: label || 'Leaderboard', display: label || 'Leaderboard', rows: [], thruHead: v.kind === 'event' ? 'Rds' : 'Thru', note: v.available ? 'No scores yet.' : (v.reason || '') }); return; }
+                // EIGHT ROWS A PAGE: ten with the names line under each team ran
+                // 117 px past the footer at 720p (measured); eight fit with room.
+                for (let i = 0; i < rows.length; i += PAGE_ROWS) {
+                    const chunk = rows.slice(i, i + PAGE_ROWS);
+                    const range = i + 1 + '\u2013' + (i + chunk.length) + ' of ' + rows.length;
+                    // (#12) the page's name in the footer: the flight (and its range
+                    // when it runs past ten), or the range alone when there are no flights.
+                    const display = label ? (rows.length > PAGE_ROWS ? label + ' \u00b7 ' + range : label) : range;
+                    out.push({ kind: 'board', key: label + '#' + i, label: label || 'Leaderboard', display, rows: chunk, from: i + 1, to: i + chunk.length, of: rows.length, thruHead: v.kind === 'event' ? 'Rds' : 'Thru' });
+                }
+            });
+        });
+        // NOTHING SCORED YET: one Waiting page instead of a board of dashes.
+        // The first score that lands rebuilds the pages and the table appears.
+        const anyScore = out.some((p) => p.kind === 'board' && p.rows.some((r) => r.hasScores));
+        // (Manny 2026-11-12) The waiting page lists the field, a line a team,
+        // eight a page like the board, turning on the same timer.
+        let pages = out;
+        if (!anyScore) {
+            const field = waitingField(d);
+            pages = [];
+            if (!field.length) pages.push({ kind: 'waiting', key: 'waiting#0', label: 'waiting', display: 'Waiting for first scores', lines: [] });
+            for (let i = 0; i < field.length; i += PAGE_ROWS) {
+                const chunk = field.slice(i, i + PAGE_ROWS);
+                const range = field.length > PAGE_ROWS ? ' \u00b7 ' + (i + 1) + '\u2013' + (i + chunk.length) + ' of ' + field.length : '';
+                pages.push({ kind: 'waiting', key: 'waiting#' + i, label: 'waiting', display: 'Waiting for first scores' + range, lines: chunk });
+            }
+        }
+        const sp = d.sponsors || {};
+        const holes = Object.keys(sp.holes || {}).filter((h) => sp.holes[h] && sp.holes[h].name).sort((a, b) => Number(a) - Number(b));
+        if ((sp.event && sp.event.name) || holes.length) pages.push({ kind: 'sponsors', label: 'Thanks to our sponsors', display: 'Thanks to our sponsors', event: sp.event || null, holes: holes.map((h) => Object.assign({ hole: h }, sp.holes[h])) });
+        return pages;
+    }
+
+    // THE GOLFERS UNDER A TEAM. A team row carries its players; a player row is
+    // the golfer already. Long lists fall back to "First L." so a row stays one line.
+    function teamNames(r) {
+        if (!data || r.entryType !== 'team') return '';
+        const t = (data.teams || {})[r.entryKey] || {};
+        const names = (t.players || []).map((p) => String(p || '').trim()).filter(Boolean);
+        if (!names.length) return '';
+        const full = names.join(' \u00b7 ');
+        if (full.length <= 60) return full;
+        return names.map((n) => { const w = n.split(/\s+/); return w.length > 1 ? w[0] + ' ' + w[w.length - 1].charAt(0) + '.' : n; }).join(' \u00b7 ');
+    }
+    // THE FIELD WHILE WAITING. A team event lists its teams (name, golfers as
+    // stored, start hole); an individual event its scoring groups, or its
+    // golfers when there are no groups. Shotgun: the hole the record holds
+    // (teams/teamN/startingHole, "1", "1A"...), left off when it is not set.
+    // Tee time: hole 1 for everyone, as the setup screen states the rule.
+    function waitingField(d) {
+        const shotgun = d.startType === 'shotgun';
+        const hole = (h) => shotgun ? (String(h || '').trim() ? 'Hole ' + String(h).trim() : '') : 'Hole 1';
+        const teams = Object.values(d.teams || {}).filter((t) => t && t.num).sort((a, b) => a.num - b.num);
+        if (teams.length) return teams.map((t) => ({ name: t.name || ('Team ' + t.num), who: (t.players || []).map((p) => String(p || '').trim()).filter(Boolean).join(', '), hole: hole(t.startingHole) }));
+        const players = d.players || {};
+        const pname = (pid) => String((players[pid] && players[pid].name) || '').trim();
+        const groups = Object.keys(d.scoringGroups || {}).map((k) => d.scoringGroups[k]).filter(Boolean);
+        if (groups.length) return groups.map((g) => ({ name: g.name || 'Group', who: (g.playerIds || []).map(pname).filter(Boolean).join(', '), hole: hole(g.startingHole) }));
+        return Object.keys(players).map(pname).filter(Boolean).map((n) => ({ name: n, who: '', hole: hole('') }));
+    }
+    function startInfo(d) {
+        const parts = [];
+        if (d.startType === 'shotgun') parts.push('Shotgun start');
+        if (d.startTime && /^\d{1,2}:\d{2}$/.test(d.startTime)) { const [hh, mm] = d.startTime.split(':').map(Number); const dt = new Date(); dt.setHours(hh, mm, 0, 0); parts.push(clock(dt)); }
+        const n = typeof competitorCount === 'function' ? competitorCount(d) : Object.keys(d.teams || {}).length;
+        const noun = typeof competitorNoun === 'function' ? competitorNoun(d, n) : (n === 1 ? 'team' : 'teams');
+        if (n) parts.push(n + ' ' + noun);
+        return parts.join(' \u00b7 ');
+    }
+    function rankCounts(rows) { const c = {}; rows.forEach((r) => { if (r.rank) c[r.rank] = (c[r.rank] || 0) + 1; }); return c; }
+
+    function renderPage() {
+        const board = $('tv-board');
+        if (!pages.length) { board.innerHTML = '<div class="err">No scores yet.</div>'; return; }
+        const p = pages[pageIdx % pages.length];
+        if (p.kind === 'waiting') {
+            const list = (p.lines || []).map((l) => '<div class="wt"><span class="a">' + esc(l.name) + '</span><span class="b">' + esc(l.who) + '</span><span class="c">' + esc(l.hole) + '</span></div>').join('');
+            board.innerHTML = '<div class="wait"><div class="w1">Waiting for first scores</div><div class="wi">' + esc(startInfo(data)) + '</div>' + (list ? '<div class="wl" id="tv-field">' + list + '</div>' : '') + '<div class="w2">The board fills in as cards post. Follow along on your phone with the QR below.</div></div>';
+        } else if (p.kind === 'sponsors') {
+            let h = '<div class="sp"><div class="k">Thanks to our sponsors</div>';
+            if (p.event && p.event.name) h += '<div class="ev-sp">' + (p.event.logo ? '<img src="' + esc(p.event.logo) + '" alt="">' : '') + '<span>' + esc(p.event.name) + '</span></div>';
+            if (p.holes.length) h += '<div class="grid">' + p.holes.map((s) => '<div class="hs">' + (s.logo ? '<img src="' + esc(s.logo) + '" alt="">' : '') + '<span>' + esc(s.name) + '<small>Hole ' + esc(s.hole) + '</small></span></div>').join('') + '</div>';
+            board.innerHTML = h + '</div>';
+        } else {
+            const rc = rankCounts(p.rows);
+            let h = '<div class="ttl"><span class="n">' + esc(p.label) + '</span><span>' + (p.of ? p.from + '–' + p.to + ' of ' + p.of : '') + '</span></div>';
+            if (!p.rows.length) h += '<div class="empty">' + esc(p.note || 'No scores yet.') + '</div>';
+            else {
+                h += '<div class="row h"><span class="pos">Pos</span><span class="nm">' + esc(typeof entryColumnLabel === 'function' ? entryColumnLabel(data) : 'Team') + '</span><span class="th">' + esc(p.thruHead) + '</span><span class="tp">To par</span></div>';
+                p.rows.forEach((r) => {
+                    const tie = (r.rank && rc[r.rank] > 1) ? '<small> tied</small>' : '';
+                    const thru = p.thruHead === 'Rds' ? (r.hasScores ? r.roundsComplete + '/' + r.countableRounds : '-') : (r.hasScores ? r.thru : '-');
+                    const who = teamNames(r);
+                    h += '<div class="row' + (r.rank === 1 ? ' lead' : '') + '"><span class="pos">' + esc(r.rank || '-') + '</span><span class="nm"><span class="nm1">' + esc(r.teamName || r.name || '') + tie + '</span>' + (who ? '<span class="nm2">' + esc(who) + '</span>' : '') + '</span><span class="th">' + esc(thru) + '</span><span class="tp ' + toParClass(r) + '">' + esc(toParText(r)) + '</span></div>';
+                });
+            }
+            board.innerHTML = h;
+        }
+        const n = pages.length;
+        $('tv-dots').innerHTML = pages.map((_, i) => '<i class="' + (i === pageIdx % n ? 'on' : '') + '"></i>').join('');
+        const next = pages[(pageIdx + 1) % n];
+        $('tv-page-label').textContent = n > 1 ? (p.display + ' · ' + (EVERY / 1000) + ' s a page') : p.display;
+        $('tv-next-label').textContent = n > 1 ? ('Next: ' + next.display) : '';
+        $('tv-foot').style.display = 'flex';
+    }
+
+    function renderHeader(d) {
+        $('tv-name').textContent = d.name || 'Tournament';
+        const n = typeof competitorCount === 'function' ? competitorCount(d) : Object.keys(d.teams || {}).length;
+        const noun = typeof competitorNoun === 'function' ? competitorNoun(d, n) : (n === 1 ? 'team' : 'teams');
+        $('tv-sub').innerHTML = [esc(d.courseName || ''), esc(fmtName(d.format || '')), n ? n + ' ' + esc(noun) : ''].filter(Boolean).join(' · ');
+        $('tv-live').style.display = 'flex';
+        $('tv-updated').textContent = 'updated ' + clock(updatedAt || new Date());
+    }
+
+    let qrDrawn = false;
+    function drawQr() {
+        if (qrDrawn) return;
+        const box = $('tv-qr');
+        try {
+            if (window.QRCode) { new QRCode(box, { text: FOLLOW_URL, width: 256, height: 256, correctLevel: QRCode.CorrectLevel.M }); qrDrawn = true; }
+        } catch (e) { /* no QR: the address still reads below */ }
+        $('tv-follow').textContent = FOLLOW_TEXT;
+    }
+
+    function onSnapshot(snap) {
+        const d = snap.val();
+        updatedAt = new Date();
+        if (!d) { data = null; pages = []; $('tv-board').innerHTML = '<div class="err">No tournament found with that code.</div>'; $('tv-live').style.display = 'none'; return; }
+        data = d;
+        const keep = pages.length ? (pages[pageIdx % pages.length].key || pages[pageIdx % pages.length].label) : null;
+        pages = buildPages(d);
+        if (keep) { const i = pages.findIndex((p) => (p.key || p.label) === keep); if (i >= 0) pageIdx = i; }
+        renderHeader(d);
+        drawQr();
+        renderPage();
+        if (!timer && pages.length > 1) timer = setInterval(() => { pageIdx = (pageIdx + 1) % Math.max(1, pages.length); renderPage(); }, EVERY);
+    }
+
+    function start() {
+        if (!CODE) { $('tv-board').innerHTML = '<div class="err">Open this page from the organizer’s Board tab, or add ?tourney=CODE to the address.</div>'; return; }
+        db.ref('tournaments/' + CODE).on('value', onSnapshot, (err) => { $('tv-board').innerHTML = '<div class="err">' + esc('The board could not be read: ' + (err && err.message ? err.message : err)) + '</div>'; });
+        // A TV should not dim mid-event; refused quietly where unsupported.
+        try { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').catch(() => {}); } catch (e) { /* no wake lock */ }
+    }
+    try {
+        const auth = firebase.auth();
+        const go = () => start();
+        if (auth.currentUser) go();
+        else auth.signInAnonymously().then(go, go);
+    } catch (e) { start(); }
+</script>
+</body>
+</html>
