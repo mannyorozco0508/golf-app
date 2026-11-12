@@ -869,15 +869,40 @@
         setSaveState('saving', 'Saving…');
         return promise
             .then(() => setSaveState('saved', '✓ Saved'))
-            .catch((err) => setSaveState('error', (err && err.code === 'PERMISSION_DENIED')
-                ? NOT_SAVED_REFUSED
-                : '⚠️ Could not save — check your signal and re-enter that hole'));
+            .catch((err) => {
+                const refused = !!(err && err.code === 'PERMISSION_DENIED');
+                // BUG HUNT #2 (2026-11-12): refused from a link with NO key = the
+                // key is what is missing. The card goes read-only and says so.
+                if (refused && !myScoreKey) { lockKeylessCard(); setSaveState('error', '\u26a0\ufe0f Not saved \u2014 ' + KEY_MISSING); return; }
+                setSaveState('error', refused ? NOT_SAVED_REFUSED : '⚠️ Could not save — check your signal and re-enter that hole');
+            });
     }
     // THE REFUSAL, IN MANNY'S WORDS (scorecard-lock wave, 2026-10-06). The
     // database refuses a score from a link without this team's key. It stays on
     // screen in red - no "Saved", no check - and the box goes back to what the
     // server holds when the SDK reverts its optimistic write.
     const NOT_SAVED_REFUSED = "⚠️ Not saved \u2014 this link can't score this card. Ask the organizer for your team's link.";
+    // BUG HUNT #2 (Manny OK 2026-11-12): a link WITHOUT its scoring key on an
+    // event whose keys are on. The page cannot know that before it writes
+    // (tournamentKeys/<code> is the owner's to read), so the first refusal is
+    // where it learns. From then on the card is read-only, the sentence under
+    // the status and the "who can score" line both name the missing key, and
+    // the Leaderboard tab keeps working. A refusal on a link WITH a key keeps
+    // NOT_SAVED_REFUSED: the key is wrong, or the event is frozen.
+    const KEY_MISSING = 'This link is missing its scoring key. Ask your organizer for your team\u2019s link; the leaderboard still works.';
+    let keylessRefused = false;
+    function lockKeylessCard() {
+        keylessRefused = true;
+        const truth = document.getElementById('link-truth');
+        if (truth) truth.textContent = KEY_MISSING;
+        enforceKeylessLock();
+    }
+    // Every holes render goes through setHolesListPreservingFocus; this runs at
+    // its two exits, so a snapshot cannot hand the boxes back.
+    function enforceKeylessLock() {
+        if (!keylessRefused) return;
+        document.querySelectorAll('#holes-list input').forEach((i) => { i.disabled = true; });
+    }
 
     // THE KEYED WRITE (scorecard-lock wave). Each writer below still builds its
     // own path through scorePath() and still calls set/remove itself when the
@@ -1075,7 +1100,10 @@
             // A REPLAY THE SERVER REFUSED is dropped by the queue, never retried,
             // and the golfer is told with the same red sentence a live refusal
             // gets - it stays on screen.
-            if (r && r.dropped) setSaveState('error', NOT_SAVED_REFUSED);
+            if (r && r.dropped) {
+                if (!myScoreKey) { lockKeylessCard(); setSaveState('error', '\u26a0\ufe0f Not saved \u2014 ' + KEY_MISSING); }   // bug hunt #2
+                else setSaveState('error', NOT_SAVED_REFUSED);
+            }
             renderWaitingChip();
             if (scoreDrainAgain) { scoreDrainAgain = false; setTimeout(drainScoreQueue, 0); }
             else if (scoreQueueWaiting()) ensureScoreRetry();
@@ -1241,6 +1269,7 @@
                 const r = list.querySelector('#' + rowId + ' .team-hole-result');
                 if (r && r.textContent !== text) r.textContent = text;
             });
+            enforceKeylessLock();   // bug hunt #2
             return;
         }
 
@@ -1254,6 +1283,7 @@
 
         list.innerHTML = html;
         lastHolesShape = shape;
+        enforceKeylessLock();   // bug hunt #2
 
         if (!keep || !keepKey) return;
         const fresh = Array.from(list.querySelectorAll('input'))
