@@ -586,7 +586,8 @@
     }
     function offerRenewal() { const p = sitePro(); return foundingOpen() ? (p.founding || '$24.99') : (p.yearly || '$49.99'); }
     function offerLine() {
-        return 'Tournament players: ' + OFFER_FIRST_YEAR + ' your first year, then ' + offerRenewal() + '/yr' + (foundingOpen() ? '' : ' (regular price)') + '. Renews until you cancel. New subscribers.';
+        // Manny 2026-11-12: the Apple offer starts with a 7-day free trial; one renewal price, no "(regular price)".
+        return 'Tournament players: 7 days free, then ' + OFFER_FIRST_YEAR + ' your first year, then ' + offerRenewal() + '/yr. Renews until you cancel. New subscribers.';
     }
     function offerAndroidLine() {
         return foundingOpen()

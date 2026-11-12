@@ -16,7 +16,7 @@
 //    second row is the line word for word; Get reads Redeem and links to the
 //    Apple redeem URL with the code; the card foot has the line + the charity
 //    line; "49.99" appears nowhere
-//  4 founding CLOSED (flag false): the "(regular price)" line; "24.99" nowhere
+//  4 founding CLOSED (flag false): the "then $49.99/yr" line; "24.99" nowhere
 //  5 Android: the Android sentence, no redeem link anywhere, Get stays Get
 //  6 ended (endsAt yesterday), off, or no code word: the banner is the live
 //    one-liner and there is no "$"
@@ -25,11 +25,21 @@
 //  9 money = base
 // 10 the owner signs in AFTER the record arrived (Manny's iPad, R7SK48): the
 //    block draws with the switch Off and no offer record (added 2026-11-12)
+// 11 Offer ends looks like the create form's Date box (appearance none, block,
+//    48 px, its border and radius, fills its cell) with "No end date" while
+//    empty, hidden once a date is in (Manny 2026-11-12, iPad: an empty grey bar)
+// Lines re-pinned 2026-11-12 (Manny): "7 days free, then $19.99 your first
+// year, then $24.99/yr" (founding closed: "then $49.99/yr", no "(regular
+// price)"); the long note became "Price switches to $49.99/yr automatically
+// once founding spots fill. HardPan collects nothing for charity." 
 //
 // Baseline against main 03231f51 (before the build), the first 9 tests:
 // 3 PASS / 6 FAIL (tests 6, 7 and 9: without the build nothing ever shows).
 // All 10 tests against preview-58 1be4e5bc (page swapped in by cp, restored by
 // sha): 9 PASS / 1 FAIL (test 10, the block empty). With the fix: 10 PASS / 0 FAIL.
+// All 11 tests (after the re-pins) against preview-58 8114178a: 4 PASS / 7 FAIL
+// (tests 1, 2, 3, 4, 8, 10, 11: the old lines, the old note, the grey bar).
+// With the build: 11 PASS / 0 FAIL.
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -42,8 +52,9 @@ const F = require('./helpers/app-card-fixtures.js');
 const OWNER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
 const GOLFER = { uid: 'u-golfer', isAnonymous: true };
 const Q = 'tourney=SCR&team=4&k=' + F.KEY4;
-const LINE_OPEN = 'Tournament players: $19.99 your first year, then $24.99/yr. Renews until you cancel. New subscribers.';
-const LINE_CLOSED = 'Tournament players: $19.99 your first year, then $49.99/yr (regular price). Renews until you cancel. New subscribers.';
+// Re-pinned 2026-11-12 (Manny): the Apple offer starts with a 7-day free trial; founding closed reads "then $49.99/yr" with no "(regular price)".
+const LINE_OPEN = 'Tournament players: 7 days free, then $19.99 your first year, then $24.99/yr. Renews until you cancel. New subscribers.';
+const LINE_CLOSED = 'Tournament players: 7 days free, then $19.99 your first year, then $49.99/yr. Renews until you cancel. New subscribers.';
 const AND_OPEN = 'Android: founding price $24.99/yr in HardPan. The tournament price arrives with the next app update.';
 const REDEEM = 'https://apps.apple.com/redeem?ctx=offercodes&id=6808220335&code=HERO2026';
 const UA_IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1';
@@ -185,6 +196,42 @@ test('10 the owner signs in AFTER the record arrived: the block draws, switch Of
     assert.equal(o.label, 'Off');
     assert.equal(o.code, false);
     assert.match(text, /Off for every event until you turn it on\./);
-    assert.match(text, /founding flag/);
+    assert.match(text, /Price switches to \$49\.99\/yr automatically once founding spots fill\. HardPan collects nothing for charity\./);
+    assert.doesNotMatch(text, /founding flag/, 'the long note is gone');
     assert.deepEqual(o.writes, [], 'drawing the block writes nothing');
+});
+
+// 11 (Manny 2026-11-12, iPad: "Offer ends" was an empty grey bar). The box
+// looks like the create form's Date box (appearance none, block, 48 px, its
+// border and radius, the width of its cell) and shows a placeholder while
+// empty; a picked date hides it. Reached by tapping the switch on, no page
+// function. Chrome cannot show the iPad's grey bar; it holds the CSS the
+// fix rests on, which the iPad simulator check confirms by eye.
+test('11 Offer ends looks like the create form\'s Date box, with a placeholder while empty', async () => {
+    const READ = { expression: `JSON.stringify((function () {
+  var i = document.getElementById('offer-ends'); if (!i) return { missing: true };
+  var c = getComputedStyle(i), cell = i.closest('.of-grid > div'), ph = document.getElementById('offer-ends-ph');
+  var shown = function (e) { if (!e) return false; var s = getComputedStyle(e); if (s.display === 'none' || s.visibility === 'hidden' || s.opacity === '0') return false; var r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  var ir = i.getBoundingClientRect();
+  return { appearance: c.appearance || c.webkitAppearance, display: c.display, h: Math.round(ir.height), w: Math.round(ir.width), cellW: Math.round(cell.getBoundingClientRect().width),
+    radius: c.borderTopLeftRadius, border: c.borderTopWidth, formBorder: getComputedStyle(document.getElementById('t-date')).borderTopWidth, formRadius: getComputedStyle(document.getElementById('t-date')).borderTopLeftRadius, ph: shown(ph) ? ph.innerText.trim() : null, value: i.value };
+})())` };
+    const db = fixture({ on: true, code: 'HERO2026' }, true);
+    const r = await arriveCold({ url: fileUrl('tournament.html', 'tourney=SCR'), db, auth: OWNER, settleMs: 3500,
+        steps: [{ tap: '#tab-btn-setup' }, { sleep: 300 }, sc('#offer-setup'), { sleep: 200 }, READ,
+            // Headless Chrome takes no typed digits in this date box through the
+            // harness (insertText, char and keyDown all left it empty), so the value
+            // is set as test 2 sets it and the box's own input + change events fire.
+            { expression: "var e = document.getElementById('offer-ends'); e.value = '2027-01-31'; e.dispatchEvent(new Event('input', { bubbles: true })); e.dispatchEvent(new Event('change', { bubbles: true })); 1" }, { sleep: 200 }, READ] });
+    assert.ok(r.ok, r.reason);
+    const [a, b] = r.value.filter((v) => typeof v === 'string' && v[0] === '{').map((v) => JSON.parse(v));
+    assert.ok(!a.missing, 'positive: the Offer ends box is on Setup');
+    assert.equal(a.appearance, 'none'); assert.equal(a.display, 'block');
+    assert.equal(a.h, 48, 'the create form\'s 48 px');
+    assert.equal(a.radius, '10px'); assert.equal(a.radius, a.formRadius);
+    assert.equal(a.border, a.formBorder, 'the create form Date box\'s border (Chrome at 1x draws 1.5 px as ' + a.formBorder + ')');
+    assert.ok(Math.abs(a.w - a.cellW) <= 1, `fills its cell: ${a.w} vs ${a.cellW}`);
+    assert.equal(a.ph, 'No end date', 'the placeholder while empty');
+    assert.equal(b.value, '2027-01-31', 'positive: a date was picked: ' + JSON.stringify(b));
+    assert.equal(b.ph, null, 'the placeholder hides once a date is in');
 });

@@ -336,7 +336,17 @@
         .tv-link .tv-url { display: block; font-family: ui-monospace, Menlo, monospace; font-size: 0.78rem; word-break: break-all; color: #fff; margin: 4px 0 6px; }
         .tv-link button { width: auto; margin: 0 6px 0 0; padding: 6px 12px; font-size: 0.78rem; }
         /* 58A: the Tournament offer block on Setup. */
-        .of-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+        .of-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 6px; }
+        .of-grid > div { min-width: 0; }
+        /* Offer ends (Manny 2026-11-12, iPad: an empty grey bar): the create form's
+           Date box (appearance none so iOS hands the width back, 48 px, its border
+           and radius) and a placeholder while empty; iOS draws an empty date as nothing. */
+        .of-date { position: relative; display: block; }
+        .of-grid .of-date input[type="date"] { -webkit-appearance: none; appearance: none; display: block; min-width: 0; width: 100%; max-width: 100%; height: 48px; min-height: 44px; box-sizing: border-box; padding: 11px 12px; border-radius: 10px; border: 1.5px solid var(--border-mid); background: var(--bg-card); color: var(--text-main); font: inherit; font-size: 16px; }
+        .of-date input::-webkit-date-and-time-value { text-align: left; min-height: 1.3em; }
+        .of-ph { display: none; position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 16px; pointer-events: none; }
+        .of-date.of-empty .of-ph { display: block; }
+        .of-date.of-empty input[type="date"]:not(:focus)::-webkit-datetime-edit { color: transparent; }
         .of-grid label, .of-f label { font-size: 0.75rem; margin: 0 0 3px; display: block; }
         .of-grid input, .of-f input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 0.9rem; margin: 0; }
         .of-f { margin-top: 8px; }
@@ -5125,6 +5135,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function copyTvLink() {
         const done = (ok) => { const s = document.getElementById('tv-copied'); if (s) s.textContent = ok ? 'Copied.' : 'Select the address above and copy it.'; };
         try { navigator.clipboard.writeText(tvBoardUrl()).then(() => done(true), () => done(false)); } catch (e) { done(false); }
+    }
+
     // ---- 58A, THE TOURNAMENT OFFER SWITCH (Manny 2026-11-12) ------------------
     // tournaments/CODE/offer = { on, code, endsAt, line }. Off by default. The
     // preview line follows the same founding flag as the pricing card
@@ -5137,7 +5149,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function offerFoundingOpen() { if (typeof foundingOpenLive === 'boolean') return foundingOpenLive; const p = offerPro(); return typeof p.foundingOpen === 'boolean' ? p.foundingOpen : true; }
     function offerPreviewLine() {
         const p = offerPro(); const open = offerFoundingOpen();
-        return 'Tournament players: ' + OFFER_FIRST_YEAR + ' your first year, then ' + (open ? (p.founding || '$24.99') : (p.yearly || '$49.99')) + '/yr' + (open ? '' : ' (regular price)') + '. Renews until you cancel. New subscribers.';
+        // Manny 2026-11-12: the Apple offer starts with a 7-day free trial; one renewal price, no "(regular price)".
+        return 'Tournament players: 7 days free, then ' + OFFER_FIRST_YEAR + ' your first year, then ' + (open ? (p.founding || '$24.99') : (p.yearly || '$49.99')) + '/yr. Renews until you cancel. New subscribers.';
     }
     function loadOfferFoundingFlag() {
         try { db.ref('gps_meta/config/foundingOpen').once('value').then((snap) => { const v = snap && snap.val(); if (typeof v === 'boolean') { foundingOpenLive = v; renderOfferSetup(); } }).catch(() => {}); } catch (e) { /* no database */ }
@@ -5158,11 +5171,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 <span style="font-size:0.8rem; color:var(--text-muted); margin-left:10px;">${on ? 'Golfers on this event’s card and board see the offer line.' : 'Off for every event until you turn it on.'}</span>
             </div>`
             + (on ? `<div class="of-f"><label for="offer-code">This event’s code word (iPhone redeem link)</label><input type="text" id="offer-code" maxlength="64" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="e.g. the word from App Store Connect" value="${escapeHtml(o.code || '')}" onchange="setOfferField('code', this.value)"></div>
-                <div class="of-grid"><div><label for="offer-ends">Offer ends</label><input type="date" id="offer-ends" value="${escapeHtml(o.endsAt || '')}" onchange="setOfferField('endsAt', this.value)"></div>
+                <div class="of-grid"><div><label for="offer-ends">Offer ends</label><span class="of-date${o.endsAt ? '' : ' of-empty'}"><input type="date" id="offer-ends" value="${escapeHtml(o.endsAt || '')}" oninput="this.parentNode.classList.toggle('of-empty', !this.value)" onchange="setOfferField('endsAt', this.value)"><span class="of-ph" id="offer-ends-ph">No end date</span></span></div>
                 <div><label>Redemptions (read-only)</label><div class="of-ro" id="offer-ro">Limit and count: set in App Store Connect; not readable here.</div></div></div>
                 <div class="of-f"><label for="offer-line">Optional line under the price (text only)</label><input type="text" id="offer-line" maxlength="80" placeholder="e.g. $5 of each goes to Hope Foundation" value="${escapeHtml(o.line || '')}" onchange="setOfferField('line', this.value)"></div>
                 <div class="of-see" id="offer-see">Golfers see: <b>${escapeHtml(offerPreviewLine())}</b>${o.line ? ' ' + escapeHtml(o.line) : ''}${o.code ? '' : ' <span style="color:var(--accent-red);">(not shown until the code word is in)</span>'}</div>` : '')
-            + `<p class="of-note">The price line follows the founding flag the pricing page uses: while founding is open “then ${escapeHtml(offerPro().founding || '$24.99')}/yr”, once it closes “then ${escapeHtml(offerPro().yearly || '$49.99')}/yr (regular price)”, never both. HardPan Pro: GPS + games; Trip Pass is separate. Android golfers see the founding or regular price with no code until the next app update. The optional line is text you type; HardPan collects nothing and sends nothing to a charity.</p>`;
+            + `<p class="of-note">Price switches to ${escapeHtml(offerPro().yearly || '$49.99')}/yr automatically once founding spots fill. HardPan collects nothing for charity.</p>`;
     }
     function setOfferOn(on) {
         if (!currentCode || !canManage()) return;
