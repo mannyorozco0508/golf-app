@@ -453,6 +453,19 @@
         .move-sheet-body .move-to { display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; }
         .move-sheet-body .move-to:disabled { opacity: .5; cursor: default; }
         .move-note { font-size: 0.78rem; color: var(--text-muted); margin: 8px 0 0; }
+        /* Edit names, option B (2026-11-11): the Setup team card in edit. */
+        .team-edit-card { border: 2px solid var(--brand-green); border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; background: var(--bg-card); }
+        .team-edit-card .te-h { font-weight: 800; margin-bottom: 6px; }
+        .team-edit-card label { font-size: 0.75rem; margin: 6px 0 3px; }
+        .team-edit-card input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 0.9rem; }
+        .te-row { display: grid; grid-template-columns: 1fr 34px; gap: 6px; align-items: center; margin-bottom: 6px; }
+        .te-row button { width: 34px; height: 34px; padding: 0; margin: 0; border: 0; background: none; color: var(--accent-red); font-weight: 800; font-size: 1rem; cursor: pointer; }
+        .te-row button:disabled { color: var(--text-muted); opacity: .4; cursor: default; }
+        .te-add { background: none; border: 0; color: var(--brand-green); font-weight: 700; font-size: 0.82rem; padding: 2px 0 8px; cursor: pointer; width: auto; margin: 0; }
+        .te-acts { display: flex; gap: 8px; }
+        .te-acts button { flex: 1; margin: 0; }
+        .te-err { color: var(--accent-red); font-size: 0.8rem; margin: 4px 0; }
+        .te-note { font-size: 0.75rem; color: var(--text-muted); margin: 6px 0 0; }
         /* EC2 + C (2026-11-11): the suggestion sentence takes the row; its two buttons sit under it. */
         .ct-row.ct-suggest { flex-wrap: wrap; }
         .ct-row.ct-suggest > span:first-child { flex: 1 1 100%; margin-bottom: 8px; }
@@ -2503,6 +2516,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             ? `<input type="number" value="${hcp}" min="0" style="width:56px; padding:6px; font-size:0.8rem;" onchange="updateTeamHandicap(${t.num}, this.value)" title="Team handicap">`
               // REMOVE TEAM (Wave 2, 2026-10-06). Setup only - the editable row.
               + `<button class="btn-outline team-remove" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-team="${t.num}" onclick="removeTeam(${t.num})">Remove</button>`
+              // EDIT NAMES, option B (2026-11-11): the card becomes editable rows.
+              + `<button class="btn-outline team-edit" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-team="${t.num}" onclick="startTeamEdit(this.dataset.team)">Edit</button>`
             : '';
         // THE INLINE QR (public rows only, 2026-09-18): a small code beside the
         // Share button so a team can scan straight off the organizer's screen.
@@ -2559,10 +2574,92 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     const NO_TEAMS = `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.85rem;">No teams yet.</div>`;
 
     // The Setup tab's per-team cards: editable. Goes with the gate.
-    function renderTeamCards() {
+    function renderTeamCards(own) {
         const list = document.getElementById('team-cards-list');
         if (!list) return;
-        list.innerHTML = sortedTeams().map(t => teamRowHtml(t, { editable: true })).join('') || NO_TEAMS;
+        // A snapshot must not eat a half-typed name: while the editor has focus a
+        // snapshot leaves the cards as they are. The editor's own buttons pass
+        // own=true (a tapped button holds the focus too).
+        const ed = document.getElementById('team-edit-card');
+        if (!own && ed && document.activeElement && ed.contains(document.activeElement)) return;
+        list.innerHTML = sortedTeams().map(t => (teamEdit && teamEdit.num === t.num) ? teamEditHtml(t) : teamRowHtml(t, { editable: true })).join('') || NO_TEAMS;
+    }
+
+    // ---- EDIT NAMES, option B (Manny 2026-11-11) ----------------------------
+    // Edit on a Setup team card turns that card into rows: the team name, each
+    // golfer's name, the team handicap (the record keeps one handicap per team,
+    // not per golfer), + Add golfer and a remove per golfer. Save is ONE update
+    // of teams/teamN/{name, players, handicap}: the node, its num, its scoring
+    // key and its scores stay, so the scorecard link keeps working and the
+    // board shows the new names on its next render. Per-golfer scores are keyed
+    // by the golfer's PLACE on the team (team{n}_p{i}_h{h}), so on a team with a
+    // score a golfer can be renamed or added at the end, never removed (that
+    // would hand the scores below to someone else) - the page says so.
+    let teamEdit = null;   // { num, name, players: [..], handicap, err }
+    function startTeamEdit(num) {
+        if (!currentCode || !canManage() || recordIsIndividual()) return;
+        const t = (currentData.teams || {})['team' + Number(num)];
+        if (!t) return;
+        teamEdit = { num: t.num, name: t.name || `Team ${t.num}`, players: (t.players || []).slice(), handicap: (t.handicap === undefined || t.handicap === null) ? 0 : t.handicap, err: '' };
+        renderTeamCards(true);
+        const first = document.getElementById('te-name');
+        if (first && first.focus) first.focus();
+    }
+    function cancelTeamEdit() { teamEdit = null; renderTeamCards(true); }
+    function teamEditField(field, idx, value) {
+        if (!teamEdit) return;
+        if (field === 'name') teamEdit.name = value;
+        else if (field === 'handicap') teamEdit.handicap = value;
+        else if (field === 'player') teamEdit.players[Number(idx)] = value;
+    }
+    function teamEditAdd() {
+        if (!teamEdit || teamEdit.players.length >= 4) return;
+        teamEdit.players.push('');
+        teamEdit.err = '';
+        renderTeamCards(true);
+        const el = document.getElementById('te-p' + (teamEdit.players.length - 1));
+        if (el && el.focus) el.focus();
+    }
+    function teamEditRemove(idx) {
+        if (!teamEdit || teamHasScores(teamEdit.num)) return;
+        teamEdit.players.splice(Number(idx), 1);
+        teamEdit.err = '';
+        renderTeamCards(true);
+    }
+    function teamEditHtml(t) {
+        const E = teamEdit;
+        const scored = teamHasScores(t.num);
+        const rows = E.players.map((p, i) => `<div class="te-row"><input type="text" id="te-p${i}" maxlength="60" value="${escapeHtml(p)}" placeholder="Golfer ${i + 1}" aria-label="Golfer ${i + 1}" oninput="teamEditField('player', ${i}, this.value)">`
+            + `<button type="button" class="te-x" data-idx="${i}" ${scored ? 'disabled title="This team has scores"' : ''} aria-label="Remove golfer ${i + 1}" onclick="teamEditRemove(this.dataset.idx)">\u2715</button></div>`).join('');
+        return `<div class="team-edit-card" id="team-edit-card" data-team="${t.num}">
+            <div class="te-h">Editing ${escapeHtml(t.name || 'Team ' + t.num)}</div>
+            <label for="te-name">Team name</label><input type="text" id="te-name" maxlength="60" value="${escapeHtml(E.name)}" oninput="teamEditField('name', 0, this.value)">
+            <label>Golfers</label>${rows}
+            ${E.players.length < 4 ? `<button type="button" class="te-add" id="te-add" onclick="teamEditAdd()">+ Add golfer</button>` : ''}
+            <label for="te-hcp">Team handicap</label><input type="number" id="te-hcp" min="0" value="${escapeHtml(String(E.handicap))}" style="width:90px;" oninput="teamEditField('handicap', 0, this.value)">
+            ${E.err ? `<p class="te-err" id="te-err">${escapeHtml(E.err)}</p>` : ''}
+            <div class="te-acts" style="margin-top:8px;"><button type="button" class="btn-outline" id="te-cancel" onclick="cancelTeamEdit()">Cancel</button><button type="button" class="btn-primary" id="te-save" onclick="saveTeamEdit()">Save team</button></div>
+            <p class="te-note">${scored ? 'This team has scores: golfers can be renamed or added, not removed. ' : ''}Save keeps the team\u2019s scorecard link, key and scores; only the names change.</p>
+        </div>`;
+    }
+    function saveTeamEdit() {
+        if (!teamEdit || !currentCode || !canManage()) return;
+        const E = teamEdit;
+        const t = (currentData.teams || {})['team' + E.num];
+        if (!t) { cancelTeamEdit(); return; }
+        const name = String(E.name || '').trim().slice(0, 60);
+        const players = E.players.map((p) => String(p || '').trim().slice(0, 60));
+        if (!name) { E.err = 'The team needs a name.'; renderTeamCards(true); return; }
+        if (players.some((p) => !p)) { E.err = 'Fill in every golfer, or remove the empty row.'; renderTeamCards(true); return; }
+        if (!players.length) { E.err = 'A team needs at least one golfer.'; renderTeamCards(true); return; }
+        // On a scored team the existing places must all still be there (renamed is fine).
+        if (teamHasScores(E.num) && players.length < (t.players || []).length) { E.err = 'This team has scores: golfers can\u2019t be removed.'; renderTeamCards(true); return; }
+        const hcp = parseFloat(E.handicap);
+        const base = `tournaments/${currentCode}/teams/team${E.num}`;
+        const upd = { [base + '/name']: name, [base + '/players']: players, [base + '/handicap']: isFinite(hcp) && hcp >= 0 ? hcp : 0 };
+        teamEdit = null;
+        db.ref().update(upd).catch((err) => alert(`Error: ${err.message}`));
+        renderTeamCards(true);
     }
     // The Leaderboard tab's scoring links: read-only rows with a Share button.
     function renderTeamLinks() {
