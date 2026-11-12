@@ -4625,9 +4625,29 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function setFeesFlag(key, on) {
         if (!currentCode || !canManage()) return;
         if (key !== 'collectByCard' && key !== 'allowCash') return;
-        const f = feesOf(currentData);
-        if (!f || !f.cents) { renderEntryFeesCard(); feesError('Set the entry fee first.'); return; }
         if (key === 'collectByCard' && !paymentsAllowed) { renderEntryFeesCard(); return; }
+        const f = feesOf(currentData);
+        if (!f || !f.cents) {
+            renderEntryFeesCard();
+            // The ONE fee field (2026-11-11) writes entryFee + entryFeePer and never
+            // creates the fees node, so an event with its fee set still met null
+            // here and was told to set the fee (Advisor 2026-11-12 16:36, live on
+            // R7SK48). The organizer's tap creates the node in ONE update: the
+            // integer cents the server charges beside the flag. On the tap only -
+            // an event with no fees node keeps today's signup form and Desk until
+            // the organizer asks for payments.
+            const hasNode = !!(currentData && currentData.fees && typeof currentData.fees === 'object');
+            if (!hasNode && oneFeeSet(currentData)) {
+                if (feePerOf(currentData) === 'team') { feesError('This fee is per team. Card payments charge each golfer: switch the fee to per golfer under Event details first.'); return; }
+                const cents = derivedFeeCents(currentData);
+                if (cents) {
+                    feesError('');
+                    db.ref(`tournaments/${currentCode}/fees`).update({ entryFeeCents: cents, [key]: !!on }).catch((err) => feesError(`Error: ${err.message}`));
+                    return;
+                }
+            }
+            feesError('Set the entry fee first.'); return;
+        }
         db.ref(`tournaments/${currentCode}/fees/${key}`).set(!!on).catch((err) => feesError(`Error: ${err.message}`));
     }
     function feesToggle(id, key, on) {
