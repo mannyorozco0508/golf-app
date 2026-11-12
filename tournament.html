@@ -229,6 +229,7 @@
         /* The organizer sign-in: a compact card, secondary to the band above it.
            Same ids, same button, same sentence; the class does the styling that an
            inline border used to. */
+        .org-signin-hint { text-align: center; font-size: 0.82rem; font-weight: 700; color: var(--brand-green); padding: 8px 0 10px; cursor: pointer; }
         .signin-panel { margin-bottom: 18px; }
         .signin-card { border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px 14px; background: var(--nav-bg); }
         .signin-card-note { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.4; }
@@ -865,7 +866,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <!-- WHO IS SIGNED IN, AS A FACT. No word that promises a lock: the sign-in
          gates what this page renders, not what the database accepts. -->
     <div id="signed-in-as" style="text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;"></div>
-    <div id="signin-panel-manage" class="signin-panel" style="display:none;"></div>
+    <!-- BUG HUNT #3 (Manny OK 2026-11-12): a spectator opening the board link
+         used to meet the organizer sign-in card first. The card now sits at the
+         bottom of this screen; this one line is the door to it. -->
+    <div id="org-signin-hint" class="org-signin-hint" style="display:none;" role="button" tabindex="0" onclick="scrollToOrganizerSignIn()" onkeydown="if (event.key === 'Enter' || event.key === ' ') scrollToOrganizerSignIn()">Organizer? Sign in ›</div>
     <div class="top-nav-bar">
         <span class="top-nav-item" onclick="showTab('home')" id="tab-btn-home">🏁 Event day</span>
         <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup">⚙️ Setup &amp; Links</span>
@@ -1267,6 +1271,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     </div>
 
 
+    <!-- Bug hunt #3: the organizer sign-in card, below the board for anyone not signed in. -->
+    <div id="signin-panel-manage" class="signin-panel" style="display:none;"></div>
     <div id="tournament-print-view"></div>
 </div>
 
@@ -3494,6 +3500,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 if (box && !box.value) box.value = pendingOauthLink.email;
             }
         });
+        // Bug hunt #3: the door at the top follows the manage card (shown for
+        // anyone not signed in, hidden for the organizer) - read off the card,
+        // so the one auth seam stays the one seam.
+        const hint = document.getElementById('org-signin-hint');
+        const card = document.getElementById('signin-panel-manage');
+        if (hint && card) hint.style.display = card.style.display === 'none' ? 'none' : 'block';
+    }
+    function scrollToOrganizerSignIn() {
+        const card = document.getElementById('signin-panel-manage');
+        if (card) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }
 
     function toggleTournamentEmail(panelId) {
