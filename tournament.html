@@ -586,6 +586,9 @@
          by renderMyEvents(): events it created, and owned events it opened. An
          account-wide list is P2-6 (a rules change) and is not built. -->
     <div class="ap-top app-only" id="ap-top-setup"><button type="button" class="ap-bk" onclick="appBack()" aria-label="Back">‹</button><div><div class="ap-tt">New tournament</div><div class="ap-ts">HardPan Tournaments</div></div></div>
+    <!-- BUG HUNT #8 (Manny OK 2026-11-12): an unknown event code used to pop a
+         native alert and bounce; now the page stays and this line says so. -->
+    <p id="not-found-note" class="course-note" role="alert" style="display:none;"></p>
     <div class="my-events app-only" id="app-my-events" style="display:none;"><div id="my-events-list"></div>
         <!-- Advisor 2026-11-11 18:05: open an event you run by its code. Static
              markup, outside the list the account snapshot redraws, so a half-typed
@@ -7476,12 +7479,32 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const c = eventCourseName(), f = formatLabelFor(currentData.format);
         return c ? `${c} • ${f}` : f;
     }
+    // BUG HUNT #8 (Manny OK 2026-11-12): the sentence replaces a native alert
+    // and a bounce to the empty page. The setup screen stays (it is the page a
+    // person was sent to), the code is left in the Open-by-code box to fix, the
+    // same sentence sits in that box's own error line and under the hero (the
+    // website shows no code box when signed out), and the address drops the
+    // bad code so a reload does not ask again.
+    function showCodeNotFound(code) {
+        const msg = `No event matches the code ${code}. Check the code and try again.`;
+        currentData = {};
+        const setup = document.getElementById('setup-screen'), manage = document.getElementById('manage-screen');
+        if (manage) manage.style.display = 'none';
+        if (setup) setup.style.display = 'block';
+        const note = document.getElementById('not-found-note');
+        if (note) { note.textContent = msg; note.style.display = 'block'; }
+        const input = document.getElementById('open-code-input');
+        if (input && !input.value) input.value = code;
+        const err = document.getElementById('open-code-err');
+        if (err) { err.textContent = msg; err.style.display = 'block'; }
+        try { history.replaceState(null, '', appHref('tournament.html')); } catch (e) { /* the address keeps the code */ }
+        try { db.ref(`tournaments/${code}`).off('value'); } catch (e) { /* listener stays */ }
+    }
     function loadTournament(code) {
         db.ref(`tournaments/${code}`).on('value', (snap) => {
             currentData = snap.val();
             if (!currentData) {
-                alert("Tournament not found.");
-                window.location.href = appHref("tournament.html");   // keeps ?app=1 on a preview (Phase 2)
+                showCodeNotFound(code);   // bug hunt #8: a sentence on the page, no dialog, no bounce
                 return;
             }
             document.getElementById('setup-screen').style.display = 'none';
