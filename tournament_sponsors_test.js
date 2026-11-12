@@ -17,12 +17,17 @@
 //  4 the recap lists the event sponsor and the holes
 //  5 the owner's Board tab shows the TV link ending tournament-tv.html?tourney=SCR
 //  6 money = base
+//  7 the owner signs in AFTER the record arrived: the Sponsors block and the
+//    Board tab's TV link draw (added 2026-11-12)
 //
 // Not proven here: the logo file -> 96 px data URL path (a file input cannot
 // be driven cold); it is read by hand on the preview.
 //
 // Baseline against main 0f11073c (re-measured after the rebase; before the build): all 6 tests: 2 PASS / 4 FAIL
 // (tests 2 and 6). With the build: 6 PASS / 0 FAIL.
+// All 7 tests against preview-57 d29e5818 (page swapped in by cp, restored by
+// sha): 6 PASS / 1 FAIL (test 7, the block empty). With the fix: 7 PASS / 0 FAIL.
+// Control: the TV-link redraw removed alone -> test 7 red on the TV row.
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -125,4 +130,21 @@ test('6 money = base', () => {
     assert.equal(sha('payouts.js'), 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8');
     assert.equal(sha('tournament-engine.js'), '1c659c46d0f91ca3dc61beb231e1356ea0a572fd7c3c40399399d36e2ff89f57');
     assert.equal(sha('handicap.js'), '2d3b2f7fd916a4b83a10491e822ece946203d2bbb11264962e7d888a7b450f17');
+});
+
+// 7 (found 2026-11-12 from the 58 report on Manny's iPad: an owner-only block
+// drew empty when the record arrived BEFORE the sign-in). Arrive signed out,
+// the owner signs in through the stand-in's door (no page function): Setup
+// shows the Sponsors block with its inputs, the Board tab shows the TV link.
+test('7 the owner signs in AFTER the record arrived: the Sponsors block and the TV link draw', async () => {
+    const r = await arriveCold({ url: fileUrl('tournament.html', 'tourney=SCR'), db: F.scrambleDb({ ownerUid: 'u-org' }), auth: 'signed-out', settleMs: 3500,
+        steps: [{ expression: `window.__signInAs(${JSON.stringify(OWNER)})` }, { sleep: 600 }, ...setupTab, scrollTo('#sponsors-setup'), { sleep: 200 }, ORG,
+            { tap: '#tab-btn-leaderboard' }, { sleep: 300 }, ORG] });
+    assert.ok(r.ok, r.reason);
+    const [s, b] = r.value.filter((v) => typeof v === 'string' && v[0] === '{').map((v) => JSON.parse(v));
+    assert.equal(s.block, true, 'positive: the Sponsors block drew on Setup');
+    assert.equal(s.eventInput, true); assert.equal(s.addBtn, true);
+    assert.equal(b.tvRow, true, 'the TV link row on the Board tab');
+    assert.match(b.tvUrl || '', /\/tournament-tv\.html\?tourney=SCR$/);
+    assert.deepEqual(s.writes, [], 'drawing writes nothing');
 });

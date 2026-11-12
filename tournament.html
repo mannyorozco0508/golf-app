@@ -3640,6 +3640,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         authUser = (user && !user.isAnonymous) ? user : null;
         loadAccountEvents();   // P2-6: the account's events, on any device
         applyManageGate();
+        // 57 (2026-11-12): the record can arrive before the sign-in, and its
+        // snapshot drew the owner-only Sponsors block and TV link for a
+        // non-owner (empty). The sign-in shows Setup; these draw what goes with it.
+        renderSponsorsSetup();
+        renderTvLink();
         renderSignedInAs();
     });
     // Once per load, after the listener is in, so a redirect that came back
