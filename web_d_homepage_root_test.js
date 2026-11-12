@@ -389,7 +389,7 @@ function loadSW({ online = true, seed = [], network = newNetwork, src } = {}) {
 describe('2. THE SERVICE WORKER: the app shell is the app, the homepage is never cached', () => {
     test('CACHE_VERSION is v394-2.0 with its "Moved to v394" line', () => {
         const src = read('sw.js');
-        assert.match(src, /const CACHE_VERSION = 'golfapp-v406-2\.0';/);
+        assert.match(src, /const CACHE_VERSION = 'golfapp-v407-2\.0';/);
         assert.match(src, /\/\/ Moved to v394-2\.0 \(website-d/);
         const shell = /const SHELL_FILES = \[([\s\S]*?)\];/.exec(src)[1];
         assert.match(shell, /'\.\/index\.html'/, 'positive: the slice is the shell list');
@@ -463,10 +463,10 @@ describe('2. THE SERVICE WORKER: the app shell is the app, the homepage is never
                 open: (n) => { if (!sandboxCaches.has(n)) sandboxCaches.set(n, new Map()); return Promise.resolve({ put: () => Promise.resolve() }); } },
             URL, Promise, console: { warn() {} }, fetch: () => Promise.reject(new TypeError('offline')), Response: class {}, Request: class {} };
         vm.createContext(ctx); vm.runInContext(src, ctx);
-        sandboxCaches.set('golfapp-v406-2.0', new Map());
+        sandboxCaches.set('golfapp-v407-2.0', new Map());
         listeners.activate({ waitUntil: (p) => waits.push(p) });
         await Promise.all(waits);
-        assert.deepEqual([...sandboxCaches.keys()], ['golfapp-v406-2.0']);
+        assert.deepEqual([...sandboxCaches.keys()], ['golfapp-v407-2.0']);
         assert.ok(sw, 'positive: the worker loads');
     });
     test('returning visitors: sw.js is never served from the HTTP cache (_headers no-cache, updateViaCache none)', () => {
