@@ -343,7 +343,7 @@ describe('6. served, static, not the app', () => {
         assert.doesNotMatch(shell, /site-features|media\/|hardpan-home/);
         assert.doesNotMatch(read('sync-mobile-web.js'), /site-features|media\/screens/);
         // Re-pinned 2026-11-11: v397-2.0, icon B moved it.
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v403-2\.0';/);
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v404-2\.0';/);
     });
     test('first load stays light: nothing in the rows loads eagerly', () => {
         assert.doesNotMatch(feat, /<img(?![^>]*loading="lazy")[^>]*>/, 'an image in the rows loads up front');
