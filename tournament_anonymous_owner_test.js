@@ -200,7 +200,10 @@ describe('THE RULES (targaryen on database.rules.json)', () => {
 describe('THE SEAM (tournament.html, comments stripped)', () => {
     const code = stripComments(read('tournament.html'));
     test('onAuthStateChanged stores a non-anonymous user or null - the one seam', () => {
-        assert.match(code, /firebase\.auth\(\)\.onAuthStateChanged\(\(user\) => \{\s*authUser = \(user && !user\.isAnonymous\) \? user : null;\s*loadAccountEvents\(\);\s*applyManageGate\(\);\s*renderSignedInAs\(\);\s*\}\);/);
+        // Re-pinned 2026-11-12 (57 + 58, Manny OK): after the gate, the sign-in draws the
+        // owner-only blocks a record that arrived first drew empty (Sponsors, the TV
+        // link, the tournament offer). Only those named redraws; the store line is unchanged.
+        assert.match(code, /firebase\.auth\(\)\.onAuthStateChanged\(\(user\) => \{\s*authUser = \(user && !user\.isAnonymous\) \? user : null;\s*loadAccountEvents\(\);\s*applyManageGate\(\);\s*(?:render(?:SponsorsSetup|TvLink|OfferSetup)\(\);\s*)*renderSignedInAs\(\);\s*\}\);/);
         assert.equal((code.match(/isAnonymous/g) || []).length, 1);
     });
     test('every organizer check reads authUser; nothing reads the SDK\'s user directly; the anonymous user is never signed out', () => {
