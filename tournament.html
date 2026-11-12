@@ -97,9 +97,21 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-page); margin: 0; padding: 12px 12px 40px 12px; color: var(--text-main); -webkit-text-size-adjust: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
         .container { max-width: 700px; margin: 0 auto; background: var(--bg-card); border-radius: 12px; box-shadow: 0 4px 12px var(--shadow-color); padding: 20px; }
         h2, h3 { color: var(--brand-green); margin-top: 0; }
-        .top-nav-bar { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-        .top-nav-bar::-webkit-scrollbar { display: none; }
-        .top-nav-item { flex: 0 0 auto; padding: 8px 14px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 20px; font-weight: bold; font-size: 0.85rem; text-decoration: none; cursor: pointer; white-space: nowrap; }
+        /* THE TAB STRIP (bug hunt #4, option B, Manny 2026-11-12). One row that
+           always fits: every visible tab is an equal column, an icon over a
+           short label on a phone (Event day · Setup · Desk · Board · Contests),
+           the icon beside the full label from 480 px up. Nothing scrolls, so
+           nothing is hidden: at 390 px the strip used to clip Desk and keep
+           Leaderboard and Contests off screen with no sign the row scrolled. */
+        .top-nav-bar { display: flex; gap: 4px; padding: 8px 0; margin-bottom: 16px; border-bottom: 1px solid var(--border-light); }
+        .top-nav-item { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 44px; padding: 5px 2px; background: var(--nav-bg); color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 12px; font-weight: bold; font-size: 0.72rem; line-height: 1.15; text-decoration: none; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+        .top-nav-item .tn-ic { font-size: 1.05rem; line-height: 1.1; }
+        .top-nav-item .tn-f { display: none; }
+        @media (min-width: 480px) {
+            .top-nav-item { flex-direction: row; gap: 6px; font-size: 0.85rem; border-radius: 20px; padding: 8px 10px; }
+            .top-nav-item .tn-s { display: none; }
+            .top-nav-item .tn-f { display: inline; }
+        }
         /* Event day home (T3B). */
         .eh-head { margin:0 0 12px; }
         .eh-name { font-size:1.25rem; font-weight:800; color:var(--text-main); }
@@ -173,6 +185,13 @@
         .custom-select-option:hover { background-color: var(--nav-bg); color: var(--brand-green); font-weight: bold; }
         .custom-select-group { background: var(--nav-bg); font-weight: bold; font-size: 0.75rem; padding: 6px 12px; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border-faint); }
         .custom-select-note { padding: 10px 12px; color: var(--text-muted); text-align: center; font-size: 0.85rem; }
+        /* Bug hunt #11 A: the nines chooser under the course box for a 27-hole record. */
+        .course-nines { background: #e8f5ee; border: 1px solid #b9dcc8; border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+        .course-nines-h { font-weight: 800; font-size: 0.9rem; color: var(--brand-green); }
+        .course-nines-q { font-size: 0.82rem; color: var(--text-main); margin: 2px 0 8px; }
+        .course-nines-row { display: flex; gap: 6px; flex-wrap: wrap; }
+        .course-nines-btn { width: auto; margin: 0; padding: 9px 12px; font-size: 0.82rem; font-weight: 700; border: 1.5px solid var(--brand-green); background: var(--bg-card); color: var(--brand-green); border-radius: 9px; cursor: pointer; min-height: 40px; }
+        .course-nines-btn.on { background: var(--brand-green); color: #fff; }
         .course-note { font-size: 0.82rem; color: var(--warn-text); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 8px 10px; margin: 8px 0 0 0; line-height: 1.4; }
         .course-note button { display: block; width: auto; margin: 8px 0 0 0; padding: 7px 10px; font-size: 0.8rem; }
         .course-note.ok { color: var(--brand-green); background: var(--nassau-box-bg); border-color: var(--accent-teal); }
@@ -438,7 +457,26 @@
         .open-code-row button { width: auto; padding: 8px 16px; margin: 0; }
         .open-code-err { color: var(--accent-red); font-size: 0.78rem; margin: 4px 0 0; }
         /* Date and start on the create form (S1 A): two boxes side by side. */
-        .setup-when { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        /* Date / Start time (Manny 2026-11-12): a 1fr track is min-content wide,
+           and Safari on an iPad gives a type=time box an intrinsic width that
+           pushed it past the right edge over the date. minmax(0, 1fr) and
+           min-width: 0 let each box shrink to its column. */
+        /* Level boxes (Manny 2026-11-12, phone): "START TIME (OPTIONAL)" wrapped to
+           two lines and dropped its box 13 px below Date at 320 px. Short labels,
+           the cells sit on the row's bottom edge so a label that still wraps
+           (large text) moves up, not its box, and both boxes take one fixed
+           height (the time box drew 46.8 px against the date's 44 in Chrome). */
+        .setup-when { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: end; }
+        .setup-when > div { min-width: 0; }
+        .setup-when input { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
+        /* iOS WebKit (measured on an iPad Pro 11 simulator, iPadOS 26.5, 834 px,
+           2026-11-12): a native-appearance date/time control keeps its intrinsic
+           width whatever width: 100% says, so the time box still ran ~40 px past
+           the form's edge over the date. appearance: none hands the width back
+           to CSS; display: block and the min-height keep the box a tappable row
+           when iOS draws an empty value as zero-height text. */
+        .setup-when input[type="date"], .setup-when input[type="time"] { -webkit-appearance: none; appearance: none; display: block; min-height: 44px; height: 48px; }
+        .setup-when input::-webkit-date-and-time-value { text-align: left; min-height: 1.3em; }
         .t-check { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: normal; }
         .t-check input { width: auto; margin: 0; }
         /* Start and links (S3): one row a team - its hole or tee time, Send, QR. */
@@ -635,8 +673,8 @@
          saveTournament and validated by the same EVENT_DETAIL_KEYS shapes. Both
          optional: an empty box writes no key, exactly as before this wave. -->
     <div class="form-group setup-field setup-when">
-        <div><label>Date (optional)</label><input type="date" id="t-date"></div>
-        <div><label>Start time (optional)</label><input type="time" id="t-time"></div>
+        <div><label>Date</label><input type="date" id="t-date"></div>
+        <div><label>Start time</label><input type="time" id="t-time"></div>
     </div>
     <div class="form-group setup-field">
         <label class="t-check"><input type="checkbox" id="t-shotgun"> Shotgun start — teams start on assigned holes, all at once</label>
@@ -875,11 +913,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
          bottom of this screen; this one line is the door to it. -->
     <div id="org-signin-hint" class="org-signin-hint" style="display:none;" role="button" tabindex="0" onclick="scrollToOrganizerSignIn()" onkeydown="if (event.key === 'Enter' || event.key === ' ') scrollToOrganizerSignIn()">Organizer? Sign in ›</div>
     <div class="top-nav-bar">
-        <span class="top-nav-item" onclick="showTab('home')" id="tab-btn-home">🏁 Event day</span>
-        <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup">⚙️ Setup &amp; Links</span>
-        <span class="top-nav-item" onclick="showTab('desk')" id="tab-btn-desk">📋 Desk</span>
-        <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard">🏆 Leaderboard</span>
-        <span class="top-nav-item" onclick="showTab('contests')" id="tab-btn-contests">🎯 Contests</span>
+        <!-- Bug hunt #4 B: icon over a short label on a phone (.tn-s), the full
+             label beside the icon from 480 px (.tn-f). Same ids, same showTab. -->
+        <span class="top-nav-item" onclick="showTab('home')" id="tab-btn-home"><span class="tn-ic">🏁</span><span class="tn-s">Event day</span><span class="tn-f">Event day</span></span>
+        <span class="top-nav-item active" onclick="showTab('setup')" id="tab-btn-setup"><span class="tn-ic">⚙️</span><span class="tn-s">Setup</span><span class="tn-f">Setup &amp; Links</span></span>
+        <span class="top-nav-item" onclick="showTab('desk')" id="tab-btn-desk"><span class="tn-ic">📋</span><span class="tn-s">Desk</span><span class="tn-f">Desk</span></span>
+        <span class="top-nav-item" onclick="showTab('leaderboard')" id="tab-btn-leaderboard"><span class="tn-ic">🏆</span><span class="tn-s">Board</span><span class="tn-f">Leaderboard</span></span>
+        <span class="top-nav-item" onclick="showTab('contests')" id="tab-btn-contests"><span class="tn-ic">🎯</span><span class="tn-s">Contests</span><span class="tn-f">Contests</span></span>
     </div>
 
     <!-- EVENT DAY HOME (T3B, Manny's pick 2026-11-10). Owner-only, hidden by the
@@ -1529,12 +1569,111 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return courseDirectory.some(g => g.items.some(item => item.name.toLowerCase().includes(t)));
     }
 
+    // SHARED COURSES IN THE DROPDOWN (bug hunt #11, option A, Manny 2026-11-12).
+    // A course imported online for an earlier event lives in the shared list
+    // with its real card, but the picker offered only the directory, so typing
+    // its name ended at "Search online" (and the provider's literal search can
+    // miss it). The typed words must each START a word of the shared name -
+    // never one shared word in the middle (bug #1's lesson). The card is used
+    // as is; a 27-hole record asks which two nines (see pickSharedCourse).
+    function sharedCourseMatches(typed) {
+        const words = String(typed || '').toLowerCase().replace(/[^a-z0-9& ]+/g, ' ').split(/\s+/).filter(Boolean);
+        if (!words.length) return [];
+        const out = [];
+        Object.keys(globalCourses || {}).forEach((key) => {
+            const rec = globalCourses[key] || {};
+            const name = String(rec.name || '').trim();
+            if (!name) return;
+            const have = name.toLowerCase().replace(/[^a-z0-9& ]+/g, ' ').split(/\s+/).filter(Boolean);
+            const ok = words.every((w) => have.some((h) => h.indexOf(w) === 0)) || name.toLowerCase().indexOf(words.join(' ')) === 0;
+            if (!ok) return;
+            const holes = Array.isArray(rec.data) ? rec.data.length : 0;
+            const at = Number(rec.source && rec.source.importedAt) || Number(rec.importedAt) || 0;
+            out.push({ key, name, holes, at });
+        });
+        return out.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    function sharedRowLabel(m) {
+        const when = m.at ? new Date(m.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+        return m.name + (m.holes ? ` \u00b7 ${m.holes} holes` : '') + (when ? ` \u00b7 imported ${when}` : '');
+    }
+    // The two nines of a 27-hole record, chosen under the box before Save:
+    // holes 1-9 (A), 10-18 (B), 19-27 (C) in the record's own numbering.
+    const NINE_PAIRS = [['A', 'B'], ['A', 'C'], ['B', 'C']];
+    const NINE_LABEL = { A: '1\u20139', B: '10\u201318', C: '19\u201327' };
+    let sharedNinesPending = null;   // { key, name, card } while a 27-hole pick waits for its pair
+    let selectedCourseNines = '';    // 'A+B' once chosen; written to the record
+    function pickSharedCourse(key, name) {
+        const go = () => {
+            const card = resolveCourseCard(key);
+            if (!card) { pickCourse(key, name); return; }
+            const n = (card.data || []).length;
+            pickCourseNow(key, name);
+            selectedCourseNines = '';
+            if (n === 27) {
+                sharedNinesPending = { key, name, card };
+                selectedCourseData = null;   // not usable until the pair is picked
+                renderNinesChooser();
+                showCourseNote(`${name} has 27 holes: pick which two nines the event plays.`);
+                return;
+            }
+            removeNinesChooser();
+            showCourseNote(`Scorecard: ${name}${n === 9 ? ', 9 holes' : ''}, from the shared course list.`, null, 'ok');
+        };
+        if (resolveCourseCard(key)) go(); else courseIndex.ensureCard(key).then(go, go);
+    }
+    function renderNinesChooser() {
+        removeNinesChooser();
+        const host = document.getElementById('course-import-host');
+        if (!host || !sharedNinesPending) return;
+        const box = document.createElement('div');
+        box.id = 'course-nines';
+        box.className = 'course-nines';
+        box.innerHTML = `<div class="course-nines-h">${escapeHtml(sharedNinesPending.name)} \u00b7 27 holes</div><div class="course-nines-q">Which two nines does the event play?</div><div class="course-nines-row"></div>`;
+        const row = box.querySelector('.course-nines-row');
+        NINE_PAIRS.forEach(([x, y]) => {
+            const b = document.createElement('button');
+            b.type = 'button'; b.className = 'course-nines-btn'; b.dataset.pair = x + '+' + y;
+            b.textContent = `${NINE_LABEL[x]} + ${NINE_LABEL[y]}`;
+            b.onclick = () => chooseNines(x + '+' + y);
+            row.appendChild(b);
+        });
+        host.appendChild(box);
+    }
+    function removeNinesChooser() { const el = document.getElementById('course-nines'); if (el) el.remove(); }
+    function chooseNines(pair) {
+        const P = sharedNinesPending;
+        if (!P) return;
+        const data = (P.card.data || []).slice().sort((a, b) => Number(a.hole) - Number(b.hole));
+        const nine = { A: data.slice(0, 9), B: data.slice(9, 18), C: data.slice(18, 27) };
+        const [x, y] = pair.split('+');
+        const holes = nine[x].concat(nine[y]);
+        if (holes.length !== 18) return;
+        // Renumbered 1..18 in play order; the record's own hole number rides as
+        // srcHole. The stroke index is re-ranked 1..18 in the same order the
+        // record gave the 27 (a 27-hole card indexes across all three nines, so
+        // the chosen two keep their relative order and net stays allocatable).
+        const order = holes.map((h, i) => ({ i, si: Number(h.hcpIndex) || 99 })).sort((p, q) => p.si - q.si || p.i - q.i);
+        const rank = []; order.forEach((o, r) => { rank[o.i] = r + 1; });
+        selectedCourseData = holes.map((h, i) => Object.assign({}, h, { hole: i + 1, srcHole: Number(h.hole), hcpIndex: rank[i] }));
+        selectedCourseNines = pair;
+        document.querySelectorAll('#course-nines .course-nines-btn').forEach((b) => b.classList.toggle('on', b.dataset.pair === pair));
+        showCourseNote(`Scorecard: ${P.name}, nines ${NINE_LABEL[x]} + ${NINE_LABEL[y]}, from the shared course list.`, null, 'ok');
+    }
+
     function filterCourseDropdown(filterText) {
         const dropdown = document.getElementById('course-dropdown');
         const typed = String(filterText || '').trim();
         const q = typed.toLowerCase();
         dropdown.innerHTML = '';
         let any = false;
+        // Bug hunt #11 A: the shared list first, when something is typed.
+        const shared = typed ? sharedCourseMatches(typed) : [];
+        if (shared.length) {
+            any = true;
+            dropdown.appendChild(pickerRow('From the shared list', 'custom-select-group', null));
+            shared.forEach((m) => { const r = pickerRow(sharedRowLabel(m), 'custom-select-option course-shared-row', () => pickSharedCourse(m.key, m.name)); r.dataset.key = m.key; dropdown.appendChild(r); });
+        }
         courseDirectory.forEach(g => {
             const matches = g.items.filter(item => item.name.toLowerCase().includes(q));
             if (matches.length > 0) {
@@ -1572,6 +1711,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     function pickCourseNow(key, name) {
+        if (key !== (sharedNinesPending || {}).key) { sharedNinesPending = null; selectedCourseNines = ''; removeNinesChooser(); }
         const card = resolveCourseCard(key);
         if (!card) {
             // NO CARD ANYWHERE (re-decided 2026-11-11; Manny through the Advisor:
@@ -2295,6 +2435,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return;
         }
         const name = document.getElementById('t-name').value.trim() || "Golf Tournament";
+        if (!selectedCourseData && sharedNinesPending) {
+            showCourseNote('Pick which two nines the event plays.');
+            const el = document.getElementById('course-nines');
+            if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center' });
+            return;
+        }
         if (!selectedCourseData) {
             // Inline, never a dialog (Advisor 2026-11-11), and the box comes into view.
             showCourseNote('Pick a golf course first.');
@@ -2389,6 +2535,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             createdAt: Date.now(),
             ownerUid: authUser.uid
         };
+        if (selectedCourseNines) payload.courseNines = selectedCourseNines;   // bug #11 A: which two nines of a 27-hole record
         // The event's own online imports ride with the record so a later round
         // can pick them (Option B). Absent when nothing was imported.
         if (Object.keys(setupImportedCourses).length) payload.importedCourses = setupImportedCourses;

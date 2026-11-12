@@ -41,7 +41,7 @@ const READ = { expression: `JSON.stringify((function () {
 })())` };
 const pick = async (shared, typed) => {
     const r = await arriveCold({ url: fileUrl('tournament.html', ''), db: db(shared), auth: OWNER, settleMs: 3000, preScript: NOFETCH,
-        steps: [{ tap: '#course-search-input' }, { cdp: { method: 'Input.insertText', params: { text: typed } } }, { sleep: 250 }, READ, { tap: '#course-dropdown .custom-select-option' }, { sleep: 900 }, READ] });
+        steps: [{ tap: '#course-search-input' }, { cdp: { method: 'Input.insertText', params: { text: typed } } }, { sleep: 250 }, READ, { tap: '#course-dropdown .custom-select-option:not(.course-shared-row)' }, { sleep: 900 }, READ] });   // re-pinned 2026-11-12 (bug #11 A): the shared list now sits first in the dropdown, so the DIRECTORY row is tapped by class, as the organizer taps it by name; the claim (what the auto-fetch matches) is unchanged
     assert.ok(r.ok, r.reason);
     return r.value.filter((v) => typeof v === 'string' && v[0] === '{').map((v) => JSON.parse(v));
 };

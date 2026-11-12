@@ -82,7 +82,8 @@ const DELIBERATE = [
         // ADDED 2026-11-11 (Phase 2, S1 A): date, start time and shotgun on the create form, before Format.
         why: 'Phase 2 S1: date, start time and a shotgun switch join the create form',
         from: '|Format|',
-        to: '|Date (optional)|Start time (optional)|Shotgun start \u2014 teams start on assigned holes, all at once|Format|'
+        // Re-pinned 2026-11-12 (Manny, phone): short labels so the two boxes sit level.
+        to: '|Date|Start time|Shotgun start \u2014 teams start on assigned holes, all at once|Format|'
     },
     {
         // ADDED 2026-11-12 (My events by account, Advisor 18:05): the "Open an event
