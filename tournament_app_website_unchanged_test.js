@@ -59,9 +59,20 @@ before(() => {
 });
 after(() => { if (dir) fs.rmSync(dir, { recursive: true, force: true }); });
 
-const SEEN = { expression: `JSON.stringify({ text: document.body.innerText, appMode: document.body.classList.contains('app-mode'),
+// RE-PINNED 2026-11-12 (Get HardPan A + B, Manny): the banner under the pills
+// and the two reasons cards are the website card's deliberate additions. They
+// are hidden for the measurement (text and height), so everything else on the
+// card is still held identical to p1-base; `getapp` says they exist on today's
+// page and not on the base page, which is the positive control for the mask.
+const SEEN = { expression: `JSON.stringify((function () {
+  var ids = ['getapp-bar', 'getapp-card-card', 'getapp-card-board'];
+  var els = ids.map(function (i) { return document.getElementById(i); }).filter(Boolean);
+  var saved = els.map(function (e) { var d = e.style.display; e.style.display = 'none'; return d; });
+  var out = { getapp: els.length, text: document.body.innerText, appMode: document.body.classList.contains('app-mode'),
   appView: (function () { var e = document.getElementById('app-view'); if (!e) return 'absent'; var r = e.getBoundingClientRect(); return getComputedStyle(e).display + ' ' + r.width + 'x' + r.height; })(),
-  boxes: document.querySelectorAll('#holes-list input').length, mainH: Math.round(document.getElementById('main-content').getBoundingClientRect().height) })` };
+  boxes: document.querySelectorAll('#holes-list input').length, mainH: Math.round(document.getElementById('main-content').getBoundingClientRect().height) };
+  els.forEach(function (e, i) { e.style.display = saved[i]; });
+  return out; })())` };
 const STEPS = [{ sleep: 300 }, SEEN, { tap: '#tab-btn-leaderboard' }, { sleep: 300 }, SEEN];
 
 async function both(query, db) {
@@ -78,6 +89,8 @@ async function both(query, db) {
 describe('the website card, no app mode: what a golfer sees is what p1-base showed', { skip: SKIP }, () => {
     test('shotgun scramble (team link, keyed): card and leaderboard text identical', async () => {
         const r = await both('tourney=SCR&team=4&k=' + F.KEY4, F.scrambleDb());
+        assert.equal(r.now[0].getapp, 3, 'positive: today\'s page has the Get HardPan banner and two cards (masked below)');
+        assert.equal(r.was[0].getapp, 0, 'p1-base had none');
         assert.ok(r.now[0].boxes === 18 && /Next: Hole 7/.test(r.now[0].text), 'positive control: the card rendered');
         assert.equal(r.now[0].text, r.was[0].text);
         assert.equal(r.now[1].text, r.was[1].text);
