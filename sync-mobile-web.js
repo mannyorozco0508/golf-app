@@ -245,6 +245,10 @@ const TOURNAMENT_SHELL = [
     'tournament-contests.js',
     // E4 photo wall: the paths and builders both tournament pages load.
     'tournament-photos.js',
+    // 58A tournament offer (Manny OK 2026-11-12): the one price table both
+    // tournament pages read for the renewal price (founding / regular). Without
+    // it the pages fall back to typed literals, and build-shell refuses the output.
+    'site-pricing.js',
     // qrcode.min.js (qrcodejs 1.0.0, MIT): the QR library tournament.html draws
     // the share modal, the inline codes and the tee sheet with. Vendored
     // 2026-09-18 - it was a runtime CDN script, and without the CDN the share
