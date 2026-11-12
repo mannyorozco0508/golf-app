@@ -7424,7 +7424,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 const who = t && (t.players || []).length ? ` · ${(t.players || []).map((p) => String(p).trim().split(' ').pop()).join(' / ')}` : '';
                 return `${r.teamName || r.name || ''}${who} ${toPar(r.toPar)}`;
             }).join(', ');
-            rows.push(['🏆 Winners', names]);
+            // BUG HUNT #7 (Manny OK 2026-11-12): "Winners" only once the field is
+            // done - every card that has scores is through the last hole (an event:
+            // every entry has all its rounds). Until then the row reads "Leading"
+            // with the holes played, so a recap opened mid-round does not crown
+            // anyone. A card that never scored does not hold the recap open.
+            const holes = (data.courseData || []).length || 18;
+            const scored = (view.rows || []).filter((r) => r.hasScores);
+            const done = scored.length > 0 && (view.kind === 'event' ? scored.every((r) => r.completedAll) : scored.every((r) => Number(r.thru) >= holes));
+            const thru = view.kind === 'event' ? `${top[0].roundsComplete}/${top[0].countableRounds} rounds` : `thru ${top[0].thru}`;
+            rows.push(done ? ['🏆 Winners', names] : ['⏳ Leading', `${names} · ${thru}`]);
         }
         const won = TournamentContests.confirmedWinners(data, recapEntries);
         const kp = won.filter((w) => w.kind === 'kp'), ld = won.filter((w) => w.kind === 'ld');
