@@ -78,17 +78,20 @@ const HEADLINES = {
     'Play': ['Every yard. Every hole.', 'Hit the number it plays.', 'Know what you can carry.', 'Miss on the right side.', 'No signal? Still every yard.', 'Your real carries.'],
     'Games': ['Set up the game in one sentence.', 'Every game your group plays.', 'Score the whole group in one tap.', 'Every game, as it happens.', 'The final word, ready to share.', 'Who owes who, done.'],
     'Your group': ['Same game. Same code. Every week.', 'Talk to the round.', 'Same group? One tap.', 'One board for the whole trip.', 'Every round you’ve played.'],
-    'Organize': ['Run the day from your phone.', 'A tournament in four questions.', 'Join the tournament.', 'Every group. One board.', 'Every flight, live.'],   // card 22 reworded Nov 10 (was Prizes, sorted.)
+    'Organize': ['Run the day from your phone.', 'A tournament in four questions.', 'Join the tournament.', 'Every group. One board.', 'Every flight, live.',
+        // 52A batch 1 (2026-11-12): seven Tournaments cards
+        'Every team gets its own link.', 'Your events, on any device.', 'Your card and the board, one link.', 'Closest to the pin, long drive.', 'Photos when the round is done.', 'A note on every card.', 'Sign-ups and check-in, one desk.'],   // card 22 reworded Nov 10 (was Prizes, sorted.)
     'Get better': ['See where shots go.', 'Practice what costs you.', 'Ask what it plays.']
 };
 // $, betting words, and price shapes (a number per month/year, "free trial" days).
 const MONEY = /\$|\b(bet|bets|betting|wager\w*|gambl\w*|pot|pots|buy-?ins?|stake|stakes|dollars?|bucks|price|prices|priced)\b|\d+\s*\/\s*(mo|month|yr|year)\b|\bper (month|year)\b/i;
 
 describe('1. the 25 cards', () => {
-    test('five rows in order, 6 + 6 + 5 + 5 + 3 cards, right after the hero', () => {
+    test('five rows in order, 6 + 6 + 5 + 12 + 3 cards, right after the hero', () => {
         assert.deepEqual(groups.map((g) => g.name), Object.keys(HEADLINES));
-        assert.deepEqual(groups.map((g) => g.n), [6, 6, 5, 5, 3]);
-        assert.equal(cards.length, 25);
+        // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12, 32 cards.
+        assert.deepEqual(groups.map((g) => g.n), [6, 6, 5, 12, 3]);
+        assert.equal(cards.length, 32);
         const at = html.indexOf('id="features"');
         assert.ok(at > html.indexOf('class="wrap hero"') && at < html.indexOf('class="wrap split"'), 'the rows are not between the hero and the golfer/organizer panels');
         assert.match(html, /EVERYTHING IN THE APP/);
@@ -121,7 +124,8 @@ describe('1. the 25 cards', () => {
         // a sharp screen: the large size is at least 2x a 390-wide phone's card. RE-CAPTURE re-pin (Nov 10):
         // every one of the 25 (was 24: the weekly-code card showed a 295 px poster until its re-capture).
         const wide = cards.filter((c) => Number(/\bwidth="(\d+)"/.exec(c.img)[1]) >= 780).length;
-        assert.equal(wide, 25, 'only ' + wide + ' of 25 screens are 2x or sharper');
+        // 52A batch 1 re-pin (2026-11-12): seven Tournaments cards joined the Organize row, each a 780-wide @2x capture.
+        assert.equal(wide, 32, 'only ' + wide + ' of 32 screens are 2x or sharper');
     });
 
     // RE-CAPTURE (Nov 10): hazards, range, my-bag and weekly-code were re-shot from the 2.0.5 web app
@@ -132,26 +136,28 @@ describe('1. the 25 cards', () => {
     test('the four re-captured screens are the 3x captures; the screens manifest lists all 25 and marks the old files unused', () => {
         const manifest = JSON.parse(read('media/screens/manifest.json'));
         assert.equal(manifest.folder, '/media/screens/');
-        assert.equal(manifest.screens.length, 25);
+        assert.equal(manifest.screens.length, 32);   // 52A batch 1 re-pin (2026-11-12): 25 + 7 Tournaments screens
         assert.deepEqual(manifest.screens.map((s) => s.key), cards.map((c) => c.key), 'the manifest lists the cards in page order');
-        ['hazards', 'range', 'my-bag', 'weekly-code'].forEach((k) => {
+        ['hazards', 'range', 'my-bag', 'weekly-code', 'ask-caddie'].forEach((k) => {
             const c = cards.find((x) => x.key === k);
             assert.match(c.img, new RegExp('src="/media/screens/' + k + '-400\\.webp" srcset="/media/screens/' + k + '-400\\.webp 400w, /media/screens/' + k + '-1170\\.webp 1170w"'), k + ': not the 400 + 1170 pair');
             assert.match(c.img, /\bwidth="1170" height="2532"/, k + ': not a 390x844 @3x capture');
             const m = manifest.screens.find((s) => s.key === k);
-            assert.ok(m && /release-205/.test(m.captured) && m.recaptured, k + ': the manifest does not say where it came from');
+            assert.ok(m && /release-20[56]/.test(m.captured) && m.recaptured, k + ': the manifest does not say where it came from');
             assert.deepEqual(m.files, ['/media/screens/' + k + '-400.webp', '/media/screens/' + k + '-1170.webp']);
         });
         manifest.screens.forEach((s) => s.files.forEach((f) => assert.ok(exists(f.slice(1)), f + ' is missing')));
         // the superseded files: still here, listed, and served by no page
-        const old = ['/media/screens/hazards-400-superseded.webp', '/media/screens/hazards-786.webp', '/media/screens/my-bag-400-superseded.webp', '/media/screens/my-bag-786.webp', '/media/screens/range-400-superseded.webp', '/media/screens/range-786.webp', '/media/screens/weekly-code-295.webp'];
+        const old = ['/media/screens/hazards-400-superseded.webp', '/media/screens/hazards-786.webp', '/media/screens/my-bag-400-superseded.webp', '/media/screens/my-bag-786.webp', '/media/screens/range-400-superseded.webp', '/media/screens/range-786.webp', '/media/screens/weekly-code-295.webp',
+            // Re-pinned 2026-11-12 (Manny, preview-52a): Ask caddie re-captured on a real hole; its old pair kept, unserved.
+            '/media/screens/ask-caddie-400-superseded.webp', '/media/screens/ask-caddie-786.webp'].sort();
         assert.deepEqual(manifest.superseded.map((s) => s.file).sort(), old);
         manifest.superseded.forEach((s) => { assert.ok(exists(s.file.slice(1)), s.file + ' was deleted'); assert.deepEqual(s.used_on, []); assert.match(s.unused_since, /re-capture/); });
         const pages = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html')).concat(fs.readdirSync(path.join(ROOT, 'help')).map((f) => 'help/' + f)).filter((f) => f.endsWith('.html'));
         pages.forEach((f) => old.forEach((o) => assert.ok(!read(f).includes(o), f + ' still serves ' + o)));
         assert.ok(!/-786\.webp|-295\.webp|-superseded\.webp/.test(read('site-features.js')));
         // no "Test" golfer, no amount on the captures' alt text (the demo golfers are Sam, Josh, Bob, Paul)
-        ['hazards', 'range', 'my-bag', 'weekly-code'].forEach((k) => { const alt = /\balt="([^"]*)"/.exec(cards.find((x) => x.key === k).img)[1]; assert.doesNotMatch(alt, /\bTest\b|\$/, k); });
+        ['hazards', 'range', 'my-bag', 'weekly-code', 'ask-caddie'].forEach((k) => { const alt = /\balt="([^"]*)"/.exec(cards.find((x) => x.key === k).img)[1]; assert.doesNotMatch(alt, /\bTest\b|\$/, k); });
     });
 
     test('each card opens the viewer: the screen is a real button with a name', () => {
@@ -177,11 +183,12 @@ describe('2. words', () => {
         assert.doesNotMatch(JS, /\bIDEA\b/);
     });
 
-    test('"Coming soon" is on Offline maps and Ask caddie, and nowhere else', () => {
+    test('"Coming soon" is on Offline maps only, and nowhere else', () => {
         const soon = cards.filter((c) => c.soon).map((c) => [c.h, c.soon]);
-        assert.deepEqual(soon, [['No signal? Still every yard.', 'COMING SOON · iPHONE 2.0.5'], ['Ask what it plays.', 'COMING SOON']]);
+        // Re-pinned 2026-11-12 (Manny): Ask caddie shipped (release-204 on, 2.0.6 live), so its tag is gone.
+        assert.deepEqual(soon, [['No signal? Still every yard.', 'COMING SOON · iPHONE 2.0.5']]);
         const rest = html.replace(/<div class="fsoon">[^<]*<\/div>/g, '');
-        assert.doesNotMatch(rest, /coming soon/i, 'a Coming soon outside those two cards');
+        assert.doesNotMatch(rest, /coming soon/i, 'a Coming soon outside that card');
     });
 
     test('co-organizers and the season page stay out', () => {

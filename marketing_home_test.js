@@ -205,7 +205,8 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         // (Offline maps, Ask caddie), each in its own <div class="fsoon">. Android never does.
         ['hardpan-home.html', 'help.html', 'support.html', 'refunds.html', 'terms.html', 'privacy.html'].forEach((f) =>
             assert.doesNotMatch(stripComments(read(f)).replace(/<div class="fsoon">COMING SOON(?: · iPHONE 2\.0\.5)?<\/div>/g, ''), /Coming soon/i, f + ' still says Android is coming soon'));
-        assert.equal((read('hardpan-home.html').match(/<div class="fsoon">/g) || []).length, 2, 'positive: the two feature cards');
+        // Re-pinned 2026-11-12 (Manny): Ask caddie shipped, its tag is gone; Offline maps keeps one.
+        assert.equal((read('hardpan-home.html').match(/<div class="fsoon">/g) || []).length, 1, 'positive: the one feature card');
     });
 
     test('every Google Play badge is Google\'s official artwork, linking to the Play listing, after Apple\'s', () => {
@@ -538,7 +539,7 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
         const sec = /<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(home)[1];
         assert.deepEqual((sec.match(/<div class="grp" id="g-[a-z]+">\s*<div class="ghd"><h2>([^<]*)<\/h2>/g) || []).map((t) => />([^<]*)<\/h2>/.exec(t)[1]),
             ['Play', 'Games', 'Your group', 'Organize', 'Get better']);
-        assert.equal((sec.match(/<li class="fc"/g) || []).length, 25);
+        assert.equal((sec.match(/<li class="fc"/g) || []).length, 32);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12
         assert.equal(videos(sec).length, 6, 'the six features with a clip');
     });
 
