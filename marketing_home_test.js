@@ -473,7 +473,17 @@ describe('4. THE SERVICE WORKER: unchanged, and the app still opens offline', ()
         assert.match(shell, /'\.\/index\.html'/, 'positive: the slice holds the shell list');
         assert.doesNotMatch(shell, /hardpan-home|refunds|site-pricing|app-store-badge/, 'the marketing page joined the app shell');
         const sync = read('sync-mobile-web.js');
-        assert.doesNotMatch(sync, /hardpan-home|refunds\.html|site-pricing|app-store-badge/, 'the marketing page joined the native bundle');
+        // Re-pinned 2026-11-12 (Manny OK, 58A): site-pricing.js is no longer a marketing-only
+        // file - tournament.html and tournament-scorecard.html read it for the offer's renewal
+        // price, so it sits in TOURNAMENT_SHELL (build-shell refused dist/tournament without it).
+        // The marketing page, the refund page and the store badges still stay out.
+        assert.doesNotMatch(sync, /hardpan-home|refunds\.html|app-store-badge/, 'the marketing page joined the native bundle');
+        const tshell = sync.slice(sync.indexOf('const TOURNAMENT_SHELL = ['), sync.indexOf('];', sync.indexOf('const TOURNAMENT_SHELL = [')));
+        assert.match(tshell, /'tournament\.html'/, 'positive: the slice holds the tournament shell list');
+        assert.match(tshell, /'site-pricing\.js'/, 'site-pricing.js rides in the tournament shell (Manny OK 2026-11-12)');
+        const cshell = sync.slice(sync.indexOf('const CONSUMER_SHELL = ['), sync.indexOf('];', sync.indexOf('const CONSUMER_SHELL = [')));
+        assert.match(cshell, /'admin\.html'/, 'positive: the slice holds the consumer shell list');
+        assert.doesNotMatch(cshell, /site-pricing/, 'the consumer bundle does not carry the price table');
     });
 
     test('the worker still leaves /__/auth/ to the network', async () => {
