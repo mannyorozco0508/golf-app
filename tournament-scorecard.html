@@ -120,6 +120,12 @@
         /* A2 (approved 2026-11-08): the row a golfer plays next, and what each
            row is. Applied after render, never in the markup the shape key reads. */
         .hole-state { font-size: 0.72rem; color: var(--text-muted); }
+        /* 57, sponsor placement A: one grey line under the hole name; the score box does not move. */
+        .hole-sponsor { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; color: var(--text-muted); }
+        .hole-row-multi .hole-sponsor { display: inline-flex; margin-left: 6px; }
+        .hole-sponsor img { height: 14px; width: auto; max-width: 40px; border-radius: 3px; }
+        .event-sponsor { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin: 0 0 10px; }
+        .event-sponsor img { height: 16px; width: auto; vertical-align: middle; margin-right: 4px; border-radius: 3px; }
         .hole-row.is-next, .hole-row-multi.is-next { border-left: 5px solid var(--brand-green); padding-left: 8px; }
         .play-order-note { text-align: center; font-size: 0.8rem; color: var(--text-muted); margin: 12px 0 0 0; }
         /* J4 (approved 2026-11-08): scores this phone holds that the server has
@@ -343,6 +349,8 @@
 
     <div class="event-title" id="event-title"></div>
     <div class="event-sub" id="event-sub"></div>
+    <!-- 57: "Presented by <event sponsor>" when the organizer named one. -->
+    <div class="event-sponsor" id="event-sponsor" style="display:none;"></div>
     <div id="starting-hole-banner" style="display:none; text-align:center; background:var(--nassau-box-bg); border:2px solid var(--accent-teal); border-radius:10px; padding:10px; margin-bottom:14px; font-weight:bold; color:var(--brand-green); font-size:1.05rem;"></div>
 
     <div id="tab-scorecard">
@@ -558,6 +566,25 @@
     }
     initGetApp();
     let currentData = {};
+
+    // 57, SPONSORS (placement A, Manny 2026-11-12): tournaments/CODE/sponsors
+    // = { event: {name, logo?}, holes: {"7": {name, logo?}} }, written by the
+    // organizer. On a sponsored hole one grey line sits under the hole name;
+    // the score box does not move. The event sponsor reads under the title.
+    function holeSponsorHtml(hole) {
+        const sp = (currentData && currentData.sponsors) || {};
+        const s = (sp.holes || {})[String(hole)];
+        if (!s || !s.name) return '';
+        return `<span class="hole-sponsor">${s.logo ? `<img src="${escapeHtml(s.logo)}" alt="">` : ''}Hole sponsor \u00b7 ${escapeHtml(s.name)}</span>`;
+    }
+    function renderEventSponsor() {
+        const el = document.getElementById('event-sponsor');
+        if (!el) return;
+        const ev = ((currentData && currentData.sponsors) || {}).event;
+        if (!ev || !ev.name) { el.style.display = 'none'; el.innerHTML = ''; return; }
+        el.innerHTML = `${ev.logo ? `<img src="${escapeHtml(ev.logo)}" alt="">` : ''}Presented by ${escapeHtml(ev.name)}`;
+        el.style.display = 'block';
+    }
 
     if (!currentCode || (!myTeamNum && !myGroupId)) {
         document.getElementById('error-detail').textContent = !currentCode
@@ -1248,6 +1275,7 @@
     }
 
     function setHolesListPreservingFocus(html, shapeSalt) {
+        renderEventSponsor();   // 57: every card render refreshes the Presented-by line
         const list = document.getElementById('holes-list');
         if (!list) return;
         const keyOf = el => el.getAttribute('onchange') || '';
@@ -1428,7 +1456,7 @@
             html += `<div class="hole-row" id="hole-row-${h.hole}" style="flex-wrap:wrap;">
                 <div class="hole-info">
                     <span class="hole-num">Hole ${h.hole}</span>
-                    <span class="hole-par">Par ${h.par}</span>
+                    <span class="hole-par">Par ${h.par}</span>${holeSponsorHtml(h.hole)}
                     <span class="hole-state"></span>
                 </div>
                 <div style="flex-basis:100%; display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">` +
@@ -1546,7 +1574,7 @@
                 html += `<div class="hole-row" id="hole-row-${h.hole}">
                     <div class="hole-info">
                         <span class="hole-num">Hole ${h.hole}</span>
-                        <span class="hole-par">Par ${h.par}</span>
+                        <span class="hole-par">Par ${h.par}</span>${holeSponsorHtml(h.hole)}
                         <span class="hole-state"></span>
                     </div>
                     <input type="number" class="hole-score-input" inputmode="numeric" min="1"
@@ -1576,7 +1604,7 @@
 
                 html += `<div class="hole-row-multi" id="hole-row-${h.hole}">
                     <div class="hole-info-row">
-                        <span><span class="hole-num">Hole ${h.hole}</span> <span class="hole-par">Par ${h.par}</span> <span class="hole-state"></span></span>
+                        <span><span class="hole-num">Hole ${h.hole}</span> <span class="hole-par">Par ${h.par}</span>${holeSponsorHtml(h.hole)} <span class="hole-state"></span></span>
                         <span class="team-hole-result">${resultText}</span>
                     </div>
                     <div class="player-score-grid">${playerCellsHtml}</div>
