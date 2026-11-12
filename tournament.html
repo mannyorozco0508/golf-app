@@ -7453,6 +7453,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             .catch(() => { if (el) el.textContent = 'Try again'; });
     }
 
+    // BUG HUNT #5 (Manny OK 2026-11-12): a multi-round event keeps its course on
+    // each round, not on the event, so the header read "undefined • ...". The
+    // event's course, else the latest round's, else the format alone.
+    function eventCourseName() {
+        if (currentData && currentData.courseName) return currentData.courseName;
+        const rounds = (currentData && currentData.rounds) || {};
+        const ids = Object.keys(rounds).sort((a, b) => ((rounds[b] || {}).createdAt || 0) - ((rounds[a] || {}).createdAt || 0));
+        for (const rid of ids) if (rounds[rid] && rounds[rid].courseName) return rounds[rid].courseName;
+        return '';
+    }
+    function eventSubLine() {
+        const c = eventCourseName(), f = formatLabelFor(currentData.format);
+        return c ? `${c} • ${f}` : f;
+    }
     function loadTournament(code) {
         db.ref(`tournaments/${code}`).on('value', (snap) => {
             currentData = snap.val();
@@ -7465,15 +7479,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             document.getElementById('manage-screen').style.display = 'block';
             document.getElementById('manage-room-badge').textContent = code;
             document.getElementById('manage-t-name').textContent = `🏆 ${currentData.name}`;
-            document.getElementById('manage-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
+            document.getElementById('manage-t-sub').textContent = eventSubLine();   // bug hunt #5
             const pool = poolTotal();
             document.getElementById('manage-t-pool').textContent = pool > 0 ? `📊 Total in: $${pool.toFixed(2)}` : '';
             document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
-            document.getElementById('lb-t-sub').textContent = `${currentData.courseName} • ${formatLabelFor(currentData.format)}`;
+            document.getElementById('lb-t-sub').textContent = eventSubLine();   // bug hunt #5
             renderEventDetails();
             if (APP_MODE) {
                 const tt = document.getElementById('ap-m-title'); if (tt) tt.textContent = currentData.name || 'Tournament';
-                const ts = document.getElementById('ap-m-sub'); if (ts) ts.textContent = `${currentData.courseName || ''} • code ${code}`;
+                const ts = document.getElementById('ap-m-sub'); if (ts) ts.textContent = `${eventCourseName() ? eventCourseName() + ' • ' : ''}code ${code}`;   // bug hunt #5
             }
             if (canManage()) { rememberMyEvent(code, currentData.name); rememberOwnedEvent(code, currentData.name, currentData.courseName); }
             renderEntryFeesCard();
