@@ -39,6 +39,9 @@
          Approve button copies it into the field that every page renders. -->
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <!-- 58A: the website's price file, for the offer line's renewal price and
+         the fallback founding flag (no Firebase, no network). -->
+    <script src="site-pricing.js"></script>
     <!-- E2 contest holes: the one ranking and entry builder this page and
          tournament.html share (tournament-contests.js). -->
     <script src="tournament-contests.js"></script>
@@ -226,6 +229,16 @@
         .getapp-card .getapp-d { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 6px; }
         .getapp-card .getapp-no { color: var(--text-muted); font-size: 0.75rem; margin: 8px 0 0 0; text-align: center; }
         body.app-mode .getapp-bar, body.app-mode .getapp-card { display: none !important; }
+        /* 58A: the tournament offer line, inside the banner and at the foot of the card. */
+        .getapp-offer { display: none; border-top: 1px solid rgba(255,255,255,.16); margin-top: 8px; padding-top: 8px; font-size: 0.82rem; line-height: 1.35; }
+        .getapp-offer.on { display: block; }
+        .getapp-offer b { color: #d4f28a; }
+        .getapp-offer .getapp-charity { display: block; margin-top: 2px; }
+        .getapp-offer .getapp-and { display: block; margin-top: 4px; }
+        .getapp-redeem { display: inline-block; background: #d4f28a; color: #13261d; font-weight: 800; padding: 7px 11px; border-radius: 9px; text-decoration: none; margin-top: 6px; font-size: 0.8rem; }
+        .getapp-card .getapp-offer { border-top-color: var(--border-faint); color: var(--text-main); }
+        .getapp-card .getapp-offer b { color: var(--brand-green); }
+        .getapp-card .getapp-redeem { background: var(--brand-green); color: #fff; }
         .ph-done-h { font-weight: 800; font-size: 1.05rem; margin-bottom: 4px; }
         /* The notes show in the app's hole view too (Phase 1 hides everything but #app-view). */
         body.app-mode:not([data-app-screen="card"]) #main-content > .org-note, body.app-mode:not([data-app-screen="card"]) #main-content > .pace-note { display: block !important; }
@@ -344,6 +357,8 @@
             <a class="getapp-get" id="getapp-get" href="https://hardpangolf.com/#get-the-app" rel="noopener">Get</a>
             <button type="button" class="getapp-x" id="getapp-x" onclick="dismissGetApp()" aria-label="Hide this">✕</button>
         </div>
+        <!-- 58A: the event's offer, when the organizer turned it on. -->
+        <div class="getapp-offer" id="getapp-offer"></div>
         <div class="getapp-more" id="getapp-more"></div>
     </div>
 
@@ -545,10 +560,80 @@
             const c = document.getElementById(id);
             if (!c) return;
             c.innerHTML = '<div class="getapp-h">Get HardPan</div><div class="getapp-d">Live yardages, your card and the board, in one app.</div>'
-                + getAppReasonsHtml() + '<p class="getapp-no">No account needed to keep scoring here.</p>';
+                + getAppReasonsHtml() + '<p class="getapp-no">No account needed to keep scoring here.</p>'
+                + '<div class="getapp-offer" id="getapp-offer-' + id + '"></div>';   // 58A
             c.classList.add('on');
         });
     }
+    // ---- 58A, THE TOURNAMENT OFFER (Manny 2026-11-12) ------------------------
+    // tournaments/CODE/offer = { on, code, endsAt, line }, the organizer's
+    // switch (off by default). When it is on, has a code word and has not
+    // ended, one price line joins the banner and the foot of the card. The
+    // renewal price follows the SAME founding flag as the pricing card:
+    // gps_meta/config/foundingOpen read live (auth != null; the card signs in
+    // anonymously), else site-pricing.js. One line, one renewal price, never
+    // both. iPhone: Get becomes Redeem, the Apple redeem link with this
+    // event's code. Android: one sentence, no code, until the app update.
+    // Nothing here is a prize; nothing is collected by HardPan.
+    const OFFER_FIRST_YEAR = '$19.99';
+    const OFFER_REDEEM = 'https://apps.apple.com/redeem?ctx=offercodes&id=6808220335';
+    let foundingOpenLive = null;   // null = not read yet / not readable
+    function sitePro() { return ((window.HARDPAN_SITE_PRICING || {}).pro) || {}; }
+    function foundingOpen() {
+        if (typeof foundingOpenLive === 'boolean') return foundingOpenLive;
+        const p = sitePro();
+        return typeof p.foundingOpen === 'boolean' ? p.foundingOpen : true;
+    }
+    function offerRenewal() { const p = sitePro(); return foundingOpen() ? (p.founding || '$24.99') : (p.yearly || '$49.99'); }
+    function offerLine() {
+        return 'Tournament players: ' + OFFER_FIRST_YEAR + ' your first year, then ' + offerRenewal() + '/yr' + (foundingOpen() ? '' : ' (regular price)') + '. Renews until you cancel. New subscribers.';
+    }
+    function offerAndroidLine() {
+        return foundingOpen()
+            ? 'Android: founding price ' + offerRenewal() + '/yr in HardPan. The tournament price arrives with the next app update.'
+            : 'Android: ' + offerRenewal() + '/yr in HardPan. The tournament price arrives with the next app update.';
+    }
+    function offerOf(d) {
+        const o = d && d.offer;
+        if (!o || !o.on) return null;
+        const code = String(o.code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (!code) return null;
+        if (o.endsAt && /^\d{4}-\d{2}-\d{2}$/.test(o.endsAt)) {
+            const today = new Date(); const ymd = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+            if (ymd > o.endsAt) return null;
+        }
+        return { code, line: String(o.line || '').trim().slice(0, 80) };
+    }
+    function offerIsAndroid() { return /Android/.test(String(navigator.userAgent || '')); }
+    function offerRedeemUrl(code) { return OFFER_REDEEM + '&code=' + encodeURIComponent(code); }
+    function offerHtml(o) {
+        let h = '<b>' + escapeHtml(offerLine()) + '</b>';
+        if (o.line) h += '<span class="getapp-charity">' + escapeHtml(o.line) + '</span>';
+        if (offerIsAndroid()) h += '<span class="getapp-and">' + escapeHtml(offerAndroidLine()) + '</span>';
+        else h += '<a class="getapp-redeem" href="' + escapeHtml(offerRedeemUrl(o.code)) + '" rel="noopener">Redeem in the App Store</a>';
+        return h;
+    }
+    function renderGetAppOffer() {
+        if (APP_MODE) return;
+        const o = offerOf(currentData);
+        const slots = ['getapp-offer', 'getapp-offer-getapp-card-card', 'getapp-offer-getapp-card-board'].map((id) => document.getElementById(id)).filter(Boolean);
+        slots.forEach((el) => { el.innerHTML = o ? offerHtml(o) : ''; el.classList.toggle('on', !!o); });
+        const get = document.getElementById('getapp-get');
+        if (get) {
+            if (o && !offerIsAndroid()) { get.textContent = 'Redeem'; get.href = offerRedeemUrl(o.code); }
+            else { get.textContent = 'Get'; get.href = getAppStoreHref(); }
+        }
+    }
+    function loadFoundingFlag() {
+        if (APP_MODE) return;
+        try {
+            db.ref('gps_meta/config/foundingOpen').once('value').then((snap) => {
+                const v = snap && snap.val();
+                if (typeof v === 'boolean') { foundingOpenLive = v; renderGetAppOffer(); }
+            }).catch(() => { /* not readable: the site file decides */ });
+        } catch (e) { /* no database yet */ }
+    }
+
     function toggleGetAppWhy() {
         const bar = document.getElementById('getapp-bar');
         const more = document.getElementById('getapp-more');
@@ -565,6 +650,7 @@
         if (bar) bar.classList.remove('on');
     }
     initGetApp();
+    loadFoundingFlag();   // 58A
     let currentData = {};
 
     // 57, SPONSORS (placement A, Manny 2026-11-12): tournaments/CODE/sponsors
@@ -1276,6 +1362,7 @@
 
     function setHolesListPreservingFocus(html, shapeSalt) {
         renderEventSponsor();   // 57: every card render refreshes the Presented-by line
+        renderGetAppOffer();   // 58A: the offer line follows the record on every card render
         const list = document.getElementById('holes-list');
         if (!list) return;
         const keyOf = el => el.getAttribute('onchange') || '';
