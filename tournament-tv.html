@@ -60,6 +60,12 @@
         .wait .w1 { font-size: 6vh; font-weight: 800; }
         .wait .wi { font-size: 2.8vh; color: var(--mute); }
         .wait .w2 { font-size: 2.2vh; color: var(--mute); }
+        /* The field while waiting (Manny 2026-11-12): one line a team, board type. */
+        .wait .wl { width: 100%; text-align: left; margin: .6vh 0; }
+        .wait .wt { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto; gap: 1.6vw; align-items: baseline; padding: .55vh 1vw; border-top: 1px solid var(--line); font-size: 3.9vh; line-height: 1.1; }
+        .wait .wt .a { font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 34vw; }
+        .wait .wt .b { color: var(--mute); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .wait .wt .c { font-weight: 800; color: var(--lime); white-space: nowrap; }
         @media (max-width: 700px) {
             html, body { overflow: auto; height: auto; }
             body { padding: 10px 12px 16px; min-height: 100vh; }
@@ -173,7 +179,19 @@
         // NOTHING SCORED YET: one Waiting page instead of a board of dashes.
         // The first score that lands rebuilds the pages and the table appears.
         const anyScore = out.some((p) => p.kind === 'board' && p.rows.some((r) => r.hasScores));
-        const pages = anyScore ? out : [{ kind: 'waiting', label: 'waiting', display: 'Waiting for first scores' }];
+        // (Manny 2026-11-12) The waiting page lists the field, a line a team,
+        // eight a page like the board, turning on the same timer.
+        let pages = out;
+        if (!anyScore) {
+            const field = waitingField(d);
+            pages = [];
+            if (!field.length) pages.push({ kind: 'waiting', key: 'waiting#0', label: 'waiting', display: 'Waiting for first scores', lines: [] });
+            for (let i = 0; i < field.length; i += PAGE_ROWS) {
+                const chunk = field.slice(i, i + PAGE_ROWS);
+                const range = field.length > PAGE_ROWS ? ' \u00b7 ' + (i + 1) + '\u2013' + (i + chunk.length) + ' of ' + field.length : '';
+                pages.push({ kind: 'waiting', key: 'waiting#' + i, label: 'waiting', display: 'Waiting for first scores' + range, lines: chunk });
+            }
+        }
         const sp = d.sponsors || {};
         const holes = Object.keys(sp.holes || {}).filter((h) => sp.holes[h] && sp.holes[h].name).sort((a, b) => Number(a) - Number(b));
         if ((sp.event && sp.event.name) || holes.length) pages.push({ kind: 'sponsors', label: 'Thanks to our sponsors', display: 'Thanks to our sponsors', event: sp.event || null, holes: holes.map((h) => Object.assign({ hole: h }, sp.holes[h])) });
@@ -191,6 +209,22 @@
         if (full.length <= 60) return full;
         return names.map((n) => { const w = n.split(/\s+/); return w.length > 1 ? w[0] + ' ' + w[w.length - 1].charAt(0) + '.' : n; }).join(' \u00b7 ');
     }
+    // THE FIELD WHILE WAITING. A team event lists its teams (name, golfers as
+    // stored, start hole); an individual event its scoring groups, or its
+    // golfers when there are no groups. Shotgun: the hole the record holds
+    // (teams/teamN/startingHole, "1", "1A"...), left off when it is not set.
+    // Tee time: hole 1 for everyone, as the setup screen states the rule.
+    function waitingField(d) {
+        const shotgun = d.startType === 'shotgun';
+        const hole = (h) => shotgun ? (String(h || '').trim() ? 'Hole ' + String(h).trim() : '') : 'Hole 1';
+        const teams = Object.values(d.teams || {}).filter((t) => t && t.num).sort((a, b) => a.num - b.num);
+        if (teams.length) return teams.map((t) => ({ name: t.name || ('Team ' + t.num), who: (t.players || []).map((p) => String(p || '').trim()).filter(Boolean).join(', '), hole: hole(t.startingHole) }));
+        const players = d.players || {};
+        const pname = (pid) => String((players[pid] && players[pid].name) || '').trim();
+        const groups = Object.keys(d.scoringGroups || {}).map((k) => d.scoringGroups[k]).filter(Boolean);
+        if (groups.length) return groups.map((g) => ({ name: g.name || 'Group', who: (g.playerIds || []).map(pname).filter(Boolean).join(', '), hole: hole(g.startingHole) }));
+        return Object.keys(players).map(pname).filter(Boolean).map((n) => ({ name: n, who: '', hole: hole('') }));
+    }
     function startInfo(d) {
         const parts = [];
         if (d.startType === 'shotgun') parts.push('Shotgun start');
@@ -207,7 +241,8 @@
         if (!pages.length) { board.innerHTML = '<div class="err">No scores yet.</div>'; return; }
         const p = pages[pageIdx % pages.length];
         if (p.kind === 'waiting') {
-            board.innerHTML = '<div class="wait"><div class="w1">Waiting for first scores</div><div class="wi">' + esc(startInfo(data)) + '</div><div class="w2">The board fills in as cards post. Follow along on your phone with the QR below.</div></div>';
+            const list = (p.lines || []).map((l) => '<div class="wt"><span class="a">' + esc(l.name) + '</span><span class="b">' + esc(l.who) + '</span><span class="c">' + esc(l.hole) + '</span></div>').join('');
+            board.innerHTML = '<div class="wait"><div class="w1">Waiting for first scores</div><div class="wi">' + esc(startInfo(data)) + '</div>' + (list ? '<div class="wl" id="tv-field">' + list + '</div>' : '') + '<div class="w2">The board fills in as cards post. Follow along on your phone with the QR below.</div></div>';
         } else if (p.kind === 'sponsors') {
             let h = '<div class="sp"><div class="k">Thanks to our sponsors</div>';
             if (p.event && p.event.name) h += '<div class="ev-sp">' + (p.event.logo ? '<img src="' + esc(p.event.logo) + '" alt="">' : '') + '<span>' + esc(p.event.name) + '</span></div>';

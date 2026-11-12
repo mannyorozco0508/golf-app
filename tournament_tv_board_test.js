@@ -29,6 +29,21 @@
 // tournament-tv.html, swapped in by cp, restored by sha): 5 tests: 0 PASS / 5 FAIL.
 // With the polish: all 11 tests: 11 PASS / 0 FAIL.
 //
+// --- The field while waiting (Manny 2026-11-12, after the polish preview) ---
+// 12 nothing scored: under "Waiting for first scores" one line a team (name,
+//    golfers as stored, start hole), read from the waiting element only:
+//    shotgun shows teams/teamN/startingHole ("1", "10A") and nothing when it is
+//    unset; a tee-time event shows Hole 1 for all; a name with markup reads as
+//    text; board type (>= 26 px at 720p); the last line above the footer
+// 13 eighteen teams at ?every=5: Teams 1-8, then 9-16, then 17-18, the footer
+//    reading "1–8 of 18"; eight lines fit above the footer at 720p
+//
+// Baseline for 12-13 against preview-57 abe16e2e's tournament-tv.html (swapped
+// in by cp, restored by sha), all 13 tests: 11 PASS / 2 FAIL (12, 13).
+// With the add: 13 PASS / 0 FAIL. Controls: the list not rendered -> 11 / 2
+// (12, 13); no paging (one page of all teams) -> 12 / 1 (13); an unset
+// shotgun hole shown as Hole 1 -> 12 / 1 (12).
+//
 // Baseline against main 0f11073c (re-measured after the rebase; before the build, no tournament-tv.html):
 // all 6 tests: 1 PASS / 5 FAIL (test 6). With the build: 6 PASS / 0 FAIL.
 'use strict';
@@ -183,6 +198,57 @@ test('11 (#12) page ranges without flights; a tie reads with a space', async () 
     assert.equal(a.pageLabel, '1–8 of 18 · 10 s a page');
     assert.equal(a.nextLabel, 'Next: 9–16 of 18');
     assert.ok(a.rows.some((r) => /Team 15 tied /.test(r)), 'tie with a space: ' + JSON.stringify(a.rows));
+});
+
+// (Manny 2026-11-12) THE FIELD WHILE WAITING: read from the waiting element only.
+const WREAD = { expression: `JSON.stringify((function () {
+  var lines = Array.prototype.map.call(document.querySelectorAll('#tv-board .wait .wt'), function (r) {
+    return Array.prototype.map.call(r.children, function (c) { return (c.innerText || '').replace(/\\s+/g, ' ').trim(); }); });
+  var w = document.querySelector('#tv-board .wait');
+  var last = document.querySelector('#tv-board .wait .wt:last-child'), foot = document.getElementById('tv-foot');
+  var px = document.querySelector('#tv-board .wait .wt .a');
+  return { head: w ? (w.querySelector('.w1') || {}).innerText : null, lines: lines, page: (document.getElementById('tv-page-label') || {}).innerText,
+    px: px ? parseFloat(getComputedStyle(px).fontSize) : 0,
+    lastBottom: last ? Math.round(last.getBoundingClientRect().bottom) : null, footTop: Math.round(foot.getBoundingClientRect().top) };
+})())` };
+const fewTeams = (patch) => {
+    const db = F.scrambleDb({ ownerUid: 'u-org' }); const t = db.tournaments.SCR; t.scores = {};
+    t.teams = { team1: { num: 1, name: 'Team 1', players: ['Manny', 'Josh'], startingHole: '1' }, team2: { num: 2, name: 'Desert <b>Dogs</b>', players: ['Al Lopez', 'Jo Kim'], startingHole: '10A' }, team3: { num: 3, name: 'Team 3', players: ['Sam'] } };
+    if (patch) patch(t);
+    return db;
+};
+
+test('12 waiting: every team under the headline with its golfers and start hole, in board type', async () => {
+    const r = await arriveCold({ url: fileUrl('tournament-tv.html', 'tourney=SCR'), db: fewTeams(), auth: { uid: 'u-tv', isAnonymous: true }, viewport: TV, settleMs: 3000, steps: [WREAD] });
+    assert.ok(r.ok, r.reason);
+    const a = JSON.parse(r.value.filter((v) => typeof v === 'string' && v[0] === '{')[0]);
+    assert.equal(a.head, 'Waiting for first scores');
+    assert.deepEqual(a.lines, [['Team 1', 'Manny, Josh', 'Hole 1'], ['Desert <b>Dogs</b>', 'Al Lopez, Jo Kim', 'Hole 10A'], ['Team 3', 'Sam', '']],
+        'shotgun: the hole the record holds; Team 3 has none set, so none is shown; a name with markup reads as text');
+    assert.ok(a.px >= 26, 'board type at 720p: ' + a.px + ' px');
+    assert.ok(a.lastBottom <= a.footTop, 'the last line above the footer: ' + a.lastBottom + ' vs ' + a.footTop);
+    assert.equal(a.page, 'Waiting for first scores', 'one page: no range');
+    // A tee-time event: everyone starts on hole 1, as the setup screen states the rule.
+    const r2 = await arriveCold({ url: fileUrl('tournament-tv.html', 'tourney=SCR'), db: fewTeams((t) => { t.startType = 'teetime'; }), auth: { uid: 'u-tv', isAnonymous: true }, viewport: TV, settleMs: 3000, steps: [WREAD] });
+    assert.ok(r2.ok, r2.reason);
+    const b = JSON.parse(r2.value.filter((v) => typeof v === 'string' && v[0] === '{')[0]);
+    assert.deepEqual(b.lines.map((l) => l[2]), ['Hole 1', 'Hole 1', 'Hole 1']);
+});
+
+test('13 waiting with many teams: eight a page, the later teams after a tick, then back', async () => {
+    const db = F.scrambleDb({ ownerUid: 'u-org' }); db.tournaments.SCR.scores = {};
+    const r = await arriveCold({ url: fileUrl('tournament-tv.html', 'tourney=SCR&every=5'), db, auth: { uid: 'u-tv', isAnonymous: true }, viewport: TV, settleMs: 2500,
+        steps: [WREAD, { sleep: 5000 }, WREAD, { sleep: 5000 }, WREAD] });
+    assert.ok(r.ok, r.reason);
+    const [p1, p2, p3] = r.value.filter((v) => typeof v === 'string' && v[0] === '{').map((v) => JSON.parse(v));
+    assert.equal(p1.lines.length, 8);
+    assert.deepEqual(p1.lines.map((l) => l[0]), ['Team 1', 'Team 2', 'Team 3', 'Team 4', 'Team 5', 'Team 6', 'Team 7', 'Team 8']);
+    assert.deepEqual(p1.lines[3], ['Team 4', 'Al Lopez, Jo Kim, Ed Ruiz, Bo Diaz', 'Hole 4']);
+    assert.match(p1.page, /^Waiting for first scores · 1–8 of 18 · 5 s a page$/);
+    assert.ok(p1.lastBottom <= p1.footTop, 'eight lines above the footer at 720p: ' + p1.lastBottom + ' vs ' + p1.footTop);
+    assert.deepEqual(p2.lines.map((l) => l[0]), ['Team 9', 'Team 10', 'Team 11', 'Team 12', 'Team 13', 'Team 14', 'Team 15', 'Team 16']);
+    assert.deepEqual(p3.lines.map((l) => l[0]), ['Team 17', 'Team 18']);
+    assert.match(p3.page, /17–18 of 18/);
 });
 
 test('6 money = base', () => {
