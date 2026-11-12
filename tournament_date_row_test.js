@@ -1,7 +1,14 @@
 // THE CREATE FORM'S DATE / START TIME ROW (Manny 2026-11-12): on an iPad,
 // Safari sizes a type=time box to its intrinsic width, and in a 1fr grid
 // track (min-content wide) the box ran past the right edge over the date.
-// The fix is minmax(0, 1fr) tracks and min-width: 0 on the boxes.
+// The fix is minmax(0, 1fr) tracks and min-width: 0 on the boxes - AND, for
+// real iOS WebKit, appearance: none on the two boxes: a native-appearance
+// date/time control keeps its intrinsic width whatever width: 100% says.
+// Measured 2026-11-12 on an iPad Pro 11 simulator (iPadOS 26.5, Safari,
+// 834 px): before, the time box ran past the form's edge over the date
+// (tournaments/screens-ui3/ipad-daterow-before.png); after, both boxes sit in
+// their columns (ipad-daterow-after.png). Chrome cannot show that overflow;
+// this file holds the geometry plus the computed CSS the fix rests on.
 //
 // WHAT CHROME CAN AND CANNOT PROVE. Headless Chrome's time box is narrow, so
 // the overlap itself does not reproduce here; the geometry assertions hold on
@@ -35,7 +42,7 @@ const READ = { expression: `JSON.stringify((function () {
   var cs = getComputedStyle(row);
   var cells = Array.prototype.map.call(row.children, function (c) { return R(c); });
   return { vw: window.innerWidth, row: R(row), cells: cells, date: R(d), time: R(t), tracks: cs.gridTemplateColumns,
-    minW: [getComputedStyle(d).minWidth, getComputedStyle(t).minWidth], parentScroll: row.parentElement.scrollWidth, parentClient: row.parentElement.clientWidth,
+    minW: [getComputedStyle(d).minWidth, getComputedStyle(t).minWidth], appearance: [getComputedStyle(d).appearance || getComputedStyle(d).webkitAppearance, getComputedStyle(t).appearance || getComputedStyle(t).webkitAppearance], display: [getComputedStyle(d).display, getComputedStyle(t).display], parentScroll: row.parentElement.scrollWidth, parentClient: row.parentElement.clientWidth,
     rule: (function () { var out = null; try { Array.prototype.forEach.call(document.styleSheets, function (ss) { Array.prototype.forEach.call(ss.cssRules || [], function (r) { if (r.selectorText === '.setup-when') out = r.style.gridTemplateColumns; }); }); } catch (e) {} return out; })() };
 })())` };
 
@@ -52,6 +59,8 @@ test('1 four widths: no overlap, inside the row, tall enough; the tracks are min
         assert.ok(a.parentScroll <= a.parentClient, `no horizontal overflow at ${vp[0]}: ${a.parentScroll} vs ${a.parentClient}`);
         assert.equal(a.rule, 'minmax(0px, 1fr) minmax(0px, 1fr)', `the row's track rule at ${vp[0]}: ${a.rule}`);
         assert.deepEqual(a.minW, ['0px', '0px'], `the boxes may shrink at ${vp[0]}`);
+        assert.deepEqual(a.appearance, ['none', 'none'], 'iOS WebKit: appearance none hands the width back to CSS');
+        assert.deepEqual(a.display, ['block', 'block']);
         assert.ok(Math.abs(a.date.w - a.cells[0].w) <= 1 && Math.abs(a.time.w - a.cells[1].w) <= 1, `each box fills its cell at ${vp[0]}: ${JSON.stringify([a.date.w, a.cells[0].w, a.time.w, a.cells[1].w])}`);
     }
 });
