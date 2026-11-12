@@ -429,6 +429,12 @@
         .my-event .me-n { font-weight: 800; }
         .my-event .me-c { font-size: 0.78rem; color: var(--text-muted); }
         .my-events-note { font-size: 0.75rem; color: var(--text-muted); margin: 4px 0 0; }
+        .open-code { margin-top: 10px; }
+        .open-code label { font-size: 0.75rem; font-weight: 700; margin: 0 0 4px; display: block; }
+        .open-code-row { display: flex; gap: 8px; }
+        .open-code-row input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: .08em; padding: 8px 10px; font-size: 0.95rem; margin: 0; }
+        .open-code-row button { width: auto; padding: 8px 16px; margin: 0; }
+        .open-code-err { color: var(--accent-red); font-size: 0.78rem; margin: 4px 0 0; }
         /* Date and start on the create form (S1 A): two boxes side by side. */
         .setup-when { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .t-check { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: normal; }
@@ -566,7 +572,17 @@
          by renderMyEvents(): events it created, and owned events it opened. An
          account-wide list is P2-6 (a rules change) and is not built. -->
     <div class="ap-top app-only" id="ap-top-setup"><button type="button" class="ap-bk" onclick="appBack()" aria-label="Back">‹</button><div><div class="ap-tt">New tournament</div><div class="ap-ts">HardPan Tournaments</div></div></div>
-    <div class="my-events app-only" id="app-my-events" style="display:none;"></div>
+    <div class="my-events app-only" id="app-my-events" style="display:none;"><div id="my-events-list"></div>
+        <!-- Advisor 2026-11-11 18:05: open an event you run by its code. Static
+             markup, outside the list the account snapshot redraws, so a half-typed
+             code survives a render. Opening it as the signed-in owner writes the
+             account pointer, the same as opening its link. -->
+        <div class="open-code">
+            <label for="open-code-input">Open an event by code</label>
+            <div class="open-code-row"><input type="text" id="open-code-input" maxlength="10" placeholder="e.g. R7SK48" autocapitalize="characters" autocomplete="off" spellcheck="false" onkeydown="if (event.key === 'Enter') openEventByCode()"><button type="button" class="btn-primary" id="open-code-btn" onclick="openEventByCode()">Open</button></div>
+            <p class="open-code-err" id="open-code-err" style="display:none;" role="alert"></p>
+        </div>
+    </div>
     <div id="signed-in-as-setup" style="text-align:center; font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;"></div>
     <div id="signin-panel-setup" class="signin-panel" style="display:none;"></div>
 
@@ -1356,20 +1372,32 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return out.sort((a, b) => (b.at || 0) - (a.at || 0));
     }
     function renderMyEvents() {
-        const box = document.getElementById('app-my-events');
-        if (!box) return;
+        const panel = document.getElementById('app-my-events');
+        const box = document.getElementById('my-events-list');
+        if (!panel || !box) return;
         // On the website the list needs a signed-in organizer; in the app it is
         // always there (this device's events at least).
-        if (!APP_MODE && !authUser) { box.style.display = 'none'; return; }
+        if (!APP_MODE && !authUser) { panel.style.display = 'none'; return; }
         const list = myEventsList();
-        box.style.display = 'block';
+        panel.style.display = 'block';
         const note = accountEvents
             ? 'Events you run, on any device you sign in on' + (APP_MODE ? ', and events this phone opened.' : '.')
             : (APP_MODE ? 'Events this phone created or opened as the organizer.' : 'Events this browser created or opened as the organizer.');
         box.innerHTML = `<div class="my-events-k">My events</div>` + (list.length
             ? list.map((e) => `<button type="button" class="my-event" data-code="${escapeHtml(e.code)}" onclick="openMyEvent(this.dataset.code)"><span class="me-n">${escapeHtml(e.name)}</span><span class="me-c">${escapeHtml(e.code)} ›</span></button>`).join('')
               + `<p class="my-events-note">${note}</p>`
-            : `<p class="my-events-note">No events yet. Create one below, or open an event you run from its link.</p>`);
+            : `<p class="my-events-note">No events yet. Create one below, or open an event you run by its code.</p>`);
+    }
+    function openEventByCode() {
+        const input = document.getElementById('open-code-input');
+        const err = document.getElementById('open-code-err');
+        const code = String((input && input.value) || '').trim().toUpperCase().replace(/\s+/g, '');
+        if (!/^[A-Z0-9]{3,12}$/.test(code)) {
+            if (err) { err.textContent = 'Type the event code: letters and numbers, like R7SK48.'; err.style.display = 'block'; }
+            return;
+        }
+        if (err) err.style.display = 'none';
+        openMyEvent(code);
     }
     function openMyEvent(code) {
         if (!code) return;
