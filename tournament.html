@@ -450,7 +450,13 @@
         .open-code-row button { width: auto; padding: 8px 16px; margin: 0; }
         .open-code-err { color: var(--accent-red); font-size: 0.78rem; margin: 4px 0 0; }
         /* Date and start on the create form (S1 A): two boxes side by side. */
-        .setup-when { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        /* Date / Start time (Manny 2026-11-12): a 1fr track is min-content wide,
+           and Safari on an iPad gives a type=time box an intrinsic width that
+           pushed it past the right edge over the date. minmax(0, 1fr) and
+           min-width: 0 let each box shrink to its column. */
+        .setup-when { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+        .setup-when > div { min-width: 0; }
+        .setup-when input { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
         .t-check { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: normal; }
         .t-check input { width: auto; margin: 0; }
         /* Start and links (S3): one row a team - its hole or tee time, Send, QR. */
