@@ -292,7 +292,8 @@ const PRODUCTS = {
         // Moved to v69 FOR UI3: TAB STRIP, SHARED COURSES, DATE ROW (2026-11-12, Manny OK): see sw.js v405.
         // Moved to v70 FOR THE TV BOARD + HOLE SPONSORS (57) AND THE HOMEPAGE CARDS (52a) (2026-11-12, Manny OK): see sw.js v406.
         // Moved to v71 FOR THE TOURNAMENT OFFER (58A) (2026-11-12, Manny OK): see sw.js v407.
-        cacheName: 'tournament-v71-offer',
+        // Moved to v72 FOR THE COLLECT-BY-CARD FIX (2026-11-12, Manny OK): see sw.js v408.
+        cacheName: 'tournament-v72-fees-card',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
