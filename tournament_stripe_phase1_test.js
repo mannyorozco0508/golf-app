@@ -41,6 +41,11 @@
 //   fix on preview-fees-card: 44 pass / 0 fail. Controls: the node-creation
 //   branch removed -> H6 + H7 red; the per-team sentence replaced by the old
 //   refusal -> H7 red; the flag set alone without the cents -> H6 red.
+//   C internal + C unavailable added 2026-11-12 (the server's 'internal' fault
+//   had the signal sentence): 46 tests. Against main 0e3322e1 (tournament.html
+//   sha256 61471c24523d4cc9…, swapped in by cp, restored by sha): 45 pass /
+//   1 fail (C internal). With the fix on preview-checkout-copy: 46 pass / 0 fail.
+//   Control: the functions/internal branch removed -> C internal red.
 // NEGATIVE CONTROLS (each mutated in tournament.html, restored by sha from a
 // saved copy): pay button with collectByCard false -> A2; card toggle for a
 // not-allow-listed owner -> H2; Refund for a non-owner with the desk gate
@@ -234,6 +239,31 @@ describe('C. every createEntryCheckout refusal reason has its own sentence', () 
         const offersPay = /id="reg-pay-again"/.test(html(sb, 'reg-checkout'));
         assert.equal(offersPay, ['already-paid', 'not-collecting', 'not-allowed-owner'].indexOf(reason) === -1, 'Pay again only where paying again can work');
     }));
+    // ADDED 2026-11-12 (Advisor 17:19, LIVE on R7SK48): the server threw 'internal'
+    // (a bad Stripe key) and the page said "Check your signal and tap Pay again",
+    // which blamed the golfer's connection for a server fault. An 'internal'
+    // answer now gets its own sentence; a transport failure keeps the signal one.
+    test('C internal: a server error gets its own sentence (not "Check your signal"); the spot is saved; Pay again offered', async () => {
+        const sb = arriveRegister(record({ fees: FEES })); await settle();
+        stubCallables(sb, { createEntryCheckout: [] });   // the stand-in rejects with code functions/internal and no details
+        fill(sb); tap(sb, HTML, byId('reg-pay')); await settle(); await settle();
+        const panel = plain(html(sb, 'reg-checkout'));
+        assert.match(panel, /Registered · Unpaid/, 'positive: the unpaid panel drew');
+        assert.match(panel, /Checkout didn't open: the payment service returned an error\. Your spot is saved; pay the organizer at the course, or try again in a few minutes\./);
+        assert.equal(panel.indexOf('Check your signal'), -1, 'the server fault is not blamed on the signal');
+        assert.match(html(sb, 'reg-checkout'), /id="reg-pay-again"/, 'Pay again stays (the fault may be fixed by then)');
+        assert.equal(regSets(sb).length, 1, 'the signup was still written first');
+    });
+    test('C unavailable: a transport failure (SDK or network) keeps the signal sentence', async () => {
+        const sb = arriveRegister(record({ fees: FEES })); await settle();
+        stubCallables(sb, {});
+        sb.firebase.functions = () => ({ httpsCallable: () => () => Promise.reject(Object.assign(new Error('offline'), { code: 'functions/unavailable' })) });
+        fill(sb); tap(sb, HTML, byId('reg-pay')); await settle(); await settle();
+        const panel = plain(html(sb, 'reg-checkout'));
+        assert.match(panel, /Registered · Unpaid/, 'positive: the unpaid panel drew');
+        assert.match(panel, /Checkout didn't open\. Check your signal and tap Pay again\./);
+        assert.equal(panel.indexOf('payment service returned an error'), -1);
+    });
     test('C the page knows exactly the contract\'s six reasons (source, decoded, with a positive anchor)', () => {
         const src = decodeEscapes(HTML);
         const at = src.indexOf('var CHECKOUT_REASON_TEXT = {');
