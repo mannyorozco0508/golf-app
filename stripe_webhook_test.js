@@ -30,6 +30,15 @@
 // 1 inert by design - removing the stripeEvents pre-read leaves the
 // transaction claim, which alone keeps a duplicate applied once).
 // Against the finished code: 14 pass / 0 fail / 0 skipped.
+//
+// ACCOUNTS V2 (2026-11-13): K1 re-pinned to POST /v2/core/accounts + /v2/core/
+// account_links with the v1 payout-schedule update (and its refusal recorded,
+// not thrown); K6 gains the metadata-less account.updated for an account we
+// hold. Baseline against main f7c1b8f3 (v1 creation): K1 + K6 red, 18 pass /
+// 2 fail of 20. With the build (final run): 20 pass / 0 fail / 0 skipped.
+// Controls (handlers.js / stripe-core.js mutated, restored by sha): the handler
+// back on v1 accounts.create -> K1 red; a refused schedule update thrown ->
+// K1 red; owner fallback dropped -> K6 red (+ 21 in stripe_core_test.js).
 // ============================================================================
 'use strict';
 const { test, before, after } = require('node:test');
@@ -95,12 +104,22 @@ function mockStripe() {
     // CONNECT (2026-11-12): accounts + account links, recorded; retrieve answers from `acctState`.
     calls.accounts = []; calls.links = []; calls.logins = []; calls.retrieves = [];
     calls.acctState = { id: 'acct_MOCK1', charges_enabled: false, payouts_enabled: false, details_submitted: false, requirements: { currently_due: ['external_account', 'tos_acceptance.date'] }, business_profile: { name: 'Hope Foundation' }, metadata: { uid: 'u-org' } };
+    // ACCOUNTS V2 (2026-11-13): creation and the onboarding link are v2
+    // (s.v2.core.*); the v1 create / account_links stay mocked ONLY to prove
+    // they are never called. retrieve / update / login links stay v1.
+    calls.v1accounts = []; calls.v1links = []; calls.updates = [];
+    calls.updateThrows = null;   // set to an Error to make the v1 payout-schedule update fail
     s.accounts = {
-        create: async (params, opts) => { calls.accounts.push({ params, opts }); return { id: 'acct_MOCK1' }; },
+        create: async (params, opts) => { calls.v1accounts.push({ params, opts }); return { id: 'acct_V1_NEVER' }; },
+        update: async (id, params) => { calls.updates.push({ id, params }); if (calls.updateThrows) throw calls.updateThrows; return Object.assign({ id }, calls.acctState); },
         retrieve: async (id) => { calls.retrieves.push(id); return Object.assign({ id }, calls.acctState); },
         createLoginLink: async (id) => { calls.logins.push(id); return { url: 'https://connect.stripe.com/express/' + id }; }
     };
-    s.accountLinks = { create: async (params) => { calls.links.push(params); return { url: 'https://connect.stripe.com/setup/e/' + params.account + '/x' }; } };
+    s.accountLinks = { create: async (params) => { calls.v1links.push(params); return { url: 'https://connect.stripe.com/setup/e/V1_NEVER' }; } };
+    s.v2 = { core: {
+        accounts: { create: async (params, opts) => { calls.accounts.push({ params, opts }); return { id: 'acct_MOCK1', object: 'v2.core.account' }; } },
+        accountLinks: { create: async (params) => { calls.links.push(params); return { object: 'v2.core.account_link', url: 'https://connect.stripe.com/setup/e/' + params.account + '/x' }; } }
+    } };
     return { s, calls };
 }
 // Count every update() the handlers make on a registrations/ path.
@@ -416,21 +435,37 @@ test('X2. index.js stripeWebhook (onRequest): forged = 400 and nothing written; 
 // 20 pass / 0 fail / 0 skipped.
 const SEED_CONNECT = () => { const d = SEED(); d.stripeAccounts = { 'u-org': { acct: 'acct_MOCK1', createdAt: 1 } }; d.connectStatus = { 'u-org': { chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, due: [], name: 'Hope Foundation', updatedAt: 1 } }; return d; };
 
-test('K1. createConnectOnboardingLink: the allow-listed owner gets an Express account once (7-day payouts, uid in metadata, idempotent) and a link back to this event; refusals before any Stripe call', SKIP, async () => {
+test('K1. createConnectOnboardingLink (Accounts v2): the allow-listed owner gets ONE account from POST /v2/core/accounts (Express dashboard, uid in metadata, idempotent), the 7-day payout delay as the v1 update, and a v2 onboarding link back to this event; v1 create never called; refusals before any Stripe call', SKIP, async () => {
     await reseed();
     const { h, calls } = H();
     const out = await h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' });
     assert.match(out.url, /^https:\/\/connect\.stripe\.com\/setup\//);
-    assert.equal(calls.accounts.length, 1);
+    assert.equal(calls.accounts.length, 1, 'one v2 create');
+    assert.equal(calls.v1accounts.length, 0, 'POST /v1/accounts is never called (Stripe refuses it)');
+    assert.equal(calls.v1links.length, 0, 'POST /v1/account_links is never called');
     const { params, opts } = calls.accounts[0];
-    assert.equal(params.type, 'express'); assert.deepEqual(params.settings.payouts.schedule, { interval: 'daily', delay_days: 7 }); assert.deepEqual(params.metadata, { uid: 'u-org' });
+    assert.equal(params.dashboard, 'express'); assert.equal(params.type, undefined);
+    assert.deepEqual(params.defaults.responsibilities, { fees_collector: 'application', losses_collector: 'application' });
+    assert.equal(params.configuration.merchant.capabilities.card_payments.requested, true);
+    assert.equal(params.configuration.recipient.capabilities.stripe_balance.stripe_transfers.requested, true);
+    assert.deepEqual(params.metadata, { uid: 'u-org' }); assert.equal(params.display_name, undefined, 'STR1 has no beneficiary / organizerName: no made-up display name');
     assert.equal(opts.idempotencyKey, 'connect-acct:u-org');
-    assert.deepEqual(calls.links[0], { account: 'acct_MOCK1', type: 'account_onboarding', return_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=return', refresh_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=refresh' });
+    assert.deepEqual(calls.updates, [{ id: 'acct_MOCK1', params: { settings: { payouts: { schedule: { interval: 'daily', delay_days: 7 } } } } }], 'the 7-day delay is the v1 update on the new account');
+    assert.deepEqual(calls.links[0], { account: 'acct_MOCK1', use_case: { type: 'account_onboarding', account_onboarding: { return_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=return', refresh_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=refresh' } } });
     const saved = await read('stripeAccounts/u-org');
-    assert.equal(saved.acct, 'acct_MOCK1'); assert.equal(typeof saved.createdAt, 'number');
-    // A second call reuses the account: one more link, no second account.
+    assert.equal(saved.acct, 'acct_MOCK1'); assert.equal(typeof saved.createdAt, 'number'); assert.equal(saved.api, 'v2'); assert.equal(saved.name, undefined); assert.equal(saved.payoutScheduleError, undefined);
+    // A second call reuses the account: one more link, no second account, no second schedule update.
     await h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' });
-    assert.equal(calls.accounts.length, 1); assert.equal(calls.links.length, 2);
+    assert.equal(calls.accounts.length, 1); assert.equal(calls.links.length, 2); assert.equal(calls.updates.length, 1);
+    // Stripe refuses the schedule update: the organizer still gets the link, and
+    // the refusal is kept on the server-only record (not hidden).
+    await adminRest(NS, 'DELETE', 'stripeAccounts/u-org');
+    calls.updateThrows = new Error('No such parameter: settings[payouts]');
+    const again = await h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' });
+    assert.match(again.url, /^https:\/\/connect\.stripe\.com\/setup\//);
+    const kept = await read('stripeAccounts/u-org');
+    assert.equal(kept.acct, 'acct_MOCK1'); assert.equal(kept.payoutScheduleError, 'No such parameter: settings[payouts]');
+    calls.updateThrows = null;
     // Refusals: signed out, not the owner, not allow-listed (OTHER's owner u-who), bad origin, bad code.
     const n = calls.accounts.length + calls.links.length;
     await refused(h.createConnectOnboardingLink({ code: 'STR1' }, { uid: null, origin: 'https://tournaments.rattlegolf.com' }), 'unauthenticated');
@@ -555,4 +590,13 @@ test('K6. stripeConnectWebhook: a signed account.updated writes the mirror for t
     assert.equal(r.status, 200); assert.equal(r.body, 'rejected-account');
     assert.equal((await read('stripeEvents/evt_acct_2')).type, 'rejected-account');
     assert.deepEqual(Object.keys(await read('connectStatus')), ['u-org']);
+    // Accounts v2 (2026-11-13): the v1 view of a v2 account arrives with no
+    // metadata.uid and no business_profile.name; it is OUR account (stripeAccounts
+    // holds its id), so the mirror is written, with the name kept at creation.
+    await adminRest(NS, 'PUT', 'stripeAccounts/u-org', { acct: 'acct_MOCK1', createdAt: 1, api: 'v2', name: 'Hope Foundation' });
+    const bare = evt('evt_acct_3', 'account.updated', Object.assign({}, acct, { charges_enabled: true, payouts_enabled: true, requirements: { currently_due: [] }, metadata: {}, business_profile: {} }));
+    r = await h.stripeConnectWebhook(bare, sign(bare, CSECRET));
+    assert.equal(r.status, 200); assert.equal(r.body, 'account.updated');
+    const v2m = await read('connectStatus/u-org');
+    assert.equal(v2m.chargesEnabled, true); assert.equal(v2m.payoutsEnabled, true); assert.equal(v2m.name, 'Hope Foundation'); assert.equal(v2m.deauthorizedAt, undefined);
 });
