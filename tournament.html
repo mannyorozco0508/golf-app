@@ -133,6 +133,7 @@
         .eh-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
         .eh-act { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 6px; border:1px solid var(--border-light); border-radius:14px; background:var(--bg-card); color:var(--text-main); font-weight:700; font-size:0.85rem; cursor:pointer; }
         .eh-act-i { font-size:1.3rem; }
+        .eh-act-wide { grid-column:1 / -1; flex-direction:row; gap:8px; }
         .top-nav-item.active { background: var(--brand-green); color: #ffffff; border-color: var(--brand-green); }
 
         .lobby-logo { font-size: 3rem; text-align: center; margin-bottom: 4px; }
@@ -985,6 +986,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <button type="button" class="eh-act" id="eh-act-desk" onclick="eventHomeGo('desk')"><span class="eh-act-i">📋</span>Desk</button>
             <button type="button" class="eh-act" id="eh-act-board" onclick="eventHomeGo('board')"><span class="eh-act-i">🏆</span>Board</button>
             <button type="button" class="eh-act" id="eh-act-setup" onclick="eventHomeGo('setup')"><span class="eh-act-i">⚙️</span>Setup</button>
+            <!-- Bug-hunt #10 (Manny 2026-11-12): the Announcements door, the same
+                 one the board has (#open-announce), where the organizer runs the day. -->
+            <button type="button" class="eh-act eh-act-wide" id="eh-act-announce" onclick="eventHomeGo('announce')"><span class="eh-act-i">📣</span>Announce to the field</button>
         </div>
     </div>
 
@@ -3484,6 +3488,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return;
         }
         if (where === 'setup') { showTab('setup'); return; }
+        if (where === 'announce') { showTab('announce'); return; }   // bug-hunt #10: the board's door, from Event day
         if (where === 'home') return;
         // EC3 C: "nudge:<team key>:<thru>" sends the E3b pace note to that team.
         const nm = /^nudge:(team[0-9]+|g[a-z0-9]+):([0-9]{1,2})$/.exec(String(where || ''));
