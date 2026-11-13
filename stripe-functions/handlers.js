@@ -82,6 +82,7 @@ function makeHandlers(deps) {
         const multi = {};
         multi['registrations/' + code + '/' + entryId + '/checkoutAt'] = now();
         multi['tournaments/' + code + '/fees/paidTo'] = plan.destination ? 'organizer' : 'hardpan';
+        if (plan.destination) multi['tournaments/' + code + '/fees/serviceFeeCents'] = plan.serviceFeeCents;
         await db.ref().update(multi);
         return { url: session.url };
     }
@@ -187,6 +188,13 @@ function makeHandlers(deps) {
         return { url: link.url };
     }
     // getConnectStatus({}, {uid}) -> the mirror's fields + state; writes connectStatus/<uid>.
+    // The resolved service fee for an event: Manny's per-event override, else the
+    // platform number, else $4 (core.serviceFee).
+    const serviceFeeFor = async (code) => {
+        const platformFeeCents = await val('platform/connect/serviceFeeCents');
+        const eventFeeCents = await val('platform/connect/eventOverrides/' + code + '/serviceFeeCents');
+        return core.serviceFee({ platformFeeCents: platformFeeCents === null ? undefined : platformFeeCents, eventFeeCents: eventFeeCents === null ? undefined : eventFeeCents });
+    };
     async function getConnectStatus(data, ctx) {
         const uid = ctx && ctx.uid;
         if (!uid || !UIDRE.test(String(uid))) throw new HandlerError(core.EXTRA_REASONS.UNAUTHENTICATED);
@@ -195,7 +203,26 @@ function makeHandlers(deps) {
         const account = await stripe.accounts.retrieve(acct.acct);
         const status = core.connectStatusOf(account, now());
         await db.ref('connectStatus/' + uid).set(status);
-        return Object.assign({ connected: true, state: core.connectState(status) }, status);
+        const out = Object.assign({ connected: true, state: core.connectState(status) }, status);
+        // With {code} for an event this caller owns: the fee the golfer will be
+        // charged on top, and the organizer's name, go on the PUBLIC record so
+        // the register screen can say "Entry $50 + $4 service fee" and
+        // "Paid to Hope Foundation" before the first checkout.
+        const code = data && typeof data.code === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(data.code) ? data.code : null;
+        if (code) {
+            const t = await val('tournaments/' + code);
+            if (t && t.ownerUid === uid) {
+                const fee = await serviceFeeFor(code);
+                if (fee.ok) {
+                    const multi = {};
+                    multi['tournaments/' + code + '/fees/serviceFeeCents'] = fee.cents;
+                    multi['tournaments/' + code + '/fees/paidToName'] = status.name || null;
+                    await db.ref().update(multi);
+                    out.serviceFeeCents = fee.cents;
+                }
+            }
+        }
+        return out;
     }
     // createConnectDashboardLink({}, {uid}) -> {url}: the Express dashboard for the caller's own account.
     async function createConnectDashboardLink(data, ctx) {

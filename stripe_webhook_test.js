@@ -458,6 +458,22 @@ test('K2. getConnectStatus: reads the account and writes the owner-readable mirr
     assert.deepEqual(await h.getConnectStatus({}, { uid: 'u-who' }), { connected: false, state: 'none' });
     assert.equal(await read('connectStatus/u-who'), null, 'no mirror for no account');
     await refused(h.getConnectStatus({}, { uid: null }), 'unauthenticated');
+    // With {code} for an event the caller owns: the resolved service fee and the
+    // organizer's name land on the RECORD (public), so the golfer's register
+    // screen can show "Entry $50 + $4 service fee" and "Paid to Hope Foundation".
+    const withCode = await h.getConnectStatus({ code: 'STR1' }, { uid: 'u-org' });
+    assert.equal(withCode.serviceFeeCents, 400);
+    const fees = await read('tournaments/STR1/fees');
+    assert.equal(fees.serviceFeeCents, 400); assert.equal(fees.paidToName, 'Hope Foundation');
+    await adminRest(NS, 'PUT', 'platform/connect/eventOverrides/STR1/serviceFeeCents', 250);
+    assert.equal((await h.getConnectStatus({ code: 'STR1' }, { uid: 'u-org' })).serviceFeeCents, 250);
+    assert.equal((await read('tournaments/STR1/fees')).serviceFeeCents, 250);
+    // Not the caller's event: status still answers, the record is untouched.
+    await h.getConnectStatus({ code: 'OTHER' }, { uid: 'u-org' });
+    assert.equal((await read('tournaments/OTHER/fees')).serviceFeeCents, undefined);
+    // No account: nothing written to the record either.
+    await h.getConnectStatus({ code: 'OTHER' }, { uid: 'u-who' });
+    assert.equal((await read('tournaments/OTHER/fees')).serviceFeeCents, undefined);
 });
 
 test('K3. createConnectDashboardLink: an Express login link for the caller\'s own account only', SKIP, async () => {
@@ -481,6 +497,7 @@ test('K4. createEntryCheckout on a connected owner: two line items (entry + $4 s
     assert.equal(params.payment_intent_data.on_behalf_of, 'acct_MOCK1'); assert.deepEqual(params.payment_intent_data.transfer_data, { destination: 'acct_MOCK1' });
     assert.equal(params.metadata.acct, 'acct_MOCK1'); assert.equal(params.metadata.serviceFeeCents, '400');
     assert.equal((await read('tournaments/STR1/fees')).paidTo, 'organizer', 'the record says who is paid, without naming the account');
+    assert.equal((await read('tournaments/STR1/fees')).serviceFeeCents, 400, 'and the fee the golfer was charged on top');
     assert.equal(typeof (await read('registrations/STR1/e1')).checkoutAt, 'number');
     // Platform setting + per-event override (Manny-only nodes) change the fee; the client cannot.
     await adminRest(NS, 'PUT', 'platform/connect', { serviceFeeCents: 300, eventOverrides: { STR1: { serviceFeeCents: 100 } } });
