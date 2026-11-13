@@ -64,7 +64,9 @@ exports.refundEntry = onCall(OPTS, async (request) => {
 // ---- CONNECT (2026-11-12): onboarding, status, dashboard; the second endpoint.
 exports.createConnectOnboardingLink = onCall(OPTS, async (request) => {
     const headers = (request.rawRequest && request.rawRequest.headers) || {};
-    try { return await handlers().createConnectOnboardingLink(request.data, { uid: request.auth && request.auth.uid, origin: headers.origin }); }
+    // The owner's sign-in email (verified token) is the v2 account's contact_email.
+    const token = (request.auth && request.auth.token) || {};
+    try { return await handlers().createConnectOnboardingLink(request.data, { uid: request.auth && request.auth.uid, origin: headers.origin, email: token.email }); }
     catch (e) { throw asHttpsError(e); }
 });
 exports.getConnectStatus = onCall(OPTS, async (request) => {

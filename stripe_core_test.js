@@ -206,10 +206,20 @@ test('13. firebase.json carries ONLY the tournaments-stripe codebase; the site n
 // `type: 'express'` slipped into the v2 params -> 14 red; the link in the v1
 // shape -> 15 red; owner fallback dropped -> 21 red (+ K6 in the webhook file);
 // creation name ignored -> 21 red.
+// CONTACT EMAIL (2026-11-13, live log 18:07 UTC: Stripe refused the v2 create
+// without one). Test 14 gains contact_email / connectEmail / the no-email
+// reason. Baseline against main 501855b4: 14 red, 21 pass / 1 fail of 22. With
+// the build (final run): 22 pass / 0 fail. Control: contact_email dropped -> 14 red.
 // ---------------------------------------------------------------------------
 test('14. Connect account params (Accounts v2, 2026-11-13): POST /v2/core/accounts with the Express dashboard, the application collecting fees and losses, card_payments + stripe_transfers requested, us/usd, the organizer name, uid in metadata; no v1 field; the 7-day payout delay as the v1 update', () => {
-    const p = C.accountCreateParams({ uid: 'u-org', name: 'Hope Foundation' });
+    const p = C.accountCreateParams({ uid: 'u-org', name: 'Hope Foundation', email: ' Org@Example.test ' });
     assert.equal(p.dashboard, 'express');
+    // Stripe: "If configuration.recipient is supplied, the Account must have a
+    // contact email" (live log 2026-11-13 18:07 UTC). The sign-in email, normalized.
+    assert.equal(p.contact_email, 'org@example.test');
+    assert.equal(C.connectEmail('not-an-email'), null); assert.equal(C.connectEmail(''), null); assert.equal(C.connectEmail(undefined), null);
+    assert.equal(C.accountCreateParams({ uid: 'u-org', name: 'x', email: 'bad' }).contact_email, undefined, 'a bad email is not sent');
+    assert.equal(C.EXTRA_REASONS.NO_EMAIL, 'no-email'); assert.equal(C.ERROR_CODES['no-email'], 'failed-precondition');
     assert.deepEqual(p.identity, { country: 'us' });
     assert.deepEqual(p.defaults, { currency: 'usd', responsibilities: { fees_collector: 'application', losses_collector: 'application' }, profile: { business_url: 'https://tournaments.rattlegolf.com' } });
     assert.deepEqual(p.configuration, { merchant: { capabilities: { card_payments: { requested: true } } }, recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } });
@@ -217,7 +227,7 @@ test('14. Connect account params (Accounts v2, 2026-11-13): POST /v2/core/accoun
     assert.deepEqual(p.metadata, { uid: 'u-org' });
     // v1-only fields never reach v2 (it refuses unknown parameters)
     for (const k of ['type', 'country', 'capabilities', 'business_profile', 'settings']) assert.equal(p[k], undefined, 'no v1 field ' + k);
-    assert.deepEqual(Object.keys(p).sort(), ['configuration', 'dashboard', 'defaults', 'display_name', 'identity', 'metadata']);
+    assert.deepEqual(Object.keys(p).sort(), ['configuration', 'contact_email', 'dashboard', 'defaults', 'display_name', 'identity', 'metadata']);
     assert.equal(C.accountCreateParams({ uid: 'u-org', name: '' }).display_name, undefined, 'no made-up name');
     assert.equal(C.accountCreateParams({ uid: 'u-org', name: 'x'.repeat(300) }).display_name.length, 100, 'clipped');
     assert.deepEqual(C.payoutScheduleParams(), { settings: { payouts: { schedule: { interval: 'daily', delay_days: 7 } } } });

@@ -182,8 +182,13 @@ function makeHandlers(deps) {
         if (!plan.ok) throw new HandlerError(plan.reason);
         let acct = await val('stripeAccounts/' + uid);
         if (!acct || typeof acct.acct !== 'string') {
+            // Stripe requires a contact email on a v2 account with the recipient
+            // configuration (live log 2026-11-13 18:07 UTC). The owner's sign-in
+            // email, from the verified token; none -> refused before any Stripe call.
+            const email = core.connectEmail(ctx.email);
+            if (!email) throw new HandlerError(core.EXTRA_REASONS.NO_EMAIL);
             const name = (tournament.beneficiary && String(tournament.beneficiary).trim()) || (tournament.organizerName && String(tournament.organizerName).trim()) || '';
-            const created = await stripe.v2.core.accounts.create(core.accountCreateParams({ uid, name }), { idempotencyKey: core.connectIdempotencyKey(uid) });
+            const created = await stripe.v2.core.accounts.create(core.accountCreateParams({ uid, name, email }), { idempotencyKey: core.connectIdempotencyKey(uid) });
             acct = { acct: created.id, createdAt: now(), api: 'v2' };
             if (name) acct.name = name.slice(0, 100);
             try { await stripe.accounts.update(created.id, core.payoutScheduleParams()); }
