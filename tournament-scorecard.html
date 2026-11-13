@@ -213,7 +213,8 @@
         .getapp-ic { flex: none; width: 34px; height: 34px; border-radius: 9px; background: var(--brand-green); border: 1px solid #2f7a5c; color: #fff; font-weight: 900; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; }
         .getapp-tx { flex: 1; min-width: 0; }
         .getapp-tx b { color: #d4f28a; }
-        .getapp-why { background: none; border: 0; padding: 0; margin: 0; color: #d4f28a; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+        /* Tap target (bug-hunt #14, Manny OK 2026-11-12): the same look, a 44 x 32 hit area. */
+        .getapp-why { background: none; border: 0; padding: 0 4px; margin: -8px -4px; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 32px; vertical-align: middle; color: #d4f28a; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
         .getapp-get { flex: none; display: inline-block; background: #d4f28a; color: #13261d; font-weight: 800; padding: 8px 12px; border-radius: 9px; text-decoration: none; font-size: 0.82rem; }
         .getapp-x { flex: none; background: none; border: 0; color: #fff; opacity: .75; font-size: 1.1rem; width: 32px; height: 32px; padding: 0; margin: 0; cursor: pointer; }
         .getapp-more { display: none; padding: 6px 0 0 0; }
