@@ -235,13 +235,20 @@ function accountCreateParams(o) {
 function payoutScheduleParams() {
     return { settings: { payouts: { schedule: { interval: 'daily', delay_days: CONNECT.payoutDelayDays } } } };
 }
-// POST /v2/core/account_links. (`configurations` was removed from
-// account_onboarding in the API this SDK pins, 2026-09-30.endive.)
+// The onboarding link: POST /v1/account_links with the v2 account id (2026-11-13,
+// second live run). Stripe created the v2 account and then refused the v2 link
+// in legacy TEST MODE: "Cannot create a v2 account link for acct_… with
+// recipient config capabilities other than stripe_balance.stripe_transfers
+// requested in testmode. Please switch to an account created in a sandbox to
+// test." Legacy test mode "partially supports V2" (docs.stripe.com/testing-use-
+// cases); v1 endpoints take v2 account ids (the v1 payout-schedule update on
+// this very account went through), so the link is the v1 call again. If Stripe
+// refuses this too, the way through is a Sandbox (STRIPE-SANDBOX-STEPS.md).
 function accountLinkParams(o) {
     const origin = allowedOrigin(o.origin, { emulator: o.emulator === true });
     if (!origin || !SAFE_KEY.test(String(o.code)) || !ACCT_ID.test(String(o.acct))) return null;
     const base = origin + '/tournament?tourney=' + encodeURIComponent(o.code) + '&connect=';
-    return { account: o.acct, use_case: { type: 'account_onboarding', account_onboarding: { return_url: base + 'return', refresh_url: base + 'refresh' } } };
+    return { account: o.acct, type: 'account_onboarding', return_url: base + 'return', refresh_url: base + 'refresh' };
 }
 // The owner-readable mirror connectStatus/<uid>, from a v1-shaped Stripe
 // Account object (GET /v1/accounts/{id} on a v2 account returns this shape).
