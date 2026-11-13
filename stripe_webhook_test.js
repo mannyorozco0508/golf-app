@@ -49,6 +49,16 @@
 // on the v2 account id, the v2 link call never made. Baseline against main 6b4bee9f:
 // K1 red, 19 pass / 1 fail of 20. With the build (final run): 20 pass / 0 fail / 0 skipped.
 // Control: the handler back on stripe.v2.core.accountLinks.create -> K1 red.
+// RISK MODEL (Manny 2026-11-13 16:40: Stripe-managed risk, DIRECT charges, full dashboard):
+// K1 (create params, a fresh mirror), K2 (a stale mirror cleared), K3 (dashboard.stripe.com,
+// no login link), K4 (the session ON the connected account, no destination fields), K5 (the
+// refund ON the account, no reverse_transfer), K6 (direct-charge payment events on the
+// Connected-accounts endpoint: another account's rejected, no account rejected, the right one
+// pays the entry, duplicate once). Baseline against main e7804f3e: K1-K6 red, 14 pass / 6 fail
+// of 20. With the build (final run): 20 pass / 0 fail / 0 skipped. Controls (restored by sha):
+// no stripeAccount on the session -> K4 red; none on the refund -> K5 red; the connect endpoint
+// ignoring payment events -> K6 red; the mirror left stale -> K2 red; responsibilities back ->
+// K1 red; the event-account check dropped -> K6 red.
 // ============================================================================
 'use strict';
 const { test, before, after } = require('node:test');
@@ -106,11 +116,12 @@ function mockStripe() {
     const s = new Stripe('sk_test_FAKE', { host: '127.0.0.1', port: 1, protocol: 'http', maxNetworkRetries: 0 });
     const calls = { sessions: [], refunds: [], refundList: [], pi: [] };
     s.checkout = { sessions: { create: async (params, opts) => { calls.sessions.push({ params, opts }); return { id: 'cs_test_' + calls.sessions.length, url: 'https://checkout.stripe.com/c/pay/cs_test_' + calls.sessions.length }; } } };
+    calls.piOpts = []; calls.refundListOpts = [];
     s.refunds = {
         create: async (params, opts) => { calls.refunds.push({ params, opts }); return { id: 're_MOCK1', status: 'pending' }; },
-        list: async (params) => { calls.refundList.push(params); return { data: [{ id: 're_LISTED' }] }; }
+        list: async (params, opts) => { calls.refundList.push(params); calls.refundListOpts.push(opts || null); return { data: [{ id: 're_LISTED' }] }; }
     };
-    s.paymentIntents = { retrieve: async (id) => { calls.pi.push(id); return { id, metadata: { code: 'STR1', entryId: 'eStripe' } }; } };
+    s.paymentIntents = { retrieve: async (id, opts) => { calls.pi.push(id); calls.piOpts.push(opts || null); return { id, metadata: { code: 'STR1', entryId: 'eStripe' } }; } };
     // CONNECT (2026-11-12): accounts + account links, recorded; retrieve answers from `acctState`.
     calls.accounts = []; calls.links = []; calls.logins = []; calls.retrieves = [];
     calls.acctState = { id: 'acct_MOCK1', charges_enabled: false, payouts_enabled: false, details_submitted: false, requirements: { currently_due: ['external_account', 'tos_acceptance.date'] }, business_profile: { name: 'Hope Foundation' }, metadata: { uid: 'u-org' } };
@@ -456,7 +467,7 @@ test('X2. index.js stripeWebhook (onRequest): forged = 400 and nothing written; 
 // 20 pass / 0 fail / 0 skipped.
 const SEED_CONNECT = () => { const d = SEED(); d.stripeAccounts = { 'u-org': { acct: 'acct_MOCK1', createdAt: 1 } }; d.connectStatus = { 'u-org': { chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, due: [], name: 'Hope Foundation', updatedAt: 1 } }; return d; };
 
-test('K1. createConnectOnboardingLink (Accounts v2): the allow-listed owner gets ONE account from POST /v2/core/accounts (Express dashboard, uid in metadata, idempotent), the 7-day payout delay as the v1 update, and a v2 onboarding link back to this event; v1 create never called; refusals before any Stripe call', SKIP, async () => {
+test('K1. createConnectOnboardingLink (Accounts v2): the allow-listed owner gets ONE account from POST /v2/core/accounts (full dashboard, Stripe-managed risk, uid in metadata, idempotent; a fresh status mirror), the 7-day payout delay as the v1 update, and a v2 onboarding link back to this event; v1 create never called; refusals before any Stripe call', SKIP, async () => {
     await reseed();
     const { h, calls } = H();
     // No sign-in email -> refused before any Stripe call (Stripe needs contact_email
@@ -476,10 +487,14 @@ test('K1. createConnectOnboardingLink (Accounts v2): the allow-listed owner gets
     assert.equal(calls.links.length, 0, 'POST /v2/core/account_links is never called');
     assert.equal(calls.v1links.length, 1, 'POST /v1/account_links, once');
     const { params, opts } = calls.accounts[0];
-    assert.equal(params.dashboard, 'express'); assert.equal(params.type, undefined);
-    assert.deepEqual(params.defaults.responsibilities, { fees_collector: 'application', losses_collector: 'application' });
+    // RE-PINNED 2026-11-13 16:40 (Manny: Stripe-managed risk, direct charges, full dashboard).
+    assert.equal(params.dashboard, 'full'); assert.equal(params.type, undefined);
+    assert.deepEqual(params.defaults.responsibilities, { fees_collector: 'stripe', losses_collector: 'stripe' });
     assert.equal(params.configuration.merchant.capabilities.card_payments.requested, true);
-    assert.equal(params.configuration.recipient.capabilities.stripe_balance.stripe_transfers.requested, true);
+    assert.equal(params.configuration.recipient, undefined, 'no recipient configuration: nothing is transferred');
+    // a fresh mirror for the new account replaces anything a retired account left
+    const mirror0 = await read('connectStatus/u-org');
+    assert.equal(mirror0.chargesEnabled, false); assert.equal(mirror0.payoutsEnabled, false); assert.deepEqual(mirror0.due || [], [], 'nothing due yet (RTDB drops an empty array)');
     assert.deepEqual(params.metadata, { uid: 'u-org' }); assert.equal(params.display_name, undefined, 'STR1 has no beneficiary / organizerName: no made-up display name');
     assert.equal(opts.idempotencyKey, 'connect-acct:u-org');
     assert.deepEqual(calls.updates, [{ id: 'acct_MOCK1', params: { settings: { payouts: { schedule: { interval: 'daily', delay_days: 7 } } } } }], 'the 7-day delay is the v1 update on the new account');
@@ -525,6 +540,10 @@ test('K2. getConnectStatus: reads the account and writes the owner-readable mirr
     assert.equal((await read('connectStatus/u-org')).payoutsEnabled, true);
     assert.deepEqual(await h.getConnectStatus({}, { uid: 'u-who' }), { connected: false, state: 'none' });
     assert.equal(await read('connectStatus/u-who'), null, 'no mirror for no account');
+    // 2026-11-13: a stale mirror left by a retired account is cleared when the owner has no account on file.
+    await adminRest(NS, 'PUT', 'connectStatus/u-who', { chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false, due: ['external_account'], name: null, updatedAt: 1 });
+    assert.deepEqual(await h.getConnectStatus({}, { uid: 'u-who' }), { connected: false, state: 'none' });
+    assert.equal(await read('connectStatus/u-who'), null, 'the retired account\'s mirror is gone');
     await refused(h.getConnectStatus({}, { uid: null }), 'unauthenticated');
     // With {code} for an event the caller owns: the resolved service fee and the
     // organizer's name land on the RECORD (public), so the golfer's register
@@ -544,25 +563,27 @@ test('K2. getConnectStatus: reads the account and writes the owner-readable mirr
     assert.equal((await read('tournaments/OTHER/fees')).serviceFeeCents, undefined);
 });
 
-test('K3. createConnectDashboardLink: an Express login link for the caller\'s own account only', SKIP, async () => {
+test('K3. createConnectDashboardLink: a FULL-dashboard account has no login-link API - the organizer signs in at dashboard.stripe.com; still only for a caller with an account', SKIP, async () => {
     await reseed(); await adminRest(NS, 'PUT', 'stripeAccounts', { 'u-org': { acct: 'acct_MOCK1', createdAt: 1 } });
     const { h, calls } = H();
-    assert.deepEqual(await h.createConnectDashboardLink({}, { uid: 'u-org' }), { url: 'https://connect.stripe.com/express/acct_MOCK1' });
-    assert.deepEqual(calls.logins, ['acct_MOCK1']);
+    // RE-PINNED 2026-11-13 16:40 (full dashboard): was the Express login link.
+    assert.deepEqual(await h.createConnectDashboardLink({}, { uid: 'u-org' }), { url: 'https://dashboard.stripe.com/' });
+    assert.deepEqual(calls.logins, [], 'the Express login-link call is never made');
     await refused(h.createConnectDashboardLink({}, { uid: 'u-who' }), 'not-connected');
     await refused(h.createConnectDashboardLink({}, { uid: null }), 'unauthenticated');
-    assert.equal(calls.logins.length, 1);
 });
 
-test('K4. createEntryCheckout on a connected owner: two line items (entry + $4 service fee), application fee, on_behalf_of/transfer_data, fees/paidTo = organizer; mid-setup = not-connected and no session', SKIP, async () => {
+test('K4. createEntryCheckout on a connected owner: a DIRECT charge - the session is created ON the organizer\'s account (stripeAccount), two line items (entry + $4 service fee), application fee, no on_behalf_of/transfer_data, fees/paidTo = organizer; mid-setup = not-connected and no session', SKIP, async () => {
     await adminRest(NS, 'PUT', '', SEED_CONNECT());
     const { h, calls } = H();
     const out = await h.createEntryCheckout({ code: 'STR1', entryId: 'e1' }, ORIGIN);
     assert.match(out.url, /^https:\/\/checkout\.stripe\.com\//);
-    const { params } = calls.sessions[0];
+    const { params, opts } = calls.sessions[0];
     assert.deepEqual(params.line_items.map((l) => [l.price_data.product_data.name, l.price_data.unit_amount]), [['Stripe Open entry fee', 5000], ['HardPan service fee', 400]]);
     assert.equal(params.payment_intent_data.application_fee_amount, 400);
-    assert.equal(params.payment_intent_data.on_behalf_of, 'acct_MOCK1'); assert.deepEqual(params.payment_intent_data.transfer_data, { destination: 'acct_MOCK1' });
+    // RE-PINNED 2026-11-13 16:40 (direct charges): on the connected account, no destination fields.
+    assert.equal(opts.stripeAccount, 'acct_MOCK1', 'the session is created on the organizer\'s account');
+    assert.equal(params.payment_intent_data.on_behalf_of, undefined); assert.equal(params.payment_intent_data.transfer_data, undefined);
     assert.equal(params.metadata.acct, 'acct_MOCK1'); assert.equal(params.metadata.serviceFeeCents, '400');
     assert.equal((await read('tournaments/STR1/fees')).paidTo, 'organizer', 'the record says who is paid, without naming the account');
     assert.equal((await read('tournaments/STR1/fees')).serviceFeeCents, 400, 'and the fee the golfer was charged on top');
@@ -582,18 +603,21 @@ test('K4. createEntryCheckout on a connected owner: two line items (entry + $4 s
     // No account at all: the HardPan charge of Phase 1, one line, paidTo = hardpan.
     await reseed();
     const five = H(); await five.h.createEntryCheckout({ code: 'STR1', entryId: 'e1' }, ORIGIN);
-    assert.equal(five.calls.sessions[0].params.line_items.length, 1); assert.equal(five.calls.sessions[0].params.payment_intent_data.on_behalf_of, undefined);
+    assert.equal(five.calls.sessions[0].params.line_items.length, 1); assert.equal(five.calls.sessions[0].opts.stripeAccount, undefined, 'HardPan\'s own charge: no connected account');
     assert.equal((await read('tournaments/STR1/fees')).paidTo, 'hardpan');
 });
 
-test('K5. refundEntry on a destination charge reverses the transfer and returns the service fee; the platform charge refunds as before', SKIP, async () => {
+test('K5. refundEntry on a direct charge runs ON the connected account and returns the application fee (no transfer to reverse); the platform charge refunds as before', SKIP, async () => {
     await adminRest(NS, 'PUT', '', SEED_CONNECT());
     await adminRest(NS, 'PUT', 'registrations/STR1/eDest', REG({ paid: true, paidAt: 5, paidVia: 'stripe', ref: 'pi_DEST', amountCents: 5000, serviceFeeCents: 400, acct: 'acct_MOCK1' }));
     const { h, calls } = H();
     assert.deepEqual(await h.refundEntry({ code: 'STR1', entryId: 'eDest' }, { uid: 'u-org' }), { status: 'pending' });
-    assert.deepEqual(calls.refunds[0].params, { payment_intent: 'pi_DEST', metadata: { code: 'STR1', entryId: 'eDest' }, reverse_transfer: true, refund_application_fee: true });
+    // RE-PINNED 2026-11-13 16:40 (direct charges).
+    assert.deepEqual(calls.refunds[0].params, { payment_intent: 'pi_DEST', metadata: { code: 'STR1', entryId: 'eDest' }, refund_application_fee: true });
+    assert.equal(calls.refunds[0].opts.stripeAccount, 'acct_MOCK1', 'refunded on the organizer\'s account');
     await h.refundEntry({ code: 'STR1', entryId: 'eStripe' }, { uid: 'u-org' });
     assert.deepEqual(calls.refunds[1].params, { payment_intent: 'pi_PAID', metadata: { code: 'STR1', entryId: 'eStripe' } });
+    assert.equal(calls.refunds[1].opts.stripeAccount, undefined, 'HardPan\'s own charge: no connected account');
 });
 
 test('K6. stripeConnectWebhook: a signed account.updated writes the mirror for the uid in its metadata; deauthorized turns everything off; forged = 400 and nothing written; an account nobody owns is recorded rejected; idempotent', SKIP, async () => {
@@ -623,6 +647,23 @@ test('K6. stripeConnectWebhook: a signed account.updated writes the mirror for t
     assert.equal(r.status, 200); assert.equal(r.body, 'rejected-account');
     assert.equal((await read('stripeEvents/evt_acct_2')).type, 'rejected-account');
     assert.deepEqual(Object.keys(await read('connectStatus')), ['u-org']);
+    // DIRECT CHARGES (2026-11-13 16:40): a connected account's checkout.session.completed arrives HERE with
+    // event.account; the same contract update as the platform endpoint; another account's event, or one
+    // with no account, writes nothing.
+    const pay = (id, account, acct) => JSON.stringify({ id, object: 'event', type: 'checkout.session.completed', account, api_version: '2026-09-30', created: 1,
+        data: { object: { id: 'cs_' + id, object: 'checkout.session', payment_status: 'paid', amount_total: 5400, currency: 'usd', payment_intent: 'pi_' + id, metadata: { code: 'STR1', entryId: 'e1', acct, serviceFeeCents: '400' } } } });
+    r = await h.stripeConnectWebhook(pay('dc1', 'acct_OTHER', 'acct_MOCK1'), sign(pay('dc1', 'acct_OTHER', 'acct_MOCK1'), CSECRET));
+    assert.equal(r.body, 'rejected-account', 'another account\'s event never pays the entry');
+    assert.equal((await read('registrations/STR1/e1')).paid, undefined);
+    const noAcct = JSON.stringify(Object.assign(JSON.parse(pay('dc2', 'x', 'acct_MOCK1')), { account: undefined }));
+    r = await h.stripeConnectWebhook(noAcct, sign(noAcct, CSECRET));
+    assert.equal(r.body, 'rejected-account', 'a payment event with no account on this endpoint');
+    r = await h.stripeConnectWebhook(pay('dc3', 'acct_MOCK1', 'acct_MOCK1'), sign(pay('dc3', 'acct_MOCK1', 'acct_MOCK1'), CSECRET));
+    assert.equal(r.status, 200); assert.equal(r.body, 'checkout.session.completed');
+    const paidRow = await read('registrations/STR1/e1');
+    assert.equal(paidRow.paid, true); assert.equal(paidRow.amountCents, 5000); assert.equal(paidRow.serviceFeeCents, 400); assert.equal(paidRow.acct, 'acct_MOCK1'); assert.equal(paidRow.ref, 'pi_dc3');
+    assert.deepEqual(await read('registrationStatus/STR1/e1'), { paid: true, paidVia: 'stripe', at: paidRow.paidAt });
+    assert.equal((await h.stripeConnectWebhook(pay('dc3', 'acct_MOCK1', 'acct_MOCK1'), sign(pay('dc3', 'acct_MOCK1', 'acct_MOCK1'), CSECRET))).body, 'duplicate');
     // Accounts v2 (2026-11-13): the v1 view of a v2 account arrives with no
     // metadata.uid and no business_profile.name; it is OUR account (stripeAccounts
     // holds its id), so the mirror is written, with the name kept at creation.

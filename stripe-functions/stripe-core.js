@@ -123,7 +123,8 @@ function isStripePaid(reg) {
 //               { acct, chargesEnabled } from stripeAccounts/<uid> + connectStatus/<uid>
 //   platformFeeCents / eventFeeCents  the service fee setting (platform/connect/serviceFeeCents,
 //               platform/connect/eventOverrides/<code>/serviceFeeCents; Manny-only nodes)
-// -> {ok:false, reason} | {ok:true, amountCents (the entry fee), serviceFeeCents, totalCents, destination, attempt}
+// -> {ok:false, reason} | {ok:true, amountCents (the entry fee), serviceFeeCents, totalCents, onAccount, attempt}
+//   onAccount   the connected account the DIRECT charge is made on (null = HardPan's own charge, Phase 1)
 function planCheckout(input) {
     const t = input && input.tournament, reg = input && input.registration;
     if (!t || typeof t !== 'object' || !reg || typeof reg !== 'object') return { ok: false, reason: REASONS.NOT_FOUND };
@@ -137,18 +138,18 @@ function planCheckout(input) {
     // CONNECT (2026-11-12). No account on file: the HardPan charge of Phase 1,
     // no service fee. An account that cannot take charges yet: refuse - money
     // must never land in the wrong account while the organizer is mid-setup.
-    // Charges enabled: a destination charge, and the golfer pays the entry fee
-    // PLUS HardPan's service fee, which is the application fee (Manny).
+    // Charges enabled: a DIRECT charge on the organizer's account, and the golfer
+    // pays the entry fee PLUS HardPan's service fee, which is the application fee.
     const c = input.connect;
-    let destination = null, serviceFeeCents = 0;
+    let onAccount = null, serviceFeeCents = 0;
     if (c && typeof c === 'object' && c.acct !== undefined && c.acct !== null) {
         if (!ACCT_ID.test(String(c.acct))) return { ok: false, reason: REASONS.BAD_FEE };
         if (c.chargesEnabled !== true) return { ok: false, reason: EXTRA_REASONS.NOT_CONNECTED };
         const fee = serviceFee({ platformFeeCents: input.platformFeeCents, eventFeeCents: input.eventFeeCents });
         if (!fee.ok) return { ok: false, reason: fee.reason };
-        destination = c.acct; serviceFeeCents = fee.cents;
+        onAccount = c.acct; serviceFeeCents = fee.cents;
     }
-    return { ok: true, amountCents: fees.entryFeeCents, serviceFeeCents, totalCents: fees.entryFeeCents + serviceFeeCents, destination, attempt: attempts + 1 };
+    return { ok: true, amountCents: fees.entryFeeCents, serviceFeeCents, totalCents: fees.entryFeeCents + serviceFeeCents, onAccount, attempt: attempts + 1 };
 }
 
 // ---- CONNECT (Phase 2, 2026-11-12). Manny's decisions, in order: layout A;
@@ -156,8 +157,19 @@ function planCheckout(input) {
 // fee per golfer ON TOP of the entry fee on card sign-ups ($4 by default, a
 // platform setting with a per-event override only Manny writes), taken as the
 // Connect application fee, so the organizer receives the full entry fee minus
-// Stripe's processing; payouts on a 7-day delay; the card statement shows the
-// organizer (on_behalf_of); Stripe issues the 1099-Ks (Express).
+// Stripe's processing; payouts on a 7-day delay; Stripe issues the 1099-Ks.
+// RISK MODEL (Manny, 2026-11-13 16:40, after the sandbox refused the create):
+// STRIPE-MANAGED RISK with DIRECT CHARGES and the FULL Stripe dashboard.
+// The account is created with fees_collector + losses_collector = 'stripe'
+// (Stripe bills the organizer its processing and carries negative balances;
+// HardPan holds no reserve). The checkout session is created ON the connected
+// account (the handler passes stripeAccount), so the charge is the organizer's
+// own: their statement descriptor, their Stripe fee; HardPan's $4 is the
+// application fee on that charge. Refunds run on the connected account too
+// and return the application fee. The organizer manages the account at
+// dashboard.stripe.com (no Express login link). Direct-charge events are
+// emitted on the connected account, so the Connected-accounts endpoint
+// handles them (CONNECT_ENDPOINT_EVENT_TYPES).
 const ACCT_ID = /^acct_[A-Za-z0-9]{1,64}$/;   // shape only; Stripe's ids are 16 chars, the tests' are short
 const UID = /^[A-Za-z0-9_-]{1,128}$/;
 const DEFAULT_SERVICE_FEE_CENTS = 400;
@@ -177,6 +189,8 @@ const MAX_SERVICE_FEE_CENTS = 2000;
 // the v1 update, and a refusal there is recorded, not hidden (handlers.js).
 const CONNECT = Object.freeze({ country: 'US', countryV2: 'us', currency: 'usd', payoutDelayDays: 7, siteUrl: 'https://tournaments.rattlegolf.com' });
 const CONNECT_EVENT_TYPES = Object.freeze(['account.updated', 'account.application.deauthorized']);
+// Where the organizer manages a full-dashboard account (no login-link API for it).
+const DASHBOARD_URL = 'https://dashboard.stripe.com/';
 
 // The service fee in cents: the per-event override when Manny set one, else the
 // platform number, else $4. Whole cents, $0..$20. The client never sends it.
@@ -200,11 +214,14 @@ function planConnect(input) {
     return { ok: true, uid };
 }
 function connectIdempotencyKey(uid) { return 'connect-acct:' + uid; }
-// POST /v2/core/accounts: the Express equivalent. `dashboard: 'express'`
-// requires fees_collector and losses_collector = 'application' (Stripe's own
-// error text), i.e. HardPan is responsible for fees and losses as with v1
-// Express. No `type`, no `capabilities`, no `settings.payouts` here: those are
-// v1 fields and v2 refuses unknown parameters.
+// POST /v2/core/accounts under Stripe-managed risk (Manny 2026-11-13 16:40):
+// `dashboard: 'full'` with fees_collector + losses_collector = 'stripe' - the
+// sandbox platform profile's model (Stripe-managed risk, direct charges). The
+// Express dashboard with managed risk is a Stripe public preview on a preview
+// API version, so the full dashboard it is. Only the merchant configuration is
+// requested (card_payments: the organizer takes the charge directly); no
+// recipient configuration - nothing is transferred. No `type`, no
+// `capabilities`, no `settings.payouts` here: those are v1 fields.
 // The organizer's sign-in email as Stripe's contact_email, or null.
 function connectEmail(email) {
     const e = (typeof email === 'string') ? email.trim().toLowerCase() : '';
@@ -214,16 +231,15 @@ function accountCreateParams(o) {
     const name = (typeof o.name === 'string' && o.name.trim()) ? o.name.trim().slice(0, 100) : null;
     const email = connectEmail(o.email);
     const p = {
-        dashboard: 'express',
+        dashboard: 'full',
         identity: { country: CONNECT.countryV2 },
         defaults: {
             currency: CONNECT.currency,
-            responsibilities: { fees_collector: 'application', losses_collector: 'application' },
+            responsibilities: { fees_collector: 'stripe', losses_collector: 'stripe' },
             profile: { business_url: CONNECT.siteUrl }
         },
         configuration: {
-            merchant: { capabilities: { card_payments: { requested: true } } },
-            recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } }
+            merchant: { capabilities: { card_payments: { requested: true } } }
         },
         metadata: { uid: o.uid }
     };
@@ -286,11 +302,12 @@ function mapAccountEvent(event, now, owner) {
     if (!uid) return { uid: null, status: null, record: rec('rejected-account') };
     return { uid, status: { chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false, due: [], name: null, updatedAt: now, deauthorizedAt: now }, record: rec(event.type) };
 }
-// Refund params: a destination charge pulls the transfer back and returns our
-// service fee, so the golfer is made whole and the organizer is never short.
+// Refund params: a direct charge is refunded ON the connected account (the
+// handler passes stripeAccount) and returns our application fee, so the golfer
+// is made whole and the organizer is never short; nothing to reverse.
 function refundParams(plan, ref) {
     const p = { payment_intent: plan.paymentIntent, metadata: { code: ref.code, entryId: ref.entryId } };
-    if (plan.destination) { p.reverse_transfer = true; p.refund_application_fee = true; }
+    if (plan.onAccount) p.refund_application_fee = true;
     return p;
 }
 
@@ -319,14 +336,13 @@ function sessionParams(o) {
     const meta = { code: o.code, entryId: o.entryId };
     const items = [{ quantity: 1, price_data: { currency: CURRENCY, unit_amount: o.amountCents, product_data: { name: name + ' entry fee' } } }];
     const pid = { metadata: meta, statement_descriptor_suffix: 'TOURNEY' };
-    // CONNECT: a destination charge on behalf of the organizer (the statement
-    // shows their name); HardPan's service fee is its own line the golfer sees,
-    // and the application fee HardPan keeps. $0 adds no line and no fee.
+    // CONNECT: a DIRECT charge on the organizer's account (the handler creates
+    // the session with stripeAccount = acct, so no on_behalf_of / transfer_data
+    // here); HardPan's service fee is its own line the golfer sees, and the
+    // application fee HardPan keeps. $0 adds no line and no fee.
     if (typeof o.acct === 'string' && ACCT_ID.test(o.acct)) {
         const fee = isIntegerCents(o.serviceFeeCents) ? o.serviceFeeCents : 0;
         meta.acct = o.acct; meta.serviceFeeCents = String(fee);
-        pid.on_behalf_of = o.acct;
-        pid.transfer_data = { destination: o.acct };
         if (fee > 0) {
             items.push({ quantity: 1, price_data: { currency: CURRENCY, unit_amount: fee, product_data: { name: 'HardPan service fee' } } });
             pid.application_fee_amount = fee;
@@ -354,10 +370,10 @@ function planRefund(input) {
     if (!t.ownerUid || t.ownerUid !== uid) return { ok: false, reason: EXTRA_REASONS.NOT_OWNER };
     if (reg.refundedAt) return { ok: false, reason: EXTRA_REASONS.ALREADY_REFUNDED };
     if (reg.paidVia !== 'stripe' || typeof reg.ref !== 'string' || !/^pi_/.test(reg.ref)) return { ok: false, reason: EXTRA_REASONS.NOT_STRIPE_PAID };
-    return { ok: true, paymentIntent: reg.ref, destination: (typeof reg.acct === 'string' && ACCT_ID.test(reg.acct)) ? reg.acct : null };
+    return { ok: true, paymentIntent: reg.ref, onAccount: (typeof reg.acct === 'string' && ACCT_ID.test(reg.acct)) ? reg.acct : null };
 }
 
-// Event types the endpoint is registered for (README lists them for the dashboard).
+// Event types the PLATFORM endpoint is registered for (HardPan's own charges).
 const EVENT_TYPES = Object.freeze([
     'checkout.session.completed',
     'checkout.session.async_payment_succeeded',
@@ -365,6 +381,10 @@ const EVENT_TYPES = Object.freeze([
     'charge.refunded',
     'charge.dispute.created'
 ]);
+// The CONNECTED-ACCOUNTS endpoint: the account events plus the same payment
+// events, which a direct charge emits on the organizer's account (with
+// event.account). README lists both sets for the dashboard.
+const CONNECT_ENDPOINT_EVENT_TYPES = Object.freeze(CONNECT_EVENT_TYPES.concat(EVENT_TYPES));
 
 // Which registration an event is about, from what the event itself carries.
 // Sessions carry metadata; charges/disputes need the PaymentIntent's metadata,
@@ -403,6 +423,11 @@ function mapEvent(event, ctx) {
             // metadata (set by sessionParams, never by a client); the total the
             // golfer paid must be the entry fee plus exactly that service fee.
             const acct = (o.metadata && typeof o.metadata.acct === 'string' && ACCT_ID.test(o.metadata.acct)) ? o.metadata.acct : null;
+            // A direct charge's event arrives on the connected account (event.account):
+            // it must be the account the session was made on, and a platform event
+            // must not claim one.
+            const evAcct = typeof event.account === 'string' ? event.account : null;
+            if ((evAcct || acct) && evAcct !== acct) return { update: null, record: rec('rejected-account') };
             let service = 0;
             if (acct) {
                 const raw = o.metadata.serviceFeeCents;
@@ -452,7 +477,7 @@ module.exports = {
     checkoutIdempotencyKey, refundIdempotencyKey, sessionParams, planRefund,
     eventRef, mapEvent,
     // Connect (2026-11-12)
-    DEFAULT_SERVICE_FEE_CENTS, MAX_SERVICE_FEE_CENTS, CONNECT, CONNECT_EVENT_TYPES,
+    DEFAULT_SERVICE_FEE_CENTS, MAX_SERVICE_FEE_CENTS, CONNECT, CONNECT_EVENT_TYPES, CONNECT_ENDPOINT_EVENT_TYPES, DASHBOARD_URL,
     serviceFee, planConnect, connectIdempotencyKey, connectEmail, accountCreateParams, payoutScheduleParams, accountLinkParams,
     connectStatusOf, connectState, mapAccountEvent, refundParams
 };
