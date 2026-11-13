@@ -41,7 +41,13 @@ const EXTRA_REASONS = Object.freeze({
     NOT_OWNER: 'not-owner',
     NOT_STRIPE_PAID: 'not-stripe-paid',
     ALREADY_REFUNDED: 'already-refunded',
-    UNAUTHENTICATED: 'unauthenticated'
+    UNAUTHENTICATED: 'unauthenticated',
+    // Accounts v2 needs a contact email on the account when the recipient
+    // configuration is requested (Stripe, live log 2026-11-13 18:07 UTC:
+    // "If configuration.recipient is supplied, the Account must have a contact
+    // email."). The owner's sign-in email is it; a sign-in without one is refused
+    // before any Stripe call.
+    NO_EMAIL: 'no-email'
 });
 // HttpsError codes per reason (the wrapper builds the HttpsError).
 const ERROR_CODES = Object.freeze({
@@ -56,7 +62,8 @@ const ERROR_CODES = Object.freeze({
     'not-stripe-paid': 'failed-precondition',
     'already-refunded': 'failed-precondition',
     'unauthenticated': 'unauthenticated',
-    'not-connected': 'failed-precondition'
+    'not-connected': 'failed-precondition',
+    'no-email': 'failed-precondition'
 });
 
 const FIXED_ORIGINS = Object.freeze([
@@ -198,8 +205,14 @@ function connectIdempotencyKey(uid) { return 'connect-acct:' + uid; }
 // error text), i.e. HardPan is responsible for fees and losses as with v1
 // Express. No `type`, no `capabilities`, no `settings.payouts` here: those are
 // v1 fields and v2 refuses unknown parameters.
+// The organizer's sign-in email as Stripe's contact_email, or null.
+function connectEmail(email) {
+    const e = (typeof email === 'string') ? email.trim().toLowerCase() : '';
+    return (e && e.length <= 254 && EMAIL.test(e)) ? e : null;
+}
 function accountCreateParams(o) {
     const name = (typeof o.name === 'string' && o.name.trim()) ? o.name.trim().slice(0, 100) : null;
+    const email = connectEmail(o.email);
     const p = {
         dashboard: 'express',
         identity: { country: CONNECT.countryV2 },
@@ -215,6 +228,7 @@ function accountCreateParams(o) {
         metadata: { uid: o.uid }
     };
     if (name) p.display_name = name;
+    if (email) p.contact_email = email;
     return p;
 }
 // The v1 update applied right after creation (v2 has no schedule field).
@@ -432,6 +446,6 @@ module.exports = {
     eventRef, mapEvent,
     // Connect (2026-11-12)
     DEFAULT_SERVICE_FEE_CENTS, MAX_SERVICE_FEE_CENTS, CONNECT, CONNECT_EVENT_TYPES,
-    serviceFee, planConnect, connectIdempotencyKey, accountCreateParams, payoutScheduleParams, accountLinkParams,
+    serviceFee, planConnect, connectIdempotencyKey, connectEmail, accountCreateParams, payoutScheduleParams, accountLinkParams,
     connectStatusOf, connectState, mapAccountEvent, refundParams
 };

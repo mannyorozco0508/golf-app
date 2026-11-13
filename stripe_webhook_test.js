@@ -39,6 +39,12 @@
 // Controls (handlers.js / stripe-core.js mutated, restored by sha): the handler
 // back on v1 accounts.create -> K1 red; a refused schedule update thrown ->
 // K1 red; owner fallback dropped -> K6 red (+ 21 in stripe_core_test.js).
+// CONTACT EMAIL (2026-11-13): K1 gains the no-email refusal (before any Stripe
+// call) and contact_email on the create; X1 drives the wrapper's no-email
+// refusal and pins its one email line in source. Baseline against main
+// 501855b4: K1 + X1 red, 18 pass / 2 fail of 20. With the build (final run):
+// 20 pass / 0 fail / 0 skipped. Controls: handler no longer refuses a missing
+// email -> K1 + X1 red; the wrapper forgets the token email -> X1 red.
 // ============================================================================
 'use strict';
 const { test, before, after } = require('node:test');
@@ -403,6 +409,17 @@ test('X1. index.js: exports exactly the three contract functions, us-central1, b
     assert.equal(await reason(m.createEntryCheckout.run({ data: { code: 'STR1', entryId: 'eCash' }, rawRequest: { headers: ORIGIN } })), 'failed-precondition/already-paid');
     assert.equal(await reason(m.refundEntry.run({ data: { code: 'STR1', entryId: 'eStripe' }, auth: { uid: 'u-who' }, rawRequest: { headers: {} } })), 'permission-denied/not-owner');
     assert.equal(await reason(m.refundEntry.run({ data: { code: 'STR1', entryId: 'eStripe' }, rawRequest: { headers: {} } })), 'unauthenticated/unauthenticated');
+    // Accounts v2 (2026-11-13): the wrapper hands the handler the token's email;
+    // a signed-in owner whose token has none is refused before any Stripe call.
+    assert.equal(await reason(m.createConnectOnboardingLink.run({ data: { code: 'STR1' }, auth: { uid: 'u-org', token: {} }, rawRequest: { headers: ORIGIN } })), 'failed-precondition/no-email');
+    assert.equal(await reason(m.createConnectOnboardingLink.run({ data: { code: 'STR1' }, auth: { uid: 'u-org' }, rawRequest: { headers: ORIGIN } })), 'failed-precondition/no-email');
+    // The positive half cannot run here (a token WITH an email would reach
+    // Stripe's API, which layer (b) never does), so the wrapper's one line is
+    // pinned in source: the token's email is what it hands the handler.
+    const wrapperSrc = fs.readFileSync(path.join(FN, 'index.js'), 'utf8');
+    const connectWrapper = wrapperSrc.slice(wrapperSrc.indexOf('exports.createConnectOnboardingLink'), wrapperSrc.indexOf('exports.getConnectStatus'));
+    assert.match(connectWrapper, /const token = \(request\.auth && request\.auth\.token\) \|\| \{\};/);
+    assert.match(connectWrapper, /email: token\.email/);
 });
 
 test('X2. index.js stripeWebhook (onRequest): forged = 400 and nothing written; signed = 200 and paid; GET = 405', SKIP, async () => {
@@ -438,9 +455,17 @@ const SEED_CONNECT = () => { const d = SEED(); d.stripeAccounts = { 'u-org': { a
 test('K1. createConnectOnboardingLink (Accounts v2): the allow-listed owner gets ONE account from POST /v2/core/accounts (Express dashboard, uid in metadata, idempotent), the 7-day payout delay as the v1 update, and a v2 onboarding link back to this event; v1 create never called; refusals before any Stripe call', SKIP, async () => {
     await reseed();
     const { h, calls } = H();
-    const out = await h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' });
+    // No sign-in email -> refused before any Stripe call (Stripe needs contact_email
+    // on a v2 account with the recipient configuration; live log 2026-11-13 18:07 UTC).
+    await refused(h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' }), 'no-email');
+    await refused(h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com', email: 'nope' }), 'no-email');
+    assert.equal(calls.accounts.length + calls.links.length, 0, 'no Stripe call without an email');
+    assert.equal(await read('stripeAccounts/u-org'), null);
+    const OWNER = { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com', email: 'Org@Example.test' };
+    const out = await h.createConnectOnboardingLink({ code: 'STR1' }, OWNER);
     assert.match(out.url, /^https:\/\/connect\.stripe\.com\/setup\//);
     assert.equal(calls.accounts.length, 1, 'one v2 create');
+    assert.equal(calls.accounts[0].params.contact_email, 'org@example.test');
     assert.equal(calls.v1accounts.length, 0, 'POST /v1/accounts is never called (Stripe refuses it)');
     assert.equal(calls.v1links.length, 0, 'POST /v1/account_links is never called');
     const { params, opts } = calls.accounts[0];
@@ -454,14 +479,15 @@ test('K1. createConnectOnboardingLink (Accounts v2): the allow-listed owner gets
     assert.deepEqual(calls.links[0], { account: 'acct_MOCK1', use_case: { type: 'account_onboarding', account_onboarding: { return_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=return', refresh_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=refresh' } } });
     const saved = await read('stripeAccounts/u-org');
     assert.equal(saved.acct, 'acct_MOCK1'); assert.equal(typeof saved.createdAt, 'number'); assert.equal(saved.api, 'v2'); assert.equal(saved.name, undefined); assert.equal(saved.payoutScheduleError, undefined);
-    // A second call reuses the account: one more link, no second account, no second schedule update.
+    // A second call reuses the account: one more link, no second account, no second
+    // schedule update - and no email needed once the account exists.
     await h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' });
     assert.equal(calls.accounts.length, 1); assert.equal(calls.links.length, 2); assert.equal(calls.updates.length, 1);
     // Stripe refuses the schedule update: the organizer still gets the link, and
     // the refusal is kept on the server-only record (not hidden).
     await adminRest(NS, 'DELETE', 'stripeAccounts/u-org');
     calls.updateThrows = new Error('No such parameter: settings[payouts]');
-    const again = await h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' });
+    const again = await h.createConnectOnboardingLink({ code: 'STR1' }, OWNER);
     assert.match(again.url, /^https:\/\/connect\.stripe\.com\/setup\//);
     const kept = await read('stripeAccounts/u-org');
     assert.equal(kept.acct, 'acct_MOCK1'); assert.equal(kept.payoutScheduleError, 'No such parameter: settings[payouts]');
