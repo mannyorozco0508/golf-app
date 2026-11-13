@@ -59,6 +59,7 @@ const SKIP = !HAS_MODULES ? { skip: 'stripe-functions/node_modules not installed
 const PORT = 9474, HOST = '127.0.0.1:' + PORT, BASE = 'http://' + HOST;
 const NS = 'stripehandlers', NSW = 'stripewrap';
 const SECRET = 'whsec_test_FAKE_not_a_real_secret';
+const CSECRET = 'whsec_test_FAKE_connect_endpoint';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const adminRest = async (ns, method, p, body) => (await fetch(`${BASE}/${p}.json?ns=${ns}`, { method, headers: { Authorization: 'Bearer owner' }, body: body === undefined ? undefined : JSON.stringify(body) })).json();
 
@@ -91,6 +92,15 @@ function mockStripe() {
         list: async (params) => { calls.refundList.push(params); return { data: [{ id: 're_LISTED' }] }; }
     };
     s.paymentIntents = { retrieve: async (id) => { calls.pi.push(id); return { id, metadata: { code: 'STR1', entryId: 'eStripe' } }; } };
+    // CONNECT (2026-11-12): accounts + account links, recorded; retrieve answers from `acctState`.
+    calls.accounts = []; calls.links = []; calls.logins = []; calls.retrieves = [];
+    calls.acctState = { id: 'acct_MOCK1', charges_enabled: false, payouts_enabled: false, details_submitted: false, requirements: { currently_due: ['external_account', 'tos_acceptance.date'] }, business_profile: { name: 'Hope Foundation' }, metadata: { uid: 'u-org' } };
+    s.accounts = {
+        create: async (params, opts) => { calls.accounts.push({ params, opts }); return { id: 'acct_MOCK1' }; },
+        retrieve: async (id) => { calls.retrieves.push(id); return Object.assign({ id }, calls.acctState); },
+        createLoginLink: async (id) => { calls.logins.push(id); return { url: 'https://connect.stripe.com/express/' + id }; }
+    };
+    s.accountLinks = { create: async (params) => { calls.links.push(params); return { url: 'https://connect.stripe.com/setup/e/' + params.account + '/x' }; } };
     return { s, calls };
 }
 // Count every update() the handlers make on a registrations/ path.
@@ -113,7 +123,7 @@ let clock = 1000;
 function H(opts) {
     const m = mockStripe();
     const cdb = countingDb(db);
-    const h = makeHandlers(Object.assign({ db: cdb, stripe: m.s, webhookSecret: SECRET, now: () => ++clock }, opts || {}));
+    const h = makeHandlers(Object.assign({ db: cdb, stripe: m.s, webhookSecret: SECRET, connectWebhookSecret: CSECRET, now: () => ++clock }, opts || {}));
     return { h, calls: m.calls, updates: cdb.updates };
 }
 const sign = (payload, secret) => signer.webhooks.generateTestHeaderString({ payload, secret: secret || SECRET });
@@ -346,7 +356,16 @@ test('X1. index.js: exports exactly the three contract functions, us-central1, b
     // and the four photo-wall callables (E4). None of them binds a Stripe
     // secret; the three Stripe functions below are pinned exactly as before.
     const PHOTO = ['approvePhoto', 'hidePhoto', 'photoLinks', 'reportPhoto'];
-    assert.deepEqual(Object.keys(m).sort(), ['approvePhoto', 'createEntryCheckout', 'hidePhoto', 'photoLinks', 'refundEntry', 'reportPhoto', 'sendAnnouncement', 'stripeWebhook']);
+    // RE-PINNED 2026-11-12 (Connect, Manny): three onboarding callables and the
+    // connected-account endpoint join; the endpoint binds the Connect secret.
+    assert.deepEqual(Object.keys(m).sort(), ['approvePhoto', 'createConnectDashboardLink', 'createConnectOnboardingLink', 'createEntryCheckout', 'getConnectStatus', 'hidePhoto', 'photoLinks', 'refundEntry', 'reportPhoto', 'sendAnnouncement', 'stripeConnectWebhook', 'stripeWebhook']);
+    for (const k of ['createConnectOnboardingLink', 'getConnectStatus', 'createConnectDashboardLink']) {
+        assert.deepEqual(m[k].__endpoint.region, ['us-central1'], k);
+        assert.ok(m[k].__endpoint.callableTrigger, k + ' is a callable');
+        assert.deepEqual(m[k].__endpoint.secretEnvironmentVariables.map((x) => x.key).sort(), ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'], k);
+    }
+    assert.ok(m.stripeConnectWebhook.__endpoint.httpsTrigger);
+    assert.deepEqual(m.stripeConnectWebhook.__endpoint.secretEnvironmentVariables.map((x) => x.key).sort(), ['STRIPE_CONNECT_WEBHOOK_SECRET', 'STRIPE_SECRET_KEY']);
     for (const k of PHOTO) {
         assert.deepEqual(m[k].__endpoint.region, ['us-central1'], k);
         assert.ok(m[k].__endpoint.callableTrigger, k + ' is a callable');
@@ -385,4 +404,138 @@ test('X2. index.js stripeWebhook (onRequest): forged = 400 and nothing written; 
     const reg = await read('registrations/STR1/e1', NSW);
     assert.equal(reg.paid, true); assert.equal(reg.paidVia, 'stripe'); assert.equal(reg.amountCents, 5000);
     assert.equal((await read('registrationStatus/STR1/e1', NSW)).paid, true);
+});
+
+
+// ------------------------------------------------------------ CONNECT (2026-11-12)
+// Manny's decisions: only payments/allowedOwners may connect; a $4 service fee
+// per golfer on top of the entry fee as the application fee; 7-day payout delay;
+// the statement shows the organizer; the account id never reaches a client.
+// Baseline: against main 5041dd9b these 6 tests fail at the first call (no
+// handler): 20 tests, 13 pass / 7 fail (K1-K6 + X1's export pin). With the build:
+// 20 pass / 0 fail / 0 skipped.
+const SEED_CONNECT = () => { const d = SEED(); d.stripeAccounts = { 'u-org': { acct: 'acct_MOCK1', createdAt: 1 } }; d.connectStatus = { 'u-org': { chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, due: [], name: 'Hope Foundation', updatedAt: 1 } }; return d; };
+
+test('K1. createConnectOnboardingLink: the allow-listed owner gets an Express account once (7-day payouts, uid in metadata, idempotent) and a link back to this event; refusals before any Stripe call', SKIP, async () => {
+    await reseed();
+    const { h, calls } = H();
+    const out = await h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' });
+    assert.match(out.url, /^https:\/\/connect\.stripe\.com\/setup\//);
+    assert.equal(calls.accounts.length, 1);
+    const { params, opts } = calls.accounts[0];
+    assert.equal(params.type, 'express'); assert.deepEqual(params.settings.payouts.schedule, { interval: 'daily', delay_days: 7 }); assert.deepEqual(params.metadata, { uid: 'u-org' });
+    assert.equal(opts.idempotencyKey, 'connect-acct:u-org');
+    assert.deepEqual(calls.links[0], { account: 'acct_MOCK1', type: 'account_onboarding', return_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=return', refresh_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=refresh' });
+    const saved = await read('stripeAccounts/u-org');
+    assert.equal(saved.acct, 'acct_MOCK1'); assert.equal(typeof saved.createdAt, 'number');
+    // A second call reuses the account: one more link, no second account.
+    await h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' });
+    assert.equal(calls.accounts.length, 1); assert.equal(calls.links.length, 2);
+    // Refusals: signed out, not the owner, not allow-listed (OTHER's owner u-who), bad origin, bad code.
+    const n = calls.accounts.length + calls.links.length;
+    await refused(h.createConnectOnboardingLink({ code: 'STR1' }, { uid: null, origin: 'https://tournaments.rattlegolf.com' }), 'unauthenticated');
+    await refused(h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-else', origin: 'https://tournaments.rattlegolf.com' }), 'not-owner');
+    await refused(h.createConnectOnboardingLink({ code: 'OTHER' }, { uid: 'u-who', origin: 'https://tournaments.rattlegolf.com' }), 'not-allowed-owner');
+    await refused(h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://evil.example' }), 'bad-origin');
+    await refused(h.createConnectOnboardingLink({ code: 'bad code' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' }), 'not-found');
+    assert.equal(calls.accounts.length + calls.links.length, n, 'no Stripe call on a refusal');
+    assert.equal(await read('stripeAccounts/u-who'), null);
+});
+
+test('K2. getConnectStatus: reads the account and writes the owner-readable mirror (never the account id); no account = {connected:false}; signed out refused', SKIP, async () => {
+    await reseed(); await adminRest(NS, 'PUT', 'stripeAccounts', { 'u-org': { acct: 'acct_MOCK1', createdAt: 1 } });
+    const { h, calls } = H();
+    const st = await h.getConnectStatus({}, { uid: 'u-org' });
+    assert.deepEqual(calls.retrieves, ['acct_MOCK1']);
+    assert.equal(st.connected, true); assert.equal(st.chargesEnabled, false); assert.deepEqual(st.due, ['external_account', 'tos_acceptance.date']); assert.equal(st.name, 'Hope Foundation'); assert.equal(st.state, 'finish');
+    const mirror = await read('connectStatus/u-org');
+    assert.equal(mirror.chargesEnabled, false); assert.equal(mirror.name, 'Hope Foundation'); assert.equal(typeof mirror.updatedAt, 'number');
+    assert.ok(!JSON.stringify(mirror).includes('acct_'), 'the account id never reaches the mirror');
+    assert.ok(!JSON.stringify(st).includes('acct_'), 'nor the answer');
+    calls.acctState = Object.assign({}, calls.acctState, { charges_enabled: true, payouts_enabled: true, requirements: { currently_due: [] } });
+    assert.equal((await h.getConnectStatus({}, { uid: 'u-org' })).state, 'on');
+    assert.equal((await read('connectStatus/u-org')).payoutsEnabled, true);
+    assert.deepEqual(await h.getConnectStatus({}, { uid: 'u-who' }), { connected: false, state: 'none' });
+    assert.equal(await read('connectStatus/u-who'), null, 'no mirror for no account');
+    await refused(h.getConnectStatus({}, { uid: null }), 'unauthenticated');
+});
+
+test('K3. createConnectDashboardLink: an Express login link for the caller\'s own account only', SKIP, async () => {
+    await reseed(); await adminRest(NS, 'PUT', 'stripeAccounts', { 'u-org': { acct: 'acct_MOCK1', createdAt: 1 } });
+    const { h, calls } = H();
+    assert.deepEqual(await h.createConnectDashboardLink({}, { uid: 'u-org' }), { url: 'https://connect.stripe.com/express/acct_MOCK1' });
+    assert.deepEqual(calls.logins, ['acct_MOCK1']);
+    await refused(h.createConnectDashboardLink({}, { uid: 'u-who' }), 'not-connected');
+    await refused(h.createConnectDashboardLink({}, { uid: null }), 'unauthenticated');
+    assert.equal(calls.logins.length, 1);
+});
+
+test('K4. createEntryCheckout on a connected owner: two line items (entry + $4 service fee), application fee, on_behalf_of/transfer_data, fees/paidTo = organizer; mid-setup = not-connected and no session', SKIP, async () => {
+    await adminRest(NS, 'PUT', '', SEED_CONNECT());
+    const { h, calls } = H();
+    const out = await h.createEntryCheckout({ code: 'STR1', entryId: 'e1' }, ORIGIN);
+    assert.match(out.url, /^https:\/\/checkout\.stripe\.com\//);
+    const { params } = calls.sessions[0];
+    assert.deepEqual(params.line_items.map((l) => [l.price_data.product_data.name, l.price_data.unit_amount]), [['Stripe Open entry fee', 5000], ['HardPan service fee', 400]]);
+    assert.equal(params.payment_intent_data.application_fee_amount, 400);
+    assert.equal(params.payment_intent_data.on_behalf_of, 'acct_MOCK1'); assert.deepEqual(params.payment_intent_data.transfer_data, { destination: 'acct_MOCK1' });
+    assert.equal(params.metadata.acct, 'acct_MOCK1'); assert.equal(params.metadata.serviceFeeCents, '400');
+    assert.equal((await read('tournaments/STR1/fees')).paidTo, 'organizer', 'the record says who is paid, without naming the account');
+    assert.equal(typeof (await read('registrations/STR1/e1')).checkoutAt, 'number');
+    // Platform setting + per-event override (Manny-only nodes) change the fee; the client cannot.
+    await adminRest(NS, 'PUT', 'platform/connect', { serviceFeeCents: 300, eventOverrides: { STR1: { serviceFeeCents: 100 } } });
+    const two = H(); await two.h.createEntryCheckout({ code: 'STR1', entryId: 'e1', serviceFeeCents: 0 }, ORIGIN);
+    assert.equal(two.calls.sessions[0].params.payment_intent_data.application_fee_amount, 100);
+    await adminRest(NS, 'DELETE', 'platform/connect/eventOverrides');
+    const three = H(); await three.h.createEntryCheckout({ code: 'STR1', entryId: 'e1' }, ORIGIN);
+    assert.equal(three.calls.sessions[0].params.payment_intent_data.application_fee_amount, 300);
+    // Mid-setup: refused, nothing created, paidTo untouched.
+    await adminRest(NS, 'PUT', 'connectStatus/u-org/chargesEnabled', false);
+    const four = H();
+    await refused(four.h.createEntryCheckout({ code: 'STR1', entryId: 'e1' }, ORIGIN), 'not-connected');
+    assert.equal(four.calls.sessions.length, 0);
+    // No account at all: the HardPan charge of Phase 1, one line, paidTo = hardpan.
+    await reseed();
+    const five = H(); await five.h.createEntryCheckout({ code: 'STR1', entryId: 'e1' }, ORIGIN);
+    assert.equal(five.calls.sessions[0].params.line_items.length, 1); assert.equal(five.calls.sessions[0].params.payment_intent_data.on_behalf_of, undefined);
+    assert.equal((await read('tournaments/STR1/fees')).paidTo, 'hardpan');
+});
+
+test('K5. refundEntry on a destination charge reverses the transfer and returns the service fee; the platform charge refunds as before', SKIP, async () => {
+    await adminRest(NS, 'PUT', '', SEED_CONNECT());
+    await adminRest(NS, 'PUT', 'registrations/STR1/eDest', REG({ paid: true, paidAt: 5, paidVia: 'stripe', ref: 'pi_DEST', amountCents: 5000, serviceFeeCents: 400, acct: 'acct_MOCK1' }));
+    const { h, calls } = H();
+    assert.deepEqual(await h.refundEntry({ code: 'STR1', entryId: 'eDest' }, { uid: 'u-org' }), { status: 'pending' });
+    assert.deepEqual(calls.refunds[0].params, { payment_intent: 'pi_DEST', metadata: { code: 'STR1', entryId: 'eDest' }, reverse_transfer: true, refund_application_fee: true });
+    await h.refundEntry({ code: 'STR1', entryId: 'eStripe' }, { uid: 'u-org' });
+    assert.deepEqual(calls.refunds[1].params, { payment_intent: 'pi_PAID', metadata: { code: 'STR1', entryId: 'eStripe' } });
+});
+
+test('K6. stripeConnectWebhook: a signed account.updated writes the mirror for the uid in its metadata; deauthorized turns everything off; forged = 400 and nothing written; an account nobody owns is recorded rejected; idempotent', SKIP, async () => {
+    await adminRest(NS, 'PUT', '', SEED_CONNECT());
+    const { h } = H();
+    const acct = { id: 'acct_MOCK1', object: 'account', charges_enabled: true, payouts_enabled: false, details_submitted: true, requirements: { currently_due: ['external_account'] }, business_profile: { name: 'Hope Foundation' }, metadata: { uid: 'u-org' } };
+    const body = evt('evt_acct_1', 'account.updated', acct);
+    let r = await h.stripeConnectWebhook(body, sign(body, 'whsec_WRONG'));
+    assert.equal(r.status, 400); assert.equal((await read('connectStatus/u-org')).payoutsEnabled, true, 'untouched by a forgery');
+    r = await h.stripeConnectWebhook(body, sign(body, SECRET));
+    assert.equal(r.status, 400, 'the PLATFORM endpoint secret does not sign the Connect endpoint');
+    r = await h.stripeConnectWebhook(body, sign(body, CSECRET));
+    assert.equal(r.status, 200); assert.equal(r.body, 'account.updated');
+    const m = await read('connectStatus/u-org');
+    assert.equal(m.chargesEnabled, true); assert.equal(m.payoutsEnabled, false); assert.deepEqual(m.due, ['external_account']);
+    assert.equal((await read('stripeEvents/evt_acct_1')).type, 'account.updated');
+    assert.equal((await h.stripeConnectWebhook(body, sign(body, CSECRET))).body, 'duplicate');
+    // Deauthorized: the event names the account, not the uid; the handler looks the owner up.
+    const de = JSON.stringify({ id: 'evt_de_1', object: 'event', type: 'account.application.deauthorized', account: 'acct_MOCK1', api_version: '2026-09-30', created: 1, data: { object: { id: 'ca_1', object: 'application' } } });
+    r = await h.stripeConnectWebhook(de, sign(de, CSECRET));
+    assert.equal(r.status, 200);
+    const off = await read('connectStatus/u-org');
+    assert.equal(off.chargesEnabled, false); assert.equal(off.payoutsEnabled, false); assert.equal(typeof off.deauthorizedAt, 'number');
+    // An account nobody owns: recorded, nothing else written.
+    const stranger = evt('evt_acct_2', 'account.updated', Object.assign({}, acct, { id: 'acct_STRANGER', metadata: {} }));
+    r = await h.stripeConnectWebhook(stranger, sign(stranger, CSECRET));
+    assert.equal(r.status, 200); assert.equal(r.body, 'rejected-account');
+    assert.equal((await read('stripeEvents/evt_acct_2')).type, 'rejected-account');
+    assert.deepEqual(Object.keys(await read('connectStatus')), ['u-org']);
 });

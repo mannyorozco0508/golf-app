@@ -62,7 +62,8 @@ test('5. metadata / input parse: only code + entryId, path-safe', () => {
 });
 
 test('6. planCheckout: each refusal reason, and the amount is the record fee', () => {
-    assert.deepEqual(plan({}), { ok: true, amountCents: 5000, attempt: 1 });
+    // Re-pinned 2026-11-12 (Connect): the plan also names the service fee (0 on a HardPan charge), the total and the destination (null).
+    assert.deepEqual(plan({}), { ok: true, amountCents: 5000, serviceFeeCents: 0, totalCents: 5000, destination: null, attempt: 1 });
     assert.equal(plan({ tournament: null }).reason, 'not-found');
     assert.equal(plan({ registration: null }).reason, 'not-found');
     assert.equal(plan({ registration: REG({ paid: true, paidVia: 'cash' }) }).reason, 'already-paid');
@@ -157,7 +158,8 @@ test('11. eventRef: sessions by their metadata only; charges fall back to the Pa
 
 test('12. planRefund: signed-in owner only, Stripe-paid, not yet refunded', () => {
     const paid = REG({ paid: true, paidVia: 'stripe', ref: 'pi_A' });
-    assert.deepEqual(C.planRefund({ callerUid: 'u-org', tournament: T(FEES), registration: paid }), { ok: true, paymentIntent: 'pi_A' });
+    // Re-pinned 2026-11-12 (Connect): the plan also names the destination account (null on a HardPan charge).
+    assert.deepEqual(C.planRefund({ callerUid: 'u-org', tournament: T(FEES), registration: paid }), { ok: true, paymentIntent: 'pi_A', destination: null });
     assert.equal(C.planRefund({ callerUid: null, tournament: T(FEES), registration: paid }).reason, 'unauthenticated');
     assert.equal(C.planRefund({ callerUid: 'u-who', tournament: T(FEES), registration: paid }).reason, 'not-owner');
     assert.equal(C.planRefund({ callerUid: 'u-org', tournament: T(FEES, { ownerUid: undefined }), registration: paid }).reason, 'not-owner');
@@ -178,4 +180,132 @@ test('13. firebase.json carries ONLY the tournaments-stripe codebase; the site n
     assert.ok(routes.include.includes('/stripe-functions') && routes.include.includes('/stripe-functions/*'));
     // positive: the site pages are still not blocked
     assert.equal(M.isBlockedPath('/tournament.html'), false);
+});
+
+// ---------------------------------------------------------------------------
+// STRIPE CONNECT (Phase 2, 2026-11-12; Manny's decisions: layout A; only
+// payments/allowedOwners may connect; application fee $0 (platform number,
+// default absent); 7-day payout delay; the card statement shows the organizer
+// (on_behalf_of); Stripe issues the 1099-Ks (Express)). Pure rules only here;
+// the handlers are driven in stripe_webhook_test.js.
+// Baseline for tests 14-21 (+19b) against main 5041dd9b (no Connect code): each
+// fails at the first call (the function is not exported): 13 pass / 9 fail.
+// With the build: 22 pass / 0 fail. Controls (stripe-core.js mutated, restored by
+// sha from a saved copy): default fee 0 -> 17 + 18 red; application_fee_amount
+// dropped -> 19 red; refund without reverse_transfer -> 20 red; mid-setup not
+// refused -> 18 red; anyone may connect -> 16 red; webhook total not exact -> 9 + 19b red.
+// ---------------------------------------------------------------------------
+test('14. Connect account params: Express, US, card_payments + transfers, 7-day daily payout delay, the organizer name, uid in metadata', () => {
+    const p = C.accountCreateParams({ uid: 'u-org', name: 'Hope Foundation' });
+    assert.equal(p.type, 'express'); assert.equal(p.country, 'US');
+    assert.deepEqual(p.capabilities, { card_payments: { requested: true }, transfers: { requested: true } });
+    assert.deepEqual(p.settings.payouts.schedule, { interval: 'daily', delay_days: 7 });
+    assert.equal(p.business_profile.name, 'Hope Foundation');
+    assert.equal(p.business_profile.url, 'https://tournaments.rattlegolf.com');
+    assert.deepEqual(p.metadata, { uid: 'u-org' });
+    assert.equal(C.accountCreateParams({ uid: 'u-org', name: '' }).business_profile.name, undefined, 'no made-up name');
+    assert.equal(C.accountCreateParams({ uid: 'u-org', name: 'x'.repeat(300) }).business_profile.name.length, 100, 'clipped');
+    assert.equal(C.connectIdempotencyKey('u-org'), 'connect-acct:u-org');
+});
+
+test('15. account link params: onboarding type, return/refresh on the allowed origin only', () => {
+    const l = C.accountLinkParams({ acct: 'acct_1', origin: 'https://tournaments.rattlegolf.com', code: 'ABC' });
+    assert.equal(l.account, 'acct_1'); assert.equal(l.type, 'account_onboarding');
+    assert.equal(l.return_url, 'https://tournaments.rattlegolf.com/tournament?tourney=ABC&connect=return');
+    assert.equal(l.refresh_url, 'https://tournaments.rattlegolf.com/tournament?tourney=ABC&connect=refresh');
+    assert.equal(C.accountLinkParams({ acct: 'acct_1', origin: 'https://evil.example', code: 'ABC' }), null, 'a bad origin gets no link');
+    assert.equal(C.accountLinkParams({ acct: 'acct_1', origin: 'https://tournaments.rattlegolf.com', code: 'bad code' }), null, 'a bad code gets no link');
+});
+
+test('16. planConnect: the signed-in OWNER of the event, and only an allow-listed owner (payments/allowedOwners)', () => {
+    const t = T(FEES);
+    assert.deepEqual(C.planConnect({ callerUid: 'u-org', tournament: t, allowed: true }), { ok: true, uid: 'u-org' });
+    assert.equal(C.planConnect({ callerUid: null, tournament: t, allowed: true }).reason, 'unauthenticated');
+    assert.equal(C.planConnect({ callerUid: 'u-org', tournament: null, allowed: true }).reason, 'not-found');
+    assert.equal(C.planConnect({ callerUid: 'u-else', tournament: t, allowed: true }).reason, 'not-owner');
+    assert.equal(C.planConnect({ callerUid: 'u-org', tournament: t, allowed: false }).reason, 'not-allowed-owner', 'Manny 2026-11-12: only owners he approves may connect');
+    assert.equal(C.planConnect({ callerUid: 'u-org', tournament: t, allowed: 'true' }).reason, 'not-allowed-owner', 'exactly true');
+    assert.equal(C.ERROR_CODES['not-connected'], 'failed-precondition');
+});
+
+test('17. service fee (Manny 2026-11-12): $4 per golfer by default, ON TOP of the entry fee; the platform number or a per-event override set by Manny only; whole cents $0..$20; never from the client', () => {
+    assert.deepEqual(C.serviceFee({}), { ok: true, cents: 400 }, 'default $4 when nothing is set');
+    assert.deepEqual(C.serviceFee({ platformFeeCents: 300 }), { ok: true, cents: 300 }, 'the platform number');
+    assert.deepEqual(C.serviceFee({ platformFeeCents: 300, eventFeeCents: 0 }), { ok: true, cents: 0 }, 'a per-event override wins, even to $0');
+    assert.deepEqual(C.serviceFee({ platformFeeCents: 300, eventFeeCents: 250 }), { ok: true, cents: 250 });
+    assert.deepEqual(C.serviceFee({ platformFeeCents: 2001 }), { ok: false, reason: 'bad-fee' }, 'over $20');
+    assert.deepEqual(C.serviceFee({ eventFeeCents: 12.5 }), { ok: false, reason: 'bad-fee' }, 'integer cents only');
+    assert.deepEqual(C.serviceFee({ eventFeeCents: -1 }), { ok: false, reason: 'bad-fee' });
+    assert.equal(C.DEFAULT_SERVICE_FEE_CENTS, 400);
+});
+
+test('18. planCheckout with Connect: no account = the HardPan charge as before (no service fee); an account that cannot charge yet = not-connected; charges enabled = destination charge, the golfer pays entry + service fee', () => {
+    const base = { tournament: T(FEES), registration: REG(), allowed: true, attempts: 0 };
+    const none = C.planCheckout(Object.assign({}, base, { connect: null }));
+    assert.equal(none.ok, true); assert.equal(none.destination, null); assert.equal(none.serviceFeeCents, 0); assert.equal(none.amountCents, 5000); assert.equal(none.totalCents, 5000);
+    const half = C.planCheckout(Object.assign({}, base, { connect: { acct: 'acct_1', chargesEnabled: false } }));
+    assert.deepEqual(half, { ok: false, reason: 'not-connected' }, 'an organizer mid-setup is never charged into the wrong account');
+    const on = C.planCheckout(Object.assign({}, base, { connect: { acct: 'acct_1', chargesEnabled: true } }));
+    assert.equal(on.ok, true); assert.equal(on.destination, 'acct_1'); assert.equal(on.amountCents, 5000); assert.equal(on.serviceFeeCents, 400); assert.equal(on.totalCents, 5400);
+    const ov = C.planCheckout(Object.assign({}, base, { connect: { acct: 'acct_1', chargesEnabled: true }, platformFeeCents: 300, eventFeeCents: 100 }));
+    assert.equal(ov.serviceFeeCents, 100); assert.equal(ov.totalCents, 5100);
+    const bad = C.planCheckout(Object.assign({}, base, { connect: { acct: 'acct_1', chargesEnabled: true }, platformFeeCents: 9999 }));
+    assert.deepEqual(bad, { ok: false, reason: 'bad-fee' });
+    assert.equal(C.planCheckout(Object.assign({}, base, { connect: { acct: 'nope', chargesEnabled: true } })).ok, false, 'a malformed account id is not a destination');
+    assert.equal(C.planCheckout(Object.assign({}, base, { allowed: false, connect: { acct: 'acct_1', chargesEnabled: true } })).reason, 'not-allowed-owner', 'the allowed-owner gate still stands in front of every branch');
+});
+
+test('19. sessionParams on a destination charge: two line items (entry fee, HardPan service fee), application_fee_amount = the service fee, on_behalf_of + transfer_data, acct in both metadata; the platform charge is one line item as before', () => {
+    const base = { code: 'ABC', entryId: 'e1', origin: 'https://tournaments.rattlegolf.com', amountCents: 5000, eventName: 'Hope Scramble' };
+    const plat = C.sessionParams(base);
+    assert.equal(plat.line_items.length, 1); assert.equal(plat.line_items[0].price_data.unit_amount, 5000);
+    assert.equal(plat.payment_intent_data.on_behalf_of, undefined); assert.equal(plat.payment_intent_data.transfer_data, undefined); assert.equal(plat.metadata.acct, undefined);
+    const dest = C.sessionParams(Object.assign({}, base, { acct: 'acct_1', serviceFeeCents: 400 }));
+    assert.equal(dest.payment_intent_data.on_behalf_of, 'acct_1');
+    assert.deepEqual(dest.payment_intent_data.transfer_data, { destination: 'acct_1' });
+    assert.equal(dest.payment_intent_data.application_fee_amount, 400, 'HardPan keeps the service fee');
+    assert.deepEqual(dest.line_items.map((l) => [l.price_data.product_data.name, l.price_data.unit_amount]), [['Hope Scramble entry fee', 5000], ['HardPan service fee', 400]]);
+    assert.equal(dest.metadata.acct, 'acct_1'); assert.equal(dest.metadata.serviceFeeCents, '400'); assert.equal(dest.payment_intent_data.metadata.acct, 'acct_1');
+    const zero = C.sessionParams(Object.assign({}, base, { acct: 'acct_1', serviceFeeCents: 0 }));
+    assert.equal(zero.line_items.length, 1, 'a $0 override adds no line'); assert.equal(zero.payment_intent_data.application_fee_amount, undefined);
+});
+
+test('19b. mapEvent on a destination payment: amount_total must equal entry + service fee; the entry records amountCents (the entry fee) and serviceFeeCents; a platform payment is unchanged', () => {
+    const ctx = { ref: { code: 'ABC', entryId: 'e1' }, tournament: T(FEES), registration: REG(), now: 7 };
+    const dest = (total, meta) => ({ id: 'evt_1', type: 'checkout.session.completed', data: { object: { payment_status: 'paid', amount_total: total, currency: 'usd', payment_intent: 'pi_9', metadata: Object.assign({ code: 'ABC', entryId: 'e1' }, meta) } } });
+    const ok = C.mapEvent(dest(5400, { acct: 'acct_1', serviceFeeCents: '400' }), ctx);
+    assert.deepEqual(ok.update, { paid: true, paidAt: 7, paidVia: 'stripe', ref: 'pi_9', amountCents: 5000, serviceFeeCents: 400, acct: 'acct_1' });
+    assert.deepEqual(ok.status, { paid: true, paidVia: 'stripe', at: 7 });
+    assert.equal(C.mapEvent(dest(5000, { acct: 'acct_1', serviceFeeCents: '400' }), ctx).record.type, 'rejected-amount', 'the entry fee alone is not the total');
+    assert.equal(C.mapEvent(dest(5400, { acct: 'acct_1', serviceFeeCents: 'abc' }), ctx).record.type, 'rejected-amount', 'a bad fee in metadata never passes');
+    const plat = C.mapEvent(dest(5000, {}), ctx);
+    assert.deepEqual(plat.update, { paid: true, paidAt: 7, paidVia: 'stripe', ref: 'pi_9', amountCents: 5000 });
+});
+
+test('20. refunds on a destination charge pull the transfer back and return our fee; a platform charge refunds as before; mapEvent keeps acct on the paid entry', () => {
+    const regD = REG({ paid: true, paidVia: 'stripe', ref: 'pi_1', acct: 'acct_1' });
+    const planD = C.planRefund({ callerUid: 'u-org', tournament: T(FEES), registration: regD });
+    assert.equal(planD.ok, true);
+    assert.deepEqual(C.refundParams(planD, { code: 'ABC', entryId: 'e1' }), { payment_intent: 'pi_1', metadata: { code: 'ABC', entryId: 'e1' }, reverse_transfer: true, refund_application_fee: true });
+    const planP = C.planRefund({ callerUid: 'u-org', tournament: T(FEES), registration: REG({ paid: true, paidVia: 'stripe', ref: 'pi_2' }) });
+    assert.deepEqual(C.refundParams(planP, { code: 'ABC', entryId: 'e1' }), { payment_intent: 'pi_2', metadata: { code: 'ABC', entryId: 'e1' } });
+    const evNo = { id: 'evt_2', type: 'checkout.session.completed', data: { object: { payment_status: 'paid', amount_total: 5000, currency: 'usd', payment_intent: 'pi_9', metadata: { code: 'ABC', entryId: 'e1', acct: 'bogus' } } } };
+    assert.equal(C.mapEvent(evNo, { ref: { code: 'ABC', entryId: 'e1' }, tournament: T(FEES), registration: REG(), now: 7 }).update.acct, undefined, 'a malformed account id is not stored (and no service fee is expected on a platform payment)');
+});
+
+test('21. account events: account.updated -> the status mirror for the uid in metadata; deauthorized -> everything off; unknown account -> rejected, no uid', () => {
+    const acct = { id: 'acct_1', object: 'account', charges_enabled: true, payouts_enabled: false, details_submitted: true, requirements: { currently_due: ['external_account'] }, business_profile: { name: 'Hope Foundation' }, metadata: { uid: 'u-org' } };
+    const st = C.connectStatusOf(acct, 9);
+    assert.deepEqual(st, { chargesEnabled: true, payoutsEnabled: false, detailsSubmitted: true, due: ['external_account'], name: 'Hope Foundation', updatedAt: 9 });
+    assert.equal(C.connectState(st), 'finish');
+    assert.equal(C.connectState({ chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, due: [] }), 'on');
+    assert.equal(C.connectState(null), 'none');
+    const up = C.mapAccountEvent({ id: 'evt_a', type: 'account.updated', data: { object: acct } }, 9);
+    assert.equal(up.uid, 'u-org'); assert.deepEqual(up.status, st); assert.equal(up.record.type, 'account.updated');
+    const de = C.mapAccountEvent({ id: 'evt_b', type: 'account.application.deauthorized', account: 'acct_1', data: { object: { id: 'ca_1', object: 'application' } } }, 9, { uid: 'u-org' });
+    assert.equal(de.uid, 'u-org'); assert.equal(de.status.chargesEnabled, false); assert.equal(de.status.payoutsEnabled, false); assert.equal(de.status.deauthorizedAt, 9);
+    const unk = C.mapAccountEvent({ id: 'evt_c', type: 'account.updated', data: { object: Object.assign({}, acct, { metadata: {} }) } }, 9);
+    assert.equal(unk.uid, null); assert.equal(unk.record.type, 'rejected-account');
+    assert.equal(C.mapAccountEvent({ id: 'evt_d', type: 'payout.paid', data: { object: {} } }, 9).record.type, 'ignored');
+    assert.deepEqual(C.CONNECT_EVENT_TYPES, ['account.updated', 'account.application.deauthorized']);
 });

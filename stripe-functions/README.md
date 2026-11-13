@@ -118,3 +118,14 @@ npx firebase-tools database:remove "/tournamentPhotoMeta/<CODE>/hidden" --projec
 ```
 Only `hidden/` - never `shown/` (the recap) or `pending/` (not yet checked). No scheduled function yet.
 Tests: `node --test tournament_photo_handlers_test.js tournament_photo_storage_rules_test.js`.
+
+
+## Stripe Connect (Phase 2, 2026-11-12, TEST MODE) - setup steps, in order
+1. Stripe Dashboard (test mode) -> Settings -> Connect: enable Express; brand name `HardPan Tournaments`; let Stripe issue 1099-Ks (Manny's dashboard step).
+2. Stripe Dashboard -> Developers -> Webhooks -> Add endpoint -> **"Listen to events on Connected accounts"**:
+   URL `https://us-central1-golfapp-9fb21.cloudfunctions.net/stripeConnectWebhook`, events exactly `account.updated` and `account.application.deauthorized`. Copy its signing secret.
+3. `firebase functions:secrets:set STRIPE_CONNECT_WEBHOOK_SECRET --project golfapp-9fb21` (paste the whsec value at the prompt; never in the repo, a mailbox file or a log). The deploy refuses in non-interactive mode until this secret exists.
+4. Rules: the Connect block (STRIPE-CONNECT-RULES-CANDIDATE.md in the shared mailbox), published by the iOS lane on Manny's typed OK.
+5. Deploy (Manny's typed OK): `npx firebase-tools deploy --only functions:tournaments-stripe --project golfapp-9fb21`.
+6. Service fee setting (Manny only, Firebase console): `platform/connect/serviceFeeCents` (absent = 400 = $4); per event `platform/connect/eventOverrides/<code>/serviceFeeCents`.
+7. Test path: on a preview as an allow-listed owner, Setup -> Entry fees -> Set up payouts with Stripe (test SSN 000-00-0000, routing 000123456, account 000123456789); `Payouts on` arrives with account.updated; a golfer pays entry + $4 with 4242 4242 4242 4242; the connected account shows the entry fee, the platform the $4; Refund from the Desk reverses both.

@@ -250,7 +250,8 @@ test('H7. a multicast that throws is logged, not fatal: pushed counts only what 
 test('X1. index.js exports sendAnnouncement beside the three Stripe functions: us-central1, a callable, NO Stripe secret bound', SKIP, async () => {
     const m = req('index.js');
     // RE-PINNED at the event-tools merge (2026-11-09): E4 adds approvePhoto, hidePhoto, photoLinks, reportPhoto.
-    assert.deepEqual(Object.keys(m).sort(), ['approvePhoto', 'createEntryCheckout', 'hidePhoto', 'photoLinks', 'refundEntry', 'reportPhoto', 'sendAnnouncement', 'stripeWebhook']);
+    // RE-PINNED 2026-11-12 (Stripe Connect, Manny): three onboarding callables and the connected-account endpoint join the codebase (stripe_webhook_test.js X1 pins their secrets).
+    assert.deepEqual(Object.keys(m).sort(), ['approvePhoto', 'createConnectDashboardLink', 'createConnectOnboardingLink', 'createEntryCheckout', 'getConnectStatus', 'hidePhoto', 'photoLinks', 'refundEntry', 'reportPhoto', 'sendAnnouncement', 'stripeConnectWebhook', 'stripeWebhook']);
     const ep = m.sendAnnouncement.__endpoint;
     assert.deepEqual(ep.region, ['us-central1']);
     assert.ok(ep.callableTrigger);
