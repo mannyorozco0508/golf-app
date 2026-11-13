@@ -10,7 +10,8 @@
       "used_on": [
         "/home card: Every yard. Every hole. (Play row)",
         "/help and /help/gps-basics"
-      ]
+      ],
+      "recut": "2026-11-13: release-207 895da9fc, the golfer walking Piipaash hole 1 from the tee (MIDDLE 397 -> ~250), whole-hole view, tabs line on; 30 frames at 10 fps, 590x1280 H.264 (sharp + AVAssetWriter)"
     },
     {
       "file": "just-say-it.mp4",
@@ -27,7 +28,8 @@
       "used_on": [
         "/home card: Score the whole group in one tap. (Games row)",
         "/help and /help/score-your-group"
-      ]
+      ],
+      "recut": "2026-11-13: release-207 895da9fc, the Card tab's score sheet over the map, Josh's hole-4 box tapped, the keypad, the 4 lands and the Undo chip appears; 30 frames at 10 fps, 590x1280 H.264"
     },
     {
       "file": "games-live-board.mp4",
@@ -35,7 +37,8 @@
       "poster": "/media/posters/games-live-board.jpg",
       "used_on": [
         "/home card: Every game, as it happens. (Games row)"
-      ]
+      ],
+      "recut": "2026-11-13: release-207 895da9fc, the Games sheet (stake-free round, 'No amount'), then the Board tab's Leaderboard; 30 frames at 10 fps, 590x1280 H.264 (sharp + AVAssetWriter)"
     },
     {
       "file": "results.mp4",
@@ -52,7 +55,8 @@
       "used_on": [
         "/home card: Run the day from your phone. (Organize row)",
         "/help and /help/run-a-tournament"
-      ]
+      ],
+      "recut": "2026-11-13: release-207 895da9fc home.html, the organizer's Desert Classic card, then the Tournaments menu (Join · Create · My events · Manage · Run) opening and closing; 28 frames at 8 fps (3.5 s, as before), H.264 1170x2532 (AVAssetWriter); no 'Rattle Golf' on screen"
     },
     {
       "file": "weekly-code.mp4",

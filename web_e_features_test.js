@@ -143,7 +143,9 @@ describe('1. the 25 cards', () => {
             assert.match(c.img, new RegExp('src="/media/screens/' + k + '-400\\.webp" srcset="/media/screens/' + k + '-400\\.webp 400w, /media/screens/' + k + '-1170\\.webp 1170w"'), k + ': not the 400 + 1170 pair');
             assert.match(c.img, /\bwidth="1170" height="2532"/, k + ': not a 390x844 @3x capture');
             const m = manifest.screens.find((s) => s.key === k);
-            assert.ok(m && /release-20[56]/.test(m.captured) && m.recaptured, k + ': the manifest does not say where it came from');
+            // RE-PINNED 2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-1246): hazards and
+            // ask-caddie are now 2.0.7 captures (release-207 895da9fc); range, my-bag, weekly-code stay 205.
+            assert.ok(m && /release-20[567]/.test(m.captured) && m.recaptured, k + ': the manifest does not say where it came from');
             assert.deepEqual(m.files, ['/media/screens/' + k + '-400.webp', '/media/screens/' + k + '-1170.webp']);
         });
         manifest.screens.forEach((s) => s.files.forEach((f) => assert.ok(exists(f.slice(1)), f + ' is missing')));

@@ -11,7 +11,9 @@
         "/media/screens/gps-886.webp"
       ],
       "width": 886,
-      "height": 1920
+      "height": 1920,
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+      "captured": "release-207 895da9fc index.html in headless Chrome 390x844 @3x: Talking Stick Piipaash hole 1 from the tee (the bundled gps-courses.js geometry), the whole-hole opening view, the 2.0.7 Card | GPS | Games | Board line (window.__hardpanDoors), no Card / + Game on the map, Esri World Imagery live (the shipped key, read-only tile GETs); stand-in Firebase (tools/sim/lib/phone.js), IAP stub Pro-active."
     },
     {
       "key": "plays-like",
@@ -22,7 +24,9 @@
         "/media/screens/plays-like-940.webp"
       ],
       "width": 940,
-      "height": 2040
+      "height": 2040,
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+      "captured": "release-207 895da9fc: Dobson Ranch hole 2, 140 yds out, My bag + the shot log seeded as coach1_aim_tip_chrome_test.js does (Aim tip: 8 yds left), the green size line, the Slope switch under Ask; same harness as gps."
     },
     {
       "key": "hazards",
@@ -34,8 +38,8 @@
       ],
       "width": 1170,
       "height": 2532,
-      "captured": "release-205 (42ec9711) index.html on the GPS map, Menu › Hazards: Talking Stick South hole 8 (the app's own GolfAPI course data with hazard points), golfer Sam on the tee, Firebase stand-in (tools/sim/lib/phone.js), IAP stand-in Pro-active, headless Chrome 390x844 @3x",
-      "recaptured": "2026-11-10 (website-e re-capture)"
+      "captured": "release-207 895da9fc: Piipaash hole 1 from the tee, ☰ Menu › Hazards, hazard points as a GolfAPI stub record (the phone's h.z shape; the bundle has none); same harness as gps.",
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)"
     },
     {
       "key": "best-miss",
@@ -46,7 +50,9 @@
         "/media/screens/best-miss-940.webp"
       ],
       "width": 940,
-      "height": 2040
+      "height": 2040,
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+      "captured": "release-207 895da9fc: Papago hole 1, 41 yds to the middle, Slope on (lidar), the safe-miss test's GolfAPI bunker 4 yds off the left edge -> 'Best miss: right.'; same harness as gps."
     },
     {
       "key": "offline",
@@ -103,7 +109,9 @@
         "/media/screens/group-scoring-886.webp"
       ],
       "width": 886,
-      "height": 1920
+      "height": 1920,
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+      "captured": "release-207 895da9fc: the Card tab tapped (the compact score sheet over the map), Josh's 4 entered on hole 4 with a tap, the ↶ Undo chip showing; four golfers thru 3; same harness as gps."
     },
     {
       "key": "live-games",
@@ -114,7 +122,9 @@
         "/media/screens/live-games-886.webp"
       ],
       "width": 886,
-      "height": 1920
+      "height": 1920,
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+      "captured": "release-207 895da9fc: the Games tab tapped on the 2.0.7 tabs line (the Games sheet over the map), Piipaash hole 4; the round is the app's own stake-free shape (every stake 0, no pool: text-safe.js roundStakeFree), so the sheet prints 'No amount · 1 game' and no currency sign; a team Nassau and skins; same harness as gps."
     },
     {
       "key": "results",
@@ -136,7 +146,9 @@
         "/media/screens/settle-786.webp"
       ],
       "width": 786,
-      "height": 900
+      "height": 900,
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+      "captured": "release-207 895da9fc settlement.html (venmo-pay.js): a finished 3-golfer round at Papago, 'This is me' = Manny; the Settle up card (Josh owes you $10 · Request on Venmo · Mark done) and the Venmo / Cash App handle card; top crop at 786x900 as before; stand-in database, nothing live."
     },
     {
       "key": "weekly-code",
@@ -160,7 +172,9 @@
         "/media/screens/chat-940.webp"
       ],
       "width": 940,
-      "height": 2040
+      "height": 2040,
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+      "captured": "release-207 895da9fc: ☰ Menu › Chat (one group: the map shows no 💬 by design), four seeded messages from the stand-in chat node; same harness as gps."
     },
     {
       "key": "play-again",
@@ -204,7 +218,9 @@
         "/media/screens/tournaments-886.webp"
       ],
       "width": 886,
-      "height": 1920
+      "height": 1920,
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+      "captured": "release-207 895da9fc home.html in headless Chrome 390x844 @3x: the organizer's own event card (Desert Classic at Papago, shotgun 8:10, 8 teams, the join code) under the GPS card; the stand-in Firebase (tools/sim/lib/phone.js), IAP stub Pro-active, app doors on. The golfer-side card's label for a golfer who runs nothing is the app's own 'Rattle Golf' (front-door.js), so the organizer state is the picture."
     },
     {
       "key": "create-event",
@@ -249,7 +265,9 @@
       ],
       "width": 780,
       "height": 1100,
-      "note": "Card 22 reworded Nov 10 (Manny): \"Every flight, live.\" - the live leaderboard and flights; was \"Prizes, sorted.\". The screen (the real tournament board) is unchanged; no amounts on it."
+      "note": "Card 22 reworded Nov 10 (Manny): \"Every flight, live.\" - the live leaderboard and flights; was \"Prizes, sorted.\". The screen (the real tournament board) is unchanged; no amounts on it.",
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+      "captured": "release-207 895da9fc tournament-scorecard.html?app=1, the Board screen: Leaderboard · LIVE · Desert Classic · 8 teams, Team 4 · You 1st −3 thru 4 leading by 2, Around you; top crop at 780x1100 as before."
     },
     {
       "key": "team-qr-links",
@@ -261,8 +279,9 @@
       ],
       "width": 780,
       "height": 1688,
-      "captured": "main 0f11073c tournament.html / tournament-scorecard.html on the repo’s Firebase stand-in (nothing live), headless Chrome 390x844 @2x, sample event Hope Foundation Scramble at Papago; WebP by sharp (400 q82, 780 q80)",
-      "added": "2026-11-12 (52A batch 1)"
+      "captured": "main 501855b4 tournament.html loaded at its LIVE origin https://hardpangolf.com/tournament?tourney=DESERT in headless Chrome (tools/lib/cold-arrival.js: the Firebase bundles blocked, the record from the stand-in - nothing live read or written), owner signed in, Setup › shotgun list › Team 4 QR: the link reads https://hardpangolf.com/tournament-scorecard.html?tourney=DESERT&team=4&k=…; 390x844 @2x.",
+      "added": "2026-11-12 (52A batch 1)",
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)"
     },
     {
       "key": "my-events",
@@ -287,8 +306,9 @@
       ],
       "width": 780,
       "height": 1688,
-      "captured": "main 0f11073c tournament.html / tournament-scorecard.html on the repo’s Firebase stand-in (nothing live), headless Chrome 390x844 @2x, sample event Hope Foundation Scramble at Papago; WebP by sharp (400 q82, 780 q80)",
-      "added": "2026-11-12 (52A batch 1)"
+      "captured": "release-207 895da9fc tournament-scorecard.html?app=1 (the 2.0.7 team card): Desert Classic, Team 4, Card | Board | GPS switch, Next to play Hole 8 · Par 5, team score with − / +, Save · Next hole; stand-in database, 390x844 @3x.",
+      "added": "2026-11-12 (52A batch 1)",
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)"
     },
     {
       "key": "contests",
@@ -376,8 +396,8 @@
       ],
       "width": 1170,
       "height": 2532,
-      "captured": "release-206 (0b51812d, 2.0.6) index.html on the GPS map: Talking Stick Piipaash hole 1 (the app's bundled gps-courses.js geometry), golfer Sam 160 yds out with a My bag, Esri World Imagery tiles live (the app's own key, read-only GETs); the golfer taps Hole, Ask, then What club? (CDP taps, no page function). Firebase stand-in, IAP stand-in Pro-active, headless Chrome 390x844 @3x",
-      "recaptured": "2026-11-12 (Manny: the old picture was mostly an empty dark screen)"
+      "captured": "release-207 895da9fc: Piipaash hole 1, 160 yds out, a My bag; the golfer taps Ask, then What club? (CDP taps, no page function); same harness as gps.",
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)"
     }
   ],
   "try_gps": {
