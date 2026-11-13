@@ -295,7 +295,8 @@ const PRODUCTS = {
         // Moved to v72 FOR THE COLLECT-BY-CARD FIX (2026-11-12, Manny OK): see sw.js v408.
         // Moved to v73 FOR THE CHECKOUT COPY (2026-11-12, Manny OK): see sw.js v409.
         // Moved to v74 FOR BUG-HUNT #10 + #14 (2026-11-13, Manny OK): see sw.js v410.
-        cacheName: 'tournament-v74-bug10-14',
+        // Moved to v75 FOR THE WEBSITE PICTURES VS iOS 2.0.7 (2026-11-13, Manny OK by phone relay): see sw.js v411.
+        cacheName: 'tournament-v75-site-pics',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

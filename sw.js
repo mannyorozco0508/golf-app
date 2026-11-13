@@ -4548,7 +4548,8 @@ const APP_SHELL_ALIASES = ['./', './app'];
 // Moved to v408-2.0 (collect-by-card fix, Manny OK 2026-11-12): tournament.html's Entry fees card switch creates the fees node for an event whose one fee is set (the Nov 11 one-fee field never wrote it); a device on v407 keeps the switch that refuses with "Set the entry fee first." on such an event.
 // Moved to v409-2.0 (checkout copy, Manny OK 2026-11-12): tournament.html's signup page says a server fault at Pay is the payment service's, not the golfer's signal; a device on v408 keeps the signal sentence for both.
 // Moved to v410-2.0 (bug-hunt #10 + #14, Manny OK 2026-11-13): tournament.html's Event day gains the Announce to the field tile; tap targets on tournament.html and tournament-scorecard.html grow to 44x32 (chips, start-type words, Sign out, every close, QR, the contest toggle, Why?); a device on v409 keeps the small targets and no tile.
-const CACHE_VERSION = 'golfapp-v410-2.0';
+// Moved to v411-2.0 (website pictures vs iOS 2.0.7, Manny OK by phone relay 2026-11-13): hardpan-home.html's 17 feature pictures (13 stills, 4 clips with posters) are 2.0.7 captures and its organizers board reads Desert Classic; a device on v410 keeps the old screens and the Rattle Classic board.
+const CACHE_VERSION = 'golfapp-v411-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
