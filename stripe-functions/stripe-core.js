@@ -36,6 +36,7 @@ const REASONS = Object.freeze({
 });
 // Server-side reasons the contract does not list (refusals it implies).
 const EXTRA_REASONS = Object.freeze({
+    NOT_CONNECTED: 'not-connected',
     BAD_ORIGIN: 'bad-origin',
     NOT_OWNER: 'not-owner',
     NOT_STRIPE_PAID: 'not-stripe-paid',
@@ -54,7 +55,8 @@ const ERROR_CODES = Object.freeze({
     'not-owner': 'permission-denied',
     'not-stripe-paid': 'failed-precondition',
     'already-refunded': 'failed-precondition',
-    'unauthenticated': 'unauthenticated'
+    'unauthenticated': 'unauthenticated',
+    'not-connected': 'failed-precondition'
 });
 
 const FIXED_ORIGINS = Object.freeze([
@@ -110,6 +112,11 @@ function isStripePaid(reg) {
 //   allowed     payments/allowedOwners/<ownerUid> (must be === true)
 //   attempts    sessions already created for this entry (server count)
 // -> {ok:false, reason} | {ok:true, amountCents, attempt}
+//   connect     (Phase 2) null when the owner has no Stripe account, else
+//               { acct, chargesEnabled } from stripeAccounts/<uid> + connectStatus/<uid>
+//   platformFeeCents / eventFeeCents  the service fee setting (platform/connect/serviceFeeCents,
+//               platform/connect/eventOverrides/<code>/serviceFeeCents; Manny-only nodes)
+// -> {ok:false, reason} | {ok:true, amountCents (the entry fee), serviceFeeCents, totalCents, destination, attempt}
 function planCheckout(input) {
     const t = input && input.tournament, reg = input && input.registration;
     if (!t || typeof t !== 'object' || !reg || typeof reg !== 'object') return { ok: false, reason: REASONS.NOT_FOUND };
@@ -120,7 +127,110 @@ function planCheckout(input) {
     if (!validFeeCents(fees.entryFeeCents)) return { ok: false, reason: REASONS.BAD_FEE };
     const attempts = isIntegerCents(input.attempts) ? input.attempts : 0;
     if (attempts >= MAX_CHECKOUT_ATTEMPTS) return { ok: false, reason: REASONS.TOO_MANY_ATTEMPTS };
-    return { ok: true, amountCents: fees.entryFeeCents, attempt: attempts + 1 };
+    // CONNECT (2026-11-12). No account on file: the HardPan charge of Phase 1,
+    // no service fee. An account that cannot take charges yet: refuse - money
+    // must never land in the wrong account while the organizer is mid-setup.
+    // Charges enabled: a destination charge, and the golfer pays the entry fee
+    // PLUS HardPan's service fee, which is the application fee (Manny).
+    const c = input.connect;
+    let destination = null, serviceFeeCents = 0;
+    if (c && typeof c === 'object' && c.acct !== undefined && c.acct !== null) {
+        if (!ACCT_ID.test(String(c.acct))) return { ok: false, reason: REASONS.BAD_FEE };
+        if (c.chargesEnabled !== true) return { ok: false, reason: EXTRA_REASONS.NOT_CONNECTED };
+        const fee = serviceFee({ platformFeeCents: input.platformFeeCents, eventFeeCents: input.eventFeeCents });
+        if (!fee.ok) return { ok: false, reason: fee.reason };
+        destination = c.acct; serviceFeeCents = fee.cents;
+    }
+    return { ok: true, amountCents: fees.entryFeeCents, serviceFeeCents, totalCents: fees.entryFeeCents + serviceFeeCents, destination, attempt: attempts + 1 };
+}
+
+// ---- CONNECT (Phase 2, 2026-11-12). Manny's decisions, in order: layout A;
+// only owners in payments/allowedOwners may connect; HardPan charges a service
+// fee per golfer ON TOP of the entry fee on card sign-ups ($4 by default, a
+// platform setting with a per-event override only Manny writes), taken as the
+// Connect application fee, so the organizer receives the full entry fee minus
+// Stripe's processing; payouts on a 7-day delay; the card statement shows the
+// organizer (on_behalf_of); Stripe issues the 1099-Ks (Express).
+const ACCT_ID = /^acct_[A-Za-z0-9]{1,64}$/;   // shape only; Stripe's ids are 16 chars, the tests' are short
+const UID = /^[A-Za-z0-9_-]{1,128}$/;
+const DEFAULT_SERVICE_FEE_CENTS = 400;
+const MAX_SERVICE_FEE_CENTS = 2000;
+const CONNECT = Object.freeze({ country: 'US', payoutDelayDays: 7, siteUrl: 'https://tournaments.rattlegolf.com' });
+const CONNECT_EVENT_TYPES = Object.freeze(['account.updated', 'account.application.deauthorized']);
+
+// The service fee in cents: the per-event override when Manny set one, else the
+// platform number, else $4. Whole cents, $0..$20. The client never sends it.
+function serviceFee(o) {
+    const pick = (o && o.eventFeeCents !== undefined && o.eventFeeCents !== null) ? o.eventFeeCents
+        : (o && o.platformFeeCents !== undefined && o.platformFeeCents !== null) ? o.platformFeeCents
+        : DEFAULT_SERVICE_FEE_CENTS;
+    if (!isIntegerCents(pick) || pick > MAX_SERVICE_FEE_CENTS) return { ok: false, reason: REASONS.BAD_FEE };
+    return { ok: true, cents: pick };
+}
+
+// Who may start onboarding: the signed-in owner of this event, and only an
+// owner Manny listed in payments/allowedOwners.
+function planConnect(input) {
+    const uid = input && input.callerUid;
+    if (!uid || !UID.test(String(uid))) return { ok: false, reason: EXTRA_REASONS.UNAUTHENTICATED };
+    const t = input.tournament;
+    if (!t || typeof t !== 'object') return { ok: false, reason: REASONS.NOT_FOUND };
+    if (!t.ownerUid || t.ownerUid !== uid) return { ok: false, reason: EXTRA_REASONS.NOT_OWNER };
+    if (input.allowed !== true) return { ok: false, reason: REASONS.NOT_ALLOWED_OWNER };
+    return { ok: true, uid };
+}
+function connectIdempotencyKey(uid) { return 'connect-acct:' + uid; }
+function accountCreateParams(o) {
+    const name = (typeof o.name === 'string' && o.name.trim()) ? o.name.trim().slice(0, 100) : null;
+    const p = {
+        type: 'express', country: CONNECT.country,
+        capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
+        business_profile: { url: CONNECT.siteUrl },
+        settings: { payouts: { schedule: { interval: 'daily', delay_days: CONNECT.payoutDelayDays } } },
+        metadata: { uid: o.uid }
+    };
+    if (name) p.business_profile.name = name;
+    return p;
+}
+function accountLinkParams(o) {
+    const origin = allowedOrigin(o.origin, { emulator: o.emulator === true });
+    if (!origin || !SAFE_KEY.test(String(o.code)) || !ACCT_ID.test(String(o.acct))) return null;
+    const base = origin + '/tournament?tourney=' + encodeURIComponent(o.code) + '&connect=';
+    return { account: o.acct, type: 'account_onboarding', return_url: base + 'return', refresh_url: base + 'refresh' };
+}
+// The owner-readable mirror connectStatus/<uid>, from a Stripe Account object.
+function connectStatusOf(acct, now) {
+    const req = (acct && acct.requirements && Array.isArray(acct.requirements.currently_due)) ? acct.requirements.currently_due.filter((x) => typeof x === 'string').slice(0, 50) : [];
+    const name = (acct && acct.business_profile && typeof acct.business_profile.name === 'string' && acct.business_profile.name.trim()) ? acct.business_profile.name.trim().slice(0, 100) : null;
+    return { chargesEnabled: !!(acct && acct.charges_enabled === true), payoutsEnabled: !!(acct && acct.payouts_enabled === true), detailsSubmitted: !!(acct && acct.details_submitted === true), due: req, name, updatedAt: now };
+}
+// 'none' (no account) | 'finish' (started, not fully on) | 'on' (charges + payouts enabled)
+function connectState(st) {
+    if (!st || typeof st !== 'object') return 'none';
+    return (st.chargesEnabled === true && st.payoutsEnabled === true) ? 'on' : 'finish';
+}
+// Connected-account events (the second endpoint). -> { uid|null, status|null, record }
+// `owner` is what the handler found in stripeAccounts for event.account (deauthorized
+// events carry no metadata of their own).
+function mapAccountEvent(event, now, owner) {
+    const rec = (type) => ({ type, at: now });
+    const o = event && event.data && event.data.object;
+    if (!o || CONNECT_EVENT_TYPES.indexOf(event.type) === -1) return { uid: null, status: null, record: rec('ignored') };
+    if (event.type === 'account.updated') {
+        const uid = o.metadata && typeof o.metadata.uid === 'string' && UID.test(o.metadata.uid) ? o.metadata.uid : null;
+        if (!uid) return { uid: null, status: null, record: rec('rejected-account') };
+        return { uid, status: connectStatusOf(o, now), record: rec(event.type) };
+    }
+    const uid = owner && typeof owner.uid === 'string' && UID.test(owner.uid) ? owner.uid : null;
+    if (!uid) return { uid: null, status: null, record: rec('rejected-account') };
+    return { uid, status: { chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false, due: [], name: null, updatedAt: now, deauthorizedAt: now }, record: rec(event.type) };
+}
+// Refund params: a destination charge pulls the transfer back and returns our
+// service fee, so the golfer is made whole and the organizer is never short.
+function refundParams(plan, ref) {
+    const p = { payment_intent: plan.paymentIntent, metadata: { code: ref.code, entryId: ref.entryId } };
+    if (plan.destination) { p.reverse_transfer = true; p.refund_application_fee = true; }
+    return p;
 }
 
 // The attempt counter's transaction body: reserve one more slot or abort.
@@ -146,12 +256,27 @@ function sessionParams(o) {
     const name = (typeof o.eventName === 'string' && o.eventName.trim()) ? o.eventName.trim().slice(0, 200) : 'Tournament';
     const urls = successUrls(o.origin, o.code, o.entryId);
     const meta = { code: o.code, entryId: o.entryId };
+    const items = [{ quantity: 1, price_data: { currency: CURRENCY, unit_amount: o.amountCents, product_data: { name: name + ' entry fee' } } }];
+    const pid = { metadata: meta, statement_descriptor_suffix: 'TOURNEY' };
+    // CONNECT: a destination charge on behalf of the organizer (the statement
+    // shows their name); HardPan's service fee is its own line the golfer sees,
+    // and the application fee HardPan keeps. $0 adds no line and no fee.
+    if (typeof o.acct === 'string' && ACCT_ID.test(o.acct)) {
+        const fee = isIntegerCents(o.serviceFeeCents) ? o.serviceFeeCents : 0;
+        meta.acct = o.acct; meta.serviceFeeCents = String(fee);
+        pid.on_behalf_of = o.acct;
+        pid.transfer_data = { destination: o.acct };
+        if (fee > 0) {
+            items.push({ quantity: 1, price_data: { currency: CURRENCY, unit_amount: fee, product_data: { name: 'HardPan service fee' } } });
+            pid.application_fee_amount = fee;
+        }
+    }
     const p = {
         mode: 'payment',
-        line_items: [{ quantity: 1, price_data: { currency: CURRENCY, unit_amount: o.amountCents, product_data: { name: name + ' entry fee' } } }],
+        line_items: items,
         client_reference_id: o.code + ':' + o.entryId,
         metadata: meta,
-        payment_intent_data: { metadata: meta, statement_descriptor_suffix: 'TOURNEY' },
+        payment_intent_data: pid,
         success_url: urls.success_url,
         cancel_url: urls.cancel_url
     };
@@ -168,7 +293,7 @@ function planRefund(input) {
     if (!t.ownerUid || t.ownerUid !== uid) return { ok: false, reason: EXTRA_REASONS.NOT_OWNER };
     if (reg.refundedAt) return { ok: false, reason: EXTRA_REASONS.ALREADY_REFUNDED };
     if (reg.paidVia !== 'stripe' || typeof reg.ref !== 'string' || !/^pi_/.test(reg.ref)) return { ok: false, reason: EXTRA_REASONS.NOT_STRIPE_PAID };
-    return { ok: true, paymentIntent: reg.ref };
+    return { ok: true, paymentIntent: reg.ref, destination: (typeof reg.acct === 'string' && ACCT_ID.test(reg.acct)) ? reg.acct : null };
 }
 
 // Event types the endpoint is registered for (README lists them for the dashboard).
@@ -213,7 +338,17 @@ function mapEvent(event, ctx) {
         case 'checkout.session.async_payment_succeeded': {
             if (event.type === 'checkout.session.completed' && o.payment_status !== 'paid') return { update: null, record: rec('pending-payment') };
             const fee = ctx.tournament.fees && ctx.tournament.fees.entryFeeCents;
-            if (!validFeeCents(fee) || o.amount_total !== fee || o.currency !== CURRENCY) return { update: null, record: rec('rejected-amount') };
+            // CONNECT: a destination session carries acct + serviceFeeCents in its
+            // metadata (set by sessionParams, never by a client); the total the
+            // golfer paid must be the entry fee plus exactly that service fee.
+            const acct = (o.metadata && typeof o.metadata.acct === 'string' && ACCT_ID.test(o.metadata.acct)) ? o.metadata.acct : null;
+            let service = 0;
+            if (acct) {
+                const raw = o.metadata.serviceFeeCents;
+                service = /^\d{1,5}$/.test(String(raw)) ? Number(raw) : NaN;
+                if (!isIntegerCents(service) || service > MAX_SERVICE_FEE_CENTS) return { update: null, record: rec('rejected-amount') };
+            }
+            if (!validFeeCents(fee) || o.amount_total !== fee + service || o.currency !== CURRENCY) return { update: null, record: rec('rejected-amount') };
             if (typeof o.payment_intent !== 'string' || !/^pi_/.test(o.payment_intent)) return { update: null, record: rec('rejected-metadata') };
             if (reg.paid === true) {
                 // Same payment delivered as a different event: nothing to do. A
@@ -221,7 +356,9 @@ function mapEvent(event, ctx) {
                 // never overwrite the first ref; it needs a refund in the dashboard.
                 return { update: null, record: rec(reg.ref === o.payment_intent ? 'already-applied' : 'rejected-already-paid') };
             }
-            return { update: { paid: true, paidAt: now, paidVia: 'stripe', ref: o.payment_intent, amountCents: o.amount_total }, record: rec(event.type), status: { paid: true, paidVia: 'stripe', at: now } };
+            const upd = { paid: true, paidAt: now, paidVia: 'stripe', ref: o.payment_intent, amountCents: fee };
+            if (acct) { upd.serviceFeeCents = service; upd.acct = acct; }
+            return { update: upd, record: rec(event.type), status: { paid: true, paidVia: 'stripe', at: now } };
         }
         case 'charge.refunded': {
             if (reg.ref !== o.payment_intent) return { update: null, record: rec('rejected-ref') };
@@ -252,5 +389,9 @@ module.exports = {
     REASONS, EXTRA_REASONS, ERROR_CODES, FIXED_ORIGINS, EVENT_TYPES,
     validFeeCents, allowedOrigin, parseRef, successUrls, planCheckout, nextAttempt,
     checkoutIdempotencyKey, refundIdempotencyKey, sessionParams, planRefund,
-    eventRef, mapEvent
+    eventRef, mapEvent,
+    // Connect (2026-11-12)
+    DEFAULT_SERVICE_FEE_CENTS, MAX_SERVICE_FEE_CENTS, CONNECT, CONNECT_EVENT_TYPES,
+    serviceFee, planConnect, connectIdempotencyKey, accountCreateParams, accountLinkParams,
+    connectStatusOf, connectState, mapAccountEvent, refundParams
 };

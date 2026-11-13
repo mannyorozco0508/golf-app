@@ -18,7 +18,10 @@ const { makeHandlers, HandlerError } = require('./handlers.js');
 
 const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
+// CONNECT (2026-11-12): the connected-account endpoint has its own signing secret.
+const STRIPE_CONNECT_WEBHOOK_SECRET = defineSecret('STRIPE_CONNECT_WEBHOOK_SECRET');
 const OPTS = { region: 'us-central1', secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET] };
+const CONNECT_OPTS = { region: 'us-central1', secrets: [STRIPE_SECRET_KEY, STRIPE_CONNECT_WEBHOOK_SECRET] };
 
 // The DEFAULT app specifically: another named app in the process must not stop it.
 if (!admin.apps.some((a) => a && a.name === '[DEFAULT]')) admin.initializeApp();
@@ -29,7 +32,9 @@ function handlers() {
         cached = makeHandlers({
             db: admin.database(),
             stripe: new Stripe(STRIPE_SECRET_KEY.value()),
-            webhookSecret: STRIPE_WEBHOOK_SECRET.value(),
+            // Thunks: a secret resolves only inside a function that binds it.
+            webhookSecret: () => STRIPE_WEBHOOK_SECRET.value(),
+            connectWebhookSecret: () => STRIPE_CONNECT_WEBHOOK_SECRET.value(),
             emulator: process.env.FUNCTIONS_EMULATOR === 'true',
             log: (...a) => logger.warn(...a)
         });
@@ -54,6 +59,31 @@ exports.refundEntry = onCall(OPTS, async (request) => {
     try {
         return await handlers().refundEntry(request.data, { uid: request.auth && request.auth.uid });
     } catch (e) { throw asHttpsError(e); }
+});
+
+// ---- CONNECT (2026-11-12): onboarding, status, dashboard; the second endpoint.
+exports.createConnectOnboardingLink = onCall(OPTS, async (request) => {
+    const headers = (request.rawRequest && request.rawRequest.headers) || {};
+    try { return await handlers().createConnectOnboardingLink(request.data, { uid: request.auth && request.auth.uid, origin: headers.origin }); }
+    catch (e) { throw asHttpsError(e); }
+});
+exports.getConnectStatus = onCall(OPTS, async (request) => {
+    try { return await handlers().getConnectStatus(request.data, { uid: request.auth && request.auth.uid }); }
+    catch (e) { throw asHttpsError(e); }
+});
+exports.createConnectDashboardLink = onCall(OPTS, async (request) => {
+    try { return await handlers().createConnectDashboardLink(request.data, { uid: request.auth && request.auth.uid }); }
+    catch (e) { throw asHttpsError(e); }
+});
+exports.stripeConnectWebhook = onRequest(CONNECT_OPTS, async (req, res) => {
+    if (req.method !== 'POST') { res.status(405).send('POST only'); return; }
+    try {
+        const out = await handlers().stripeConnectWebhook(req.rawBody, req.get('stripe-signature'));
+        res.status(out.status).send(out.body);
+    } catch (e) {
+        logger.error('stripeConnectWebhook internal error', e && e.message);
+        res.status(500).send('error');
+    }
 });
 
 // ---- E4 PHOTO WALL (2026-11-09): no Stripe, no secrets, no money ---------
