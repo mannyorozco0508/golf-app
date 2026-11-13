@@ -293,7 +293,8 @@ const PRODUCTS = {
         // Moved to v70 FOR THE TV BOARD + HOLE SPONSORS (57) AND THE HOMEPAGE CARDS (52a) (2026-11-12, Manny OK): see sw.js v406.
         // Moved to v71 FOR THE TOURNAMENT OFFER (58A) (2026-11-12, Manny OK): see sw.js v407.
         // Moved to v72 FOR THE COLLECT-BY-CARD FIX (2026-11-12, Manny OK): see sw.js v408.
-        cacheName: 'tournament-v72-fees-card',
+        // Moved to v73 FOR THE CHECKOUT COPY (2026-11-12, Manny OK): see sw.js v409.
+        cacheName: 'tournament-v73-checkout-copy',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

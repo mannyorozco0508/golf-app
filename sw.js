@@ -4546,7 +4546,8 @@ const APP_SHELL_ALIASES = ['./', './app'];
 // Moved to v406-2.0 (57 + 52a, Manny OK 2026-11-12): tournament.html gains Setup → Sponsors and the Board tab's TV link (both drawn on a late sign-in), tournament-scorecard.html the hole sponsor line and Presented by, tournament-tv.html the read-only TV board; hardpan-home.html seven real Organize cards, Start a tournament, and the Ask Caddie card re-shot without Coming soon; a device on v405 keeps the pages without them.
 // Moved to v407-2.0 (58A tournament offer, Manny OK 2026-11-12): tournament.html's Setup → Tournament offer (off by default; code word, Offer ends, optional line) and tournament-scorecard.html's offer line on the Get HardPan banner and the reasons card, Redeem on an iPhone; a device on v406 keeps the pages without it.
 // Moved to v408-2.0 (collect-by-card fix, Manny OK 2026-11-12): tournament.html's Entry fees card switch creates the fees node for an event whose one fee is set (the Nov 11 one-fee field never wrote it); a device on v407 keeps the switch that refuses with "Set the entry fee first." on such an event.
-const CACHE_VERSION = 'golfapp-v408-2.0';
+// Moved to v409-2.0 (checkout copy, Manny OK 2026-11-12): tournament.html's signup page says a server fault at Pay is the payment service's, not the golfer's signal; a device on v408 keeps the signal sentence for both.
+const CACHE_VERSION = 'golfapp-v409-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
