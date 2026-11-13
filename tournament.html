@@ -601,6 +601,9 @@
         .fees-stripe { border: 2px solid var(--brand-green); border-radius: 12px; padding: 10px 14px; margin-top: 10px; font-size: 0.88rem; }
         .fees-stripe-head { font-weight: 800; letter-spacing: 0.06em; color: var(--brand-green); font-size: 0.78rem; margin-bottom: 4px; }
         .fees-stripe div { display: flex; justify-content: space-between; padding: 4px 0; }
+        .fees-stripe-off { border-color: #b8860b; }
+        .fees-stripe-off .fees-stripe-head { color: #b8860b; }
+        .fees-stripe strong { text-align: right; max-width: 62%; }
         .fees-test-mode { background: #fbecd0; color: #8a5a00; font-weight: 800; font-size: 0.74rem; border-radius: 10px; padding: 2px 8px; }
         .fees-soon { font-size: 0.82rem; color: var(--text-muted); margin: 8px 0 0 0; }
         /* Stripe Connect, the Get paid card (layout A, Manny 2026-11-12). */
@@ -4708,6 +4711,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             + `<button type="button" class="${cls}" id="connect-btn" onclick="connectAction()"${connectBusy ? ' disabled' : ''}>${label}</button>`
             + `<p class="fees-error" id="connect-err" style="display:${connectErr ? 'block' : 'none'};">${escReg(connectErr)}</p></div>`;
     }
+    // The Stripe panel under the toggles, labelled by the Get paid state, and
+    // honest about where a card payment lands (planCheckout on the server).
+    function connectPanelHtml() {
+        const st = connectStateOf(connectMirror);
+        const name = (connectMirror && typeof connectMirror.name === 'string' && connectMirror.name.trim()) ? escReg(connectMirror.name.trim()) : 'the organizer’s Stripe account';
+        const head = st === 'on' ? '✓ STRIPE CONNECTED' : st === 'finish' ? 'STRIPE SETUP UNFINISHED' : 'STRIPE NOT SET UP';
+        const to = st === 'on' ? name : st === 'finish' ? 'nobody yet · cards stay off until the Stripe setup is finished' : 'HardPan’s account until you set up payouts above';
+        return `<div class="fees-stripe${st === 'on' ? '' : ' fees-stripe-off'}" id="fees-stripe"><div class="fees-stripe-head">${head}</div>`
+            + `<div><span>Card money goes to</span><strong>${to}</strong></div>`
+            + `<div><span>Mode</span><span class="fees-test-mode">TEST MODE</span></div></div>`;
+    }
     function connectRowsHtml() {
         const entries = registrationData && typeof registrationData === 'object' ? Object.values(registrationData) : [];
         if (!entries.length) return '';
@@ -4732,10 +4746,30 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const st = connectStateOf(connectMirror);
         const call = st === 'on' ? stripeCall('createConnectDashboardLink', {}) : stripeCall('createConnectOnboardingLink', { code: currentCode });
         call.then((res) => connectGo(res && res.data && res.data.url)).catch((err) => {
-            const r = callReason(err);
-            connectErr = r === 'not-allowed-owner' ? 'Card payments are not switched on for this organizer yet.' : r === 'not-owner' ? 'Only the event\u2019s owner can set up payouts.' : 'Stripe did not answer. Check your signal and try again.';
+            connectErr = connectRefusalText(err);
             connectBusy = false; renderEntryFeesCard();
         });
+    }
+    // EVERY WAY THE CONNECT CALL CAN FAIL, AS A SENTENCE THE ORGANIZER CAN ACT
+    // ON. The server's reasons first; then its own fault ('internal': Stripe
+    // refused or errored - on 2026-11-13 that was a refused account create, and
+    // "check your signal" sent Grok to retry a dead end); then the payment script
+    // not loading; the signal line only when nothing else is known.
+    var CONNECT_REASON_TEXT = {
+        'not-allowed-owner': 'Card payments are not switched on for this organizer yet.',
+        'not-owner': 'Only the event\u2019s owner can set up payouts.',
+        'no-email': 'Your sign-in has no email address, and Stripe needs one to pay you. Sign in with an account that has an email, then try again.',
+        'not-connected': 'Finish the Stripe setup first, then try again.'
+    };
+    var CONNECT_INTERNAL_TEXT = 'Stripe returned an error setting this up. Try again in a few minutes; if it keeps failing, text HardPan.';
+    var CONNECT_SCRIPT_TEXT = 'The payment script did not load. Reload this page and try again.';
+    var CONNECT_FALLBACK_TEXT = 'Stripe did not answer. Check your signal and try again.';
+    function connectRefusalText(err) {
+        var byReason = CONNECT_REASON_TEXT[callReason(err)];
+        if (byReason) return byReason;
+        if (err && err.code === 'functions/internal') return CONNECT_INTERNAL_TEXT;
+        if (err && err.code === 'functions/unavailable' && /SDK/.test(String(err.message || ''))) return CONNECT_SCRIPT_TEXT;
+        return CONNECT_FALLBACK_TEXT;
     }
     // Back from Stripe: one fresh status; on refresh, straight back into onboarding.
     function connectArrival() {
@@ -4852,9 +4886,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (paymentsAllowed) {
             html += `<div class="fees-row"><span><strong>Collect entry fees by card</strong><small>Golfers pay when they sign up</small></span>${feesToggle('fees-card', 'collectByCard', !!(f && f.collectByCard))}</div>`
                 + `<div class="fees-row"><span><strong>Also allow pay at the course</strong><small>Desk marks Paid (cash)</small></span>${feesToggle('fees-cash', 'allowCash', !!(f && f.allowCash))}</div>`
-                + `<div class="fees-stripe" id="fees-stripe"><div class="fees-stripe-head">✓ STRIPE CONNECTED</div>`
-                + `<div><span>Account</span><strong>${connectStateOf(connectMirror) === 'on' ? escReg((connectMirror.name || 'the organizer\u2019s Stripe account')) : 'HardPan'}</strong></div>`
-                + `<div><span>Mode</span><span class="fees-test-mode">TEST MODE</span></div></div>`;
+                // Labelled by the Get paid state (Advisor 2026-11-13 12:44: "STRIPE
+                // CONNECTED - Account HardPan" sat next to "Not set up"). Where card
+                // money goes is what the server's planCheckout does: no account -> HardPan's
+                // own account (Phase 1); mid-setup -> cards refused; on -> the organizer.
+                + connectPanelHtml();
         } else {
             html += `<p class="fees-soon" id="fees-soon">Card payments coming soon. Golfers pay at the course; the Desk marks Paid (cash).</p>`;
         }
