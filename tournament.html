@@ -300,7 +300,7 @@
         .ct-btn { border: 1px solid var(--border-mid); background: var(--bg-card); color: var(--brand-navy); border-radius: 10px; padding: 7px 9px; font-weight: bold; font-size: 0.82rem; cursor: pointer; font-family: inherit; white-space: nowrap; }
         .ct-btn.rm { border-color: #f3b4b8; color: #b3261e; }
         .ct-note { text-align: center; font-size: 0.85rem; color: var(--text-muted); }
-        .ct-gps { background: none; border: 0; padding: 0; font: inherit; font-weight: bold; color: var(--text-main); cursor: pointer; text-decoration: underline; }
+        .ct-gps { background: none; border: 0; padding: 0 6px; font: inherit; font-weight: bold; color: var(--text-main); cursor: pointer; text-decoration: underline; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 32px; margin: -8px -2px; vertical-align: middle; }   /* #14 */
         /* E4b photo queue + E4c recap (approved "as mocked" 2026-11-09). */
         .pq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
         .pq-tile { position: relative; border-radius: 14px; overflow: hidden; aspect-ratio: 4 / 3; background: linear-gradient(135deg, #cfe3d6, #7aa58b); }
@@ -323,7 +323,7 @@
         .sp-row .sp-h { width: 58px; color: var(--text-muted); font-size: 0.78rem; font-weight: 700; flex: none; }
         .sp-row .sp-n { flex: 1; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .sp-row img { height: 22px; width: auto; max-width: 60px; border-radius: 4px; border: 1px solid var(--border-faint); }
-        .sp-row .sp-x { background: none; border: 0; color: var(--accent-red); font-weight: 800; font-size: 1rem; width: 32px; height: 32px; padding: 0; margin: 0; cursor: pointer; }
+        .sp-x, .sp-row .sp-x { background: none; border: 0; color: var(--accent-red); font-weight: 800; font-size: 1rem; width: 44px; min-width: 44px; height: 32px; padding: 0; margin: 0; cursor: pointer; }   /* #14: 44 wide; the event sponsor's x sits outside .sp-row */
         .sp-logo-btn { font-size: 0.72rem; color: var(--brand-green); font-weight: 700; cursor: pointer; white-space: nowrap; }
         .sp-logo-btn input { display: none; }
         .sp-add { display: grid; grid-template-columns: 84px 1fr auto; gap: 6px; align-items: center; margin-top: 8px; }
@@ -403,10 +403,16 @@
 
         .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
         .toggle-label-sm { font-size: 0.8rem; font-weight: bold; color: var(--text-muted); cursor: pointer; transition: color 0.2s ease; user-select: none; }
+        /* Tap targets (bug-hunt #14, Manny OK 2026-11-12): every control below keeps
+           its look and gains a hit area of at least 44 x 32 - padding out, margin
+           back in where the row must not move. Measured in Chrome at 390 px by
+           tournament_tap_targets_test.js. */
+        #start-type-label-normal, #start-type-label-shotgun { display: inline-flex; align-items: center; min-height: 32px; min-width: 44px; justify-content: center; padding: 0 6px; margin: -8px -6px; }
         .toggle-label-sm.active { color: var(--brand-green); }
-        .toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+        #signed-in-as a, #signed-in-as-setup a { display: inline-block; padding: 9px 8px; margin: -9px -8px; min-width: 44px; text-align: center; }   /* #14: the Sign out link's hit area */
+        .toggle-switch { position: relative; display: inline-block; width: 44px; height: 32px; flex-shrink: 0; }   /* #14: 32 tall; the slider stays 24 */
         .toggle-switch input { opacity: 0; width: 0; height: 0; }
-        .toggle-switch .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border-mid); transition: .2s ease; border-radius: 24px; }
+        .toggle-switch .toggle-slider { position: absolute; cursor: pointer; top: 4px; left: 0; right: 0; bottom: 4px; background-color: var(--border-mid); transition: .2s ease; border-radius: 24px; }
         .toggle-switch .toggle-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s ease; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
         .toggle-switch input:checked + .toggle-slider { background-color: var(--brand-green); }
         .toggle-switch input:checked + .toggle-slider:before { transform: translateX(20px); }
@@ -416,7 +422,7 @@
         .modal-content { background: var(--bg-card); border-radius: 14px; padding: 20px; max-width: 400px; width:100%; max-height:85vh; overflow-y:auto; }
         .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
         .modal-header span { font-weight:bold; font-size:1.05rem; color:var(--brand-green); }
-        .close-modal { background:none; border:none; font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0; line-height:1; }
+        .close-modal { background:none; border:none; font-size:1.5rem; color:var(--text-muted); cursor:pointer; padding:0 8px; line-height:1; min-width:44px; min-height:32px; display:inline-flex; align-items:center; justify-content:center; margin:-4px -8px -4px 0; }   /* #14 */
         .qr-box { display:flex; justify-content:center; padding:14px; background:#fff; border-radius:10px; margin-bottom:12px; }
         .link-text-box { background: var(--nav-bg); border: 1px solid var(--border-mid); border-radius: 8px; padding: 10px; font-size: 0.8rem; word-break: break-all; color: var(--text-main); margin-bottom: 10px; user-select: all; }
 
@@ -438,7 +444,7 @@
         .flight-row { display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid var(--border-faint); border-radius:8px; margin-bottom:6px; }
         .flight-row input.flight-name-input { flex:1; min-width:0; padding:6px 8px; font-size:0.9rem; }
         .flight-count { font-size:0.75rem; color:var(--text-muted); white-space:nowrap; }
-        .flight-del { background:none; border:none; color:var(--accent-red); font-size:0.85rem; cursor:pointer; padding:4px; }
+        .flight-del { background:none; border:none; color:var(--accent-red); font-size:0.85rem; cursor:pointer; padding:4px; min-width:44px; min-height:32px; }   /* #14 */
         .flight-del[disabled] { color:var(--text-muted); cursor:not-allowed; }
         .fa-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border-faint); }
         /* The payer sits on its own line inside the row it belongs to, so it
@@ -523,11 +529,11 @@
         .sl-when input { width: 56px; padding: 6px; font-size: 0.85rem; text-align: center; }
         .sl-team { font-size: 0.9rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .sl-acts { display: flex; gap: 6px; }
-        .sl-acts button { width: auto; padding: 6px 10px; font-size: 0.75rem; margin: 0; }
+        .sl-acts button { width: auto; padding: 6px 10px; font-size: 0.75rem; margin: 0; min-width: 44px; min-height: 32px; }   /* #14 */
         .tee-times-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 10px; }
         .tee-times-box label { font-size: 0.75rem; }
         /* Golfer chips on the Setup team card (S2 A + C): tap one to move it. */
-        .golfer-chip { display: inline-block; border: 1px solid var(--border-mid); border-radius: 999px; padding: 3px 9px; font-size: 0.78rem; margin: 2px 4px 2px 0; background: var(--bg-card); color: inherit; font-family: inherit; cursor: pointer; }
+        .golfer-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 32px; box-sizing: border-box; border: 1px solid var(--border-mid); border-radius: 999px; padding: 3px 9px; font-size: 0.78rem; margin: 2px 4px 2px 0; background: var(--bg-card); color: inherit; font-family: inherit; cursor: pointer; }   /* #14: 32 tall, 44 wide */
         .move-sheet-body .move-to { display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; }
         .move-sheet-body .move-to:disabled { opacity: .5; cursor: default; }
         .move-note { font-size: 0.78rem; color: var(--text-muted); margin: 8px 0 0; }
@@ -539,7 +545,7 @@
         .te-row { display: grid; grid-template-columns: 1fr 34px; gap: 6px; align-items: center; margin-bottom: 6px; }
         .te-row button { width: 34px; height: 34px; padding: 0; margin: 0; border: 0; background: none; color: var(--accent-red); font-weight: 800; font-size: 1rem; cursor: pointer; }
         .te-row button:disabled { color: var(--text-muted); opacity: .4; cursor: default; }
-        .te-add { background: none; border: 0; color: var(--brand-green); font-weight: 700; font-size: 0.82rem; padding: 2px 0 8px; cursor: pointer; width: auto; margin: 0; }
+        .te-add { background: none; border: 0; color: var(--brand-green); font-weight: 700; font-size: 0.82rem; padding: 6px 0; min-height: 32px; display: inline-flex; align-items: center; cursor: pointer; width: auto; margin: 0; }   /* #14 */
         .te-acts { display: flex; gap: 8px; }
         .te-acts button { flex: 1; margin: 0; }
         .te-err { color: var(--accent-red); font-size: 0.8rem; margin: 4px 0; }
