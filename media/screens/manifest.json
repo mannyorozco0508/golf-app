@@ -122,7 +122,9 @@
         "/media/screens/live-games-886.webp"
       ],
       "width": 886,
-      "height": 1920
+      "height": 1920,
+      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+      "captured": "release-207 895da9fc: the Games tab tapped on the 2.0.7 tabs line (the Games sheet over the map), Piipaash hole 4; the round is the app's own stake-free shape (every stake 0, no pool: text-safe.js roundStakeFree), so the sheet prints 'No amount · 1 game' and no currency sign; a team Nassau and skins; same harness as gps."
     },
     {
       "key": "results",

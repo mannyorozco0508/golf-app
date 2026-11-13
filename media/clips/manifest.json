@@ -37,7 +37,8 @@
       "poster": "/media/posters/games-live-board.jpg",
       "used_on": [
         "/home card: Every game, as it happens. (Games row)"
-      ]
+      ],
+      "recut": "2026-11-13: release-207 895da9fc, the Games sheet (stake-free round, 'No amount'), then the Board tab's Leaderboard; 30 frames at 10 fps, 590x1280 H.264 (sharp + AVAssetWriter)"
     },
     {
       "file": "results.mp4",

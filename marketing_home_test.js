@@ -671,10 +671,10 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
         // tournaments.mp4 re-cut from the 2.0.7 home (the organizer's Desert Classic card); its
         // poster is the re-cut clip's own first frame (sharp, 295x640 JPEG q82).
         // gps.mp4 and group-scoring.mp4 re-cut the same way (the 2.0.7 map with the tabs line); their posters
-        // are their first frames; games-live-board.mp4 follows in this wave too.
+        // are their first frames; games-live-board.mp4 the same (the stake-free Games sheet, then the Board tab).
         const posterSha = (buf) => require('crypto').createHash('sha256').update(buf).digest('hex').slice(0, 16);
         posterSha.FIRST_FRAME = { 'gps': 'cf2efd65f78e71e8', 'add-a-game': '3494edfa101d9586', 'group-scoring': 'e2e4a6caecaabf90',
-            'games-live-board': '461ae62aac009946', 'results': '847620f41248eb7e', 'tournaments': '94852db0fdaf4cc1' };
+            'games-live-board': '48f19b8bd81e8495', 'results': '847620f41248eb7e', 'tournaments': '94852db0fdaf4cc1' };
         posterSha.KEPT = { 'just-say-it': '7bcb59a6ecafe3b8' };
         Object.keys(CUT).forEach((f) => {
             const name = f.replace('.mp4', '');
