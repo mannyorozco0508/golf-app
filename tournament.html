@@ -4257,8 +4257,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         'bad-fee': "The entry fee on this event isn't set up right. Your spot is saved; text the organizer."
     };
     var CHECKOUT_FALLBACK_TEXT = "Checkout didn't open. Check your signal and tap Pay again.";
+    // The server masks its own faults as 'internal' (a bad key, a Stripe outage):
+    // that is not the golfer's signal, and saying so sent a golfer to retry a
+    // dead end twice (Advisor 2026-11-12 17:19, live on R7SK48).
+    var CHECKOUT_INTERNAL_TEXT = "Checkout didn't open: the payment service returned an error. Your spot is saved; pay the organizer at the course, or try again in a few minutes.";
     function checkoutRefusalText(err) {
-        return CHECKOUT_REASON_TEXT[callReason(err)] || CHECKOUT_FALLBACK_TEXT;
+        var byReason = CHECKOUT_REASON_TEXT[callReason(err)];
+        if (byReason) return byReason;
+        if (err && err.code === 'functions/internal') return CHECKOUT_INTERNAL_TEXT;
+        return CHECKOUT_FALLBACK_TEXT;
     }
 
     // ---- M2a: THE SIGNUP FORM ----------------------------------------------
