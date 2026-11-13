@@ -160,10 +160,15 @@ function makeHandlers(deps) {
         return { status: 200, body: out.record.type };
     }
 
-    // ---- CONNECT (2026-11-12) ---------------------------------------------
+    // ---- CONNECT (2026-11-12; Accounts v2 2026-11-13) ----------------------
     // createConnectOnboardingLink({code}, {uid, origin}) -> {url}: the signed-in
-    // owner of this event, allow-listed by Manny, gets ONE Express account
-    // (idempotent on the uid) and an onboarding link that returns to this event.
+    // owner of this event, allow-listed by Manny, gets ONE Express-dashboard
+    // account (POST /v2/core/accounts, idempotent on the uid) and a v2 onboarding
+    // link that returns to this event. The 7-day payout delay is a v1 update
+    // right after creation; if Stripe refuses that update the account still
+    // onboards and the refusal is kept on stripeAccounts/<uid>/payoutScheduleError
+    // and logged ALERT - never silent, never blocking.
+    const ACCT_V1_API_ERROR_MAX = 300;
     async function createConnectOnboardingLink(data, ctx) {
         const uid = ctx && ctx.uid;
         if (!uid || !UIDRE.test(String(uid))) throw new HandlerError(core.EXTRA_REASONS.UNAUTHENTICATED);
@@ -178,13 +183,19 @@ function makeHandlers(deps) {
         let acct = await val('stripeAccounts/' + uid);
         if (!acct || typeof acct.acct !== 'string') {
             const name = (tournament.beneficiary && String(tournament.beneficiary).trim()) || (tournament.organizerName && String(tournament.organizerName).trim()) || '';
-            const created = await stripe.accounts.create(core.accountCreateParams({ uid, name }), { idempotencyKey: core.connectIdempotencyKey(uid) });
-            acct = { acct: created.id, createdAt: now() };
+            const created = await stripe.v2.core.accounts.create(core.accountCreateParams({ uid, name }), { idempotencyKey: core.connectIdempotencyKey(uid) });
+            acct = { acct: created.id, createdAt: now(), api: 'v2' };
+            if (name) acct.name = name.slice(0, 100);
+            try { await stripe.accounts.update(created.id, core.payoutScheduleParams()); }
+            catch (e) {
+                acct.payoutScheduleError = String((e && e.message) || e).slice(0, ACCT_V1_API_ERROR_MAX);
+                log('ALERT payout schedule not applied', uid, acct.payoutScheduleError);
+            }
             await db.ref('stripeAccounts/' + uid).set(acct);
         }
         const linkParams = core.accountLinkParams({ acct: acct.acct, origin, code, emulator: deps.emulator === true });
         if (!linkParams) throw new HandlerError(core.EXTRA_REASONS.BAD_ORIGIN);
-        const link = await stripe.accountLinks.create(linkParams);
+        const link = await stripe.v2.core.accountLinks.create(linkParams);
         return { url: link.url };
     }
     // getConnectStatus({}, {uid}) -> the mirror's fields + state; writes connectStatus/<uid>.
@@ -200,8 +211,8 @@ function makeHandlers(deps) {
         if (!uid || !UIDRE.test(String(uid))) throw new HandlerError(core.EXTRA_REASONS.UNAUTHENTICATED);
         const acct = await val('stripeAccounts/' + uid);
         if (!acct || typeof acct.acct !== 'string') return { connected: false, state: 'none' };
-        const account = await stripe.accounts.retrieve(acct.acct);
-        const status = core.connectStatusOf(account, now());
+        const account = await stripe.accounts.retrieve(acct.acct);   // v1 view of the v2 account
+        const status = core.connectStatusOf(account, now(), acct.name);
         await db.ref('connectStatus/' + uid).set(status);
         const out = Object.assign({ connected: true, state: core.connectState(status) }, status);
         // With {code} for an event this caller owns: the fee the golfer will be
@@ -246,11 +257,16 @@ function makeHandlers(deps) {
         if (!event || typeof event.id !== 'string' || !EVENT_ID.test(event.id)) return { status: 400, body: 'bad event id' };
         const evPath = 'stripeEvents/' + event.id;
         if ((await db.ref(evPath).once('value')).exists()) return { status: 200, body: 'duplicate' };
+        // Whose account: looked up by the account id for every Connect event
+        // (deauthorized names it in event.account, account.updated in
+        // data.object.id), so the mirror is written for an account we hold even
+        // when the v1 view of a v2 account carries no metadata.uid.
         let owner = null;
-        if (event.type === 'account.application.deauthorized' && typeof event.account === 'string') {
+        const acctId = (typeof event.account === 'string' && event.account) || (event.data && event.data.object && typeof event.data.object.id === 'string' && /^acct_/.test(event.data.object.id) && event.data.object.id) || null;
+        if (acctId && core.CONNECT_EVENT_TYPES.indexOf(event.type) !== -1) {
             const all = await val('stripeAccounts');
-            const hit = all && Object.keys(all).find((u) => all[u] && all[u].acct === event.account);
-            if (hit) owner = { uid: hit };
+            const hit = all && Object.keys(all).find((u) => all[u] && all[u].acct === acctId);
+            if (hit) owner = { uid: hit, name: (all[hit] && typeof all[hit].name === 'string') ? all[hit].name : null };
         }
         const out = core.mapAccountEvent(event, now(), owner);
         const tx = await db.ref(evPath).transaction((cur) => (cur === null ? out.record : undefined));

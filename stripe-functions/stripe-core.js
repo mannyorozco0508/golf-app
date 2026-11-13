@@ -155,7 +155,20 @@ const ACCT_ID = /^acct_[A-Za-z0-9]{1,64}$/;   // shape only; Stripe's ids are 16
 const UID = /^[A-Za-z0-9_-]{1,128}$/;
 const DEFAULT_SERVICE_FEE_CENTS = 400;
 const MAX_SERVICE_FEE_CENTS = 2000;
-const CONNECT = Object.freeze({ country: 'US', payoutDelayDays: 7, siteUrl: 'https://tournaments.rattlegolf.com' });
+// ACCOUNTS V2 (2026-11-13). Stripe refuses POST /v1/accounts for new Connect
+// integrations ("Stripe no longer recommends Accounts v1 ... use POST
+// /v2/core/accounts"; the Dashboard's "Accounts v1 support" policy did not
+// lift it for our key, Grok 10:04). Only CREATION moves to v2: the account is
+// made with POST /v2/core/accounts (dashboard 'express', the application
+// collects fees and losses, card_payments + stripe_transfers requested) and
+// its onboarding link with POST /v2/core/account_links. Everything else stays
+// on v1, which Stripe documents as working with v2 account ids: GET
+// /v1/accounts/{id} returns the v1 shape (charges_enabled, payouts_enabled,
+// requirements.currently_due), login links, and v2 accounts keep sending the
+// v1 account.updated event, so the second endpoint is unchanged. The v2 create
+// has no payout-schedule field; the 7-day delay is applied right after with
+// the v1 update, and a refusal there is recorded, not hidden (handlers.js).
+const CONNECT = Object.freeze({ country: 'US', countryV2: 'us', currency: 'usd', payoutDelayDays: 7, siteUrl: 'https://tournaments.rattlegolf.com' });
 const CONNECT_EVENT_TYPES = Object.freeze(['account.updated', 'account.application.deauthorized']);
 
 // The service fee in cents: the per-event override when Manny set one, else the
@@ -180,28 +193,50 @@ function planConnect(input) {
     return { ok: true, uid };
 }
 function connectIdempotencyKey(uid) { return 'connect-acct:' + uid; }
+// POST /v2/core/accounts: the Express equivalent. `dashboard: 'express'`
+// requires fees_collector and losses_collector = 'application' (Stripe's own
+// error text), i.e. HardPan is responsible for fees and losses as with v1
+// Express. No `type`, no `capabilities`, no `settings.payouts` here: those are
+// v1 fields and v2 refuses unknown parameters.
 function accountCreateParams(o) {
     const name = (typeof o.name === 'string' && o.name.trim()) ? o.name.trim().slice(0, 100) : null;
     const p = {
-        type: 'express', country: CONNECT.country,
-        capabilities: { card_payments: { requested: true }, transfers: { requested: true } },
-        business_profile: { url: CONNECT.siteUrl },
-        settings: { payouts: { schedule: { interval: 'daily', delay_days: CONNECT.payoutDelayDays } } },
+        dashboard: 'express',
+        identity: { country: CONNECT.countryV2 },
+        defaults: {
+            currency: CONNECT.currency,
+            responsibilities: { fees_collector: 'application', losses_collector: 'application' },
+            profile: { business_url: CONNECT.siteUrl }
+        },
+        configuration: {
+            merchant: { capabilities: { card_payments: { requested: true } } },
+            recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } }
+        },
         metadata: { uid: o.uid }
     };
-    if (name) p.business_profile.name = name;
+    if (name) p.display_name = name;
     return p;
 }
+// The v1 update applied right after creation (v2 has no schedule field).
+function payoutScheduleParams() {
+    return { settings: { payouts: { schedule: { interval: 'daily', delay_days: CONNECT.payoutDelayDays } } } };
+}
+// POST /v2/core/account_links. (`configurations` was removed from
+// account_onboarding in the API this SDK pins, 2026-09-30.endive.)
 function accountLinkParams(o) {
     const origin = allowedOrigin(o.origin, { emulator: o.emulator === true });
     if (!origin || !SAFE_KEY.test(String(o.code)) || !ACCT_ID.test(String(o.acct))) return null;
     const base = origin + '/tournament?tourney=' + encodeURIComponent(o.code) + '&connect=';
-    return { account: o.acct, type: 'account_onboarding', return_url: base + 'return', refresh_url: base + 'refresh' };
+    return { account: o.acct, use_case: { type: 'account_onboarding', account_onboarding: { return_url: base + 'return', refresh_url: base + 'refresh' } } };
 }
-// The owner-readable mirror connectStatus/<uid>, from a Stripe Account object.
-function connectStatusOf(acct, now) {
+// The owner-readable mirror connectStatus/<uid>, from a v1-shaped Stripe
+// Account object (GET /v1/accounts/{id} on a v2 account returns this shape).
+// `fallbackName` is the name we gave at creation, kept in stripeAccounts, for
+// when the v1 view carries no business_profile.name.
+function connectStatusOf(acct, now, fallbackName) {
     const req = (acct && acct.requirements && Array.isArray(acct.requirements.currently_due)) ? acct.requirements.currently_due.filter((x) => typeof x === 'string').slice(0, 50) : [];
-    const name = (acct && acct.business_profile && typeof acct.business_profile.name === 'string' && acct.business_profile.name.trim()) ? acct.business_profile.name.trim().slice(0, 100) : null;
+    const clean = (s) => (typeof s === 'string' && s.trim()) ? s.trim().slice(0, 100) : null;
+    const name = clean(acct && acct.business_profile && acct.business_profile.name) || clean(fallbackName);
     return { chargesEnabled: !!(acct && acct.charges_enabled === true), payoutsEnabled: !!(acct && acct.payouts_enabled === true), detailsSubmitted: !!(acct && acct.details_submitted === true), due: req, name, updatedAt: now };
 }
 // 'none' (no account) | 'finish' (started, not fully on) | 'on' (charges + payouts enabled)
@@ -210,18 +245,23 @@ function connectState(st) {
     return (st.chargesEnabled === true && st.payoutsEnabled === true) ? 'on' : 'finish';
 }
 // Connected-account events (the second endpoint). -> { uid|null, status|null, record }
-// `owner` is what the handler found in stripeAccounts for event.account (deauthorized
-// events carry no metadata of their own).
+// `owner` is what the handler found in stripeAccounts for the event's account id
+// ({uid, name}): deauthorized events carry no metadata of their own, and the v1
+// view of a v2 account is not relied on for metadata either - an account we
+// hold is ours whether or not metadata.uid comes through. The two must agree
+// when both are present.
 function mapAccountEvent(event, now, owner) {
     const rec = (type) => ({ type, at: now });
     const o = event && event.data && event.data.object;
     if (!o || CONNECT_EVENT_TYPES.indexOf(event.type) === -1) return { uid: null, status: null, record: rec('ignored') };
+    const ownerUid = owner && typeof owner.uid === 'string' && UID.test(owner.uid) ? owner.uid : null;
     if (event.type === 'account.updated') {
-        const uid = o.metadata && typeof o.metadata.uid === 'string' && UID.test(o.metadata.uid) ? o.metadata.uid : null;
-        if (!uid) return { uid: null, status: null, record: rec('rejected-account') };
-        return { uid, status: connectStatusOf(o, now), record: rec(event.type) };
+        const metaUid = o.metadata && typeof o.metadata.uid === 'string' && UID.test(o.metadata.uid) ? o.metadata.uid : null;
+        const uid = metaUid || ownerUid;
+        if (!uid || (metaUid && ownerUid && metaUid !== ownerUid)) return { uid: null, status: null, record: rec('rejected-account') };
+        return { uid, status: connectStatusOf(o, now, owner && owner.name), record: rec(event.type) };
     }
-    const uid = owner && typeof owner.uid === 'string' && UID.test(owner.uid) ? owner.uid : null;
+    const uid = ownerUid;
     if (!uid) return { uid: null, status: null, record: rec('rejected-account') };
     return { uid, status: { chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false, due: [], name: null, updatedAt: now, deauthorizedAt: now }, record: rec(event.type) };
 }
@@ -392,6 +432,6 @@ module.exports = {
     eventRef, mapEvent,
     // Connect (2026-11-12)
     DEFAULT_SERVICE_FEE_CENTS, MAX_SERVICE_FEE_CENTS, CONNECT, CONNECT_EVENT_TYPES,
-    serviceFee, planConnect, connectIdempotencyKey, accountCreateParams, accountLinkParams,
+    serviceFee, planConnect, connectIdempotencyKey, accountCreateParams, payoutScheduleParams, accountLinkParams,
     connectStatusOf, connectState, mapAccountEvent, refundParams
 };

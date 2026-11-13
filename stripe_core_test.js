@@ -194,25 +194,43 @@ test('13. firebase.json carries ONLY the tournaments-stripe codebase; the site n
 // sha from a saved copy): default fee 0 -> 17 + 18 red; application_fee_amount
 // dropped -> 19 red; refund without reverse_transfer -> 20 red; mid-setup not
 // refused -> 18 red; anyone may connect -> 16 red; webhook total not exact -> 9 + 19b red.
+//
+// ACCOUNTS V2 (2026-11-13, Advisor 10:42; Stripe refused POST /v1/accounts for
+// the live key, Grok 10:00/10:04). Creation moves to POST /v2/core/accounts and
+// the onboarding link to POST /v2/core/account_links; status, login links and
+// the account.updated webhook stay v1 (Stripe documents both as working with v2
+// account ids). Tests 14, 15 re-pinned to the v2 shapes; 21 gains the owner /
+// name fallbacks. Baseline against main f7c1b8f3 (v1 code): 14 + 15 + 21 red,
+// 19 pass / 3 fail of 22. With the build (final run): 22 pass / 0 fail.
+// Controls (stripe-core.js mutated, restored by sha from a saved copy): a v1
+// `type: 'express'` slipped into the v2 params -> 14 red; the link in the v1
+// shape -> 15 red; owner fallback dropped -> 21 red (+ K6 in the webhook file);
+// creation name ignored -> 21 red.
 // ---------------------------------------------------------------------------
-test('14. Connect account params: Express, US, card_payments + transfers, 7-day daily payout delay, the organizer name, uid in metadata', () => {
+test('14. Connect account params (Accounts v2, 2026-11-13): POST /v2/core/accounts with the Express dashboard, the application collecting fees and losses, card_payments + stripe_transfers requested, us/usd, the organizer name, uid in metadata; no v1 field; the 7-day payout delay as the v1 update', () => {
     const p = C.accountCreateParams({ uid: 'u-org', name: 'Hope Foundation' });
-    assert.equal(p.type, 'express'); assert.equal(p.country, 'US');
-    assert.deepEqual(p.capabilities, { card_payments: { requested: true }, transfers: { requested: true } });
-    assert.deepEqual(p.settings.payouts.schedule, { interval: 'daily', delay_days: 7 });
-    assert.equal(p.business_profile.name, 'Hope Foundation');
-    assert.equal(p.business_profile.url, 'https://tournaments.rattlegolf.com');
+    assert.equal(p.dashboard, 'express');
+    assert.deepEqual(p.identity, { country: 'us' });
+    assert.deepEqual(p.defaults, { currency: 'usd', responsibilities: { fees_collector: 'application', losses_collector: 'application' }, profile: { business_url: 'https://tournaments.rattlegolf.com' } });
+    assert.deepEqual(p.configuration, { merchant: { capabilities: { card_payments: { requested: true } } }, recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } } });
+    assert.equal(p.display_name, 'Hope Foundation');
     assert.deepEqual(p.metadata, { uid: 'u-org' });
-    assert.equal(C.accountCreateParams({ uid: 'u-org', name: '' }).business_profile.name, undefined, 'no made-up name');
-    assert.equal(C.accountCreateParams({ uid: 'u-org', name: 'x'.repeat(300) }).business_profile.name.length, 100, 'clipped');
+    // v1-only fields never reach v2 (it refuses unknown parameters)
+    for (const k of ['type', 'country', 'capabilities', 'business_profile', 'settings']) assert.equal(p[k], undefined, 'no v1 field ' + k);
+    assert.deepEqual(Object.keys(p).sort(), ['configuration', 'dashboard', 'defaults', 'display_name', 'identity', 'metadata']);
+    assert.equal(C.accountCreateParams({ uid: 'u-org', name: '' }).display_name, undefined, 'no made-up name');
+    assert.equal(C.accountCreateParams({ uid: 'u-org', name: 'x'.repeat(300) }).display_name.length, 100, 'clipped');
+    assert.deepEqual(C.payoutScheduleParams(), { settings: { payouts: { schedule: { interval: 'daily', delay_days: 7 } } } });
     assert.equal(C.connectIdempotencyKey('u-org'), 'connect-acct:u-org');
 });
 
-test('15. account link params: onboarding type, return/refresh on the allowed origin only', () => {
+test('15. account link params (v2): POST /v2/core/account_links, use_case account_onboarding, return/refresh on the allowed origin only, no `configurations`', () => {
     const l = C.accountLinkParams({ acct: 'acct_1', origin: 'https://tournaments.rattlegolf.com', code: 'ABC' });
-    assert.equal(l.account, 'acct_1'); assert.equal(l.type, 'account_onboarding');
-    assert.equal(l.return_url, 'https://tournaments.rattlegolf.com/tournament?tourney=ABC&connect=return');
-    assert.equal(l.refresh_url, 'https://tournaments.rattlegolf.com/tournament?tourney=ABC&connect=refresh');
+    assert.equal(l.account, 'acct_1'); assert.equal(l.use_case.type, 'account_onboarding');
+    assert.equal(l.use_case.account_onboarding.return_url, 'https://tournaments.rattlegolf.com/tournament?tourney=ABC&connect=return');
+    assert.equal(l.use_case.account_onboarding.refresh_url, 'https://tournaments.rattlegolf.com/tournament?tourney=ABC&connect=refresh');
+    assert.deepEqual(Object.keys(l.use_case.account_onboarding).sort(), ['refresh_url', 'return_url']);
+    assert.equal(l.type, undefined, 'the v1 `type` field is not sent');
     assert.equal(C.accountLinkParams({ acct: 'acct_1', origin: 'https://evil.example', code: 'ABC' }), null, 'a bad origin gets no link');
     assert.equal(C.accountLinkParams({ acct: 'acct_1', origin: 'https://tournaments.rattlegolf.com', code: 'bad code' }), null, 'a bad code gets no link');
 });
@@ -308,4 +326,16 @@ test('21. account events: account.updated -> the status mirror for the uid in me
     assert.equal(unk.uid, null); assert.equal(unk.record.type, 'rejected-account');
     assert.equal(C.mapAccountEvent({ id: 'evt_d', type: 'payout.paid', data: { object: {} } }, 9).record.type, 'ignored');
     assert.deepEqual(C.CONNECT_EVENT_TYPES, ['account.updated', 'account.application.deauthorized']);
+    // Accounts v2 (2026-11-13): the v1 view of a v2 account may carry no
+    // metadata.uid and no business_profile.name; an account WE hold (owner from
+    // stripeAccounts) is still ours, with the name we gave at creation.
+    const bare = Object.assign({}, acct, { metadata: {}, business_profile: {} });
+    const own = C.mapAccountEvent({ id: 'evt_e', type: 'account.updated', data: { object: bare } }, 9, { uid: 'u-org', name: 'Hope Foundation' });
+    assert.equal(own.uid, 'u-org'); assert.equal(own.status.name, 'Hope Foundation'); assert.equal(own.status.chargesEnabled, true); assert.equal(own.record.type, 'account.updated');
+    assert.equal(C.connectStatusOf(bare, 9, 'Hope Foundation').name, 'Hope Foundation');
+    assert.equal(C.connectStatusOf(acct, 9, 'Other Name').name, 'Hope Foundation', 'Stripe\'s own name wins when present');
+    assert.equal(C.connectStatusOf(bare, 9).name, null);
+    // metadata and our record disagree -> rejected, nothing written
+    const dis = C.mapAccountEvent({ id: 'evt_f', type: 'account.updated', data: { object: acct } }, 9, { uid: 'u-else' });
+    assert.equal(dis.uid, null); assert.equal(dis.record.type, 'rejected-account');
 });
