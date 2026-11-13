@@ -202,6 +202,9 @@ test('13. firebase.json carries ONLY the tournaments-stripe codebase; the site n
 // account ids). Tests 14, 15 re-pinned to the v2 shapes; 21 gains the owner /
 // name fallbacks. Baseline against main f7c1b8f3 (v1 code): 14 + 15 + 21 red,
 // 19 pass / 3 fail of 22. With the build (final run): 22 pass / 0 fail.
+// V1 LINK (2026-11-13, second live run): test 15 re-pinned to the v1 account-link
+// shape. Baseline against main 6b4bee9f (v2 link): 15 red, 21 pass / 1 fail of 22.
+// With the build (final run): 22 pass / 0 fail. Control: the v2 shape back -> 15 red.
 // Controls (stripe-core.js mutated, restored by sha from a saved copy): a v1
 // `type: 'express'` slipped into the v2 params -> 14 red; the link in the v1
 // shape -> 15 red; owner fallback dropped -> 21 red (+ K6 in the webhook file);
@@ -234,13 +237,13 @@ test('14. Connect account params (Accounts v2, 2026-11-13): POST /v2/core/accoun
     assert.equal(C.connectIdempotencyKey('u-org'), 'connect-acct:u-org');
 });
 
-test('15. account link params (v2): POST /v2/core/account_links, use_case account_onboarding, return/refresh on the allowed origin only, no `configurations`', () => {
+test('15. account link params: the v1 POST /v1/account_links shape on the v2 account id (2026-11-13: legacy test mode refused the v2 link), return/refresh on the allowed origin only', () => {
     const l = C.accountLinkParams({ acct: 'acct_1', origin: 'https://tournaments.rattlegolf.com', code: 'ABC' });
-    assert.equal(l.account, 'acct_1'); assert.equal(l.use_case.type, 'account_onboarding');
-    assert.equal(l.use_case.account_onboarding.return_url, 'https://tournaments.rattlegolf.com/tournament?tourney=ABC&connect=return');
-    assert.equal(l.use_case.account_onboarding.refresh_url, 'https://tournaments.rattlegolf.com/tournament?tourney=ABC&connect=refresh');
-    assert.deepEqual(Object.keys(l.use_case.account_onboarding).sort(), ['refresh_url', 'return_url']);
-    assert.equal(l.type, undefined, 'the v1 `type` field is not sent');
+    assert.equal(l.account, 'acct_1'); assert.equal(l.type, 'account_onboarding');
+    assert.equal(l.return_url, 'https://tournaments.rattlegolf.com/tournament?tourney=ABC&connect=return');
+    assert.equal(l.refresh_url, 'https://tournaments.rattlegolf.com/tournament?tourney=ABC&connect=refresh');
+    assert.deepEqual(Object.keys(l).sort(), ['account', 'refresh_url', 'return_url', 'type']);
+    assert.equal(l.use_case, undefined, 'the v2 `use_case` shape is not sent');
     assert.equal(C.accountLinkParams({ acct: 'acct_1', origin: 'https://evil.example', code: 'ABC' }), null, 'a bad origin gets no link');
     assert.equal(C.accountLinkParams({ acct: 'acct_1', origin: 'https://tournaments.rattlegolf.com', code: 'bad code' }), null, 'a bad code gets no link');
 });

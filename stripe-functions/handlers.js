@@ -200,7 +200,7 @@ function makeHandlers(deps) {
         }
         const linkParams = core.accountLinkParams({ acct: acct.acct, origin, code, emulator: deps.emulator === true });
         if (!linkParams) throw new HandlerError(core.EXTRA_REASONS.BAD_ORIGIN);
-        const link = await stripe.v2.core.accountLinks.create(linkParams);
+        const link = await stripe.accountLinks.create(linkParams);   // v1 link on the v2 account id (see core.accountLinkParams)
         return { url: link.url };
     }
     // getConnectStatus({}, {uid}) -> the mirror's fields + state; writes connectStatus/<uid>.

@@ -45,6 +45,10 @@
 // 501855b4: K1 + X1 red, 18 pass / 2 fail of 20. With the build (final run):
 // 20 pass / 0 fail / 0 skipped. Controls: handler no longer refuses a missing
 // email -> K1 + X1 red; the wrapper forgets the token email -> X1 red.
+// V1 LINK (2026-11-13, second live run): K1 re-pinned - the link is POST /v1/account_links
+// on the v2 account id, the v2 link call never made. Baseline against main 6b4bee9f:
+// K1 red, 19 pass / 1 fail of 20. With the build (final run): 20 pass / 0 fail / 0 skipped.
+// Control: the handler back on stripe.v2.core.accountLinks.create -> K1 red.
 // ============================================================================
 'use strict';
 const { test, before, after } = require('node:test');
@@ -121,7 +125,7 @@ function mockStripe() {
         retrieve: async (id) => { calls.retrieves.push(id); return Object.assign({ id }, calls.acctState); },
         createLoginLink: async (id) => { calls.logins.push(id); return { url: 'https://connect.stripe.com/express/' + id }; }
     };
-    s.accountLinks = { create: async (params) => { calls.v1links.push(params); return { url: 'https://connect.stripe.com/setup/e/V1_NEVER' }; } };
+    s.accountLinks = { create: async (params) => { calls.v1links.push(params); return { object: 'account_link', url: 'https://connect.stripe.com/setup/e/' + params.account + '/v1' }; } };
     s.v2 = { core: {
         accounts: { create: async (params, opts) => { calls.accounts.push({ params, opts }); return { id: 'acct_MOCK1', object: 'v2.core.account' }; } },
         accountLinks: { create: async (params) => { calls.links.push(params); return { object: 'v2.core.account_link', url: 'https://connect.stripe.com/setup/e/' + params.account + '/x' }; } }
@@ -467,7 +471,10 @@ test('K1. createConnectOnboardingLink (Accounts v2): the allow-listed owner gets
     assert.equal(calls.accounts.length, 1, 'one v2 create');
     assert.equal(calls.accounts[0].params.contact_email, 'org@example.test');
     assert.equal(calls.v1accounts.length, 0, 'POST /v1/accounts is never called (Stripe refuses it)');
-    assert.equal(calls.v1links.length, 0, 'POST /v1/account_links is never called');
+    // 2026-11-13 second live run: the link is the v1 call on the v2 account id (legacy test mode
+    // refused the v2 link); the v2 link call is never made.
+    assert.equal(calls.links.length, 0, 'POST /v2/core/account_links is never called');
+    assert.equal(calls.v1links.length, 1, 'POST /v1/account_links, once');
     const { params, opts } = calls.accounts[0];
     assert.equal(params.dashboard, 'express'); assert.equal(params.type, undefined);
     assert.deepEqual(params.defaults.responsibilities, { fees_collector: 'application', losses_collector: 'application' });
@@ -476,13 +483,13 @@ test('K1. createConnectOnboardingLink (Accounts v2): the allow-listed owner gets
     assert.deepEqual(params.metadata, { uid: 'u-org' }); assert.equal(params.display_name, undefined, 'STR1 has no beneficiary / organizerName: no made-up display name');
     assert.equal(opts.idempotencyKey, 'connect-acct:u-org');
     assert.deepEqual(calls.updates, [{ id: 'acct_MOCK1', params: { settings: { payouts: { schedule: { interval: 'daily', delay_days: 7 } } } } }], 'the 7-day delay is the v1 update on the new account');
-    assert.deepEqual(calls.links[0], { account: 'acct_MOCK1', use_case: { type: 'account_onboarding', account_onboarding: { return_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=return', refresh_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=refresh' } } });
+    assert.deepEqual(calls.v1links[0], { account: 'acct_MOCK1', type: 'account_onboarding', return_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=return', refresh_url: 'https://tournaments.rattlegolf.com/tournament?tourney=STR1&connect=refresh' });
     const saved = await read('stripeAccounts/u-org');
     assert.equal(saved.acct, 'acct_MOCK1'); assert.equal(typeof saved.createdAt, 'number'); assert.equal(saved.api, 'v2'); assert.equal(saved.name, undefined); assert.equal(saved.payoutScheduleError, undefined);
     // A second call reuses the account: one more link, no second account, no second
     // schedule update - and no email needed once the account exists.
     await h.createConnectOnboardingLink({ code: 'STR1' }, { uid: 'u-org', origin: 'https://tournaments.rattlegolf.com' });
-    assert.equal(calls.accounts.length, 1); assert.equal(calls.links.length, 2); assert.equal(calls.updates.length, 1);
+    assert.equal(calls.accounts.length, 1); assert.equal(calls.v1links.length, 2); assert.equal(calls.updates.length, 1);
     // Stripe refuses the schedule update: the organizer still gets the link, and
     // the refusal is kept on the server-only record (not hidden).
     await adminRest(NS, 'DELETE', 'stripeAccounts/u-org');
