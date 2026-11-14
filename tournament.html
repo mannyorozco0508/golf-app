@@ -63,11 +63,16 @@
          Approve button copies it into the field that every page renders. -->
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <script src="event-columns.js"></script>
     <script src="site-pricing.js"></script>   <!-- 58A: the offer preview's renewal price + fallback founding flag -->
     <!-- E2: contest holes - the ranking and labels the golfer's card uses too. -->
     <script src="tournament-contests.js"></script>
     <!-- E4: the photo wall's paths and labels (tournament-photos.js). -->
     <script src="tournament-photos.js"></script>
+    <!-- PO (2026-11-14): the skins counter behind the prize screen's Skins card. -->
+    <script src="skins.js"></script>
+    <!-- PO: the prize builder - places per flight, skins, KPs, the posted record. -->
+    <script src="tournament-prizes.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -397,6 +402,81 @@
         .lb-thru { width: 56px; text-align: center; color: var(--text-muted); font-size: 0.78rem; }
         .lb-score { width: 60px; text-align: right; font-weight: bold; }
         .lb-row.leader { background: #fff8e1; }
+        /* UNDER PAR IS RED and nothing else is coloured (Manny 2026-11-14: "red means
+           under par and just keep everything else as the same color"). */
+        .lb-score.under { color: var(--accent-red); }
+        /* THE EVENT BOARD (MR-FINAL, 2026-11-14): one column a round, a total, to par. */
+        .lb-rnd { width: 44px; text-align: right; font-weight: bold; font-variant-numeric: tabular-nums; }
+        .lb-rnd small { display: block; font-size: 0.6rem; color: var(--text-muted); font-weight: normal; line-height: 1.1; }
+        .lb-tot { width: 44px; text-align: right; font-weight: bold; font-variant-numeric: tabular-nums; }
+        .lb-caret { width: 14px; text-align: right; color: var(--text-muted); font-size: 0.7rem; }
+        .lb-row.lb-event { cursor: pointer; }
+        .lb-row.lb-event.open { background: #fffbe6; }
+        .lb-expand { padding: 8px 6px 10px; border-bottom: 1px solid var(--border-faint); background: #fafbfa; font-size: 0.78rem; }
+        .lb-expand .rh { font-weight: bold; margin: 6px 0 4px; }
+        .lb-expand .rh small { font-weight: normal; color: var(--text-muted); margin-left: 6px; }
+        .lb-expand .rh .under { color: var(--accent-red); }
+        .lb-holes { display: grid; grid-template-columns: 40px repeat(9, 1fr) 34px; align-items: center; font-size: 0.7rem; margin-bottom: 4px; }
+        .lb-holes .k { color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; }
+        .lb-holes .h, .lb-holes .p { text-align: center; color: var(--text-muted); }
+        .lb-holes .s { text-align: center; }
+        .lb-holes .t { text-align: right; font-weight: bold; }
+        /* Rings, the live card's own style: a circle under par, a square over, the
+           number in its normal colour. */
+        .lb-expand i { display: inline-grid; place-items: center; width: 22px; height: 22px; font-style: normal; font-weight: bold; }
+        .lb-expand i.mark-birdie { box-shadow: inset 0 0 0 2px #c1121f; border-radius: 50%; }
+        .lb-expand i.mark-eagle { box-shadow: inset 0 0 0 2px #c1121f, inset 0 0 0 4px #fafbfa, inset 0 0 0 6px #c1121f; border-radius: 50%; }
+        .lb-expand i.mark-bogey { box-shadow: inset 0 0 0 2px #1f2a24; }
+        .lb-expand i.mark-double { box-shadow: inset 0 0 0 2px #1f2a24, inset 0 0 0 4px #fafbfa, inset 0 0 0 6px #1f2a24; }
+        .lb-key { font-size: 0.66rem; color: var(--text-muted); margin-top: 6px; }
+        .lb-key i { width: 14px; height: 14px; vertical-align: middle; margin-right: 2px; }
+        .lb-basis { display: flex; justify-content: center; margin: 0 0 6px; }
+        .lb-basis button { font-size: 0.8rem; padding: 6px 16px; border: 1px solid var(--brand-green); background: transparent; color: var(--brand-green); cursor: pointer; }
+        .lb-basis button:first-child { border-radius: 14px 0 0 14px; }
+        .lb-basis button:last-child { border-radius: 0 14px 14px 0; border-left: 0; }
+        .lb-basis button.active { background: var(--brand-green); color: #fff; }
+        .lb-basis button:disabled { opacity: .5; cursor: default; }
+        .lb-basis-note { font-size: 0.72rem; color: var(--text-muted); text-align: center; margin: 0 0 10px; }
+        /* LB-FINAL (Manny 2026-11-14): Leaderboard / Skins / Pairings at the top of the Board tab. */
+        .lb-subtabs { display: flex; border-bottom: 2px solid var(--border-faint); margin: 0 0 12px; }
+        .lb-subtabs button { flex: 1; background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -2px; padding: 10px 4px; font-size: 0.95rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
+        .lb-subtabs button.active { color: var(--brand-green); border-bottom-color: var(--brand-green); }
+        /* The tappable score header on a round board: the label is the state, Net or Gross. */
+        .lb-th-tap { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; color: var(--brand-green); }
+        /* THE SCORECARD SHEET: a half-sheet on a phone, a right-side panel from 900px. */
+        .lb-sheet-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 2000; align-items: flex-end; }
+        .lb-sheet-overlay.open { display: flex; }
+        .lb-sheet { box-sizing: border-box; background: var(--bg-card); width: 100%; max-height: 82vh; overflow-y: auto; border-radius: 18px 18px 0 0; box-shadow: 0 -4px 18px rgba(0,0,0,.18); padding: 10px 12px 16px; }
+        .lb-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+        .lb-sheet-nav { background: none; border: 1px solid var(--border-mid); border-radius: 9px; padding: 6px 8px; font-size: 0.78rem; font-weight: 700; color: var(--brand-green); cursor: pointer; min-width: 86px; text-align: center; }
+        .lb-sheet-nav small { display: block; font-weight: normal; color: var(--text-muted); font-size: 0.68rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lb-sheet-nav:disabled { opacity: .4; cursor: default; }
+        .lb-sheet-who { text-align: center; flex: 1; min-width: 0; }
+        .lb-sheet-who b { display: block; font-size: 1rem; }
+        .lb-sheet-who small { color: var(--text-muted); font-size: 0.74rem; }
+        .lb-sheet-foot { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 10px; }
+        .lb-sheet-foot .btn-outline { width: auto; margin: 0; font-size: 0.82rem; padding: 8px 12px; }
+        .lb-sheet .lb-expand { background: transparent; border: 0; padding: 0; }
+        @media (min-width: 900px) {
+            .lb-sheet-overlay { align-items: stretch; justify-content: flex-end; background: rgba(0,0,0,.18); }
+            .lb-sheet { width: 420px; max-height: none; height: 100%; border-radius: 0; box-shadow: -6px 0 18px rgba(0,0,0,.12); }
+        }
+        .lb-pair-row { padding: 10px 6px; border-bottom: 1px solid var(--border-faint); }
+        .lb-pair-row .hd { display: flex; justify-content: space-between; font-weight: bold; font-size: 0.9rem; }
+        .lb-pair-row .hd span:last-child { color: var(--text-muted); font-weight: normal; font-size: 0.8rem; }
+        .lb-pair-row .pl { font-size: 0.85rem; color: var(--text-main); margin-top: 3px; }
+        .lb-pair-row .pl .wd { color: var(--text-muted); text-decoration: line-through; }
+        .lb-pair-row .gl { margin-top: 6px; }
+        .lb-pair-row .gl a { font-size: 0.78rem; }
+        .lb-skins .pz-row, .lb-skins .pz-note, .lb-skins .pz-k, .lb-skins .pz-total { font-size: 0.86rem; }
+        .rounds-card { border: 1px solid var(--border-faint); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px; font-size: 0.8rem; }
+        .rounds-card .rc-head { font-weight: bold; margin-bottom: 6px; }
+        .rounds-card .rc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; margin-bottom: 8px; }
+        .rounds-card .rc-tile { border: 1px solid var(--border-faint); border-radius: 8px; padding: 6px 8px; font-size: 0.76rem; }
+        .rounds-card .rc-tile b { display: block; font-size: 0.82rem; }
+        .rounds-card .rc-tile .st { color: var(--text-muted); }
+        .rounds-card .rc-line { color: var(--text-muted); margin-top: 3px; }
+        .rounds-card .rc-line b { color: var(--text-dark, inherit); }
 
         .room-badge { display: inline-block; background: var(--brand-navy); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.15rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 14px; }
         .section-divider { border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0; }
@@ -464,6 +544,43 @@
         .payout-basis-seg button.on { background:var(--brand-navy); color:#fff; }
         .payout-basis-label { text-align:center; font-size:0.85rem; color:var(--text-main); margin-top:8px; }
         .payout-basis-note { text-align:center; font-size:0.8rem; color:var(--text-muted); margin-top:6px; }
+        /* PAYOUTS / PRIZE RESULTS (PO build 2026-11-14): the prize type switch,
+           three cards (places, skins, contest holes), the total and Post results,
+           the recap by card and My results. Rings follow index.html's
+           .mark-birdie / .mark-eagle: a 2px inset ring, never a colour fill. */
+        .pz-type-note { font-size:0.78rem; color:var(--text-muted); margin:-6px 0 12px; }
+        .pz-card { border:1px solid var(--border-mid); border-radius:14px; padding:10px 14px; margin-bottom:12px; background:var(--bg-card); }
+        .pz-card h3 { margin:4px 0 8px; }
+        .pz-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .pz-title { font-size:1.02rem; font-weight:800; color:var(--text-main); }
+        .pz-sub { font-size:0.8rem; color:var(--text-muted); margin:2px 0 8px; }
+        .pz-k { font-size:0.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); margin:10px 0 2px; }
+        .pz-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border-faint); font-size:0.92rem; }
+        .pz-row:last-child { border-bottom:0; }
+        .pz-row .pz-n { width:34px; flex:none; font-weight:800; color:var(--brand-green); }
+        .pz-row .pz-who { flex:1; min-width:0; }
+        .pz-row .pz-who small { display:block; color:var(--text-muted); font-size:0.78rem; margin-top:1px; }
+        .pz-row .pz-who small.pz-tp { display:inline; margin-left:4px; }
+        .pz-row .pz-amt { flex:none; font-weight:800; text-align:right; white-space:nowrap; }
+        .pz-total-line > span:last-child { white-space:nowrap; text-align:right; }
+        .pz-note { font-size:0.8rem; color:var(--text-muted); margin:6px 0; }
+        .pz-ctl { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:6px 0 10px; font-size:0.85rem; }
+        .pz-ctl input[type="number"] { width:90px; padding:8px; border:1px solid var(--border-mid); border-radius:8px; font-size:16px; }
+        .pz-ctl .payout-basis-seg { margin:0; flex:1 1 160px; }
+        .pz-tag { font-size:0.68rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); }
+        .pz-under { color:#c1121f; }
+        .pz-ring { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; flex:none; font-weight:800; font-size:0.85rem; color:var(--text-main); }
+        .pz-ring.birdie { box-shadow:inset 0 0 0 2px #c1121f; border-radius:50%; }
+        .pz-ring.eagle { box-shadow:inset 0 0 0 2px #c1121f, inset 0 0 0 4px var(--bg-card), inset 0 0 0 6px #c1121f; border-radius:50%; }
+        .pz-ring.bogey { box-shadow:inset 0 0 0 2px var(--text-main); border-radius:3px; }
+        .pz-ring.double { box-shadow:inset 0 0 0 2px var(--text-main), inset 0 0 0 4px var(--bg-card), inset 0 0 0 6px var(--text-main); border-radius:3px; }
+        .pz-total { border-top:2px solid var(--text-main); margin-top:4px; padding-top:10px; }
+        .pz-total-line { display:flex; justify-content:space-between; align-items:baseline; gap:10px; font-weight:800; }
+        .pz-total-line small { display:block; font-weight:400; color:var(--text-muted); font-size:0.78rem; }
+        .pz-msg { font-size:0.82rem; color:var(--text-muted); text-align:center; min-height:16px; margin:6px 0; }
+        .pz-name { background:none; border:0; padding:0; font:inherit; font-weight:800; color:var(--brand-green); cursor:pointer; text-align:left; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; }
+        .pz-shop { border:1px solid var(--border-mid); background:var(--nav-bg); border-radius:10px; padding:10px 12px; font-size:0.85rem; color:var(--text-main); margin:10px 0; }
+        .pz-back { background:none; border:0; padding:6px 0; font:inherit; color:var(--brand-green); font-weight:700; cursor:pointer; }
 
         /* ---- PHASE 2: THE APP MODE (Manny's picks 2026-11-11: S1 A, S2 A + C's
            move sheet, S3 A shotgun / B tee times + C's QR). Every rule here is
@@ -995,6 +1112,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <h1 class="rc-title" id="recap-title"></h1>
     <p class="rc-sub" id="recap-sub"></p>
     <div class="rc-card" id="recap-winners" style="display:none;"></div>
+    <!-- PO (2026-11-14): the posted results, card by card; names open My results. -->
+    <div class="rc-card" id="recap-prizes" style="display:none;"></div>
     <div class="pq-grid" id="recap-photos"></div>
     <button type="button" class="rc-share" id="recap-share" onclick="shareRecap()">Share recap link</button>
     <p class="rc-msg" id="recap-msg" aria-live="polite"></p>
@@ -1017,6 +1136,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     </div>
     <div id="ci-done" style="display:none;"></div>
     <p class="ci-msg" id="ci-msg" role="alert" style="display:none;"></p>
+</div>
+
+<!-- PO (2026-11-14): MY RESULTS, one golfer's share of the posted results.
+     Opened by a name on the recap, or by ?tourney=CODE&recap=1&me=<key>. -->
+<div class="container" id="my-results-screen" style="display:none;">
+    <button type="button" class="pz-back" id="my-results-back" onclick="closeMyResults()">‹ Recap</button>
+    <h1 class="rc-title" id="my-results-title">🏆 My results</h1>
+    <p class="rc-sub" id="my-results-sub"></p>
+    <div class="rc-card" id="my-results-card"></div>
+    <button type="button" class="btn-primary" id="my-results-full" onclick="closeMyResults()">See the full results</button>
+    <p class="rc-msg" id="my-results-posted"></p>
 </div>
 
 <div class="container" id="manage-screen" style="display:none;">
@@ -1210,6 +1340,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <h3>📅 Rounds</h3>
             <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each round has its own course, format and scores. Setup means nobody can enter scores yet; Open means scoring is live; Closed means the result is final.</p>
             <button class="btn-outline" onclick="createRound()">+ Add Round</button>
+            <!-- MR-FINAL (Manny 2026-11-14): the rounds as a schedule, above the editable list. -->
+            <div id="rounds-card"></div>
             <div id="rounds-list"></div>
             <div id="round-editor"></div>
         </div>
@@ -1391,6 +1523,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              the leaderboard it always did, with no extra control to ignore. -->
         <!-- Only rendered for a multi-round event. A single-round tournament shows the
              leaderboard it always showed, with no extra control to ignore. -->
+        <!-- LB-FINAL (Manny 2026-11-14): Leaderboard / Skins / Pairings. The board is the
+             default; Skins reads skins.js through the prize builder (gross, the organizer's
+             carryover setting); Pairings reads the same rows the printed sheet does. -->
+        <div class="lb-subtabs" id="lb-subtabs" role="tablist">
+            <button type="button" class="active" id="lb-sub-board" role="tab" aria-selected="true" onclick="setLeaderboardSub('board')">Leaderboard</button>
+            <button type="button" id="lb-sub-skins" role="tab" aria-selected="false" onclick="setLeaderboardSub('skins')">Skins</button>
+            <button type="button" id="lb-sub-pairings" role="tab" aria-selected="false" onclick="setLeaderboardSub('pairings')">Pairings</button>
+        </div>
+        <div id="lb-skins-panel" class="lb-skins" style="display:none;"></div>
+        <div id="lb-pairings-panel" style="display:none;"></div>
+        <div id="lb-board-panel">
         <!-- 57, TV BOARD (Manny 2026-11-12): the clubhouse TV page, owner only. -->
         <div class="tv-link" id="tv-link-row" style="display:none;"></div>
         <div id="lb-round-filter" style="display:none; text-align:center; margin-bottom:10px;"></div>
@@ -1400,20 +1543,39 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div id="lb-no-owner-note" style="display:none; font-size:0.8rem; color:var(--text-muted); text-align:center; margin-bottom:10px; padding:10px; border:1px dashed var(--border-faint); border-radius:8px;">This event has no organizer account, so its setup can't be changed. Scores still save.</div>
         <div id="lb-combined-note" style="display:none; font-size:0.8rem; color:var(--text-muted); text-align:center; margin-bottom:10px; padding:10px; border:1px dashed var(--border-faint); border-radius:8px;"></div>
         <div id="lb-flight-filter" style="display:none; text-align:center; margin-bottom:12px;"></div>
+        <!-- MR-FINAL (Manny 2026-11-14): Gross | Net above the combined board. -->
+        <div id="lb-basis" class="lb-basis" style="display:none;"></div>
+        <div id="lb-basis-note" class="lb-basis-note" style="display:none;"></div>
         <div id="leaderboard-list"></div>
 
         <!-- THE WATCH LINK (Wave 1, A3). The board itself, for family and the
              clubhouse TV. Shown to everyone: a watcher forwarding it is the point. -->
         <button class="btn-outline" id="lb-watch-share" onclick="openShareModal(leaderboardWatchUrl(), (currentData && currentData.name) || 'Event', 'leaderboard')">📣 Share live leaderboard</button>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:8px; text-align:center;">Anyone with this link can watch the board as scores come in.</p>
+        </div><!-- /lb-board-panel -->
 
         <hr class="section-divider">
+        <!-- PAYOUTS / PRIZE RESULTS (PO build 2026-11-14, ADVISOR-20261114-1156-OK-build-final-set).
+             The organizer's prize screen is the prize type switch and three cards:
+             Places (the calculator below, run per flight when the event has
+             flights), Skins (skins.js) and KPs (the Contests tab's confirmed
+             winners). Post results saves the numbers on the event as
+             tournaments/<code>/prizeResults, beside payoutSpots and payoutBasis;
+             the recap, My results and the TV read that. Owner only: hidden in the
+             tree for everyone else, like the calculator. -->
+        <div id="prize-owner-head" style="display:none;">
+            <h3>🏆 Prize Results Calculator</h3>
+            <div class="payout-basis-head">Prize type</div>
+            <div class="payout-basis-seg" id="prize-type-control" role="group" aria-label="Prize type"></div>
+            <p class="pz-type-note" id="prize-type-note"></p>
+        </div>
+        <div class="pz-card" id="prize-card-places">
         <!-- THE CALCULATOR IS THE ORGANIZER'S (Wave 1, A3/A4). Hidden for everyone
              else, never removed (the f0fa56f rule: hide in the tree). The amounts it
              sets are SAVED on the record as payoutSpots and everyone reads those. -->
         <div id="payout-owner-controls" style="display:none;">
-        <h3>🏆 Prize Results Calculator</h3>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;" id="payout-pool-sub">Set how many places win a prize — this maps straight onto the standings above. Ties split the pro shop credit their tied places add up to.</p>
+        <div class="pz-title" id="prize-places-title">Places</div>
+        <p style="font-size:0.8rem; color:var(--text-muted);" id="payout-pool-sub">Set how many places win a prize — this maps straight onto the standings above. Ties split the pro shop credit their tied places add up to.</p>
         <!-- RESULTS ARE PAID ON (audit #1, A1): multi-round only, filled by
              renderPayoutBasis. Saved as payoutBasis; every phone reads it. -->
         <div id="payout-basis-control" style="display:none;"></div>
@@ -1428,6 +1590,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div id="payout-basis-label" class="payout-basis-label" style="display:none;"></div>
         <div id="payout-results" style="margin-top:10px;"></div>
         <p id="payout-basis-note" class="payout-basis-note" style="display:none;">Same list on every phone. Changing the board tab above does not change it.</p>
+        </div>
+        <div class="pz-card" id="prize-card-skins" style="display:none;"></div>
+        <div class="pz-card" id="prize-card-kps" style="display:none;"></div>
+        <div id="prize-post" style="display:none;">
+            <div class="pz-total" id="prize-total"></div>
+            <button type="button" class="btn-primary" id="prize-post-btn" onclick="postPrizeResults()">Post results</button>
+            <p class="pz-msg" id="prize-post-msg" aria-live="polite"></p>
+            <p class="pz-note" id="prize-post-note">Posting makes the recap, the TV and each golfer's My results read these numbers. Nothing is sent anywhere.</p>
+        </div>
 
         <!-- THE ORGANIZER'S HANDOUT, HIDDEN FOR EVERYONE ELSE (Wave 1, A3). The print
              buttons and the scoring links lived beside the public board, so the page
@@ -6388,7 +6559,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (note) { note.style.display = 'none'; note.textContent = ''; }
 
         // ONE RESOLUTION, shared with the printed sheet and the golfer's card.
-        const view = resolveLeaderboardView(currentData, lbRoundId, lbFlightId);
+        let view = resolveLeaderboardView(currentData, lbRoundId, lbFlightId);
+        // LB-FINAL: a NET round viewed as gross (the header tap). The same engine
+        // function, the same rows, with the round's scoring read as gross strokes.
+        // The other direction (a gross round as net) needs stroke allocation the
+        // engine does not run for it, so the header is plain there.
+        if (view.kind === 'round' && view.available && lbRoundGross && lbRoundIsNet(view)) {
+            const base = lbRoundViewFor();
+            view = Object.assign({}, view, { rows: computeTournamentLeaderboard(Object.assign({}, base, { scoringMode: 'gross' }), lbFlightId), grossOfNet: true });
+        }
+        lbLast = { rows: view.rows || [], kind: view.kind, rid: lbLastRoundId(view), available: !!view.available };
+        renderLeaderboardSubtabs();
 
         // PRIZES DO NOT READ THIS VIEW (audit #1, A1, 2026-11-08). The prize
         // calculator used to cache resolveLeaderboardView(currentData, lbRoundId)
@@ -6397,6 +6578,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // itself: the saved basis, never the tab, never a flight. It is rendered
         // on every board, including a refused one, so the board tab can never
         // leave the prize list stale either.
+        renderLeaderboardBasis(view);
         if (!view.available) {
             // A REFUSAL IS NOT AN ERROR. The organizer gets the sentence, and
             // every round leaderboard still works beside it.
@@ -6404,16 +6586,187 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             note.textContent = view.reason;
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px;">Pick a round above to see its leaderboard.</div>`;
         } else {
-            renderLeaderboardRows(container, view.rows, view.kind);
+            renderLeaderboardRows(container, view.rows, view.kind, view.grossOfNet);
         }
+        // The open sheet follows the board it was opened from (a new score lands, the
+        // card updates). The prize list stays the function's last line: it never
+        // reads lbLast or the sheet, only resolvePrizeView(currentData).
+        if (lbSheet) renderLeaderboardSheet();
         renderPayoutSpotInputs();
+    }
+
+    // --- LB-FINAL (Manny 2026-11-14): the three sub-tabs, the header tap, the sheet ---
+    let lbSub = 'board';
+    let lbLast = { rows: [], kind: 'round', rid: null, available: false };
+    let lbRoundGross = false;
+    function setLeaderboardSub(sub) { lbSub = ['board', 'skins', 'pairings'].includes(sub) ? sub : 'board'; renderLeaderboard(); }
+    function renderLeaderboardSubtabs() {
+        const panels = { board: 'lb-board-panel', skins: 'lb-skins-panel', pairings: 'lb-pairings-panel' };
+        Object.keys(panels).forEach((k) => {
+            const el = document.getElementById(panels[k]); if (el) el.style.display = k === lbSub ? 'block' : 'none';
+            const btn = document.getElementById('lb-sub-' + k); if (btn) { btn.classList.toggle('active', k === lbSub); btn.setAttribute('aria-selected', k === lbSub ? 'true' : 'false'); }
+        });
+        if (lbSub === 'skins') renderSkinsTab();
+        if (lbSub === 'pairings') renderPairingsTab();
+    }
+    // The round in view: a multi-round chip, or null on a single-round record.
+    function lbLastRoundId(view) { return recordIsMultiRound() ? (view.kind === 'round' ? lbRoundId : 'event') : null; }
+    function lbRoundViewFor() { return recordIsMultiRound() && lbRoundId && lbRoundId !== 'event' ? roundView(currentData, lbRoundId) : currentData; }
+    function lbRoundIsNet(view) { const v = lbRoundViewFor(); return !!v && view.kind === 'round' && netIsInPlay(v); }
+    function tapLeaderboardBasis() { lbRoundGross = !lbRoundGross; renderLeaderboard(); }
+
+    // THE SHEET. Opened by a tap on a row; Prev / Next follow the board's current
+    // order, so a watcher pages through a flight without closing it. The cards are
+    // the same markup the event board's opened row used (renderEventEntryCards).
+    let lbSheet = null;
+    function openLeaderboardSheet(key) {
+        const keys = lbLast.rows.map(lbRowKey);
+        const idx = keys.indexOf(key);
+        if (idx === -1) return;
+        lbSheet = { idx };
+        renderLeaderboardSheet();
+        const ov = document.getElementById('lb-sheet'); if (ov) ov.classList.add('open');
+    }
+    function closeLeaderboardSheet() { lbSheet = null; const ov = document.getElementById('lb-sheet'); if (ov) ov.classList.remove('open'); }
+    function stepLeaderboardSheet(d) { if (!lbSheet) return; const i = lbSheet.idx + d; if (i < 0 || i >= lbLast.rows.length) return; lbSheet.idx = i; renderLeaderboardSheet(); }
+    // The key a row's scores are filed under: the golfer's id, or team<N> for a scramble.
+    function lbRowKey(r) { return r.entryType === 'player' || r.entryType === 'event' ? String(r.entryKey || r.playerId || '') : ('team' + r.num); }
+    function lbGroupLinkFor(r) {
+        if (!canManage()) return '';
+        // On the combined board the link goes to the golfer's group in the latest
+        // countable round that has one (the round in play, usually).
+        const rid = lbLast.rid === 'event' ? null : lbLast.rid;
+        if (r.entryType === 'player' || r.entryType === 'event') {
+            const pid = String(r.entryKey || r.playerId || '');
+            const rids = !recordIsMultiRound() ? [null] : (rid ? [rid] : countableRoundIds(currentData).slice().reverse());
+            for (const x of rids) {
+                const groups = x ? (((currentData.rounds || {})[x] || {}).scoringGroups || {}) : (recordIsMultiRound() ? {} : (currentData.scoringGroups || {}));
+                const gid = Object.keys(groups).find((g) => ((groups[g] || {}).playerIds || []).includes(pid));
+                if (gid) return groupScorecardUrl(gid, x);
+            }
+            return '';
+        }
+        const t = Object.values(currentData.teams || {}).find((x) => x && x.num === r.num);
+        return t ? teamScorecardUrl(t, rid) : '';
+    }
+    function renderLeaderboardSheet() {
+        if (!lbSheet) return;
+        const rows = lbLast.rows;
+        if (!rows.length || lbSheet.idx >= rows.length) { closeLeaderboardSheet(); return; }
+        const r = rows[lbSheet.idx], key = lbRowKey(r);
+        const set = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+        const flights = currentData.flights || {};
+        const flightName = r.flightId && flights[r.flightId] ? flights[r.flightId].name : '';
+        const players = currentData.players || {};
+        const hcp = players[key] ? players[key].handicap : null;
+        const toPar = !r.hasScores ? '' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : String(r.toPar)));
+        set('lb-sheet-name', r.teamName || '');
+        set('lb-sheet-sub', [flightName, hcp !== null && hcp !== undefined && hcp !== '' ? `handicap ${hcp}` : '', r.rank ? `${ordinal(r.rank)}` : '', toPar ? (lbLast.kind === 'event' ? 'Event ' : '') + toPar : ''].filter(Boolean).join(' · '));
+        const prev = rows[lbSheet.idx - 1], next = rows[lbSheet.idx + 1];
+        const pb = document.getElementById('lb-sheet-prev'), nb = document.getElementById('lb-sheet-next');
+        if (pb) pb.disabled = !prev; if (nb) nb.disabled = !next;
+        set('lb-sheet-prev-name', prev ? prev.teamName : ''); set('lb-sheet-next-name', next ? next.teamName : '');
+        const body = document.getElementById('lb-sheet-body');
+        if (body) {
+            if (lbLast.kind === 'event') body.innerHTML = renderEventEntryCards(r, eventRoundColumns(currentData).columns);
+            else if (r.entryType === 'team' && (currentData.format || 'scramble') !== 'scramble') body.innerHTML = `<p class="fine" style="font-size:0.82rem; color:var(--text-muted);">This team's golfers each keep a card; open the team's card to see them hole by hole.</p>`;
+            else body.innerHTML = renderOneRoundCard(r, key, lbLast.rid);
+        }
+        const g = document.getElementById('lb-sheet-group');
+        if (g) { const url = lbGroupLinkFor(r); g.style.display = url ? '' : 'none'; g.setAttribute('href', url || '#'); }
+    }
+    // One round's card for the sheet (a round chip or a single-round record).
+    function renderOneRoundCard(r, key, rid) {
+        const card = playerRoundHoles(currentData, rid, key);
+        if (!card.holes.length) return `<p style="font-size:0.82rem; color:var(--text-muted);">No course card on this round yet.</p>`;
+        const played = card.thru;
+        const parPlayed = card.holes.filter(h => h.score > 0).reduce((a, h) => a + h.par, 0);
+        const tp = card.total - parPlayed;
+        const tpText = tp === 0 ? 'E' : (tp > 0 ? `+${tp}` : String(tp));
+        const state = !played ? 'not started' : (played === card.holes.length ? 'complete' : `thru ${played}`);
+        const name = rid && currentData.rounds && currentData.rounds[rid] ? (currentData.rounds[rid].name || 'Round') : (currentData.courseName || 'Round');
+        let html = `<div class="lb-expand"><div class="rh">${escapeHtml(name)} · ${played ? card.total : '–'}${played ? ` <span class="${tp < 0 ? 'under' : ''}">(${tpText})</span>` : ''}<small>${state}</small></div>`;
+        html += lbHolesGrid(card.holes.slice(0, 9), 'Out', card.out, card.parOut);
+        if (card.holes.length > 9) html += lbHolesGrid(card.holes.slice(9, 18), 'In', card.inn, card.parIn);
+        html += '<div class="lb-key"><i class="mark-birdie"></i> birdie &nbsp; <i class="mark-eagle"></i> eagle &nbsp; <i class="mark-bogey"></i> bogey &nbsp; <i class="mark-double"></i> double or worse</div></div>';
+        return html;
+    }
+
+    // SKINS TAB: the same summary the prize screen's Skins card reads (one builder,
+    // tournament-prizes.js skinsSummary + skins.js), shown read-only to everyone.
+    function renderSkinsTab() {
+        const el = document.getElementById('lb-skins-panel');
+        if (!el) return;
+        if (typeof TournamentPrizes === 'undefined' || typeof TournamentSkins === 'undefined') { el.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:16px;">Skins are not available on this page.</p>'; return; }
+        const sk = TournamentPrizes.skinsSummary(currentData);
+        const perRound = sk.rounds.map((r) => `${r.name ? escapeHtml(r.name) + ' ' : ''}${r.result.totals.skins} skin${r.result.totals.skins === 1 ? '' : 's'}${r.result.totals.pending ? ' (holes still open)' : ''}`).join(' · ');
+        let h = `<div class="lb-skins-head" style="margin:4px 0 8px;"><b style="font-size:1rem;">${sk.skins} skin${sk.skins === 1 ? '' : 's'} so far</b>`
+            + `<div style="font-size:0.8rem; color:var(--text-muted);">Gross · carryover ${sk.carryover ? 'on' : 'off'} · ${perRound || 'no rounds yet'}</div>`
+            + `<div style="font-size:0.8rem; color:var(--text-muted);">${sk.perSkin > 0 ? `${escapeHtml(TournamentPrizes.amountText(sk.perSkin, currentData))} a skin, as the organizer set it` : 'The organizer has not set an amount a skin yet'}</div></div>`;
+        h += prizeSkinsCardHtml(sk, currentData, { tab: true });
+        el.innerHTML = h;
+    }
+
+    // PAIRINGS TAB: the printed sheet's rows (pairingsRows), per round on a
+    // multi-round event. The group's scoring link carries its key, so it is shown
+    // to the organizer only; everyone else sees names and starts.
+    let lbPairRid = null;
+    function setPairingsRound(rid) { lbPairRid = rid || null; renderPairingsTab(); }
+    function renderPairingsTab() {
+        const el = document.getElementById('lb-pairings-panel');
+        if (!el) return;
+        const multi = recordIsMultiRound();
+        const ids = multi ? orderedRoundIds(currentData) : [];
+        if (multi && (!lbPairRid || !ids.includes(lbPairRid))) lbPairRid = ids[0] || null;
+        const rid = multi ? lbPairRid : null;
+        let h = '';
+        if (multi && ids.length) h += `<div style="text-align:center; margin-bottom:10px;">${ids.map((x) => `<button class="lb-flight-btn ${x === rid ? 'active' : ''}" onclick="setPairingsRound('${x}')">${escapeHtml((currentData.rounds[x] || {}).name || 'Round')}</button>`).join('')}</div>`;
+        const pr = pairingsRows(currentData, rid);
+        const owner = canManage();
+        if (!pr.rows.length) h += `<div style="text-align:center; color:var(--text-muted); padding:16px;">No ${pr.kind === 'player' ? 'groups' : 'teams'} yet.</div>`;
+        pr.rows.forEach((row, i) => {
+            const start = pr.shotgun ? (row.hole ? `Hole ${escapeHtml(row.hole)}` : 'Hole not set') : (pr.kind === 'team' ? (teeTimeFor(i) || 'Tee 1') : 'Tee 1');
+            const names = row.players.map((p) => p.wd ? `<span class="wd">${escapeHtml(p.name)}</span>` : escapeHtml(p.name)).join(' · ') || '<span style="color:var(--text-muted);">nobody assigned yet</span>';
+            let link = '';
+            if (owner) {
+                const url = pr.kind === 'player' ? groupScorecardUrl(row.key, rid) : (function () { const t = Object.values(currentData.teams || {}).find((x) => x && ('team' + x.num) === row.key); return t ? teamScorecardUrl(t, rid) : ''; })();
+                if (url) link = `<div class="gl"><a class="rc-link" href="${url}">${pr.kind === 'player' ? "Group card" : "Team card"} ▶</a></div>`;
+            }
+            h += `<div class="lb-pair-row"><div class="hd"><span>${escapeHtml(row.label)}</span><span>${start}</span></div><div class="pl">${names}</div>${link}</div>`;
+        });
+        if (pr.unassigned.length) h += `<div class="lb-pair-row"><div class="hd"><span>Not in a group yet</span><span></span></div><div class="pl">${pr.unassigned.map((p) => escapeHtml(p.name)).join(' · ')}</div></div>`;
+        if (owner && pr.rows.length) h += `<button class="btn-outline" style="margin-top:12px;" onclick="printTournamentPairings()">🖨️ Print Pairings</button>`;
+        h += `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:8px; text-align:center;">${pr.shotgun ? 'Shotgun start: each group starts on its hole.' : 'Everyone starts on the first tee.'}${owner ? ' Group cards are scoring links; share them only with that group.' : ''}</p>`;
+        el.innerHTML = h;
+    }
+
+    // GROSS | NET ABOVE THE COMBINED BOARD (MR-FINAL + A's switch, Manny 2026-11-14).
+    // The half the engine already plays is active; the other half is disabled with
+    // the sentence, because a Net view of a GROSS combined board needs per-hole
+    // stroke allocation inside the engine (protected, proposed separately), and a
+    // Gross view of a NET one would be a second scoring the rounds did not run.
+    // A round chip hides the switch: the round scores the way its own setting says.
+    function renderLeaderboardBasis(view) {
+        const el = document.getElementById('lb-basis'), note = document.getElementById('lb-basis-note');
+        if (!el || !note) return;
+        if (!view || view.kind !== 'event' || !view.available) {
+            el.style.display = 'none'; el.innerHTML = ''; note.style.display = 'none'; note.textContent = ''; return;
+        }
+        const net = aggregateFamily(currentData) === 'individual:net';
+        const seg = (label, on) => `<button type="button" class="${on ? 'active' : ''}" aria-pressed="${on}" ${on ? '' : 'disabled'}>${label}</button>`;
+        el.style.display = 'flex';
+        el.innerHTML = seg('Gross', !net) + seg('Net', net);
+        note.style.display = 'block';
+        note.textContent = net
+            ? 'Net across the rounds, as each round is scored. A gross view of this board is not available yet.'
+            : 'Gross across the rounds. Net on the combined board is not available yet.';
     }
 
     // ONE ROW RENDERER for every board. A round, a flight and the combined standings
     // are the same shape, so a second renderer would be a second chance to disagree
     // about what "tied" looks like. Only the Thru column differs, because "thru 14"
     // means holes in a round and rounds in an event.
-    function renderLeaderboardRows(container, rows, kind) {
+    function renderLeaderboardRows(container, rows, kind, grossOfNet) {
         if (rows.length === 0) {
             const flights = currentData.flights || {};
             container.innerHTML = lbFlightId && flights[lbFlightId]
@@ -6421,35 +6774,100 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 : `<div style="text-align:center; color:var(--text-muted); padding:20px;">No scores yet.</div>`;
             return;
         }
-        const thruHead = kind === 'event' ? 'Rds' : 'Thru';
-        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span><span class="lb-thru">${thruHead}</span><span class="lb-score">To Par</span>
-        </div>`;
         const rankCounts = {};
         rows.forEach(r => { if (r.rank) rankCounts[r.rank] = (rankCounts[r.rank] || 0) + 1; });
+        const toParText = (r) => !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
+        // UNDER PAR IS RED and nothing else is coloured (Manny 2026-11-14): the
+        // class is added only below par; E and over par keep the row's own colour.
+        const toParClass = (r) => (r.hasScores && r.toPar < 0) ? 'lb-score under' : 'lb-score';
+        // ONE DEFINITION OF "TIED" (and of "pending") for every board: built here,
+        // handed to the event renderer, never written twice.
+        const tieTagOf = (r) => (r.rank && rankCounts[r.rank] > 1) ? '<span class="tie-tag">(tied)</span>' : '';
+        const pendingTagOf = (r) => r.netPending ? `<span class="tie-tag" style="color:var(--text-muted);">(${HANDICAP_PENDING_TEXT})</span>` : '';
+        if (kind === 'event') { renderEventBoardRows(container, rows, { tieTagOf, pendingTagOf, toParText, toParClass }); return; }
+        // LB-FINAL: on a NET round the score header is the state and a tap flips it
+        // (Net ⇄ shows net, tap for gross; Gross ⇄ shows gross, tap for net). A gross
+        // round's header is plain: the engine does not allocate strokes for it.
+        const netRound = kind === 'round' && lbRoundIsNet({ kind: 'round' });
+        const head = netRound
+            ? `<span class="lb-score lb-th-tap" role="button" tabindex="0" onclick="tapLeaderboardBasis()" title="Tap to switch">${grossOfNet ? 'Gross' : 'Net'} ⇄</span>`
+            : '<span class="lb-score">To Par</span>';
+        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span><span class="lb-thru">Thru</span>${head}
+        </div>`;
         rows.forEach(r => {
-            const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
-            const tieTag = (r.rank && rankCounts[r.rank] > 1) ? '<span class="tie-tag">(tied)</span>' : '';
-            // AN INCOMPLETE EVENT ENTRY IS MARKED, not hidden and not silently ranked
-            // as though it were finished - a golfer who has played one of two rounds
-            // is behind, and the board should say why.
-            const partial = (kind === 'event' && r.hasScores && !r.completedAll)
-                ? '<span class="tie-tag" style="color:var(--text-muted);">(incomplete)</span>' : '';
             // UNRANKED WITH A REASON. A bare dash beside a golfer who has posted
-            // eighteen holes reads as a bug; this says it is waiting on a number.
-            const pendingTag = r.netPending
-                ? `<span class="tie-tag" style="color:var(--text-muted);">(${HANDICAP_PENDING_TEXT})</span>` : '';
-            const thru = kind === 'event'
-                ? (r.hasScores ? `${r.roundsComplete}/${r.countableRounds}` : '-')
-                : (r.hasScores ? r.thru : '-');
-            html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''}">
+            // eighteen holes reads as a bug; the pending tag says it is waiting on a number.
+            html += `<div class="lb-row lb-tap ${r.rank === 1 ? 'leader' : ''}" data-entry="${escapeHtml(lbRowKey(r))}" onclick="openLeaderboardSheet(this.dataset.entry)">
                 <span class="lb-pos">${r.rank || '-'}</span>
-                <span class="lb-team">${escapeHtml(r.teamName)}${tieTag}${partial}${pendingTag}</span>
-                <span class="lb-thru">${thru}</span>
-                <span class="lb-score">${toParStr}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${tieTagOf(r)}${pendingTagOf(r)}</span>
+                <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
+                <span class="${toParClass(r)}">${toParText(r)}</span>
             </div>`;
         });
         container.innerHTML = html;
+    }
+
+    // THE EVENT BOARD (MR-FINAL, Manny 2026-11-14): one column a round, the total
+    // so far, to par. A round in play reads "thru N" under its score where the old
+    // board said "(incomplete)" beside the name and counted rounds in an Rds column.
+    // The ORDER is the engine's and unchanged: completed rounds first, then to par
+    // (computeEventStandings); only what a row shows changed. The per-round numbers
+    // come from eventRoundColumns(), which asks the engine for each round's own
+    // board, so a column shows exactly what that round's card showed.
+    // Tap a row to open both rounds' hole-by-hole cards in the scorecard sheet
+    // (LB-FINAL, Manny 2026-11-14: the sheet with Prev / Next replaced the inline
+    // expand of the first MR build; the cards are the same markup).
+    function renderEventBoardRows(container, rows, fmt) {
+        const { tieTagOf, pendingTagOf, toParText, toParClass } = fmt;
+        const cols = eventRoundColumns(currentData);
+        const rc = cols.columns;
+        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span>${rc.map(c => `<span class="lb-rnd" title="${escapeHtml(c.name)}">${c.short}</span>`).join('')}<span class="lb-tot">Tot</span><span class="lb-score">To Par</span><span class="lb-caret"></span>
+        </div>`;
+        rows.forEach(r => {
+            const mine = cols.byPlayer[r.entryKey] || {};
+            const cells = rc.map(c => {
+                const x = mine[c.rid];
+                if (!x || !x.hasScores) return '<span class="lb-rnd">–</span>';
+                return `<span class="lb-rnd">${x.strokes}${x.complete ? '' : `<small>thru ${x.thru}</small>`}</span>`;
+            }).join('');
+            html += `<div class="lb-row lb-event lb-tap ${r.rank === 1 ? 'leader' : ''}" data-entry="${escapeHtml(r.entryKey)}" onclick="openLeaderboardSheet(this.dataset.entry)">
+                <span class="lb-pos">${r.rank || '-'}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${tieTagOf(r)}${pendingTagOf(r)}</span>${cells}<span class="lb-tot">${r.hasScores ? r.strokes : '–'}</span>
+                <span class="${toParClass(r)}">${toParText(r)}</span><span class="lb-caret">›</span>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    // BOTH ROUNDS' CARDS under an opened row: hole, par, score with the ring the
+    // live card draws (circle under par, square over; the number keeps its colour).
+    function renderEventEntryCards(r, rc) {
+        const players = currentData.players || {};
+        const hcp = players[r.entryKey] ? players[r.entryKey].handicap : null;
+        let html = '<div class="lb-expand">';
+        rc.forEach(c => {
+            const card = playerRoundHoles(currentData, c.rid, r.entryKey);
+            const played = card.thru;
+            const parPlayed = card.holes.filter(h => h.score > 0).reduce((a, h) => a + h.par, 0);
+            const tp = card.total - parPlayed;
+            const tpText = tp === 0 ? 'E' : (tp > 0 ? `+${tp}` : String(tp));
+            const state = !played ? 'not started' : (played === card.holes.length ? 'complete' : `thru ${played}`);
+            const where = c.courseName && c.courseName !== c.name ? ` · ${escapeHtml(c.courseName)}` : '';
+            html += `<div class="rh">${escapeHtml(c.name)}${where} · ${played ? card.total : '–'}${played ? ` <span class="${tp < 0 ? 'under' : ''}">(${tpText})</span>` : ''}<small>${state}${hcp !== null && hcp !== undefined && hcp !== '' ? ` · handicap ${escapeHtml(String(hcp))}` : ''}</small></div>`;
+            html += lbHolesGrid(card.holes.slice(0, 9), 'Out', card.out, card.parOut);
+            if (card.holes.length > 9) html += lbHolesGrid(card.holes.slice(9, 18), 'In', card.inn, card.parIn);
+        });
+        html += '<div class="lb-key"><i class="mark-birdie"></i> birdie &nbsp; <i class="mark-eagle"></i> eagle &nbsp; <i class="mark-bogey"></i> bogey &nbsp; <i class="mark-double"></i> double or worse</div></div>';
+        return html;
+    }
+    function lbHolesGrid(holes, label, total, parTotal) {
+        if (!holes.length) return '';
+        const played = holes.some(h => h.score > 0);
+        return `<div class="lb-holes"><span class="k">Hole</span>${holes.map(h => `<span class="h">${h.hole}</span>`).join('')}<span class="k t">${label}</span>`
+            + `<span class="k">Par</span>${holes.map(h => `<span class="p">${h.par || ''}</span>`).join('')}<span class="p t">${parTotal || ''}</span>`
+            + `<span class="k">Score</span>${holes.map(h => `<span class="s"><i class="${h.mark}">${h.score || '–'}</i></span>`).join('')}<span class="t">${played ? total : '–'}</span></div>`;
     }
 
     // THE PRIZE AMOUNTS ARE SAVED (Wave 1, A4). They lived only in the DOM, so
@@ -6476,7 +6894,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // place IS pro shop credit, so every place reads "$600 pro shop credit", and
     // a place with no amount reads "Trophy". Wording only: payouts.js and the
     // allocation are untouched (tournament_no_cash_prize_test.js).
-    const prizeLabel = (v) => (v > 0 ? `$${v % 1 === 0 ? v : v.toFixed(2)} pro shop credit` : 'Trophy');
+    // PO (2026-11-14): the word follows the event's prize type switch - pro
+    // shop credit unless the organizer picked the other half (prizeTypeOf).
+    const prizeLabel = (v) => (v > 0 ? `${prizeMoney(v)} ${prizeWordOf(currentData)}` : 'Trophy');
 
     function payoutSpotCount() {
         const spotsInput = document.getElementById('payout-spots-input');
@@ -6515,8 +6935,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const container = document.getElementById('payout-spot-amounts');
         const subEl = document.getElementById('payout-pool-sub');
         subEl.textContent = pool > 0
-            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${feeUnits(currentData)} ${feePer(currentData) === 'golfer' ? (feeUnits(currentData) === 1 ? 'golfer' : 'golfers') : competitorNoun(currentData, competitorCount(currentData))}). Set how many places win a prize — ties split the pro shop credit their tied places add up to.`
-            : `No entry fee set for this tournament — type each place's pro shop credit below.`;
+            ? `Total in is $${pool.toFixed(2)} (${currentData.entryFee || 0} × ${feeUnits(currentData)} ${feePer(currentData) === 'golfer' ? (feeUnits(currentData) === 1 ? 'golfer' : 'golfers') : competitorNoun(currentData, competitorCount(currentData))}). Set how many places win a prize — ties split the ${prizeWordOf(currentData)} their tied places add up to.`
+            : `No entry fee set for this tournament — type each place's ${prizeWordOf(currentData)} below.`;
 
         let html = '';
         let focusedAt = -1, focusedValue = '';
@@ -6527,7 +6947,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // not an amount.
             const val = i < saved.length ? saved[i] : '';
             html += `<div class="form-group" style="margin-bottom:6px;">
-                <label>${ordinal(i + 1)} Place — pro shop credit $ (0 = Trophy)</label>
+                <label>${ordinal(i + 1)} Place — ${prizeWordOf(currentData)} $ (0 = Trophy)</label>
                 <input type="number" id="payout-spot-${i}" min="0" value="${val}" placeholder="0" oninput="renderPayoutResults()" onchange="savePayoutSpots()">
             </div>`;
         }
@@ -6593,13 +7013,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // The owner previews what they are typing; everyone else reads the record.
         const owner = canManage();
         const spotAmounts = owner ? typedPayoutSpots() : savedPayoutSpots();
+        // PO (2026-11-14): the organizer's Skins and KPs cards and the total
+        // follow every keystroke here too, before any early return below.
+        renderPrizeOwnerCards(owner, spotAmounts);
 
         // A WATCHER SEES THE AMOUNTS, READ-ONLY - the saved ones or a plain
         // sentence, never an invented split.
         const pub = document.getElementById('payout-public-amounts');
         if (pub) {
             pub.innerHTML = owner ? '' : (payoutsAreSet(spotAmounts)
-                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${spotAmounts.map((v, i) => `${ordinal(i + 1)} ${prizeLabel(v)}`).join(' \u00b7 ')}</div>`
+                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${eventFlightIds(currentData).length ? 'Each flight: ' : ''}${spotAmounts.map((v, i) => `${ordinal(i + 1)} ${prizeLabel(v)}`).join(' \u00b7 ')}</div>`
                 : `<div class="payout-spot-readonly" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Results not set yet.</div>`);
         }
         // ONE BASIS FOR EVERY PHONE (audit #1, A1). The data decides - the
@@ -6637,7 +7060,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const placesSet = payoutsAreSet(spotAmounts);
         const payouts = computeTournamentPayouts(prizeRows, spotAmounts)
             .filter((p) => p.amount > 0 || (placesSet && p.rank <= spotAmounts.length));
-        const totalAllocated = spotAmounts.reduce((s, v) => s + v, 0);
+        // With flights every flight pays the same places, so the amounts count once a flight.
+        const totalAllocated = spotAmounts.reduce((s, v) => s + v, 0) * Math.max(1, eventFlightIds(currentData).length);
         const pool = poolTotal();
 
         let html = '';
@@ -6645,7 +7069,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // that disagrees with the pool.
         if (owner && payoutsAreSet(spotAmounts) && pool > 0 && Math.abs(totalAllocated - pool) > 0.01) {
             html += `<div style="font-size:0.75rem; color:var(--accent-red); background:var(--danger-box-bg); border:1px solid var(--accent-red); border-radius:6px; padding:8px; margin-bottom:10px;">
-                ⚠️ Pro shop credit adds up to $${totalAllocated.toFixed(2)}, but the total in is $${pool.toFixed(2)}.
+                ⚠️ ${prizeWordCap(currentData)} adds up to $${totalAllocated.toFixed(2)}, but the total in is $${pool.toFixed(2)}.
             </div>`;
         }
 
@@ -6656,8 +7080,15 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // P1-a, 2026-11-10: a $0 place inside the count is now a "Trophy" row, so
         // with a scored team 1st is always listed and this sentence is a
         // fallback that no fixture reaches. Kept, not deleted (wording only).
+        // PER FLIGHT (PO 2026-11-14). An event with flights pays each flight its
+        // own places from the same amounts: the same basis, the same allocator,
+        // one ranking per flight from the engine. Every phone computes it from
+        // the record, never from the flight tab this viewer has open.
+        const flightPlaces = prizePlaceGroups(currentData || {}, prize, spotAmounts);
         if (!spotAmounts.some((v) => v > 0)) {
             html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Enter spot amounts above to see results.</div>`;
+        } else if (flightPlaces.byFlight) {
+            html += prizeFlightRowsHtml(flightPlaces);
         } else if (payouts.length === 0) {
             html += `<div style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">No prize places reached yet.</div>`;
         } else {
@@ -6666,6 +7097,177 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             });
         }
         resultsContainer.innerHTML = html;
+    }
+
+    // ========================================================================
+    // PAYOUTS / PRIZE RESULTS (PO build 2026-11-14,
+    // ADVISOR-20261114-1156-OK-build-final-set; mockups PO-FINAL desktop/phone)
+    //
+    // The organizer's prize screen: the prize type switch on top, then three
+    // cards - Places (the calculator above, per flight when the event has
+    // flights), Skins and KPs - then the total and Post results. Every number
+    // comes from tournament-prizes.js, which the TV page loads too, so the
+    // screen, the recap, My results and the TV cannot disagree about a word or
+    // an amount. Settings save the way payoutSpots does, owner only:
+    // prizeType and prizeSettings/<key>. Post results saves prizeResults.
+    // ========================================================================
+    function prizeTypeOf(data) { return TournamentPrizes.typeOf(data); }
+    function prizeWordOf(data) { return TournamentPrizes.wordOf(data); }
+    function prizeWordCap(data) { return TournamentPrizes.wordCap(data); }
+    function prizeMoney(v) { return TournamentPrizes.money(v); }
+    function eventFlightIds(data) { return TournamentPrizes.flightIds(data); }
+    function prizePlaceGroups(data, prize, spots) { return TournamentPrizes.placeGroups(data, prize, spots); }
+
+    function prizeFlightRowsHtml(fp) {
+        let h = '';
+        fp.groups.forEach((gr) => {
+            h += `<div class="pz-k">${escapeHtml(gr.name)}</div>`;
+            h += gr.rows.length
+                ? gr.rows.map((p) => `<div class="ledger-row"><span>${ordinal(p.rank)} — ${escapeHtml(p.name)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">${prizeLabel(p.amount)}</span></div>`).join('')
+                : `<div class="pz-note">No scores in this flight yet.</div>`;
+        });
+        if (fp.unflighted) h += `<div class="pz-note">${fp.unflighted} scored ${fp.unflighted === 1 ? 'entry is' : 'entries are'} in no flight, so in no flight's places.</div>`;
+        return h;
+    }
+
+    function setPrizeType(t) {
+        if (!currentCode || !canManage() || (t !== 'credit' && t !== 'cash')) return;
+        db.ref(`tournaments/${currentCode}/prizeType`).set(t).catch(err => alert(`Error: ${err.message}`));
+    }
+    function savePrizeSetting(key, raw) {
+        if (!currentCode || !canManage()) return;
+        let v;
+        if (key === 'perSkin' || key === 'perContest') v = TournamentPrizes.amountOf(parseFloat(raw));
+        else if (key === 'carryover') v = raw === true || raw === 'true';
+        else return;
+        db.ref(`tournaments/${currentCode}/prizeSettings/${key}`).set(v).catch(err => alert(`Error: ${err.message}`));
+    }
+    let prizeSkinsOpen = false;
+    function togglePrizeSkins() {
+        prizeSkinsOpen = !prizeSkinsOpen;
+        renderPrizeOwnerCards(canManage(), typedPayoutSpots());
+    }
+
+    // The ring a winning score wears (skins.js scoreMark): circle birdie,
+    // double circle eagle, square bogey, double square worse; plain at par.
+    function prizeRing(score, par) {
+        const mark = TournamentSkins.scoreMark(score, par);
+        return `<span class="pz-ring${mark ? ' ' + mark : ''}" data-mark="${mark || 'par'}">${escapeHtml(String(score))}</span>`;
+    }
+    function prizeNames(ids, tally) { return ids.map((id) => ((tally[id] || {}).name || '').split(' ')[0]).filter(Boolean).join(', '); }
+
+    // opts.tab (LB-FINAL): the Skins tab shows the same detail read-only, always
+    // open, without the organizer's amount and carryover controls.
+    function prizeSkinsCardHtml(sk, data, opts) {
+        const tab = !!(opts && opts.tab);
+        const open = tab || prizeSkinsOpen;
+        const amt = (v) => (sk.perSkin > 0 ? escapeHtml(TournamentPrizes.shortText(v, data)) : '');
+        let h = '';
+        if (!tab) h += `<div class="pz-head"><span class="pz-title">Skins · gross</span><button type="button" class="ct-btn" id="prize-skins-open" onclick="togglePrizeSkins()">${prizeSkinsOpen ? 'Close' : 'Open'}</button></div>`;
+        h += `<div class="pz-sub">${sk.perSkin > 0 ? `${escapeHtml(TournamentPrizes.amountText(sk.perSkin, data))} a skin` : 'No amount a skin yet'} · per round · carryover ${sk.carryover ? 'on (a hole won after a tie takes the carried skin too)' : 'off'}</div>`;
+        if (!tab) h += `<div class="pz-ctl"><label for="prize-skin-amount">A skin $</label><input type="number" id="prize-skin-amount" min="0" step="1" placeholder="0" value="${sk.perSkin > 0 ? sk.perSkin : ''}" onchange="savePrizeSetting('perSkin', this.value)">`
+            + `<div class="payout-basis-seg" role="group" aria-label="Carryover"><button type="button" class="${sk.carryover ? 'on' : ''}" aria-pressed="${sk.carryover}" onclick="savePrizeSetting('carryover', true)">Carryover on</button><button type="button" class="${sk.carryover ? '' : 'on'}" aria-pressed="${!sk.carryover}" onclick="savePrizeSetting('carryover', false)">Carryover off</button></div></div>`;
+        h += `<div class="pz-note">Gross scores only. Net skins need each golfer's handicap strokes on every hole, so they are not built yet.</div>`;
+        const line = sk.rounds.map((r) => {
+            const t = r.result.totals;
+            return `${r.name ? escapeHtml(r.name) + ' ' : ''}${t.skins} skin${t.skins === 1 ? '' : 's'}${t.carried ? ` (${t.carried} carried)` : ''}`;
+        }).join(' · ');
+        const full = (v) => escapeHtml(TournamentPrizes.amountText(v, data));
+        h += `<div class="pz-note" id="prize-skins-line">${line}${sk.perSkin > 0 ? ` → ${full(sk.total)}` : ''}</div>`;
+        if (open) {
+            sk.rounds.forEach((r, ri) => {
+                const res = r.result, rows = res.holes;
+                if (r.name || sk.rounds.length > 1) h += `<div class="pz-k">Round ${ri + 1}${r.name ? ' · ' + escapeHtml(r.name) : ''}</div>`;
+                let otherTies = 0;
+                // A run of tied holes is one line, just above the hole that took it.
+                const runLine = (run, to) => (run.length === 1
+                    ? `Tied at ${run[0].score} (${escapeHtml(prizeNames(run[0].tiedIds, res.tally))}) · no skin, carried to ${to}`
+                    : `Holes ${run[0].hole}–${run[run.length - 1].hole} tied · no skin, carried to ${to}`);
+                rows.forEach((x, i) => {
+                    if (x.status === 'won') {
+                        const run = x.carriedIn ? rows.slice(i - x.carriedIn, i) : [];
+                        const from = run.map((y) => y.hole);
+                        if (run.length) h += `<div class="pz-row pz-carry" data-hole="${from.join(',')}"><span class="pz-n">${run.length === 1 ? from[0] : ''}</span><span class="pz-who pz-note">${runLine(run, x.hole)}</span></div>`;
+                        h += `<div class="pz-row" data-hole="${x.hole}"><span class="pz-n">${x.hole}</span>${prizeRing(x.score, x.par)}<span class="pz-who">${escapeHtml(x.name)} <small>par ${x.par || '-'}${from.length ? ` · <span class="pz-tag">carried from ${from.length > 1 ? from[0] + '–' + from[from.length - 1] : from[0]}</span>` : ''}</small></span><span class="pz-amt">${amt(x.skins * sk.perSkin)}</span></div>`;
+                    } else if (x.status === 'tied' && !x.carriesTo) {
+                        otherTies++;
+                    }
+                });
+                const last = rows[rows.length - 1];
+                const lastTie = last && last.status === 'tied';
+                const others = otherTies - (lastTie ? 1 : 0);
+                const lastRun = lastTie && last.carriedIn ? `Holes ${rows[rows.length - 1 - last.carriedIn].hole}–${last.hole} tied: ` : (lastTie ? `Hole ${last.hole} tied: ` : '');
+                if (otherTies) h += `<div class="pz-note">${others > 0 ? `${others} other hole${others === 1 ? '' : 's'} tied, no skin. ` : ''}${lastTie ? `${lastRun}nothing carries past the last hole.` : ''}</div>`;
+                if (res.totals.pending) {
+                    const waiting = rows.filter((y) => y.status === 'pending').map((y) => y.hole);
+                    h += `<div class="pz-note">${waiting.length === 1 ? `Hole ${waiting[0]} is` : `Holes ${waiting[0]}–${waiting[waiting.length - 1]} are`} waiting for every card's score.</div>`;
+                }
+                if (!res.totals.holesWon && !res.totals.pending && !otherTies) h += `<div class="pz-note">No scores yet.</div>`;
+            });
+            h += `<div class="pz-total"><div class="pz-total-line"><span>Skins total<small>${sk.holesWon} hole${sk.holesWon === 1 ? '' : 's'} won · ${sk.carried} carried · ${sk.skins} skin${sk.skins === 1 ? '' : 's'}</small></span><span>${sk.perSkin > 0 ? full(sk.total) : ''}</span></div></div>`;
+        }
+        return h;
+    }
+
+    function prizeKpsCardHtml(ct, data) {
+        let h = `<div class="pz-head"><span class="pz-title">KPs · contest holes</span><button type="button" class="ct-btn" id="prize-kps-edit" onclick="showTab('contests')">Edit</button></div>`;
+        if (ct.multi) {
+            return h + `<div class="pz-note" id="prize-kps-multi">Contest holes are for one-round events, so this event has none. KP and long drive credit stays off here.</div>`;
+        }
+        h += `<div class="pz-sub">Winners from the Contests tab · ${ct.perContest > 0 ? `${escapeHtml(TournamentPrizes.amountText(ct.perContest, data))} each` : 'no amount each yet'}</div>`;
+        h += `<div class="pz-ctl"><label for="prize-kp-amount">Each contest $</label><input type="number" id="prize-kp-amount" min="0" step="1" placeholder="0" value="${ct.perContest > 0 ? ct.perContest : ''}" onchange="savePrizeSetting('perContest', this.value)"></div>`;
+        if (!ct.rows.length && !ct.open.length) return h + `<div class="pz-note">No contest holes yet. Mark them on the Contests tab.</div>`;
+        h += ct.rows.map((c) => `<div class="pz-row" data-hole="${c.hole}"><span class="pz-n">${c.hole}</span><span class="pz-who">${escapeHtml(c.name)} <small>${c.kind === 'kp' ? 'closest' : 'long drive'} · ${escapeHtml(c.value)}</small></span><span class="pz-amt">${c.amount > 0 ? escapeHtml(TournamentPrizes.shortText(c.amount, data)) : ''}</span></div>`).join('');
+        h += ct.open.map((c) => `<div class="pz-note">Hole ${c.hole} (${c.kind === 'kp' ? 'closest to the pin' : 'long drive'}): no winner confirmed yet.</div>`).join('');
+        return h;
+    }
+
+    function renderPrizeOwnerCards(owner, spots) {
+        const els = ['prize-owner-head', 'prize-card-skins', 'prize-card-kps', 'prize-post'].map((id) => document.getElementById(id));
+        if (els.some((e) => !e)) return;
+        if (!owner || !currentData) {
+            els.forEach((e) => { e.style.display = 'none'; });
+            ['prize-card-skins', 'prize-card-kps', 'prize-total', 'prize-type-control'].forEach((id) => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+            return;
+        }
+        els.forEach((e) => { e.style.display = 'block'; });
+        const data = currentData;
+        const type = prizeTypeOf(data);
+        document.getElementById('prize-type-control').innerHTML = [['credit', 'Pro shop credit'], ['cash', 'Cash']]
+            .map(([v, label]) => `<button type="button" class="${type === v ? 'on' : ''}" aria-pressed="${type === v}" onclick="setPrizeType('${v}')">${label}</button>`).join('');
+        document.getElementById('prize-type-note').textContent = type === 'credit'
+            ? 'Credit is spent at the host pro shop. Trophies are set per place.'
+            : 'The organizer hands each amount over. Trophies are set per place.';
+        const sum = TournamentPrizes.summary(data, contestEntriesAll, spots);
+        const title = document.getElementById('prize-places-title');
+        if (title) title.textContent = sum.places.byFlight ? 'Places · per flight' : 'Places';
+        document.getElementById('prize-card-skins').innerHTML = prizeSkinsCardHtml(sum.skins, data);
+        document.getElementById('prize-card-kps').innerHTML = prizeKpsCardHtml(sum.contests, data);
+        const n = competitorCount(data);
+        const trophies = sum.trophies ? ` + ${sum.trophies} troph${sum.trophies === 1 ? 'y' : 'ies'}` : '';
+        const post = TournamentPrizes.posted(data);
+        document.getElementById('prize-total').innerHTML = `<div class="pz-total-line"><span>Total awarded<small>${escapeHtml(prizeWordOf(data))} · ${n} ${escapeHtml(competitorNoun(data, n))}</small></span><span id="prize-total-amount">${escapeHtml(prizeMoney(sum.total))} ${escapeHtml(prizeWordOf(data))}${trophies}</span></div>`
+            + (post ? `<div class="pz-note" id="prize-posted-line">Posted ${escapeHtml(prizePostedWhen(post.postedAt))}. Post again after a change.</div>` : '');
+    }
+
+    function prizePostedWhen(ms) {
+        const d = new Date(Number(ms) || 0);
+        if (!(d.getTime() > 0)) return '';
+        return d.toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    }
+
+    // POST RESULTS. The three cards' numbers, as this screen shows them, saved
+    // on the event in one write. Posting again replaces them. Nothing is sent.
+    function postPrizeResults() {
+        if (!currentCode || !canManage()) return;
+        const sum = TournamentPrizes.summary(currentData, contestEntriesAll, typedPayoutSpots());
+        const rec = TournamentPrizes.recordFor(currentData, sum);
+        rec.postedAt = firebase.database.ServerValue.TIMESTAMP;
+        const msg = document.getElementById('prize-post-msg');
+        if (msg) msg.textContent = 'Posting…';
+        return db.ref(`tournaments/${currentCode}/prizeResults`).set(rec)
+            .then(() => { if (msg) msg.textContent = 'Posted. The recap, the TV and My results now show these numbers.'; })
+            .catch((err) => { if (msg) msg.textContent = `Not posted: ${err.message}`; });
     }
 
     // ========================================================================
@@ -6806,10 +7408,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (ids.length === 0) {
             listEl.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No rounds yet.</p>`;
             document.getElementById('round-editor').innerHTML = '';
+            renderRoundsCard(ids);
             return;
         }
 
         const label = { setup: '⚙️ Setup', open: '🟢 Open', closed: '🔒 Closed' };
+        renderRoundsCard(ids);
         listEl.innerHTML = ids.map((rid, i) => {
             const r = rounds[rid];
             const st = roundStatus(r);
@@ -6834,6 +7438,51 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }).join('');
 
         renderRoundEditor();
+    }
+
+    // THE ROUNDS CARD (MR-FINAL, Manny 2026-11-14): the same rounds as the list
+    // below, read as a schedule - each round's course, format, scoring and state,
+    // what the Board shows, the flights, and what prizes go by. It renders only;
+    // every edit still happens in the list and the prize controls.
+    function renderRoundsCard(ids) {
+        const card = document.getElementById('rounds-card');
+        if (!card) return;
+        if (!ids.length) { card.innerHTML = ''; return; }
+        const rounds = currentData.rounds || {};
+        const cols = eventRoundColumns(currentData);
+        const players = currentData.players || {};
+        const field = Object.keys(players).length;
+        const tiles = ids.map((rid) => {
+            const r = rounds[rid] || {};
+            const st = roundStatus(r);
+            const holes = (r.courseData || []).length;
+            const done = Object.keys(cols.byPlayer).filter((pid) => cols.byPlayer[pid][rid] && cols.byPlayer[pid][rid].complete).length;
+            const scored = Object.keys(cols.byPlayer).filter((pid) => cols.byPlayer[pid][rid] && cols.byPlayer[pid][rid].hasScores).length;
+            const state = st === 'closed' ? `✓ Closed · ${done} of ${field} cards`
+                : st === 'open' ? (scored ? `● Open · in play, ${scored} of ${field} scoring` : '● Open · no scores yet')
+                : '⚙ Setup · not open yet';
+            const scoring = r.format === 'individual' ? (netIsInPlay(r) ? 'Net' : 'Gross') : '';
+            return `<div class="rc-tile"><b>${escapeHtml(r.name || 'Round')}</b>${escapeHtml(r.courseName || 'No course set')}${holes ? ` · ${holes} holes` : ''}<br>${formatLabelFor(r.format)}${scoring ? ' · ' + scoring : ''}<br><span class="st">${state}</span></div>`;
+        }).join('');
+        const avail = aggregateAvailability(currentData);
+        const fam = aggregateFamily(currentData);
+        const board = avail.available
+            ? `Event total · ${cols.columns.map((c) => c.short).join(' · ')} · Tot · ${fam === 'individual:net' ? 'Net' : 'Gross'}${fam === 'individual:net' ? '' : ' (Net on the combined board is not available yet)'}`
+            : avail.reason;
+        const flights = currentData.flights || {};
+        const fids = Object.keys(flights).sort((a, b) => (flights[a].createdAt || 0) - (flights[b].createdAt || 0));
+        const flightLine = fids.length
+            ? fids.map((f) => `${escapeHtml(flights[f].name || 'Flight')} (${Object.keys(players).filter((p) => players[p].flightId === f).length})`).join(' · ')
+            : 'none';
+        const basis = currentData.payoutBasis && rounds[currentData.payoutBasis] ? (rounds[currentData.payoutBasis].name || 'Round') : 'Event total';
+        const totalHoles = ids.reduce((a, rid) => a + ((rounds[rid] || {}).courseData || []).length, 0);
+        card.innerHTML = `<div class="rounds-card">
+            <div class="rc-head">${ids.length} round${ids.length === 1 ? '' : 's'}${totalHoles ? ` · ${totalHoles} holes` : ''} · each round has its own course</div>
+            <div class="rc-tiles">${tiles}</div>
+            <div class="rc-line"><b>Board shows</b> ${escapeHtml(board)}</div>
+            <div class="rc-line"><b>Flights</b> ${flightLine}</div>
+            <div class="rc-line"><b>Prizes go by</b> ${escapeHtml(basis)} · trophies and pro shop credit</div>
+        </div>`;
     }
 
     // A ROUND'S SETTINGS ARE LOCKED ONCE IT OPENS. Changing the course or the format
@@ -7896,6 +8545,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (currentCode !== code) return;
             contestEntriesAll = (snap && snap.val()) || {};
             renderContestsTab();
+            renderPayoutResults();   // PO: the KPs card reads the confirmed winners' entries
         });
     }
     function contestGpsOn() {
@@ -8534,7 +9184,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     function renderRecap() {
         const data = currentData;
+        const showMe = !!(myResultsKey && data);
+        document.getElementById('recap-screen').style.display = showMe ? 'none' : 'block';
+        const meScreen = document.getElementById('my-results-screen');
+        if (meScreen) meScreen.style.display = showMe ? 'block' : 'none';
         if (!data) { document.getElementById('recap-title').textContent = 'No tournament found with that code.'; return; }
+        if (showMe) { renderMyResults(data); return; }
         document.getElementById('recap-title').textContent = `${data.name || 'Tournament'} recap`;
         const n = competitorCount(data);
         document.getElementById('recap-sub').textContent = [recapDate(data.eventDate), data.courseName, n ? `${n} ${competitorNoun(data, n)}` : ''].filter(Boolean).join(' · ');
@@ -8565,12 +9220,112 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         ld.forEach((w) => rows.push([`🏌️ Long drive ${w.hole}`, `${w.name} ${w.value}`]));
         const card = document.getElementById('recap-winners');
         card.innerHTML = rows.map(([a, b]) => `<div class="rc-row"><span>${escapeHtml(a)}</span><strong>${escapeHtml(b)}</strong></div>`).join('');
-        card.style.display = rows.length ? 'block' : 'none';
+        // PO: once posted, the posted cards take the winners card's place.
+        const post = TournamentPrizes.posted(data);
+        card.style.display = rows.length && !post ? 'block' : 'none';
+        const prizesEl = document.getElementById('recap-prizes');
+        if (prizesEl) {
+            prizesEl.innerHTML = post ? recapPrizesHtml(post, data) : '';
+            prizesEl.style.display = post ? 'block' : 'none';
+        }
         document.getElementById('recap-photos').innerHTML = TournamentPhotos.ordered(recapShown).map((p) => {
             const label = TournamentPhotos.photoLabel(data, p);
             return `<div class="pq-tile"><img src="${escapeHtml(TournamentPhotos.shownUrl(currentCode, p.id))}" alt="${escapeHtml(label)}" loading="lazy" onerror="this.style.display='none'">${label ? `<span class="pq-tag">${escapeHtml(label)}</span>` : ''}`
                 + `<button type="button" class="rc-report" data-photo="${escapeHtml(p.id)}" onclick="reportRecapPhoto(this.dataset.photo, this)">Report</button></div>`;
         }).join('');
+    }
+    // ===== PO (2026-11-14): THE RECAP BY CARD, AND MY RESULTS =====
+    // Once the organizer posts, the recap lists the posted numbers card by card
+    // (places per flight, skins, KPs) and every name is a button to that
+    // golfer's My results. ?tourney=CODE&recap=1&me=<key> (or &me= alone) opens
+    // My results straight from a link. Before posting the recap is unchanged.
+    let myResultsKey = null;
+    function recapToParHtml(v) {
+        if (typeof v !== 'number') return '';
+        const t = v === 0 ? 'E' : (v > 0 ? `+${v}` : String(v));
+        return ` <small class="pz-tp${v < 0 ? ' pz-under' : ''}">${t}</small>`;
+    }
+    function recapNameBtn(key, name) {
+        return key ? `<button type="button" class="pz-name" data-key="${escapeHtml(key)}" onclick="openMyResults(this.dataset.key)">${escapeHtml(name)}</button>` : escapeHtml(name);
+    }
+    function recapPrizesHtml(post, data) {
+        const amt = (v) => escapeHtml(TournamentPrizes.shortText(v, data));
+        let h = `<div class="pz-note" style="margin-top:10px;">Tap your name to see My results.</div>`;
+        post.places.forEach((gr) => {
+            if (!gr.rows.length) return;
+            h += `<div class="pz-k">Places${gr.flight ? ' · ' + escapeHtml(gr.flight) : ''}</div>`;
+            h += gr.rows.map((r) => `<div class="pz-row"><span class="pz-n">${ordinal(r.rank)}</span><span class="pz-who">${recapNameBtn(r.key, r.name)}${recapToParHtml(r.toPar)}</span><span class="pz-amt">${amt(r.amount)}</span></div>`).join('');
+        });
+        const won = [];
+        post.skins.rounds.forEach((rd) => rd.won.forEach((x) => won.push(Object.assign({ round: rd.name }, x))));
+        if (won.length) {
+            h += `<div class="pz-k">Skins · ${post.skins.skins}</div>`;
+            h += won.map((x) => `<div class="pz-row"><span class="pz-n">${x.hole}</span>${prizeRing(x.score, x.par)}<span class="pz-who">${recapNameBtn(x.key, x.name)} <small>${x.round ? escapeHtml(x.round) + ' · ' : ''}par ${x.par || '-'}${x.carriedIn ? ` · ${x.carriedIn} carried` : ''}</small></span><span class="pz-amt">${x.amount > 0 ? amt(x.amount) : ''}</span></div>`).join('');
+        }
+        if (post.contests.rows.length) {
+            h += `<div class="pz-k">KPs &amp; long drive</div>`;
+            h += post.contests.rows.map((c) => `<div class="pz-row"><span class="pz-n">${c.hole}</span><span class="pz-who">${recapNameBtn(c.key, c.name)} <small>${c.kind === 'kp' ? 'closest' : 'long drive'} · ${escapeHtml(c.value)}</small></span><span class="pz-amt">${c.amount > 0 ? amt(c.amount) : ''}</span></div>`).join('');
+        }
+        const trophies = post.trophies ? ` + ${post.trophies} troph${post.trophies === 1 ? 'y' : 'ies'}` : '';
+        h += `<div class="pz-total"><div class="pz-total-line"><span>Total awarded<small>${escapeHtml(prizeWordOf(data))}${trophies}</small></span><span id="recap-prizes-total">${escapeHtml(prizeMoney(post.total))}</span></div></div>`;
+        return h;
+    }
+    function meUrl(key) {
+        return 'tournament.html?tourney=' + encodeURIComponent(currentCode) + '&recap=1' + (key ? '&me=' + encodeURIComponent(key) : '');
+    }
+    function openMyResults(key) {
+        myResultsKey = String(key || '') || null;
+        try { if (window.history && history.replaceState) history.replaceState(null, '', meUrl(myResultsKey)); } catch (e) { /* file:// or no history */ }
+        renderRecap();
+        if (typeof window.scrollTo === 'function') window.scrollTo(0, 0);
+    }
+    function closeMyResults() { openMyResults(null); }
+    function myResultsWho(data, key) {
+        const players = data.players || {}, teams = data.teams || {}, flights = data.flights || {};
+        const p = players[key], t = teams[key];
+        const name = p ? competitorDisplayName(p) : (t ? (t.name || `Team ${t.num}`) : '');
+        const fid = (p || t || {}).flightId;
+        return { name, flight: fid && flights[fid] ? (flights[fid].name || '') : '' };
+    }
+    function renderMyResults(data) {
+        const post = TournamentPrizes.posted(data);
+        const who = myResultsWho(data, myResultsKey);
+        const mine = TournamentPrizes.myResults(post, myResultsKey);
+        const name = who.name || mine.name;
+        document.getElementById('my-results-sub').textContent = [data.name || 'Tournament', name, who.flight].filter(Boolean).join(' · ');
+        const card = document.getElementById('my-results-card');
+        const postedLine = document.getElementById('my-results-posted');
+        if (!post) {
+            card.innerHTML = `<div class="pz-note" style="padding:10px 0;">Results are not posted yet. The organizer posts them after the last card is in.</div>`;
+            postedLine.textContent = '';
+            return;
+        }
+        if (!name) {
+            card.innerHTML = `<div class="pz-note" style="padding:10px 0;">No golfer with that link in this event.</div>`;
+            postedLine.textContent = '';
+            return;
+        }
+        const amt = (v) => escapeHtml(TournamentPrizes.shortText(v, data));
+        let h = '';
+        if (mine.places.length) {
+            h += `<div class="pz-k">Places</div>` + mine.places.map((r) => `<div class="pz-row"><span class="pz-who"><strong>${ordinal(r.rank)}${r.flight ? ' · ' + escapeHtml(r.flight) : ''}</strong>${recapToParHtml(r.toPar)}${post.basisTitle ? `<small>${escapeHtml(post.basisTitle)}</small>` : ''}</span><span class="pz-amt">${amt(r.amount)}</span></div>`).join('');
+        }
+        if (mine.skins.length) {
+            h += `<div class="pz-k">Skins</div>` + mine.skins.map((x) => `<div class="pz-row">${prizeRing(x.score, x.par)}<span class="pz-who"><strong>${x.skins} skin${x.skins === 1 ? '' : 's'} · ${x.round ? escapeHtml(x.round) + ' ' : 'hole '}${x.hole}</strong> <small>par ${x.par || '-'}${x.carriedIn ? ` · ${x.carriedIn} carried` : ''}</small></span><span class="pz-amt">${x.amount > 0 ? amt(x.amount) : ''}</span></div>`).join('');
+        }
+        if (mine.contests.length) {
+            h += `<div class="pz-k">KPs</div>` + mine.contests.map((c) => `<div class="pz-row"><span class="pz-who"><strong>${c.kind === 'kp' ? 'Closest to the pin' : 'Long drive'} · hole ${c.hole}</strong> <small>${escapeHtml(c.value)}</small></span><span class="pz-amt">${c.amount > 0 ? amt(c.amount) : ''}</span></div>`).join('');
+        }
+        if (!h) h = `<div class="pz-note" style="padding:10px 0;">No prize for ${escapeHtml(name)} on the posted results.</div>`;
+        const credit = prizeTypeOf(data) === 'credit';
+        const host = post.host || TournamentPrizes.hostOf(data);
+        if (mine.total > 0 || mine.trophies) {
+            const trophy = mine.trophies ? ` + ${mine.trophies === 1 ? 'Trophy' : mine.trophies + ' trophies'}` : '';
+            h += `<div class="pz-total"><div class="pz-total-line"><span>${escapeHtml(prizeWordCap(data))}${credit && host ? `<small>at the ${escapeHtml(host)} pro shop</small>` : ''}</span><span id="my-results-total">${mine.total > 0 ? escapeHtml(prizeMoney(mine.total)) : ''}${trophy}</span></div></div>`;
+            if (credit && mine.total > 0) h += `<div class="pz-shop" id="my-results-shop">Spend it at the ${escapeHtml(host || 'host')} pro shop. The organizer settles with the shop; HardPan collects nothing.</div>`;
+        }
+        card.innerHTML = h;
+        postedLine.textContent = post.postedAt ? `Posted ${prizePostedWhen(post.postedAt)} by the organizer` : '';
     }
     function shareRecap() {
         const url = recapUrl();
@@ -8700,8 +9455,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     renderMyEvents();   // Phase 2, P2-0: this phone's events, app mode only (hidden otherwise)
     if (registerParam) {
         openRegisterScreen(registerParam.toUpperCase());
-    } else if (tourneyParam && urlParams.get('recap') === '1') {
+    } else if (tourneyParam && (urlParams.get('recap') === '1' || urlParams.get('me'))) {
         // E4c: the read-only recap. Never the console, whoever opens it.
+        // PO: &me=<key> opens that golfer's My results on the same page.
+        myResultsKey = urlParams.get('me') || null;
         openRecap(tourneyParam.toUpperCase());
     } else if (tourneyParam && urlParams.get('checkin') === '1') {
         // CI-FINAL: the table QR's name list. Never the console, whoever opens it.
@@ -8741,5 +9498,22 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
     </div>
 </div>
+    <!-- LB-FINAL (Manny 2026-11-14): a golfer's scorecard, opened from the board. A
+         half-sheet on a phone, a right-side panel on a laptop; Prev / Next walk the board
+         in the order it is showing. -->
+    <div class="lb-sheet-overlay" id="lb-sheet" onclick="if (event.target === this) closeLeaderboardSheet()">
+        <div class="lb-sheet" role="dialog" aria-modal="true" aria-label="Scorecard">
+            <div class="lb-sheet-head">
+                <button type="button" class="lb-sheet-nav" id="lb-sheet-prev" onclick="stepLeaderboardSheet(-1)">‹ Prev<small id="lb-sheet-prev-name"></small></button>
+                <div class="lb-sheet-who"><b id="lb-sheet-name"></b><small id="lb-sheet-sub"></small></div>
+                <button type="button" class="lb-sheet-nav" id="lb-sheet-next" onclick="stepLeaderboardSheet(1)">Next ›<small id="lb-sheet-next-name"></small></button>
+            </div>
+            <div id="lb-sheet-body"></div>
+            <div class="lb-sheet-foot">
+                <a class="btn-outline" id="lb-sheet-group" href="#" style="display:none;">Open the group's card</a>
+                <button type="button" class="btn-outline" onclick="closeLeaderboardSheet()">Close</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

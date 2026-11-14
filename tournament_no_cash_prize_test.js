@@ -52,6 +52,20 @@
 //   C3 the golfer's basis line back to "Paid on"                   -> 3 fail
 //   C4 "prize money" put back in the calculator's sub-line          -> 1 fail
 //   Each restored from a saved copy, sha cd416f82a716 printed beside RESTORED-OK.
+//
+// RE-PINNED 2026-11-14 (PO build, ADVISOR-20261114-1156-OK-build-final-set):
+// the approved PO mockups add a Prize type switch, "Pro shop credit | Cash",
+// credit by default, and the amount labels follow it. The word "cash" may now
+// appear in exactly the places that switch needs, and nowhere else: the switch
+// button, the setPrizeType guard, and tournament-prizes.js's word table and typeOf
+// (ALLOWED below, exact lines; each must still exist, so the list cannot go
+// stale). The scan now also reads tournament-prizes.js and tournament-tv.html.
+// Part 1 is unchanged: with nothing tapped every prize container reads credit
+// (tournament_prizes_chrome_test.js holds the switch's default state).
+// FINAL RUN after the re-pin: 13 tests / 13 pass / 0 fail. BASELINE of this
+// file as it stands against main e1312cf2 (tournament.html sha256
+// fad162561b8f4db8): 13 tests / 12 pass / 1 fail (the allowlist's must-exist
+// test: none of the allowed lines exist there; 12 + 1 = 13).
 // ============================================================================
 const { test, describe, before } = require('node:test');
 const assert = require('node:assert/strict');
@@ -159,12 +173,20 @@ describe('PART 1: cold arrival, basis picked (Sunday), spots 600/250/0', () => {
 });
 
 describe('PART 2: source scan, decoded, comments stripped', () => {
-    const FILES = ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js'];
+    const FILES = ['tournament.html', 'tournament-scorecard.html', 'tournament-engine.js', 'tournament-prizes.js', 'tournament-tv.html'];
+    // The Prize type switch (PO, 2026-11-14): the only lines allowed to say cash.
+    const ALLOWED = [
+        "if (!currentCode || !canManage() || (t !== 'credit' && t !== 'cash')) return;",
+        "document.getElementById('prize-type-control').innerHTML = [['credit', 'Pro shop credit'], ['cash', 'Cash']]",
+        "var PRIZE_WORD = { credit: 'pro shop credit', cash: 'cash' };",
+        "function typeOf(data) { return data && data.prizeType === 'cash' ? 'cash' : 'credit'; }",
+    ];
     const ALWAYS = /\bspots? pay\b|\bpurse\b|\bwinnings\b|prize money|payout pool/i;
     const ON_PRIZE_LINE = /\bcash\b|\bpays\b|\bpaid on\b|\bpot\b/i;
     const PRIZE_LINE = /prize|place|payout|result|trophy|credit|spot/i;
     const isHit = (l) => ALWAYS.test(l) || (ON_PRIZE_LINE.test(l) && PRIZE_LINE.test(l));
     function userText(file) {
+        if (!fs.existsSync(path.join(REPO_ROOT, file))) return '';
         let s = decodeEscapes(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'));
         s = s.replace(/<!--[\s\S]*?-->/g, ' ').replace(/\/\*[\s\S]*?\*\//g, ' ');
         s = s.split('\n').filter((l) => !/^\s*\/\//.test(l)).map((l) => l.replace(/\s\/\/\s.*$/, '')).join('\n');
@@ -190,8 +212,15 @@ describe('PART 2: source scan, decoded, comments stripped', () => {
     });
     test('no banned prize words in any tournament page', () => {
         const hits = [];
-        FILES.forEach((f) => TEXT[f].split('\n').forEach((l, i) => { if (isHit(l)) hits.push(f + ':' + (i + 1) + ': ' + l.trim().slice(0, 140)); }));
+        FILES.forEach((f) => TEXT[f].split('\n').forEach((l, i) => { if (isHit(l) && !ALLOWED.includes(l.trim())) hits.push(f + ':' + (i + 1) + ': ' + l.trim().slice(0, 140)); }));
         assert.deepEqual(hits, []);
+    });
+    test('the switch allowance is exact and live: each allowed line exists and is a hit without the allowance', () => {
+        const all = FILES.map((f) => TEXT[f]).join('\n').split('\n').map((l) => l.trim());
+        ALLOWED.forEach((a) => {
+            assert.ok(all.includes(a), 'allowed line no longer in the source (drop it from ALLOWED): ' + a);
+            assert.ok(isHit(a), 'allowed line is not a hit, so it needs no allowance: ' + a);
+        });
     });
     test('no amount is printed as a bare toFixed dollar in the prize renderer', () => {
         const src = TEXT['tournament.html'];
