@@ -46,6 +46,18 @@
 //   sha256 61471c24523d4cc9…, swapped in by cp, restored by sha): 45 pass /
 //   1 fail (C internal). With the fix on preview-checkout-copy: 46 pass / 0 fail.
 //   Control: the functions/internal branch removed -> C internal red.
+//   Connect polish a-d (preview-connect-polish, 2026-11-14, ADVISOR-20261114-0142): E1 and
+//   E7 extended (DESK_REGS_CONNECT: two Stripe entries carrying serviceFeeCents 400, one in
+//   the field), D3 rewritten and D3b/D3c added: 58 tests. Against main e1312cf2
+//   (tournament.html sha256 fad162561b8f…, the test and the stub helper carried over, the
+//   stub gained a recording off()): 53 pass / 5 fail (D3, D3b, D3c, E1, E7). With the build:
+//   58 pass / 0 fail. Controls, each restored by sha: (a) the split text dropped -> E7 red;
+//   (b1) the pre-read hide block skipped -> D3, D3b, D3c red; (b2) the listener dedupe
+//   removed -> D3 red (two live listeners); (c) the field question promised to every
+//   refund -> E7 red; (d) the help line reworded -> E7 red. A FIRST version of (b) that
+//   only guarded the handler's own form.style line was INERT: the handler hides the form
+//   again two lines later in the same tick, so neither a test nor a paint can see the
+//   difference - and D3 as first written passed on main. The fix moved to BEFORE the read.
 // NEGATIVE CONTROLS (each mutated in tournament.html, restored by sha from a
 // saved copy): pay button with collectByCard false -> A2; card toggle for a
 // not-allow-listed owner -> H2; Refund for a non-owner with the desk gate
@@ -295,6 +307,57 @@ describe('D. M2c: back from Stripe - the RECORD decides, never the URL', () => {
         assert.match(panel, /\$100\.00 paid by card · Stripe emails your receipt/);
         assert.match(panel, /Shotgun 8:00 AM/);
     });
+    // Live status listeners on a path: what the page registered minus what it dropped
+    // (the stub records off() in __dbOffs and prunes nothing; an off with no cb drops all).
+    const liveStatus = (sb, p) => {
+        const offs = sb.__dbOffs.filter((o) => o.event === 'value' && o.path === p);
+        return sb.__dbHandlers.filter((h) => h.event === 'value' && h.path === p && !offs.some((o) => o.cb === null || o.cb === h.cb));
+    };
+    test('D3 polish b (2026-11-14): back from Checkout the result panel owns the screen BEFORE the record read answers - the default form is never on screen; one live listener per arrival', async () => {
+        const sb = loadHtmlInlineScript(PAGE, [], { search: '?register=REG1&entry=e2&checkout=done', beforeRun(s) { s.__dbReads = { 'tournaments/REG1': clone(record({ fees: FEES })) }; } });
+        // Synchronously, before the read's promise can resolve: the first paint.
+        assert.equal(shown(sb, 'reg-form'), false, 'the form is hidden before the record read answers (the markup shows it by default)');
+        assert.match(plain(html(sb, 'reg-checkout')), /Payment processing…/, 'the processing panel is up before the read');
+        assert.equal(liveStatus(sb, 'registrationStatus/REG1/e2').length, 1, 'one live status listener before the read');
+        await settle();
+        assert.equal(shown(sb, 'reg-form'), false, 'still hidden once the record arrived');
+        const panel = plain(html(sb, 'reg-checkout'));
+        assert.match(panel, /Payment processing…/); assert.match(panel, /Rattle Classic/, 'the record re-rendered the panel with the event name');
+        assert.equal(sb.__dbHandlers.filter((h) => h.event === 'value' && h.path === 'registrationStatus/REG1/e2').length, 2, 'the page subscribed twice (before and after the read)...');
+        const hs = liveStatus(sb, 'registrationStatus/REG1/e2');
+        assert.equal(hs.length, 1, '...and exactly one is live: the first was dropped before the second was registered');
+        hs[0].cb({ val: () => ({ paid: true, paidVia: 'stripe', at: 2 }), exists: () => true });
+        assert.match(plain(html(sb, 'reg-checkout')), /You're registered · Paid/);
+        assert.equal(shown(sb, 'reg-form'), false, 'and the form stays hidden');
+        // a second status delivery (Stripe retries, or the mirror re-written) never brings the form back
+        hs[0].cb({ val: () => ({ paid: true, paidVia: 'stripe', at: 3 }), exists: () => true });
+        assert.equal(shown(sb, 'reg-form'), false); assert.match(plain(html(sb, 'reg-checkout')), /You're registered · Paid/);
+    });
+    test('D3b polish b: the record read NEVER answers (Grok run 2: a blank "Sign up" form) - the golfer still sees Payment processing…, and the paid status still turns it Paid', async () => {
+        const sb = loadHtmlInlineScript(PAGE, [], { search: '?register=REG1&entry=e2&checkout=done', beforeRun(s) {
+            s.__dbReads = {};
+            const orig = s.db.ref.bind(s.db);
+            s.db.ref = (p) => { const r = orig(p); if (p === 'tournaments/REG1') r.once = () => new Promise(() => {}); return r; };
+        } });
+        await settle(); await settle();
+        assert.equal(shown(sb, 'reg-form'), false, 'no blank sign-up form while the read is stalled');
+        assert.match(plain(html(sb, 'reg-checkout')), /Payment processing…/);
+        // mini-dom reads static text as '' (the markup's "Sign up" is not parsed); a record would have written the name.
+        assert.equal(el(sb, 'reg-event-name').textContent || '', '', 'positive: the record really never arrived (no event name written)');
+        const hs = liveStatus(sb, 'registrationStatus/REG1/e2');
+        assert.equal(hs.length, 1);
+        hs[0].cb({ val: () => ({ paid: true, paidVia: 'stripe', at: 2 }), exists: () => true });
+        assert.match(plain(html(sb, 'reg-checkout')), /You're registered · Paid/, 'Paid without the record: the status mirror is enough');
+        assert.equal(shown(sb, 'reg-form'), false);
+    });
+    test('D3c polish b: ?checkout=cancel hides the form before the read too, and the unpaid panel follows the record', async () => {
+        const sb = loadHtmlInlineScript(PAGE, [], { search: '?register=REG1&entry=e2&checkout=cancel', beforeRun(s) { s.__dbReads = { 'tournaments/REG1': clone(record({ fees: FEES })) }; } });
+        assert.equal(shown(sb, 'reg-form'), false, 'hidden before the read');
+        assert.equal(liveStatus(sb, 'registrationStatus/REG1/e2').length, 0, 'a cancel listens for nothing');
+        await settle();
+        assert.equal(shown(sb, 'reg-form'), false);
+        assert.match(plain(html(sb, 'reg-checkout')), /Registered · Unpaid/);
+    });
     test('D2 the entry status cannot be read (rules not published, or offline): the page says so instead of waiting forever', async () => {
         // The stub's on() drops a cancel callback, so the arrival keeps it here -
         // installed before the page runs, the way the SDK would hold it.
@@ -336,10 +399,17 @@ const DESK_REGS = {
     e5: { fullName: 'Dee Nguyen', email: 'dee@example.com', phone: '6025550146', createdAt: 5, paid: true, paidVia: 'stripe', ref: 'pi_5', amountCents: 12345, refundPendingAt: 7 },
     e6: { fullName: 'Lee Park', email: 'lee@example.com', phone: '6025550147', createdAt: 6, paid: true, paidVia: 'stripe', ref: 'pi_6', amountCents: 12345, disputedAt: 8 }
 };
+// Connect (2026-11-14 polish a/c): the same desk plus two sign-ups that paid the entry PLUS HardPan's $4 -
+// in the field (e7) and not (e8). Kept apart so the tile counts in E4/E5 stay as pinned.
+const DESK_REGS_CONNECT = Object.assign({}, DESK_REGS, {
+    e7: { fullName: 'Ray Diaz', email: 'ray@example.com', phone: '6025550148', createdAt: 7, paid: true, paidAt: 5, paidVia: 'stripe', ref: 'pi_7', amountCents: 12345, serviceFeeCents: 400, acct: 'acct_1', approvedAt: 9, playerId: 'p7' },
+    e8: { fullName: 'Kim Vo', email: 'kim@example.com', phone: '6025550149', createdAt: 8, paid: true, paidAt: 5, paidVia: 'stripe', ref: 'pi_8', amountCents: 12345, serviceFeeCents: 400, acct: 'acct_1' }
+});
 const DESK_FEES = { entryFeeCents: 12345, collectByCard: true, allowCash: true };
 
 describe('E. M3: the Desk with fees', () => {
     function desk() { const sb = arriveOwner(individual({ fees: DESK_FEES })); fireRegistrations(sb, DESK_REGS); return sb; }
+    function deskC() { const sb = arriveOwner(individual({ fees: DESK_FEES })); fireRegistrations(sb, DESK_REGS_CONNECT); return sb; }
     test('E1 badges: Paid (Stripe) / Paid (cash) / Unpaid / Refunded / Refund pending / Disputed', () => {
         const sb = desk();
         assert.match(plain(rowOf(sb, 'e1')), /Paid \(Stripe\) \$123\.45/);
@@ -348,6 +418,10 @@ describe('E. M3: the Desk with fees', () => {
         assert.match(plain(rowOf(sb, 'e4')), /Refunded \$123\.45 · Nov 12/);
         assert.match(plain(rowOf(sb, 'e5')), /Refund pending/);
         assert.match(plain(rowOf(sb, 'e6')), /Disputed/);
+        // polish a (2026-11-14): what the golfer paid, with the split, when HardPan's fee was part of it
+        const sc = deskC();
+        assert.match(plain(rowOf(sc, 'e7')), /Paid \(Stripe\) \$127\.45 \(\$123\.45 \+ \$4 fee\)/);
+        assert.ok(!/\(\$123\.45 \+/.test(plain(rowOf(sc, 'e1'))), 'no split on a plain entry fee');
     });
     test('E2 a Stripe-paid entry has Refund and NO Undo, NO checkbox, NO Mark cash paid', () => {
         const r = rowOf(desk(), 'e1');
@@ -398,6 +472,28 @@ describe('E. M3: the Desk with fees', () => {
         assert.deepEqual(sb.__calls.map((c) => [c.name, c.data]), [['refundEntry', { code: 'OWN1', entryId: 'e1' }]]);
         assert.equal(sb.__dbWrites.length, before, 'refund is the server\'s write, not the page\'s');
         assert.match(plain(html(sb, 'refund-sheet-body')), /Also remove from the field\?/);
+        // polish a + c (2026-11-14): the whole amount and its split, the fee that really comes back,
+        // "Stripe keeps its own processing fee", never "HardPan absorbs it"; the second question is
+        // promised only for a golfer who is in the field (e7), and not for one who is not (e8), who
+        // gets "Refund started" with no question after the refund - the page's own rule.
+        const seven = deskC(); stubCallables(seven, { refundEntry: [{ ok: { status: 'pending' } }] });
+        tap(seven, rowOf(seven, 'e7'), byClass('reg-refund-btn'));
+        const s7 = plain(html(seven, 'refund-sheet-body'));
+        assert.match(s7, /Refund Ray Diaz \$127\.45\?/);
+        assert.match(s7, /\$127\.45 \(\$123\.45 entry \+ \$4\.00 HardPan fee returned\) goes back to the card they paid with/);
+        assert.match(s7, /Stripe keeps its own processing fee\./); assert.ok(!/absorbs/.test(s7), 'no "HardPan absorbs it"');
+        assert.match(s7, /You'll be asked next whether to take them out of the field\./, 'in the field: the question is promised');
+        assert.match(html(seven, 'refund-sheet-body'), /id="refund-confirm"[^>]*>Refund \$127\.45</);
+        const eight = deskC(); stubCallables(eight, { refundEntry: [{ ok: { status: 'pending' } }] });
+        tap(eight, rowOf(eight, 'e8'), byClass('reg-refund-btn'));
+        const s8 = plain(html(eight, 'refund-sheet-body'));
+        assert.match(s8, /Refund Kim Vo \$127\.45\?/); assert.ok(!/asked next/.test(s8), 'not in the field: no promise of a question that will not come');
+        tap(eight, html(eight, 'refund-sheet-body'), byId('refund-confirm')); await settle(); await settle();
+        assert.match(plain(html(eight, 'refund-sheet-body')), /Refund started/); assert.ok(!/Also remove from the field/.test(html(eight, 'refund-sheet-body')));
+        // polish d: the organizer help names the refund path
+        const helpTxt = fs.readFileSync(path.join(__dirname, 'help', 'run-a-tournament.html'), 'utf8');
+        assert.match(helpTxt, /Refund a card sign-up from the <b>Desk<\/b> and the golfer gets the whole amount back, HardPan&rsquo;s \$4 service fee included\. Stripe keeps its own processing fee\./);
+        assert.match(helpTxt, /tick <b>&ldquo;Refund the application fee&rdquo;<\/b>/);
     });
     test('E8 then "Remove from the field" is ONE owner write (withdrawn); "Keep in the field" writes nothing', async () => {
         const yes = desk(); stubCallables(yes, { refundEntry: [{ ok: { status: 'pending' } }] });

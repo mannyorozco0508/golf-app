@@ -3900,6 +3900,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         document.getElementById('setup-screen').style.display = 'none';
         document.getElementById('manage-screen').style.display = 'none';
         document.getElementById('register-screen').style.display = 'block';
+        // Polish b (Grok's Connect recheck 2026-11-14, run 2: back from Stripe the page showed a
+        // blank "Sign up" form and no result). The markup shows the sign-up form by default, and
+        // every line that hides it used to sit INSIDE the record read's handler - so a read that
+        // was slow or never answered left the default form on screen. Back from Checkout
+        // (?checkout=done|cancel&entry=ID) the result panel owns this screen from the first
+        // paint: the form is hidden here, before the read, and a return from a payment shows
+        // "Payment processing…" and listens for the paid status at once. The handler below
+        // re-renders the panel with the event's name when the record arrives, and drops this
+        // listener before it subscribes again (one listener per arrival).
+        const arriveQ = new URLSearchParams(window.location.search);
+        const arriveEntry = arriveQ.get('entry'), arriveMode = arriveQ.get('checkout');
+        if ((arriveMode === 'done' || arriveMode === 'cancel') && arriveEntry) {
+            document.getElementById('reg-form').style.display = 'none';
+            if (arriveMode === 'done') showCheckoutReturn(registerCode, arriveEntry, 'done');
+        }
         db.ref('tournaments/' + registerCode).once('value').then((snap) => {
             const data = snap.val();
             registerEvent = data;
@@ -3934,7 +3949,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 ].filter(Boolean).join(' \u2022 ');
             }
             const taking = !!data.ownerUid;
-            form.style.display = taking ? 'block' : 'none';
+            // Polish b: back from Checkout the form stays hidden (see the top of this function).
+            const backQ = new URLSearchParams(window.location.search);
+            const backFromCheckout = (backQ.get('checkout') === 'done' || backQ.get('checkout') === 'cancel') && !!backQ.get('entry');
+            form.style.display = (taking && !backFromCheckout) ? 'block' : 'none';
             closed.style.display = taking ? 'none' : 'block';
             if (!taking) {
                 closed.textContent = 'This event is not taking signups. Signups need an organizer account, and this event does not have one.';
@@ -4424,17 +4442,22 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // Only paid === true AND paidVia === 'stripe' is Paid. The webhook writes
     // both in one update; anything else keeps the page waiting.
     function entryIsCardPaid(rec) { return !!(rec && rec.paid === true && rec.paidVia === 'stripe'); }
+    var checkoutStatusRef = null, checkoutStatusCb = null;
     function showCheckoutReturn(code, entryId, mode) {
         if (mode === 'cancel') { showRegisteredUnpaid(code, entryId, '', ''); return; }
         showProcessingPanel('');
         // registrationStatus, not registrations: the golfer is signed out and
         // registrations/<code> is owner-only. The webhook writes this mirror in
         // the same update as the entry (STRIPE-CONTRACT.md Addendum 2026-11-08).
+        // ONE listener per arrival (polish b): a re-run drops the earlier one first.
+        if (checkoutStatusRef && checkoutStatusCb) { try { checkoutStatusRef.off('value', checkoutStatusCb); } catch (e) { /* stub */ } }
         const ref = db.ref(`registrationStatus/${code}/${entryId}`);
-        ref.on('value', (snap) => {
+        checkoutStatusRef = ref;
+        checkoutStatusCb = (snap) => {
             const rec = snap && snap.val ? snap.val() : null;
             if (entryIsCardPaid(rec)) { try { ref.off('value'); } catch (e) { /* stub */ } showPaidPanel(rec); }
-        }, () => {
+        };
+        ref.on('value', checkoutStatusCb, () => {
             // The read was refused (rules not published yet, or offline).
             // Said plainly, rather than a page that waits forever.
             showProcessingPanel("This page can't check the payment from here, so it can't turn Paid by itself. Stripe emails your receipt when the payment goes through, and the organizer sees Paid on their desk.");
@@ -4469,7 +4492,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function payBadgeHtml(e) {
         const st = payState(e);
         const amt = Number.isInteger(e.amountCents) ? ' ' + centsShort(e.amountCents) : '';
-        if (st === 'stripe') return `<span class="reg-state reg-state-stripe">Paid (Stripe)${amt}</span>`;
+        // Polish a (2026-11-14): the figure the golfer paid, with the split when HardPan's fee was part of it.
+        const fee = refundFeeCents(e);
+        const paidAmt = Number.isInteger(e.amountCents) ? ' ' + centsShort(e.amountCents + fee) + (fee ? ' (' + centsShort(e.amountCents) + ' + ' + centsShort(fee) + ' fee)' : '') : '';
+        if (st === 'stripe') return `<span class="reg-state reg-state-stripe">Paid (Stripe)${paidAmt}</span>`;
         if (st === 'cash') return `<span class="reg-state reg-state-cash">Paid (cash)</span>`;
         if (st === 'refunded') {
             const r = Number.isInteger(e.refundCents) ? ' ' + centsShort(e.refundCents) : '';
@@ -4566,10 +4592,19 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (sheet) sheet.classList.remove('open');
         refundSheetEntry = null;
     }
+    // What the golfer PAID: the entry fee plus HardPan's service fee when there was one
+    // (a connected organizer's sign-up). The refund returns both (refund_application_fee
+    // on the server), so the dialog and the Desk row say the whole figure and the split.
     function refundAmountCents(e) {
-        if (e && Number.isInteger(e.amountCents)) return e.amountCents;
-        const f = feesOf(currentData);
-        return (f && f.cents) || 0;
+        const entry = (e && Number.isInteger(e.amountCents)) ? e.amountCents : (((feesOf(currentData) || {}).cents) || 0);
+        return entry + refundFeeCents(e);
+    }
+    function refundFeeCents(e) { return (e && Number.isInteger(e.serviceFeeCents) && e.serviceFeeCents > 0) ? e.serviceFeeCents : 0; }
+    function refundSplitText(e) {
+        const fee = refundFeeCents(e);
+        if (!fee) return '';
+        const entry = refundAmountCents(e) - fee;
+        return ' (' + centsText(entry) + ' entry + ' + centsText(fee) + ' HardPan fee returned)';
     }
     function openRefundSheet(entryId) {
         if (!currentCode || !canManage()) return;
@@ -4578,9 +4613,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         refundSheetEntry = entryId;
         const who = escReg(String(e.fullName || e.name || 'this golfer').trim());
         const amt = centsText(refundAmountCents(e));
+        // Polish a + c (Grok's recheck 2026-11-14): the whole amount with its split, the fee that
+        // really comes back, and the second question promised only when there IS a field to leave.
+        const next = regInField(e) ? " You'll be asked next whether to take them out of the field." : '';
         refundSheet(
             `<h3 id="refund-sheet-title">Refund ${who} ${amt}?</h3>`
-            + `<p>Back to the card they paid with, usually in 5-10 days. Stripe keeps its fee; HardPan absorbs it. You'll be asked next whether to take them out of the field.</p>`
+            + `<p>${centsText(refundAmountCents(e))}${escReg(refundSplitText(e))} goes back to the card they paid with, usually in 5-10 days. Stripe keeps its own processing fee.${next}</p>`
             + `<p class="checkout-error" id="refund-sheet-error" style="display:none;"></p>`
             + `<button class="btn-danger" id="refund-confirm" onclick="confirmRefund()">Refund ${amt}</button>`
             + `<button class="btn-soft" onclick="closeRefundSheet()">Keep</button>`);

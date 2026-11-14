@@ -42,6 +42,7 @@ function makeStubSandbox() {
     const documentStub = createDocument();
     const elementRegistry = documentStub.__registry;
     const captured = [];
+    const offs = [];
     const writes = [];
     // firebase.auth(). A page that asks for auth at load must find something,
     // and the vendored SDK is skipped (VENDOR_SKIP). Since 2026-09-15 what it
@@ -91,6 +92,12 @@ function makeStubSandbox() {
                 on(ev, cb) {
                     if (typeof cb === 'function') captured.push({ path: p, event: ev, cb: cb });
                 },
+                // off() is RECORDED, not applied (2026-11-14, Connect polish b): 85 files
+                // read __dbHandlers as "what the page registered", and pruning here would
+                // move 128 counts. sandbox.__dbOffs holds { path, event, cb } per call, cb
+                // null when the page dropped every handler on the path; a test that asks
+                // how many listeners are LIVE subtracts the offs from the ons itself.
+                off(ev, cb) { offs.push({ path: p, event: ev, cb: typeof cb === 'function' ? cb : null }); },
                 // A read answers from sandbox.__dbReads[path] when a test set one
                 // (organizer-gate reads organizers/<uid> back after a refusal), null otherwise.
                 once() { const v = (sandbox.__dbReads && Object.prototype.hasOwnProperty.call(sandbox.__dbReads, p)) ? sandbox.__dbReads[p] : null; return Promise.resolve({ val() { return v; }, exists() { return v !== null; } }); },
@@ -149,7 +156,8 @@ function makeStubSandbox() {
         Set: Set, Map: Map,
         __elementRegistry: elementRegistry, // exposed so tests can inspect rendered output directly
         __dbHandlers: captured,             // the value handlers the page registered
-        __dbWrites: writes,                 // every set/update/remove the page made, in order
+        __dbOffs: offs,                     // every off() the page called ({ path, event, cb|null }), in order
+        __dbWrites: writes,                // every set/update/remove the page made, in order
         __auth: { setUser(u) { authState.user = u; authListeners.forEach((cb) => cb(u)); }, listeners: authListeners },
         // window.addEventListener, as a no-op. No page calls it at top level (grep:
         // 0 uses across the ten pages), so nothing that ran before now runs
