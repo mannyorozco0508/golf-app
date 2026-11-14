@@ -20,6 +20,7 @@
     <script src="payouts.js"></script>
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <script src="event-columns.js"></script>
     <script src="./qrcode.min.js"></script>
     <style>
         :root { --bg: #0b1d16; --panel: #10281f; --line: rgba(255,255,255,.12); --ink: #ffffff; --mute: #a9c2b6; --lime: #d4f28a; --red: #ff6b6b; --live: #c0392b; }
@@ -46,7 +47,13 @@
         .row .nm2 { display: block; font-size: 1.9vh; color: var(--mute); font-weight: 500; line-height: 1.15; margin-top: .2vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .row .th { text-align: center; color: var(--mute); }
         .row .tp { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
-        .row .tp.under { color: var(--lime); } .row .tp.over { color: var(--red); }
+        /* UNDER PAR IS RED, nothing else is coloured (Manny 2026-11-14: "red means under par and
+           just keep everything else as the same color - white number with the green background"). */
+        .row .tp.under { color: var(--red); }
+        /* THE EVENT PAGES (MR-FINAL): a column a round, a total, to par. --rn is the round count. */
+        .row.ev { grid-template-columns: minmax(44px, 6vw) minmax(0, 1fr) repeat(var(--rn, 2), minmax(64px, 8vw)) minmax(64px, 8vw) minmax(64px, 12vw); }
+        .row .rd, .row .tot { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .row .rd small { display: block; font-size: .5em; color: var(--mute); font-weight: 600; line-height: 1; }
         .empty { color: var(--mute); font-size: 3vh; padding: 4vh 1vw; }
         /* The QR lives in the footer's right end (the table has the whole width). */
         .ftq { display: flex; align-items: center; gap: 1vw; }
@@ -154,7 +161,7 @@
         const selections = [];
         if (multi) {
             const ev = resolveLeaderboardView(d, 'event', null);
-            if (ev.available) selections.push({ sel: 'event', title: ev.title || 'Event total' });
+            if (ev.available) selections.push({ sel: 'event', title: (ev.title || 'Event total') + ' \u00b7 ' + (typeof aggregateFamily === 'function' && aggregateFamily(d) === 'individual:net' ? 'Net' : 'Gross') });
             else Object.keys(d.rounds || {}).forEach((rid) => selections.push({ sel: rid, title: (d.rounds[rid] && d.rounds[rid].name) || 'Round' }));
         } else selections.push({ sel: null, title: '' });
         selections.forEach(({ sel, title }) => {
@@ -163,7 +170,7 @@
                 const v = resolveLeaderboardView(d, sel, fid);
                 const rows = v.available ? v.rows : [];
                 const label = [title, name].filter(Boolean).join(' · ');
-                if (!rows.length) { out.push({ kind: 'board', label: label || 'Leaderboard', display: label || 'Leaderboard', rows: [], thruHead: v.kind === 'event' ? 'Rds' : 'Thru', note: v.available ? 'No scores yet.' : (v.reason || '') }); return; }
+                if (!rows.length) { out.push({ kind: 'board', label: label || 'Leaderboard', display: label || 'Leaderboard', rows: [], thruHead: v.kind === 'event' ? 'Rds' : 'Thru', cols: v.kind === 'event' && typeof eventRoundColumns === 'function' ? eventRoundColumns(d) : null, note: v.available ? 'No scores yet.' : (v.reason || '') }); return; }
                 // EIGHT ROWS A PAGE: ten with the names line under each team ran
                 // 117 px past the footer at 720p (measured); eight fit with room.
                 for (let i = 0; i < rows.length; i += PAGE_ROWS) {
@@ -172,7 +179,7 @@
                     // (#12) the page's name in the footer: the flight (and its range
                     // when it runs past ten), or the range alone when there are no flights.
                     const display = label ? (rows.length > PAGE_ROWS ? label + ' \u00b7 ' + range : label) : range;
-                    out.push({ kind: 'board', key: label + '#' + i, label: label || 'Leaderboard', display, rows: chunk, from: i + 1, to: i + chunk.length, of: rows.length, thruHead: v.kind === 'event' ? 'Rds' : 'Thru' });
+                    out.push({ kind: 'board', key: label + '#' + i, label: label || 'Leaderboard', display, rows: chunk, from: i + 1, to: i + chunk.length, of: rows.length, thruHead: v.kind === 'event' ? 'Rds' : 'Thru', cols: v.kind === 'event' && typeof eventRoundColumns === 'function' ? eventRoundColumns(d) : null });
                 }
             });
         });
@@ -253,12 +260,25 @@
             let h = '<div class="ttl"><span class="n">' + esc(p.label) + '</span><span>' + (p.of ? p.from + '–' + p.to + ' of ' + p.of : '') + '</span></div>';
             if (!p.rows.length) h += '<div class="empty">' + esc(p.note || 'No scores yet.') + '</div>';
             else {
-                h += '<div class="row h"><span class="pos">Pos</span><span class="nm">' + esc(typeof entryColumnLabel === 'function' ? entryColumnLabel(data) : 'Team') + '</span><span class="th">' + esc(p.thruHead) + '</span><span class="tp">To par</span></div>';
+                const cols = p.cols && p.cols.columns && p.cols.columns.length ? p.cols : null;
+                const ev = cols ? ' ev" style="--rn:' + cols.columns.length : '';
+                const entryHead = esc(typeof entryColumnLabel === 'function' ? entryColumnLabel(data) : 'Team');
+                // THE EVENT PAGE (MR-FINAL, Manny 2026-11-14): R1 / R2 / Tot replace the Rds
+                // count; a round in play shows "thru N" under its score. Round pages unchanged.
+                if (cols) h += '<div class="row h' + ev + '"><span class="pos">Pos</span><span class="nm">' + entryHead + '</span>' + cols.columns.map((c) => '<span class="rd">' + esc(c.short) + '</span>').join('') + '<span class="tot">Tot</span><span class="tp">To par</span></div>';
+                else h += '<div class="row h"><span class="pos">Pos</span><span class="nm">' + entryHead + '</span><span class="th">' + esc(p.thruHead) + '</span><span class="tp">To par</span></div>';
                 p.rows.forEach((r) => {
                     const tie = (r.rank && rc[r.rank] > 1) ? '<small> tied</small>' : '';
-                    const thru = p.thruHead === 'Rds' ? (r.hasScores ? r.roundsComplete + '/' + r.countableRounds : '-') : (r.hasScores ? r.thru : '-');
                     const who = teamNames(r);
-                    h += '<div class="row' + (r.rank === 1 ? ' lead' : '') + '"><span class="pos">' + esc(r.rank || '-') + '</span><span class="nm"><span class="nm1">' + esc(r.teamName || r.name || '') + tie + '</span>' + (who ? '<span class="nm2">' + esc(who) + '</span>' : '') + '</span><span class="th">' + esc(thru) + '</span><span class="tp ' + toParClass(r) + '">' + esc(toParText(r)) + '</span></div>';
+                    const name = '<span class="nm"><span class="nm1">' + esc(r.teamName || r.name || '') + tie + '</span>' + (who ? '<span class="nm2">' + esc(who) + '</span>' : '') + '</span>';
+                    if (cols) {
+                        const mine = cols.byPlayer[r.entryKey] || {};
+                        const cells = cols.columns.map((c) => { const x = mine[c.rid]; return '<span class="rd">' + (x && x.hasScores ? esc(x.strokes) + (x.complete ? '' : '<small>thru ' + esc(x.thru) + '</small>') : '\u2013') + '</span>'; }).join('');
+                        h += '<div class="row' + (r.rank === 1 ? ' lead' : '') + ev + '"><span class="pos">' + esc(r.rank || '-') + '</span>' + name + cells + '<span class="tot">' + (r.hasScores ? esc(r.strokes) : '\u2013') + '</span><span class="tp ' + toParClass(r) + '">' + esc(toParText(r)) + '</span></div>';
+                    } else {
+                        const thru = p.thruHead === 'Rds' ? (r.hasScores ? r.roundsComplete + '/' + r.countableRounds : '-') : (r.hasScores ? r.thru : '-');
+                        h += '<div class="row' + (r.rank === 1 ? ' lead' : '') + '"><span class="pos">' + esc(r.rank || '-') + '</span>' + name + '<span class="th">' + esc(thru) + '</span><span class="tp ' + toParClass(r) + '">' + esc(toParText(r)) + '</span></div>';
+                    }
                 });
             }
             board.innerHTML = h;

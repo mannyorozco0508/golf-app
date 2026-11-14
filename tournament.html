@@ -63,6 +63,7 @@
          Approve button copies it into the field that every page renders. -->
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <script src="event-columns.js"></script>
     <script src="site-pricing.js"></script>   <!-- 58A: the offer preview's renewal price + fallback founding flag -->
     <!-- E2: contest holes - the ranking and labels the golfer's card uses too. -->
     <script src="tournament-contests.js"></script>
@@ -397,6 +398,49 @@
         .lb-thru { width: 56px; text-align: center; color: var(--text-muted); font-size: 0.78rem; }
         .lb-score { width: 60px; text-align: right; font-weight: bold; }
         .lb-row.leader { background: #fff8e1; }
+        /* UNDER PAR IS RED and nothing else is coloured (Manny 2026-11-14: "red means
+           under par and just keep everything else as the same color"). */
+        .lb-score.under { color: var(--accent-red); }
+        /* THE EVENT BOARD (MR-FINAL, 2026-11-14): one column a round, a total, to par. */
+        .lb-rnd { width: 44px; text-align: right; font-weight: bold; font-variant-numeric: tabular-nums; }
+        .lb-rnd small { display: block; font-size: 0.6rem; color: var(--text-muted); font-weight: normal; line-height: 1.1; }
+        .lb-tot { width: 44px; text-align: right; font-weight: bold; font-variant-numeric: tabular-nums; }
+        .lb-caret { width: 14px; text-align: right; color: var(--text-muted); font-size: 0.7rem; }
+        .lb-row.lb-event { cursor: pointer; }
+        .lb-row.lb-event.open { background: #fffbe6; }
+        .lb-expand { padding: 8px 6px 10px; border-bottom: 1px solid var(--border-faint); background: #fafbfa; font-size: 0.78rem; }
+        .lb-expand .rh { font-weight: bold; margin: 6px 0 4px; }
+        .lb-expand .rh small { font-weight: normal; color: var(--text-muted); margin-left: 6px; }
+        .lb-expand .rh .under { color: var(--accent-red); }
+        .lb-holes { display: grid; grid-template-columns: 40px repeat(9, 1fr) 34px; align-items: center; font-size: 0.7rem; margin-bottom: 4px; }
+        .lb-holes .k { color: var(--text-muted); font-size: 0.6rem; text-transform: uppercase; }
+        .lb-holes .h, .lb-holes .p { text-align: center; color: var(--text-muted); }
+        .lb-holes .s { text-align: center; }
+        .lb-holes .t { text-align: right; font-weight: bold; }
+        /* Rings, the live card's own style: a circle under par, a square over, the
+           number in its normal colour. */
+        .lb-expand i { display: inline-grid; place-items: center; width: 22px; height: 22px; font-style: normal; font-weight: bold; }
+        .lb-expand i.mark-birdie { box-shadow: inset 0 0 0 2px #c1121f; border-radius: 50%; }
+        .lb-expand i.mark-eagle { box-shadow: inset 0 0 0 2px #c1121f, inset 0 0 0 4px #fafbfa, inset 0 0 0 6px #c1121f; border-radius: 50%; }
+        .lb-expand i.mark-bogey { box-shadow: inset 0 0 0 2px #1f2a24; }
+        .lb-expand i.mark-double { box-shadow: inset 0 0 0 2px #1f2a24, inset 0 0 0 4px #fafbfa, inset 0 0 0 6px #1f2a24; }
+        .lb-key { font-size: 0.66rem; color: var(--text-muted); margin-top: 6px; }
+        .lb-key i { width: 14px; height: 14px; vertical-align: middle; margin-right: 2px; }
+        .lb-basis { display: flex; justify-content: center; margin: 0 0 6px; }
+        .lb-basis button { font-size: 0.8rem; padding: 6px 16px; border: 1px solid var(--brand-green); background: transparent; color: var(--brand-green); cursor: pointer; }
+        .lb-basis button:first-child { border-radius: 14px 0 0 14px; }
+        .lb-basis button:last-child { border-radius: 0 14px 14px 0; border-left: 0; }
+        .lb-basis button.active { background: var(--brand-green); color: #fff; }
+        .lb-basis button:disabled { opacity: .5; cursor: default; }
+        .lb-basis-note { font-size: 0.72rem; color: var(--text-muted); text-align: center; margin: 0 0 10px; }
+        .rounds-card { border: 1px solid var(--border-faint); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px; font-size: 0.8rem; }
+        .rounds-card .rc-head { font-weight: bold; margin-bottom: 6px; }
+        .rounds-card .rc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; margin-bottom: 8px; }
+        .rounds-card .rc-tile { border: 1px solid var(--border-faint); border-radius: 8px; padding: 6px 8px; font-size: 0.76rem; }
+        .rounds-card .rc-tile b { display: block; font-size: 0.82rem; }
+        .rounds-card .rc-tile .st { color: var(--text-muted); }
+        .rounds-card .rc-line { color: var(--text-muted); margin-top: 3px; }
+        .rounds-card .rc-line b { color: var(--text-dark, inherit); }
 
         .room-badge { display: inline-block; background: var(--brand-navy); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 1.15rem; font-weight: bold; letter-spacing: 1px; margin-bottom: 14px; }
         .section-divider { border: 0; border-top: 1px dashed var(--border-mid); margin: 20px 0; }
@@ -1155,6 +1199,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <h3>📅 Rounds</h3>
             <p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Each round has its own course, format and scores. Setup means nobody can enter scores yet; Open means scoring is live; Closed means the result is final.</p>
             <button class="btn-outline" onclick="createRound()">+ Add Round</button>
+            <!-- MR-FINAL (Manny 2026-11-14): the rounds as a schedule, above the editable list. -->
+            <div id="rounds-card"></div>
             <div id="rounds-list"></div>
             <div id="round-editor"></div>
         </div>
@@ -1327,6 +1373,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div id="lb-no-owner-note" style="display:none; font-size:0.8rem; color:var(--text-muted); text-align:center; margin-bottom:10px; padding:10px; border:1px dashed var(--border-faint); border-radius:8px;">This event has no organizer account, so its setup can't be changed. Scores still save.</div>
         <div id="lb-combined-note" style="display:none; font-size:0.8rem; color:var(--text-muted); text-align:center; margin-bottom:10px; padding:10px; border:1px dashed var(--border-faint); border-radius:8px;"></div>
         <div id="lb-flight-filter" style="display:none; text-align:center; margin-bottom:12px;"></div>
+        <!-- MR-FINAL (Manny 2026-11-14): Gross | Net above the combined board. -->
+        <div id="lb-basis" class="lb-basis" style="display:none;"></div>
+        <div id="lb-basis-note" class="lb-basis-note" style="display:none;"></div>
         <div id="leaderboard-list"></div>
 
         <!-- THE WATCH LINK (Wave 1, A3). The board itself, for family and the
@@ -6306,6 +6355,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // itself: the saved basis, never the tab, never a flight. It is rendered
         // on every board, including a refused one, so the board tab can never
         // leave the prize list stale either.
+        renderLeaderboardBasis(view);
         if (!view.available) {
             // A REFUSAL IS NOT AN ERROR. The organizer gets the sentence, and
             // every round leaderboard still works beside it.
@@ -6316,6 +6366,28 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderLeaderboardRows(container, view.rows, view.kind);
         }
         renderPayoutSpotInputs();
+    }
+
+    // GROSS | NET ABOVE THE COMBINED BOARD (MR-FINAL + A's switch, Manny 2026-11-14).
+    // The half the engine already plays is active; the other half is disabled with
+    // the sentence, because a Net view of a GROSS combined board needs per-hole
+    // stroke allocation inside the engine (protected, proposed separately), and a
+    // Gross view of a NET one would be a second scoring the rounds did not run.
+    // A round chip hides the switch: the round scores the way its own setting says.
+    function renderLeaderboardBasis(view) {
+        const el = document.getElementById('lb-basis'), note = document.getElementById('lb-basis-note');
+        if (!el || !note) return;
+        if (!view || view.kind !== 'event' || !view.available) {
+            el.style.display = 'none'; el.innerHTML = ''; note.style.display = 'none'; note.textContent = ''; return;
+        }
+        const net = aggregateFamily(currentData) === 'individual:net';
+        const seg = (label, on) => `<button type="button" class="${on ? 'active' : ''}" aria-pressed="${on}" ${on ? '' : 'disabled'}>${label}</button>`;
+        el.style.display = 'flex';
+        el.innerHTML = seg('Gross', !net) + seg('Net', net);
+        note.style.display = 'block';
+        note.textContent = net
+            ? 'Net across the rounds, as each round is scored. A gross view of this board is not available yet.'
+            : 'Gross across the rounds. Net on the combined board is not available yet.';
     }
 
     // ONE ROW RENDERER for every board. A round, a flight and the combined standings
@@ -6330,35 +6402,95 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 : `<div style="text-align:center; color:var(--text-muted); padding:20px;">No scores yet.</div>`;
             return;
         }
-        const thruHead = kind === 'event' ? 'Rds' : 'Thru';
-        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span><span class="lb-thru">${thruHead}</span><span class="lb-score">To Par</span>
-        </div>`;
         const rankCounts = {};
         rows.forEach(r => { if (r.rank) rankCounts[r.rank] = (rankCounts[r.rank] || 0) + 1; });
+        const toParText = (r) => !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
+        // UNDER PAR IS RED and nothing else is coloured (Manny 2026-11-14): the
+        // class is added only below par; E and over par keep the row's own colour.
+        const toParClass = (r) => (r.hasScores && r.toPar < 0) ? 'lb-score under' : 'lb-score';
+        // ONE DEFINITION OF "TIED" (and of "pending") for every board: built here,
+        // handed to the event renderer, never written twice.
+        const tieTagOf = (r) => (r.rank && rankCounts[r.rank] > 1) ? '<span class="tie-tag">(tied)</span>' : '';
+        const pendingTagOf = (r) => r.netPending ? `<span class="tie-tag" style="color:var(--text-muted);">(${HANDICAP_PENDING_TEXT})</span>` : '';
+        if (kind === 'event') { renderEventBoardRows(container, rows, { tieTagOf, pendingTagOf, toParText, toParClass }); return; }
+        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
+        </div>`;
         rows.forEach(r => {
-            const toParStr = !r.hasScores ? '—' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : r.toPar));
-            const tieTag = (r.rank && rankCounts[r.rank] > 1) ? '<span class="tie-tag">(tied)</span>' : '';
-            // AN INCOMPLETE EVENT ENTRY IS MARKED, not hidden and not silently ranked
-            // as though it were finished - a golfer who has played one of two rounds
-            // is behind, and the board should say why.
-            const partial = (kind === 'event' && r.hasScores && !r.completedAll)
-                ? '<span class="tie-tag" style="color:var(--text-muted);">(incomplete)</span>' : '';
             // UNRANKED WITH A REASON. A bare dash beside a golfer who has posted
-            // eighteen holes reads as a bug; this says it is waiting on a number.
-            const pendingTag = r.netPending
-                ? `<span class="tie-tag" style="color:var(--text-muted);">(${HANDICAP_PENDING_TEXT})</span>` : '';
-            const thru = kind === 'event'
-                ? (r.hasScores ? `${r.roundsComplete}/${r.countableRounds}` : '-')
-                : (r.hasScores ? r.thru : '-');
+            // eighteen holes reads as a bug; the pending tag says it is waiting on a number.
             html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''}">
                 <span class="lb-pos">${r.rank || '-'}</span>
-                <span class="lb-team">${escapeHtml(r.teamName)}${tieTag}${partial}${pendingTag}</span>
-                <span class="lb-thru">${thru}</span>
-                <span class="lb-score">${toParStr}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${tieTagOf(r)}${pendingTagOf(r)}</span>
+                <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
+                <span class="${toParClass(r)}">${toParText(r)}</span>
             </div>`;
         });
         container.innerHTML = html;
+    }
+
+    // THE EVENT BOARD (MR-FINAL, Manny 2026-11-14): one column a round, the total
+    // so far, to par. A round in play reads "thru N" under its score where the old
+    // board said "(incomplete)" beside the name and counted rounds in an Rds column.
+    // The ORDER is the engine's and unchanged: completed rounds first, then to par
+    // (computeEventStandings); only what a row shows changed. The per-round numbers
+    // come from eventRoundColumns(), which asks the engine for each round's own
+    // board, so a column shows exactly what that round's card showed.
+    // Tap a row to open both rounds' hole-by-hole cards under it; tap again to close.
+    let lbOpenKey = null;
+    function toggleLeaderboardEntry(key) { lbOpenKey = lbOpenKey === key ? null : key; renderLeaderboard(); }
+    function renderEventBoardRows(container, rows, fmt) {
+        const { tieTagOf, pendingTagOf, toParText, toParClass } = fmt;
+        const cols = eventRoundColumns(currentData);
+        const rc = cols.columns;
+        let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
+            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span>${rc.map(c => `<span class="lb-rnd" title="${escapeHtml(c.name)}">${c.short}</span>`).join('')}<span class="lb-tot">Tot</span><span class="lb-score">To Par</span><span class="lb-caret"></span>
+        </div>`;
+        rows.forEach(r => {
+            const mine = cols.byPlayer[r.entryKey] || {};
+            const cells = rc.map(c => {
+                const x = mine[c.rid];
+                if (!x || !x.hasScores) return '<span class="lb-rnd">–</span>';
+                return `<span class="lb-rnd">${x.strokes}${x.complete ? '' : `<small>thru ${x.thru}</small>`}</span>`;
+            }).join('');
+            const open = lbOpenKey === r.entryKey;
+            html += `<div class="lb-row lb-event ${r.rank === 1 ? 'leader' : ''} ${open ? 'open' : ''}" data-entry="${escapeHtml(r.entryKey)}" onclick="toggleLeaderboardEntry(this.dataset.entry)">
+                <span class="lb-pos">${r.rank || '-'}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${tieTagOf(r)}${pendingTagOf(r)}</span>${cells}<span class="lb-tot">${r.hasScores ? r.strokes : '–'}</span>
+                <span class="${toParClass(r)}">${toParText(r)}</span><span class="lb-caret">${open ? '▾' : '▸'}</span>
+            </div>`;
+            if (open) html += renderEventEntryCards(r, rc);
+        });
+        container.innerHTML = html;
+    }
+
+    // BOTH ROUNDS' CARDS under an opened row: hole, par, score with the ring the
+    // live card draws (circle under par, square over; the number keeps its colour).
+    function renderEventEntryCards(r, rc) {
+        const players = currentData.players || {};
+        const hcp = players[r.entryKey] ? players[r.entryKey].handicap : null;
+        let html = '<div class="lb-expand">';
+        rc.forEach(c => {
+            const card = playerRoundHoles(currentData, c.rid, r.entryKey);
+            const played = card.thru;
+            const parPlayed = card.holes.filter(h => h.score > 0).reduce((a, h) => a + h.par, 0);
+            const tp = card.total - parPlayed;
+            const tpText = tp === 0 ? 'E' : (tp > 0 ? `+${tp}` : String(tp));
+            const state = !played ? 'not started' : (played === card.holes.length ? 'complete' : `thru ${played}`);
+            const where = c.courseName && c.courseName !== c.name ? ` · ${escapeHtml(c.courseName)}` : '';
+            html += `<div class="rh">${escapeHtml(c.name)}${where} · ${played ? card.total : '–'}${played ? ` <span class="${tp < 0 ? 'under' : ''}">(${tpText})</span>` : ''}<small>${state}${hcp !== null && hcp !== undefined && hcp !== '' ? ` · handicap ${escapeHtml(String(hcp))}` : ''}</small></div>`;
+            html += lbHolesGrid(card.holes.slice(0, 9), 'Out', card.out, card.parOut);
+            if (card.holes.length > 9) html += lbHolesGrid(card.holes.slice(9, 18), 'In', card.inn, card.parIn);
+        });
+        html += '<div class="lb-key"><i class="mark-birdie"></i> birdie &nbsp; <i class="mark-eagle"></i> eagle &nbsp; <i class="mark-bogey"></i> bogey &nbsp; <i class="mark-double"></i> double or worse</div></div>';
+        return html;
+    }
+    function lbHolesGrid(holes, label, total, parTotal) {
+        if (!holes.length) return '';
+        const played = holes.some(h => h.score > 0);
+        return `<div class="lb-holes"><span class="k">Hole</span>${holes.map(h => `<span class="h">${h.hole}</span>`).join('')}<span class="k t">${label}</span>`
+            + `<span class="k">Par</span>${holes.map(h => `<span class="p">${h.par || ''}</span>`).join('')}<span class="p t">${parTotal || ''}</span>`
+            + `<span class="k">Score</span>${holes.map(h => `<span class="s"><i class="${h.mark}">${h.score || '–'}</i></span>`).join('')}<span class="t">${played ? total : '–'}</span></div>`;
     }
 
     // THE PRIZE AMOUNTS ARE SAVED (Wave 1, A4). They lived only in the DOM, so
@@ -6715,10 +6847,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (ids.length === 0) {
             listEl.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No rounds yet.</p>`;
             document.getElementById('round-editor').innerHTML = '';
+            renderRoundsCard(ids);
             return;
         }
 
         const label = { setup: '⚙️ Setup', open: '🟢 Open', closed: '🔒 Closed' };
+        renderRoundsCard(ids);
         listEl.innerHTML = ids.map((rid, i) => {
             const r = rounds[rid];
             const st = roundStatus(r);
@@ -6743,6 +6877,51 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }).join('');
 
         renderRoundEditor();
+    }
+
+    // THE ROUNDS CARD (MR-FINAL, Manny 2026-11-14): the same rounds as the list
+    // below, read as a schedule - each round's course, format, scoring and state,
+    // what the Board shows, the flights, and what prizes go by. It renders only;
+    // every edit still happens in the list and the prize controls.
+    function renderRoundsCard(ids) {
+        const card = document.getElementById('rounds-card');
+        if (!card) return;
+        if (!ids.length) { card.innerHTML = ''; return; }
+        const rounds = currentData.rounds || {};
+        const cols = eventRoundColumns(currentData);
+        const players = currentData.players || {};
+        const field = Object.keys(players).length;
+        const tiles = ids.map((rid) => {
+            const r = rounds[rid] || {};
+            const st = roundStatus(r);
+            const holes = (r.courseData || []).length;
+            const done = Object.keys(cols.byPlayer).filter((pid) => cols.byPlayer[pid][rid] && cols.byPlayer[pid][rid].complete).length;
+            const scored = Object.keys(cols.byPlayer).filter((pid) => cols.byPlayer[pid][rid] && cols.byPlayer[pid][rid].hasScores).length;
+            const state = st === 'closed' ? `✓ Closed · ${done} of ${field} cards`
+                : st === 'open' ? (scored ? `● Open · in play, ${scored} of ${field} scoring` : '● Open · no scores yet')
+                : '⚙ Setup · not open yet';
+            const scoring = r.format === 'individual' ? (netIsInPlay(r) ? 'Net' : 'Gross') : '';
+            return `<div class="rc-tile"><b>${escapeHtml(r.name || 'Round')}</b>${escapeHtml(r.courseName || 'No course set')}${holes ? ` · ${holes} holes` : ''}<br>${formatLabelFor(r.format)}${scoring ? ' · ' + scoring : ''}<br><span class="st">${state}</span></div>`;
+        }).join('');
+        const avail = aggregateAvailability(currentData);
+        const fam = aggregateFamily(currentData);
+        const board = avail.available
+            ? `Event total · ${cols.columns.map((c) => c.short).join(' · ')} · Tot · ${fam === 'individual:net' ? 'Net' : 'Gross'}${fam === 'individual:net' ? '' : ' (Net on the combined board is not available yet)'}`
+            : avail.reason;
+        const flights = currentData.flights || {};
+        const fids = Object.keys(flights).sort((a, b) => (flights[a].createdAt || 0) - (flights[b].createdAt || 0));
+        const flightLine = fids.length
+            ? fids.map((f) => `${escapeHtml(flights[f].name || 'Flight')} (${Object.keys(players).filter((p) => players[p].flightId === f).length})`).join(' · ')
+            : 'none';
+        const basis = currentData.payoutBasis && rounds[currentData.payoutBasis] ? (rounds[currentData.payoutBasis].name || 'Round') : 'Event total';
+        const totalHoles = ids.reduce((a, rid) => a + ((rounds[rid] || {}).courseData || []).length, 0);
+        card.innerHTML = `<div class="rounds-card">
+            <div class="rc-head">${ids.length} round${ids.length === 1 ? '' : 's'}${totalHoles ? ` · ${totalHoles} holes` : ''} · each round has its own course</div>
+            <div class="rc-tiles">${tiles}</div>
+            <div class="rc-line"><b>Board shows</b> ${escapeHtml(board)}</div>
+            <div class="rc-line"><b>Flights</b> ${flightLine}</div>
+            <div class="rc-line"><b>Prizes go by</b> ${escapeHtml(basis)} · trophies and pro shop credit</div>
+        </div>`;
     }
 
     // A ROUND'S SETTINGS ARE LOCKED ONCE IT OPENS. Changing the course or the format
