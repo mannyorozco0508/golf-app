@@ -11,7 +11,10 @@
          type, one flight a page, paging on its own; the last page thanks the
          sponsors when the organizer has added any; a QR in the corner follows
          the event on a phone. Nothing here writes to the database.
-         ?every=N sets the seconds a page stays (3..60, default 10). -->
+         ?every=N sets the seconds a page stays (3..60, default 10).
+         PO (2026-11-14): once the organizer posts results, the first page is
+         RESULTS - places per flight, skins, KPs and long drive, card by card -
+         read from tournaments/<code>/prizeResults through tournament-prizes.js. -->
     <link rel="icon" href="tournament-icon-192.png" type="image/png">
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
@@ -20,6 +23,9 @@
     <script src="payouts.js"></script>
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <!-- PO (2026-11-14): the posted prize results, read with the same builder as the recap. -->
+    <script src="skins.js"></script>
+    <script src="tournament-prizes.js"></script>
     <script src="./qrcode.min.js"></script>
     <style>
         :root { --bg: #0b1d16; --panel: #10281f; --line: rgba(255,255,255,.12); --ink: #ffffff; --mute: #a9c2b6; --lime: #d4f28a; --red: #ff6b6b; --live: #c0392b; }
@@ -96,6 +102,25 @@
         .sp .hs small { display: block; font-size: .6em; color: var(--mute); font-weight: 600; }
         .err { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 3.4vh; color: var(--mute); text-align: center; padding: 4vw; }
         .hide { display: none !important; }
+        /* PO: the results page. Three cards side by side, 16:9. */
+        .res { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.6vw; }
+        .res .col { background: var(--panel); border: 1px solid var(--line); border-radius: 1.6vh; padding: 1.8vh 1.4vw; min-width: 0; overflow: hidden; }
+        .res .ch { font-size: 2.6vh; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--lime); margin-bottom: .8vh; }
+        .res .fh { font-size: 1.9vh; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin: 1vh 0 .3vh; }
+        .res .rr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1vw; padding: .7vh 0; border-top: 1px solid var(--line); font-size: 3.1vh; line-height: 1.1; }
+        .res .rr .a { font-weight: 800; color: var(--lime); min-width: 3.2vw; }
+        .res .rr .b { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .res .rr .b small { font-size: .6em; color: var(--mute); font-weight: 600; margin-left: .4em; }
+        .res .rr .b small.under { color: var(--red); }
+        .res .rr .c { font-weight: 800; text-align: right; white-space: nowrap; }
+        .res .ring { display: inline-flex; align-items: center; justify-content: center; width: 4.4vh; height: 4.4vh; font-weight: 800; font-size: 2.4vh; }
+        .res .ring.birdie { box-shadow: inset 0 0 0 2px var(--red); border-radius: 50%; }
+        .res .ring.eagle { box-shadow: inset 0 0 0 2px var(--red), inset 0 0 0 4px var(--panel), inset 0 0 0 6px var(--red); border-radius: 50%; }
+        .res .ring.bogey { box-shadow: inset 0 0 0 2px var(--ink); border-radius: 3px; }
+        .res .ring.double { box-shadow: inset 0 0 0 2px var(--ink), inset 0 0 0 4px var(--panel), inset 0 0 0 6px var(--ink); border-radius: 3px; }
+        .res .more, .res .none { font-size: 2vh; color: var(--mute); padding-top: .8vh; }
+        .res .note { font-size: 2.1vh; color: var(--mute); margin-top: 2vh; line-height: 1.35; }
+        @media (max-width: 700px) { .res { grid-template-columns: 1fr; } .res .rr { font-size: 16px; } .res .ch { font-size: 13px; } .res .fh, .res .more, .res .none, .res .note { font-size: 12px; } .res .ring { width: 26px; height: 26px; font-size: 13px; } }
     </style>
 </head>
 <body>
@@ -192,6 +217,9 @@
                 pages.push({ kind: 'waiting', key: 'waiting#' + i, label: 'waiting', display: 'Waiting for first scores' + range, lines: chunk });
             }
         }
+        // PO: posted results lead the rotation.
+        const post = window.TournamentPrizes ? TournamentPrizes.posted(d) : null;
+        if (post) pages.unshift({ kind: 'results', key: 'results', label: 'Results', display: 'Results', post: post });
         const sp = d.sponsors || {};
         const holes = Object.keys(sp.holes || {}).filter((h) => sp.holes[h] && sp.holes[h].name).sort((a, b) => Number(a) - Number(b));
         if ((sp.event && sp.event.name) || holes.length) pages.push({ kind: 'sponsors', label: 'Thanks to our sponsors', display: 'Thanks to our sponsors', event: sp.event || null, holes: holes.map((h) => Object.assign({ hole: h }, sp.holes[h])) });
@@ -240,7 +268,9 @@
         const board = $('tv-board');
         if (!pages.length) { board.innerHTML = '<div class="err">No scores yet.</div>'; return; }
         const p = pages[pageIdx % pages.length];
-        if (p.kind === 'waiting') {
+        if (p.kind === 'results') {
+            board.innerHTML = resultsHtml(p.post, data);
+        } else if (p.kind === 'waiting') {
             const list = (p.lines || []).map((l) => '<div class="wt"><span class="a">' + esc(l.name) + '</span><span class="b">' + esc(l.who) + '</span><span class="c">' + esc(l.hole) + '</span></div>').join('');
             board.innerHTML = '<div class="wait"><div class="w1">Waiting for first scores</div><div class="wi">' + esc(startInfo(data)) + '</div>' + (list ? '<div class="wl" id="tv-field">' + list + '</div>' : '') + '<div class="w2">The board fills in as cards post. Follow along on your phone with the QR below.</div></div>';
         } else if (p.kind === 'sponsors') {
@@ -269,6 +299,36 @@
         $('tv-page-label').textContent = n > 1 ? (p.display + ' · ' + (EVERY / 1000) + ' s a page') : p.display;
         $('tv-next-label').textContent = n > 1 ? ('Next: ' + next.display) : '';
         $('tv-foot').style.display = 'flex';
+    }
+
+    // THE RESULTS PAGE: what the organizer posted, card by card. Amounts are
+    // the posted ones; the word (pro shop credit or cash) follows the event's
+    // switch, said once in the KPs card and on every amount there.
+    const RES_ROWS = 11;   // measured: 11 rows and two flight heads fit a 720p card
+    function resultsHtml(post, d) {
+        const amt = (v) => esc(v > 0 ? TournamentPrizes.money(v) : 'Trophy');
+        const ord = (n) => esc(typeof ordinal === 'function' ? ordinal(n) : String(n));
+        const tp = (v) => typeof v !== 'number' ? '' : ' <small class="' + (v < 0 ? 'under' : '') + '">' + esc(v === 0 ? 'E' : (v > 0 ? '+' + v : String(v))) + '</small>';
+        const ring = (sc, par) => '<span class="ring ' + TournamentSkins.scoreMark(sc, par) + '">' + esc(sc) + '</span>';
+        const capped = (rows) => rows.slice(0, RES_ROWS).join('') + (rows.length > RES_ROWS ? '<div class="more">+' + (rows.length - RES_ROWS) + ' more on the recap</div>' : '');
+        let places = '';
+        const placeRows = [];
+        post.places.forEach((g) => {
+            if (!g.rows.length) return;
+            if (g.flight) placeRows.push('<div class="fh">' + esc(g.flight) + '</div>');
+            g.rows.forEach((r) => placeRows.push('<div class="rr"><span class="a">' + ord(r.rank) + '</span><span class="b">' + esc(r.name) + tp(r.toPar) + '</span><span class="c">' + amt(r.amount) + '</span></div>'));
+        });
+        places = placeRows.length ? capped(placeRows) : '<div class="none">No places posted.</div>';
+        const skinRows = [];
+        const multi = post.skins.rounds.length > 1;
+        post.skins.rounds.forEach((rd) => rd.won.forEach((x) => skinRows.push('<div class="rr"><span class="a">' + ring(x.score, x.par) + '</span><span class="b">' + esc(x.name) + ' <small>' + esc((multi && rd.name ? rd.name.charAt(0) : '') + x.hole) + (x.carriedIn ? ' · x' + esc(x.skins) : '') + '</small></span><span class="c">' + (x.amount > 0 ? amt(x.amount) : '') + '</span></div>')));
+        const skins = skinRows.length ? capped(skinRows) : '<div class="none">No skins won.</div>';
+        const kpRows = post.contests.rows.map((c) => '<div class="rr"><span class="a">' + esc(c.hole) + '</span><span class="b">' + esc(c.name) + ' <small>' + esc(c.value) + '</small></span><span class="c">' + (c.amount > 0 ? amt(c.amount) : '') + '</span></div>');
+        const credit = TournamentPrizes.typeOf(d) === 'credit';
+        const host = post.host || TournamentPrizes.hostOf(d);
+        const note = '<div class="note">All amounts are ' + esc(TournamentPrizes.wordOf(d)) + (credit && host ? ' at the ' + esc(host) + ' pro shop' : '') + '.<br>See yours: open the recap on your phone, tap your name.</div>';
+        const kps = (post.contests.multi ? '<div class="none">Contest holes are for one-round events.</div>' : (kpRows.length ? capped(kpRows) : '<div class="none">No contest winners posted.</div>')) + note;
+        return '<div class="res" id="tv-results"><div class="col"><div class="ch">Places</div>' + places + '</div><div class="col"><div class="ch">Skins</div>' + skins + '</div><div class="col"><div class="ch">KPs &amp; long drive</div>' + kps + '</div></div>';
     }
 
     function renderHeader(d) {
