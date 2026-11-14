@@ -190,12 +190,13 @@ describe('2. words', () => {
         assert.doesNotMatch(JS, /\bIDEA\b/);
     });
 
-    test('"Coming soon" is on Offline maps only, and nowhere else', () => {
+    test('"Coming soon" is on no card: every card shown has shipped', () => {
         const soon = cards.filter((c) => c.soon).map((c) => [c.h, c.soon]);
         // Re-pinned 2026-11-12 (Manny): Ask caddie shipped (release-204 on, 2.0.6 live), so its tag is gone.
-        assert.deepEqual(soon, [['No signal? Still every yard.', 'COMING SOON · iPHONE 2.0.5']]);
-        const rest = html.replace(/<div class="fsoon">[^<]*<\/div>/g, '');
-        assert.doesNotMatch(rest, /coming soon/i, 'a Coming soon outside that card');
+        // 2.0.7 site (Manny Nov 14): offline map download shipped (release-206/207 in both stores), so Offline maps' tag is gone too.
+        assert.deepEqual(soon, []);
+        assert.ok(cards.some((c) => c.h === 'No signal? Still every yard.'), 'positive: the Offline maps card is still there');
+        assert.doesNotMatch(html, /coming soon/i, 'a Coming soon on the page');
     });
 
     // 2.0.7 re-pin (2026-11-14): the Season board ships in 2.0.7 (55A, What's New), so it may be named, in the

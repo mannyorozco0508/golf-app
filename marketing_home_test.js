@@ -119,8 +119,9 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
     test('it is the marketing page, not the app', () => {
         // Full name (Nov 10): the title and the footer say "HardPan: Golf GPS & Games"; the footer keeps
         // "a Rattle Golf LLC app". Was: <title>HardPan Golf</title> and a "HardPan Golf" footer.
+        // 2.0.7 site (Manny Nov 14, DECISIONS 12:55 PM): the fine print reads "HardPan is a product of Rattle Golf LLC".
         assert.match(html, /<title>HardPan: Golf GPS &amp; Games<\/title>/);
-        assert.match(html, /<footer>[\s\S]*?<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ<\/div>[\s\S]*?<\/footer>/);
+        assert.match(html, /<footer>[\s\S]*?<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; HardPan is a product of Rattle Golf LLC &middot; Scottsdale, AZ<\/div>[\s\S]*?<\/footer>/);
         // 41A (Manny, Nov 11): the header shows the full name on two lines, "HardPan:" over "Golf GPS & Games".
         // Was: "HardPan Golf" on one line. Same header on help.html and help/*.html.
         const HDR41 = /<a class="logo" href="[^"]*"><img src="\/hardpan-icon\.svg" alt="" width="36" height="36"><span class="logo-name"><span class="logo-1">HardPan:<\/span><span class="logo-2">Golf GPS &amp; Games<\/span><\/span><\/a>/;
@@ -128,7 +129,7 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         assert.doesNotMatch(html, /<a class="logo"[^>]*>[\s\S]{0,120}HardPan Golf<\/a>/, 'header still says HardPan Golf');
         // the help pages share the footer: same full name there
         ['help.html'].concat(fs.readdirSync(path.join(ROOT, 'help')).filter((f) => f.endsWith('.html')).map((f) => 'help/' + f)).forEach((f) => {
-            assert.match(read(f), /<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ/, f + ': footer is not the full name');
+            assert.match(read(f), /<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; HardPan is a product of Rattle Golf LLC &middot; Scottsdale, AZ/, f + ': footer is not the full name');
             assert.match(read(f), HDR41, f + ': header is not the 41A two-line name');
         });
         assert.match(html, /Play it\. Run it\./);
@@ -206,7 +207,9 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         ['hardpan-home.html', 'help.html', 'support.html', 'refunds.html', 'terms.html', 'privacy.html'].forEach((f) =>
             assert.doesNotMatch(stripComments(read(f)).replace(/<div class="fsoon">COMING SOON(?: · iPHONE 2\.0\.5)?<\/div>/g, ''), /Coming soon/i, f + ' still says Android is coming soon'));
         // Re-pinned 2026-11-12 (Manny): Ask caddie shipped, its tag is gone; Offline maps keeps one.
-        assert.equal((read('hardpan-home.html').match(/<div class="fsoon">/g) || []).length, 1, 'positive: the one feature card');
+        // 2.0.7 site (Manny Nov 14): offline map download ships (release-206/207, both stores), so no card carries a tag.
+        assert.equal((read('hardpan-home.html').match(/<div class="fsoon">/g) || []).length, 0, 'a Coming soon tag on a shipped card');
+        assert.match(read('hardpan-home.html'), /<li class="fc" id="f-offline" data-key="offline"><div class="cap"><span class="eb">OFFLINE MAPS<\/span>/, 'positive: the Offline maps card is there, untagged');
     });
 
     test('every Google Play badge is Google\'s official artwork, linking to the Play listing, after Apple\'s', () => {
