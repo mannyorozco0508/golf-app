@@ -1,0 +1,18 @@
+{
+  "_about": "Pictures that exist only for the HardPan Tournaments landing page (tournaments.html -> /tournaments). Everything else on that page comes from media/screens/ (the homepage's stills). Each is a real screenshot of a current page; nothing is mocked.",
+  "folder": "/media/landing/",
+  "files": [
+    {
+      "file": "register-780.webp",
+      "size": "780x1688",
+      "from": "tournaments/screens-connect/connect-register-A-390.png (shared mailbox): the golfer's sign-up page on preview-connect, 390x844 @2x, stand-in data - Entry fee $50.00, HardPan service fee $4.00, Total today $54.00, Pay $54.00",
+      "made": "2026-11-14, sharp webp q80"
+    },
+    {
+      "file": "tv-board-1280.webp",
+      "size": "1280x663",
+      "from": "tournaments/screens-57/57-tv-A-flight-A.png (shared mailbox): tournament-tv.html, Saturday Scramble flight A, 1920x1080 @1.33; the bottom 8% (the board's footer line with the old host name) is cut from the picture",
+      "made": "2026-11-14, sharp webp q80"
+    }
+  ]
+}

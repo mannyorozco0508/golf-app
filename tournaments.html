@@ -1,0 +1,99 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="HardPan Tournaments: online registration, teams and pairings, a live leaderboard and GPS on every golfer’s phone. Free for organizers; the golfer pays a $4 service fee at sign-up by card.">
+<link rel="icon" href="/hardpan-icon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icon-192.png"><title>HardPan Tournaments: run your golf event in one link</title><style>
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,"SF Pro Text",Inter,Segoe UI,Helvetica,Arial,sans-serif;color:#14281d;background:#f3f6f1}
+:root{--g:#0f4b32;--g2:#1d7a4e;--lime:#c9f26b;--ink:#14281d;--mut:#55665c;--card:#fff;--amber:#b8860b}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+header.top{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;letter-spacing:-.01em}
+.brand svg{width:34px;height:34px}.mk{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--g);color:#fff;font-size:13px;font-weight:900}
+.brand small{display:block;font-size:11px;font-weight:700;letter-spacing:.14em;color:var(--g2)}
+nav a{margin-left:22px;font-weight:600;color:var(--mut);font-size:15px}
+.btn{display:inline-block;padding:14px 22px;border-radius:12px;font-weight:800;font-size:16px}
+.btn.p{background:var(--lime);color:#0b2a1b}.btn.o{background:#fff;border:1.5px solid #cfd8d1;color:var(--ink)}
+.hero h1{font-size:54px;line-height:1.02;letter-spacing:-.02em;margin:0 0 16px}
+.hero p.sub{font-size:20px;color:var(--mut);max-width:560px;line-height:1.45;margin:0 0 26px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.tag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.12em;padding:4px 8px;border-radius:999px;background:#fff3c4;color:#7a5a00;border:1px solid #f0d77a;vertical-align:middle;margin-left:6px}
+.tag.live{background:#e4f6ea;color:#0f4b32;border-color:#bfe3cb}
+/* device frames */
+.phone{position:relative;width:230px;border-radius:34px;background:#0e0f10;padding:10px;box-shadow:0 24px 50px rgba(0,0,0,.22)}
+.phone:before{content:"";position:absolute;left:50%;top:14px;transform:translateX(-50%);width:84px;height:22px;background:#0e0f10;border-radius:12px;z-index:2}
+.phone img{display:block;width:100%;height:auto;border-radius:26px;aspect-ratio:390/844;object-fit:cover;object-position:top}   /* height:auto - the width/height attributes are for layout reservation only */
+.phone .cap{position:absolute;left:0;right:0;bottom:-28px;text-align:center;font-size:12px;font-weight:700;color:var(--mut)}
+.desk{position:relative;border-radius:14px;background:#1b1f1d;padding:12px 12px 14px;box-shadow:0 30px 60px rgba(0,0,0,.25)}
+.desk:before{content:"● ● ●";color:#6c7571;font-size:10px;letter-spacing:4px;display:block;margin:-2px 0 8px 2px}
+.desk img{display:block;width:100%;height:auto;border-radius:8px;aspect-ratio:16/8.1;object-fit:cover;object-position:top}  /* the TV board's footer strip (its old host line) is cropped */
+.desk .cap{text-align:center;font-size:12px;font-weight:700;color:#aab3ad;margin-top:8px}
+section{padding:56px 0}
+h2{font-size:34px;letter-spacing:-.02em;margin:0 0 8px}.lead{color:var(--mut);font-size:17px;margin:0 0 28px}
+.grid{display:grid;gap:16px}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
+.tile{background:var(--card);border:1px solid #e3e9e4;border-radius:16px;padding:20px}
+.tile b{display:block;font-size:17px;margin-bottom:6px}.tile p{margin:0;color:var(--mut);font-size:14.5px;line-height:1.45}
+.tile .ic{font-size:22px;margin-bottom:8px;display:block}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:s}
+.step{background:#fff;border-radius:16px;padding:22px;border:1px solid #e3e9e4;position:relative}
+.step:before{counter-increment:s;content:counter(s);position:absolute;top:-14px;left:18px;width:30px;height:30px;border-radius:50%;background:var(--g);color:#fff;font-weight:900;display:grid;place-items:center}
+.step b{display:block;font-size:17px;margin:8px 0 6px}.step p{margin:0;color:var(--mut);font-size:14.5px;line-height:1.45}
+.band{background:var(--g);color:#fff;border-radius:24px;padding:40px 36px}
+.band h2{color:#fff}.band .lead{color:#cfe3d6}
+.strip{display:flex;gap:28px;align-items:flex-end;justify-content:center;flex-wrap:wrap;padding:10px 0 40px}
+.price{display:grid;grid-template-columns:1.1fr .9fr;gap:20px;align-items:stretch}
+.pcard{background:#fff;border-radius:18px;padding:26px;border:1px solid #e3e9e4}
+.pcard .big{font-size:44px;font-weight:900;letter-spacing:-.03em}.pcard .big small{font-size:16px;color:var(--mut);font-weight:600}
+.pcard ul{margin:10px 0 0;padding-left:18px;color:var(--mut);font-size:14.5px;line-height:1.6}
+.faq .q{background:#fff;border:1px solid #e3e9e4;border-radius:14px;padding:16px 18px;margin-bottom:10px}
+.faq .q b{display:block;margin-bottom:4px}.faq .q p{margin:0;color:var(--mut);font-size:14.5px;line-height:1.45}
+footer{padding:30px 0 50px;color:var(--mut);font-size:13px;border-top:1px solid #e3e9e4;margin-top:20px}
+.spon{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.spon .slot{background:#fff;border:1.5px dashed #c9d3cc;border-radius:12px;padding:12px 16px;font-weight:700;color:var(--mut);font-size:14px}
+/* layout A */
+.A .hero{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center;padding:30px 0 10px}
+/* layout B */
+.B .hero{text-align:center;padding:30px 0 0}.B .hero p.sub{margin:0 auto 26px}.B .cta{justify-content:center}
+.B .fan{display:flex;justify-content:center;align-items:flex-end;margin-top:34px;height:440px;overflow:hidden;position:relative}
+.B .fan .phone{position:absolute;bottom:-60px}.B .fan .p1{left:calc(50% - 400px);transform:rotate(-5deg)}.B .fan .p2{left:calc(50% - 125px);z-index:3;width:250px;bottom:-30px}.B .fan .p3{left:calc(50% + 170px);transform:rotate(5deg)}
+.B .tiles .tile{display:grid;grid-template-columns:1fr 92px;gap:12px;align-items:center}.B .tiles .tile img{width:92px;border-radius:10px;border:1px solid #e3e9e4;aspect-ratio:390/560;object-fit:cover;object-position:top}
+/* layout C */
+.C .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:36px;align-items:center;padding:24px 0 0}
+.C .duo{position:relative}.C .duo .desk{width:92%}.C .duo .phone{position:absolute;right:-6px;bottom:-30px;width:170px}
+.C .steps{grid-template-columns:1fr}.C .step{display:grid;grid-template-columns:1fr 2fr;gap:16px;align-items:center}
+.C .pf{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+/* phone width */
+@media (max-width:520px){
+ .wrap{padding:0 16px} header.top nav{display:none} .hero h1{font-size:34px} .hero p.sub{font-size:16px}
+ .A .hero,.C .hero,.price,.C .pf{grid-template-columns:1fr} .g3,.g2{grid-template-columns:1fr} .steps{grid-template-columns:1fr}
+ .phone{width:150px} .B .fan{height:320px} .B .fan .p1{left:calc(50% - 250px)} .B .fan .p2{left:calc(50% - 90px);width:180px} .B .fan .p3{left:calc(50% + 100px)}
+ .C .duo .phone{width:120px;right:0} .C .step{grid-template-columns:1fr} section{padding:36px 0} h2{font-size:26px} .band{padding:26px 20px;border-radius:18px}
+ .B .tiles .tile{grid-template-columns:1fr 70px}.B .tiles .tile img{width:70px}
+}
+
+/* layout D: the blend (Manny 2:19 AM: C with B's phones) */
+.D .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:36px;align-items:center;padding:24px 0 0}
+.D .duo{position:relative}.D .duo .desk{width:92%}.D .duo .phone{position:absolute;right:-6px;bottom:-30px;width:170px}
+.D .steps{grid-template-columns:1fr}.D .step{display:grid;grid-template-columns:1fr 2fr;gap:16px;align-items:center}
+.D .pf{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.D .fan{position:relative;height:470px;margin:10px 0 70px}   /* 70px: the captions sit clear of the TV frame below */
+.D .fan .phone{position:absolute;bottom:0;width:230px}
+.D .fan .p1{left:calc(50% - 400px);transform:rotate(-5deg);bottom:-10px}
+.D .fan .p2{left:calc(50% - 125px);width:250px;z-index:3;bottom:30px}
+.D .fan .p3{left:calc(50% + 170px);transform:rotate(5deg);bottom:-10px}
+.D .fan .cap{bottom:-26px;color:#cfe3d6}
+@media (max-width:520px){
+ .D .hero,.D .pf{grid-template-columns:1fr} .D .duo .phone{width:120px;right:0} .D .step{grid-template-columns:1fr}
+ /* the small fan (Manny 2026-11-14): GPS in front, the team card and the leaderboard peeking behind; nothing leaves the 390px frame */
+ .D .fan{height:360px;margin:6px 0 44px}
+ .D .fan .phone{position:absolute;bottom:0;width:150px}
+ .D .fan .p1{left:4px;transform:rotate(-6deg);bottom:10px;width:136px;z-index:1}
+ .D .fan .p2{left:50%;margin-left:-85px;width:170px;z-index:3;bottom:22px}
+ .D .fan .p3{right:4px;left:auto;transform:rotate(6deg);bottom:10px;width:136px;z-index:1}
+ .D .fan .p1 .cap,.D .fan .p3 .cap{display:none} .D .fan .p2 .cap{bottom:-24px}
+ body{overflow-x:hidden} .hero>div{min-width:0} .hero h1{overflow-wrap:anywhere} .spon{flex-wrap:wrap} .duo{margin-top:18px;min-width:0}
+}
+</style></head><body class="D">
+<!-- HARDPAN TOURNAMENTS LANDING PAGE (Manny 2026-11-14, "C with B's phones"): the organizer-facing page for
+     hardpangolf.com/tournaments. Every picture is a real screenshot of a current page; anything not built carries a
+     "coming" tag; no old-brand wording (landing_page_test.js holds the exact word); pricing is $0 for organizers and a $4 per-golfer service fee paid by the golfer.
+     Static: no script, no service worker; served by Pages at /tournaments (tournaments.html, Pretty URLs). --><header class="top wrap"><a class="brand" href="/" aria-label="HardPan home"><svg class="wm-mark" viewBox="4 24 92 46" width="56" height="28" aria-hidden="true" focusable="false"><g fill="#f5f2ea"><rect x="6" y="28" width="8.5" height="30" rx="1"/><rect x="26" y="28" width="8.5" height="30" rx="1"/><rect x="12" y="40.5" width="16" height="7"/><rect x="40" y="28" width="8.5" height="30" rx="1"/><path d="M46 28 H54 A11 11 0 0 1 54 50 H46 Z"/></g><path d="M48.5 34.5 H53.5 A4.5 4.5 0 0 1 53.5 43.5 H48.5 Z" fill="#0B0F0C"/><path d="M79 64.5 C75.15 55.7 68 50.75 68 42.5 A11 11 0 1 1 90 42.5 C90 50.75 82.85 55.7 79 64.5Z" fill="#2e7d4f"/><circle cx="79" cy="42.5" r="7.92" fill="#f5f2ea" stroke="#2e7d4f" stroke-width="1"/></svg><span>HardPan<small>TOURNAMENTS</small></span></a><nav><a href="#get">What you get</a><a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a class="btn p" style="padding:10px 16px;font-size:14px" href="/tournament">Set up my event</a></nav></header><section class="wrap hero"><div><h1>Run your golf event in one link.</h1><p class="sub">Online registration, teams and pairings, a live leaderboard and GPS on every golfer’s phone. Charity scrambles, member-guests, company outings — one page the whole field follows.</p><div class="cta"><a class="btn p" href="/tournament">Set up my event</a><a class="btn o" href="#how">See how it works</a></div><div class="spon" style="margin-top:22px"><span class="slot">Sponsor · Hole 1</span><span class="slot">Sponsor · Hole 7</span><span class="slot">Presented by …</span></div></div><div class="duo"><div class="desk"><img src="/media/screens/registration-desk-780.webp" width="780" height="1688" alt="The organizer’s registration desk: sign-ups with Paid and Approve buttons." loading="lazy" decoding="async"><div class="cap">Your registration desk</div></div><div class="phone"><img src="/media/landing/register-780.webp" width="780" height="1688" alt="The sign-up page for a scramble: Entry fee $50.00, HardPan service fee $4.00, Total today $54.00 and the Pay button." loading="lazy" decoding="async"><div class="cap"></div></div></div></section><section class="wrap"><div class="band"><h2>During the round</h2><p class="lead">GPS on every phone, the card in every team’s hand, the board on the TV.</p><div class="fan"><div class="phone p1"><img src="/media/screens/card-board-780.webp" width="780" height="1688" alt="A team’s card in the app for Desert Classic: Card, Board and GPS tabs, next to play Hole 8, the team score and Save · Next hole." loading="lazy" decoding="async"><div class="cap">Team card</div></div><div class="phone p2"><img src="/media/screens/gps-886.webp" width="886" height="1920" alt="The HardPan GPS map on hole 1 at Talking Stick: 397 yards to the middle of the green, back and front numbers, and the Card, GPS, Games and Board tabs on top." loading="lazy" decoding="async"><div class="cap">GPS hole view (HardPan app)</div></div><div class="phone p3"><img src="/media/screens/prizes-780.webp" width="780" height="1100" alt="The live tournament leaderboard in the app: Team 4 in 1st at 3 under through 4, leading by 2, and the teams around it." loading="lazy" decoding="async"><div class="cap">Live leaderboard</div></div></div><div class="desk"><img src="/media/landing/tv-board-1280.webp" width="1280" height="663" alt="The live board on a clubhouse TV: Saturday Scramble, Flight A, teams 1 to 9 with thru and to-par, and the QR to follow on your phone." loading="lazy" decoding="async"><div class="cap">The TV board, live</div></div></div></section><section class="wrap" id="get"><h2>What organizers get</h2><p class="lead">Everything the day needs, from one page.</p><div class="grid g3"><div class="tile"><div><span class="ic">📝</span><b>Online registration</b><p>Golfers sign up from the link; you approve the field from the Desk.</p></div></div><div class="tile"><div><span class="ic">💳</span><b>Card payments<span class="tag">coming</span></b><p>Entry fee at sign-up, paid straight to your Stripe account; cash at the course stays an option.</p></div></div><div class="tile"><div><span class="ic">👥</span><b>Teams and pairings</b><p>Flights, teams, shotgun holes or tee times. Every team gets its own card link.</p></div></div><div class="tile"><div><span class="ic">🏆</span><b>Live leaderboard</b><p>Scores post from the course and the board moves. Put it on the clubhouse TV.</p></div></div><div class="tile"><div><span class="ic">📍</span><b>Golfer GPS</b><p>Yards to front, middle and back on every hole in the HardPan app, free for your field.</p></div></div><div class="tile"><div><span class="ic">🏷</span><b>Sponsor spots</b><p>A sponsor on every hole on the card and the TV board, and a presented-by line.</p></div></div><div class="tile"><div><span class="ic">📸</span><b>Results and recap</b><p>Final places, contests, photos and a thank-you recap the field can share.</p></div></div></div></section><section class="wrap" id="how"><h2>How it works</h2><div class="steps"><div class="step"><b>Create the event</b><p>Name, course, date, format. Four questions, two minutes.</p></div><div class="step"><b>Share the link</b><p>Golfers register and pick their team. You see the field fill in on the Desk.</p></div><div class="step"><b>Play</b><p>Scores post from the course; the leaderboard, the TV board and the GPS follow the round.</p></div></div></section><section class="wrap"><div class="pf"><div id="pricing"><h2>Pricing</h2><p class="lead">Free for organizers. The golfer pays a small service fee when they sign up by card.</p><div class="price"><div class="pcard"><div class="big">$0 <small>for organizers</small></div><ul><li>Unlimited events, teams and golfers</li><li>Live leaderboard, TV board, GPS for the field</li><li>Registration desk, pairings, contests, recap</li></ul></div><div class="pcard"><div class="big">$4 <small>per golfer, paid by the golfer</small></div><ul><li>Added on top of your entry fee at sign-up by card <span class="tag">coming</span></li><li>Entry fees go to your own Stripe account</li><li>Cash at the course: no fee</li></ul></div></div></div><div id="faq"><div class="faq"><h2>Questions</h2><div class="q"><b>Do my golfers need the app?</b><p>No. Registration, their team card and the leaderboard are web links. The HardPan app adds GPS on the course.</p></div><div class="q"><b>Where does the money go?</b><p>Entry fees go to your own Stripe account; HardPan’s $4 service fee is paid by the golfer on top. Card payments are marked coming until Stripe is switched on.</p></div><div class="q"><b>Can I run a shotgun start with flights?</b><p>Yes. Assign starting holes, split flights, and the board shows each flight live.</p></div></div></div></div></section><section class="wrap"><div class="band" style="text-align:center"><h2>Ready for your event?</h2><p class="lead">Set it up in two minutes. We’ll help with the first one.</p><div class="cta" style="justify-content:center"><a class="btn p" href="/tournament">Set up my event</a><a class="btn o" style="background:transparent;color:#fff;border-color:#4e8a6c" href="/support">Contact us</a></div></div></section><footer class="wrap">HardPan Tournaments · a HardPan Golf product · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></footer></body></html>
