@@ -34,7 +34,7 @@
 //   (c2) `.lb-score.under` rule removed from the CSS -> C1 red;
 //   (c3) the `thru` sub-cell dropped from the event rows -> A3 red (and the
 //        re-pinned "in play" test in tournament_multiround_test.js);
-//   (c4) renderEventEntryCards returns '' -> B1, B2, B3 red;
+//   (c4) renderEventEntryCards returns '' -> B1 red (re-measured after the LB re-pin: B1, B2);
 //   (c5) the TV's `.row .tp.under { color: var(--red) }` set back to lime -> C2
 //        red here and test 2 of tournament_tv_event_columns_test.js (the
 //        computed colour) red in Chrome.
@@ -119,40 +119,50 @@ describe('A. the combined board, as it arrives (nothing tapped)', () => {
     });
 });
 
-describe('B. tapping a row opens both rounds\' cards', () => {
-    test('B1 default: no card is open; a tap on Ana opens hers under her row, with rings', () => {
+describe('B. tapping a row opens both rounds\' cards in the scorecard sheet (LB-FINAL re-pin 2026-11-14)', () => {
+    // RE-PINNED when the leaderboard build landed on this branch: Manny's LB pick
+    // (a half-sheet with Prev / Next) replaced the first MR build's inline expand.
+    // The cards are the same markup; they now render into #lb-sheet-body.
+    const sheet = (sb) => el(sb, 'lb-sheet');
+    const sheetBody = (sb) => el(sb, 'lb-sheet-body').innerHTML;
+    test('B1 default: the sheet is closed; a tap on Ana opens it on her with both rounds and the rings', () => {
         const sb = arrive(record());
-        assert.ok(!/lb-expand/.test(board(sb)), 'nothing open on arrival');
+        assert.ok(!/\bopen\b/.test(sheet(sb).className), 'closed on arrival');
+        assert.ok(!/lb-expand/.test(board(sb)), 'nothing inline on the board');
         tap(sb, board(sb), (t) => /data-entry="pA"/.test(t));
-        const b = board(sb);
-        assert.match(b, /lb-row lb-event leader open" data-entry="pA"/, 'her row is marked open');
-        const ex = b.split('<div class="lb-expand">')[1];
-        assert.ok(ex, 'the card block follows her row');
+        assert.match(sheet(sb).className, /\bopen\b/, 'the sheet opened');
+        assert.equal(el(sb, 'lb-sheet-name').textContent, 'Ana Diaz');
+        assert.equal(el(sb, 'lb-sheet-sub').textContent, 'A Flight · handicap 4 · 1st · Event -2');
+        const ex = sheetBody(sb);
         assert.match(ex, /Cascade · Cascade Golf Course · 70 <span class="under">\(-2\)<\/span><small>complete · handicap 4<\/small>/);
         assert.match(ex, /Olympic · Olympic Course · 36 <span class="">\(E\)<\/span><small>thru 9 · handicap 4<\/small>/);
-        // rings, counted against the hand-laid cards: eagles on C7 and O7; birdies C2, C9, O2; bogeys C5, C17, O4, O6, O9
         assert.equal((ex.match(/mark-eagle"/g) || []).length - 1, 2, 'two eagles (minus the key swatch)');
         assert.equal((ex.match(/mark-birdie"/g) || []).length - 1, 3, 'three birdies');
         assert.equal((ex.match(/mark-bogey"/g) || []).length - 1, 5, 'five bogeys');
         assert.equal((ex.match(/mark-double"/g) || []).length - 1, 0, 'no doubles');
         assert.match(ex, /class="s"><i class="">–<\/i>/, 'an unplayed hole is a dash in no ring');
-        assert.ok(!/mark-[a-z]+" style|color:\s*(green|red)/.test(ex), 'rings carry no colour of their own in the markup');
+        assert.ok(!/color:\s*(green|red)/.test(ex), 'rings carry no colour of their own');
     });
-    test('B2 a second tap closes it; a tap on another golfer moves it', () => {
+    test('B2 Prev / Next walk the board in its order; Close shuts it', () => {
         const sb = arrive(record());
         tap(sb, board(sb), (t) => /data-entry="pA"/.test(t));
-        tap(sb, board(sb), (t) => /data-entry="pA"/.test(t));
-        assert.ok(!/lb-expand/.test(board(sb)), 'closed again');
-        tap(sb, board(sb), (t) => /data-entry="pD"/.test(t));
-        const b = board(sb);
-        assert.equal((b.match(/lb-expand/g) || []).length, 1, 'one open at a time');
-        assert.match(b, /open" data-entry="pD"/);
-        assert.match(b.split('<div class="lb-expand">')[1], /handicap 15/);
+        assert.equal(el(sb, 'lb-sheet-prev').disabled, true, 'nothing before the leader');
+        assert.equal(el(sb, 'lb-sheet-next-name').textContent, 'Sam Ortiz', 'the next name is the board\'s second row');
+        tap(sb, read(PAGE), (t) => /id="lb-sheet-next"/.test(t));
+        assert.equal(el(sb, 'lb-sheet-name').textContent, 'Sam Ortiz');
+        assert.equal(el(sb, 'lb-sheet-prev-name').textContent, 'Ana Diaz');
+        assert.match(sheetBody(sb), /handicap 2/);
+        tap(sb, read(PAGE), (t) => /id="lb-sheet-prev"/.test(t));
+        assert.equal(el(sb, 'lb-sheet-name').textContent, 'Ana Diaz');
+        tap(sb, read(PAGE), (t) => /onclick="closeLeaderboardSheet\(\)"/.test(t) && /button/.test(t));
+        assert.ok(!/\bopen\b/.test(sheet(sb).className), 'closed');
     });
-    test('B3 a watcher (signed out) can open a row too', () => {
+    test('B3 a watcher (signed out) opens it too, without the group scoring link', () => {
         const sb = arrive(record(), null);
         tap(sb, board(sb), (t) => /data-entry="pB"/.test(t));
-        assert.match(board(sb), /lb-expand/);
+        assert.match(sheet(sb).className, /\bopen\b/);
+        assert.equal(el(sb, 'lb-sheet-name').textContent, 'Joe Fox');
+        assert.equal(el(sb, 'lb-sheet-group').style.display, 'none', 'no scoring link for a watcher');
     });
 });
 

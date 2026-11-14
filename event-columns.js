@@ -74,10 +74,11 @@
     // The hole-by-hole card for one golfer in one round, read from the round's
     // own scores map (the `${pid}_h${n}` keys the scorecard page writes).
     // Returns { holes: [{ hole, par, score, mark }], out, inn, total, thru }.
+    // rid null = a single-round record: the scores and the course sit at the root.
     function playerRoundHoles(data, rid, playerId, fns) {
         const view = pick(fns, 'roundView');
-        const v = view && data ? view(data, rid) : null;
-        const r = ((data && data.rounds) || {})[rid] || {};
+        const v = view && data && rid ? view(data, rid) : null;
+        const r = rid ? (((data && data.rounds) || {})[rid] || {}) : (data || {});
         const cd = (v && v.courseData) || r.courseData || [];
         const scores = r.scores || {};
         const holes = cd.map((h, i) => {

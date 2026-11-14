@@ -217,7 +217,11 @@ describe('5. WIRED (A1 approved 2026-11-08; this section pinned the unwired stat
         assert.ok(lb.length > 200 && /resolveLeaderboardView\(currentData, lbRoundId, lbFlightId\)/.test(lb),
             'positive: the slice is the board renderer');
         assert.doesNotMatch(src, /cachedLeaderboardRows/);
-        assert.match(lb, /\n        \}\n        renderPayoutSpotInputs\(\);\n    \}\n/,
+        // LB-FINAL (2026-11-14): the board keeps lbLast for its scorecard sheet; the
+        // prize renderers never read it.
+        assert.doesNotMatch(body(src, 'function renderPayoutResults()'), /lbLast|lbSheet/);
+        assert.doesNotMatch(body(src, 'function renderPrizeOwnerCards('), /lbLast|lbSheet/);
+        assert.match(lb, /\n        \}\n(?:        \/\/[^\n]*\n)*        if \(lbSheet\) renderLeaderboardSheet\(\);\n        renderPayoutSpotInputs\(\);\n    \}\n/,
             'the prize list is re-rendered after the board, refused or not, as the function\'s last line');
     });
     test('an unavailable basis shows its reason (organizer) or "coming soon" (golfer) and returns before any row is built', () => {

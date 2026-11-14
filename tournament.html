@@ -437,6 +437,38 @@
         .lb-basis button.active { background: var(--brand-green); color: #fff; }
         .lb-basis button:disabled { opacity: .5; cursor: default; }
         .lb-basis-note { font-size: 0.72rem; color: var(--text-muted); text-align: center; margin: 0 0 10px; }
+        /* LB-FINAL (Manny 2026-11-14): Leaderboard / Skins / Pairings at the top of the Board tab. */
+        .lb-subtabs { display: flex; border-bottom: 2px solid var(--border-faint); margin: 0 0 12px; }
+        .lb-subtabs button { flex: 1; background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -2px; padding: 10px 4px; font-size: 0.95rem; font-weight: 700; color: var(--text-muted); cursor: pointer; }
+        .lb-subtabs button.active { color: var(--brand-green); border-bottom-color: var(--brand-green); }
+        /* The tappable score header on a round board: the label is the state, Net or Gross. */
+        .lb-th-tap { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; color: var(--brand-green); }
+        /* THE SCORECARD SHEET: a half-sheet on a phone, a right-side panel from 900px. */
+        .lb-sheet-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 2000; align-items: flex-end; }
+        .lb-sheet-overlay.open { display: flex; }
+        .lb-sheet { box-sizing: border-box; background: var(--bg-card); width: 100%; max-height: 82vh; overflow-y: auto; border-radius: 18px 18px 0 0; box-shadow: 0 -4px 18px rgba(0,0,0,.18); padding: 10px 12px 16px; }
+        .lb-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 8px; }
+        .lb-sheet-nav { background: none; border: 1px solid var(--border-mid); border-radius: 9px; padding: 6px 8px; font-size: 0.78rem; font-weight: 700; color: var(--brand-green); cursor: pointer; min-width: 86px; text-align: center; }
+        .lb-sheet-nav small { display: block; font-weight: normal; color: var(--text-muted); font-size: 0.68rem; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lb-sheet-nav:disabled { opacity: .4; cursor: default; }
+        .lb-sheet-who { text-align: center; flex: 1; min-width: 0; }
+        .lb-sheet-who b { display: block; font-size: 1rem; }
+        .lb-sheet-who small { color: var(--text-muted); font-size: 0.74rem; }
+        .lb-sheet-foot { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 10px; }
+        .lb-sheet-foot .btn-outline { width: auto; margin: 0; font-size: 0.82rem; padding: 8px 12px; }
+        .lb-sheet .lb-expand { background: transparent; border: 0; padding: 0; }
+        @media (min-width: 900px) {
+            .lb-sheet-overlay { align-items: stretch; justify-content: flex-end; background: rgba(0,0,0,.18); }
+            .lb-sheet { width: 420px; max-height: none; height: 100%; border-radius: 0; box-shadow: -6px 0 18px rgba(0,0,0,.12); }
+        }
+        .lb-pair-row { padding: 10px 6px; border-bottom: 1px solid var(--border-faint); }
+        .lb-pair-row .hd { display: flex; justify-content: space-between; font-weight: bold; font-size: 0.9rem; }
+        .lb-pair-row .hd span:last-child { color: var(--text-muted); font-weight: normal; font-size: 0.8rem; }
+        .lb-pair-row .pl { font-size: 0.85rem; color: var(--text-main); margin-top: 3px; }
+        .lb-pair-row .pl .wd { color: var(--text-muted); text-decoration: line-through; }
+        .lb-pair-row .gl { margin-top: 6px; }
+        .lb-pair-row .gl a { font-size: 0.78rem; }
+        .lb-skins .pz-row, .lb-skins .pz-note, .lb-skins .pz-k, .lb-skins .pz-total { font-size: 0.86rem; }
         .rounds-card { border: 1px solid var(--border-faint); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px; font-size: 0.8rem; }
         .rounds-card .rc-head { font-weight: bold; margin-bottom: 6px; }
         .rounds-card .rc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; margin-bottom: 8px; }
@@ -1418,6 +1450,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              the leaderboard it always did, with no extra control to ignore. -->
         <!-- Only rendered for a multi-round event. A single-round tournament shows the
              leaderboard it always showed, with no extra control to ignore. -->
+        <!-- LB-FINAL (Manny 2026-11-14): Leaderboard / Skins / Pairings. The board is the
+             default; Skins reads skins.js through the prize builder (gross, the organizer's
+             carryover setting); Pairings reads the same rows the printed sheet does. -->
+        <div class="lb-subtabs" id="lb-subtabs" role="tablist">
+            <button type="button" class="active" id="lb-sub-board" role="tab" aria-selected="true" onclick="setLeaderboardSub('board')">Leaderboard</button>
+            <button type="button" id="lb-sub-skins" role="tab" aria-selected="false" onclick="setLeaderboardSub('skins')">Skins</button>
+            <button type="button" id="lb-sub-pairings" role="tab" aria-selected="false" onclick="setLeaderboardSub('pairings')">Pairings</button>
+        </div>
+        <div id="lb-skins-panel" class="lb-skins" style="display:none;"></div>
+        <div id="lb-pairings-panel" style="display:none;"></div>
+        <div id="lb-board-panel">
         <!-- 57, TV BOARD (Manny 2026-11-12): the clubhouse TV page, owner only. -->
         <div class="tv-link" id="tv-link-row" style="display:none;"></div>
         <div id="lb-round-filter" style="display:none; text-align:center; margin-bottom:10px;"></div>
@@ -1436,6 +1479,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              clubhouse TV. Shown to everyone: a watcher forwarding it is the point. -->
         <button class="btn-outline" id="lb-watch-share" onclick="openShareModal(leaderboardWatchUrl(), (currentData && currentData.name) || 'Event', 'leaderboard')">📣 Share live leaderboard</button>
         <p style="font-size:0.8rem; color:var(--text-muted); margin-top:8px; text-align:center;">Anyone with this link can watch the board as scores come in.</p>
+        </div><!-- /lb-board-panel -->
 
         <hr class="section-divider">
         <!-- PAYOUTS / PRIZE RESULTS (PO build 2026-11-14, ADVISOR-20261114-1156-OK-build-final-set).
@@ -6424,7 +6468,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (note) { note.style.display = 'none'; note.textContent = ''; }
 
         // ONE RESOLUTION, shared with the printed sheet and the golfer's card.
-        const view = resolveLeaderboardView(currentData, lbRoundId, lbFlightId);
+        let view = resolveLeaderboardView(currentData, lbRoundId, lbFlightId);
+        // LB-FINAL: a NET round viewed as gross (the header tap). The same engine
+        // function, the same rows, with the round's scoring read as gross strokes.
+        // The other direction (a gross round as net) needs stroke allocation the
+        // engine does not run for it, so the header is plain there.
+        if (view.kind === 'round' && view.available && lbRoundGross && lbRoundIsNet(view)) {
+            const base = lbRoundViewFor();
+            view = Object.assign({}, view, { rows: computeTournamentLeaderboard(Object.assign({}, base, { scoringMode: 'gross' }), lbFlightId), grossOfNet: true });
+        }
+        lbLast = { rows: view.rows || [], kind: view.kind, rid: lbLastRoundId(view), available: !!view.available };
+        renderLeaderboardSubtabs();
 
         // PRIZES DO NOT READ THIS VIEW (audit #1, A1, 2026-11-08). The prize
         // calculator used to cache resolveLeaderboardView(currentData, lbRoundId)
@@ -6441,9 +6495,158 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             note.textContent = view.reason;
             container.innerHTML = `<div style="text-align:center; color:var(--text-muted); padding:16px;">Pick a round above to see its leaderboard.</div>`;
         } else {
-            renderLeaderboardRows(container, view.rows, view.kind);
+            renderLeaderboardRows(container, view.rows, view.kind, view.grossOfNet);
         }
+        // The open sheet follows the board it was opened from (a new score lands, the
+        // card updates). The prize list stays the function's last line: it never
+        // reads lbLast or the sheet, only resolvePrizeView(currentData).
+        if (lbSheet) renderLeaderboardSheet();
         renderPayoutSpotInputs();
+    }
+
+    // --- LB-FINAL (Manny 2026-11-14): the three sub-tabs, the header tap, the sheet ---
+    let lbSub = 'board';
+    let lbLast = { rows: [], kind: 'round', rid: null, available: false };
+    let lbRoundGross = false;
+    function setLeaderboardSub(sub) { lbSub = ['board', 'skins', 'pairings'].includes(sub) ? sub : 'board'; renderLeaderboard(); }
+    function renderLeaderboardSubtabs() {
+        const panels = { board: 'lb-board-panel', skins: 'lb-skins-panel', pairings: 'lb-pairings-panel' };
+        Object.keys(panels).forEach((k) => {
+            const el = document.getElementById(panels[k]); if (el) el.style.display = k === lbSub ? 'block' : 'none';
+            const btn = document.getElementById('lb-sub-' + k); if (btn) { btn.classList.toggle('active', k === lbSub); btn.setAttribute('aria-selected', k === lbSub ? 'true' : 'false'); }
+        });
+        if (lbSub === 'skins') renderSkinsTab();
+        if (lbSub === 'pairings') renderPairingsTab();
+    }
+    // The round in view: a multi-round chip, or null on a single-round record.
+    function lbLastRoundId(view) { return recordIsMultiRound() ? (view.kind === 'round' ? lbRoundId : 'event') : null; }
+    function lbRoundViewFor() { return recordIsMultiRound() && lbRoundId && lbRoundId !== 'event' ? roundView(currentData, lbRoundId) : currentData; }
+    function lbRoundIsNet(view) { const v = lbRoundViewFor(); return !!v && view.kind === 'round' && netIsInPlay(v); }
+    function tapLeaderboardBasis() { lbRoundGross = !lbRoundGross; renderLeaderboard(); }
+
+    // THE SHEET. Opened by a tap on a row; Prev / Next follow the board's current
+    // order, so a watcher pages through a flight without closing it. The cards are
+    // the same markup the event board's opened row used (renderEventEntryCards).
+    let lbSheet = null;
+    function openLeaderboardSheet(key) {
+        const keys = lbLast.rows.map(lbRowKey);
+        const idx = keys.indexOf(key);
+        if (idx === -1) return;
+        lbSheet = { idx };
+        renderLeaderboardSheet();
+        const ov = document.getElementById('lb-sheet'); if (ov) ov.classList.add('open');
+    }
+    function closeLeaderboardSheet() { lbSheet = null; const ov = document.getElementById('lb-sheet'); if (ov) ov.classList.remove('open'); }
+    function stepLeaderboardSheet(d) { if (!lbSheet) return; const i = lbSheet.idx + d; if (i < 0 || i >= lbLast.rows.length) return; lbSheet.idx = i; renderLeaderboardSheet(); }
+    // The key a row's scores are filed under: the golfer's id, or team<N> for a scramble.
+    function lbRowKey(r) { return r.entryType === 'player' || r.entryType === 'event' ? String(r.entryKey || r.playerId || '') : ('team' + r.num); }
+    function lbGroupLinkFor(r) {
+        if (!canManage()) return '';
+        // On the combined board the link goes to the golfer's group in the latest
+        // countable round that has one (the round in play, usually).
+        const rid = lbLast.rid === 'event' ? null : lbLast.rid;
+        if (r.entryType === 'player' || r.entryType === 'event') {
+            const pid = String(r.entryKey || r.playerId || '');
+            const rids = !recordIsMultiRound() ? [null] : (rid ? [rid] : countableRoundIds(currentData).slice().reverse());
+            for (const x of rids) {
+                const groups = x ? (((currentData.rounds || {})[x] || {}).scoringGroups || {}) : (recordIsMultiRound() ? {} : (currentData.scoringGroups || {}));
+                const gid = Object.keys(groups).find((g) => ((groups[g] || {}).playerIds || []).includes(pid));
+                if (gid) return groupScorecardUrl(gid, x);
+            }
+            return '';
+        }
+        const t = Object.values(currentData.teams || {}).find((x) => x && x.num === r.num);
+        return t ? teamScorecardUrl(t, rid) : '';
+    }
+    function renderLeaderboardSheet() {
+        if (!lbSheet) return;
+        const rows = lbLast.rows;
+        if (!rows.length || lbSheet.idx >= rows.length) { closeLeaderboardSheet(); return; }
+        const r = rows[lbSheet.idx], key = lbRowKey(r);
+        const set = (id, t) => { const e = document.getElementById(id); if (e) e.textContent = t; };
+        const flights = currentData.flights || {};
+        const flightName = r.flightId && flights[r.flightId] ? flights[r.flightId].name : '';
+        const players = currentData.players || {};
+        const hcp = players[key] ? players[key].handicap : null;
+        const toPar = !r.hasScores ? '' : (r.toPar === 0 ? 'E' : (r.toPar > 0 ? `+${r.toPar}` : String(r.toPar)));
+        set('lb-sheet-name', r.teamName || '');
+        set('lb-sheet-sub', [flightName, hcp !== null && hcp !== undefined && hcp !== '' ? `handicap ${hcp}` : '', r.rank ? `${ordinal(r.rank)}` : '', toPar ? (lbLast.kind === 'event' ? 'Event ' : '') + toPar : ''].filter(Boolean).join(' · '));
+        const prev = rows[lbSheet.idx - 1], next = rows[lbSheet.idx + 1];
+        const pb = document.getElementById('lb-sheet-prev'), nb = document.getElementById('lb-sheet-next');
+        if (pb) pb.disabled = !prev; if (nb) nb.disabled = !next;
+        set('lb-sheet-prev-name', prev ? prev.teamName : ''); set('lb-sheet-next-name', next ? next.teamName : '');
+        const body = document.getElementById('lb-sheet-body');
+        if (body) {
+            if (lbLast.kind === 'event') body.innerHTML = renderEventEntryCards(r, eventRoundColumns(currentData).columns);
+            else if (r.entryType === 'team' && (currentData.format || 'scramble') !== 'scramble') body.innerHTML = `<p class="fine" style="font-size:0.82rem; color:var(--text-muted);">This team's golfers each keep a card; open the team's card to see them hole by hole.</p>`;
+            else body.innerHTML = renderOneRoundCard(r, key, lbLast.rid);
+        }
+        const g = document.getElementById('lb-sheet-group');
+        if (g) { const url = lbGroupLinkFor(r); g.style.display = url ? '' : 'none'; g.setAttribute('href', url || '#'); }
+    }
+    // One round's card for the sheet (a round chip or a single-round record).
+    function renderOneRoundCard(r, key, rid) {
+        const card = playerRoundHoles(currentData, rid, key);
+        if (!card.holes.length) return `<p style="font-size:0.82rem; color:var(--text-muted);">No course card on this round yet.</p>`;
+        const played = card.thru;
+        const parPlayed = card.holes.filter(h => h.score > 0).reduce((a, h) => a + h.par, 0);
+        const tp = card.total - parPlayed;
+        const tpText = tp === 0 ? 'E' : (tp > 0 ? `+${tp}` : String(tp));
+        const state = !played ? 'not started' : (played === card.holes.length ? 'complete' : `thru ${played}`);
+        const name = rid && currentData.rounds && currentData.rounds[rid] ? (currentData.rounds[rid].name || 'Round') : (currentData.courseName || 'Round');
+        let html = `<div class="lb-expand"><div class="rh">${escapeHtml(name)} · ${played ? card.total : '–'}${played ? ` <span class="${tp < 0 ? 'under' : ''}">(${tpText})</span>` : ''}<small>${state}</small></div>`;
+        html += lbHolesGrid(card.holes.slice(0, 9), 'Out', card.out, card.parOut);
+        if (card.holes.length > 9) html += lbHolesGrid(card.holes.slice(9, 18), 'In', card.inn, card.parIn);
+        html += '<div class="lb-key"><i class="mark-birdie"></i> birdie &nbsp; <i class="mark-eagle"></i> eagle &nbsp; <i class="mark-bogey"></i> bogey &nbsp; <i class="mark-double"></i> double or worse</div></div>';
+        return html;
+    }
+
+    // SKINS TAB: the same summary the prize screen's Skins card reads (one builder,
+    // tournament-prizes.js skinsSummary + skins.js), shown read-only to everyone.
+    function renderSkinsTab() {
+        const el = document.getElementById('lb-skins-panel');
+        if (!el) return;
+        if (typeof TournamentPrizes === 'undefined' || typeof TournamentSkins === 'undefined') { el.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:16px;">Skins are not available on this page.</p>'; return; }
+        const sk = TournamentPrizes.skinsSummary(currentData);
+        const perRound = sk.rounds.map((r) => `${r.name ? escapeHtml(r.name) + ' ' : ''}${r.result.totals.skins} skin${r.result.totals.skins === 1 ? '' : 's'}${r.result.totals.pending ? ' (holes still open)' : ''}`).join(' · ');
+        let h = `<div class="lb-skins-head" style="margin:4px 0 8px;"><b style="font-size:1rem;">${sk.skins} skin${sk.skins === 1 ? '' : 's'} so far</b>`
+            + `<div style="font-size:0.8rem; color:var(--text-muted);">Gross · carryover ${sk.carryover ? 'on' : 'off'} · ${perRound || 'no rounds yet'}</div>`
+            + `<div style="font-size:0.8rem; color:var(--text-muted);">${sk.perSkin > 0 ? `${escapeHtml(TournamentPrizes.amountText(sk.perSkin, currentData))} a skin, as the organizer set it` : 'The organizer has not set an amount a skin yet'}</div></div>`;
+        h += prizeSkinsCardHtml(sk, currentData, { tab: true });
+        el.innerHTML = h;
+    }
+
+    // PAIRINGS TAB: the printed sheet's rows (pairingsRows), per round on a
+    // multi-round event. The group's scoring link carries its key, so it is shown
+    // to the organizer only; everyone else sees names and starts.
+    let lbPairRid = null;
+    function setPairingsRound(rid) { lbPairRid = rid || null; renderPairingsTab(); }
+    function renderPairingsTab() {
+        const el = document.getElementById('lb-pairings-panel');
+        if (!el) return;
+        const multi = recordIsMultiRound();
+        const ids = multi ? orderedRoundIds(currentData) : [];
+        if (multi && (!lbPairRid || !ids.includes(lbPairRid))) lbPairRid = ids[0] || null;
+        const rid = multi ? lbPairRid : null;
+        let h = '';
+        if (multi && ids.length) h += `<div style="text-align:center; margin-bottom:10px;">${ids.map((x) => `<button class="lb-flight-btn ${x === rid ? 'active' : ''}" onclick="setPairingsRound('${x}')">${escapeHtml((currentData.rounds[x] || {}).name || 'Round')}</button>`).join('')}</div>`;
+        const pr = pairingsRows(currentData, rid);
+        const owner = canManage();
+        if (!pr.rows.length) h += `<div style="text-align:center; color:var(--text-muted); padding:16px;">No ${pr.kind === 'player' ? 'groups' : 'teams'} yet.</div>`;
+        pr.rows.forEach((row, i) => {
+            const start = pr.shotgun ? (row.hole ? `Hole ${escapeHtml(row.hole)}` : 'Hole not set') : (pr.kind === 'team' ? (teeTimeFor(i) || 'Tee 1') : 'Tee 1');
+            const names = row.players.map((p) => p.wd ? `<span class="wd">${escapeHtml(p.name)}</span>` : escapeHtml(p.name)).join(' · ') || '<span style="color:var(--text-muted);">nobody assigned yet</span>';
+            let link = '';
+            if (owner) {
+                const url = pr.kind === 'player' ? groupScorecardUrl(row.key, rid) : (function () { const t = Object.values(currentData.teams || {}).find((x) => x && ('team' + x.num) === row.key); return t ? teamScorecardUrl(t, rid) : ''; })();
+                if (url) link = `<div class="gl"><a class="rc-link" href="${url}">${pr.kind === 'player' ? "Group card" : "Team card"} ▶</a></div>`;
+            }
+            h += `<div class="lb-pair-row"><div class="hd"><span>${escapeHtml(row.label)}</span><span>${start}</span></div><div class="pl">${names}</div>${link}</div>`;
+        });
+        if (pr.unassigned.length) h += `<div class="lb-pair-row"><div class="hd"><span>Not in a group yet</span><span></span></div><div class="pl">${pr.unassigned.map((p) => escapeHtml(p.name)).join(' · ')}</div></div>`;
+        if (owner && pr.rows.length) h += `<button class="btn-outline" style="margin-top:12px;" onclick="printTournamentPairings()">🖨️ Print Pairings</button>`;
+        h += `<p style="font-size:0.78rem; color:var(--text-muted); margin-top:8px; text-align:center;">${pr.shotgun ? 'Shotgun start: each group starts on its hole.' : 'Everyone starts on the first tee.'}${owner ? ' Group cards are scoring links; share them only with that group.' : ''}</p>`;
+        el.innerHTML = h;
     }
 
     // GROSS | NET ABOVE THE COMBINED BOARD (MR-FINAL + A's switch, Manny 2026-11-14).
@@ -6472,7 +6675,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // are the same shape, so a second renderer would be a second chance to disagree
     // about what "tied" looks like. Only the Thru column differs, because "thru 14"
     // means holes in a round and rounds in an event.
-    function renderLeaderboardRows(container, rows, kind) {
+    function renderLeaderboardRows(container, rows, kind, grossOfNet) {
         if (rows.length === 0) {
             const flights = currentData.flights || {};
             container.innerHTML = lbFlightId && flights[lbFlightId]
@@ -6491,13 +6694,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const tieTagOf = (r) => (r.rank && rankCounts[r.rank] > 1) ? '<span class="tie-tag">(tied)</span>' : '';
         const pendingTagOf = (r) => r.netPending ? `<span class="tie-tag" style="color:var(--text-muted);">(${HANDICAP_PENDING_TEXT})</span>` : '';
         if (kind === 'event') { renderEventBoardRows(container, rows, { tieTagOf, pendingTagOf, toParText, toParClass }); return; }
+        // LB-FINAL: on a NET round the score header is the state and a tap flips it
+        // (Net ⇄ shows net, tap for gross; Gross ⇄ shows gross, tap for net). A gross
+        // round's header is plain: the engine does not allocate strokes for it.
+        const netRound = kind === 'round' && lbRoundIsNet({ kind: 'round' });
+        const head = netRound
+            ? `<span class="lb-score lb-th-tap" role="button" tabindex="0" onclick="tapLeaderboardBasis()" title="Tap to switch">${grossOfNet ? 'Gross' : 'Net'} ⇄</span>`
+            : '<span class="lb-score">To Par</span>';
         let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span><span class="lb-thru">Thru</span><span class="lb-score">To Par</span>
+            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span><span class="lb-thru">Thru</span>${head}
         </div>`;
         rows.forEach(r => {
             // UNRANKED WITH A REASON. A bare dash beside a golfer who has posted
             // eighteen holes reads as a bug; the pending tag says it is waiting on a number.
-            html += `<div class="lb-row ${r.rank === 1 ? 'leader' : ''}">
+            html += `<div class="lb-row lb-tap ${r.rank === 1 ? 'leader' : ''}" data-entry="${escapeHtml(lbRowKey(r))}" onclick="openLeaderboardSheet(this.dataset.entry)">
                 <span class="lb-pos">${r.rank || '-'}</span>
                 <span class="lb-team">${escapeHtml(r.teamName)}${tieTagOf(r)}${pendingTagOf(r)}</span>
                 <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
@@ -6514,9 +6724,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // (computeEventStandings); only what a row shows changed. The per-round numbers
     // come from eventRoundColumns(), which asks the engine for each round's own
     // board, so a column shows exactly what that round's card showed.
-    // Tap a row to open both rounds' hole-by-hole cards under it; tap again to close.
-    let lbOpenKey = null;
-    function toggleLeaderboardEntry(key) { lbOpenKey = lbOpenKey === key ? null : key; renderLeaderboard(); }
+    // Tap a row to open both rounds' hole-by-hole cards in the scorecard sheet
+    // (LB-FINAL, Manny 2026-11-14: the sheet with Prev / Next replaced the inline
+    // expand of the first MR build; the cards are the same markup).
     function renderEventBoardRows(container, rows, fmt) {
         const { tieTagOf, pendingTagOf, toParText, toParClass } = fmt;
         const cols = eventRoundColumns(currentData);
@@ -6531,13 +6741,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 if (!x || !x.hasScores) return '<span class="lb-rnd">–</span>';
                 return `<span class="lb-rnd">${x.strokes}${x.complete ? '' : `<small>thru ${x.thru}</small>`}</span>`;
             }).join('');
-            const open = lbOpenKey === r.entryKey;
-            html += `<div class="lb-row lb-event ${r.rank === 1 ? 'leader' : ''} ${open ? 'open' : ''}" data-entry="${escapeHtml(r.entryKey)}" onclick="toggleLeaderboardEntry(this.dataset.entry)">
+            html += `<div class="lb-row lb-event lb-tap ${r.rank === 1 ? 'leader' : ''}" data-entry="${escapeHtml(r.entryKey)}" onclick="openLeaderboardSheet(this.dataset.entry)">
                 <span class="lb-pos">${r.rank || '-'}</span>
                 <span class="lb-team">${escapeHtml(r.teamName)}${tieTagOf(r)}${pendingTagOf(r)}</span>${cells}<span class="lb-tot">${r.hasScores ? r.strokes : '–'}</span>
-                <span class="${toParClass(r)}">${toParText(r)}</span><span class="lb-caret">${open ? '▾' : '▸'}</span>
+                <span class="${toParClass(r)}">${toParText(r)}</span><span class="lb-caret">›</span>
             </div>`;
-            if (open) html += renderEventEntryCards(r, rc);
         });
         container.innerHTML = html;
     }
@@ -6857,11 +7065,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     function prizeNames(ids, tally) { return ids.map((id) => ((tally[id] || {}).name || '').split(' ')[0]).filter(Boolean).join(', '); }
 
-    function prizeSkinsCardHtml(sk, data) {
+    // opts.tab (LB-FINAL): the Skins tab shows the same detail read-only, always
+    // open, without the organizer's amount and carryover controls.
+    function prizeSkinsCardHtml(sk, data, opts) {
+        const tab = !!(opts && opts.tab);
+        const open = tab || prizeSkinsOpen;
         const amt = (v) => (sk.perSkin > 0 ? escapeHtml(TournamentPrizes.shortText(v, data)) : '');
-        let h = `<div class="pz-head"><span class="pz-title">Skins · gross</span><button type="button" class="ct-btn" id="prize-skins-open" onclick="togglePrizeSkins()">${prizeSkinsOpen ? 'Close' : 'Open'}</button></div>`;
+        let h = '';
+        if (!tab) h += `<div class="pz-head"><span class="pz-title">Skins · gross</span><button type="button" class="ct-btn" id="prize-skins-open" onclick="togglePrizeSkins()">${prizeSkinsOpen ? 'Close' : 'Open'}</button></div>`;
         h += `<div class="pz-sub">${sk.perSkin > 0 ? `${escapeHtml(TournamentPrizes.amountText(sk.perSkin, data))} a skin` : 'No amount a skin yet'} · per round · carryover ${sk.carryover ? 'on (a hole won after a tie takes the carried skin too)' : 'off'}</div>`;
-        h += `<div class="pz-ctl"><label for="prize-skin-amount">A skin $</label><input type="number" id="prize-skin-amount" min="0" step="1" placeholder="0" value="${sk.perSkin > 0 ? sk.perSkin : ''}" onchange="savePrizeSetting('perSkin', this.value)">`
+        if (!tab) h += `<div class="pz-ctl"><label for="prize-skin-amount">A skin $</label><input type="number" id="prize-skin-amount" min="0" step="1" placeholder="0" value="${sk.perSkin > 0 ? sk.perSkin : ''}" onchange="savePrizeSetting('perSkin', this.value)">`
             + `<div class="payout-basis-seg" role="group" aria-label="Carryover"><button type="button" class="${sk.carryover ? 'on' : ''}" aria-pressed="${sk.carryover}" onclick="savePrizeSetting('carryover', true)">Carryover on</button><button type="button" class="${sk.carryover ? '' : 'on'}" aria-pressed="${!sk.carryover}" onclick="savePrizeSetting('carryover', false)">Carryover off</button></div></div>`;
         h += `<div class="pz-note">Gross scores only. Net skins need each golfer's handicap strokes on every hole, so they are not built yet.</div>`;
         const line = sk.rounds.map((r) => {
@@ -6870,7 +7083,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }).join(' · ');
         const full = (v) => escapeHtml(TournamentPrizes.amountText(v, data));
         h += `<div class="pz-note" id="prize-skins-line">${line}${sk.perSkin > 0 ? ` → ${full(sk.total)}` : ''}</div>`;
-        if (prizeSkinsOpen) {
+        if (open) {
             sk.rounds.forEach((r, ri) => {
                 const res = r.result, rows = res.holes;
                 if (r.name || sk.rounds.length > 1) h += `<div class="pz-k">Round ${ri + 1}${r.name ? ' · ' + escapeHtml(r.name) : ''}</div>`;
@@ -8807,5 +9020,22 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
     </div>
 </div>
+    <!-- LB-FINAL (Manny 2026-11-14): a golfer's scorecard, opened from the board. A
+         half-sheet on a phone, a right-side panel on a laptop; Prev / Next walk the board
+         in the order it is showing. -->
+    <div class="lb-sheet-overlay" id="lb-sheet" onclick="if (event.target === this) closeLeaderboardSheet()">
+        <div class="lb-sheet" role="dialog" aria-modal="true" aria-label="Scorecard">
+            <div class="lb-sheet-head">
+                <button type="button" class="lb-sheet-nav" id="lb-sheet-prev" onclick="stepLeaderboardSheet(-1)">‹ Prev<small id="lb-sheet-prev-name"></small></button>
+                <div class="lb-sheet-who"><b id="lb-sheet-name"></b><small id="lb-sheet-sub"></small></div>
+                <button type="button" class="lb-sheet-nav" id="lb-sheet-next" onclick="stepLeaderboardSheet(1)">Next ›<small id="lb-sheet-next-name"></small></button>
+            </div>
+            <div id="lb-sheet-body"></div>
+            <div class="lb-sheet-foot">
+                <a class="btn-outline" id="lb-sheet-group" href="#" style="display:none;">Open the group's card</a>
+                <button type="button" class="btn-outline" onclick="closeLeaderboardSheet()">Close</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
