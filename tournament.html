@@ -601,8 +601,22 @@
         .fees-stripe { border: 2px solid var(--brand-green); border-radius: 12px; padding: 10px 14px; margin-top: 10px; font-size: 0.88rem; }
         .fees-stripe-head { font-weight: 800; letter-spacing: 0.06em; color: var(--brand-green); font-size: 0.78rem; margin-bottom: 4px; }
         .fees-stripe div { display: flex; justify-content: space-between; padding: 4px 0; }
+        .fees-stripe-off { border-color: #b8860b; }
+        .fees-stripe-off .fees-stripe-head { color: #b8860b; }
+        .fees-stripe strong { text-align: right; max-width: 62%; }
         .fees-test-mode { background: #fbecd0; color: #8a5a00; font-weight: 800; font-size: 0.74rem; border-radius: 10px; padding: 2px 8px; }
         .fees-soon { font-size: 0.82rem; color: var(--text-muted); margin: 8px 0 0 0; }
+        /* Stripe Connect, the Get paid card (layout A, Manny 2026-11-12). */
+        .gp { border: 1.5px solid var(--border-mid); border-radius: 14px; padding: 12px; background: var(--bg-card); margin: 6px 0 12px; }
+        .gp-t { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 0.95rem; gap: 8px; }
+        .gp-pill { font-size: 0.72rem; font-weight: 800; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+        .gp-pill.off { background: #eef1ef; color: #55645c; } .gp-pill.mid { background: #fff4d6; color: #5a4300; } .gp-pill.on { background: #e8f5ee; color: var(--brand-green); }
+        .gp-d { font-size: 0.82rem; color: var(--text-muted); margin: 6px 0 8px; line-height: 1.4; }
+        .gp-d b { color: var(--text-main); }
+        .gp-kv { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 7px 0; border-bottom: 1px solid var(--border-faint); }
+        .gp-kv:last-of-type { border-bottom: 0; }
+        .gp .btn-outline, .gp .btn-primary { width: 100%; margin: 8px 0 0; min-height: 44px; }
+        .fee-box-total { border-top: 1px solid var(--border-faint); margin-top: 4px; padding-top: 8px; font-weight: 800; }
         /* M1: the organizer's event-day panel on the board. */
         .day-card { border: 1px solid var(--border-mid); border-radius: 12px; padding: 10px 14px; margin: 0 0 12px 0; }
         .day-head { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.08em; color: var(--text-muted); text-transform: uppercase; padding-bottom: 6px; border-bottom: 1px solid var(--border-faint); }
@@ -920,11 +934,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              server reads the same field and never takes one from this page. -->
         <div class="fee-box" id="reg-fee-box" style="display:none;">
             <div class="fee-box-row"><span>Entry fee</span><strong id="reg-fee-amount"></strong></div>
-            <div class="fee-box-note">Card payments go to HardPan. Refunds by the organizer.</div>
+            <!-- Connect (2026-11-13, layout A): on an organizer-paid event the golfer
+                 sees HardPan's service fee as its own line and the total; the note
+                 names who receives what. Both rows stay hidden on a HardPan-paid event. -->
+            <div class="fee-box-row" id="reg-fee-service-row" style="display:none;"><span>HardPan service fee</span><strong id="reg-fee-service"></strong></div>
+            <div class="fee-box-row fee-box-total" id="reg-fee-total-row" style="display:none;"><span>Total today</span><strong id="reg-fee-total"></strong></div>
+            <div class="fee-box-note" id="reg-fee-note">Card payments go to HardPan. Refunds by the organizer.</div>
         </div>
         <button class="btn-pay" id="reg-pay" style="display:none;" onclick="submitRegistrationAndPay()"></button>
         <button class="btn-primary" id="reg-submit" onclick="submitRegistration()">Sign up</button>
-        <p class="reg-cash-line" id="reg-cash-line" style="display:none;">Paying cash at the course? <button class="link-btn" id="reg-cash-signup" onclick="submitRegistration()">Sign up without paying</button></p>
+        <p class="reg-cash-line" id="reg-cash-line" style="display:none;">Paying cash at the course? <button class="link-btn" id="reg-cash-signup" onclick="submitRegistration()">Sign up without paying</button> <span id="reg-cash-note"></span></p>
         <p id="reg-status" style="font-size:0.85rem; color:var(--brand-green); margin-top:10px; text-align:center;"></p>
     </div>
     <!-- M2c: back from Stripe Checkout (?checkout=done|cancel&entry=ID).
@@ -4280,8 +4299,26 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     // ---- M2a: THE SIGNUP FORM ----------------------------------------------
+    // CONNECT (2026-11-13): what a golfer pays and to whom, from the PUBLIC
+    // record fields the server writes (fees.paidTo, fees.serviceFeeCents,
+    // fees.paidToName). An organizer-paid event adds HardPan's service fee on
+    // top of the entry fee; a HardPan-paid event is exactly Phase 1.
+    function feeLines(data) {
+        const f = feesOf(data);
+        if (!f) return null;
+        const fees = (data && data.fees) || {};
+        const organizer = fees.paidTo === 'organizer';
+        const svc = organizer && Number.isInteger(fees.serviceFeeCents) && fees.serviceFeeCents >= 0 && fees.serviceFeeCents <= 2000 ? fees.serviceFeeCents : 0;
+        const name = organizer && typeof fees.paidToName === 'string' && fees.paidToName.trim() ? fees.paidToName.trim().slice(0, 100) : '';
+        return { entry: f.cents, service: svc, total: (f.cents || 0) + svc, organizer, name: name || 'the organizer', collectByCard: f.collectByCard, allowCash: f.allowCash };
+    }
+    function owedText(L) {
+        if (!L || !L.entry) return '';
+        return L.organizer && L.service ? centsText(L.total) + ' (' + centsText(L.entry) + ' entry + ' + centsText(L.service) + ' service fee)' : centsText(L.entry) + ' entry fee';
+    }
     function applyRegistrationFees(data) {
         const f = feesOf(data);
+        const L = feeLines(data);
         const card = !!(f && f.collectByCard);
         const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
         show('reg-fee-box', card);
@@ -4292,7 +4329,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const amt = document.getElementById('reg-fee-amount');
             if (amt) amt.textContent = centsText(f.cents);
             const pay = document.getElementById('reg-pay');
-            if (pay) pay.textContent = 'Pay entry fee ' + centsText(f.cents) + ' ›';
+            const svc = document.getElementById('reg-fee-service'), tot = document.getElementById('reg-fee-total');
+            const note = document.getElementById('reg-fee-note'), cashNote = document.getElementById('reg-cash-note');
+            const withFee = !!(L && L.organizer && L.service);
+            show('reg-fee-service-row', withFee); show('reg-fee-total-row', withFee);
+            if (withFee) {
+                if (svc) svc.textContent = centsText(L.service);
+                if (tot) tot.textContent = centsText(L.total);
+                if (pay) pay.textContent = 'Pay ' + centsText(L.total) + ' ›';
+                if (note) note.textContent = centsText(L.entry) + ' goes to ' + L.name + ' through Stripe; the ' + centsText(L.service) + ' service fee goes to HardPan. Your card statement shows ' + L.name + '.';
+                if (cashNote) cashNote.textContent = '(pay ' + centsText(L.entry) + ' at the course)';
+            } else {
+                if (pay) pay.textContent = 'Pay entry fee ' + centsText(f.cents) + ' ›';
+                if (note) note.textContent = L && L.organizer ? 'Paid to ' + L.name + ' through Stripe. Your card statement shows ' + L.name + '.' : 'Card payments go to HardPan. Refunds by the organizer.';
+                if (cashNote) cashNote.textContent = '';
+            }
         }
     }
 
@@ -4331,12 +4382,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     function showRegisteredUnpaid(code, entryId, why, reason) {
         const f = feesOf(registerEvent);
-        const owed = f && f.cents ? centsText(f.cents) : '';
+        const owed = owedText(feeLines(registerEvent));
         const canPay = reason !== 'already-paid' && reason !== 'not-collecting' && reason !== 'not-allowed-owner' && !!(f && f.collectByCard);
         checkoutPanel(
             `<h2 class="checkout-title" id="reg-checkout-title">Registered · Unpaid</h2>`
             + `<p class="checkout-line">${eventLine(registerEvent)}</p>`
-            + `<p class="checkout-line">Your spot is saved.${owed ? ' The ' + owed + ' entry fee is still owed.' : ''}</p>`
+            + `<p class="checkout-line">Your spot is saved.${owed ? ' The ' + owed + ' is still owed.' : ''}</p>`
             + (why ? `<p class="checkout-error" id="reg-checkout-error">${escReg(why)}</p>` : '')
             + (canPay ? `<button class="btn-pay" id="reg-pay-again" data-code="${escReg(code)}" data-entry="${escReg(entryId)}" onclick="startCheckout(this.dataset.code, this.dataset.entry)">Pay again</button>` : '')
             + (f && f.allowCash ? `<p class="checkout-note">Or pay cash at the course.</p>` : '')
@@ -4344,7 +4395,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     function showPaidPanel(rec) {
         const f = feesOf(registerEvent);
-        const cents = Number.isInteger(rec && rec.amountCents) ? rec.amountCents : (f && f.cents);
+        const L = feeLines(registerEvent);
+        const paidTotal = (L && L.organizer && L.service) ? L.total : null;   // the golfer paid entry + service fee
+        const cents = paidTotal !== null ? paidTotal : (Number.isInteger(rec && rec.amountCents) ? rec.amountCents : (f && f.cents));
         // rec is registrationStatus/<code>/<entryId> ({paid, paidVia, at}):
         // no email, no team. Stripe sends the receipt (Manny, 2026-11-08).
         const email = rec && rec.email ? ' · receipt sent to ' + escReg(rec.email) : ' · Stripe emails your receipt';
@@ -4479,7 +4532,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             + `<div class="pay-tile"><b id="pay-tile-card">${centsShort(t.cardCents)}</b><span>card (${t.card})</span></div>`
             + `<div class="pay-tile"><b id="pay-tile-cash">${centsShort(t.cashCents)}</b><span>cash (${t.cash})</span></div>`
             + `<div class="pay-tile"><b id="pay-tile-unpaid">${centsShort(t.unpaidCents)}</b><span>unpaid (${t.unpaid})</span></div>`
-            + `</div><p class="pay-note" id="pay-note">Card fees are absorbed by HardPan, so the card total is what golfers paid.${extra.length ? ' ' + extra.join(' ') : ''}</p>`;
+            + `</div><p class="pay-note" id="pay-note">${payNoteText()}${extra.length ? ' ' + extra.join(' ') : ''}</p>`;
+    }
+    // CONNECT (2026-11-13): the Desk says who the card money reaches. The card
+    // tile is entry fees (amountCents is the entry fee on both kinds of charge).
+    function payNoteText() {
+        const L = feeLines(currentData);
+        if (L && L.organizer) return 'Card payments go to ' + escReg(L.name) + ' through Stripe; the card total is the entry fees received.' + (L.service ? ' HardPan\u2019s ' + centsText(L.service) + ' service fee per card sign-up is charged on top and is not in these totals.' : '');
+        return 'Card fees are absorbed by HardPan, so the card total is what golfers paid.';
     }
 
     // MARK CASH PAID / UNDO: the owner's own write, paid + paidAt + paidVia
@@ -4593,6 +4653,165 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // WHOSE ANSWER: the signed-in owner's. canManage() is true only when the
     // signed-in uid IS the record's ownerUid, so that is the uid read - the
     // page's one auth seam is not read a second time here.
+    // ---- CONNECT (2026-11-13, layout A): the Get paid card ---------------
+    // The page reads ONE thing: the owner-readable mirror connectStatus/<uid>
+    // (written by the server). It never sees an account id and writes nothing
+    // of its own; every action is a callable. ?connect=return|refresh (Stripe's
+    // way back) asks the server for a fresh status once, and refresh then asks
+    // for a new onboarding link (the old one expired).
+    var connectMirror = null, connectMirrorUid = null, connectBusy = false, connectErr = '';
+    var connectParam = (new URLSearchParams(window.location.search)).get('connect');
+    var connectHandled = false;
+    function connectStateOf(st) { if (!st || typeof st !== 'object') return 'none'; return (st.chargesEnabled === true && st.payoutsEnabled === true) ? 'on' : 'finish'; }
+    // FIX B (Grok retest 2026-11-13 18:11: "Finish setup" stayed until a refresh). The
+    // mirror is LISTENED to, not read once: Stripe's account.updated reaches the server
+    // after the organizer is already back on this page, and the webhook's write now
+    // repaints the card by itself. The listener is dropped when the owner changes.
+    var connectMirrorRef = null, connectMirrorCb = null;
+    function syncConnectMirror() {
+        const uid = (currentData && currentData.ownerUid && canManage()) ? currentData.ownerUid : null;
+        if (uid === connectMirrorUid) return;
+        if (connectMirrorRef && connectMirrorCb) { try { connectMirrorRef.off('value', connectMirrorCb); } catch (e) { /* stand-in */ } }
+        connectMirrorRef = null; connectMirrorCb = null;
+        connectMirrorUid = uid; connectMirror = null;
+        if (!uid) return;
+        const ref = db.ref('connectStatus/' + uid);
+        const cb = (snap) => {
+            if (connectMirrorUid !== uid) return;
+            connectMirror = (snap && snap.val) ? snap.val() : null;
+            renderEntryFeesCard();
+        };
+        connectMirrorRef = ref; connectMirrorCb = cb;
+        // One read for the first paint, then the live listener for every later write.
+        ref.once('value').then(cb).catch(() => { /* not readable = not set up */ });
+        try { ref.on('value', cb, () => { /* not readable = not set up */ }); } catch (e) { /* not readable */ }
+    }
+    // And a fresh status from the server when the organizer comes back to this tab
+    // (visibilitychange / focus) while payouts are not on yet - at most once in 10 s.
+    var connectRecheckAt = 0;
+    function connectRecheck() {
+        if (!currentCode || !canManage() || !paymentsAllowed || connectBusy) return;
+        if (connectStateOf(connectMirror) === 'on' || connectStateOf(connectMirror) === 'none') return;   // nothing in flight
+        const t = Date.now(); if (t - connectRecheckAt < 10000) return; connectRecheckAt = t;
+        stripeCall('getConnectStatus', { code: currentCode }).then((res) => {
+            const d = res && res.data;
+            if (d && d.connected) { connectMirror = d; renderEntryFeesCard(); }
+        }).catch(() => { /* the listener and the next look will tell */ });
+    }
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === undefined || document.visibilityState === 'visible') connectRecheck(); });
+    window.addEventListener('focus', connectRecheck);
+    function dueText(due) {
+        const words = [];
+        (Array.isArray(due) ? due : []).forEach((d) => {
+            const w = /external_account/.test(d) ? 'a bank account' : /tos_acceptance/.test(d) ? 'the terms of service' : /^(individual|company|business_profile|representative)/.test(d) ? 'identity details' : 'more details';
+            if (words.indexOf(w) === -1) words.push(w);
+        });
+        return words.length ? words.join(', ') : 'more details';
+    }
+    function serviceFeeShown() {
+        const fees = (currentData && currentData.fees) || {};
+        return Number.isInteger(fees.serviceFeeCents) && fees.serviceFeeCents >= 0 ? fees.serviceFeeCents : 400;   // the server's default; the exact number lands on the record after the first status read
+    }
+    function connectCardHtml() {
+        const st = connectStateOf(connectMirror);
+        const dollars = Number(currentData && currentData.entryFee) || 0;
+        const entry = dollars > 0 ? centsShort(Math.round(dollars * 100)) : '';
+        const fee = centsShort(serviceFeeShown());
+        const name = (connectMirror && typeof connectMirror.name === 'string' && connectMirror.name.trim()) ? escReg(connectMirror.name.trim()) : 'Your';
+        let pill, line, label, cls = 'btn-primary', rows = '';
+        if (st === 'on') {
+            pill = '<span class="gp-pill on" id="connect-pill">Payouts on</span>';
+            line = (name === 'Your' ? 'Your' : name) + ' · Stripe account connected. ' + (entry ? 'Card sign-ups charge the golfer <b>' + entry + ' entry + ' + fee + ' HardPan service fee</b>. You receive the full ' + entry + ' less Stripe processing; HardPan keeps the ' + fee + '.' : 'Card sign-ups add a ' + fee + ' HardPan service fee the golfer pays; you receive the full entry fee less Stripe processing.');
+            label = 'Manage on Stripe'; cls = 'btn-outline';
+            rows = connectRowsHtml();
+        } else if (st === 'finish') {
+            pill = '<span class="gp-pill mid" id="connect-pill">Finish setup</span>';
+            line = 'Stripe still needs: ' + escReg(dueText(connectMirror.due)) + '. Card payments stay off until it is in.';
+            label = 'Finish setup on Stripe';
+        } else {
+            pill = '<span class="gp-pill off" id="connect-pill">Not set up</span>';
+            line = 'Entry fees go to the organizer\u2019s own Stripe account. Card sign-ups add a ' + fee + ' HardPan service fee the golfer pays; you receive the full entry fee less Stripe processing. Stripe does the identity and bank steps on its own page; you come straight back here.';
+            label = 'Set up payouts with Stripe';
+        }
+        return `<div class="gp" id="connect-card"><div class="gp-t"><span>Get paid</span>${pill}</div><p class="gp-d" id="connect-line">${line}</p>${rows}`
+            + `<button type="button" class="${cls}" id="connect-btn" onclick="connectAction()"${connectBusy ? ' disabled' : ''}>${label}</button>`
+            + `<p class="fees-error" id="connect-err" style="display:${connectErr ? 'block' : 'none'};">${escReg(connectErr)}</p></div>`;
+    }
+    // The Stripe panel under the toggles, labelled by the Get paid state, and
+    // honest about where a card payment lands (planCheckout on the server).
+    function connectPanelHtml() {
+        const st = connectStateOf(connectMirror);
+        const name = (connectMirror && typeof connectMirror.name === 'string' && connectMirror.name.trim()) ? escReg(connectMirror.name.trim()) : 'the organizer’s Stripe account';
+        const head = st === 'on' ? '✓ STRIPE CONNECTED' : st === 'finish' ? 'STRIPE SETUP UNFINISHED' : 'STRIPE NOT SET UP';
+        const to = st === 'on' ? name : st === 'finish' ? 'nobody yet · cards stay off until the Stripe setup is finished' : 'HardPan’s account until you set up payouts above';
+        return `<div class="fees-stripe${st === 'on' ? '' : ' fees-stripe-off'}" id="fees-stripe"><div class="fees-stripe-head">${head}</div>`
+            + `<div><span>Card money goes to</span><strong>${to}</strong></div>`
+            + `<div><span>Mode</span><span class="fees-test-mode">TEST MODE</span></div></div>`;
+    }
+    function connectRowsHtml() {
+        const entries = registrationData && typeof registrationData === 'object' ? Object.values(registrationData) : [];
+        if (!entries.length) return '';
+        let n = 0, toYou = 0, svc = 0, rn = 0, rc = 0;
+        entries.forEach((e) => {
+            if (!e || e.paidVia !== 'stripe') return;
+            if (e.refundedAt) { rn++; rc += Number.isInteger(e.refundCents) ? e.refundCents : 0; return; }
+            if (e.paid === true) { n++; toYou += Number.isInteger(e.amountCents) ? e.amountCents : 0; svc += Number.isInteger(e.serviceFeeCents) ? e.serviceFeeCents : 0; }
+        });
+        if (!n && !rn) return '';
+        return `<div class="gp-kv"><span>Card sign-ups</span><b>${n} · ${centsShort(toYou)} to you</b></div>`
+            + `<div class="gp-kv"><span>Service fees</span><b>${centsShort(svc)} to HardPan</b></div>`
+            + (rn ? `<div class="gp-kv"><span>Refunded</span><b>${rn} · ${centsShort(rc)}</b></div>` : '');
+    }
+    function connectGo(url) {
+        if (typeof url !== 'string' || !/^https:\/\//.test(url)) { connectErr = 'Stripe did not hand back a link. Try again in a minute.'; connectBusy = false; renderEntryFeesCard(); return; }
+        window.location.href = url;
+    }
+    function connectAction() {
+        if (!currentCode || !canManage() || connectBusy) return;
+        connectBusy = true; connectErr = ''; renderEntryFeesCard();
+        const st = connectStateOf(connectMirror);
+        const call = st === 'on' ? stripeCall('createConnectDashboardLink', {}) : stripeCall('createConnectOnboardingLink', { code: currentCode });
+        call.then((res) => connectGo(res && res.data && res.data.url)).catch((err) => {
+            connectErr = connectRefusalText(err);
+            connectBusy = false; renderEntryFeesCard();
+        });
+    }
+    // EVERY WAY THE CONNECT CALL CAN FAIL, AS A SENTENCE THE ORGANIZER CAN ACT
+    // ON. The server's reasons first; then its own fault ('internal': Stripe
+    // refused or errored - on 2026-11-13 that was a refused account create, and
+    // "check your signal" sent Grok to retry a dead end); then the payment script
+    // not loading; the signal line only when nothing else is known.
+    var CONNECT_REASON_TEXT = {
+        'not-allowed-owner': 'Card payments are not switched on for this organizer yet.',
+        'not-owner': 'Only the event\u2019s owner can set up payouts.',
+        'no-email': 'Your sign-in has no email address, and Stripe needs one to pay you. Sign in with an account that has an email, then try again.',
+        'not-connected': 'Finish the Stripe setup first, then try again.'
+    };
+    var CONNECT_INTERNAL_TEXT = 'Stripe returned an error setting this up. Try again in a few minutes; if it keeps failing, text HardPan.';
+    var CONNECT_SCRIPT_TEXT = 'The payment script did not load. Reload this page and try again.';
+    var CONNECT_FALLBACK_TEXT = 'Stripe did not answer. Check your signal and try again.';
+    function connectRefusalText(err) {
+        var byReason = CONNECT_REASON_TEXT[callReason(err)];
+        if (byReason) return byReason;
+        if (err && err.code === 'functions/internal') return CONNECT_INTERNAL_TEXT;
+        if (err && err.code === 'functions/unavailable' && /SDK/.test(String(err.message || ''))) return CONNECT_SCRIPT_TEXT;
+        return CONNECT_FALLBACK_TEXT;
+    }
+    // Back from Stripe: one fresh status; on refresh, straight back into onboarding.
+    function connectArrival() {
+        if (connectHandled || !connectParam || !currentCode || !canManage() || !paymentsAllowed) return;
+        connectHandled = true;
+        const mode = connectParam;
+        stripeCall('getConnectStatus', { code: currentCode }).then((res) => {
+            const d = res && res.data;
+            if (d && d.connected) connectMirror = d;
+            renderEntryFeesCard();
+            if (mode === 'refresh' && connectStateOf(connectMirror) !== 'on') connectAction();
+            // FIX B: Stripe's account.updated can land seconds after the return; one more
+            // read a moment later, besides the live mirror above.
+            if (mode === 'return' && connectStateOf(connectMirror) !== 'on') setTimeout(() => { connectRecheckAt = 0; connectRecheck(); }, 4000);
+        }).catch(() => { renderEntryFeesCard(); });
+    }
     function syncPaymentsAllowed() {
         const uid = (currentData && currentData.ownerUid && canManage()) ? currentData.ownerUid : null;
         if (uid === paymentsAllowedUid) return;
@@ -4686,7 +4905,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const keepErr = err ? err.textContent : '';
         // The amount is read, not typed, here: ONE field, on Event details above.
         const amount = dollars > 0 ? `${centsShort(Math.round(dollars * 100))} per ${per}` : 'not set';
+        syncConnectMirror();
         let html = `<h3 style="margin:0 0 4px 0;">Entry fees</h3>`
+            + (paymentsAllowed ? connectCardHtml() : '')
             + `<div class="fees-row"><span><strong>Entry fee</strong><small>set under Event details</small></span><strong id="fees-amount">${escReg(amount)}</strong></div>`
             // The per-team sentence waits for Stripe (Advisor 2026-11-11 14:17): shown only where card payments are live for this owner.
             + (paymentsAllowed && per === 'team' && dollars > 0 ? `<p class="fees-soon" id="fees-per-team">Card payments charge each golfer. This fee is per team, so cards stay off; switch it to per golfer under Event details to collect by card.</p>` : '')
@@ -4694,13 +4915,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (paymentsAllowed) {
             html += `<div class="fees-row"><span><strong>Collect entry fees by card</strong><small>Golfers pay when they sign up</small></span>${feesToggle('fees-card', 'collectByCard', !!(f && f.collectByCard))}</div>`
                 + `<div class="fees-row"><span><strong>Also allow pay at the course</strong><small>Desk marks Paid (cash)</small></span>${feesToggle('fees-cash', 'allowCash', !!(f && f.allowCash))}</div>`
-                + `<div class="fees-stripe" id="fees-stripe"><div class="fees-stripe-head">✓ STRIPE CONNECTED</div>`
-                + `<div><span>Account</span><strong>HardPan</strong></div>`
-                + `<div><span>Mode</span><span class="fees-test-mode">TEST MODE</span></div></div>`;
+                // Labelled by the Get paid state (Advisor 2026-11-13 12:44: "STRIPE
+                // CONNECTED - Account HardPan" sat next to "Not set up"). Where card
+                // money goes is what the server's planCheckout does: no account -> HardPan's
+                // own account (Phase 1); mid-setup -> cards refused; on -> the organizer.
+                + connectPanelHtml();
         } else {
             html += `<p class="fees-soon" id="fees-soon">Card payments coming soon. Golfers pay at the course; the Desk marks Paid (cash).</p>`;
         }
         block.innerHTML = html;
+        connectArrival();
     }
 
     // ---- M1 (web part): THE EVENT-DAY PANEL --------------------------------

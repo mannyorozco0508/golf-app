@@ -75,14 +75,17 @@ function makeHandlers(deps) {
         if (!tx.committed) throw new HandlerError(core.REASONS.TOO_MANY_ATTEMPTS);
         const attempt = tx.snapshot.val();
 
-        const params = core.sessionParams({ code, entryId, origin, amountCents: plan.amountCents, eventName: tournament.name, email: registration.email, acct: plan.destination, serviceFeeCents: plan.serviceFeeCents });
-        const session = await stripe.checkout.sessions.create(params, { idempotencyKey: core.checkoutIdempotencyKey(code, entryId, attempt) });
+        const params = core.sessionParams({ code, entryId, origin, amountCents: plan.amountCents, eventName: tournament.name, email: registration.email, acct: plan.onAccount, serviceFeeCents: plan.serviceFeeCents });
+        // A DIRECT charge: the session is created ON the organizer's account (stripeAccount).
+        const sopts = { idempotencyKey: core.checkoutIdempotencyKey(code, entryId, attempt) };
+        if (plan.onAccount) sopts.stripeAccount = plan.onAccount;
+        const session = await stripe.checkout.sessions.create(params, sopts);
         // checkoutAt on the entry and, on the record, who is paid (the Desk and
         // the register line read it; the account id itself stays server-side).
         const multi = {};
         multi['registrations/' + code + '/' + entryId + '/checkoutAt'] = now();
-        multi['tournaments/' + code + '/fees/paidTo'] = plan.destination ? 'organizer' : 'hardpan';
-        if (plan.destination) multi['tournaments/' + code + '/fees/serviceFeeCents'] = plan.serviceFeeCents;
+        multi['tournaments/' + code + '/fees/paidTo'] = plan.onAccount ? 'organizer' : 'hardpan';
+        if (plan.onAccount) multi['tournaments/' + code + '/fees/serviceFeeCents'] = plan.serviceFeeCents;
         await db.ref().update(multi);
         return { url: session.url };
     }
@@ -96,10 +99,26 @@ function makeHandlers(deps) {
         const registration = await val('registrations/' + code + '/' + entryId);
         const plan = core.planRefund({ callerUid: ctx.uid, tournament, registration });
         if (!plan.ok) throw new HandlerError(plan.reason);
-        await stripe.refunds.create(
-            core.refundParams(plan, { code, entryId }),
-            { idempotencyKey: core.refundIdempotencyKey(code, entryId, plan.paymentIntent) });
+        // A direct charge is refunded ON the connected account, with refund_application_fee
+        // (core.refundParams), so HardPan's $4 goes back to the organizer.
+        const ropts = { idempotencyKey: core.refundIdempotencyKey(code, entryId, plan.paymentIntent) };
+        if (plan.onAccount) ropts.stripeAccount = plan.onAccount;
+        const refund = await stripe.refunds.create(core.refundParams(plan, { code, entryId }), ropts);
         await db.ref('registrations/' + code + '/' + entryId).update({ refundPendingAt: now() });
+        // FIX C audit (Grok retest 2026-11-13 18:11 read the organizer as short by the fee): the
+        // application fee is read back from Stripe after the refund and the answer is recorded
+        // server-side (payments/refundAudit), with an ALERT in the log when it was not returned.
+        // Measured, not assumed; the audit never blocks the refund.
+        if (plan.onAccount) {
+            try {
+                const charge = refund && typeof refund.charge === 'string' ? refund.charge : null;
+                const fees = charge ? await stripe.applicationFees.list({ charge, limit: 1 }) : null;
+                const fee = fees && fees.data && fees.data[0];
+                const audit = { refund: refund && refund.id ? refund.id : null, at: now(), appFeeCents: fee ? fee.amount : null, appFeeRefundedCents: fee ? fee.amount_refunded : null, appFeeRefunded: !!(fee && fee.refunded === true) };
+                await db.ref('payments/refundAudit/' + code + '/' + entryId).set(audit);
+                if (!fee || fee.refunded !== true) log('ALERT application fee not refunded', code, entryId, audit.refund, audit.appFeeCents, audit.appFeeRefundedCents);
+            } catch (e) { log('refund audit failed', code, entryId, e && e.message); }
+        }
         return { status: 'pending' };
     }
 
@@ -115,19 +134,24 @@ function makeHandlers(deps) {
         if (!event || typeof event.id !== 'string' || !EVENT_ID.test(event.id)) return { status: 400, body: 'bad event id' };
         const evPath = 'stripeEvents/' + event.id;
         if ((await db.ref(evPath).once('value')).exists()) return { status: 200, body: 'duplicate' };
-
+        return applyPaymentEvent(event, evPath, {});
+    }
+    // The payment pipeline, shared by both endpoints. `acctOpts` is {} for a
+    // platform event and { stripeAccount } for a direct charge's event, which
+    // lives on the connected account (its PaymentIntent and refunds are read there).
+    async function applyPaymentEvent(event, evPath, acctOpts) {
         const o = (event.data && event.data.object) || {};
         let piMetadata = null, refundId = null;
         if (core.EVENT_TYPES.indexOf(event.type) !== -1 && !/^checkout\.session\./.test(event.type)) {
             if (!core.parseRef(o.metadata) && typeof o.payment_intent === 'string') {
-                const pi = await stripe.paymentIntents.retrieve(o.payment_intent);
+                const pi = await stripe.paymentIntents.retrieve(o.payment_intent, acctOpts);
                 piMetadata = pi && pi.metadata;
             }
             if (event.type === 'charge.refunded') {
                 const first = o.refunds && o.refunds.data && o.refunds.data[0];
                 if (first && first.id) refundId = first.id;
                 else {
-                    const list = await stripe.refunds.list({ charge: o.id, limit: 1 });
+                    const list = await stripe.refunds.list({ charge: o.id, limit: 1 }, acctOpts);
                     refundId = list && list.data && list.data[0] && list.data[0].id;
                 }
             }
@@ -197,6 +221,8 @@ function makeHandlers(deps) {
                 log('ALERT payout schedule not applied', uid, acct.payoutScheduleError);
             }
             await db.ref('stripeAccounts/' + uid).set(acct);
+            // A fresh mirror for the new account (nothing enabled yet), replacing any retired account's.
+            await db.ref('connectStatus/' + uid).set(core.connectStatusOf({}, now(), name));
         }
         const linkParams = core.accountLinkParams({ acct: acct.acct, origin, code, emulator: deps.emulator === true });
         if (!linkParams) throw new HandlerError(core.EXTRA_REASONS.BAD_ORIGIN);
@@ -215,7 +241,9 @@ function makeHandlers(deps) {
         const uid = ctx && ctx.uid;
         if (!uid || !UIDRE.test(String(uid))) throw new HandlerError(core.EXTRA_REASONS.UNAUTHENTICATED);
         const acct = await val('stripeAccounts/' + uid);
-        if (!acct || typeof acct.acct !== 'string') return { connected: false, state: 'none' };
+        // No account on file (none yet, or retired): the owner-readable mirror is
+        // cleared too, so the card can never show a retired account's status.
+        if (!acct || typeof acct.acct !== 'string') { await db.ref('connectStatus/' + uid).remove(); return { connected: false, state: 'none' }; }
         const account = await stripe.accounts.retrieve(acct.acct);   // v1 view of the v2 account
         const status = core.connectStatusOf(account, now(), acct.name);
         await db.ref('connectStatus/' + uid).set(status);
@@ -233,6 +261,11 @@ function makeHandlers(deps) {
                     const multi = {};
                     multi['tournaments/' + code + '/fees/serviceFeeCents'] = fee.cents;
                     multi['tournaments/' + code + '/fees/paidToName'] = status.name || null;
+                    // FIX A (Grok retest 2026-11-13 18:11: the form showed only the $5): the golfer's
+                    // form shows the service fee line only when fees.paidTo says the organizer is
+                    // paid. Until now only the FIRST checkout wrote that - too late for the form.
+                    // Payouts on = card sign-ups will be the organizer's direct charges: say so now.
+                    if (core.connectState(status) === 'on') multi['tournaments/' + code + '/fees/paidTo'] = 'organizer';
                     await db.ref().update(multi);
                     out.serviceFeeCents = fee.cents;
                 }
@@ -240,14 +273,15 @@ function makeHandlers(deps) {
         }
         return out;
     }
-    // createConnectDashboardLink({}, {uid}) -> {url}: the Express dashboard for the caller's own account.
+    // createConnectDashboardLink({}, {uid}) -> {url}: where the caller manages their
+    // own account. A FULL-dashboard account has no login-link API (that was the
+    // Express dashboard's); the organizer signs in at dashboard.stripe.com.
     async function createConnectDashboardLink(data, ctx) {
         const uid = ctx && ctx.uid;
         if (!uid || !UIDRE.test(String(uid))) throw new HandlerError(core.EXTRA_REASONS.UNAUTHENTICATED);
         const acct = await val('stripeAccounts/' + uid);
         if (!acct || typeof acct.acct !== 'string') throw new HandlerError(core.EXTRA_REASONS.NOT_CONNECTED);
-        const link = await stripe.accounts.createLoginLink(acct.acct);
-        return { url: link.url };
+        return { url: core.DASHBOARD_URL };
     }
     // The second endpoint ("listen to events on Connected accounts"), its own
     // secret. account.updated -> the mirror; deauthorized -> everything off.
@@ -262,6 +296,18 @@ function makeHandlers(deps) {
         if (!event || typeof event.id !== 'string' || !EVENT_ID.test(event.id)) return { status: 400, body: 'bad event id' };
         const evPath = 'stripeEvents/' + event.id;
         if ((await db.ref(evPath).once('value')).exists()) return { status: 200, body: 'duplicate' };
+        // A direct charge's payment event (checkout.session.*, charge.*) arrives here,
+        // on the connected account: the same pipeline as the platform endpoint, with
+        // the PaymentIntent / refunds read on that account; mapEvent holds
+        // event.account against the session's own acct.
+        if (core.EVENT_TYPES.indexOf(event.type) !== -1) {
+            if (typeof event.account !== 'string' || !/^acct_/.test(event.account)) {
+                await db.ref(evPath).transaction((cur) => (cur === null ? { type: 'rejected-account', at: now() } : undefined));
+                log('ALERT connect payment event without an account', event.id, event.type);
+                return { status: 200, body: 'rejected-account' };
+            }
+            return applyPaymentEvent(event, evPath, { stripeAccount: event.account });
+        }
         // Whose account: looked up by the account id for every Connect event
         // (deauthorized names it in event.account, account.updated in
         // data.object.id), so the mirror is written for an account we hold even
