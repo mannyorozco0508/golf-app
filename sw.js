@@ -4549,7 +4549,8 @@ const APP_SHELL_ALIASES = ['./', './app'];
 // Moved to v409-2.0 (checkout copy, Manny OK 2026-11-12): tournament.html's signup page says a server fault at Pay is the payment service's, not the golfer's signal; a device on v408 keeps the signal sentence for both.
 // Moved to v410-2.0 (bug-hunt #10 + #14, Manny OK 2026-11-13): tournament.html's Event day gains the Announce to the field tile; tap targets on tournament.html and tournament-scorecard.html grow to 44x32 (chips, start-type words, Sign out, every close, QR, the contest toggle, Why?); a device on v409 keeps the small targets and no tile.
 // Moved to v411-2.0 (website pictures vs iOS 2.0.7, Manny OK by phone relay 2026-11-13): hardpan-home.html's 17 feature pictures (13 stills, 4 clips with posters) are 2.0.7 captures and its organizers board reads Desert Classic; a device on v410 keeps the old screens and the Rattle Classic board.
-const CACHE_VERSION = 'golfapp-v411-2.0';
+// Moved to v412-2.0 (Stripe Connect on tournament.html, Manny OK by phone relay 2026-11-13): the Get paid card, the service-fee lines on the register form, the state-labelled Stripe box and the honest Connect error copy; a device on v411 keeps the page without them.
+const CACHE_VERSION = 'golfapp-v412-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
