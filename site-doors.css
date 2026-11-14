@@ -1,0 +1,27 @@
+/* ============================================================================
+   THE TWO DOORS BAR (Two doors option B, Manny's pick; ADVISOR-20261114-1527).
+   A slim Golfers | Organizers switch pinned at the top of the page while it
+   scrolls. One file so both doors draw the same bar:
+
+     hardpangolf.com/             (hardpan-home.html)  Golfers lit
+     hardpangolf.com/tournaments  (the landing)        Organizers lit
+
+   Markup, the first element in <body>; the lit door carries aria-current:
+     <link rel="stylesheet" href="/site-doors.css">
+     <nav class="door-bar" aria-label="Golfers or organizers">
+       <a href="/" aria-current="page">Golfers</a><a href="/tournaments">Organizers</a>
+     </nav>
+   (on the landing, move aria-current="page" to the Organizers link).
+   No script, no tracking, no dependency. Guard: hardpan_home_two_doors_test.js.
+   ============================================================================ */
+.door-bar { position:sticky; top:0; z-index:40; display:flex; gap:4px; padding:5px; background:#14201b; }
+.door-bar a { flex:1 1 0; display:flex; align-items:center; justify-content:center; min-height:36px; border-radius:9px;
+    font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Inter, Arial, sans-serif; font-size:14px; font-weight:800;
+    letter-spacing:.01em; color:#c9d1cc; text-decoration:none; -webkit-tap-highlight-color:transparent; }
+.door-bar a:hover { color:#fff; }
+.door-bar a[aria-current="page"] { background:#d9f07a; color:#0f4a36; }
+.door-bar a:focus-visible { outline:3px solid #d9f07a; outline-offset:2px; }
+@media (min-width:701px) {
+    .door-bar { justify-content:center; }
+    .door-bar a { flex:0 0 180px; }
+}

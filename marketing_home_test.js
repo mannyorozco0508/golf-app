@@ -120,13 +120,17 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         // Full name (Nov 10): the title and the footer say "HardPan: Golf GPS & Games"; the footer keeps
         // "a Rattle Golf LLC app". Was: <title>HardPan Golf</title> and a "HardPan Golf" footer.
         assert.match(html, /<title>HardPan: Golf GPS &amp; Games<\/title>/);
-        assert.match(html, /<footer>[\s\S]*?<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ<\/div>[\s\S]*?<\/footer>/);
-        // 41A (Manny, Nov 11): the header shows the full name on two lines, "HardPan:" over "Golf GPS & Games".
-        // Was: "HardPan Golf" on one line. Same header on help.html and help/*.html.
+        // Re-pinned 2026-11-14 (Two doors B, Manny's lockup pick 15:26, ADVISOR-20261114-1527): the homepage
+        // footer reads "HardPan Golf" and the legal line "HardPan is a product of Rattle Golf LLC." (was
+        // "HardPan: Golf GPS & Games · a Rattle Golf LLC app"); the header is the light mark + "HardPan Golf"
+        // over "GPS & GAMES" (was 41A "HardPan:" over "Golf GPS & Games"). hardpan_home_two_doors_test.js
+        // holds the rest. The help pages were not part of this item and keep 41A, pinned below as before.
+        assert.match(html, /<footer>[\s\S]*?<b style="color:#fff">HardPan Golf<\/b> &middot; GPS &amp; games &middot; Scottsdale, AZ<\/div>[\s\S]*?HardPan is a product of Rattle Golf LLC\.[\s\S]*?<\/footer>/);
+        assert.match(html, /<a class="logo" href="\/"><img src="\/hardpan-golf-icon\.svg" alt="" width="46" height="46"><span class="logo-name"><span class="logo-1">HardPan Golf<\/span><span class="logo-2">GPS &amp; GAMES<\/span><\/span><\/a>/);
+        assert.doesNotMatch(html, /Golf GPS &amp; Games<\/span>|a Rattle Golf LLC app/, 'the 41A lockup or the old footer wording is back on the homepage');
+        // 41A (Manny, Nov 11): the help pages' header: the full name on two lines, "HardPan:" over "Golf GPS & Games".
         const HDR41 = /<a class="logo" href="[^"]*"><img src="\/hardpan-icon\.svg" alt="" width="36" height="36"><span class="logo-name"><span class="logo-1">HardPan:<\/span><span class="logo-2">Golf GPS &amp; Games<\/span><\/span><\/a>/;
-        assert.match(html, HDR41);
-        assert.doesNotMatch(html, /<a class="logo"[^>]*>[\s\S]{0,120}HardPan Golf<\/a>/, 'header still says HardPan Golf');
-        // the help pages share the footer: same full name there
+        // the help pages' footer: the full name there
         ['help.html'].concat(fs.readdirSync(path.join(ROOT, 'help')).filter((f) => f.endsWith('.html')).map((f) => 'help/' + f)).forEach((f) => {
             assert.match(read(f), /<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ/, f + ': footer is not the full name');
             assert.match(read(f), HDR41, f + ': header is not the 41A two-line name');
@@ -242,7 +246,10 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
     test('the page has no dollar figure of its own (prices come from site-pricing.js)', () => {
         const visible = stripScripts(html);
         assert.doesNotMatch(visible, /\$\s?\d/, 'a hard-coded price is back in the page');
-        assert.ok((visible.match(/data-price="/g) || []).length >= 8, 'the price slots are gone');
+        // Re-pinned 2026-11-14 (live-price check pending, Advisor 2026-11-14 15:27): was >= 8. The four
+        // unconfirmed price slots (pro-yearly, pro-monthly, host-yearly, trip-pass) read "see in app" in the
+        // page; the GPS card added one trial-days slot. 7 remain.
+        assert.ok((visible.match(/data-price="/g) || []).length >= 7, 'the price slots are gone');
         assert.match(html, /<script src="\/site-pricing\.js"><\/script>/);
     });
 
@@ -317,11 +324,16 @@ describe('2. PRICES: one config, the same as the app and the terms', () => {
         vm.createContext(sb);
         vm.runInContext(read('site-pricing.js'), sb);
         vm.runInContext(inline[1], sb);
-        assert.ok(slots.length >= 8);
+        assert.ok(slots.length >= 7);   // re-pinned 2026-11-14, was 8: see the slot test above
         slots.forEach((s) => assert.notEqual(s.textContent, '–', 'slot ' + s.key + ' has no value'));
         const by = Object.fromEntries(slots.map((s) => [s.key, s.textContent]));
-        assert.equal(by['pro-headline'], P.pro.founding + '/yr');
-        assert.equal(by['trip-pass'], P.tripPass.price);
+        // Re-pinned 2026-11-14 (live-price check pending, Advisor 2026-11-14 15:27): the page's own inline
+        // script writes the founding line as "$24.99 / year" (was site-pricing.js's "$24.99/yr").
+        assert.equal(by['pro-headline'], P.pro.founding + ' / year');
+        // Re-pinned 2026-11-14 (live-price check pending, Advisor 2026-11-14 15:27): the Trip Pass price slot left
+        // the page; it reads "see in app" (was by['trip-pass'] === P.tripPass.price).
+        assert.ok(!('trip-pass' in by), 'the Trip Pass price slot is back on the page');
+        assert.match(html, /<span class="nm">Trip Pass<\/span><b class="sia">see in app<\/b>/);
         assert.equal(by['free-golfers'], '5');
     });
 
@@ -622,7 +634,8 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
     });
 
     test('Help is linked from the homepage nav and footer, and from the support and refund pages', () => {
-        assert.ok(anchors(/<nav[\s\S]*?<\/nav>/.exec(home)[0]).some((x) => x.attrs.href === '/help'), 'nav');
+        // Re-pinned 2026-11-14 (Two doors B): the first <nav> is now the Golfers | Organizers bar; Help is in the main nav.
+        assert.ok(anchors(/<nav class="wrap top"[\s\S]*?<\/nav>/.exec(home)[0]).some((x) => x.attrs.href === '/help'), 'nav');
         assert.match(read('support.html'), /<a href="\/help">Help<\/a>/);
         assert.match(read('refunds.html'), /<a href="\/help">Help<\/a>/);
         helpPages.forEach((f) => assert.match(read(f), /href="\/home#get-the-app"/, f + ': Get the app goes nowhere'));

@@ -352,7 +352,7 @@
     {
       "key": "registration-desk",
       "card": "f-desk",
-      "headline": "Sign-ups and check-in, one desk.",
+      "headline": "Sign-ups, one desk.",
       "files": [
         "/media/screens/registration-desk-400.webp",
         "/media/screens/registration-desk-780.webp"

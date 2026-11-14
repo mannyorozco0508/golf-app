@@ -8,6 +8,7 @@
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <title>HardPan: Golf GPS &amp; Games</title>
+<link rel="stylesheet" href="/site-doors.css">
 <!--
   THE MARKETING PAGE (website-b, ADVISOR-20261108-0356, Manny picked design B).
   Served at / (website-d: a BARE / only - functions/index.js + _front-door.js),
@@ -48,6 +49,26 @@
     site-features.js. The feature section between the two markers below is
     generated (scratch tools/gen.js); the cards, sources and alt text are listed in
     the website-e report. Not in sw.js's shell list, not in the native bundle.
+  TWO DOORS, OPTION B (Manny's pick, built on a preview: ADVISOR-20261114-1527,
+    -1248, -1256). The hero keeps "Play it. Run it." and gains two buttons: "I'm a
+    golfer" scrolls to #app (the first band: the store badges and the GPS card) and
+    "I run events" goes to /tournaments. A slim Golfers | Organizers bar is pinned at
+    the top (nav.door-bar, styled by site-doors.css, which the /tournaments landing
+    can link as-is and light Organizers with aria-current="page"). The header lockup
+    is the light mark (hardpan-golf-icon.svg = HardPan-icon-light.svg, unchanged) +
+    "HardPan Golf" over "GPS & GAMES" (Manny 15:26). Pricing shows only what is live:
+    the Founding line; every other paid line reads "see in app" until the live-price
+    check (Advisor 2026-11-14 15:27). The footer's legal line is the only Rattle.
+    Guard: hardpan_home_two_doors_test.js.
+  WEBSITE vs 2.0.7 (ADVISOR-20261114-1558, Manny: "we always need to keep the website
+    updated"): every feature live in the stores is on the page with a real screenshot,
+    or as a text line where no capture exists; anything not in the stores is left off
+    or tagged COMING. #green-slope is the 72R-A green slope (not in a store build yet,
+    so the whole section is tagged "coming in the next update"). Its picture is ONE
+    <img src="/site/gps-green-slope.png">: replace that file with the real capture
+    (Home Course hole 6, from the iOS lane via the Advisor) and the markup does not
+    change. Today it is the AFTER phone of 72RA-before-after.png (feat-207-72ra
+    0550334c, True Blue hole 4, the real app at 402x874), its debug top bar cropped.
   STILL TO FILL (grep data-todo):
     data-todo="copy-approve"    claims Grok flagged for Manny's wording OK
   Prices: none in this file. site-pricing.js fills every data-price slot.
@@ -61,10 +82,13 @@
     .wrap { max-width:1180px; margin:0 auto; padding:0 28px; }
     nav.top { display:flex; align-items:center; justify-content:space-between; padding:18px 0; gap:16px; }
     .logo { display:flex; align-items:center; gap:10px; font-weight:800; font-size:20px; }
-    .logo img { width:36px; height:36px; border-radius:9px; display:block; }
-    .logo .logo-name { display:flex; flex-direction:column; line-height:1.08; }
-    .logo .logo-1 { font-size:20px; font-weight:800; }
-    .logo .logo-2 { font-size:13.5px; font-weight:700; color:var(--g); }
+    /* Two doors B: the lockup is the light mark + "HardPan Golf" over a letter-spaced "GPS & GAMES"
+       (HardPan-Golf-lockup-light.png: the word 900-weight in near-black, the line green, about a third its size). */
+    .logo { gap:8px; }
+    .logo img { width:46px; height:46px; display:block; flex:0 0 auto; }
+    .logo .logo-name { display:flex; flex-direction:column; line-height:1; }
+    .logo .logo-1 { font-size:23px; font-weight:900; letter-spacing:-.025em; color:#0b100d; }
+    .logo .logo-2 { font-size:10.5px; font-weight:800; letter-spacing:.3em; color:var(--g); margin-top:5px; }
     .links { display:flex; gap:26px; font-size:15px; font-weight:600; }
     .links a:hover { color:var(--g); }
     .btn { display:inline-flex; align-items:center; gap:8px; padding:13px 20px; border-radius:12px; font-weight:700; font-size:15px; white-space:nowrap; }
@@ -277,12 +301,59 @@
         .fv-ar { width:36px; height:36px; font-size:22px; }
         .fv-prev { left:4px; } .fv-next { right:4px; }
     }
+
+    /* TWO DOORS B (Manny's pick, ADVISOR-20261114-1527): the two hero buttons, the #app band with
+       the GPS card and the store badges, the pricing "see in app" lines, and room under the pinned bar. */
+    section[id], .panel[id] { scroll-margin-top:56px; }
+    .doors { display:flex; justify-content:center; gap:14px; margin:22px auto 0; max-width:560px; }
+    .doors .btn { justify-content:center; min-height:52px; font-size:18px; padding:14px 28px; border-radius:14px; }
+    .ghost { border:2px solid var(--g); color:var(--g); background:transparent; }
+    .app-band { background:#fff; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:44px 0 46px; margin:18px 0 26px; }
+    .app-in { display:grid; grid-template-columns:1.2fr 1fr; gap:32px; align-items:center; }
+    .app-band .kicker { color:var(--g); }
+    .app-band h2 { font-size:38px; font-weight:900; letter-spacing:-.02em; margin:8px 0 8px; }
+    .app-band .sub { margin-bottom:20px; }
+    .app-band .badges { justify-content:flex-start; margin-top:0; }
+    .gps-card { background:var(--g); color:#fff; border-radius:24px; padding:26px 26px 24px; }
+    .gps-card .kicker { color:var(--lime); }
+    .gps-card ul { margin-top:8px; }
+    .gps-card ul { list-style:none; }
+    .gps-card li { font-size:16px; font-weight:700; padding:7px 0 7px 28px; position:relative; color:#e6efe9; }
+    .gps-card li::before { content:"\2713"; position:absolute; left:0; color:var(--lime); font-weight:900; }
+    .gps-card .trial { display:inline-block; margin-top:14px; background:var(--lime); color:var(--g); font-weight:800; font-size:14px; border-radius:999px; padding:6px 14px; }
+    .pc .pend { display:block; font-size:13.5px; margin-top:4px; }
+    .slope-sec { padding:8px 0 40px; }
+    .slope-in { display:grid; grid-template-columns:300px 1fr; gap:40px; align-items:center; }
+    .slope-shot { margin:0; }
+    .slope-shot img { display:block; width:100%; height:auto; border-radius:28px; border:7px solid #0b0f0d; box-shadow:0 18px 40px rgba(0,0,0,.25); background:#2f5a3a; }
+    .slope-sec .kicker { color:var(--g); }
+    .slope-sec h2 { font-size:36px; font-weight:900; letter-spacing:-.02em; margin:8px 0 10px; }
+    .soon-tag { display:inline-block; font-size:11.5px; font-weight:800; letter-spacing:.08em; color:var(--ink); background:#ffd76a; border-radius:8px; padding:4px 9px; margin-bottom:12px; }
+    .org-soon { font-size:13px; font-weight:700; color:#ffd76a; margin:14px 0 0; }
+    .pc b.sia { font-size:20px; }
+    .board .row b { color:#c0392b; }   /* under par: red, the only colour a score gets */
+    @media (max-width:700px) {
+        .doors { flex-direction:column; gap:10px; margin-top:16px; }
+        .doors .btn { width:100%; font-size:17px; padding:14px 16px; }
+        .app-band { padding:28px 0 30px; margin:14px 0 18px; }
+        .app-in { grid-template-columns:1fr; gap:20px; }
+        .app-band h2 { font-size:28px; }
+        .gps-card { padding:20px 20px 18px; }
+        .slope-sec { padding:0 0 28px; }
+        .slope-in { grid-template-columns:1fr; gap:18px; }
+        .slope-shot { max-width:260px; margin:0 auto; order:2; }
+        .slope-sec h2 { font-size:27px; }
+        .logo img { width:42px; height:42px; }
+        .logo .logo-1 { font-size:21px; }
+        .logo .logo-2 { font-size:9.5px; }
+    }
 </style>
 </head>
 <body>
+<nav class="door-bar" aria-label="Golfers or organizers"><a href="/" aria-current="page">Golfers</a><a href="/tournaments">Organizers</a></nav>
 
 <nav class="wrap top" aria-label="Main">
-    <a class="logo" href="/"><img src="/hardpan-icon.svg" alt="" width="36" height="36"><span class="logo-name"><span class="logo-1">HardPan:</span><span class="logo-2">Golf GPS &amp; Games</span></span></a>
+    <a class="logo" href="/"><img src="/hardpan-golf-icon.svg" alt="" width="46" height="46"><span class="logo-name"><span class="logo-1">HardPan Golf</span><span class="logo-2">GPS &amp; GAMES</span></span></a>
     <div class="links">
         <a href="#features">Features</a>
         <a href="#golfers">Games</a>
@@ -298,9 +369,36 @@
 <section class="wrap hero">
     <h1>Play it. Run it.<br><span>HardPan does the math.</span></h1>
     <p class="sub">GPS, games and live scoring for your group, and a full tournament tool for the people who organize the day.</p>
-    <div class="badges hb"><a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a><a class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app" data-store="google"><img src="/google-play-badge.png" alt="Get it on Google Play" width="170" height="66"></a></div>
-    <p class="start-row hero-start"><a class="btn lime" id="hero-start-tournament" href="/tournament">Start a tournament &rarr;</a></p>
+    <div class="doors"><a class="btn lime" id="door-golfer" href="#app">I'm a golfer &darr;</a><a class="btn ghost" id="door-events" href="/tournaments">I run events &rarr;</a></div>
     <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
+</section>
+
+<section class="app-band" id="app" aria-labelledby="app-h">
+    <div class="wrap app-in">
+        <div>
+            <div class="kicker">THE HARDPAN APP</div>
+            <h2 id="app-h">Your round, on your phone</h2>
+            <p class="sub">Course maps, distances to the green, green slope and every game your group plays.</p>
+            <div class="badges hb"><a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a><a class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app" data-store="google"><img src="/google-play-badge.png" alt="Get it on Google Play" width="170" height="66"></a></div>
+        </div>
+        <div class="gps-card" id="gps-card">
+            <div class="kicker">GPS</div>
+            <ul><li>Course maps</li><li>Distances to the green</li><li>Green slope</li><li>Plays-like with wind and elevation</li><li>Yardages on the Lock Screen (iPhone)</li></ul>
+            <span class="trial"><span data-price="pro-trial-days"></span>-day free trial</span>
+        </div>
+    </div>
+</section>
+
+<section class="slope-sec" id="green-slope" aria-labelledby="slope-h">
+    <div class="wrap slope-in">
+        <figure class="slope-shot"><img src="/site/gps-green-slope.png" width="402" height="828" loading="lazy" decoding="async" alt="The HardPan GPS on the green at True Blue Golf Club, hole 4, 40 yards out: the green shaded by its slope with flow arrows, Uphill putt from: short-left, and the slope key under the Slope switch."></figure>
+        <div>
+            <span class="soon-tag">COMING IN THE NEXT UPDATE</span>
+            <div class="kicker">GREEN SLOPE</div>
+            <h2 id="slope-h">See which way the green breaks</h2>
+            <p class="sub">Smooth slope shading and flow arrows drawn on the green from 1 m lidar, and where to leave yourself the uphill putt.</p>
+        </div>
+    </div>
 </section>
 
 <!-- website-e features (generated) -->
@@ -365,7 +463,7 @@
         <div class="ghd"><h2>Organize</h2><span class="gn">12 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="Organize: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="Organize: more cards">&rsaquo;</button></span></div>
         <p class="start-row"><a class="btn lime" id="start-tournament" href="/tournament">Start a tournament &rarr;</a></p>
         <p class="gln">Run a tournament from your phone.</p>
-        <ul class="row" aria-label="Organize features"><li class="fc" id="f-tourney" data-key="tournaments"><div class="cap"><span class="eb">TOURNAMENTS</span> <span class="clipchip">&#9654; clip 0:04</span><h3>Run the day from your phone.</h3><p>Tournaments sit right on Home. Keep score, open the board.</p></div><button type="button" class="ph" data-open="tournaments" aria-label="See Run the day from your phone full screen"><span class="s clipslot"><img src="/media/screens/tournaments-400.webp" srcset="/media/screens/tournaments-400.webp 400w, /media/screens/tournaments-886.webp 886w" sizes="(max-width:700px) 200px, 206px" width="886" height="1920" loading="lazy" decoding="async" alt="HardPan Home with the Golf GPS card for Papago Golf Club and the organizer’s event card under it: Desert Classic, shotgun 8:10 AM, 8 teams, the join code, Share code and Manage."><video muted playsinline preload="none" data-src="/media/clips/tournaments.mp4" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></span></button></li><li class="fc" id="f-create-event" data-key="create-event"><div class="cap"><span class="eb">QUICK START</span><h3>A tournament in four questions.</h3><p>Name, course, when and format. You get a join code to share.</p></div><button type="button" class="ph" data-open="create-event" aria-label="See A tournament in four questions full screen"><span class="s"><img src="/media/screens/create-event-400.webp" srcset="/media/screens/create-event-400.webp 400w, /media/screens/create-event-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="1704" loading="lazy" decoding="async" alt="Creating a tournament, question four: pick the format, Scramble, Best ball, Shamble or Individual."></span></button></li><li class="fc" id="f-join-event" data-key="join-event"><div class="cap"><span class="eb">JOIN CODE</span><h3>Join the tournament.</h3><p>Type the event code, find your team, and you’re in.</p></div><button type="button" class="ph" data-open="join-event" aria-label="See Join the tournament full screen"><span class="s"><img src="/media/screens/join-event-400.webp" srcset="/media/screens/join-event-400.webp 400w, /media/screens/join-event-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="Joining the Papago Fall Scramble: Which team are you on?, with Teams 1 to 8 and their starting holes."></span></button></li><li class="fc" id="f-event-board" data-key="event-board"><div class="cap"><span class="eb">LEADERBOARD</span><h3>Every group. One board.</h3><p>Net or gross, all groups or by flight, with skins as they happen.</p></div><button type="button" class="ph" data-open="event-board" aria-label="See Every group. One board full screen"><span class="s"><img src="/media/screens/event-board-400.webp" srcset="/media/screens/event-board-400.webp 400w, /media/screens/event-board-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="A tournament leaderboard, net, with every group on one board: Andy leads at 4 under through 13."></span></button></li><li class="fc" id="f-prizes" data-key="prizes"><div class="cap"><span class="eb">FLIGHTS</span><h3>Every flight, live.</h3><p>The leaderboard updates as groups post. Flights sorted for you.</p></div><button type="button" class="ph" data-open="prizes" aria-label="See Every flight, live full screen"><span class="s fit" style="background:#eef3f1"><img src="/media/screens/prizes-400.webp" srcset="/media/screens/prizes-400.webp 400w, /media/screens/prizes-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1100" loading="lazy" decoding="async" alt="The live tournament leaderboard in the app, with Card, Board and GPS tabs on top: Team 4 in 1st at 3 under through 4, leading by 2, and the teams around it."></span></button></li><li class="fc" id="f-team-links" data-key="team-qr-links"><div class="cap"><span class="eb">TEAM QR LINKS</span><h3>Every team gets its own link.</h3><p>Scan the QR or tap the text; it opens that team’s card and nothing else.</p></div><button type="button" class="ph" data-open="team-qr-links" aria-label="See Every team gets its own link full screen"><span class="s"><img src="/media/screens/team-qr-links-400.webp" srcset="/media/screens/team-qr-links-400.webp 400w, /media/screens/team-qr-links-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="Setup on the organizer page: Team 4’s scorecard link on hardpangolf.com shown as a QR code with a Copy Link button, from the shotgun start list."></span></button></li><li class="fc" id="f-my-events" data-key="my-events"><div class="cap"><span class="eb">MY EVENTS</span><h3>Your events, on any device.</h3><p>Sign in and the events you run are listed; or open one by its code.</p></div><button type="button" class="ph" data-open="my-events" aria-label="See Your events, on any device full screen"><span class="s"><img src="/media/screens/my-events-400.webp" srcset="/media/screens/my-events-400.webp 400w, /media/screens/my-events-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="The organizer home with My events listing Hope Foundation Scramble and Club Championship, and an Open an event by code box."></span></button></li><li class="fc" id="f-card-board" data-key="card-board"><div class="cap"><span class="eb">CARD AND BOARD</span><h3>Your card and the board, one link.</h3><p>Type the hole’s score; the live leaderboard is the next tab over.</p></div><button type="button" class="ph" data-open="card-board" aria-label="See Your card and the board, one link full screen"><span class="s"><img src="/media/screens/card-board-400.webp" srcset="/media/screens/card-board-400.webp 400w, /media/screens/card-board-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="A team’s card in the app for Desert Classic: Card, Board and GPS tabs, next to play Hole 8 · Par 5, the team score with minus and plus buttons, and Save · Next hole."></span></button></li><li class="fc" id="f-contests" data-key="contests"><div class="cap"><span class="eb">CONTESTS</span><h3>Closest to the pin, long drive.</h3><p>Take the par-3 suggestion or pick your holes; golfers enter their mark on the card.</p></div><button type="button" class="ph" data-open="contests" aria-label="See Closest to the pin, long drive full screen"><span class="s"><img src="/media/screens/contests-400.webp" srcset="/media/screens/contests-400.webp 400w, /media/screens/contests-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="The organizer’s Contests tab suggesting closest to the pin on every par 3 and long drive on 18, with a Use these button."></span></button></li><li class="fc" id="f-photos" data-key="photos-after"><div class="cap"><span class="eb">PHOTOS</span><h3>Photos when the round is done.</h3><p>After the last hole the card asks for photos; you OK them for the recap.</p></div><button type="button" class="ph" data-open="photos-after" aria-label="See Photos when the round is done full screen"><span class="s"><img src="/media/screens/photos-after-400.webp" srcset="/media/screens/photos-after-400.webp 400w, /media/screens/photos-after-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="A finished team card asking Round done, add photos from today?, with a photo picker, a caption box and a Send to the organizer button."></span></button></li><li class="fc" id="f-announce" data-key="announcements"><div class="cap"><span class="eb">NOTES AND PACE</span><h3>A note on every card.</h3><p>A weather hold reaches every golfer’s card at once; a pace nudge goes to one group.</p></div><button type="button" class="ph" data-open="announcements" aria-label="See A note on every card full screen"><span class="s"><img src="/media/screens/announcements-400.webp" srcset="/media/screens/announcements-400.webp 400w, /media/screens/announcements-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="A golfer’s card covered by a full-screen weather note: Stop play, lightning in the area, with a Got it button."></span></button></li><li class="fc" id="f-desk" data-key="registration-desk"><div class="cap"><span class="eb">REGISTRATION DESK</span><h3>Sign-ups and check-in, one desk.</h3><p>Who signed up, who paid, who’s in the field; correct a name on the spot.</p></div><button type="button" class="ph" data-open="registration-desk" aria-label="See Sign-ups and check-in, one desk full screen"><span class="s"><img src="/media/screens/registration-desk-400.webp" srcset="/media/screens/registration-desk-400.webp 400w, /media/screens/registration-desk-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="The Desk tab: 4 signups, filters All, Unpaid, Paid and Approved, and each golfer with Approve into field, Correct and Remove buttons."></span></button></li></ul>
+        <ul class="row" aria-label="Organize features"><li class="fc" id="f-tourney" data-key="tournaments"><div class="cap"><span class="eb">TOURNAMENTS</span> <span class="clipchip">&#9654; clip 0:04</span><h3>Run the day from your phone.</h3><p>Tournaments sit right on Home. Keep score, open the board.</p></div><button type="button" class="ph" data-open="tournaments" aria-label="See Run the day from your phone full screen"><span class="s clipslot"><img src="/media/screens/tournaments-400.webp" srcset="/media/screens/tournaments-400.webp 400w, /media/screens/tournaments-886.webp 886w" sizes="(max-width:700px) 200px, 206px" width="886" height="1920" loading="lazy" decoding="async" alt="HardPan Home with the Golf GPS card for Papago Golf Club and the organizer’s event card under it: Desert Classic, shotgun 8:10 AM, 8 teams, the join code, Share code and Manage."><video muted playsinline preload="none" data-src="/media/clips/tournaments.mp4" aria-hidden="true"></video><span class="cb">&#9654; 0:04</span></span></button></li><li class="fc" id="f-create-event" data-key="create-event"><div class="cap"><span class="eb">QUICK START</span><h3>A tournament in four questions.</h3><p>Name, course, when and format. You get a join code to share.</p></div><button type="button" class="ph" data-open="create-event" aria-label="See A tournament in four questions full screen"><span class="s"><img src="/media/screens/create-event-400.webp" srcset="/media/screens/create-event-400.webp 400w, /media/screens/create-event-786.webp 786w" sizes="(max-width:700px) 200px, 206px" width="786" height="1704" loading="lazy" decoding="async" alt="Creating a tournament, question four: pick the format, Scramble, Best ball, Shamble or Individual."></span></button></li><li class="fc" id="f-join-event" data-key="join-event"><div class="cap"><span class="eb">JOIN CODE</span><h3>Join the tournament.</h3><p>Type the event code, find your team, and you’re in.</p></div><button type="button" class="ph" data-open="join-event" aria-label="See Join the tournament full screen"><span class="s"><img src="/media/screens/join-event-400.webp" srcset="/media/screens/join-event-400.webp 400w, /media/screens/join-event-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="Joining the Papago Fall Scramble: Which team are you on?, with Teams 1 to 8 and their starting holes."></span></button></li><li class="fc" id="f-event-board" data-key="event-board"><div class="cap"><span class="eb">LEADERBOARD</span><h3>Every group. One board.</h3><p>Net or gross, all groups or by flight, with skins as they happen.</p></div><button type="button" class="ph" data-open="event-board" aria-label="See Every group. One board full screen"><span class="s"><img src="/media/screens/event-board-400.webp" srcset="/media/screens/event-board-400.webp 400w, /media/screens/event-board-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="A tournament leaderboard, net, with every group on one board: Andy leads at 4 under through 13."></span></button></li><li class="fc" id="f-prizes" data-key="prizes"><div class="cap"><span class="eb">FLIGHTS</span><h3>Every flight, live.</h3><p>The leaderboard updates as groups post. Flights sorted for you.</p></div><button type="button" class="ph" data-open="prizes" aria-label="See Every flight, live full screen"><span class="s fit" style="background:#eef3f1"><img src="/media/screens/prizes-400.webp" srcset="/media/screens/prizes-400.webp 400w, /media/screens/prizes-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1100" loading="lazy" decoding="async" alt="The live tournament leaderboard in the app, with Card, Board and GPS tabs on top: Team 4 in 1st at 3 under through 4, leading by 2, and the teams around it."></span></button></li><li class="fc" id="f-team-links" data-key="team-qr-links"><div class="cap"><span class="eb">TEAM QR LINKS</span><h3>Every team gets its own link.</h3><p>Scan the QR or tap the text; it opens that team’s card and nothing else.</p></div><button type="button" class="ph" data-open="team-qr-links" aria-label="See Every team gets its own link full screen"><span class="s"><img src="/media/screens/team-qr-links-400.webp" srcset="/media/screens/team-qr-links-400.webp 400w, /media/screens/team-qr-links-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="Setup on the organizer page: Team 4’s scorecard link on hardpangolf.com shown as a QR code with a Copy Link button, from the shotgun start list."></span></button></li><li class="fc" id="f-my-events" data-key="my-events"><div class="cap"><span class="eb">MY EVENTS</span><h3>Your events, on any device.</h3><p>Sign in and the events you run are listed; or open one by its code.</p></div><button type="button" class="ph" data-open="my-events" aria-label="See Your events, on any device full screen"><span class="s"><img src="/media/screens/my-events-400.webp" srcset="/media/screens/my-events-400.webp 400w, /media/screens/my-events-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="The organizer home with My events listing Hope Foundation Scramble and Club Championship, and an Open an event by code box."></span></button></li><li class="fc" id="f-card-board" data-key="card-board"><div class="cap"><span class="eb">CARD AND BOARD</span><h3>Your card and the board, one link.</h3><p>Type the hole’s score; the live leaderboard is the next tab over.</p></div><button type="button" class="ph" data-open="card-board" aria-label="See Your card and the board, one link full screen"><span class="s"><img src="/media/screens/card-board-400.webp" srcset="/media/screens/card-board-400.webp 400w, /media/screens/card-board-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="A team’s card in the app for Desert Classic: Card, Board and GPS tabs, next to play Hole 8 · Par 5, the team score with minus and plus buttons, and Save · Next hole."></span></button></li><li class="fc" id="f-contests" data-key="contests"><div class="cap"><span class="eb">CONTESTS</span><h3>Closest to the pin, long drive.</h3><p>Take the par-3 suggestion or pick your holes; golfers enter their mark on the card.</p></div><button type="button" class="ph" data-open="contests" aria-label="See Closest to the pin, long drive full screen"><span class="s"><img src="/media/screens/contests-400.webp" srcset="/media/screens/contests-400.webp 400w, /media/screens/contests-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="The organizer’s Contests tab suggesting closest to the pin on every par 3 and long drive on 18, with a Use these button."></span></button></li><li class="fc" id="f-photos" data-key="photos-after"><div class="cap"><span class="eb">PHOTOS</span><h3>Photos when the round is done.</h3><p>After the last hole the card asks for photos; you OK them for the recap.</p></div><button type="button" class="ph" data-open="photos-after" aria-label="See Photos when the round is done full screen"><span class="s"><img src="/media/screens/photos-after-400.webp" srcset="/media/screens/photos-after-400.webp 400w, /media/screens/photos-after-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="A finished team card asking Round done, add photos from today?, with a photo picker, a caption box and a Send to the organizer button."></span></button></li><li class="fc" id="f-announce" data-key="announcements"><div class="cap"><span class="eb">NOTES AND PACE</span><h3>A note on every card.</h3><p>A weather hold reaches every golfer’s card at once; a pace nudge goes to one group.</p></div><button type="button" class="ph" data-open="announcements" aria-label="See A note on every card full screen"><span class="s"><img src="/media/screens/announcements-400.webp" srcset="/media/screens/announcements-400.webp 400w, /media/screens/announcements-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="A golfer’s card covered by a full-screen weather note: Stop play, lightning in the area, with a Got it button."></span></button></li><li class="fc" id="f-desk" data-key="registration-desk"><div class="cap"><span class="eb">REGISTRATION DESK</span><h3>Sign-ups, one desk.</h3><p>Who signed up, who paid, who’s in the field; correct a name on the spot.</p></div><button type="button" class="ph" data-open="registration-desk" aria-label="See Sign-ups, one desk full screen"><span class="s"><img src="/media/screens/registration-desk-400.webp" srcset="/media/screens/registration-desk-400.webp 400w, /media/screens/registration-desk-780.webp 780w" sizes="(max-width:700px) 200px, 206px" width="780" height="1688" loading="lazy" decoding="async" alt="The Desk tab: 4 signups, filters All, Unpaid, Paid and Approved, and each golfer with Approve into field, Correct and Remove buttons."></span></button></li></ul>
         <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     </div>
     <div class="grp" id="g-better">
@@ -412,6 +510,7 @@
             <div class="row"><span>2. Team 2 &middot; Hale / Ruiz</span><b>&minus;9</b></div>
             <div class="row"><span>3. Team 4 &middot; Lopez / Kim</span><b>&minus;8</b></div>
         </div>
+        <p class="org-soon">COMING: golfer check-in on event day, and entry fees paid by card.</p>
         <a class="btn lime" id="run-an-event" href="/tournament">Run an event &rarr;</a>
     </div>
 </section>
@@ -428,10 +527,10 @@
         <div class="h2">Simple pricing</div>
         <div class="price">
             <div class="pc"><span class="nm">Free</span><b data-price="free"></b>One group of up to <span data-price="free-golfers"></span>. Scores, games, leaderboard.</div>
-            <div class="pc hi"><span class="nm">HardPan Pro</span><b data-price="pro-headline"></b><span data-price="pro-label"></span>. Full GPS map, coaching, hosting. <span data-price="pro-trial-days"></span>-day free trial.
-                <small>Or <span data-price="pro-yearly"></span>/yr, or <span data-price="pro-monthly"></span>/mo.</small></div>
-            <div class="pc"><span class="nm">Host Pro</span><b data-price="host-yearly"></b>Host bigger games and events all year.</div>
-            <div class="pc"><span class="nm">Trip Pass</span><b data-price="trip-pass"></b>One golf trip, <span data-price="trip-pass-days"></span> days of hosting.</div>
+            <div class="pc hi" id="price-founding"><span class="nm">HardPan Pro</span><b data-price="pro-headline"></b><span data-price="pro-label"></span> &middot; the first 1,000 golfers &middot; locked for as long as you stay subscribed. Full GPS map, coaching, hosting. <span data-price="pro-trial-days"></span>-day free trial.
+                <small>Monthly, and yearly after the founding price: see in app.</small></div>
+            <div class="pc"><span class="nm">Host Pro</span><b class="sia">see in app</b>Host bigger games and events all year.</div>
+            <div class="pc"><span class="nm">Trip Pass</span><b class="sia">see in app</b>One golf trip, <span data-price="trip-pass-days"></span> days of hosting.</div>
         </div>
         <p class="note">US prices. The App Store or Google Play shows the price in your country before you confirm. Subscriptions renew automatically until cancelled in your store account; the free trial is for new subscribers. Joining a round and scoring are always free.</p>
     </div>
@@ -448,13 +547,14 @@
 
 <footer>
     <div class="wrap">
-        <div><b style="color:#fff">HardPan: Golf GPS &amp; Games</b> &middot; a Rattle Golf LLC app &middot; Scottsdale, AZ</div>
+        <div><b style="color:#fff">HardPan Golf</b> &middot; GPS &amp; games &middot; Scottsdale, AZ</div>
         <div class="flinks">
             <a href="/help">Help</a><a href="/support">Support</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a>
         </div>
         <div>HardPan keeps score for your group's side games. It never holds or moves money.</div>
         <div style="font-size:12px">Apple, the Apple logo and App Store are trademarks of Apple Inc., registered in the U.S. and other countries.</div>
         <div style="font-size:12px">Google Play and the Google Play logo are trademarks of Google LLC.</div>
+        <div style="font-size:12px">HardPan is a product of Rattle Golf LLC.</div>
     </div>
 </footer>
 
@@ -464,6 +564,14 @@
 <script src="/site-pricing.js"></script>
 <script>
     if (typeof window.HardPanSitePricingFill === 'function') window.HardPanSitePricingFill(document);
+    // Live-price check pending (Advisor 2026-11-14 15:27): only the founding price is confirmed live.
+    // The headline is that price or "see in app" - never site-pricing.js's after-founding yearly figure.
+    (function (P) {
+        var pro = (P && P.pro) || {}, n = document.querySelectorAll('[data-price]');
+        for (var i = 0; i < n.length; i++) {
+            if (n[i].getAttribute('data-price') === 'pro-headline') n[i].textContent = (pro.foundingOpen && pro.founding) ? pro.founding + ' / year' : 'see in app';
+        }
+    })(window.HARDPAN_SITE_PRICING);
 </script>
 </body>
 </html>

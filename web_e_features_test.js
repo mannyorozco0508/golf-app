@@ -80,7 +80,9 @@ const HEADLINES = {
     'Your group': ['Same game. Same code. Every week.', 'Talk to the round.', 'Same group? One tap.', 'One board for the whole trip.', 'Every round you’ve played.'],
     'Organize': ['Run the day from your phone.', 'A tournament in four questions.', 'Join the tournament.', 'Every group. One board.', 'Every flight, live.',
         // 52A batch 1 (2026-11-12): seven Tournaments cards
-        'Every team gets its own link.', 'Your events, on any device.', 'Your card and the board, one link.', 'Closest to the pin, long drive.', 'Photos when the round is done.', 'A note on every card.', 'Sign-ups and check-in, one desk.'],   // card 22 reworded Nov 10 (was Prizes, sorted.)
+        'Every team gets its own link.', 'Your events, on any device.', 'Your card and the board, one link.', 'Closest to the pin, long drive.', 'Photos when the round is done.', 'A note on every card.', 'Sign-ups, one desk.'],   // card 22 reworded Nov 10 (was Prizes, sorted.)
+        // Re-pinned 2026-11-14 (website vs 2.0.7, ADVISOR-20261114-1558): the Desk card was 'Sign-ups and check-in, one desk.';
+        // check-in is on a preview only (main's Desk has no check-in), so the card no longer claims it.
     'Get better': ['See where shots go.', 'Practice what costs you.', 'Ask what it plays.']
 };
 // $, betting words, and price shapes (a number per month/year, "free trial" days).

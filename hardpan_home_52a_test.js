@@ -47,7 +47,7 @@ const READ = { expression: `JSON.stringify((function () {
   }) : null;
   var allH3 = Array.prototype.map.call(document.querySelectorAll('section#features li.fc h3'), function (h) { return h.textContent.trim(); });
   var allIds = Array.prototype.map.call(document.querySelectorAll('section#features li.fc'), function (li) { return li.id; });
-  var b = $('#start-tournament'), hb = $('#hero-start-tournament');
+  var b = $('#start-tournament'), hb = $('#door-events');
   return { cards: cards, allH3: allH3, allIds: allIds, btn: rect(b), btnHref: b ? b.getAttribute('href') : null, btnText: b ? b.innerText : null, hero: rect(hb), heroHref: hb ? hb.getAttribute('href') : null,
     gn: (function () { var g = $('#g-organize .gn, ul[aria-label="Organize features"]'); var h = org && org.parentElement ? org.parentElement.querySelector('.gn') : null; return h ? h.innerText : null; })(),
     scrollW: document.scrollingElement.scrollWidth, vw: window.innerWidth };
@@ -86,7 +86,9 @@ test('2 Start a tournament: over the Organize row and in the hero, on screen at 
     assert.equal(a.btnHref, '/tournament'); assert.match(a.btnText, /^Start a tournament/);
     assert.ok(a.btn.h >= 44 && a.btn.w >= 160, 'size ' + JSON.stringify(a.btn));
     assert.ok(a.btn.l >= 0 && a.btn.r <= a.vw, 'inside the screen: ' + JSON.stringify(a.btn));
-    assert.ok(a.hero && a.heroHref === '/tournament' && a.hero.h >= 44 && a.hero.r <= a.vw, 'the hero button: ' + JSON.stringify(a.hero));
+    // Re-pinned 2026-11-14 (Two doors B, Manny's pick, ADVISOR-20261114-1527): the hero's organizer button is
+    // now "I run events" -> /tournaments (the landing; preview-landing until it merges). Was #hero-start-tournament -> /tournament.
+    assert.ok(a.hero && a.heroHref === '/tournaments' && a.hero.h >= 44 && a.hero.r <= a.vw, 'the hero button: ' + JSON.stringify(a.hero));
 });
 
 test('3 the 25 cards main had keep their headlines and order', async () => {
