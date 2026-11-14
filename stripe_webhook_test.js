@@ -59,6 +59,13 @@
 // no stripeAccount on the session -> K4 red; none on the refund -> K5 red; the connect endpoint
 // ignoring payment events -> K6 red; the mirror left stale -> K2 red; responsibilities back ->
 // K1 red; the event-account check dropped -> K6 red.
+// FIXES A + C (2026-11-13, after Grok's passing sandbox run): K2 holds that the status
+// call writes fees/paidTo = 'organizer' once payouts are on (the golfer's form shows
+// the service fee line only then - it showed the $5 alone); K5 holds the refund audit
+// (the application fee read back after the refund, recorded at payments/refundAudit,
+// ALERT when Stripe says it was not returned). Baseline against the file before these
+// two (v2d 0e0fa59c): K2 + K5 red. With the build (final run): 20 pass / 0 fail / 0
+// skipped. Controls: paidTo line dropped -> K2 red; the audit never reads the fee -> K5 red.
 // ============================================================================
 'use strict';
 const { test, before, after } = require('node:test');
@@ -118,10 +125,13 @@ function mockStripe() {
     s.checkout = { sessions: { create: async (params, opts) => { calls.sessions.push({ params, opts }); return { id: 'cs_test_' + calls.sessions.length, url: 'https://checkout.stripe.com/c/pay/cs_test_' + calls.sessions.length }; } } };
     calls.piOpts = []; calls.refundListOpts = [];
     s.refunds = {
-        create: async (params, opts) => { calls.refunds.push({ params, opts }); return { id: 're_MOCK1', status: 'pending' }; },
+        create: async (params, opts) => { calls.refunds.push({ params, opts }); return { id: 're_MOCK1', status: 'pending', charge: 'ch_MOCK1' }; },
         list: async (params, opts) => { calls.refundList.push(params); calls.refundListOpts.push(opts || null); return { data: [{ id: 're_LISTED' }] }; }
     };
     s.paymentIntents = { retrieve: async (id, opts) => { calls.pi.push(id); calls.piOpts.push(opts || null); return { id, metadata: { code: 'STR1', entryId: 'eStripe' } }; } };
+    // FIX C audit: the application fee as Stripe reports it after a refund (a test sets calls.appFee)
+    calls.appFeeList = []; calls.appFee = { id: 'fee_MOCK1', amount: 400, amount_refunded: 400, refunded: true };
+    s.applicationFees = { list: async (params) => { calls.appFeeList.push(params); return { data: calls.appFee ? [calls.appFee] : [] }; } };
     // CONNECT (2026-11-12): accounts + account links, recorded; retrieve answers from `acctState`.
     calls.accounts = []; calls.links = []; calls.logins = []; calls.retrieves = [];
     calls.acctState = { id: 'acct_MOCK1', charges_enabled: false, payouts_enabled: false, details_submitted: false, requirements: { currently_due: ['external_account', 'tos_acceptance.date'] }, business_profile: { name: 'Hope Foundation' }, metadata: { uid: 'u-org' } };
@@ -552,6 +562,9 @@ test('K2. getConnectStatus: reads the account and writes the owner-readable mirr
     assert.equal(withCode.serviceFeeCents, 400);
     const fees = await read('tournaments/STR1/fees');
     assert.equal(fees.serviceFeeCents, 400); assert.equal(fees.paidToName, 'Hope Foundation');
+    // FIX A (Grok retest 2026-11-13 18:11): payouts ON -> the record says the organizer is paid, so the
+    // golfer's form shows the service fee line BEFORE the first checkout (acctState is 'on' here).
+    assert.equal(fees.paidTo, 'organizer', 'paidTo written by the status call once payouts are on');
     await adminRest(NS, 'PUT', 'platform/connect/eventOverrides/STR1/serviceFeeCents', 250);
     assert.equal((await h.getConnectStatus({ code: 'STR1' }, { uid: 'u-org' })).serviceFeeCents, 250);
     assert.equal((await read('tournaments/STR1/fees')).serviceFeeCents, 250);
@@ -615,9 +628,21 @@ test('K5. refundEntry on a direct charge runs ON the connected account and retur
     // RE-PINNED 2026-11-13 16:40 (direct charges).
     assert.deepEqual(calls.refunds[0].params, { payment_intent: 'pi_DEST', metadata: { code: 'STR1', entryId: 'eDest' }, refund_application_fee: true });
     assert.equal(calls.refunds[0].opts.stripeAccount, 'acct_MOCK1', 'refunded on the organizer\'s account');
+    // FIX C audit: the application fee is read back and recorded server-side.
+    assert.deepEqual(calls.appFeeList, [{ charge: 'ch_MOCK1', limit: 1 }]);
+    const audit = await read('payments/refundAudit/STR1/eDest');
+    assert.equal(audit.refund, 're_MOCK1'); assert.equal(audit.appFeeCents, 400); assert.equal(audit.appFeeRefundedCents, 400); assert.equal(audit.appFeeRefunded, true);
+    // Stripe reporting the fee NOT returned: recorded as such and ALERTed; the refund itself still went through.
+    await adminRest(NS, 'PUT', 'registrations/STR1/eDest2', REG({ paid: true, paidAt: 5, paidVia: 'stripe', ref: 'pi_DEST2', amountCents: 5000, serviceFeeCents: 400, acct: 'acct_MOCK1' }));
+    const logs = []; const h2 = makeHandlers({ db, stripe: (() => { const m = mockStripe(); m.calls.appFee = { id: 'fee_X', amount: 400, amount_refunded: 0, refunded: false }; return m.s; })(), webhookSecret: SECRET, connectWebhookSecret: CSECRET, now: () => ++clock, log: (...a) => logs.push(a.join(' ')) });
+    assert.deepEqual(await h2.refundEntry({ code: 'STR1', entryId: 'eDest2' }, { uid: 'u-org' }), { status: 'pending' });
+    const audit2 = await read('payments/refundAudit/STR1/eDest2');
+    assert.equal(audit2.appFeeRefunded, false); assert.equal(audit2.appFeeRefundedCents, 0);
+    assert.ok(logs.some((l) => /ALERT application fee not refunded/.test(l)), 'the log says so: ' + JSON.stringify(logs));
     await h.refundEntry({ code: 'STR1', entryId: 'eStripe' }, { uid: 'u-org' });
     assert.deepEqual(calls.refunds[1].params, { payment_intent: 'pi_PAID', metadata: { code: 'STR1', entryId: 'eStripe' } });
     assert.equal(calls.refunds[1].opts.stripeAccount, undefined, 'HardPan\'s own charge: no connected account');
+    assert.equal(await read('payments/refundAudit/STR1/eStripe'), null, 'no application fee to audit on HardPan\'s own charge');
 });
 
 test('K6. stripeConnectWebhook: a signed account.updated writes the mirror for the uid in its metadata; deauthorized turns everything off; forged = 400 and nothing written; an account nobody owns is recorded rejected; idempotent', SKIP, async () => {

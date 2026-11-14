@@ -641,6 +641,14 @@ describe('J. source guards (decoded, each with a positive anchor)', () => {
 // the build (final run): 53 pass / 0 fail. Controls (the page mutated, restored
 // by sha): the box says STRIPE CONNECTED with no account -> H1 + L1 red; a
 // server fault falls back to the signal line -> L7 red.
+// FIX B (2026-11-13, after Grok's passing sandbox run): L8 (the mirror is listened to:
+// the webhook's later write repaints the card) and L9 (coming back to the tab asks
+// getConnectStatus once while setup is unfinished; never when on / nothing started;
+// mini-dom now RECORDS document listeners in doc.__listeners so the test fires the
+// page's own handler). Baseline against the page before (preview-connect-2 47d278e3,
+// swapped in by git show, restored by sha): L8 + L9 red, 53 pass / 2 fail of 55. With
+// the build (final run): 55 pass / 0 fail. Controls: the live listener dropped -> L8
+// red; the visibilitychange re-read dropped -> L9 red.
 // ===========================================================================
 const ON_STATUS = { chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, due: [], name: 'Hope Foundation', updatedAt: 1 };
 const FINISH_STATUS = { chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: true, due: ['external_account'], name: 'Hope Foundation', updatedAt: 1 };
@@ -726,6 +734,33 @@ describe('L. Stripe Connect on the page', () => {
         assert.match(await text({ createConnectOnboardingLink: [{ reason: 'no-email' }] }), /Your sign-in has no email address, and Stripe needs one to pay you\. Sign in with an account that has an email, then try again\./);
         assert.match(await text({ createConnectOnboardingLink: [{ reason: 'not-allowed-owner' }] }), /Card payments are not switched on for this organizer yet\./);
         assert.match(await text({ createConnectOnboardingLink: [{ reason: 'not-connected' }] }), /Finish the Stripe setup first, then try again\./);
+    });
+    test('L8 FIX B (Grok retest 2026-11-13): the Get paid card follows the mirror LIVE - the webhook\'s later write repaints Finish setup into Payouts on without a reload; the listener is the page\'s own on(\'value\')', async () => {
+        const sb = ownerWith(FINISH_STATUS); await settle(); fireRecord(sb, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' })); await settle();
+        assert.match(plain(html(sb, 'entry-fees-block')), /Get paid Finish setup/, 'positive: the stale state first');
+        const hs = sb.__dbHandlers.filter((h) => h.event === 'value' && h.path === 'connectStatus/u-org');
+        assert.equal(hs.length, 1, 'exactly one live listener on the owner\'s mirror');
+        hs[0].cb({ val: () => clone(ON_STATUS), exists: () => true });
+        await settle();
+        const card = plain(html(sb, 'entry-fees-block'));
+        assert.match(card, /Get paid Payouts on/, 'the webhook\'s write repainted the card');
+        assert.match(card, /✓ STRIPE CONNECTED/); assert.match(html(sb, 'entry-fees-block'), /id="connect-btn"[^>]*>Manage on Stripe</);
+    });
+    test('L9 FIX B: coming back to the tab while setup is unfinished asks the server once (getConnectStatus({code})), repaints from the answer, and never asks when payouts are already on or nothing was started', async () => {
+        // mini-dom records document listeners (doc.__listeners); the test fires the page's own handler.
+        const fire = (sb) => (sb.document.__listeners.visibilitychange || []).forEach((fn) => fn());
+        const fin = ownerWith(FINISH_STATUS); await settle(); fireRecord(fin, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' })); await settle();
+        stubCallables(fin, { getConnectStatus: [{ ok: Object.assign({ connected: true, state: 'on', serviceFeeCents: 400 }, ON_STATUS) }] });
+        assert.equal((fin.document.__listeners.visibilitychange || []).length, 1, 'positive: the page listens for the tab coming back');
+        fire(fin); await settle(); await settle();
+        assert.deepEqual(fin.__calls.map((c) => [c.name, c.data]), [['getConnectStatus', { code: 'OWN1' }]]);
+        assert.match(plain(html(fin, 'entry-fees-block')), /Get paid Payouts on/);
+        fire(fin); await settle();
+        assert.equal(fin.__calls.length, 1, 'payouts on: no more asking');
+        const on = ownerWith(ON_STATUS); await settle(); fireRecord(on, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' })); await settle(); stubCallables(on, {});
+        fire(on); await settle(); assert.equal(on.__calls.length, 0, 'already on: nothing to ask');
+        const none = ownerWith(null); await settle(); fireRecord(none, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' })); await settle(); stubCallables(none, {});
+        fire(none); await settle(); assert.equal(none.__calls.length, 0, 'nothing started: nothing to ask');
     });
     test('L4 the golfer\'s register screen (A): Entry fee / HardPan service fee / Total today, Pay $54.00, the note names the organizer and the $4; createEntryCheckout still gets only {code, entryId}; a HardPan-paid event keeps today\'s box', async () => {
         const sb = arriveRegister(record({ fees: CONNECT_FEES, entryFee: 50, entryFeePer: 'golfer' })); await settle();

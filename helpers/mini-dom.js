@@ -327,8 +327,13 @@ function createDocument() {
         },
         querySelector(sel) { return root.querySelector(sel); },
         querySelectorAll(sel) { return root.querySelectorAll(sel); },
-        addEventListener() { },
-        removeEventListener() { },
+        // RECORDED, not run (2026-11-13, L9): a page's document-level listeners
+        // (visibilitychange, keydown) are kept in doc.__listeners[type] so a test can
+        // fire the page's OWN handler, as __dbHandlers does for database callbacks.
+        // Nothing here dispatches by itself; mini-dom has no event loop.
+        addEventListener(type, fn) { if (typeof fn === 'function') (this.__listeners[type] = this.__listeners[type] || []).push(fn); },
+        removeEventListener(type, fn) { this.__listeners[type] = (this.__listeners[type] || []).filter((f) => f !== fn); },
+        __listeners: {},
         // Lets a test place a registered element into the live tree, so selector
         // queries can find it the way they would in a browser.
         __mount(el) { return root.appendChild(el); },

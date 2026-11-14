@@ -4663,17 +4663,43 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     var connectParam = (new URLSearchParams(window.location.search)).get('connect');
     var connectHandled = false;
     function connectStateOf(st) { if (!st || typeof st !== 'object') return 'none'; return (st.chargesEnabled === true && st.payoutsEnabled === true) ? 'on' : 'finish'; }
+    // FIX B (Grok retest 2026-11-13 18:11: "Finish setup" stayed until a refresh). The
+    // mirror is LISTENED to, not read once: Stripe's account.updated reaches the server
+    // after the organizer is already back on this page, and the webhook's write now
+    // repaints the card by itself. The listener is dropped when the owner changes.
+    var connectMirrorRef = null, connectMirrorCb = null;
     function syncConnectMirror() {
         const uid = (currentData && currentData.ownerUid && canManage()) ? currentData.ownerUid : null;
         if (uid === connectMirrorUid) return;
+        if (connectMirrorRef && connectMirrorCb) { try { connectMirrorRef.off('value', connectMirrorCb); } catch (e) { /* stand-in */ } }
+        connectMirrorRef = null; connectMirrorCb = null;
         connectMirrorUid = uid; connectMirror = null;
         if (!uid) return;
-        db.ref('connectStatus/' + uid).once('value').then((snap) => {
+        const ref = db.ref('connectStatus/' + uid);
+        const cb = (snap) => {
             if (connectMirrorUid !== uid) return;
             connectMirror = (snap && snap.val) ? snap.val() : null;
             renderEntryFeesCard();
-        }).catch(() => { /* not readable = not set up */ });
+        };
+        connectMirrorRef = ref; connectMirrorCb = cb;
+        // One read for the first paint, then the live listener for every later write.
+        ref.once('value').then(cb).catch(() => { /* not readable = not set up */ });
+        try { ref.on('value', cb, () => { /* not readable = not set up */ }); } catch (e) { /* not readable */ }
     }
+    // And a fresh status from the server when the organizer comes back to this tab
+    // (visibilitychange / focus) while payouts are not on yet - at most once in 10 s.
+    var connectRecheckAt = 0;
+    function connectRecheck() {
+        if (!currentCode || !canManage() || !paymentsAllowed || connectBusy) return;
+        if (connectStateOf(connectMirror) === 'on' || connectStateOf(connectMirror) === 'none') return;   // nothing in flight
+        const t = Date.now(); if (t - connectRecheckAt < 10000) return; connectRecheckAt = t;
+        stripeCall('getConnectStatus', { code: currentCode }).then((res) => {
+            const d = res && res.data;
+            if (d && d.connected) { connectMirror = d; renderEntryFeesCard(); }
+        }).catch(() => { /* the listener and the next look will tell */ });
+    }
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === undefined || document.visibilityState === 'visible') connectRecheck(); });
+    window.addEventListener('focus', connectRecheck);
     function dueText(due) {
         const words = [];
         (Array.isArray(due) ? due : []).forEach((d) => {
@@ -4781,6 +4807,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (d && d.connected) connectMirror = d;
             renderEntryFeesCard();
             if (mode === 'refresh' && connectStateOf(connectMirror) !== 'on') connectAction();
+            // FIX B: Stripe's account.updated can land seconds after the return; one more
+            // read a moment later, besides the live mirror above.
+            if (mode === 'return' && connectStateOf(connectMirror) !== 'on') setTimeout(() => { connectRecheckAt = 0; connectRecheck(); }, 4000);
         }).catch(() => { renderEntryFeesCard(); });
     }
     function syncPaymentsAllowed() {

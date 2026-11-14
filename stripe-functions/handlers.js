@@ -99,11 +99,26 @@ function makeHandlers(deps) {
         const registration = await val('registrations/' + code + '/' + entryId);
         const plan = core.planRefund({ callerUid: ctx.uid, tournament, registration });
         if (!plan.ok) throw new HandlerError(plan.reason);
-        // A direct charge is refunded ON the connected account.
+        // A direct charge is refunded ON the connected account, with refund_application_fee
+        // (core.refundParams), so HardPan's $4 goes back to the organizer.
         const ropts = { idempotencyKey: core.refundIdempotencyKey(code, entryId, plan.paymentIntent) };
         if (plan.onAccount) ropts.stripeAccount = plan.onAccount;
-        await stripe.refunds.create(core.refundParams(plan, { code, entryId }), ropts);
+        const refund = await stripe.refunds.create(core.refundParams(plan, { code, entryId }), ropts);
         await db.ref('registrations/' + code + '/' + entryId).update({ refundPendingAt: now() });
+        // FIX C audit (Grok retest 2026-11-13 18:11 read the organizer as short by the fee): the
+        // application fee is read back from Stripe after the refund and the answer is recorded
+        // server-side (payments/refundAudit), with an ALERT in the log when it was not returned.
+        // Measured, not assumed; the audit never blocks the refund.
+        if (plan.onAccount) {
+            try {
+                const charge = refund && typeof refund.charge === 'string' ? refund.charge : null;
+                const fees = charge ? await stripe.applicationFees.list({ charge, limit: 1 }) : null;
+                const fee = fees && fees.data && fees.data[0];
+                const audit = { refund: refund && refund.id ? refund.id : null, at: now(), appFeeCents: fee ? fee.amount : null, appFeeRefundedCents: fee ? fee.amount_refunded : null, appFeeRefunded: !!(fee && fee.refunded === true) };
+                await db.ref('payments/refundAudit/' + code + '/' + entryId).set(audit);
+                if (!fee || fee.refunded !== true) log('ALERT application fee not refunded', code, entryId, audit.refund, audit.appFeeCents, audit.appFeeRefundedCents);
+            } catch (e) { log('refund audit failed', code, entryId, e && e.message); }
+        }
         return { status: 'pending' };
     }
 
@@ -246,6 +261,11 @@ function makeHandlers(deps) {
                     const multi = {};
                     multi['tournaments/' + code + '/fees/serviceFeeCents'] = fee.cents;
                     multi['tournaments/' + code + '/fees/paidToName'] = status.name || null;
+                    // FIX A (Grok retest 2026-11-13 18:11: the form showed only the $5): the golfer's
+                    // form shows the service fee line only when fees.paidTo says the organizer is
+                    // paid. Until now only the FIRST checkout wrote that - too late for the form.
+                    // Payouts on = card sign-ups will be the organizer's direct charges: say so now.
+                    if (core.connectState(status) === 'on') multi['tournaments/' + code + '/fees/paidTo'] = 'organizer';
                     await db.ref().update(multi);
                     out.serviceFeeCents = fee.cents;
                 }
