@@ -468,14 +468,20 @@ describe('H. M4: the Entry fees card', () => {
         await settle(); fireRecord(sb, record({ fees: FEES }));
         const card = html(sb, 'entry-fees-block');
         assert.match(card, /id="fees-card"/); assert.match(card, /id="fees-cash"/);
-        assert.match(plain(card), /Collect entry fees by card/); assert.match(plain(card), /STRIPE CONNECTED/); assert.match(plain(card), /TEST MODE/);
+        assert.match(plain(card), /Collect entry fees by card/); assert.match(plain(card), /TEST MODE/);
+        // RE-PINNED 2026-11-13 (Advisor 12:44): with no Stripe account the box no
+        // longer claims "STRIPE CONNECTED · Account HardPan" beside a "Not set up"
+        // pill; it is labelled by state and says where card money lands.
+        assert.match(plain(card), /STRIPE NOT SET UP/); assert.ok(!/STRIPE CONNECTED/.test(card), 'no false "connected"');
+        assert.match(plain(card), /Card money goes to\s*HardPan’s account until you set up payouts above/);
+        assert.match(card, /class="fees-stripe fees-stripe-off"/, 'amber, not green');
         assert.equal(shown(sb, 'entry-fees-block'), true);
     });
     test('H2 not allow-listed: no card toggle, "Card payments coming soon"', async () => {
         const sb = arriveOwner(record({ fees: FEES }), { reads: { 'payments/allowedOwners/u-org': null } });
         await settle(); fireRecord(sb, record({ fees: FEES }));
         const card = html(sb, 'entry-fees-block');
-        assert.ok(!/id="fees-card"/.test(card)); assert.ok(!/STRIPE CONNECTED/.test(card));
+        assert.ok(!/id="fees-card"/.test(card)); assert.ok(!/id="fees-stripe"/.test(card), 'no Stripe box at all');
         assert.match(plain(card), /Card payments coming soon/);
         assert.match(plain(card), /Entry fees/, 'positive: the card itself is there');
     });
@@ -612,5 +618,154 @@ describe('J. source guards (decoded, each with a positive anchor)', () => {
         assert.match(buf.toString('utf8'), /"@firebase\/functions-compat","0\.3\.5"/);
         assert.ok(!/<script src="\.?\/?firebase-functions-compat\.js"/.test(HTML), 'not a blocking tag');
         assert.match(src, /s\.src = '\.\/firebase-functions-compat\.js'/, 'positive: the lazy loader names it');
+    });
+});
+
+// ===========================================================================
+// L. STRIPE CONNECT, the page half (Manny 2026-11-12/13: layout A for the
+// onboarding card and for the $4 service fee). The organizer's Get paid card
+// reads the owner-readable mirror connectStatus/<uid>; the golfer's register
+// screen reads the PUBLIC record fields the server writes (fees.paidTo,
+// fees.serviceFeeCents, fees.paidToName). No account id ever reaches the page.
+// Baseline for L1-L6 against main 5041dd9b (tournament.html sha256
+// f9c50f128e0a3a3b…, the page swapped in by cp, restored by sha): all 52
+// tests 46 pass / 6 fail (L1-L6). On preview-connect: 52 pass / 0 fail.
+// Controls (the page mutated, restored by sha): the arrival hook removed ->
+// L3 red; the fee rows never shown -> L4 red; the Desk note never names the
+// organizer -> L5 red; a non-https link followed -> L2 red.
+// 2026-11-13 (Advisor 12:44, after the live Connect test): the Stripe box under
+// the toggles is labelled by state (H1 re-pinned, L1 extended) and the Connect
+// error copy names a server fault instead of the signal (L7, new). Baseline
+// against the page before this change (preview-connect 9ea7f550, swapped in by
+// git show, restored by sha): H1 + L1 + L7 red, 50 pass / 3 fail of 53. With
+// the build (final run): 53 pass / 0 fail. Controls (the page mutated, restored
+// by sha): the box says STRIPE CONNECTED with no account -> H1 + L1 red; a
+// server fault falls back to the signal line -> L7 red.
+// ===========================================================================
+const ON_STATUS = { chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, due: [], name: 'Hope Foundation', updatedAt: 1 };
+const FINISH_STATUS = { chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: true, due: ['external_account'], name: 'Hope Foundation', updatedAt: 1 };
+const CONNECT_FEES = { entryFeeCents: 5000, collectByCard: true, allowCash: true, paidTo: 'organizer', serviceFeeCents: 400, paidToName: 'Hope Foundation' };
+const ownerWith = (status, rec) => {
+    const sb = arriveOwner(rec || record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' }), { reads: { 'payments/allowedOwners/u-org': true, 'connectStatus/u-org': status } });
+    return sb;
+};
+describe('L. Stripe Connect on the page', () => {
+    test('L1 the Get paid card (layout A): Not set up / Finish setup / Payouts on from the mirror, one button whose label follows; the $4 sentence; not for a non-allow-listed owner or a visitor', async () => {
+        const none = ownerWith(null); await settle(); fireRecord(none, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' }));
+        let card = plain(html(none, 'entry-fees-block'));
+        assert.match(card, /Get paid Not set up/, 'positive: the card drew, with its pill');
+        assert.match(html(none, 'entry-fees-block'), /id="connect-btn"[^>]*>Set up payouts with Stripe</);
+        assert.match(card, /Card sign-ups add a \$4 HardPan service fee the golfer pays; you receive the full entry fee less Stripe processing\./);
+        assert.ok(card.indexOf('Get paid') < card.indexOf('Entry fee set under'), 'the card sits at the top of Entry fees');
+        const fin = ownerWith(FINISH_STATUS); await settle(); fireRecord(fin, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' }));
+        card = plain(html(fin, 'entry-fees-block'));
+        assert.match(card, /Get paid Finish setup/); assert.match(card, /Stripe still needs: a bank account\. Card payments stay off until it is in\./);
+        assert.match(html(fin, 'entry-fees-block'), /id="connect-btn"[^>]*>Finish setup on Stripe</);
+        // The Stripe box under the toggles follows the same state (Advisor 2026-11-13 12:44).
+        assert.match(card, /STRIPE SETUP UNFINISHED/); assert.match(card, /Card money goes to\s*nobody yet · cards stay off until the Stripe setup is finished/);
+        assert.ok(!/STRIPE CONNECTED/.test(card));
+        const on = ownerWith(ON_STATUS); await settle(); fireRecord(on, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' }));
+        card = plain(html(on, 'entry-fees-block'));
+        assert.match(card, /Get paid Payouts on/);
+        assert.match(card, /✓ STRIPE CONNECTED/); assert.match(card, /Card money goes to\s*Hope Foundation/);
+        assert.ok(!/fees-stripe-off/.test(html(on, 'entry-fees-block')), 'green when on');
+        // plain() leaves a space where the bold run closes before the period.
+        assert.match(card, /Hope Foundation · Stripe account connected\. Card sign-ups charge the golfer \$50 entry \+ \$4 HardPan service fee ?\. You receive the full \$50 less Stripe processing; HardPan keeps the \$4\./);
+        assert.match(html(on, 'entry-fees-block'), /id="connect-btn"[^>]*>Manage on Stripe</);
+        assert.ok(!/Account HardPan/.test(card), 'the HardPan account box gives way to the organizer\'s account');
+        const not = arriveOwner(record({ fees: FEES }), { reads: { 'payments/allowedOwners/u-org': null, 'connectStatus/u-org': ON_STATUS } }); await settle(); fireRecord(not, record({ fees: FEES }));
+        assert.ok(!/Get paid/.test(plain(html(not, 'entry-fees-block'))), 'not allow-listed: no card');
+        assert.ok(!/connect-btn/.test(html(not, 'entry-fees-block')));
+    });
+    test('L2 the button: Not set up / Finish setup call createConnectOnboardingLink({code}) and go to its https url; Payouts on calls createConnectDashboardLink; a non-https url is never followed', async () => {
+        const none = ownerWith(null); await settle(); fireRecord(none, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' }));
+        stubCallables(none, { createConnectOnboardingLink: [{ ok: { url: 'https://connect.stripe.com/setup/e/acct_x/y' } }] });
+        tap(none, html(none, 'entry-fees-block'), byId('connect-btn'), 'connect-btn'); await settle(); await settle();
+        assert.deepEqual(none.__calls.map((c) => [c.name, c.data]), [['createConnectOnboardingLink', { code: 'OWN1' }]]);
+        assert.equal(none.location.href, 'https://connect.stripe.com/setup/e/acct_x/y');
+        const on = ownerWith(ON_STATUS); await settle(); fireRecord(on, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' }));
+        stubCallables(on, { createConnectDashboardLink: [{ ok: { url: 'https://connect.stripe.com/express/acct_x' } }] });
+        tap(on, html(on, 'entry-fees-block'), byId('connect-btn'), 'connect-btn'); await settle(); await settle();
+        assert.deepEqual(on.__calls.map((c) => [c.name, c.data]), [['createConnectDashboardLink', {}]]);
+        assert.equal(on.location.href, 'https://connect.stripe.com/express/acct_x');
+        const bad = ownerWith(null); await settle(); fireRecord(bad, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' }));
+        stubCallables(bad, { createConnectOnboardingLink: [{ ok: { url: 'javascript:alert(1)' } }] });
+        const before = bad.location.href;
+        tap(bad, html(bad, 'entry-fees-block'), byId('connect-btn'), 'connect-btn'); await settle(); await settle();
+        assert.equal(bad.location.href, before);
+        assert.equal(bad.__dbWrites.filter((w) => /connectStatus|paidTo|serviceFeeCents|paidToName/.test(w.path)).length, 0, 'the page writes nothing of its own for Connect (the Phase 1 fee mirror is not Connect)');
+    });
+    test('L3 ?connect=return calls getConnectStatus({code}) on arrival and repaints from the answer; ?connect=refresh then asks for a new onboarding link', async () => {
+        const ret = loadHtmlInlineScript(PAGE, [], { search: '?tourney=OWN1&connect=return', beforeRun(s) { s.__dbReads = { 'payments/allowedOwners/u-org': true, 'connectStatus/u-org': null }; } });
+        stubCallables(ret, { getConnectStatus: [{ ok: Object.assign({ connected: true, state: 'on', serviceFeeCents: 400 }, ON_STATUS) }] });
+        ret.__auth.setUser(ORGANIZER); fireRecord(ret, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' })); await settle(); await settle(); await settle();
+        assert.deepEqual(ret.__calls.map((c) => [c.name, c.data]), [['getConnectStatus', { code: 'OWN1' }]]);
+        assert.match(plain(html(ret, 'entry-fees-block')), /Get paid Payouts on/, 'painted from the callable\'s answer, not the stale mirror');
+        const ref = loadHtmlInlineScript(PAGE, [], { search: '?tourney=OWN1&connect=refresh', beforeRun(s) { s.__dbReads = { 'payments/allowedOwners/u-org': true, 'connectStatus/u-org': FINISH_STATUS }; } });
+        stubCallables(ref, { getConnectStatus: [{ ok: Object.assign({ connected: true, state: 'finish' }, FINISH_STATUS) }], createConnectOnboardingLink: [{ ok: { url: 'https://connect.stripe.com/setup/e/acct_x/z' } }] });
+        ref.__auth.setUser(ORGANIZER); fireRecord(ref, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' })); await settle(); await settle(); await settle(); await settle();
+        assert.deepEqual(ref.__calls.map((c) => c.name), ['getConnectStatus', 'createConnectOnboardingLink']);
+        assert.equal(ref.location.href, 'https://connect.stripe.com/setup/e/acct_x/z');
+        // Plain arrival on Setup (no connect= param) calls nothing: the mirror is enough.
+        const plainArr = ownerWith(ON_STATUS); stubCallables(plainArr, {}); await settle(); fireRecord(plainArr, record({ fees: FEES })); await settle();
+        assert.equal(plainArr.__calls.length, 0);
+    });
+    test('L7 what the organizer reads when the Connect call fails (Advisor 2026-11-13 12:44): the server\'s own fault says Stripe returned an error, never "check your signal"; no-email and not-allowed-owner get their sentences; the signal line only when nothing is known', async () => {
+        const text = async (plan) => {
+            const sb = ownerWith(null); await settle(); fireRecord(sb, record({ fees: FEES, entryFee: 50, entryFeePer: 'golfer' }));
+            stubCallables(sb, plan);
+            tap(sb, html(sb, 'entry-fees-block'), byId('connect-btn'), 'connect-btn'); await settle(); await settle();
+            const block = html(sb, 'entry-fees-block');
+            assert.match(block, /id="connect-btn"(?![^>]*disabled)/, 'the button is live again after a refusal');
+            return plain(block.slice(block.indexOf('id="connect-err"')));
+        };
+        // An empty plan: the stand-in rejects with code functions/internal and no details - the
+        // live shape of 2026-11-13 (Stripe refused the account create inside the function).
+        assert.match(await text({}), /Stripe returned an error setting this up\. Try again in a few minutes; if it keeps failing, text HardPan\./);
+        assert.ok(!/signal/.test(await text({})), 'a server fault is not the organizer\'s signal');
+        assert.match(await text({ createConnectOnboardingLink: [{ reason: 'no-email' }] }), /Your sign-in has no email address, and Stripe needs one to pay you\. Sign in with an account that has an email, then try again\./);
+        assert.match(await text({ createConnectOnboardingLink: [{ reason: 'not-allowed-owner' }] }), /Card payments are not switched on for this organizer yet\./);
+        assert.match(await text({ createConnectOnboardingLink: [{ reason: 'not-connected' }] }), /Finish the Stripe setup first, then try again\./);
+    });
+    test('L4 the golfer\'s register screen (A): Entry fee / HardPan service fee / Total today, Pay $54.00, the note names the organizer and the $4; createEntryCheckout still gets only {code, entryId}; a HardPan-paid event keeps today\'s box', async () => {
+        const sb = arriveRegister(record({ fees: CONNECT_FEES, entryFee: 50, entryFeePer: 'golfer' })); await settle();
+        // Static markup is not parsed by mini-dom: the rows are read by element.
+        const T = (id) => String(el(sb, id).textContent || '');
+        assert.equal(T('reg-fee-amount'), '$50.00'); assert.equal(T('reg-fee-service'), '$4.00'); assert.equal(T('reg-fee-total'), '$54.00');
+        assert.equal(shown(sb, 'reg-fee-service-row'), true); assert.equal(shown(sb, 'reg-fee-total-row'), true);
+        assert.equal(plain(el(sb, 'reg-pay').textContent || el(sb, 'reg-pay').innerHTML), 'Pay $54.00 ›');
+        assert.equal(T('reg-fee-note'), '$50.00 goes to Hope Foundation through Stripe; the $4.00 service fee goes to HardPan. Your card statement shows Hope Foundation.');
+        assert.equal(T('reg-cash-note'), '(pay $50.00 at the course)');
+        stubCallables(sb, { createEntryCheckout: [{ ok: { url: 'https://checkout.stripe.com/c/pay/x' } }] });
+        fill(sb); tap(sb, HTML, byId('reg-pay')); await settle(); await settle();
+        assert.deepEqual(sb.__calls[0].data, { code: 'REG1', entryId: regSets(sb)[0].path.split('/').pop() }, 'no amount, no fee from the client');
+        assert.ok(!/Connect|Express|application fee/i.test(plain(html(sb, 'reg-form'))), 'nothing on the golfer\'s screen names Connect');
+        const hp = arriveRegister(record({ fees: Object.assign({}, FEES, { paidTo: 'hardpan' }), entryFee: 100, entryFeePer: 'golfer' })); await settle();
+        const H = (id) => String(el(hp, id).textContent || '');
+        assert.equal(H('reg-fee-amount'), '$100.00'); assert.equal(shown(hp, 'reg-fee-service-row'), false); assert.equal(shown(hp, 'reg-fee-total-row'), false);
+        assert.equal(H('reg-fee-note'), 'Card payments go to HardPan. Refunds by the organizer.'); assert.equal(H('reg-cash-note'), '');
+        assert.equal(plain(el(hp, 'reg-pay').textContent || el(hp, 'reg-pay').innerHTML), 'Pay entry fee $100.00 ›');
+        // Unpaid panel after a refusal: the amount owed is the total.
+        stubCallables(sb, { createEntryCheckout: [{ reason: 'too-many-attempts' }] });
+        tap(sb, HTML, byId('reg-pay')); await settle(); await settle();
+        assert.match(plain(html(sb, 'reg-checkout')), /The \$54\.00 \(\$50\.00 entry \+ \$4\.00 service fee\) is still owed\./);
+    });
+    test('L5 the Desk names who is paid: on an organizer-paid event the note says the card total is entry fees received by Hope Foundation and the service fee is not in it; a HardPan-paid event keeps today\'s note', () => {
+        const sb = arriveOwner(record({ fees: CONNECT_FEES }), { reads: { 'payments/allowedOwners/u-org': true, 'connectStatus/u-org': ON_STATUS } });
+        fireRegistrations(sb, { e1: { fullName: 'Al', email: 'a@b.c', phone: '1', createdAt: 1, paid: true, paidVia: 'stripe', ref: 'pi_1', amountCents: 5000, serviceFeeCents: 400, acct: 'acct_1', paidAt: 2 } });
+        const tiles = plain(html(sb, 'registration-counts'));
+        assert.match(tiles, /\$50 card \(1\)/, 'positive: the card tile shows the entry fee received, not the $54 the golfer paid');
+        assert.match(tiles, /Card payments go to Hope Foundation through Stripe; the card total is the entry fees received\. HardPan’s \$4\.00 service fee per card sign-up is charged on top and is not in these totals\./);
+        const hp = arriveOwner(record({ fees: Object.assign({}, FEES, { paidTo: 'hardpan' }) }), { reads: { 'payments/allowedOwners/u-org': true } });
+        fireRegistrations(hp, { e1: { fullName: 'Al', email: 'a@b.c', phone: '1', createdAt: 1, paid: true, paidVia: 'stripe', ref: 'pi_1', amountCents: 10000, paidAt: 2 } });
+        assert.match(plain(html(hp, 'registration-counts')), /Card fees are absorbed by HardPan/);
+    });
+    test('L6 source: the page never reads stripeAccounts or platform/, and never writes connectStatus, fees/paidTo, fees/serviceFeeCents or fees/paidToName', () => {
+        const src = decodeEscapes(HTML);
+        assert.doesNotMatch(src, /stripeAccounts|platform\/connect/);
+        assert.match(src, /connectStatus\//, 'positive: the mirror is read');
+        const writes = [...src.matchAll(/db\.ref\(([^)]*)\)\.(set|update|remove|push)\(/g)].map((m) => m[1]);
+        assert.ok(writes.length > 20, 'positive: the scan found the page\'s writes');
+        writes.forEach((w) => assert.doesNotMatch(w, /connectStatus|paidTo|serviceFeeCents|paidToName/, w));
     });
 });
