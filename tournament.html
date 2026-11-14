@@ -73,6 +73,8 @@
     <script src="skins.js"></script>
     <!-- PO: the prize builder - places per flight, skins, KPs, the posted record. -->
     <script src="tournament-prizes.js"></script>
+    <!-- SK (2026-11-14): the scorecard scan check - the scanner's read against the app's scores. -->
+    <script src="scan-compare.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -803,6 +805,68 @@
         .pace-call { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.92rem; }
         .pace-call .btn-outline { width: auto; margin: 0; padding: 8px 12px; color: var(--brand-navy); border: 1px solid var(--border-mid); white-space: nowrap; }
         .pace-foot { text-align: center; font-size: 0.86rem; color: var(--text-muted); margin: 10px 0 0 0; }
+        /* SK (ADVISOR-20261114-1527): the scorecard scan check on the Desk.
+           A match is a plain digit in ink and a row's tick is ink, never green;
+           red = the card and the app differ; amber = the scanner was unsure.
+           Rings as on the prize cards: circle birdie, double circle eagle,
+           square bogey, double square double+; red only under par. */
+        .ck-card { border: 1px solid var(--border-mid); border-radius: 12px; padding: 10px 12px; margin: 8px 0 10px 0; background: var(--bg-card); }
+        .ck-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .ck-title { font-weight: 800; font-size: 1rem; color: var(--text-main); }
+        .ck-note, .ck-sub { font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 8px 0; }
+        .ck-review-btn { width: auto; margin: 0; padding: 6px 10px; font-size: 0.8rem; }
+        .ck-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px 0; }
+        .ck-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 4px 0 8px 0; }
+        .ck-tiles .pay-tile span { font-size: 0.7rem; }
+        .ck-tiles .pay-tile.ck-t-open { border-color: #e57373; }
+        .ck-tiles .pay-tile.ck-t-open b { color: #b00020; }
+        .ck-verified { border: 1.5px solid var(--text-main); border-radius: 10px; padding: 9px 12px; font-weight: 800; text-align: center; margin: 6px 0 8px 0; color: var(--text-main); }
+        .ck-verified small { display: block; font-weight: 400; color: var(--text-muted); font-size: 0.76rem; margin-top: 2px; }
+        .ck-msg { font-size: 0.85rem; color: #b00020; margin: 6px 0; }
+        .ck-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border-faint); }
+        .ck-who { min-width: 0; font-size: 0.86rem; }
+        .ck-who small { display: block; color: var(--text-muted); font-size: 0.76rem; margin: 1px 0; }
+        .ck-state { display: inline-block; font-size: 0.74rem; color: var(--text-muted); }
+        .ck-state.ck-open { color: #b00020; font-weight: 700; }
+        .ck-state.ck-ok { color: var(--text-main); font-weight: 700; }
+        .ck-act { display: flex; flex-direction: column; gap: 4px; flex: none; }
+        .ck-act .btn-primary, .ck-act .btn-outline, .ck-btns .btn-primary, .ck-btns .btn-outline { width: auto; margin: 0; padding: 7px 10px; font-size: 0.8rem; }
+        .ck-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .ck-foot { font-size: 0.74rem; color: var(--text-muted); margin: 8px 0 0 0; }
+        .ck-top { margin: -4px 0 0 0; }
+        .ck-grid-wrap { overflow-x: auto; margin: 6px 0; }
+        .ck-grid { border-collapse: collapse; width: 100%; font-size: 0.8rem; margin: 0 0 8px 0; table-layout: fixed; }
+        .ck-grid th, .ck-grid td { text-align: center; padding: 3px 0; font-weight: 700; color: var(--text-main); }
+        .ck-grid tr.ck-hr th, .ck-grid tr.ck-par th, .ck-grid tr.ck-par td { font-size: 0.66rem; color: var(--text-muted); font-weight: 600; }
+        .ck-grid th.ck-nm { text-align: left; width: 52px; font-size: 0.74rem; white-space: nowrap; overflow: hidden; }
+        .ck-grid tr.ck-hr th:first-child, .ck-grid tr.ck-par th:first-child { text-align: left; width: 52px; }
+        .ck-grid .ck-sum { color: var(--text-muted); }
+        .ck-grid .ck-mk { width: 16px; }
+        .ck-d { display: inline-flex; align-items: center; justify-content: center; width: 21px; height: 21px; }
+        .ck-d.birdie { box-shadow: inset 0 0 0 1.5px #c1121f; border-radius: 50%; }
+        .ck-d.eagle { box-shadow: inset 0 0 0 1.5px #c1121f, inset 0 0 0 3px var(--bg-card), inset 0 0 0 4.5px #c1121f; border-radius: 50%; }
+        .ck-d.bogey { box-shadow: inset 0 0 0 1.5px var(--text-main); border-radius: 2px; }
+        .ck-d.double { box-shadow: inset 0 0 0 1.5px var(--text-main), inset 0 0 0 3px var(--bg-card), inset 0 0 0 4.5px var(--text-main); border-radius: 2px; }
+        .ck-grid td.ck-x, .ck-grid td.ck-u { line-height: 1; }
+        .ck-grid td.ck-x span { display: inline-block; color: #b00020; border: 1.5px solid #b00020; border-radius: 3px; min-width: 16px; }
+        .ck-grid td.ck-u span { display: inline-block; color: var(--warn-text); background: var(--warn-bg); border: 1.5px dashed var(--warn-border); border-radius: 3px; min-width: 16px; }
+        .ck-grid td.ck-x small, .ck-grid td.ck-u small { display: block; font-size: 0.5rem; letter-spacing: -0.02em; font-weight: 600; white-space: nowrap; margin-top: 1px; }
+        .ck-grid td.ck-x small { color: #b00020; }
+        .ck-grid td.ck-u small { color: var(--warn-text); }
+        .ck-ne { color: #b00020; }
+        .ck-q { color: var(--warn-text); }
+        .ck-key { font-size: 0.74rem; color: var(--text-muted); margin: 0 0 8px 0; }
+        .ck-issue { border: 1.5px solid #e57373; border-radius: 10px; padding: 8px 10px; margin: 0 0 8px 0; font-size: 0.85rem; }
+        .ck-issue > span { display: block; color: #b00020; font-weight: 700; }
+        .ck-issue.ck-amber { border-style: dashed; border-color: var(--warn-border); background: var(--warn-bg); }
+        .ck-issue.ck-amber > span { color: var(--warn-text); }
+        .ck-issue.ck-done { border: 1px solid var(--border-mid); }
+        .ck-issue.ck-done > span { color: var(--text-main); font-weight: 400; }
+        .ck-issue.ck-done small { color: var(--text-muted); }
+        .ck-photo { margin: 6px 0 8px 0; }
+        .ck-photo img { width: 100%; max-height: 420px; object-fit: contain; border: 1px solid var(--border-mid); border-radius: 8px; background: #fff; }
+        .ck-photo small { display: block; font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; }
+        .rc-verified { text-align: center; font-size: 0.85rem; color: var(--text-main); border-top: 1px solid var(--border-faint); padding: 10px 0 0 0; margin: 10px 0; }
     </style>
 </head>
 <body>
@@ -1115,6 +1179,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <!-- PO (2026-11-14): the posted results, card by card; names open My results. -->
     <div class="rc-card" id="recap-prizes" style="display:none;"></div>
     <div class="pq-grid" id="recap-photos"></div>
+    <!-- SK: "All N cards verified at 2:14 PM", once the organizer's scan check is done. -->
+    <p class="rc-verified" id="recap-verified" style="display:none;"></p>
     <button type="button" class="rc-share" id="recap-share" onclick="shareRecap()">Share recap link</button>
     <p class="rc-msg" id="recap-msg" aria-live="polite"></p>
 </div>
@@ -1445,6 +1511,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             </div>
         </div>
         <p class="ci-msg" id="checkin-desk-msg" role="alert" style="display:none;"></p>
+        <!-- SK (ADVISOR-20261114-1527): the scorecard scan check - a Scan card
+             button per team or group, the card's grid, Verify cards. Filled by
+             renderCardCheck on each Desk render; empty until the round has a
+             score. The file input is STATIC MARKUP, like the search box: a
+             camera open on a phone must not lose its input to a re-render.
+             accept is written image/&#42; (the browser reads image/ and an
+             asterisk): a slash-star in markup reads as a comment opener to the
+             repo's source scans (tournament_no_cash_prize_test.js strips
+             slash-star comments) and hid every line after it. -->
+        <div id="cardcheck-wrap"></div>
+        <input type="file" id="cardcheck-file" accept="image/&#42;" capture="environment" style="display:none;" onchange="cardCheckPicked(this)">
         <div id="registration-chips"></div>
         <input type="search" id="registration-search" placeholder="Search a name or email" autocomplete="off" autocapitalize="off" spellcheck="false">
         <!-- THE EDITOR (2026-10-06). STATIC MARKUP, for the same reason the search
@@ -5963,6 +6040,468 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return html;
     }
 
+    // ---- SCORECARD SCAN CHECK (SK, ADVISOR-20261114-1527) --------------------
+    //
+    // Manny's pick: A (a Scan card button per team or group row on the Desk,
+    // that card's hole grid as the result) with B's review list (Verify cards:
+    // every open mismatch across the field, one list). Owner only, like the Desk.
+    //
+    // THE SCAN. The organizer photographs the paper card (the phone's camera, or
+    // a picked photo); the page shrinks it to a JPEG of at most about 600 KB and
+    // sends it with the group's round (holes, par, stroke index, names) to the
+    // LIVE scanner, POST /api/scorecard-scan, signed with the organizer's ID
+    // token. The scanner's limits apply as they are: 3 a minute, 30 a day per
+    // account (functions/api/_scan.js). Nothing here changes them.
+    //
+    // THE COMPARE is scan-compare.js (window.ScanCompare): match, mismatch,
+    // unsure (a digit read below its confidence cut), missing; the card's written
+    // total against the app's. Use card writes the card's digit through THE
+    // CORRECTOR ABOVE (correctTeamScore / correctTeamPlayerScore /
+    // correctPlayerScore), the same path and the same gates as typing it there.
+    // Keep app writes no score. Both record the choice on the stored check.
+    //
+    // STORED: tournaments/<code>/cardChecks/<card> (the read digits, the app's
+    // digits at scan time, each cell's status and choice, the totals, the
+    // verdict) and, once every card is scanned and nothing is open,
+    // tournaments/<code>/cardsVerified { count, at, by: 'organizer' }. No uid and
+    // NO PHOTO: the photo stays in this page's memory for the session (View
+    // photo) and is gone on reload.
+    const CARD_SCAN_PER_DAY = 30;   // functions/api/_scan.js PER_DAY, as the scanner enforces it
+    let cardCheckView = null;        // null (the Desk list) | { mode: 'card', sk } | { mode: 'review' }
+    let cardCheckRoundId = null;     // multi-round: the round chip
+    let cardCheckPending = null;     // the card a Scan card tap is photographing
+    let cardCheckBusy = null;        // { sk, text } while a photo is on its way
+    let cardCheckMsg = '';           // the last sentence for the organizer (a refusal, a closed round)
+    let cardCheckPhotoShown = null;  // the card whose photo is open
+    const cardCheckPhotos = {};      // sk -> data URL, this session only, never written anywhere
+
+    function cardCheckUnits(view) {
+        if (!view) return [];
+        if (recordIsIndividual()) {
+            const groups = view.scoringGroups || {};
+            const players = view.players || {};
+            return Object.keys(groups).sort((a, b) => ((groups[a] || {}).createdAt || 0) - ((groups[b] || {}).createdAt || 0)).map((gid) => {
+                const g = groups[gid] || {};
+                const ids = (g.playerIds || []).filter((pid) => players[pid]);
+                return { gk: gid, gid, label: g.name || 'Group', start: String(g.startingHole || '').trim(),
+                    players: ids.map((pid) => ({ key: pid, name: String(players[pid].name || pid), handicap: players[pid].handicap })) };
+            }).filter((u) => u.players.length);
+        }
+        const teams = view.teams || {};
+        const scramble = (view.format || 'scramble') === 'scramble';
+        return Object.keys(teams).sort((a, b) => ((teams[a] || {}).num || 0) - ((teams[b] || {}).num || 0)).map((tid) => {
+            const t = teams[tid] || {};
+            const names = (t.players || []).map((n) => String(n || '').trim());
+            const label = t.name || ('Team ' + t.num);
+            const players = scramble
+                ? [{ key: 'team', name: String(label), aliases: names.filter(Boolean) }]
+                : names.map((n, i) => ({ key: 'p' + i, idx: i, name: n })).filter((p) => p.name);
+            return { gk: 'team' + t.num, num: t.num, label, start: String(t.startingHole || '').trim(), golfers: names.filter(Boolean), scramble, players };
+        }).filter((u) => u.num && u.players.length);
+    }
+    function cardCheckHoles(view) {
+        return ((view && view.courseData) || []).map((h) => ({ hole: Number(h.hole), par: Number(h.par), si: Number(h.hcpIndex) || null }))
+            .filter((h) => h.hole >= 1 && h.hole <= 18).sort((a, b) => a.hole - b.hole);
+    }
+    // The app's scores for one card, read the way the board reads them.
+    function cardCheckAppScores(view, unit) {
+        const scores = (view && view.scores) || {};
+        const out = {};
+        cardCheckHoles(view).forEach((h) => {
+            unit.players.forEach((p) => {
+                const k = recordIsIndividual() ? playerHoleKey(p.key, h.hole)
+                    : (unit.scramble ? teamHoleKey(unit.num, h.hole) : teamPlayerHoleKey(unit.num, p.idx, h.hole));
+                const v = parseInt(scores[k], 10);
+                if (v > 0) (out[p.key] = out[p.key] || {})[h.hole] = v;
+            });
+        });
+        return out;
+    }
+    // Every card in the event: one per team or group, per countable round.
+    function cardCheckAllCards() {
+        if (!currentData) return [];
+        const checks = currentData.cardChecks || {};
+        const list = [];
+        const add = (view, rid) => cardCheckUnits(view).forEach((u) => {
+            const sk = rid ? `${rid}~${u.gk}` : u.gk;
+            list.push({ sk, rid: rid || null, view, unit: u, check: checks[sk] || null });
+        });
+        if (recordIsMultiRound()) countableRoundIds(currentData).forEach((rid) => add(roundView(currentData, rid), rid));
+        else add(currentData, null);
+        return list;
+    }
+    function cardCheckFind(sk) { return cardCheckAllCards().find((c) => c.sk === sk) || null; }
+    function cardCheckTime(ms) {
+        const d = new Date(Number(ms) || 0);
+        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+    function cardCheckToday() { return new Date().toISOString().slice(0, 10); }   // the scanner's day is UTC
+    function cardCheckUsedToday() {
+        let n = 0;
+        try { const s = JSON.parse(localStorage.getItem('hp-card-scans') || 'null'); if (s && s.d === cardCheckToday()) n = Number(s.n) || 0; } catch (e) { /* no storage */ }
+        const stored = Object.values((currentData && currentData.cardChecks) || {}).filter((c) => c && c.at && new Date(c.at).toISOString().slice(0, 10) === cardCheckToday()).length;
+        return Math.max(n, stored);
+    }
+    function cardCheckCountScan() {
+        try { localStorage.setItem('hp-card-scans', JSON.stringify({ d: cardCheckToday(), n: cardCheckUsedToday() + 1 })); } catch (e) { /* no storage */ }
+    }
+    function cardCheckMark(score, par) {
+        const d = Number(score) - Number(par);
+        if (!(score > 0) || !(par > 0)) return '';
+        return d <= -2 ? ' eagle' : d === -1 ? ' birdie' : d === 1 ? ' bogey' : d >= 2 ? ' double' : '';
+    }
+    function cardCheckCardName(c) { return c.unit.label; }
+
+    function renderCardCheck() {
+        const mount = document.getElementById('cardcheck-wrap');
+        if (!mount) return;
+        if (!currentData || !currentCode || !canManage()) { mount.innerHTML = ''; return; }
+        const all = cardCheckAllCards();
+        const scored = all.some((c) => Object.keys(cardCheckAppScores(c.view, c.unit)).length > 0);
+        // A Desk before anyone has scored shows nothing new: there is no card to check.
+        if (!all.length || (!scored && !Object.keys(currentData.cardChecks || {}).length)) { mount.innerHTML = ''; return; }
+        if (cardCheckView && cardCheckView.mode === 'card' && cardCheckFind(cardCheckView.sk)) { mount.innerHTML = cardCheckCardHtml(cardCheckFind(cardCheckView.sk)); return; }
+        if (cardCheckView && cardCheckView.mode === 'review') { mount.innerHTML = cardCheckReviewHtml(all); return; }
+        cardCheckView = null;
+        mount.innerHTML = cardCheckDeskHtml(all);
+    }
+    function cardCheckVerifiedLine() {
+        const v = currentData && currentData.cardsVerified;
+        if (!v || !(v.count > 0) || !v.at) return '';
+        return `All ${Number(v.count)} cards verified at ${cardCheckTime(v.at)}`;
+    }
+    function cardCheckDeskHtml(all) {
+        const multi = recordIsMultiRound();
+        const rids = multi ? countableRoundIds(currentData) : [];
+        if (multi && rids.indexOf(cardCheckRoundId) === -1) cardCheckRoundId = rids[rids.length - 1] || null;
+        const cards = multi ? all.filter((c) => c.rid === cardCheckRoundId) : all;
+        const s = ScanCompare.fieldSummary(cards);
+        const fieldAll = ScanCompare.fieldSummary(all);
+        let h = `<div class="ck-card" id="cardcheck-desk"><div class="ck-head"><div class="ck-title">Scorecard check</div>`
+            + (fieldAll.open ? `<button type="button" class="btn-outline ck-review-btn" id="ck-review-open" onclick="cardCheckOpenReview()">Verify cards · ${fieldAll.open}</button>` : '') + `</div>`
+            + `<p class="ck-note">Photograph each paper card after the round. The scanner reads it and checks every hole against the app.</p>`;
+        if (multi) {
+            h += `<div class="ck-chips">` + rids.map((rid) => `<button type="button" class="reg-chip${rid === cardCheckRoundId ? ' active' : ''}" data-rid="${escapeHtml(rid)}" onclick="cardCheckPickRound(this.dataset.rid)">${escapeHtml((currentData.rounds[rid] || {}).name || rid)}</button>`).join('') + `</div>`;
+        }
+        h += `<div class="ck-tiles" id="ck-tiles">`
+            + `<div class="pay-tile"><b id="ck-tile-cards">${s.cards}</b><span>cards</span></div>`
+            + `<div class="pay-tile"><b id="ck-tile-verified">${s.verified}</b><span>verified</span></div>`
+            + `<div class="pay-tile${s.withMismatches ? ' ck-t-open' : ''}"><b id="ck-tile-open">${s.withMismatches}</b><span>with mismatches</span></div>`
+            + `<div class="pay-tile"><b id="ck-tile-toscan">${s.toScan}</b><span>to scan</span></div></div>`;
+        const line = cardCheckVerifiedLine();
+        if (line) h += `<div class="ck-verified" id="ck-verified">✓ ${escapeHtml(line)}</div>`;
+        if (cardCheckMsg) h += `<p class="ck-msg" id="ck-msg" role="alert">${escapeHtml(cardCheckMsg)}</p>`;
+        h += cards.map((c) => {
+            const u = c.unit;
+            const who = (u.golfers || u.players.map((p) => p.name)).join(', ');
+            const start = u.start ? ` · H${escapeHtml(u.start)}` : '';
+            let state, act;
+            if (cardCheckBusy && cardCheckBusy.sk === c.sk) { state = `<span class="ck-state">${escapeHtml(cardCheckBusy.text)}</span>`; act = ''; }
+            else if (!c.check) { state = `<span class="ck-state">not scanned</span>`; act = `<button type="button" class="btn-primary ck-scan" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk)">Scan card</button>`; }
+            else {
+                const open = ScanCompare.openIssues(c.check).length;
+                state = open ? `<span class="ck-state ck-open">${open} to resolve</span>` : `<span class="ck-state ck-ok">✓ verified · ${escapeHtml(cardCheckTime(c.check.at))}</span>`;
+                act = `<button type="button" class="btn-outline ck-look" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckOpenCard(this.dataset.sk)">${open ? 'Review' : 'Details'}</button>`
+                    + `<button type="button" class="btn-outline ck-scan" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk)">Scan again</button>`;
+            }
+            return `<div class="ck-row" data-card="${escapeHtml(c.sk)}"><div class="ck-who"><strong>${escapeHtml(u.label)}${start}</strong><small>${escapeHtml(who)}</small>${state}</div><div class="ck-act">${act}</div></div>`;
+        }).join('');
+        const left = Math.max(0, CARD_SCAN_PER_DAY - cardCheckUsedToday());
+        h += `<p class="ck-foot" id="ck-allowance">${left} of ${CARD_SCAN_PER_DAY} scans left today, counted on this phone. The scanner allows ${CARD_SCAN_PER_DAY} scans a day on this account and 3 a minute.</p></div>`;
+        return h;
+    }
+    function cardCheckPickRound(rid) { cardCheckRoundId = rid || null; renderCardCheck(); }
+    function cardCheckOpenCard(sk) { cardCheckView = { mode: 'card', sk }; cardCheckPhotoShown = null; cardCheckMsg = ''; renderCardCheck(); cardCheckScrollTop(); }
+    function cardCheckOpenReview() { cardCheckView = { mode: 'review' }; cardCheckPhotoShown = null; cardCheckMsg = ''; renderCardCheck(); cardCheckScrollTop(); }
+    function cardCheckBack() { cardCheckView = null; cardCheckPhotoShown = null; cardCheckMsg = ''; renderCardCheck(); cardCheckScrollTop(); }
+    function cardCheckScrollTop() { try { const el = document.getElementById('cardcheck-wrap'); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' }); } catch (e) { /* no scroll here */ } }
+    function cardCheckTogglePhoto(sk) { cardCheckPhotoShown = cardCheckPhotoShown === sk ? null : sk; renderCardCheck(); }
+
+    // One issue's sentence, the same on the card screen and in the review list.
+    function cardCheckIssueText(x) {
+        if (x.kind === 'mismatch') return `Hole ${x.hole} · ${x.name}: card ${x.card}, app ${x.app}`;
+        if (x.kind === 'unsure') return `Hole ${x.hole} · ${x.name}: reads ${x.card}?, app ${x.app}. Check the photo.`;
+        if (x.kind === 'missing') return x.card === null ? `Hole ${x.hole} · ${x.name}: blank on the card, app ${x.app}` : `Hole ${x.hole} · ${x.name}: card ${x.card}, no score in the app`;
+        if (x.kind === 'total') return `${x.name}: the card's total says ${x.written}, the app adds to ${x.appTotal === null ? 'nothing' : x.appTotal}`;
+        if (x.kind === 'absent') return `${x.name}: no row on the card`;
+        return `Card row ${x.row}: not matched${x.asWritten ? ' (“' + x.asWritten + '”)' : ''}`;
+    }
+    function cardCheckIssueHtml(c, x, withCard) {
+        const cls = x.kind === 'unsure' ? 'ck-issue ck-amber' : 'ck-issue';
+        const head = (withCard ? `${cardCheckCardName(c)} · ` : '') + cardCheckIssueText(x);
+        const data = `data-sk="${escapeHtml(c.sk)}" data-issue="${escapeHtml(x.id)}"`;
+        if (x.choice) {
+            const said = x.choice === 'card' ? `Used the card (${x.card})` : 'Kept the app';
+            return `<div class="ck-issue ck-done" data-issue="${escapeHtml(x.id)}"><span>${escapeHtml(head)}</span><small>${escapeHtml(said)}</small></div>`;
+        }
+        const keepLabel = (x.kind === 'mismatch' || x.kind === 'unsure' || x.kind === 'missing') && x.app !== null ? `Keep app (${x.app})` : 'Keep app';
+        return `<div class="${cls}" data-issue="${escapeHtml(x.id)}"><span>${escapeHtml(head)}</span><div class="ck-btns">`
+            + (x.canUseCard ? `<button type="button" class="btn-primary ck-use" ${data} onclick="cardCheckChoose(this.dataset.sk, this.dataset.issue, 'card')">Use card (${x.card})</button>` : '')
+            + `<button type="button" class="btn-outline ck-keep" ${data} onclick="cardCheckChoose(this.dataset.sk, this.dataset.issue, 'app')">${escapeHtml(keepLabel)}</button>`
+            // The photo beside an amber line (the one that says "check the photo") and on every line of the field's list.
+            + (cardCheckPhotos[c.sk] && (withCard || x.kind === 'unsure') ? `<button type="button" class="btn-outline ck-photo-btn" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckTogglePhoto(this.dataset.sk)">${withCard ? 'Photo' : 'View photo'}</button>` : '')
+            + `</div></div>`;
+    }
+    function cardCheckGridHtml(c) {
+        const holes = cardCheckHoles(c.view);
+        const rows = (c.check && c.check.rows) || {};
+        const nines = [holes.filter((h) => h.hole <= 9), holes.filter((h) => h.hole >= 10)].filter((n) => n.length);
+        return nines.map((nine) => {
+            const tag = nine[0].hole >= 10 ? 'IN' : 'OUT';
+            let t = `<table class="ck-grid"><tr class="ck-hr"><th>Hole</th>${nine.map((h) => `<th>${h.hole}</th>`).join('')}<th>${tag}</th><th></th></tr>`
+                + `<tr class="ck-par"><th>Par</th>${nine.map((h) => `<td>${h.par || ''}</td>`).join('')}<td>${nine.reduce((s, h) => s + (h.par || 0), 0)}</td><td></td></tr>`;
+            c.unit.players.forEach((p) => {
+                const r = rows[p.key] || { h: {} };
+                let sum = 0, all = true, any = false;
+                const cells = nine.map((h) => {
+                    const cell = (r.h || {})['h' + h.hole] || { status: 'empty' };
+                    const shown = cell.choice === 'card' ? cell.card : (cell.app !== undefined ? cell.app : cell.card);
+                    if (shown > 0) sum += shown; else all = false;
+                    if (cell.status === 'match' || cell.choice) {
+                        if (cell.status !== 'match') any = true;
+                        return `<td><span class="ck-d${cardCheckMark(shown, h.par)}">${shown || ''}</span></td>`;
+                    }
+                    if (cell.status === 'empty') { all = false; return `<td></td>`; }
+                    any = true;
+                    if (cell.status === 'unsure') return `<td class="ck-u"><span>${cell.card}?</span><small>app ${cell.app}</small></td>`;
+                    if (cell.status === 'mismatch') return `<td class="ck-x"><span>${cell.card}</span><small>app ${cell.app}</small></td>`;
+                    return `<td class="ck-x"><span>${cell.card || '–'}</span><small>app ${cell.app || '–'}</small></td>`;
+                }).join('');
+                const open = nine.some((h) => { const cell = (r.h || {})['h' + h.hole]; return cell && cell.status !== 'match' && cell.status !== 'empty' && !cell.choice; });
+                const unsureOnly = open && nine.every((h) => { const cell = (r.h || {})['h' + h.hole]; return !cell || cell.status === 'match' || cell.status === 'empty' || cell.choice || cell.status === 'unsure'; });
+                const mark = !r.row ? '' : (open ? (unsureOnly ? '<span class="ck-q">?</span>' : '<span class="ck-ne">≠</span>') : (all || any ? '✓' : ''));
+                const short = String(p.name).split(' ').filter(Boolean);
+                const nm = short.length > 1 ? `${short[0]} ${short[short.length - 1].charAt(0)}` : (short[0] || '');
+                t += `<tr><th class="ck-nm">${escapeHtml(nm)}</th>${cells}<td class="ck-sum">${sum || ''}</td><td class="ck-mk">${mark}</td></tr>`;
+            });
+            return t + `</table>`;
+        }).join('');
+    }
+    function cardCheckCardHtml(c) {
+        const u = c.unit;
+        const head = `<div class="ck-top"><button type="button" class="pz-back" id="ck-back" onclick="cardCheckBack()">‹ Desk</button></div>`
+            + `<div class="ck-title" id="ck-card-title">${escapeHtml(u.label)} · card check</div>`;
+        if (cardCheckBusy && cardCheckBusy.sk === c.sk) return `<div class="ck-card" id="cardcheck-card">${head}<p class="ck-note" id="ck-busy">${escapeHtml(cardCheckBusy.text)}</p></div>`;
+        if (!c.check) {
+            return `<div class="ck-card" id="cardcheck-card">${head}${cardCheckMsg ? `<p class="ck-msg" id="ck-msg" role="alert">${escapeHtml(cardCheckMsg)}</p>` : ''}`
+                + `<button type="button" class="btn-primary ck-scan" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk)">Scan card</button></div>`;
+        }
+        const issues = ScanCompare.issuesOf(c.check);
+        const open = issues.filter((x) => !x.choice);
+        const holesN = cardCheckHoles(c.view).length * u.players.length;
+        let h = `<div class="ck-card" id="cardcheck-card">${head}<p class="ck-sub">${escapeHtml(currentData.name || '')} · read ${escapeHtml(cardCheckTime(c.check.at))} · ${u.players.length} ${u.scramble ? 'team row' : (u.players.length === 1 ? 'golfer' : 'golfers')}</p>`;
+        if (cardCheckMsg) h += `<p class="ck-msg" id="ck-msg" role="alert">${escapeHtml(cardCheckMsg)}</p>`;
+        if (cardCheckPhotoShown === c.sk && cardCheckPhotos[c.sk]) h += `<div class="ck-photo"><img id="ck-photo-img" src="${escapeHtml(cardCheckPhotos[c.sk])}" alt="The photo of this card"><small>This photo is kept on this screen only, until the page is closed.</small></div>`;
+        h += `<div class="ck-grid-wrap" id="ck-grid">${cardCheckGridHtml(c)}</div>`;
+        h += `<p class="ck-key">✓ = every hole in that nine matches. Red: the card and the app differ. Amber: the scanner was unsure.</p>`;
+        h += `<div id="ck-issues">` + issues.map((x) => cardCheckIssueHtml(c, x, false)).join('') + `</div>`;
+        h += open.length
+            ? `<p class="ck-foot">Use card writes that hole through the score corrector, as if typed there. Keep app leaves the score as it is.</p>`
+            : `<div class="ck-verified" id="ck-card-ok">✓ ${escapeHtml(u.label)}: verified, ${holesN} holes checked${issues.length ? ` · ${issues.length} resolved` : ''}</div>`;
+        h += `<div class="ck-btns"><button type="button" class="btn-outline ck-scan" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk)">Scan again</button>`
+            + (cardCheckPhotos[c.sk] ? `<button type="button" class="btn-outline ck-photo-btn" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckTogglePhoto(this.dataset.sk)">${cardCheckPhotoShown === c.sk ? 'Hide photo' : 'View photo'}</button>` : '')
+            + `</div></div>`;
+        return h;
+    }
+    function cardCheckReviewHtml(all) {
+        const s = ScanCompare.fieldSummary(all);
+        const read = all.filter((c) => c.check).length;
+        let unsure = 0;
+        const items = [];
+        all.forEach((c) => {
+            if (!c.check) return;
+            ScanCompare.openIssues(c.check).forEach((x) => { if (x.kind === 'unsure') unsure++; items.push([c, x]); });
+        });
+        let h = `<div class="ck-card" id="cardcheck-review"><div class="ck-top"><button type="button" class="pz-back" id="ck-back" onclick="cardCheckBack()">‹ Desk</button></div>`
+            + `<div class="ck-title">Verify cards</div><p class="ck-sub" id="ck-review-sub">${read} of ${s.cards} read · ${s.matched} of ${s.cards} cards match</p>`
+            + `<div class="ck-tiles"><div class="pay-tile"><b>${read}</b><span>read</span></div><div class="pay-tile"><b>${s.matched}</b><span>match ✓</span></div>`
+            + `<div class="pay-tile${items.length - unsure ? ' ck-t-open' : ''}"><b id="ck-rv-open">${items.length - unsure}</b><span>to resolve</span></div><div class="pay-tile"><b id="ck-rv-unsure">${unsure}</b><span>unsure</span></div></div>`;
+        if (cardCheckMsg) h += `<p class="ck-msg" id="ck-msg" role="alert">${escapeHtml(cardCheckMsg)}</p>`;
+        if (cardCheckPhotoShown && cardCheckPhotos[cardCheckPhotoShown]) {
+            const pc = all.find((c) => c.sk === cardCheckPhotoShown);
+            h += `<div class="ck-photo"><img id="ck-photo-img" src="${escapeHtml(cardCheckPhotos[cardCheckPhotoShown])}" alt="The photo of ${escapeHtml(pc ? pc.unit.label : 'this card')}"><small>${escapeHtml(pc ? pc.unit.label : '')} · kept on this screen only, until the page is closed.</small></div>`;
+        }
+        h += `<div id="ck-review-list">` + items.map(([c, x]) => cardCheckIssueHtml(c, x, true)).join('') + `</div>`;
+        if (!items.length) {
+            const line = cardCheckVerifiedLine();
+            h += line ? `<div class="ck-verified" id="ck-review-done">✓ ${escapeHtml(line)}<small>Shown on the Desk and the recap.</small></div>`
+                : `<p class="ck-note" id="ck-review-done">Nothing left to resolve.${s.toScan ? ` ${s.toScan} ${s.toScan === 1 ? 'card is' : 'cards are'} still to scan.` : ''}</p>`;
+        }
+        return h + `</div>`;
+    }
+
+    // ---- THE SCAN ----
+    function cardCheckScan(sk) {
+        if (!canManage() || cardCheckBusy) return;
+        const c = cardCheckFind(sk);
+        if (!c) return;
+        cardCheckPending = sk;
+        cardCheckMsg = '';
+        const input = document.getElementById('cardcheck-file');
+        if (input && typeof input.click === 'function') input.click();
+    }
+    function cardCheckPicked(input) {
+        const file = input && input.files && input.files[0];
+        const sk = cardCheckPending;
+        cardCheckPending = null;
+        if (!file || !sk || !canManage()) return;
+        const c = cardCheckFind(sk);
+        if (!c) return;
+        const holes = cardCheckHoles(c.view);
+        if (holes.length !== 9 && holes.length !== 18) { cardCheckMsg = 'The scanner reads 9- or 18-hole cards only.'; renderCardCheck(); return; }
+        cardCheckBusy = { sk, text: `Reading ${c.unit.label}’s card…` };
+        cardCheckView = { mode: 'card', sk };
+        renderCardCheck();
+        cardCheckScrollTop();
+        cardCheckJpeg(file).then((dataUrl) => {
+            cardCheckPhotos[sk] = dataUrl;
+            return cardCheckSend(c, dataUrl);
+        }).then((res) => {
+            cardCheckBusy = null;
+            if (!res.ok) { cardCheckMsg = res.text; renderCardCheck(); return; }
+            cardCheckCountScan();
+            const check = ScanCompare.compareCard({ scan: res.result, players: c.unit.players, holes: holes.map((h) => h.hole), app: cardCheckAppScores(c.view, c.unit), at: Date.now() });
+            cardCheckStore(sk, check);
+        }).catch(() => {
+            cardCheckBusy = null;
+            cardCheckMsg = 'That photo could not be used. Take it again, flat and in good light.';
+            renderCardCheck();
+        });
+        try { input.value = ''; } catch (e) { /* a picked file stays picked */ }
+    }
+    // The phone's photo, shrunk to a JPEG of at most about 600 KB (the size
+    // the scanner expects: 300-600 KB; it refuses anything over about 2.2 MB).
+    function cardCheckJpeg(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error('read'));
+            reader.onload = () => {
+                const img = new Image();
+                img.onerror = () => reject(new Error('image'));
+                img.onload = () => {
+                    const w = img.naturalWidth || img.width, ht = img.naturalHeight || img.height;
+                    if (!(w > 0) || !(ht > 0)) { reject(new Error('image')); return; }
+                    let max = 1600, q = 0.8, out = '';
+                    for (let i = 0; i < 5; i++) {
+                        const k = Math.min(1, max / Math.max(w, ht));
+                        const cv = document.createElement('canvas');
+                        cv.width = Math.max(1, Math.round(w * k)); cv.height = Math.max(1, Math.round(ht * k));
+                        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+                        out = cv.toDataURL('image/jpeg', q);
+                        if (out.length * 0.75 <= 600 * 1024) break;
+                        max = Math.round(max * 0.8); q = Math.max(0.6, q - 0.08);
+                    }
+                    if (!/^data:image\/jpeg;base64,/.test(out)) { reject(new Error('encode')); return; }
+                    resolve(out);
+                };
+                img.src = String(reader.result);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+    // The scanner's own answers, as a sentence each (functions/api/_scan.js).
+    const CARD_SCAN_SAYS = {
+        not_configured: 'The card scanner is not switched on yet.',
+        sign_in: 'Sign in again to scan a card.',
+        needs_pass: 'This account has used its free scans. More scans need an organizer pass.',
+        rate_limited: 'The scanner takes 3 cards a minute. Wait a minute, then scan this card again.',
+        daily_limit: `That is the scanner’s limit: ${CARD_SCAN_PER_DAY} scans a day on this account. Check the other cards against the board, or scan them tomorrow.`,
+        monthly_cap: 'The scanner has reached its monthly limit. Check this card against the board by hand.',
+        bad_request: 'The scanner could not use this round. Check the course card in Setup.',
+        bad_image: 'That photo could not be read. Take it again, flat and in good light.',
+        busy: 'The scanner is busy. Try this card again in a minute.',
+        upstream_error: 'The scanner could not read this card. Take the photo again.',
+        network: 'The scanner did not answer. Check the signal and try again.'
+    };
+    function cardCheckRound(c) {
+        const holes = cardCheckHoles(c.view);
+        const par = {}, si = {};
+        holes.forEach((h) => { if (h.par > 0) par[h.hole] = h.par; if (h.si > 0) si[h.hole] = h.si; });
+        const hcp = (v) => { const t = String(v === undefined || v === null ? '' : v).trim(); return /^\d{1,2}$/.test(t) ? parseInt(t, 10) : undefined; };
+        return {
+            holes: holes.length === 9 ? 9 : 18,
+            startHole: holes.length === 9 && holes[0].hole === 10 ? 10 : 1,
+            expectedHoles: holes.map((h) => h.hole),
+            par, strokeIndex: si,
+            course: String(c.view.courseName || currentData.courseName || ''),
+            tee: '',
+            players: c.unit.players.slice(0, 8).map((p) => {
+                const o = { name: String(p.name).slice(0, 60) };
+                if (p.aliases && p.aliases.length) o.nicknames = p.aliases.slice(0, 4);
+                const hv = hcp(p.handicap);
+                if (hv !== undefined) o.handicap = hv;
+                return o;
+            })
+        };
+    }
+    function cardCheckSend(c, dataUrl) {
+        const user = authUser;   // the page's one seam: the signed-in organizer, never the anonymous session
+        if (!user || typeof user.getIdToken !== 'function') return Promise.resolve({ ok: false, text: CARD_SCAN_SAYS.sign_in });
+        if (typeof fetch !== 'function') return Promise.resolve({ ok: false, text: CARD_SCAN_SAYS.network });
+        const body = { image: { mimeType: 'image/jpeg', data: String(dataUrl).replace(/^data:[^,]*,/, '') }, round: cardCheckRound(c) };
+        return Promise.resolve(user.getIdToken()).then((tok) => fetch('/api/scorecard-scan', {
+            method: 'POST', credentials: 'omit',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+            body: JSON.stringify(body)
+        })).then((r) => Promise.resolve(r.json()).catch(() => null)).then((j) => {
+            if (j && j.status === 'ok' && j.result && Array.isArray(j.result.players)) return { ok: true, result: j.result };
+            const why = j && (j.status === 'not_configured' ? 'not_configured' : j.reason);
+            return { ok: false, text: CARD_SCAN_SAYS[why] || CARD_SCAN_SAYS.network };
+        }, () => ({ ok: false, text: CARD_SCAN_SAYS.network }));
+    }
+
+    // ---- STORE, CHOOSE, VERIFY ----
+    function cardCheckStore(sk, check) {
+        if (!currentCode || !canManage()) return;
+        currentData.cardChecks = Object.assign({}, currentData.cardChecks || {}, { [sk]: check });
+        db.ref(`tournaments/${currentCode}/cardChecks/${sk}`).set(check).catch((err) => { cardCheckMsg = `That did not save: ${err.message}`; renderCardCheck(); });
+        cardCheckSyncVerified();
+        renderCardCheck();
+    }
+    function cardCheckChoose(sk, issueId, choice) {
+        if (!currentCode || !canManage()) return;
+        const c = cardCheckFind(sk);
+        if (!c || !c.check) return;
+        const x = ScanCompare.issuesOf(c.check).find((i) => i.id === issueId);
+        if (!x || x.choice) return;
+        cardCheckMsg = '';
+        if (choice === 'card') {
+            if (!x.canUseCard || x.kind === 'total' || x.kind === 'absent' || x.kind === 'row') return;
+            // The corrector writes nothing to a round that is not open; say so
+            // rather than record a choice that changed no score.
+            if (c.rid && roundStatus((currentData.rounds || {})[c.rid]) !== 'open') {
+                cardCheckMsg = 'This round is not open. Open it in Setup to use the card’s score.';
+                renderCardCheck();
+                return;
+            }
+            const u = c.unit;
+            const rid = c.rid || undefined;
+            if (recordIsIndividual()) correctPlayerScore(u.gid, x.key, x.hole, x.card, rid);
+            else if (u.scramble) correctTeamScore(u.num, x.hole, x.card, rid);
+            else correctTeamPlayerScore(u.num, (u.players.find((p) => p.key === x.key) || {}).idx, x.hole, x.card, rid);
+        }
+        const next = ScanCompare.choose(c.check, issueId, choice);
+        if (next === c.check) return;
+        cardCheckStore(sk, next);
+    }
+    // Every card scanned and nothing open: the line goes on the event. A card
+    // scanned again with something open takes it off.
+    function cardCheckSyncVerified() {
+        if (!currentCode || !canManage()) return;
+        const s = ScanCompare.fieldSummary(cardCheckAllCards());
+        const have = currentData.cardsVerified;
+        const ref = db.ref(`tournaments/${currentCode}/cardsVerified`);
+        if (s.allVerified) {
+            if (have && have.count === s.cards) return;
+            const v = { count: s.cards, at: Date.now(), by: 'organizer' };
+            currentData.cardsVerified = v;
+            ref.set(v).catch((err) => { cardCheckMsg = `That did not save: ${err.message}`; renderCardCheck(); });
+        } else if (have) {
+            delete currentData.cardsVerified;
+            ref.remove().catch(() => { /* the next snapshot shows what is there */ });
+        }
+    }
+
     // ---- THE REGISTRATION DESK (waves 1, 2a, 2b, 2c) --------------------------
     //
     // Two hosts, one data source. Setup holds the CONFIGURATION (the "Ask golfers
@@ -6133,6 +6672,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const note = document.getElementById('registration-desk-note');
         const search = document.getElementById('registration-search');
         if (!panel || !list) return;
+        renderCardCheck();   // SK: the scorecard scan check, above the signups
         // The search box is wired here, once, and only ever READ: typing re-renders
         // the rows and the chips; nothing re-renders the box.
         if (search && typeof search.oninput !== 'function') search.oninput = function () { renderRegistrationDesk(); };
@@ -9227,6 +9767,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (prizesEl) {
             prizesEl.innerHTML = post ? recapPrizesHtml(post, data) : '';
             prizesEl.style.display = post ? 'block' : 'none';
+        }
+        const verifiedEl = document.getElementById('recap-verified');
+        if (verifiedEl) {
+            const v = data.cardsVerified;
+            const ok = !!(v && v.count > 0 && v.at);
+            verifiedEl.textContent = ok ? `All ${Number(v.count)} cards verified at ${new Date(Number(v.at)).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : '';
+            verifiedEl.style.display = ok ? 'block' : 'none';
         }
         document.getElementById('recap-photos').innerHTML = TournamentPhotos.ordered(recapShown).map((p) => {
             const label = TournamentPhotos.photoLabel(data, p);
