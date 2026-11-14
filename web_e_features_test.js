@@ -75,6 +75,9 @@ function sayTable() {
 }
 
 const HEADLINES = {
+    // 2.0.7 site update (web-207-site, Manny's standing rule 2026-11-14 15:57: what ships goes on the site in the same
+    // release cycle, with real screenshots): a 'New in 2.0.7' row of four cards cut from the 2.0.7 App Store screenshots.
+    'New in 2.0.7': ['Card, GPS, Games, Board.', 'Read the green.', 'How big is the green?', 'Your team card, in the app.'],
     'Play': ['Every yard. Every hole.', 'Hit the number it plays.', 'Know what you can carry.', 'Miss on the right side.', 'No signal? Still every yard.', 'Your real carries.'],
     'Games': ['Set up the game in one sentence.', 'Every game your group plays.', 'Score the whole group in one tap.', 'Every game, as it happens.', 'The final word, ready to share.', 'Who owes who, done.'],
     'Your group': ['Same game. Same code. Every week.', 'Talk to the round.', 'Same group? One tap.', 'One board for the whole trip.', 'Every round you’ve played.'],
@@ -90,8 +93,9 @@ describe('1. the 25 cards', () => {
     test('five rows in order, 6 + 6 + 5 + 12 + 3 cards, right after the hero', () => {
         assert.deepEqual(groups.map((g) => g.name), Object.keys(HEADLINES));
         // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12, 32 cards.
-        assert.deepEqual(groups.map((g) => g.n), [6, 6, 5, 12, 3]);
-        assert.equal(cards.length, 32);
+        // 2.0.7 re-pin (2026-11-14): New in 2.0.7 (4) leads, 36 cards.
+        assert.deepEqual(groups.map((g) => g.n), [4, 6, 6, 5, 12, 3]);
+        assert.equal(cards.length, 36);
         const at = html.indexOf('id="features"');
         assert.ok(at > html.indexOf('class="wrap hero"') && at < html.indexOf('class="wrap split"'), 'the rows are not between the hero and the golfer/organizer panels');
         assert.match(html, /EVERYTHING IN THE APP/);
@@ -125,7 +129,8 @@ describe('1. the 25 cards', () => {
         // every one of the 25 (was 24: the weekly-code card showed a 295 px poster until its re-capture).
         const wide = cards.filter((c) => Number(/\bwidth="(\d+)"/.exec(c.img)[1]) >= 780).length;
         // 52A batch 1 re-pin (2026-11-12): seven Tournaments cards joined the Organize row, each a 780-wide @2x capture.
-        assert.equal(wide, 32, 'only ' + wide + ' of 32 screens are 2x or sharper');
+        // 2.0.7 re-pin (2026-11-14): + the four New in 2.0.7 screens, 940 wide.
+        assert.equal(wide, 36, 'only ' + wide + ' of 36 screens are 2x or sharper');
     });
 
     // RE-CAPTURE (Nov 10): hazards, range, my-bag and weekly-code were re-shot from the 2.0.5 web app
@@ -136,7 +141,7 @@ describe('1. the 25 cards', () => {
     test('the four re-captured screens are the 3x captures; the screens manifest lists all 25 and marks the old files unused', () => {
         const manifest = JSON.parse(read('media/screens/manifest.json'));
         assert.equal(manifest.folder, '/media/screens/');
-        assert.equal(manifest.screens.length, 32);   // 52A batch 1 re-pin (2026-11-12): 25 + 7 Tournaments screens
+        assert.equal(manifest.screens.length, 36);   // 52A batch 1 re-pin (2026-11-12): 25 + 7 Tournaments screens; 2.0.7 re-pin (2026-11-14): + 4 New in 2.0.7
         assert.deepEqual(manifest.screens.map((s) => s.key), cards.map((c) => c.key), 'the manifest lists the cards in page order');
         ['hazards', 'range', 'my-bag', 'weekly-code', 'ask-caddie'].forEach((k) => {
             const c = cards.find((x) => x.key === k);
@@ -193,8 +198,23 @@ describe('2. words', () => {
         assert.doesNotMatch(rest, /coming soon/i, 'a Coming soon outside that card');
     });
 
+    // 2.0.7 re-pin (2026-11-14): the Season board ships in 2.0.7 (55A, What's New), so it may be named, in the
+    // 'Also new in 2.0.7' list only; co-organizers stay out everywhere.
+    // 2.0.7 site update (2026-11-14): only what is in a store build is shown. Built or being built on feature
+    // branches, in NO store build yet, so never on the page as available: the smooth 1 m slope, the Home Course
+    // bundle, slope on by default + whole-course prefetch, the target ring hiding while slope is on, the shareable
+    // round card, the Android-twin lock screen.
+    test('2.0.7: nothing from the feature branches is shown as available', () => {
+        const t = textOf(html);
+        assert.match(t, /New in 2\.0\.7/, 'positive: the 2.0.7 row is there');
+        assert.doesNotMatch(t, /\b1\s?m(etre|eter)? slope|smooth(er)? slope|Home Course|whole[- ]course|prefetch|target ring|round card to share|shareable round|lock[- ]screen/i);
+    });
+
     test('co-organizers and the season page stay out', () => {
-        assert.doesNotMatch(textOf(feat), /co-?organi[sz]er|season/i);
+        const also = (/<ul class="new207"[^>]*>([\s\S]*?)<\/ul>/.exec(feat) || [])[1] || '';
+        assert.match(textOf(also), /Season board/, 'positive: the 2.0.7 list names the Season board');
+        assert.doesNotMatch(textOf(feat.replace(also, '')), /co-?organi[sz]er|season/i);
+        assert.doesNotMatch(textOf(also), /co-?organi[sz]er/i);
     });
 });
 

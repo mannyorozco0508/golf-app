@@ -548,8 +548,8 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
         assert.match(home, /EVERYTHING IN THE APP/);
         const sec = /<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(home)[1];
         assert.deepEqual((sec.match(/<div class="grp" id="g-[a-z]+">\s*<div class="ghd"><h2>([^<]*)<\/h2>/g) || []).map((t) => />([^<]*)<\/h2>/.exec(t)[1]),
-            ['Play', 'Games', 'Your group', 'Organize', 'Get better']);
-        assert.equal((sec.match(/<li class="fc"/g) || []).length, 32);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12
+            ['New in 2.0.7', 'Play', 'Games', 'Your group', 'Organize', 'Get better']);   // 2.0.7 re-pin (2026-11-14): the New in 2.0.7 row leads
+        assert.equal((sec.match(/<li class="fc"/g) || []).length, 36);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin: + 4
         assert.equal(videos(sec).length, 6, 'the six features with a clip');
     });
 

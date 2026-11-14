@@ -3,6 +3,58 @@
   "folder": "/media/screens/",
   "screens": [
     {
+      "key": "round-tabs",
+      "card": "f-round-tabs",
+      "headline": "Card, GPS, Games, Board.",
+      "files": [
+        "/media/screens/round-tabs-400.webp",
+        "/media/screens/round-tabs-940.webp"
+      ],
+      "width": 940,
+      "height": 2040,
+      "recaptured": "2026-11-14 (2.0.7 site update, web-207-site)",
+      "captured": "release-207 2.0.7 (3) App Store screenshot outbox/appstore-207-submit/iphone-6.9/01-gps-every-yard.png (1320x2868, as submitted to Apple): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040, rounded corners clear) and saved as WebP 940 and 400 wide in headless Chrome; the original PNG is untouched."
+    },
+    {
+      "key": "green-slope",
+      "card": "f-green-slope",
+      "headline": "Read the green.",
+      "files": [
+        "/media/screens/green-slope-400.webp",
+        "/media/screens/green-slope-940.webp"
+      ],
+      "width": 940,
+      "height": 2040,
+      "recaptured": "2026-11-14 (2.0.7 site update, web-207-site)",
+      "captured": "release-207 2.0.7 (3) App Store screenshot outbox/appstore-207-submit/iphone-6.9/07-green-slope.png (1320x2868, as submitted to Apple): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040, rounded corners clear) and saved as WebP 940 and 400 wide in headless Chrome; the original PNG is untouched."
+    },
+    {
+      "key": "green-size",
+      "card": "f-green-size",
+      "headline": "How big is the green?",
+      "files": [
+        "/media/screens/green-size-400.webp",
+        "/media/screens/green-size-940.webp"
+      ],
+      "width": 940,
+      "height": 2040,
+      "recaptured": "2026-11-14 (2.0.7 site update, web-207-site)",
+      "captured": "release-207 2.0.7 (3) App Store screenshot outbox/appstore-207-submit/iphone-6.9/06-aim-tip.png (1320x2868, as submitted to Apple): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040, rounded corners clear) and saved as WebP 940 and 400 wide in headless Chrome; the original PNG is untouched."
+    },
+    {
+      "key": "team-card",
+      "card": "f-team-card",
+      "headline": "Your team card, in the app.",
+      "files": [
+        "/media/screens/team-card-400.webp",
+        "/media/screens/team-card-940.webp"
+      ],
+      "width": 940,
+      "height": 2040,
+      "recaptured": "2026-11-14 (2.0.7 site update, web-207-site)",
+      "captured": "release-207 2.0.7 (3) App Store screenshot outbox/appstore-207-submit/iphone-6.9/09-team-card.png (1320x2868, as submitted to Apple): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040, rounded corners clear) and saved as WebP 940 and 400 wide in headless Chrome; the original PNG is untouched."
+    },
+    {
       "key": "gps",
       "card": "f-gps",
       "headline": "Every yard. Every hole.",

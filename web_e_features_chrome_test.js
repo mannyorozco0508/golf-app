@@ -168,15 +168,15 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         if (srv) { srv.closeAllConnections(); srv.close(); }
     });
 
-    test('32 cards render in five rows, each with its headline and a described screen', async () => {
+    test('36 cards render in six rows, each with its headline and a described screen', async () => {
         await tab.go(base + '/');
         const r = await tab.eval(`(() => { const cs = [...document.querySelectorAll('#features .fc')];
             return { n: cs.length, rows: [...document.querySelectorAll('#features .row')].map((r) => r.children.length),
               bad: cs.filter((c) => !c.querySelector('h3').textContent.trim() || !c.querySelector('p').textContent.trim() || !(c.querySelector('.ph img').alt || '').trim()).map((c) => c.id),
               sideways: document.documentElement.scrollWidth > window.innerWidth,
               text: document.body.innerText }; })()`);
-        assert.equal(r.n, 32);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12
-        assert.deepEqual(r.rows, [6, 6, 5, 12, 3]);
+        assert.equal(r.n, 36);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin (2026-11-14): + New in 2.0.7 (4)
+        assert.deepEqual(r.rows, [4, 6, 6, 5, 12, 3]);
         assert.deepEqual(r.bad, []);
         assert.equal(r.sideways, false, 'the page scrolls sideways at 390');
         assert.doesNotMatch(r.text, /\bIDEA\b/, 'a mockup IDEA tag is on the page');
@@ -199,10 +199,11 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         await tab.key('ArrowRight');
         v = await tab.eval(VIEWER);
         assert.equal(v.n, 'Play · 2 / 6'); assert.equal(v.title, 'Hit the number it plays.');
-        const big = await tab.eval(`(() => { const li = document.querySelector('#fv-track .fv-s[data-i="1"] img'); return li ? { src: li.currentSrc, w: li.getBoundingClientRect().width } : null; })()`);
+        const big = await tab.eval(`(() => { const li = document.querySelector('#fv-track .fv-s[data-i="5"] img'); return li ? { src: li.currentSrc, w: li.getBoundingClientRect().width } : null; })()`);
         assert.ok(big && /plays-like-940\.webp$/.test(big.src) && big.w > 250, 'the viewer does not show the sharp screen: ' + JSON.stringify(big));
-        // a swipe: the track is scrolled the way a finger scrolls it, to the 7th slide (Games 1)
-        await tab.eval(`(() => { const t = document.getElementById('fv-track'); t.scrollTo({ left: t.clientWidth * 6 }); return true; })()`);
+        // a swipe: the track is scrolled the way a finger scrolls it, to the 11th slide (Games 1).
+        // 2.0.7 re-pin (2026-11-14): the four New in 2.0.7 slides come first, so Play 2 is slide 6 (data-i 5) and Games 1 is slide 11 (was 7).
+        await tab.eval(`(() => { const t = document.getElementById('fv-track'); t.scrollTo({ left: t.clientWidth * 10 }); return true; })()`);
         await sleep(700);
         v = await tab.eval(VIEWER);
         assert.equal(v.n, 'Games · 1 / 6', 'a swipe did not move to the next feature');
