@@ -960,7 +960,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <h1 class="rc-title" id="recap-title"></h1>
     <p class="rc-sub" id="recap-sub"></p>
     <div class="rc-card" id="recap-winners" style="display:none;"></div>
-    <div class="rc-card" id="recap-sponsors" style="display:none;"></div>
     <div class="pq-grid" id="recap-photos"></div>
     <button type="button" class="rc-share" id="recap-share" onclick="shareRecap()">Share recap link</button>
     <p class="rc-msg" id="recap-msg" aria-live="polite"></p>
@@ -1126,10 +1125,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         </div>
         <p style="font-size:0.72rem; color:var(--text-muted); margin:6px 0 0 0;">From each team's last scored hole and its time, never a location. A team about a hole behind shows on Event day under "Needs you", with a Send note button. "Behind" can be wrong when a group simply has not entered scores yet: it is a hint, not a ruling.</p>
 
-        <!-- 57, SPONSORS (Manny 2026-11-12): names and an optional small logo per
-             hole and for the event. Shown as one grey line on that hole's row of
-             the team card, on the TV board's last page and on the recap. Nothing
-             is billed or collected here. -->
+        <!-- 57, SPONSORS (Manny 2026-11-12; placement changed 2026-11-14): names
+             and an optional small logo per hole and for the event. No web page
+             shows them: a hole sponsor is read by the HardPan app's GPS tee card
+             (HANDOFF.md, "Sponsor tee card: data contract for iOS/Android"). The
+             event sponsor is saved and shown nowhere yet. Nothing is billed or
+             collected here. -->
         <hr class="section-divider">
         <h3>🤝 Sponsors</h3>
         <div id="sponsors-setup"></div>
@@ -5296,7 +5297,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // ---- 57, SPONSORS + THE TV BOARD (Manny 2026-11-12) ---------------------
     // tournaments/CODE/sponsors = { event: {name, logo?}, holes: {"7": {name, logo?}} }.
     // The owner writes it under its own record (the live rules already allow
-    // that); every reader of the record sees it. A logo is a small data URL
+    // that). No web page renders it (Manny 2026-11-14): the HardPan app's GPS
+    // tee card reads holes/<n>; the event sponsor is shown nowhere yet. A logo is a small data URL
     // made here from the chosen image (96 px, <= 24 KB): no file storage.
     // Names and logos only: nothing is billed or collected anywhere.
     function sponsorsOf(d) { return (d && d.sponsors && typeof d.sponsors === 'object') ? d.sponsors : {}; }
@@ -5317,7 +5319,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const n = (currentData.courseData || []).length || 18;
         let opts = '';
         for (let i = 1; i <= n; i++) if (!(sp.holes || {})[String(i)]) opts += `<option value="${i}">Hole ${i}</option>`;
-        box.innerHTML = `<label style="font-size:0.75rem; margin:0 0 3px;">Event sponsor (optional)</label>
+        box.innerHTML = `<label style="font-size:0.75rem; margin:0 0 3px;">Event sponsor (optional, saved but not shown yet)</label>
             <div class="sp-event"><input type="text" id="sp-event-name" maxlength="60" placeholder="e.g. Desert Ridge Auto" value="${escapeHtml(ev.name || '')}" onchange="setEventSponsor(this.value)">
                 ${ev.name ? `<span style="display:flex; align-items:center; gap:8px;">${ev.logo ? `<img src="${escapeHtml(ev.logo)}" alt="" style="height:22px; width:auto; max-width:60px; border-radius:4px;">` : ''}<label class="sp-logo-btn">${ev.logo ? 'Change logo' : '+ Logo'}<input type="file" accept="image/*" onchange="setSponsorLogo('event', this.files[0])"></label><button type="button" class="sp-x" aria-label="Remove the event sponsor" onclick="removeSponsor('event')">\u2715</button></span>` : '<span></span>'}
             </div>
@@ -5326,7 +5328,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
               || '<p class="sp-note" style="margin-top:4px;">No hole sponsors yet.</p>'}
             ${opts ? `<div class="sp-add"><select id="sp-hole" aria-label="Hole">${opts}</select><input type="text" id="sp-name" maxlength="60" placeholder="Sponsor name" onkeydown="if (event.key === 'Enter') addHoleSponsor()"><button type="button" class="btn-primary" id="sp-add" onclick="addHoleSponsor()">Add</button></div>` : ''}
             ${sponsorErr ? `<p class="sp-err" id="sp-err">${escapeHtml(sponsorErr)}</p>` : ''}
-            <p class="sp-note">A name and an optional logo, shown on that hole's row of the team card, on the TV board and on the recap. Nothing is billed or collected here.</p>`;
+            <p class="sp-note" id="sp-placement">A hole sponsor shows once on that hole's GPS screen in the HardPan app: when a golfer's phone reaches the tee, a card reads "Hole 7 presented by" the name, with the logo, for 6 seconds, and the golfer can close it. The scorecard, the board, the TV and the recap show no sponsors. Nothing is billed or collected here.</p>`;
     }
     function setEventSponsor(v) {
         if (!currentCode || !canManage()) return;
@@ -8080,17 +8082,6 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const card = document.getElementById('recap-winners');
         card.innerHTML = rows.map(([a, b]) => `<div class="rc-row"><span>${escapeHtml(a)}</span><strong>${escapeHtml(b)}</strong></div>`).join('');
         card.style.display = rows.length ? 'block' : 'none';
-        // 57: thanks to the sponsors, when the organizer added any.
-        const spc = document.getElementById('recap-sponsors');
-        if (spc) {
-            const sp = sponsorsOf(data);
-            const srows = [];
-            if (sp.event && sp.event.name) srows.push(['Event sponsor', sp.event.name, sp.event.logo]);
-            sponsorHoleList(sp).forEach((h) => srows.push([`Hole ${h.hole}`, h.name, h.logo]));
-            spc.innerHTML = srows.length ? `<div class="rc-row" style="border-bottom:0; padding-bottom:4px;"><span style="font-size:0.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted);">Thanks to our sponsors</span></div>`
-                + srows.map(([a, b, logo]) => `<div class="rc-row"><span>${escapeHtml(a)}</span><strong>${logo ? `<img src="${escapeHtml(logo)}" alt="" style="height:20px; width:auto; vertical-align:middle; margin-right:6px; border-radius:4px;">` : ''}${escapeHtml(b)}</strong></div>`).join('') : '';
-            spc.style.display = srows.length ? 'block' : 'none';
-        }
         document.getElementById('recap-photos').innerHTML = TournamentPhotos.ordered(recapShown).map((p) => {
             const label = TournamentPhotos.photoLabel(data, p);
             return `<div class="pq-tile"><img src="${escapeHtml(TournamentPhotos.shownUrl(currentCode, p.id))}" alt="${escapeHtml(label)}" loading="lazy" onerror="this.style.display='none'">${label ? `<span class="pq-tag">${escapeHtml(label)}</span>` : ''}`

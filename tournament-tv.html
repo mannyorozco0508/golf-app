@@ -8,9 +8,9 @@
          tournament-tv.html?tourney=CODE, opened on the bar TV in any browser.
          Read-only: it shows what the board already knows (the same engine
          resolution as the organizer's Board tab and the golfer's card), in big
-         type, one flight a page, paging on its own; the last page thanks the
-         sponsors when the organizer has added any; a QR in the corner follows
-         the event on a phone. Nothing here writes to the database.
+         type, one flight a page, paging on its own; a QR in the corner follows
+         the event on a phone. No sponsor is shown here (Manny 2026-11-14: one
+         placement only, the HardPan app's GPS tee card). Nothing here writes to the database.
          ?every=N sets the seconds a page stays (3..60, default 10). -->
     <link rel="icon" href="tournament-icon-192.png" type="image/png">
     <script src="./firebase-app-compat.js"></script>
@@ -86,14 +86,6 @@
         .dots { display: flex; gap: .8vw; }
         .dots i { width: 3.2vw; height: .9vh; border-radius: .5vh; background: rgba(255,255,255,.18); }
         .dots i.on { background: var(--lime); }
-        .sp { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 2.4vh; }
-        .sp .k { font-size: 2.6vh; letter-spacing: .18em; text-transform: uppercase; color: var(--mute); font-weight: 700; }
-        .sp .ev-sp { font-size: 6.4vh; font-weight: 800; display: flex; align-items: center; gap: 2vw; }
-        .sp .ev-sp img, .sp .hs img { height: 7vh; width: auto; border-radius: 1vh; background: #fff; padding: .6vh; }
-        .sp .hs img { height: 4.6vh; }
-        .sp .grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.6vh 3vw; max-width: 90vw; }
-        .sp .hs { background: var(--panel); border: 1px solid var(--line); border-radius: 1.6vh; padding: 1.6vh 2.4vw; font-size: 3.2vh; font-weight: 700; display: flex; align-items: center; gap: 1.2vw; }
-        .sp .hs small { display: block; font-size: .6em; color: var(--mute); font-weight: 600; }
         .err { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 3.4vh; color: var(--mute); text-align: center; padding: 4vw; }
         .hide { display: none !important; }
     </style>
@@ -192,9 +184,6 @@
                 pages.push({ kind: 'waiting', key: 'waiting#' + i, label: 'waiting', display: 'Waiting for first scores' + range, lines: chunk });
             }
         }
-        const sp = d.sponsors || {};
-        const holes = Object.keys(sp.holes || {}).filter((h) => sp.holes[h] && sp.holes[h].name).sort((a, b) => Number(a) - Number(b));
-        if ((sp.event && sp.event.name) || holes.length) pages.push({ kind: 'sponsors', label: 'Thanks to our sponsors', display: 'Thanks to our sponsors', event: sp.event || null, holes: holes.map((h) => Object.assign({ hole: h }, sp.holes[h])) });
         return pages;
     }
 
@@ -243,11 +232,6 @@
         if (p.kind === 'waiting') {
             const list = (p.lines || []).map((l) => '<div class="wt"><span class="a">' + esc(l.name) + '</span><span class="b">' + esc(l.who) + '</span><span class="c">' + esc(l.hole) + '</span></div>').join('');
             board.innerHTML = '<div class="wait"><div class="w1">Waiting for first scores</div><div class="wi">' + esc(startInfo(data)) + '</div>' + (list ? '<div class="wl" id="tv-field">' + list + '</div>' : '') + '<div class="w2">The board fills in as cards post. Follow along on your phone with the QR below.</div></div>';
-        } else if (p.kind === 'sponsors') {
-            let h = '<div class="sp"><div class="k">Thanks to our sponsors</div>';
-            if (p.event && p.event.name) h += '<div class="ev-sp">' + (p.event.logo ? '<img src="' + esc(p.event.logo) + '" alt="">' : '') + '<span>' + esc(p.event.name) + '</span></div>';
-            if (p.holes.length) h += '<div class="grid">' + p.holes.map((s) => '<div class="hs">' + (s.logo ? '<img src="' + esc(s.logo) + '" alt="">' : '') + '<span>' + esc(s.name) + '<small>Hole ' + esc(s.hole) + '</small></span></div>').join('') + '</div>';
-            board.innerHTML = h + '</div>';
         } else {
             const rc = rankCounts(p.rows);
             let h = '<div class="ttl"><span class="n">' + esc(p.label) + '</span><span>' + (p.of ? p.from + '–' + p.to + ' of ' + p.of : '') + '</span></div>';

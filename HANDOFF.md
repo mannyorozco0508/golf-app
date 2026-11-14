@@ -5411,6 +5411,48 @@ the trip roster twice — a wave of its own, not a fix inside the money card.
 
 - **No monetization built. v1.1 is specced in `MONETIZATION.md` — read that before touching any of it.** One round stays free forever; a trip is paid. The **Trip Pass is $19.99, trip-scoped and consumable** — bought per trip, so Apple will not restore it, which is fine because the entitlement lives at `trips/<code>/entitlement/paid` rather than on the buyer's device. That is also what makes it exploitable today: **`database.rules.json` is step one and blocks everything else**, because right now any client can write that node, the repo is public and a trip code is six characters. Nothing can be sold until the rules are right. `database.rules.json` is a protected file and needs explicit per-file approval. Note that `MONETIZATION.md` is a plan, not a record — nothing in it exists
 
+## Sponsor tee card: data contract for iOS/Android
+
+Manny, 2026-11-14 (ADVISOR-20261114-1156-OK-build-final-set): sponsors get ONE
+placement only. When a golfer's phone reaches the tee of a sponsored hole, the
+HardPan app's GPS hole view shows a card "Hole N presented by <name>" with the
+logo for 6 seconds, closable with an X. The iOS and Android lanes build that
+card. **The web shows no sponsor anywhere**: the team card's hole line, the
+card's "Presented by", the TV board's sponsors page and the recap's "Thanks to
+our sponsors" were removed. `tournament_sponsor_web_removed_test.js` holds that
+(card, board, every TV page, recap: no name, no logo, no sponsor wording, with
+sponsors on the record).
+
+**Path and shape (unchanged from wave 57; the organizer writes it from Setup ->
+Sponsors, `#sponsors-setup` in `tournament.html`):**
+
+- `tournaments/<code>/sponsors/holes/<n>` = `{ name, logo? }`
+  - `<n>`: the hole number as a string key, `"1"` .. the course's hole count
+    (no leading zero). A hole with no node, or a node with no `name`, has no sponsor.
+  - `name`: string, trimmed, at most 60 characters. Add writes `set({ name })`,
+    so re-adding a hole replaces its node (and drops its logo).
+  - `logo`: optional; written separately as `update({ logo })`.
+- `tournaments/<code>/sponsors/event` = `{ name, logo? }`: same fields. **Shown
+  nowhere** today, on the web or (as specced) in the app; Setup labels it "saved
+  but not shown yet".
+- Remove (the x on Setup) deletes the node.
+
+**The logo, as `sponsorLogoDataUrl` in `tournament.html` writes it** (read from
+the code, not measured on a device): a `data:` URL string, either
+`data:image/png;base64,...` or `data:image/jpeg;base64,...` (JPEG at quality 0.82
+is kept only when its string is shorter than the PNG's). The image is drawn on a
+canvas scaled so its longer side is at most 96 px (never scaled up; a smaller
+image keeps its size), aspect ratio kept. A result longer than 24,000 characters
+is refused with a sentence and nothing is written. No file storage: the logo
+lives in the record. Data written before this code, or by hand, may not meet
+these limits; a reader should treat `logo` as optional and tolerate a bad one.
+
+**Rules:** no database rule was changed or proposed for this; the removal needed
+none. The node sits under the event record and is written by its owner under
+the live rules wave 57 already relied on. Whether the app's reader can read it
+follows the live read rule for `tournaments/<code>`, which this wave did not
+re-measure.
+
 ## Checks that live outside `npm test`
 
 **DEVICE CHECKS MUST ARRIVE COLD.** Navigate to the URL a user lands on, replace

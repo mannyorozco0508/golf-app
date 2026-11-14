@@ -1,8 +1,9 @@
-// HOLE SPONSORS, placement A (57; Manny 2026-11-12): the organizer names an
-// event sponsor and a sponsor per hole on Setup; a sponsored hole shows one
-// grey line under the hole name on the team card (the score box does not
-// move); "Presented by" reads under the card's title; the recap thanks them;
-// the Board tab gives the owner the TV board link. Reached the way each person
+// HOLE SPONSORS (57; Manny 2026-11-12): the organizer names an event sponsor
+// and a sponsor per hole on Setup; the Board tab gives the owner the TV board
+// link. RE-PINNED 2026-11-14 (Manny's decision, ADVISOR-20261114-1156-OK-build-final-set):
+// the card line, "Presented by" and the recap list were removed; one placement
+// only, the HardPan app's GPS tee card. Tests 3 and 4 now pin their absence;
+// tournament_sponsor_web_removed_test.js guards every screen. Reached the way each person
 // reaches it: arrive cold (tools/lib/cold-arrival.js) at 390x844, tap and type;
 // no page function is called.
 //
@@ -11,10 +12,10 @@
 //    writes ONE set tournaments/SCR/sponsors/holes/7 {name}; Add with no name
 //    refuses with a sentence and writes nothing
 //  2 a golfer (not the owner) sees no sponsor inputs and no TV link
-//  3 the golfer's card with sponsors: hole 7's row carries the line, hole 8's
-//    does not; the score boxes sit where they sit without sponsors; Presented
-//    by under the title. The multi-golfer card (best ball) carries it too
-//  4 the recap lists the event sponsor and the holes
+//  3 (re-pinned 2026-11-14) the golfer's card with sponsors: no line on any
+//    row, no Presented by; the score boxes sit where they sit without
+//    sponsors; the multi-golfer card (best ball) has none either
+//  4 (re-pinned 2026-11-14) the recap shows no sponsors card
 //  5 the owner's Board tab shows the TV link ending tournament-tv.html?tourney=SCR
 //  6 money = base
 //  7 the owner signs in AFTER the record arrived: the Sponsors block and the
@@ -28,6 +29,9 @@
 // All 7 tests against preview-57 d29e5818 (page swapped in by cp, restored by
 // sha): 6 PASS / 1 FAIL (test 7, the block empty). With the fix: 7 PASS / 0 FAIL.
 // Control: the TV-link redraw removed alone -> test 7 red on the TV row.
+// Re-pin 2026-11-14 against main e1312cf2's pages (tournament.html fad16256...,
+// tournament-scorecard.html 42860db9...; swapped in by cp, restored by sha): tests
+// 3 and 4: 0 PASS / 2 FAIL. With the removal, all 7 tests: 7 PASS / 0 FAIL.
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -47,7 +51,7 @@ const ORG = { expression: `JSON.stringify((function () {
   var t = function (s) { var e = $(s); return e && shown(e) ? (e.innerText || '').replace(/\\s+/g, ' ').trim() : null; };
   return { block: shown($('#sponsors-setup')), eventInput: shown($('#sp-event-name')), addBtn: shown($('#sp-add')), err: t('#sp-err'),
     holeRows: Array.prototype.map.call(document.querySelectorAll('#sponsors-setup .sp-row'), function (r) { return (r.innerText || '').replace(/\\s+/g, ' ').trim(); }),
-    tvRow: shown($('#tv-link-row')), tvUrl: t('#tv-url'), recap: t('#recap-sponsors'),
+    tvRow: shown($('#tv-link-row')), tvUrl: t('#tv-url'), recap: t('#recap-screen'), recapSp: document.querySelectorAll('#recap-sponsors').length,
     writes: (window.__coldWrites || []).filter(function (w) { return !/^organizers\\//.test(w.path); }).map(function (w) { return { op: w.op, path: w.path, value: w.value }; }) };
 })())` };
 const CARD = { expression: `JSON.stringify((function () {
@@ -94,29 +98,30 @@ test('2 a golfer sees no sponsor inputs and no TV link', async () => {
     assert.equal(a.eventInput, false); assert.equal(a.addBtn, false); assert.equal(a.tvRow, false);
 });
 
-test('3 the card: one grey line on hole 7, none on hole 8, the score boxes where they were; Presented by; best ball too', async () => {
+// Re-pinned 2026-11-14: the card line and Presented by were removed on Manny's decision (one placement: the GPS tee card).
+test('3 the card: no sponsor line on any row, no Presented by; the score boxes where they were; best ball too', async () => {
     const q = 'tourney=SCR&team=4&k=' + F.KEY4;
     const [plain] = await go('tournament-scorecard.html', q, F.scrambleDb({ ownerUid: 'u-org' }), GOLFER, [CARD]);
     const [a] = await go('tournament-scorecard.html', q, withSponsors(F.scrambleDb({ ownerUid: 'u-org' })), GOLFER, [CARD]);
-    assert.equal(plain.lines, 0, 'positive control: no lines without sponsors');
-    assert.equal(a.lines, 1);
-    assert.equal(a.sp7, 'Hole sponsor · Sun Devil Dental');
-    assert.match(a.row7, /^Hole 7 Par 4 /);
-    assert.equal(a.sp8, null); assert.doesNotMatch(a.row8 || '', /sponsor/i);
-    assert.deepEqual(a.box7, plain.box7, 'hole 7 score box did not move: ' + JSON.stringify([a.box7, plain.box7]));
+    assert.match(a.row7 || '', /^Hole 7 Par 4 /, 'positive: hole 7 drew');
+    assert.equal(a.lines, 0); assert.equal(a.sp7, null);
+    assert.doesNotMatch(a.row7, /sponsor|Sun Devil/i);
+    assert.deepEqual(a.box7, plain.box7, 'hole 7 score box: ' + JSON.stringify([a.box7, plain.box7]));
+    assert.ok(a.box7 && a.box7[1] > 0, 'positive: the box was measured');
     assert.deepEqual(a.box8, plain.box8);
-    assert.equal(a.presented, 'Presented by Desert Ridge Auto');
-    assert.equal(plain.presented, null);
+    assert.equal(a.presented, null, 'no Presented by line');
     const bb = F.bestBallDb(); bb.tournaments.BBL.sponsors = JSON.parse(JSON.stringify(SPONSORS));
     const [b] = await go('tournament-scorecard.html', 'tourney=BBL&team=3', bb, GOLFER, [CARD]);
-    assert.equal(b.sp7, 'Hole sponsor · Sun Devil Dental', 'the per-golfer card carries it too');
+    assert.ok(b.row7, 'positive: the per-golfer card drew hole 7');
+    assert.equal(b.lines, 0); assert.doesNotMatch(b.row7, /sponsor|Sun Devil/i);
 });
 
-test('4 the recap thanks the sponsors', async () => {
+// Re-pinned 2026-11-14: the recap's sponsors list was removed on Manny's decision (one placement: the GPS tee card).
+test('4 the recap shows no sponsors', async () => {
     const [a] = await go('tournament.html', 'tourney=SCR&recap=1', withSponsors(F.scrambleDb({ ownerUid: 'u-org' })), GOLFER, [ORG]);
-    assert.match(a.recap || '', /^THANKS TO OUR SPONSORS Event sponsor Desert Ridge Auto Hole 7 Sun Devil Dental$/);
-    const [b] = await go('tournament.html', 'tourney=SCR&recap=1', F.scrambleDb({ ownerUid: 'u-org' }), GOLFER, [ORG]);
-    assert.equal(b.recap, null, 'no sponsors: no card');
+    assert.match(a.recap || '', /Saturday Scramble recap .*Leading/, 'positive: the recap drew: ' + a.recap);
+    assert.doesNotMatch(a.recap, /sponsor|Desert Ridge|Sun Devil/i);
+    assert.equal(a.recapSp, 0, 'no sponsors card in the markup');
 });
 
 test('5 the owner\'s Board tab shows the TV link', async () => {
