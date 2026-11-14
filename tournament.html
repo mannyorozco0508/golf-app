@@ -585,6 +585,41 @@
         .reg-state-refunded, .reg-state-pending { background: #eef0f2; color: #3c4650; border: 1px solid #c5ccd3; }
         .reg-state-disputed { background: #fdecea; color: #b00020; border: 1px solid #e57373; }
         .reg-pay-btn { width: auto; padding: 6px 10px; font-size: 0.78rem; margin: 0; }
+        /* CHECK-IN (CI-FINAL, 2026-11-14): the Desk's arrival state, its three
+           tiles and the table QR card; the golfer's name list and "checked in". */
+        .reg-state-arrived { background: #e6f4ea; color: #1b5e20; border: 1px solid #7fc48a; }
+        .reg-state-notarrived { background: #eef0f2; color: #3c4650; border: 1px solid #c5ccd3; }
+        .reg-arr-by { font-size: 0.74rem; color: var(--text-muted); }
+        .reg-row .ci-btn { width: auto; padding: 6px 10px; font-size: 0.78rem; margin: 0; }
+        .ci-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 8px 0; }
+        .ci-tiles .pay-tile b { font-size: 1.35rem; }
+        .ci-tiles .pay-tile.ci-t-arrived { background: var(--nassau-box-bg); border-color: #7fc48a; }
+        .ci-tiles .pay-tile.ci-t-unpaid { background: #fff8ef; border-color: #f0b060; }
+        .ci-card { display: flex; gap: 12px; align-items: center; border: 1px solid var(--border-mid); border-radius: 12px; padding: 10px 12px; margin: 8px 0 4px 0; }
+        .ci-card .ci-qr { flex: 0 0 auto; width: 84px; height: 84px; background: #fff; font-size: 0.7rem; color: var(--text-muted); }
+        .ci-card .ci-qr canvas, .ci-card .ci-qr img { width: 84px !important; height: 84px !important; display: block; }
+        .ci-card-t { font-weight: bold; font-size: 0.92rem; }
+        .ci-card-s { font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 8px 0; }
+        .ci-card-b { display: flex; flex-wrap: wrap; gap: 6px; }
+        .ci-card-b .btn-outline, .ci-card-b .btn-primary { width: auto; margin: 0; padding: 7px 12px; font-size: 0.8rem; text-decoration: none; display: inline-block; }
+        .ci-msg { font-size: 0.85rem; color: var(--accent-red); margin: 8px 0 0 0; }
+        #ci-search { width: 100%; box-sizing: border-box; margin: 0 0 6px 0; -webkit-appearance: none; appearance: none; }
+        .ci-count { font-size: 0.8rem; color: var(--text-muted); margin: 6px 0 8px 0; }
+        .ci-flight { font-size: 0.76rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--brand-green); margin: 16px 0 0 0; }
+        .ci-group-head { display: flex; justify-content: space-between; gap: 8px; font-size: 0.74rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin: 14px 0 0 0; }
+        .ci-group-done { background: var(--nassau-box-bg); border: 1px solid var(--border-mid); color: var(--brand-green); border-radius: 8px; padding: 8px 12px; font-size: 0.86rem; margin: 10px 0 0 0; }
+        .ci-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-faint); min-height: 44px; }
+        .ci-row .ci-name { font-weight: bold; }
+        .ci-row.ci-in .ci-name { font-weight: normal; color: var(--text-muted); }
+        .ci-row .ci-here { width: auto; margin: 0; padding: 8px 14px; font-size: 0.9rem; min-height: 40px; }
+        .ci-done-card { background: var(--nassau-box-bg); border: 1px solid var(--border-mid); border-radius: 12px; padding: 18px 14px; text-align: center; margin: 0 0 12px 0; }
+        .ci-tick { width: 56px; height: 56px; border-radius: 50%; background: var(--brand-green); color: #fff; font-size: 2rem; line-height: 56px; margin: 0 auto 8px auto; font-weight: bold; }
+        .ci-done-card h2 { color: var(--brand-green); margin: 0 0 4px 0; font-size: 1.3rem; }
+        .ci-done-card p { margin: 2px 0; }
+        .ci-small { font-size: 0.78rem; color: var(--text-muted); }
+        .ci-unpaid { background: var(--warn-bg); border: 1px solid #f0b060; color: var(--warn-text); border-radius: 10px; padding: 10px 12px; font-size: 0.88rem; margin: 0 0 12px 0; }
+        .ci-sec { font-size: 0.74rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin: 12px 0 0 0; }
+        .ci-wrong { font-size: 0.8rem; color: var(--text-muted); margin: 12px 0 4px 0; }
         .reg-refund-btn { color: #b3261e; border-color: #e3a6a1; }
         .pay-sheet { align-items: flex-end; padding: 0; }
         .pay-sheet .modal-content { max-width: 520px; border-radius: 18px 18px 0 0; padding: 20px 18px 24px 18px; }
@@ -966,6 +1001,25 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <p class="rc-msg" id="recap-msg" aria-live="polite"></p>
 </div>
 
+<!-- CHECK-IN (CI-FINAL, approved 2026-11-14): ?tourney=CODE&checkin=1, the page
+     the table QR opens. The names come from tournaments/<code>/checkin, the
+     list the organizer's Desk keeps (approved signups: name and team or player,
+     nothing else); each golfer's arrival is registrations/<code>/<id>/arrivedAt.
+     "I'm here" writes arrivedAt + arrivedBy 'golfer' on that one entry and
+     nothing else. No payment action here, ever. The search box is STATIC
+     markup that renderCheckin only reads, as on the Desk. -->
+<div class="container" id="checkin-screen" style="display:none;">
+    <h1 class="rc-title" id="ci-title"></h1>
+    <p class="rc-sub" id="ci-sub"></p>
+    <div id="ci-pick">
+        <input type="search" id="ci-search" placeholder="Type your name" autocomplete="off" autocapitalize="words" spellcheck="false" aria-label="Type your name">
+        <p class="ci-count" id="ci-count"></p>
+        <div id="ci-list"></div>
+    </div>
+    <div id="ci-done" style="display:none;"></div>
+    <p class="ci-msg" id="ci-msg" role="alert" style="display:none;"></p>
+</div>
+
 <div class="container" id="manage-screen" style="display:none;">
     <!-- PHASE 2, P2-0: the app's top bar. Filled by loadTournament; app mode only. -->
     <div class="ap-top app-only" id="ap-top-manage"><button type="button" class="ap-bk" onclick="appBack()" aria-label="Back">‹</button><div><div class="ap-tt" id="ap-m-title"></div><div class="ap-ts" id="ap-m-sub"></div></div></div>
@@ -1239,7 +1293,25 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <div id="manage-tab-desk" style="display:none;">
         <h3>📋 Desk</h3>
         <p id="registration-desk-note" style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;"></p>
+        <!-- CHECK-IN (CI-FINAL): arrived / not arrived / unpaid. Its own box, above
+             the counts line (which is pinned as it is); empty until a golfer is
+             in the field. -->
+        <div id="checkin-tiles"></div>
         <div id="registration-counts"></div>
+        <!-- CHECK-IN (CI-FINAL): the table QR. Shown with the Desk's list;
+             drawn by renderCheckinCard on each Desk render. -->
+        <div class="ci-card" id="checkin-card" style="display:none;">
+            <div class="ci-qr" id="checkin-qr" data-fallback="QR unavailable"></div>
+            <div>
+                <div class="ci-card-t">Check-in QR for the table</div>
+                <div class="ci-card-s">Golfers scan it and tap their own name.</div>
+                <div class="ci-card-b">
+                    <button type="button" class="btn-primary" id="checkin-print" onclick="printCheckinQr()">Print QR</button>
+                    <a class="btn-outline" id="checkin-tv" href="#" target="_blank" rel="noopener">Open TV board</a>
+                </div>
+            </div>
+        </div>
+        <p class="ci-msg" id="checkin-desk-msg" role="alert" style="display:none;"></p>
         <div id="registration-chips"></div>
         <input type="search" id="registration-search" placeholder="Search a name or email" autocomplete="off" autocapitalize="off" spellcheck="false">
         <!-- THE EDITOR (2026-10-06). STATIC MARKUP, for the same reason the search
@@ -3874,6 +3946,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     let registrationData = {};
     let registrationBoundCode = null;
     let registrationCb = null;
+    let registrationLoadedFor = null;   // the code whose registrations snapshot has arrived (check-in index)
 
     function eventIsIndividual(data) {
         return !!(data && (data.scoringModel === PLAYER_MODEL || data.format === 'individual'));
@@ -4156,11 +4229,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             registrationBoundCode = null;
             registrationCb = null;
         }
-        if (!wanted) { registrationData = {}; return; }
+        if (!wanted) { registrationData = {}; registrationLoadedFor = null; return; }
         const code = currentCode;
         registrationCb = (snap) => {
             if (currentCode !== code) return;
             registrationData = snap.val() || {};
+            registrationLoadedFor = code;   // CHECK-IN: the index syncs only from a list that has arrived
             renderRegistrationList();
             renderEventHome();
         };
@@ -5761,6 +5835,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     let registrationFilter = 'all';   // all | unpaid | paid | approved | pending
     const REG_FILTERS = [
         { key: 'all', label: 'All', test: () => true },
+        // CHECK-IN (CI-FINAL): arrival is asked only of a golfer in the field,
+        // and these two chips are the two tiles' numbers (checkinTilesHtml).
+        // Shown only once a golfer is in the field (fieldOnly): before that there is nobody to arrive.
+        { key: 'arrived', label: 'Arrived', test: (e) => regInField(e) && regArrivedAt(e) > 0, fieldOnly: true },
+        { key: 'notarrived', label: 'Not arrived', test: (e) => regInField(e) && !(regArrivedAt(e) > 0), fieldOnly: true },
         { key: 'unpaid', label: 'Unpaid', test: (e) => e.paid !== true },
         { key: 'paid', label: 'Paid', test: (e) => e.paid === true },
         { key: 'approved', label: 'Approved', test: (e) => regInField(e) },
@@ -5891,6 +5970,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         showExport(false);
         const photosOnDesk = registrationFilter === 'photos';
         renderDeskPhotos(photosOnDesk);
+        renderCheckinCard();
+        syncCheckinIndex();
+        // The tiles are drawn below only when someone is in the field.
+        const tilesEl = document.getElementById('checkin-tiles');
+        if (tilesEl) tilesEl.innerHTML = '';
         if (!registrationAllowed()) {
             // A legacy event (no ownerUid) has no signups to list - the rules
             // refuse the create and nobody could read it - and the page says so
@@ -5917,10 +6001,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }
         showExport(true);
         const entriesOnly = all.map((x) => x[1]);
+        const anyInField = entriesOnly.some(regInField);
+        if (tilesEl) tilesEl.innerHTML = anyInField ? checkinTilesHtml(entriesOnly) : '';
         if (countsEl) countsEl.innerHTML = (feesOn ? payTilesHtml(entriesOnly) : '') + registrationCountsHtml(registrationCounts(entriesOnly));
         const filters = deskFilters();
         if (!photosOnDesk && !filters.some((f) => f.key === registrationFilter)) registrationFilter = 'all';
-        if (chipsEl) chipsEl.innerHTML = filters.filter((f) => !f.teamOnly || !recordIsIndividual()).map((f) => {
+        if (chipsEl) chipsEl.innerHTML = filters.filter((f) => (!f.teamOnly || !recordIsIndividual()) && (!f.fieldOnly || anyInField)).map((f) => {
             const n = entriesOnly.filter(f.test).length;
             return `<button class="reg-chip${f.key === registrationFilter ? ' active' : ''}" onclick="setRegistrationFilter('${f.key}')">${f.label} ${n}</button>`;
         }).join('') + photosChipHtml();
@@ -5930,6 +6016,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const shown = all.filter(([, e]) => filter.test(e) && (!q
             || String(e.fullName || e.name || '').toLowerCase().indexOf(q) !== -1
             || String(e.email || '').toLowerCase().indexOf(q) !== -1));
+        // The Arrived chip lists the latest arrival first (who just walked in).
+        if (filter.key === 'arrived') shown.sort((a, b) => regArrivedAt(b[1]) - regArrivedAt(a[1]));
         if (shown.length === 0) {
             list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No one matches.</p>`;
             return;
@@ -5989,6 +6077,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 + payControl
                 + dest
                 + approve
+                + checkinRowHtml(id, e)
                 + fix
                 + (meta || dupMark ? `<span class="reg-meta">${meta}${meta && dupMark ? ' · ' : ''}${dupMark}</span>` : '')
                 + `</div>`;
@@ -8029,6 +8118,401 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function showPhoto(id) { return photoAction('approvePhoto', id); }
     function hidePhoto(id) { return photoAction('hidePhoto', id); }
 
+    // ===== CHECK-IN (CI-FINAL, approved 2026-11-14) ===========================
+    //
+    // ONE RECORD PER GOLFER. An arrival lives on the golfer's own signup:
+    // registrations/<code>/<entryId>/arrivedAt (ms) + arrivedBy ('golfer' from
+    // the table QR, 'organizer' from the Desk). The Desk writes and clears both;
+    // the table page writes both, once; the table page and the TV read arrivedAt.
+    //
+    // THE RULES FOR IT ARE A CANDIDATE, NOT LIVE (tools/checkin-rules-candidate.js).
+    // registrations/$code/$entryId is a CLOSED schema ($other: false), so until
+    // that candidate is published BOTH writes are refused - the organizer's Mark
+    // arrived as well as the golfer's tap - and nobody but the owner can read
+    // arrivedAt. A refused write says so in a sentence; nothing is shown as saved
+    // that was not.
+    //
+    // THE NAME LIST. A golfer at the table cannot read registrations (owner-only:
+    // it holds email and phone). The organizer's page keeps tournaments/<code>/
+    // checkin = { <entryId>: { name, teamNum | playerId } } for every approved
+    // signup: names the public board already shows, and the id an arrival is
+    // written under. The owner already writes the tournament record, so this
+    // needs no rules change. syncCheckinIndex writes it only while the Desk is
+    // open, only when it differs, and only from a registrations list that has
+    // actually arrived - never from the empty list the page starts with, which
+    // would wipe it. So the list is as fresh as the organizer's last look at the
+    // Desk (where golfers are approved and the table QR is printed).
+    //
+    // NO PAYMENT ACTION ANYWHERE ON THE GOLFER'S SIDE. The one money word is the
+    // amber line when the golfer's own entry reads unpaid; the TV shows none.
+
+    // CHECKIN-ROSTER-BEGIN (byte-identical in tournament-tv.html: the two screens
+    // a golfer and the clubhouse read must agree on who is in which group, and
+    // tournament_checkin_test.js holds the two copies equal).
+    function checkinClock(ms) {
+        const d = new Date(Number(ms));
+        const h = d.getHours() % 12 || 12, m = d.getMinutes();
+        return h + ':' + (m < 10 ? '0' : '') + m;
+    }
+    // The check-in list from the record alone: tournaments/<code>/checkin for the
+    // names, the teams / scoring groups for where each one starts, flights for
+    // the order. arrivals is { entryId: ms } (whatever could be read). Pure.
+    function checkinRoster(data, arrivals) {
+        data = data || {};
+        arrivals = arrivals || {};
+        const index = (data.checkin && typeof data.checkin === 'object') ? data.checkin : {};
+        const shotgun = data.startType === 'shotgun';
+        const flights = data.flights || {};
+        const fids = Object.keys(flights).sort((a, b) => ((flights[a] || {}).createdAt || 0) - ((flights[b] || {}).createdAt || 0));
+        const flightName = (fid) => (fid && flights[fid]) ? String(flights[fid].name || 'Flight') : '';
+        const holeOf = (v) => { const h = String(v === undefined || v === null ? '' : v).trim(); return shotgun ? h : ''; };
+        const holeRank = (h) => { const m = /^(\d+)\s*([A-Za-z]?)$/.exec(h || ''); return m ? Number(m[1]) * 100 + (m[2] ? m[2].toUpperCase().charCodeAt(0) - 64 : 0) : 100000; };
+        const teams = data.teams || {};
+        const players = data.players || {};
+        let groups = data.scoringGroups || {};
+        if (!Object.keys(groups).length) {
+            const rounds = data.rounds || {};
+            const rid = Object.keys(rounds).sort((a, b) => ((rounds[a] || {}).createdAt || 0) - ((rounds[b] || {}).createdAt || 0))
+                .find((r) => rounds[r] && rounds[r].scoringGroups && Object.keys(rounds[r].scoringGroups).length);
+            groups = rid ? rounds[rid].scoringGroups : {};
+        }
+        const gids = Object.keys(groups).sort((a, b) => ((groups[a] || {}).createdAt || 0) - ((groups[b] || {}).createdAt || 0));
+        const groupOf = {}, posOf = {};
+        gids.forEach((gid) => ((groups[gid] || {}).playerIds || []).forEach((pid, i) => { if (!(pid in groupOf)) { groupOf[pid] = gid; posOf[pid] = i; } }));
+        const out = {}, byId = {};
+        Object.keys(index).forEach((id) => {
+            const e = index[id] || {};
+            const name = String(e.name || '').trim();
+            if (!name) return;
+            let g = null;
+            if (e.teamNum !== undefined && e.teamNum !== null && e.teamNum !== '') {
+                const t = teams['team' + e.teamNum];
+                if (!t) return;   // the team is no longer in the field
+                const pos = (t.players || []).map((p) => String(p).trim().toLowerCase()).indexOf(name.toLowerCase());
+                g = { key: 'team' + t.num, label: String(t.name || ('Team ' + t.num)), hole: holeOf(t.startingHole), fid: t.flightId, order: Number(t.num) || 0, pos: pos === -1 ? 99 : pos };
+            } else if (e.playerId !== undefined && e.playerId !== null && e.playerId !== '') {
+                const pid = String(e.playerId);
+                const p = players[pid];
+                if (!p || p.status === 'withdrawn') return;
+                const gid = groupOf[pid];
+                g = gid ? { key: gid, label: String(groups[gid].name || 'Group'), hole: holeOf(groups[gid].startingHole), fid: p.flightId, order: gids.indexOf(gid), pos: posOf[pid] }
+                    : { key: 'nogroup', label: 'No group yet', hole: '', fid: p.flightId, order: 1e9, pos: 0 };
+            } else return;
+            const at = Number(arrivals[id]) > 0 ? Number(arrivals[id]) : 0;
+            if (!out[g.key]) out[g.key] = { key: g.key, label: g.label, hole: g.hole, flightId: (g.fid && flights[g.fid]) ? g.fid : '', flight: flightName(g.fid), order: g.order, members: [], arrived: 0, total: 0 };
+            const grp = out[g.key];
+            const m = { id: id, name: name, arrivedAt: at, pos: g.pos, groupKey: g.key };
+            grp.members.push(m);
+            grp.total++;
+            if (at) grp.arrived++;
+            byId[id] = m;
+        });
+        const flightRank = (fid) => { const i = fids.indexOf(fid); return i === -1 ? fids.length : i; };
+        const list = Object.keys(out).map((k) => out[k]);
+        list.forEach((g) => g.members.sort((a, b) => (a.pos - b.pos) || a.name.localeCompare(b.name)));
+        list.sort((a, b) => (flightRank(a.flightId) - flightRank(b.flightId)) || (shotgun ? holeRank(a.hole) - holeRank(b.hole) : 0) || (a.order - b.order) || a.label.localeCompare(b.label));
+        const members = list.reduce((acc, g) => acc.concat(g.members), []);
+        const recent = members.filter((m) => m.arrivedAt).sort((a, b) => b.arrivedAt - a.arrivedAt);
+        const flightList = [];
+        list.forEach((g) => { if (flightList.indexOf(g.flight) === -1) flightList.push(g.flight); });
+        return { groups: list, groupsByKey: out, byId: byId, total: members.length, arrived: recent.length, recent: recent, flights: flightList };
+    }
+    // CHECKIN-ROSTER-END
+
+    function regArrivedAt(e) { const v = Number(e && e.arrivedAt); return v > 0 ? v : 0; }
+    function checkinUrl() { return shareBaseUrl() + 'tournament.html?tourney=' + encodeURIComponent(currentCode || '') + '&checkin=1'; }
+    function checkinTvUrl() { return shareBaseUrl() + 'tournament-tv.html?tourney=' + encodeURIComponent(currentCode || '') + '&checkin=1'; }
+    // The entry fee in dollars, as the golfer's signup form states it.
+    function checkinFeeDollars(data) {
+        const f = feesOf(data);
+        if (f && f.cents) return f.cents / 100;
+        return Number(data && data.entryFee) || 0;
+    }
+
+    // ---- THE DESK'S HALF ------------------------------------------------------
+    // The three tiles are the chips' own tests, so a tile and its chip cannot
+    // disagree: Arrived / Not arrived (golfers in the field) and the Unpaid chip
+    // the Desk is showing (the money chip when fees are on).
+    function checkinTilesHtml(entries) {
+        const n = (filters, key) => { const f = filters.find((x) => x.key === key); return f ? entries.filter(f.test).length : 0; };
+        const fee = checkinFeeDollars(currentData);
+        return `<div class="ci-tiles" id="checkin-tile-row">`
+            + `<div class="pay-tile ci-t-arrived"><b id="ci-tile-arrived">${n(REG_FILTERS, 'arrived')}</b><span>arrived</span></div>`
+            + `<div class="pay-tile"><b id="ci-tile-notarrived">${n(REG_FILTERS, 'notarrived')}</b><span>not arrived</span></div>`
+            + `<div class="pay-tile ci-t-unpaid"><b id="ci-tile-unpaid">${n(deskFilters(), 'unpaid')}</b><span>unpaid${fee > 0 ? ' · ' + regDollars(fee) + ' entry' : ''}</span></div>`
+            + `</div>`;
+    }
+    function checkinRowHtml(id, e) {
+        if (!regInField(e)) return '';
+        const eid = escReg(id);
+        const at = regArrivedAt(e);
+        if (at > 0) {
+            const by = e.arrivedBy === 'golfer' ? 'at the table' : (e.arrivedBy === 'organizer' ? 'by the organizer' : '');
+            return `<span class="reg-state reg-state-arrived">Arrived ${checkinClock(at)}</span>${by ? `<span class="reg-arr-by">${by}</span>` : ''}`
+                + `<button class="btn-outline ci-btn ci-undo" onclick="undoArrival('${eid}')">Undo arrival</button>`;
+        }
+        return `<span class="reg-state reg-state-notarrived">Not arrived</span>`
+            + `<button class="btn-primary ci-btn ci-mark" onclick="markArrived('${eid}')">Mark arrived</button>`;
+    }
+    function checkinDeskSay(msg) {
+        const el = document.getElementById('checkin-desk-msg');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.style.display = msg ? 'block' : 'none';
+    }
+    const arrivalsInFlight = {};
+    function markArrived(entryId) {
+        if (!currentCode || !canManage()) return;
+        const e = (registrationData || {})[entryId];
+        if (!e || !regInField(e) || regArrivedAt(e) > 0 || arrivalsInFlight[entryId]) return;
+        arrivalsInFlight[entryId] = true;
+        checkinDeskSay('');
+        return db.ref(`registrations/${currentCode}/${entryId}`).update({ arrivedAt: Date.now(), arrivedBy: 'organizer' })
+            .then(() => { delete arrivalsInFlight[entryId]; },
+                (err) => { delete arrivalsInFlight[entryId]; checkinDeskSay('Arrival not saved: ' + ((err && err.message) || err)); });
+    }
+    function undoArrival(entryId) {
+        if (!currentCode || !canManage()) return;
+        const e = (registrationData || {})[entryId];
+        if (!e || !(regArrivedAt(e) > 0)) return;
+        checkinDeskSay('');
+        return db.ref(`registrations/${currentCode}/${entryId}`).update({ arrivedAt: null, arrivedBy: null })
+            .catch((err) => checkinDeskSay('Undo not saved: ' + ((err && err.message) || err)));
+    }
+    let checkinQrDrawnFor = null;
+    function renderCheckinCard() {
+        const card = document.getElementById('checkin-card');
+        if (!card) return;
+        const on = !!(currentCode && registrationAllowed());
+        card.style.display = on ? 'flex' : 'none';
+        if (!on) return;
+        const tv = document.getElementById('checkin-tv');
+        if (tv) tv.href = checkinTvUrl();
+        const url = checkinUrl();
+        if (checkinQrDrawnFor !== url) {
+            drawQrInto(document.getElementById('checkin-qr'), url, 168, qrLevelM());
+            checkinQrDrawnFor = url;
+        }
+    }
+    function printCheckinQr() { if (canManage()) printSheet(buildCheckinQrPrintView); }
+    // One page for the check-in table: the event, "Check in here", the QR (a
+    // bitmap painted before the print call, as the tee sheet does) and the
+    // address in small type for a phone that will not scan.
+    function buildCheckinQrPrintView() {
+        const container = document.getElementById('tournament-print-view');
+        const data = currentData || {};
+        const url = checkinUrl();
+        const sub = [eventCourseName(), teeTimeText(data)].filter(Boolean).join(' · ');
+        container.innerHTML = `<div style="text-align:center; padding:24px 12px;">`
+            + `<h1 style="margin:0 0 6px 0; font-size:2rem;">${escReg(data.name || 'Tournament')}</h1>`
+            + (sub ? `<p style="margin:0 0 18px 0; font-size:1.1rem; color:#555;">${escReg(sub)}</p>` : '')
+            + `<p style="margin:0 0 14px 0; font-size:1.7rem; font-weight:bold;">Check in here</p>`
+            + `<div id="ci-print-qr" style="display:inline-block;"></div>`
+            + `<p style="margin:14px 0 4px 0; font-size:1.2rem;">Scan with your phone camera, then tap your name.</p>`
+            + `<p style="margin:0; font-family:ui-monospace, Menlo, monospace; font-size:0.85rem; word-break:break-all;">${escReg(url)}</p></div>`;
+        const slot = document.getElementById('ci-print-qr');
+        const bmp = qrBitmap(url, 360, qrLevelM());
+        if (slot && bmp && typeof slot.appendChild === 'function') slot.appendChild(bmp);
+        else if (slot) slot.textContent = 'QR unavailable. Use the address below.';
+        return true;
+    }
+    // THE INDEX the table page reads (see the header above).
+    function checkinIndexWanted() {
+        const out = {};
+        const players = (currentData && currentData.players) || {};
+        Object.keys(registrationData || {}).forEach((id) => {
+            const e = registrationData[id] || {};
+            if (!regInField(e)) return;
+            const typed = String(e.fullName || e.name || '').trim();
+            if (e.teamNum !== undefined && e.teamNum !== null && e.teamNum !== '') {
+                if (typed) out[id] = { name: typed, teamNum: Number(e.teamNum) };
+            } else if (e.playerId !== undefined && e.playerId !== null && e.playerId !== '') {
+                const pid = String(e.playerId);
+                const name = String((players[pid] && players[pid].name) || typed).trim();
+                if (name) out[id] = { name: name, playerId: pid };
+            }
+        });
+        return out;
+    }
+    function sameCheckinIndex(a, b) {
+        a = a || {}; b = (b && typeof b === 'object') ? b : {};
+        const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+        if (ka.join('|') !== kb.join('|')) return false;
+        const f = (x, k) => (x === undefined || x === null) ? '' : String(x[k] === undefined || x[k] === null ? '' : x[k]);
+        return ka.every((k) => f(a[k], 'name') === f(b[k], 'name') && f(a[k], 'teamNum') === f(b[k], 'teamNum') && f(a[k], 'playerId') === f(b[k], 'playerId'));
+    }
+    let checkinIndexSent = null;
+    function syncCheckinIndex() {
+        if (!currentCode || !currentData || !currentData.ownerUid || !canManage() || registrationLoadedFor !== currentCode) return;
+        // ONLY WHILE THE DESK IS OPEN: the organizer approves golfers there and
+        // prints the table QR there, so the list follows them; a page open on
+        // Setup or the Board writes nothing it was not asked to.
+        const desk = document.getElementById('manage-tab-desk');
+        if (!desk || desk.style.display !== 'block') return;
+        const want = checkinIndexWanted();
+        if (sameCheckinIndex(want, currentData.checkin)) { checkinIndexSent = null; return; }
+        const sig = currentCode + ' ' + JSON.stringify(want);
+        if (checkinIndexSent === sig) return;   // already sent; the record has not come back yet
+        checkinIndexSent = sig;
+        db.ref(`tournaments/${currentCode}/checkin`).set(Object.keys(want).length ? want : null)
+            .catch(() => { checkinIndexSent = null; });
+    }
+
+    // ---- THE TABLE PAGE, ?tourney=CODE&checkin=1 -------------------------------
+    let checkinArrivals = {};       // entryId -> arrivedAt, as read or as just written here
+    let checkinReadRefused = false; // the rules refused an arrivedAt read: show no counts
+    const checkinWatching = {};     // entryIds with a listener
+    let checkinMine = null;         // the entry this phone just checked in
+    let checkinMinePaid = null;     // true / false once read; null when unknown or unreadable
+    let checkinBusy = false;
+    function openCheckin(code) {
+        currentCode = code;
+        ['setup-screen', 'manage-screen', 'register-screen', 'recap-screen'].forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+        document.getElementById('checkin-screen').style.display = 'block';
+        const search = document.getElementById('ci-search');
+        if (search && typeof search.oninput !== 'function') search.oninput = function () { renderCheckin(); };
+        db.ref(`tournaments/${code}`).on('value', (snap) => {
+            currentData = (snap && snap.val()) || null;
+            watchCheckinArrivals();
+            renderCheckin();
+        });
+    }
+    function watchCheckinArrivals() {
+        const index = (currentData && currentData.checkin) || {};
+        Object.keys(index).forEach((id) => {
+            if (checkinWatching[id]) return;
+            checkinWatching[id] = true;
+            db.ref(`registrations/${currentCode}/${id}/arrivedAt`).on('value', (snap) => {
+                const v = Number(snap && snap.val());
+                if (v > 0) checkinArrivals[id] = v; else delete checkinArrivals[id];
+                renderCheckin();
+            }, () => { checkinReadRefused = true; renderCheckin(); });
+        });
+    }
+    function checkinSay(msg) {
+        const el = document.getElementById('ci-msg');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.style.display = msg ? 'block' : 'none';
+    }
+    function checkinFirstName(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
+    function checkinGroupLabel(g) { return g.label + (g.hole ? ' · Hole ' + g.hole : ''); }
+    function renderCheckin() {
+        const screen = document.getElementById('checkin-screen');
+        if (!screen || screen.style.display === 'none') return;
+        const data = currentData;
+        const title = document.getElementById('ci-title');
+        const sub = document.getElementById('ci-sub');
+        const pick = document.getElementById('ci-pick');
+        const done = document.getElementById('ci-done');
+        const count = document.getElementById('ci-count');
+        const list = document.getElementById('ci-list');
+        if (!data) {
+            title.textContent = 'No event matches that code.';
+            sub.textContent = ''; count.textContent = ''; list.innerHTML = '';
+            return;
+        }
+        title.textContent = `${data.name || 'Tournament'} · Check in`;
+        sub.textContent = [eventCourseName(), teeTimeText(data)].filter(Boolean).join(' · ');
+        const roster = checkinRoster(data, checkinArrivals);
+        if (checkinMine && roster.byId[checkinMine]) {
+            pick.style.display = 'none';
+            done.style.display = 'block';
+            done.innerHTML = checkinDoneHtml(roster, roster.byId[checkinMine]);
+            return;
+        }
+        pick.style.display = 'block';
+        done.style.display = 'none';
+        if (!roster.total) {
+            count.textContent = '';
+            list.innerHTML = `<p class="ci-small" id="ci-empty">No names to check in yet. Please see the desk.</p>`;
+            return;
+        }
+        count.textContent = "Tap I'm here beside your own name." + (checkinReadRefused ? '' : ` ${roster.arrived} of ${roster.total} checked in.`);
+        const q = String((document.getElementById('ci-search') || {}).value || '').trim().toLowerCase();
+        const showFlights = roster.flights.some(Boolean);
+        let lastFlight = null;
+        let html = '';
+        roster.groups.forEach((g) => {
+            const members = q ? g.members.filter((m) => m.name.toLowerCase().indexOf(q) !== -1) : g.members;
+            if (!members.length) return;
+            if (showFlights && g.flight !== lastFlight) { html += `<div class="ci-flight">${escReg(g.flight || 'No flight')}</div>`; lastFlight = g.flight; }
+            // A FULL GROUP FOLDS TO ONE LINE, unless the golfer is searching.
+            if (!q && !checkinReadRefused && g.total > 0 && g.arrived === g.total) {
+                html += `<div class="ci-group-done" data-group="${escReg(g.key)}">${escReg(checkinGroupLabel(g))} · all ${g.total} checked in ✓</div>`;
+                return;
+            }
+            html += `<div class="ci-group-head" data-group="${escReg(g.key)}"><span>${escReg(checkinGroupLabel(g))}</span>${checkinReadRefused ? '' : `<span>${g.arrived} of ${g.total} in</span>`}</div>`;
+            members.forEach((m) => {
+                html += m.arrivedAt
+                    ? `<div class="ci-row ci-in" data-entry-id="${escReg(m.id)}"><span class="ci-name">${escReg(m.name)}</span><span class="reg-state reg-state-arrived">Checked in ${checkinClock(m.arrivedAt)}</span></div>`
+                    : `<div class="ci-row" data-entry-id="${escReg(m.id)}"><span class="ci-name">${escReg(m.name)}</span><button type="button" class="btn-primary ci-here" onclick="checkInHere('${escReg(m.id)}')">I'm here</button></div>`;
+            });
+        });
+        list.innerHTML = html || `<p class="ci-small" id="ci-nomatch">No name matches. Check the spelling, or see the desk.</p>`;
+    }
+    function checkinDoneHtml(roster, me) {
+        const g = roster.groupsByKey[me.groupKey];
+        const start = teeTimeText(currentData);
+        const where = [g.label, g.hole ? 'starts on hole ' + g.hole : '', start ? start.charAt(0).toLowerCase() + start.slice(1) : ''].filter(Boolean).join(' · ');
+        const when = ['Checked in ' + checkinClock(me.arrivedAt), g.flight].filter(Boolean).join(' · ');
+        const fee = checkinFeeDollars(currentData);
+        const unpaid = (checkinMinePaid === false && fee > 0)
+            ? `<div class="ci-unpaid" id="ci-unpaid">Your ${feePer(currentData) === 'team' ? "team's " : ''}${regDollars(fee)} entry shows unpaid. Please see the desk.</div>`
+            : '';
+        const rows = g.members.map((m) => {
+            const state = m.arrivedAt
+                ? `<span class="reg-state reg-state-arrived">Checked in ${checkinClock(m.arrivedAt)}</span>`
+                : (checkinReadRefused ? '' : `<span class="reg-state reg-state-notarrived">Not here yet</span>`);
+            return `<div class="ci-row"><span class="ci-name">${escReg(m.name)}${m.id === me.id ? ' <span style="font-weight:normal;">(you)</span>' : ''}</span>${state}</div>`;
+        }).join('');
+        return `<div class="ci-done-card"><div class="ci-tick" aria-hidden="true">✓</div>`
+            + `<h2 id="ci-done-title">You're checked in, ${escReg(checkinFirstName(me.name))}</h2>`
+            + `<p>${escReg(where)}</p><p class="ci-small">${escReg(when)}</p></div>`
+            + unpaid
+            + `<div class="ci-sec">Your group</div>${rows}`
+            + `<p class="ci-wrong">Tapped the wrong name? Tell the desk; they can undo it.</p>`
+            + `<button type="button" class="btn-primary" id="ci-done-btn" onclick="checkinDone()">Done</button>`;
+    }
+    function checkInHere(entryId) {
+        if (!currentCode || checkinBusy) return;
+        const index = (currentData && currentData.checkin) || {};
+        if (!index[entryId]) return;
+        checkinSay('');
+        if (checkinArrivals[entryId]) { checkinMine = entryId; renderCheckin(); return; }
+        checkinBusy = true;
+        const at = Date.now();
+        return db.ref(`registrations/${currentCode}/${entryId}`).update({ arrivedAt: at, arrivedBy: 'golfer' }).then(() => {
+            checkinBusy = false;
+            checkinArrivals[entryId] = at;
+            checkinMine = entryId;
+            checkinMinePaid = null;
+            readCheckinPaid(entryId);
+            renderCheckin();
+        }, () => {
+            checkinBusy = false;
+            checkinSay('That did not go through. Please check in at the desk.');
+        });
+    }
+    // Only the golfer's own entry, only to say "unpaid". A refused read (the
+    // rules as they are today) shows nothing rather than guessing.
+    function readCheckinPaid(entryId) {
+        return db.ref(`registrations/${currentCode}/${entryId}/paid`).once('value').then((snap) => {
+            if (checkinMine !== entryId) return;
+            checkinMinePaid = !!(snap && snap.val() === true);
+            renderCheckin();
+        }, () => {});
+    }
+    function checkinDone() {
+        checkinMine = null;
+        checkinMinePaid = null;
+        const search = document.getElementById('ci-search');
+        if (search) search.value = '';
+        checkinSay('');
+        renderCheckin();
+        try { window.scrollTo(0, 0); } catch (e) { /* no scroll here */ }
+    }
+
     // ===== E4c: THE RECAP, ?tourney=CODE&recap=1 (read-only, public) =====
     function recapUrl() { return shareBaseUrl() + 'tournament.html?tourney=' + encodeURIComponent(currentCode) + '&recap=1'; }
     let recapEntries = {}, recapShown = {};
@@ -8228,6 +8712,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     } else if (tourneyParam && urlParams.get('recap') === '1') {
         // E4c: the read-only recap. Never the console, whoever opens it.
         openRecap(tourneyParam.toUpperCase());
+    } else if (tourneyParam && urlParams.get('checkin') === '1') {
+        // CI-FINAL: the table QR's name list. Never the console, whoever opens it.
+        openCheckin(tourneyParam.toUpperCase());
     } else if (tourneyParam) {
         currentCode = tourneyParam.toUpperCase();
         loadTournament(currentCode);
