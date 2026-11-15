@@ -8,10 +8,17 @@
          tournament-tv.html?tourney=CODE, opened on the bar TV in any browser.
          Read-only: it shows what the board already knows (the same engine
          resolution as the organizer's Board tab and the golfer's card), in big
-         type, one flight a page, paging on its own; the last page thanks the
-         sponsors when the organizer has added any; a QR in the corner follows
-         the event on a phone. Nothing here writes to the database.
-         ?every=N sets the seconds a page stays (3..60, default 10). -->
+         type, one flight a page, paging on its own; a QR in the corner follows
+         the event on a phone. No sponsor is shown here (Manny 2026-11-14: one
+         placement only, the HardPan app's GPS tee card). Nothing here writes to the database.
+         ?every=N sets the seconds a page stays (3..60, default 10).
+         ?checkin=1 (CI-FINAL, 2026-11-14) is the CHECK-IN BOARD instead: the
+         table QR, who has arrived group by group, a Just arrived strip. It
+         reads arrivals only - no payment status is read or shown - and writes
+         nothing either.
+         PO (2026-11-14): once the organizer posts results, the first page is
+         RESULTS - places per flight, skins, KPs and long drive, card by card -
+         read from tournaments/<code>/prizeResults through tournament-prizes.js. -->
     <link rel="icon" href="tournament-icon-192.png" type="image/png">
     <script src="./firebase-app-compat.js"></script>
     <script src="./firebase-database-compat.js"></script>
@@ -20,6 +27,10 @@
     <script src="payouts.js"></script>
     <script src="text-safe.js"></script>
     <script src="tournament-engine.js"></script>
+    <script src="event-columns.js"></script>
+    <!-- PO (2026-11-14): the posted prize results, read with the same builder as the recap. -->
+    <script src="skins.js"></script>
+    <script src="tournament-prizes.js"></script>
     <script src="./qrcode.min.js"></script>
     <style>
         :root { --bg: #0b1d16; --panel: #10281f; --line: rgba(255,255,255,.12); --ink: #ffffff; --mute: #a9c2b6; --lime: #d4f28a; --red: #ff6b6b; --live: #c0392b; }
@@ -46,7 +57,13 @@
         .row .nm2 { display: block; font-size: 1.9vh; color: var(--mute); font-weight: 500; line-height: 1.15; margin-top: .2vh; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .row .th { text-align: center; color: var(--mute); }
         .row .tp { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
-        .row .tp.under { color: var(--lime); } .row .tp.over { color: var(--red); }
+        /* UNDER PAR IS RED, nothing else is coloured (Manny 2026-11-14: "red means under par and
+           just keep everything else as the same color - white number with the green background"). */
+        .row .tp.under { color: var(--red); }
+        /* THE EVENT PAGES (MR-FINAL): a column a round, a total, to par. --rn is the round count. */
+        .row.ev { grid-template-columns: minmax(44px, 6vw) minmax(0, 1fr) repeat(var(--rn, 2), minmax(64px, 8vw)) minmax(64px, 8vw) minmax(64px, 12vw); }
+        .row .rd, .row .tot { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .row .rd small { display: block; font-size: .5em; color: var(--mute); font-weight: 600; line-height: 1; }
         .empty { color: var(--mute); font-size: 3vh; padding: 4vh 1vw; }
         /* The QR lives in the footer's right end (the table has the whole width). */
         .ftq { display: flex; align-items: center; gap: 1vw; }
@@ -86,16 +103,61 @@
         .dots { display: flex; gap: .8vw; }
         .dots i { width: 3.2vw; height: .9vh; border-radius: .5vh; background: rgba(255,255,255,.18); }
         .dots i.on { background: var(--lime); }
-        .sp { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 2.4vh; }
-        .sp .k { font-size: 2.6vh; letter-spacing: .18em; text-transform: uppercase; color: var(--mute); font-weight: 700; }
-        .sp .ev-sp { font-size: 6.4vh; font-weight: 800; display: flex; align-items: center; gap: 2vw; }
-        .sp .ev-sp img, .sp .hs img { height: 7vh; width: auto; border-radius: 1vh; background: #fff; padding: .6vh; }
-        .sp .hs img { height: 4.6vh; }
-        .sp .grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.6vh 3vw; max-width: 90vw; }
-        .sp .hs { background: var(--panel); border: 1px solid var(--line); border-radius: 1.6vh; padding: 1.6vh 2.4vw; font-size: 3.2vh; font-weight: 700; display: flex; align-items: center; gap: 1.2vw; }
-        .sp .hs small { display: block; font-size: .6em; color: var(--mute); font-weight: 600; }
         .err { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 3.4vh; color: var(--mute); text-align: center; padding: 4vw; }
+        /* CHECK-IN BOARD (CI-FINAL, 2026-11-14): ?tourney=CODE&checkin=1. Who has
+           arrived, group by group, beside the table QR. No payment status, ever. */
+        .ci-clock { font-size: 5.4vh; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .ci-side { flex: 0 0 25vw; background: var(--panel); border: 1px solid var(--line); border-radius: 1.6vh; display: flex; flex-direction: column; align-items: center; padding: 2.4vh 1.4vw; text-align: center; }
+        .ci-side .ci-qr { background: #fff; padding: 1.2vh; border-radius: 1vh; }
+        .ci-side .ci-qr canvas, .ci-side .ci-qr img { width: 29vh !important; height: 29vh !important; display: block; }
+        .ci-scan { font-size: 2.7vh; font-weight: 800; margin-top: 1.8vh; line-height: 1.25; }
+        .ci-url { font-size: 1.6vh; color: var(--mute); margin-top: .8vh; word-break: break-all; }
+        .ci-big { margin-top: auto; font-size: 9.5vh; font-weight: 800; color: var(--lime); line-height: 1; font-variant-numeric: tabular-nums; }
+        .ci-bigsub { font-size: 2.3vh; margin-top: .8vh; }
+        .ci-right { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .ci-fl { font-size: 2.3vh; font-weight: 800; letter-spacing: .12em; color: var(--lime); text-transform: uppercase; margin: .2vh 0 .8vh; }
+        .ci-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.4vh 1vw; margin-bottom: 1.6vh; }
+        .ci-g { border: 2px solid var(--line); border-radius: 1.4vh; padding: 1vh .9vw; background: var(--panel); min-width: 0; }
+        .ci-g.full { border-color: var(--lime); }
+        .ci-gh { display: flex; justify-content: space-between; gap: .6vw; font-size: 2vh; font-weight: 800; margin-bottom: .6vh; }
+        .ci-gh .l { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ci-gh .n { color: var(--mute); white-space: nowrap; }
+        .ci-g.full .ci-gh .n { color: var(--lime); }
+        .ci-p { display: flex; justify-content: space-between; gap: .6vw; font-size: 2.5vh; line-height: 1.45; }
+        .ci-p .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ci-p .t { color: var(--lime); font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .ci-p.no, .ci-p.no .t { color: rgba(255,255,255,.45); font-weight: 600; }
+        .ci-strip { margin-top: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 1vh; padding: 1vh 1vw; font-size: 2.2vh; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ci-strip b { color: var(--lime); margin-left: 1.4vw; }
+        .ci-strip span { color: var(--ink); }
+        .ci-page { font-size: 1.8vh; color: var(--mute); text-align: right; margin-top: .6vh; }
+        @media (max-width: 700px) {
+            .ci-main { flex-direction: column; }
+            .ci-side { flex: 0 0 auto; }
+            .ci-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .ci-p { font-size: 15px; } .ci-gh { font-size: 13px; } .ci-big { font-size: 48px; }
+            .ci-side .ci-qr canvas, .ci-side .ci-qr img { width: 160px !important; height: 160px !important; }
+        }
         .hide { display: none !important; }
+        /* PO: the results page. Three cards side by side, 16:9. */
+        .res { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.6vw; }
+        .res .col { background: var(--panel); border: 1px solid var(--line); border-radius: 1.6vh; padding: 1.8vh 1.4vw; min-width: 0; overflow: hidden; }
+        .res .ch { font-size: 2.6vh; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--lime); margin-bottom: .8vh; }
+        .res .fh { font-size: 1.9vh; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); margin: 1vh 0 .3vh; }
+        .res .rr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1vw; padding: .7vh 0; border-top: 1px solid var(--line); font-size: 3.1vh; line-height: 1.1; }
+        .res .rr .a { font-weight: 800; color: var(--lime); min-width: 3.2vw; }
+        .res .rr .b { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .res .rr .b small { font-size: .6em; color: var(--mute); font-weight: 600; margin-left: .4em; }
+        .res .rr .b small.under { color: var(--red); }
+        .res .rr .c { font-weight: 800; text-align: right; white-space: nowrap; }
+        .res .ring { display: inline-flex; align-items: center; justify-content: center; width: 4.4vh; height: 4.4vh; font-weight: 800; font-size: 2.4vh; }
+        .res .ring.birdie { box-shadow: inset 0 0 0 2px var(--red); border-radius: 50%; }
+        .res .ring.eagle { box-shadow: inset 0 0 0 2px var(--red), inset 0 0 0 4px var(--panel), inset 0 0 0 6px var(--red); border-radius: 50%; }
+        .res .ring.bogey { box-shadow: inset 0 0 0 2px var(--ink); border-radius: 3px; }
+        .res .ring.double { box-shadow: inset 0 0 0 2px var(--ink), inset 0 0 0 4px var(--panel), inset 0 0 0 6px var(--ink); border-radius: 3px; }
+        .res .more, .res .none { font-size: 2vh; color: var(--mute); padding-top: .8vh; }
+        .res .note { font-size: 2.1vh; color: var(--mute); margin-top: 2vh; line-height: 1.35; }
+        @media (max-width: 700px) { .res { grid-template-columns: 1fr; } .res .rr { font-size: 16px; } .res .ch { font-size: 13px; } .res .fh, .res .more, .res .none, .res .note { font-size: 12px; } .res .ring { width: 26px; height: 26px; font-size: 13px; } }
     </style>
 </head>
 <body>
@@ -154,7 +216,7 @@
         const selections = [];
         if (multi) {
             const ev = resolveLeaderboardView(d, 'event', null);
-            if (ev.available) selections.push({ sel: 'event', title: ev.title || 'Event total' });
+            if (ev.available) selections.push({ sel: 'event', title: (ev.title || 'Event total') + ' \u00b7 ' + (typeof aggregateFamily === 'function' && aggregateFamily(d) === 'individual:net' ? 'Net' : 'Gross') });
             else Object.keys(d.rounds || {}).forEach((rid) => selections.push({ sel: rid, title: (d.rounds[rid] && d.rounds[rid].name) || 'Round' }));
         } else selections.push({ sel: null, title: '' });
         selections.forEach(({ sel, title }) => {
@@ -163,7 +225,7 @@
                 const v = resolveLeaderboardView(d, sel, fid);
                 const rows = v.available ? v.rows : [];
                 const label = [title, name].filter(Boolean).join(' · ');
-                if (!rows.length) { out.push({ kind: 'board', label: label || 'Leaderboard', display: label || 'Leaderboard', rows: [], thruHead: v.kind === 'event' ? 'Rds' : 'Thru', note: v.available ? 'No scores yet.' : (v.reason || '') }); return; }
+                if (!rows.length) { out.push({ kind: 'board', label: label || 'Leaderboard', display: label || 'Leaderboard', rows: [], thruHead: v.kind === 'event' ? 'Rds' : 'Thru', cols: v.kind === 'event' && typeof eventRoundColumns === 'function' ? eventRoundColumns(d) : null, note: v.available ? 'No scores yet.' : (v.reason || '') }); return; }
                 // EIGHT ROWS A PAGE: ten with the names line under each team ran
                 // 117 px past the footer at 720p (measured); eight fit with room.
                 for (let i = 0; i < rows.length; i += PAGE_ROWS) {
@@ -172,7 +234,7 @@
                     // (#12) the page's name in the footer: the flight (and its range
                     // when it runs past ten), or the range alone when there are no flights.
                     const display = label ? (rows.length > PAGE_ROWS ? label + ' \u00b7 ' + range : label) : range;
-                    out.push({ kind: 'board', key: label + '#' + i, label: label || 'Leaderboard', display, rows: chunk, from: i + 1, to: i + chunk.length, of: rows.length, thruHead: v.kind === 'event' ? 'Rds' : 'Thru' });
+                    out.push({ kind: 'board', key: label + '#' + i, label: label || 'Leaderboard', display, rows: chunk, from: i + 1, to: i + chunk.length, of: rows.length, thruHead: v.kind === 'event' ? 'Rds' : 'Thru', cols: v.kind === 'event' && typeof eventRoundColumns === 'function' ? eventRoundColumns(d) : null });
                 }
             });
         });
@@ -192,9 +254,9 @@
                 pages.push({ kind: 'waiting', key: 'waiting#' + i, label: 'waiting', display: 'Waiting for first scores' + range, lines: chunk });
             }
         }
-        const sp = d.sponsors || {};
-        const holes = Object.keys(sp.holes || {}).filter((h) => sp.holes[h] && sp.holes[h].name).sort((a, b) => Number(a) - Number(b));
-        if ((sp.event && sp.event.name) || holes.length) pages.push({ kind: 'sponsors', label: 'Thanks to our sponsors', display: 'Thanks to our sponsors', event: sp.event || null, holes: holes.map((h) => Object.assign({ hole: h }, sp.holes[h])) });
+        // PO: posted results lead the rotation.
+        const post = window.TournamentPrizes ? TournamentPrizes.posted(d) : null;
+        if (post) pages.unshift({ kind: 'results', key: 'results', label: 'Results', display: 'Results', post: post });
         return pages;
     }
 
@@ -240,25 +302,35 @@
         const board = $('tv-board');
         if (!pages.length) { board.innerHTML = '<div class="err">No scores yet.</div>'; return; }
         const p = pages[pageIdx % pages.length];
-        if (p.kind === 'waiting') {
+        if (p.kind === 'results') {
+            board.innerHTML = resultsHtml(p.post, data);
+        } else if (p.kind === 'waiting') {
             const list = (p.lines || []).map((l) => '<div class="wt"><span class="a">' + esc(l.name) + '</span><span class="b">' + esc(l.who) + '</span><span class="c">' + esc(l.hole) + '</span></div>').join('');
             board.innerHTML = '<div class="wait"><div class="w1">Waiting for first scores</div><div class="wi">' + esc(startInfo(data)) + '</div>' + (list ? '<div class="wl" id="tv-field">' + list + '</div>' : '') + '<div class="w2">The board fills in as cards post. Follow along on your phone with the QR below.</div></div>';
-        } else if (p.kind === 'sponsors') {
-            let h = '<div class="sp"><div class="k">Thanks to our sponsors</div>';
-            if (p.event && p.event.name) h += '<div class="ev-sp">' + (p.event.logo ? '<img src="' + esc(p.event.logo) + '" alt="">' : '') + '<span>' + esc(p.event.name) + '</span></div>';
-            if (p.holes.length) h += '<div class="grid">' + p.holes.map((s) => '<div class="hs">' + (s.logo ? '<img src="' + esc(s.logo) + '" alt="">' : '') + '<span>' + esc(s.name) + '<small>Hole ' + esc(s.hole) + '</small></span></div>').join('') + '</div>';
-            board.innerHTML = h + '</div>';
         } else {
             const rc = rankCounts(p.rows);
             let h = '<div class="ttl"><span class="n">' + esc(p.label) + '</span><span>' + (p.of ? p.from + '–' + p.to + ' of ' + p.of : '') + '</span></div>';
             if (!p.rows.length) h += '<div class="empty">' + esc(p.note || 'No scores yet.') + '</div>';
             else {
-                h += '<div class="row h"><span class="pos">Pos</span><span class="nm">' + esc(typeof entryColumnLabel === 'function' ? entryColumnLabel(data) : 'Team') + '</span><span class="th">' + esc(p.thruHead) + '</span><span class="tp">To par</span></div>';
+                const cols = p.cols && p.cols.columns && p.cols.columns.length ? p.cols : null;
+                const ev = cols ? ' ev" style="--rn:' + cols.columns.length : '';
+                const entryHead = esc(typeof entryColumnLabel === 'function' ? entryColumnLabel(data) : 'Team');
+                // THE EVENT PAGE (MR-FINAL, Manny 2026-11-14): R1 / R2 / Tot replace the Rds
+                // count; a round in play shows "thru N" under its score. Round pages unchanged.
+                if (cols) h += '<div class="row h' + ev + '"><span class="pos">Pos</span><span class="nm">' + entryHead + '</span>' + cols.columns.map((c) => '<span class="rd">' + esc(c.short) + '</span>').join('') + '<span class="tot">Tot</span><span class="tp">To par</span></div>';
+                else h += '<div class="row h"><span class="pos">Pos</span><span class="nm">' + entryHead + '</span><span class="th">' + esc(p.thruHead) + '</span><span class="tp">To par</span></div>';
                 p.rows.forEach((r) => {
                     const tie = (r.rank && rc[r.rank] > 1) ? '<small> tied</small>' : '';
-                    const thru = p.thruHead === 'Rds' ? (r.hasScores ? r.roundsComplete + '/' + r.countableRounds : '-') : (r.hasScores ? r.thru : '-');
                     const who = teamNames(r);
-                    h += '<div class="row' + (r.rank === 1 ? ' lead' : '') + '"><span class="pos">' + esc(r.rank || '-') + '</span><span class="nm"><span class="nm1">' + esc(r.teamName || r.name || '') + tie + '</span>' + (who ? '<span class="nm2">' + esc(who) + '</span>' : '') + '</span><span class="th">' + esc(thru) + '</span><span class="tp ' + toParClass(r) + '">' + esc(toParText(r)) + '</span></div>';
+                    const name = '<span class="nm"><span class="nm1">' + esc(r.teamName || r.name || '') + tie + '</span>' + (who ? '<span class="nm2">' + esc(who) + '</span>' : '') + '</span>';
+                    if (cols) {
+                        const mine = cols.byPlayer[r.entryKey] || {};
+                        const cells = cols.columns.map((c) => { const x = mine[c.rid]; return '<span class="rd">' + (x && x.hasScores ? esc(x.strokes) + (x.complete ? '' : '<small>thru ' + esc(x.thru) + '</small>') : '\u2013') + '</span>'; }).join('');
+                        h += '<div class="row' + (r.rank === 1 ? ' lead' : '') + ev + '"><span class="pos">' + esc(r.rank || '-') + '</span>' + name + cells + '<span class="tot">' + (r.hasScores ? esc(r.strokes) : '\u2013') + '</span><span class="tp ' + toParClass(r) + '">' + esc(toParText(r)) + '</span></div>';
+                    } else {
+                        const thru = p.thruHead === 'Rds' ? (r.hasScores ? r.roundsComplete + '/' + r.countableRounds : '-') : (r.hasScores ? r.thru : '-');
+                        h += '<div class="row' + (r.rank === 1 ? ' lead' : '') + '"><span class="pos">' + esc(r.rank || '-') + '</span>' + name + '<span class="th">' + esc(thru) + '</span><span class="tp ' + toParClass(r) + '">' + esc(toParText(r)) + '</span></div>';
+                    }
                 });
             }
             board.innerHTML = h;
@@ -269,6 +341,36 @@
         $('tv-page-label').textContent = n > 1 ? (p.display + ' · ' + (EVERY / 1000) + ' s a page') : p.display;
         $('tv-next-label').textContent = n > 1 ? ('Next: ' + next.display) : '';
         $('tv-foot').style.display = 'flex';
+    }
+
+    // THE RESULTS PAGE: what the organizer posted, card by card. Amounts are
+    // the posted ones; the word (pro shop credit or cash) follows the event's
+    // switch, said once in the KPs card and on every amount there.
+    const RES_ROWS = 11;   // measured: 11 rows and two flight heads fit a 720p card
+    function resultsHtml(post, d) {
+        const amt = (v) => esc(v > 0 ? TournamentPrizes.money(v) : 'Trophy');
+        const ord = (n) => esc(typeof ordinal === 'function' ? ordinal(n) : String(n));
+        const tp = (v) => typeof v !== 'number' ? '' : ' <small class="' + (v < 0 ? 'under' : '') + '">' + esc(v === 0 ? 'E' : (v > 0 ? '+' + v : String(v))) + '</small>';
+        const ring = (sc, par) => '<span class="ring ' + TournamentSkins.scoreMark(sc, par) + '">' + esc(sc) + '</span>';
+        const capped = (rows) => rows.slice(0, RES_ROWS).join('') + (rows.length > RES_ROWS ? '<div class="more">+' + (rows.length - RES_ROWS) + ' more on the recap</div>' : '');
+        let places = '';
+        const placeRows = [];
+        post.places.forEach((g) => {
+            if (!g.rows.length) return;
+            if (g.flight) placeRows.push('<div class="fh">' + esc(g.flight) + '</div>');
+            g.rows.forEach((r) => placeRows.push('<div class="rr"><span class="a">' + ord(r.rank) + '</span><span class="b">' + esc(r.name) + tp(r.toPar) + '</span><span class="c">' + amt(r.amount) + '</span></div>'));
+        });
+        places = placeRows.length ? capped(placeRows) : '<div class="none">No places posted.</div>';
+        const skinRows = [];
+        const multi = post.skins.rounds.length > 1;
+        post.skins.rounds.forEach((rd) => rd.won.forEach((x) => skinRows.push('<div class="rr"><span class="a">' + ring(x.score, x.par) + '</span><span class="b">' + esc(x.name) + ' <small>' + esc((multi && rd.name ? rd.name.charAt(0) : '') + x.hole) + (x.carriedIn ? ' · x' + esc(x.skins) : '') + '</small></span><span class="c">' + (x.amount > 0 ? amt(x.amount) : '') + '</span></div>')));
+        const skins = skinRows.length ? capped(skinRows) : '<div class="none">No skins won.</div>';
+        const kpRows = post.contests.rows.map((c) => '<div class="rr"><span class="a">' + esc(c.hole) + '</span><span class="b">' + esc(c.name) + ' <small>' + esc(c.value) + '</small></span><span class="c">' + (c.amount > 0 ? amt(c.amount) : '') + '</span></div>');
+        const credit = TournamentPrizes.typeOf(d) === 'credit';
+        const host = post.host || TournamentPrizes.hostOf(d);
+        const note = '<div class="note">All amounts are ' + esc(TournamentPrizes.wordOf(d)) + (credit && host ? ' at the ' + esc(host) + ' pro shop' : '') + '.<br>See yours: open the recap on your phone, tap your name.</div>';
+        const kps = (post.contests.multi ? '<div class="none">Contest holes are for one-round events.</div>' : (kpRows.length ? capped(kpRows) : '<div class="none">No contest winners posted.</div>')) + note;
+        return '<div class="res" id="tv-results"><div class="col"><div class="ch">Places</div>' + places + '</div><div class="col"><div class="ch">Skins</div>' + skins + '</div><div class="col"><div class="ch">KPs &amp; long drive</div>' + kps + '</div></div>';
     }
 
     function renderHeader(d) {
@@ -304,8 +406,176 @@
         if (!timer && pages.length > 1) timer = setInterval(() => { pageIdx = (pageIdx + 1) % Math.max(1, pages.length); renderPage(); }, EVERY);
     }
 
+
+    // ===== CHECK-IN BOARD (CI-FINAL, approved 2026-11-14) =====================
+    // tournament-tv.html?tourney=CODE&checkin=1, opened from the Desk. The names
+    // are tournaments/<code>/checkin (the list the organizer's Desk keeps); each
+    // arrival is registrations/<code>/<entryId>/arrivedAt, read one entry at a
+    // time. That read is refused for anyone but the owner until the check-in
+    // rules candidate is published; the board then says arrivals cannot be read
+    // rather than showing everyone as not arrived. This page reads arrivedAt and
+    // the record, and NOTHING about payment: no paid key is ever read here.
+    // Writes nothing.
+    // THE SWITCH: the same CHECKIN_LIVE as tournament.html (see its comment);
+    // off until the check-in rules candidate is published. Off, ?checkin=1 is
+    // the leaderboard TV it always was. Flip both files in the publish commit.
+    const CHECKIN_LIVE = false;
+    const CHECKIN = CHECKIN_LIVE && params.get('checkin') === '1';
+    const CHECKIN_URL = 'https://tournaments.rattlegolf.com/tournament?tourney=' + encodeURIComponent(CODE) + '&checkin=1';
+    const CHECKIN_TEXT = 'tournaments.rattlegolf.com/tournament?tourney=' + CODE + '&checkin=1';
+    const CI_GROUPS_PAGE = 8;
+    // CHECKIN-ROSTER-BEGIN (byte-identical in tournament-tv.html: the two screens
+    // a golfer and the clubhouse read must agree on who is in which group, and
+    // tournament_checkin_test.js holds the two copies equal).
+    function checkinClock(ms) {
+        const d = new Date(Number(ms));
+        const h = d.getHours() % 12 || 12, m = d.getMinutes();
+        return h + ':' + (m < 10 ? '0' : '') + m;
+    }
+    // The check-in list from the record alone: tournaments/<code>/checkin for the
+    // names, the teams / scoring groups for where each one starts, flights for
+    // the order. arrivals is { entryId: ms } (whatever could be read). Pure.
+    function checkinRoster(data, arrivals) {
+        data = data || {};
+        arrivals = arrivals || {};
+        const index = (data.checkin && typeof data.checkin === 'object') ? data.checkin : {};
+        const shotgun = data.startType === 'shotgun';
+        const flights = data.flights || {};
+        const fids = Object.keys(flights).sort((a, b) => ((flights[a] || {}).createdAt || 0) - ((flights[b] || {}).createdAt || 0));
+        const flightName = (fid) => (fid && flights[fid]) ? String(flights[fid].name || 'Flight') : '';
+        const holeOf = (v) => { const h = String(v === undefined || v === null ? '' : v).trim(); return shotgun ? h : ''; };
+        const holeRank = (h) => { const m = /^(\d+)\s*([A-Za-z]?)$/.exec(h || ''); return m ? Number(m[1]) * 100 + (m[2] ? m[2].toUpperCase().charCodeAt(0) - 64 : 0) : 100000; };
+        const teams = data.teams || {};
+        const players = data.players || {};
+        let groups = data.scoringGroups || {};
+        if (!Object.keys(groups).length) {
+            const rounds = data.rounds || {};
+            const rid = Object.keys(rounds).sort((a, b) => ((rounds[a] || {}).createdAt || 0) - ((rounds[b] || {}).createdAt || 0))
+                .find((r) => rounds[r] && rounds[r].scoringGroups && Object.keys(rounds[r].scoringGroups).length);
+            groups = rid ? rounds[rid].scoringGroups : {};
+        }
+        const gids = Object.keys(groups).sort((a, b) => ((groups[a] || {}).createdAt || 0) - ((groups[b] || {}).createdAt || 0));
+        const groupOf = {}, posOf = {};
+        gids.forEach((gid) => ((groups[gid] || {}).playerIds || []).forEach((pid, i) => { if (!(pid in groupOf)) { groupOf[pid] = gid; posOf[pid] = i; } }));
+        const out = {}, byId = {};
+        Object.keys(index).forEach((id) => {
+            const e = index[id] || {};
+            const name = String(e.name || '').trim();
+            if (!name) return;
+            let g = null;
+            if (e.teamNum !== undefined && e.teamNum !== null && e.teamNum !== '') {
+                const t = teams['team' + e.teamNum];
+                if (!t) return;   // the team is no longer in the field
+                const pos = (t.players || []).map((p) => String(p).trim().toLowerCase()).indexOf(name.toLowerCase());
+                g = { key: 'team' + t.num, label: String(t.name || ('Team ' + t.num)), hole: holeOf(t.startingHole), fid: t.flightId, order: Number(t.num) || 0, pos: pos === -1 ? 99 : pos };
+            } else if (e.playerId !== undefined && e.playerId !== null && e.playerId !== '') {
+                const pid = String(e.playerId);
+                const p = players[pid];
+                if (!p || p.status === 'withdrawn') return;
+                const gid = groupOf[pid];
+                g = gid ? { key: gid, label: String(groups[gid].name || 'Group'), hole: holeOf(groups[gid].startingHole), fid: p.flightId, order: gids.indexOf(gid), pos: posOf[pid] }
+                    : { key: 'nogroup', label: 'No group yet', hole: '', fid: p.flightId, order: 1e9, pos: 0 };
+            } else return;
+            const at = Number(arrivals[id]) > 0 ? Number(arrivals[id]) : 0;
+            if (!out[g.key]) out[g.key] = { key: g.key, label: g.label, hole: g.hole, flightId: (g.fid && flights[g.fid]) ? g.fid : '', flight: flightName(g.fid), order: g.order, members: [], arrived: 0, total: 0 };
+            const grp = out[g.key];
+            const m = { id: id, name: name, arrivedAt: at, pos: g.pos, groupKey: g.key };
+            grp.members.push(m);
+            grp.total++;
+            if (at) grp.arrived++;
+            byId[id] = m;
+        });
+        const flightRank = (fid) => { const i = fids.indexOf(fid); return i === -1 ? fids.length : i; };
+        const list = Object.keys(out).map((k) => out[k]);
+        list.forEach((g) => g.members.sort((a, b) => (a.pos - b.pos) || a.name.localeCompare(b.name)));
+        list.sort((a, b) => (flightRank(a.flightId) - flightRank(b.flightId)) || (shotgun ? holeRank(a.hole) - holeRank(b.hole) : 0) || (a.order - b.order) || a.label.localeCompare(b.label));
+        const members = list.reduce((acc, g) => acc.concat(g.members), []);
+        const recent = members.filter((m) => m.arrivedAt).sort((a, b) => b.arrivedAt - a.arrivedAt);
+        const flightList = [];
+        list.forEach((g) => { if (flightList.indexOf(g.flight) === -1) flightList.push(g.flight); });
+        return { groups: list, groupsByKey: out, byId: byId, total: members.length, arrived: recent.length, recent: recent, flights: flightList };
+    }
+    // CHECKIN-ROSTER-END
+    let ciArrivals = {}, ciRefused = false, ciPage = 0, ciTimer = null, ciQrDrawn = false;
+    const ciWatching = {};
+    function ciWatch() {
+        const index = (data && data.checkin) || {};
+        Object.keys(index).forEach((id) => {
+            if (ciWatching[id]) return;
+            ciWatching[id] = true;
+            db.ref('registrations/' + CODE + '/' + id + '/arrivedAt').on('value', (snap) => {
+                const v = Number(snap && snap.val());
+                if (v > 0) ciArrivals[id] = v; else delete ciArrivals[id];
+                renderCheckinBoard();
+            }, () => { ciRefused = true; renderCheckinBoard(); });
+        });
+    }
+    function ciStartText(d) {
+        if (!d.startTime || !/^\d{1,2}:\d{2}$/.test(d.startTime)) return d.startType === 'shotgun' ? 'Shotgun' : '';
+        const [hh, mm] = d.startTime.split(':').map(Number);
+        const dt = new Date(); dt.setHours(hh, mm, 0, 0);
+        return (d.startType === 'shotgun' ? 'Shotgun ' : 'Tee time ') + clock(dt);
+    }
+    function renderCheckinBoard() {
+        const main = $('tv-main');
+        if (!data) return;
+        const r = checkinRoster(data, ciArrivals);
+        $('tv-name').textContent = (data.name || 'Tournament') + ' \u00b7 Check in here';
+        const size = r.groups.length ? (r.total + ' golfer' + (r.total === 1 ? '' : 's') + ', ' + r.groups.length + ' group' + (r.groups.length === 1 ? '' : 's')) : '';
+        $('tv-sub').textContent = [data.courseName || '', ciStartText(data), size].filter(Boolean).join(' \u00b7 ');
+        const pages = Math.max(1, Math.ceil(r.groups.length / CI_GROUPS_PAGE));
+        if (ciPage >= pages) ciPage = 0;
+        const shown = r.groups.slice(ciPage * CI_GROUPS_PAGE, (ciPage + 1) * CI_GROUPS_PAGE);
+        const showFlights = r.flights.some(Boolean);
+        let right = '';
+        if (!r.total) right = '<div class="err" id="ci-empty">No names to check in yet. The list fills in as the organizer approves signups.</div>';
+        else {
+            let open = false, last = null;
+            shown.forEach((g) => {
+                if (!open || (showFlights && g.flight !== last)) {
+                    if (open) right += '</div>';
+                    if (showFlights) right += '<div class="ci-fl">' + esc(g.flight || 'No flight') + '</div>';
+                    right += '<div class="ci-grid">';
+                    open = true; last = g.flight;
+                }
+                const full = !ciRefused && g.total > 0 && g.arrived === g.total;
+                const n = ciRefused ? '' : (full ? 'All here' : g.arrived + ' / ' + g.total);
+                right += '<div class="ci-g' + (full ? ' full' : '') + '" data-group="' + esc(g.key) + '"><div class="ci-gh"><span class="l">' + esc(g.label + (g.hole ? ' \u00b7 Hole ' + g.hole : '')) + '</span><span class="n">' + esc(n) + '</span></div>'
+                    + g.members.map((m) => '<div class="ci-p' + (m.arrivedAt ? '' : ' no') + '"><span class="nm">' + esc(m.name) + '</span><span class="t">' + (m.arrivedAt ? '\u2713' + esc(checkinClock(m.arrivedAt)) : (ciRefused ? '' : 'not yet')) + '</span></div>').join('')
+                    + '</div>';
+            });
+            if (open) right += '</div>';
+            if (pages > 1) right += '<div class="ci-page">Page ' + (ciPage + 1) + ' of ' + pages + '</div>';
+            const recent = r.recent.slice(0, 5);
+            right += '<div class="ci-strip" id="ci-strip">' + (ciRefused ? 'Arrivals cannot be read on this screen yet.'
+                : ('Just arrived' + (recent.length ? recent.map((m) => '<b>' + esc(m.name) + ' <span>' + esc(checkinClock(m.arrivedAt)) + '</span></b>').join('') : ' <b>no one yet</b>'))) + '</div>';
+        }
+        const big = ciRefused ? '<div class="ci-big">' + r.total + '</div><div class="ci-bigsub">golfers</div>'
+            : '<div class="ci-big" id="ci-count">' + r.arrived + ' / ' + r.total + '</div><div class="ci-bigsub">arrived \u00b7 ' + (r.total - r.arrived) + ' to come</div>';
+        main.className = 'main ci-main';
+        main.innerHTML = '<div class="ci-side"><div class="ci-qr" id="ci-qr"></div><div class="ci-scan">Scan with your camera.<br>Tap your name.</div><div class="ci-url">' + esc(CHECKIN_TEXT) + '</div>' + big + '</div><div class="ci-right" id="ci-right">' + right + '</div>';
+        // The QR is redrawn into the fresh box each render (innerHTML replaced it).
+        try { if (window.QRCode) new QRCode($('ci-qr'), { text: CHECKIN_URL, width: 256, height: 256, correctLevel: QRCode.CorrectLevel.M }); } catch (e) { /* the address reads below it */ }
+        if (!ciTimer && pages > 1) ciTimer = setInterval(() => { ciPage++; renderCheckinBoard(); }, EVERY);
+    }
+    function tickClock() { const c = $('tv-clock'); if (c) { const t = clock(new Date()); c.textContent = t.replace(/ [AP]M$/, ''); } }
+    function startCheckin() {
+        document.title = 'HardPan Tournaments \u00b7 Check-in board';
+        $('tv-live').innerHTML = '<span class="ci-clock" id="tv-clock"></span>';
+        $('tv-live').style.display = 'flex';
+        tickClock(); setInterval(tickClock, 15000);
+        db.ref('tournaments/' + CODE).on('value', (snap) => {
+            data = snap.val();
+            if (!data) { $('tv-main').innerHTML = '<div class="board"><div class="err">No tournament found with that code.</div></div>'; return; }
+            ciWatch();
+            renderCheckinBoard();
+        }, (err) => { $('tv-main').innerHTML = '<div class="board"><div class="err">' + esc('The board could not be read: ' + (err && err.message ? err.message : err)) + '</div></div>'; });
+        try { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').catch(() => {}); } catch (e) { /* no wake lock */ }
+    }
+
     function start() {
         if (!CODE) { $('tv-board').innerHTML = '<div class="err">Open this page from the organizer’s Board tab, or add ?tourney=CODE to the address.</div>'; return; }
+        if (CHECKIN) { startCheckin(); return; }
         db.ref('tournaments/' + CODE).on('value', onSnapshot, (err) => { $('tv-board').innerHTML = '<div class="err">' + esc('The board could not be read: ' + (err && err.message ? err.message : err)) + '</div>'; });
         // A TV should not dim mid-event; refused quietly where unsupported.
         try { if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').catch(() => {}); } catch (e) { /* no wake lock */ }

@@ -8,8 +8,8 @@
 //    a row at least 28 px of type, eight rows a page, the QR and the follow address
 //  2 two flights: Flight A (8 teams) one page, Flight B (10) two, three dots, "Next:" names the other flight;
 //    at ?every=5 the second page is on screen 3.5 s after a read before the turn
-//  3 sponsors on the record: a last page thanks them (event + holes); no
-//    sponsors: no such page
+//  3 (re-pinned 2026-11-14, Manny: no ads on the TV) sponsors on the record:
+//    no sponsors page, the same three pages as without them, no sponsor text
 //  4 nothing written; a missing code gets a sentence
 //  5 no price or prize words on any page
 //  6 money = base
@@ -46,6 +46,9 @@
 //
 // Baseline against main 0f11073c (re-measured after the rebase; before the build, no tournament-tv.html):
 // all 6 tests: 1 PASS / 5 FAIL (test 6). With the build: 6 PASS / 0 FAIL.
+// Re-pin 2026-11-14 against main e1312cf2's tournament-tv.html (cbaca51e...,
+// swapped in by cp, restored by sha): test 3: 0 PASS / 1 FAIL. With the removal,
+// all 13 tests: 13 PASS / 0 FAIL.
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -117,18 +120,17 @@ test('2 flights: one page each, dots, Next names the other; the page turns at ?e
     assert.ok(b.rows.length === 8 && b.rows.every((r) => /Team (9|1[0-8])( tied)? /.test(r)), 'Flight B holds teams 9-18: ' + JSON.stringify(b.rows));
 });
 
-test('3 sponsors: a last page thanks them; none: no such page', async () => {
-    const reads = await go(withSponsors(F.scrambleDb({ ownerUid: 'u-org' })), 'tourney=SCR&every=3', [READ, { sleep: 3500 }, READ, { sleep: 3100 }, READ]);
-    const a = reads[0];
-    assert.equal(a.dots, 4, '18 teams = three pages of eight, then sponsors');
-    // reads at ~3 s, ~6.6 s, ~9.7 s after load; the fourth page (sponsors) is on from 9 s; a spare arrival reads at ~9.7 s too
-    const sp = reads.concat(await go(withSponsors(F.scrambleDb({ ownerUid: 'u-org' })), 'tourney=SCR&every=3', [{ sleep: 6700 }, READ])).find((x) => x.evSponsor);
-    assert.ok(sp, 'the sponsors page came round');
-    assert.equal(sp.evSponsor, 'Desert Ridge Auto');
-    assert.deepEqual(sp.sponsors, ['Sun Devil Dental Hole 7', 'Papago Grill Hole 12']);
+// Re-pinned 2026-11-14: the sponsors page was removed on Manny's decision (one placement: the GPS tee card).
+test('3 sponsors on the record: no sponsors page, no sponsor text', async () => {
+    const reads = await go(withSponsors(F.scrambleDb({ ownerUid: 'u-org' })), 'tourney=SCR&every=3', [READ, { sleep: 3300 }, READ, { sleep: 3300 }, READ, { sleep: 3300 }, READ]);
+    assert.equal(reads.length, 4);
+    reads.forEach((r) => {
+        assert.equal(r.dots, 3, 'three pages of eight, nothing after');
+        assert.ok(r.rows.length > 0, 'positive: a page of rows');
+        assert.doesNotMatch(r.body, /sponsor|Desert Ridge|Sun Devil|Papago Grill/i);
+    });
     const [none] = await go(F.scrambleDb({ ownerUid: 'u-org' }), 'tourney=SCR');
-    assert.equal(none.dots, 3, 'no sponsors: three pages only');
-    assert.doesNotMatch(none.body, /sponsor/i);
+    assert.equal(none.dots, 3, 'no sponsors: three pages too');
 });
 
 test('4 read-only; a missing code gets a sentence', async () => {

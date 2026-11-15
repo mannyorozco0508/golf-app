@@ -780,11 +780,20 @@ describe('EVENT VIEW — one renderer, three sources', () => {
         assert.match(fn, /!rounds\[lbRoundId\]\) lbRoundId = null;/);
     });
 
-    test('one row renderer serves round, flight and combined boards', () => {
+    test('one row renderer serves round, flight and combined boards (re-pinned 2026-11-14)', () => {
+        // RE-PINNED, MR-FINAL (Manny 2026-11-14). The event board now has columns
+        // of its own (R1 / R2 / Tot), so there are TWO tables - but still ONE
+        // definition of "tied" and of "pending": renderLeaderboardRows builds the
+        // rank counts and the two tag builders once and hands them to
+        // renderEventBoardRows. The literal "(tied)" appears once in the page.
         const s = src();
         assert.equal((s.match(/function renderLeaderboardRows/g) || []).length, 1);
-        assert.equal((s.match(/<span class="lb-pos">/g) || []).length, 2,
-            'one header cell and one body cell - not a second table');
+        assert.equal((s.match(/function renderEventBoardRows/g) || []).length, 1);
+        assert.equal((s.match(/<span class="lb-pos">/g) || []).length, 4,
+            'a header and a body cell for the round table and for the event table');
+        assert.equal((s.match(/\(tied\)/g) || []).length, 1, 'tied is defined once');
+        assert.equal((s.match(/rankCounts\[r\.rank\] = \(rankCounts\[r\.rank\] \|\| 0\) \+ 1/g) || []).length, 1, 'rank counts built once');
+        assert.match(fnBody(s, 'renderEventBoardRows'), /tieTagOf\(r\)/, 'the event rows use the handed-in builder');
     });
 
     test('a refusal shows its reason and leaves the round boards working', () => {
@@ -796,12 +805,20 @@ describe('EVENT VIEW — one renderer, three sources', () => {
         assert.match(fn, /Pick a round above to see its leaderboard/);
     });
 
-    test('an incomplete event entry is marked, not hidden', () => {
-        const fn = fnBody(src(), 'renderLeaderboardRows');
-        assert.match(fn, /!r\.completedAll/);
-        assert.match(fn, /\(incomplete\)/);
-        assert.match(fn, /r\.roundsComplete\}\/\$\{r\.countableRounds/,
-            'the event board counts rounds where a round board counts holes');
+    test('an event entry in play is marked, not hidden (re-pinned 2026-11-14)', () => {
+        // RE-PINNED, MR-FINAL (Manny 2026-11-14): the "(incomplete)" tag and the
+        // Rds count are gone from the event board. The same fact - a golfer has a
+        // round still in play - now reads as "thru N" under that round's score in
+        // its own column (renderEventBoardRows), and the round board keeps counting
+        // holes. The RANK rule is unchanged and pinned above (completed rounds first).
+        const rows = fnBody(src(), 'renderLeaderboardRows');
+        assert.ok(rows.length > 200, 'positive: the slice is the row renderer');
+        assert.ok(!/\(incomplete\)/.test(rows), 'the old tag is gone');
+        assert.match(rows, /renderEventBoardRows\(container, rows, \{ tieTagOf/, 'the event board has its own rows, fed the one tie builder');
+        const ev = fnBody(src(), 'renderEventBoardRows');
+        assert.ok(ev.length > 200, 'positive: the slice is the event renderer');
+        assert.match(ev, /<small>thru \$\{x\.thru\}<\/small>/, 'a round in play says thru N under its score');
+        assert.match(ev, /eventRoundColumns\(currentData\)/, 'the columns come from the one builder');
     });
 
     test('every board caches the UNFILTERED field for the prize calculator', () => {
