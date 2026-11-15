@@ -611,6 +611,35 @@
         .my-event .me-n { font-weight: 800; }
         .my-event .me-c { font-size: 0.78rem; color: var(--text-muted); }
         .my-events-note { font-size: 0.75rem; color: var(--text-muted); margin: 4px 0 0; }
+        /* DE-B (2026-11-15): the row's ••• menu, the Hidden events list, the one-line note. */
+        .my-event-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+        .my-event-row .my-event { flex: 1; min-width: 0; margin-bottom: 0; }
+        .me-more { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--bg-card); border: 1.5px solid var(--border-mid); color: var(--brand-green); font: inherit; font-size: 0.7rem; font-weight: 900; letter-spacing: 1px; cursor: pointer; padding: 0; margin: 0; display: flex; align-items: center; justify-content: center; }
+        .me-more.on { border-color: var(--brand-green); }
+        .me-menu { flex-basis: 100%; background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.14); padding: 4px 0; margin: -2px 0 4px 40px; }
+        .me-menu button { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--border-mid); padding: 9px 14px; font: inherit; font-size: 0.85rem; font-weight: 600; color: inherit; cursor: pointer; margin: 0; border-radius: 0; }
+        .me-menu button:last-child { border-bottom: 0; }
+        .me-menu .me-sub { display: block; font-size: 0.72rem; font-weight: 400; color: var(--text-muted); margin-top: 2px; }
+        .my-events-line { font-size: 0.8rem; margin: 2px 0 6px; }
+        .me-undo { background: none; border: 0; padding: 0 2px; margin: 0; width: auto; font: inherit; font-size: 0.8rem; font-weight: 700; color: var(--brand-green); text-decoration: underline; cursor: pointer; }
+        .me-hidden-k { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 8px 0 4px; margin: 6px 0 0; font: inherit; font-size: 0.72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); cursor: pointer; }
+        .me-hidden { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px dashed var(--border-mid); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; opacity: .8; }
+        .me-hidden .me-n { font-weight: 800; flex: 1; min-width: 0; }
+        .me-hidden .me-c { font-size: 0.78rem; color: var(--text-muted); }
+        .me-hidden .me-show { width: auto; margin: 0; padding: 6px 12px; font-size: 0.78rem; }
+        /* DE-C (2026-11-15): Past events rows, the Final mark, the Setup card. */
+        .me-past { background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; }
+        .me-past-t { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+        .me-past .me-n { font-weight: 800; min-width: 0; }
+        .me-past .me-c { font-size: 0.78rem; color: var(--text-muted); white-space: nowrap; }
+        .me-past-b { display: flex; gap: 8px; margin-top: 6px; }
+        .me-past-b .btn-outline { flex: 1; margin: 0; padding: 6px 12px; font-size: 0.78rem; text-align: center; text-decoration: none; display: inline-block; box-sizing: border-box; }
+        .me-final, .ev-final { font-weight: 800; color: var(--brand-green); }
+        h2 .ev-final { font-size: 0.72em; margin-left: 8px; border: 1.5px solid var(--brand-green); border-radius: 6px; padding: 1px 7px; vertical-align: middle; }
+        .ev-after-row { display: flex; align-items: center; gap: 12px; margin: 4px 0 10px; }
+        .ev-after-t { font-size: 0.9rem; font-weight: 700; }
+        .ev-after-s { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+        .ev-after-state { font-size: 0.82rem; margin: 0 0 8px; }
         .open-code { margin-top: 10px; }
         .open-code label { font-size: 0.75rem; font-weight: 700; margin: 0 0 4px; display: block; }
         .open-code-row { display: flex; gap: 8px; }
@@ -1239,6 +1268,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div class="form-group" style="margin-bottom:8px;"><label>Venue</label><input type="text" id="ev-venue" maxlength="120" placeholder="e.g. Camas Meadows Golf Club" onchange="setEventDetail('venue', this.value)"></div>
             <div class="form-group" style="margin-bottom:0;"><label>Beneficiary</label><input type="text" id="ev-beneficiary" maxlength="120" placeholder="e.g. Hope Foundation" onchange="setEventDetail('beneficiary', this.value)"></div>
         </div>
+        <!-- DE-C (Manny 2026-11-15, ADVISOR-20261115-0407): Event day and after.
+             tournaments/<code>/autoArchive (true on events created from today;
+             absent on an older event = off) and tournaments/<code>/archivedAt,
+             both owner writes. renderEventAfterCard() fills it from the record. -->
+        <div class="team-card" id="event-after-block" style="margin-top:12px;">
+            <div class="team-card-header"><span class="team-label">🏁 Event day and after</span></div>
+            <div class="ev-after-row">
+                <label class="toggle-switch"><input type="checkbox" id="auto-archive-switch" onchange="setAutoArchive(this.checked)"><span class="toggle-slider"></span></label>
+                <label for="auto-archive-switch" style="text-transform:none; letter-spacing:normal; margin:0;"><div class="ev-after-t">Archive the day after the last round</div><div class="ev-after-s">Moves to Past events, closes signups, keeps the board as Final.</div></label>
+            </div>
+            <p class="ev-after-state" id="event-after-state" style="display:none;"></p>
+            <button type="button" class="btn-outline" id="archive-now-btn" onclick="archiveEventNow()">Archive now</button>
+            <button type="button" class="btn-outline" id="archive-restore-btn" style="display:none;" onclick="restoreEventNow()">Restore</button>
+            <p class="course-note">Refunds still work from the Desk on an archived event.</p>
+        </div>
         <!-- SCORING LINKS LOCK (scorecard-lock wave). Owner only; hidden otherwise,
              in the tree. renderLockPanel decides the sentence and the button. -->
         <!-- M4 (Stripe Phase 1): the Entry fees card. tournaments/<code>/fees,
@@ -1719,12 +1763,50 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         try { const v = JSON.parse(localStorage.getItem(MY_EVENTS_KEY) || '[]'); return Array.isArray(v) ? v.filter((e) => e && typeof e.code === 'string') : []; }
         catch (e) { return []; }
     }
+    function writeMyEvents(list) {
+        try { localStorage.setItem(MY_EVENTS_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) { /* storage full or off */ }
+    }
     function rememberMyEvent(code, name) {
         if (!code) return;
-        const list = readMyEvents().filter((e) => e.code !== code);
-        list.unshift({ code: code, name: String(name || code).slice(0, 120), at: Date.now() });
-        try { localStorage.setItem(MY_EVENTS_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) { /* storage full or off */ }
+        const all = readMyEvents();
+        const was = all.find((e) => e.code === code);
+        const list = all.filter((e) => e.code !== code);
+        const entry = { code: code, name: String(name || code).slice(0, 120), at: Date.now() };
+        // DE-B (Manny 2026-11-15, ADVISOR-20261115-0407): the owner opening a
+        // hidden event must not un-hide it. The entry is rebuilt here, so the
+        // flag rides across from the old one.
+        if (was && was.hidden === true) entry.hidden = true;
+        if (was && Number(was.archivedAt) > 0) entry.archivedAt = Number(was.archivedAt);   // DE-C: the same for Past events
+        list.unshift(entry);
+        writeMyEvents(list);
         renderMyEvents();
+    }
+    // The flag on THIS device's entry. An event only on the account gets a local
+    // entry too, so the flag holds while the account snapshot lags (or, before
+    // the rules candidate is published, is refused).
+    function flagMyEvent(code, patch) {
+        if (!code) return;
+        const all = readMyEvents();
+        let entry = all.find((e) => e.code === code);
+        if (!entry) {
+            const acct = (accountEvents || []).find((e) => e.code === code);
+            entry = { code: code, name: String((acct && acct.name) || code).slice(0, 120), at: (acct && acct.at) || Date.now() };
+            all.push(entry);
+        }
+        Object.keys(patch).forEach((k) => { if (patch[k] === null || patch[k] === undefined) delete entry[k]; else entry[k] = patch[k]; });
+        writeMyEvents(all);
+    }
+    // The same flag on the account pointer, when signed in. update(), so the
+    // pointer's at/name/course stay; caught, as rememberOwnedEvent is, because
+    // live refuses the key until the My-events candidate is published.
+    function flagOwnedEvent(code, patch) {
+        const uid = authUser && authUser.uid;
+        if (!uid || !code) return Promise.resolve();
+        // The snapshot in hand is patched too, as the SDK raises the local
+        // event before the server answers; a refusal's snapshot puts it back.
+        const acct = (accountEvents || []).find((e) => e.code === code);
+        if (acct) Object.keys(patch).forEach((k) => { if (patch[k] === null || patch[k] === undefined) delete acct[k]; else acct[k] = patch[k]; });
+        return db.ref('organizers/' + uid + '/tournaments/' + code).update(patch).catch(() => { /* not published yet: this device's flag still holds */ });
     }
     // THE ACCOUNT'S EVENTS (P2-6, Advisor 2026-11-11 16:19): organizers/<uid>/
     // tournaments/<code> = {at, name, course}, written by the owner's own page
@@ -1743,7 +1825,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         db.ref('organizers/' + uid + '/tournaments').on('value', (snap) => {
             if (accountEventsUid !== uid) return;
             const v = (snap && snap.val()) || {};
-            accountEvents = Object.keys(v).filter((c) => v[c] && typeof v[c] === 'object').map((c) => ({ code: c, name: String(v[c].name || c), at: Number(v[c].at) || 0, account: true }));
+            accountEvents = Object.keys(v).filter((c) => v[c] && typeof v[c] === 'object').map((c) => ({ code: c, name: String(v[c].name || c), at: Number(v[c].at) || 0, account: true, hidden: v[c].hidden === true, archivedAt: Number(v[c].archivedAt) || 0 }));
             renderMyEvents();
         }, () => { accountEvents = null; renderMyEvents(); });
     }
@@ -1757,10 +1839,161 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     // One list, newest first: the account's events (any device) and this
     // device's (events it created or opened), the account winning a tie.
+    // A flag set by EITHER source counts (DE-B): the account snapshot can lag a
+    // tap on this phone, and before the candidate is published it never carries
+    // the flag at all. Show clears both, so a flag cannot come back from the
+    // side that was not cleared.
     function myEventsList() {
-        const seen = {}, out = [];
-        (accountEvents || []).concat(readMyEvents()).forEach((e) => { if (!seen[e.code]) { seen[e.code] = true; out.push(e); } });
+        const byCode = {}, out = [];
+        (accountEvents || []).concat(readMyEvents()).forEach((e) => {
+            if (!byCode[e.code]) { byCode[e.code] = Object.assign({}, e, { hidden: e.hidden === true, archivedAt: Number(e.archivedAt) || 0 }); out.push(byCode[e.code]); return; }
+            if (e.hidden === true) byCode[e.code].hidden = true;
+            if (Number(e.archivedAt) > 0) byCode[e.code].archivedAt = Math.max(byCode[e.code].archivedAt, Number(e.archivedAt));
+        });
+        // DE-C: the record itself is the third source - tournaments/<code>/
+        // archivedAt is an owner write live today, where the pointer flag is not.
+        out.forEach((e) => { const m = eventMeta[e.code]; if (m && m.archivedAt > e.archivedAt) e.archivedAt = m.archivedAt; });
         return out.sort((a, b) => (b.at || 0) - (a.at || 0));
+    }
+    // DE-C, ARCHIVE AFTER THE EVENT (column C of the picked sheet). What Home
+    // knows about each listed event's record: the date it ends, the switch,
+    // whether it is archived, and whose it is. Read once per code per page load
+    // (once(), the public record), so the Past row can show the event's date and
+    // the automatic archive can run. The automatic archive is a date check when
+    // the OWNER opens Home: an event with autoArchive true whose last day is at
+    // least one full day in the past gets tournaments/<code>/archivedAt once.
+    // No function, no timer; nothing when no date is known.
+    const eventMeta = {};            // code -> { eventDate, lastDate, autoArchive, archivedAt, ownerUid }
+    const eventMetaAsked = {};       // code -> true once this page asked for the record
+    const autoArchived = {};         // code -> true once this page wrote archivedAt for it
+    function lastEventDate(data) {
+        const ok = (v) => EVENT_DETAIL_KEYS.eventDate.test(v || '') && formatEventDate(v);
+        const roundDates = Object.keys(data.rounds || {}).map((rid) => (data.rounds[rid] || {}).date).filter(ok).sort();
+        if (roundDates.length) return roundDates[roundDates.length - 1];
+        return ok(data.eventDate) ? data.eventDate : null;
+    }
+    function daysSinceLocal(ymd) {
+        const [y, m, d] = String(ymd).split('-').map(Number);
+        const then = new Date(y, m - 1, d).getTime();
+        const now = new Date(); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        return Math.floor((today - then) / 86400000);
+    }
+    function syncEventMeta(list) {
+        list.forEach((e) => {
+            if (eventMetaAsked[e.code]) return;
+            eventMetaAsked[e.code] = true;
+            db.ref('tournaments/' + e.code).once('value').then((snap) => {
+                const data = (snap && snap.val()) || null;
+                if (!data) return;
+                eventMeta[e.code] = { eventDate: data.eventDate || null, lastDate: lastEventDate(data), autoArchive: data.autoArchive === true, archivedAt: Number(data.archivedAt) || 0, ownerUid: data.ownerUid || null };
+                maybeAutoArchive(e.code);
+                renderMyEvents();
+            }).catch(() => { /* unreadable: the row renders from the pointer alone */ });
+        });
+    }
+    // Run when a record arrives AND on every Home render: the record can be read
+    // before the sign-in lands, and only the signed-in owner archives.
+    function maybeAutoArchive(code) {
+        const m = eventMeta[code];
+        const uid = authUser && authUser.uid;
+        if (!m || !uid || m.ownerUid !== uid || !m.autoArchive || m.archivedAt || autoArchived[code] || !m.lastDate) return false;
+        if (daysSinceLocal(m.lastDate) < 1) return false;
+        autoArchived[code] = true;
+        writeArchived(code, Date.now());
+        return true;
+    }
+    // The archive itself: the record's archivedAt (an owner write, allowed live
+    // today) and the pointer flag on both My-events sources, as hidden is.
+    // null restores. The record's other keys are untouched: refunds, the board
+    // and the Desk keep working.
+    function writeArchived(code, at) {
+        const v = at ? Number(at) : null;
+        if (eventMeta[code]) eventMeta[code].archivedAt = v || 0;
+        db.ref('tournaments/' + code + '/archivedAt').set(v).catch(() => { /* not the owner on this device: the flags below still move the row */ });
+        flagMyEvent(code, { archivedAt: v });
+        flagOwnedEvent(code, { archivedAt: v });
+    }
+    let pastEventsOpen = true;
+    function togglePastEvents() { pastEventsOpen = !pastEventsOpen; renderMyEvents(); }
+    function restoreMyEvent(code) {
+        writeArchived(code, null);
+        myEventsMenuCode = null;
+        renderMyEvents();
+    }
+    function shortEventDate(ymd) {
+        if (!EVENT_DETAIL_KEYS.eventDate.test(ymd || '')) return '';
+        const [, m, d] = String(ymd).split('-').map(Number);
+        return `${EV_MONTHS[m - 1]} ${d}`;
+    }
+    function pastEventsHtml(past) {
+        if (!past.length) return '';
+        return `<button type="button" class="me-hidden-k" id="past-events-toggle" aria-expanded="${pastEventsOpen ? 'true' : 'false'}" onclick="togglePastEvents()">Past events (${past.length}) <span aria-hidden="true">${pastEventsOpen ? '▾' : '▸'}</span></button>`
+            + (pastEventsOpen ? past.map((e) => {
+                const m = eventMeta[e.code] || {};
+                const when = shortEventDate(m.lastDate || m.eventDate) || (e.archivedAt ? shortEventDate(new Date(e.archivedAt).toISOString().slice(0, 10)) : '');
+                const recap = appHref('tournament.html?tourney=' + encodeURIComponent(e.code) + '&recap=1');
+                return `<div class="me-past" data-code="${escapeHtml(e.code)}"><div class="me-past-t"><span class="me-n">${escapeHtml(e.name)}</span><span class="me-c">${escapeHtml(e.code)}${when ? ' · ' + escapeHtml(when) : ''} · <span class="me-final">Final</span></span></div>`
+                    + `<div class="me-past-b"><a class="btn-outline me-recap" data-code="${escapeHtml(e.code)}" href="${escapeHtml(recap)}">Recap</a><button type="button" class="btn-outline me-restore" data-code="${escapeHtml(e.code)}" onclick="restoreMyEvent(this.dataset.code)">Restore</button></div></div>`;
+            }).join('') : '');
+    }
+    // DE-B, "Hide from Home" (Manny 2026-11-15 4:06 AM, B then C; the picked
+    // sheet DE-delete-hide-ABC column B). Each row has a ••• menu: Open event,
+    // Share code (the same signup link the console hands out), Hide from Home.
+    // Hidden rows sit under a collapsed "Hidden events (n)" list with Show.
+    // Nothing is deleted: the event, its links, its board and its signups are
+    // untouched; only the two My-events sources carry hidden: true.
+    let myEventsMenuCode = null;     // the row whose ••• menu is open; null = none (the default)
+    let hiddenEventsOpen = false;    // the Hidden events list, collapsed until tapped
+    let myEventsLine = null;         // { text, undo } - the one-line note after a hide / share
+    function toggleMyEventMenu(code) {
+        myEventsMenuCode = myEventsMenuCode === code ? null : code;
+        renderMyEvents();
+    }
+    function toggleHiddenEvents() { hiddenEventsOpen = !hiddenEventsOpen; renderMyEvents(); }
+    function hideMyEvent(code) {
+        const e = myEventsList().find((x) => x.code === code);
+        flagMyEvent(code, { hidden: true });
+        flagOwnedEvent(code, { hidden: true });
+        myEventsMenuCode = null;
+        myEventsLine = { text: `${(e && e.name) || code} is hidden.`, undo: code };
+        renderMyEvents();
+    }
+    function showMyEvent(code) {
+        flagMyEvent(code, { hidden: null });
+        flagOwnedEvent(code, { hidden: null });
+        myEventsMenuCode = null;
+        myEventsLine = null;
+        renderMyEvents();
+    }
+    // The join link, as the console's Share builds it: the registration page
+    // on the public origin. The share sheet when the device has one, the
+    // clipboard otherwise, and the line under the list says which happened.
+    function shareMyEventCode(code) {
+        const url = shareBaseUrl() + 'tournament.html?register=' + encodeURIComponent(code);
+        const e = myEventsList().find((x) => x.code === code);
+        myEventsMenuCode = null;
+        const say = (t) => { myEventsLine = { text: t, undo: null }; renderMyEvents(); };
+        if (navigator.share) { renderMyEvents(); return navigator.share({ title: (e && e.name) || code, text: `Sign up for ${(e && e.name) || code}`, url: url }).catch(() => {}); }
+        if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(url).then(() => say('Join link copied.'), () => say(url));
+        say(url);
+    }
+    function myEventRowHtml(e) {
+        const c = escapeHtml(e.code);
+        const open = myEventsMenuCode === e.code;
+        return `<div class="my-event-row" data-code="${c}">`
+            + `<button type="button" class="my-event" data-code="${c}" onclick="openMyEvent(this.dataset.code)"><span class="me-n">${escapeHtml(e.name)}</span><span class="me-c">${c} ›</span></button>`
+            + `<button type="button" class="me-more${open ? ' on' : ''}" data-code="${c}" aria-label="More" aria-expanded="${open ? 'true' : 'false'}" onclick="toggleMyEventMenu(this.dataset.code)">•••</button>`
+            + (open ? `<div class="me-menu" role="menu">`
+                + `<button type="button" role="menuitem" data-code="${c}" onclick="openMyEvent(this.dataset.code)">Open event</button>`
+                + `<button type="button" role="menuitem" data-code="${c}" onclick="shareMyEventCode(this.dataset.code)">Share code<span class="me-sub">Text or copy the join link</span></button>`
+                + `<button type="button" role="menuitem" class="me-hide" data-code="${c}" onclick="hideMyEvent(this.dataset.code)">Hide from Home<span class="me-sub">Still open by code or link; nothing is deleted</span></button>`
+                + `</div>` : '')
+            + `</div>`;
+    }
+    function hiddenEventsHtml(hidden) {
+        if (!hidden.length) return '';
+        return `<button type="button" class="me-hidden-k" id="hidden-events-toggle" aria-expanded="${hiddenEventsOpen ? 'true' : 'false'}" onclick="toggleHiddenEvents()">Hidden events (${hidden.length}) <span aria-hidden="true">${hiddenEventsOpen ? '▾' : '▸'}</span></button>`
+            + (hiddenEventsOpen ? hidden.map((e) => `<div class="me-hidden" data-code="${escapeHtml(e.code)}"><span class="me-n">${escapeHtml(e.name)}</span><span class="me-c">${escapeHtml(e.code)}</span><button type="button" class="btn-outline me-show" data-code="${escapeHtml(e.code)}" onclick="showMyEvent(this.dataset.code)">Show</button></div>`).join('') : '');
     }
     function renderMyEvents() {
         const panel = document.getElementById('app-my-events');
@@ -1769,15 +2002,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // On the website the list needs a signed-in organizer; in the app it is
         // always there (this device's events at least).
         if (!APP_MODE && !authUser) { panel.style.display = 'none'; return; }
-        const list = myEventsList();
+        let all = myEventsList();
+        syncEventMeta(all);
+        if (Object.keys(eventMeta).filter(maybeAutoArchive).length) all = myEventsList();   // DE-C: an archive just written moves its row now
+        const past = all.filter((e) => e.archivedAt > 0);
+        const list = all.filter((e) => !e.hidden && !(e.archivedAt > 0));
+        const hidden = all.filter((e) => e.hidden && !(e.archivedAt > 0));
         panel.style.display = 'block';
         const note = accountEvents
             ? 'Events you run, on any device you sign in on' + (APP_MODE ? ', and events this phone opened.' : '.')
             : (APP_MODE ? 'Events this phone created or opened as the organizer.' : 'Events this browser created or opened as the organizer.');
+        const line = myEventsLine
+            ? `<p class="my-events-line" id="my-events-line">${escapeHtml(myEventsLine.text)}${myEventsLine.undo ? ` <button type="button" class="me-undo" data-code="${escapeHtml(myEventsLine.undo)}" onclick="showMyEvent(this.dataset.code)">Undo</button>` : ''}</p>`
+            : '';
         box.innerHTML = `<div class="my-events-k">My events</div>` + (list.length
-            ? list.map((e) => `<button type="button" class="my-event" data-code="${escapeHtml(e.code)}" onclick="openMyEvent(this.dataset.code)"><span class="me-n">${escapeHtml(e.name)}</span><span class="me-c">${escapeHtml(e.code)} ›</span></button>`).join('')
-              + `<p class="my-events-note">${note}</p>`
-            : `<p class="my-events-note">No events yet. Create one below, or open an event you run by its code.</p>`);
+            ? list.map(myEventRowHtml).join('') + line + `<p class="my-events-note">${note}</p>`
+            : line + `<p class="my-events-note">No events yet. Create one below, or open an event you run by its code.</p>`)
+            + pastEventsHtml(past)
+            + hiddenEventsHtml(hidden);
     }
     function openEventByCode() {
         const input = document.getElementById('open-code-input');
@@ -2861,7 +3103,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             shambleCountBest: shambleCountBest,
             teams: teams,
             createdAt: Date.now(),
-            ownerUid: authUser.uid
+            ownerUid: authUser.uid,
+            autoArchive: true   // DE-C: on for a new event; an older record has no key and reads off
         };
         if (selectedCourseNines) payload.courseNines = selectedCourseNines;   // bug #11 A: which two nines of a 27-hole record
         // The event's own online imports ride with the record so a later round
@@ -3246,6 +3489,44 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const per = feePer(data);
             seg.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.per === per));
         }
+    }
+    // DE-C: the Event day and after card, from the record. The switch reads
+    // autoArchive === true (absent on an older event = off); an archived event
+    // shows when, and Restore in place of Archive now.
+    function renderEventAfterCard() {
+        const card = document.getElementById('event-after-block');
+        if (!card) return;
+        const data = currentData || {};
+        const sw = document.getElementById('auto-archive-switch');
+        if (sw && document.activeElement !== sw) sw.checked = data.autoArchive === true;
+        const at = Number(data.archivedAt) || 0;
+        const state = document.getElementById('event-after-state');
+        if (state) {
+            state.textContent = at ? `Archived ${archivedWhen(at)}. The board reads Final and signups are closed; the Desk still works.` : '';
+            state.style.display = at ? 'block' : 'none';
+        }
+        const a = document.getElementById('archive-now-btn'), r = document.getElementById('archive-restore-btn');
+        if (a) a.style.display = at ? 'none' : '';
+        if (r) r.style.display = at ? '' : 'none';
+    }
+    function archivedWhen(at) {
+        const d = new Date(Number(at));
+        return isNaN(d.getTime()) ? '' : `${EV_MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    }
+    function setAutoArchive(on) {
+        if (!currentCode || !canManage()) return;
+        db.ref(`tournaments/${currentCode}/autoArchive`).set(!!on).catch(err => alert(`Error: ${err.message}`));
+    }
+    function archiveEventNow() { if (currentCode && canManage()) writeArchived(currentCode, Date.now()); }
+    function restoreEventNow() { if (currentCode && canManage()) writeArchived(currentCode, null); }
+    // "Final" beside the title on an archived event's headers - the console's
+    // and the public board's. Appended after textContent is set, so an event
+    // that is not archived reads exactly as before.
+    function markFinal(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const old = el.querySelector('.ev-final'); if (old) old.remove();
+        if (Number(currentData && currentData.archivedAt) > 0) { const s = document.createElement('span'); s.className = 'ev-final'; s.textContent = 'Final'; el.appendChild(document.createTextNode(' ')); el.appendChild(s); }
     }
     function setEventDetail(key, value) {
         if (!currentCode || !canManage()) return;
@@ -4179,11 +4460,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                     fee > 0 ? ('$' + (Math.round(fee * 100) % 100 === 0 ? fee.toFixed(0) : fee.toFixed(2)) + ' entry per ' + feePer(data)) : ''
                 ].filter(Boolean).join(' \u2022 ');
             }
-            const taking = !!data.ownerUid;
+            // DE-C: an archived event takes no more signups (the public form
+            // only; the owner's Desk, refunds included, is not gated here).
+            const archived = Number(data.archivedAt) > 0;
+            const taking = !!data.ownerUid && !archived;
             form.style.display = taking ? 'block' : 'none';
             closed.style.display = taking ? 'none' : 'block';
             if (!taking) {
-                closed.textContent = 'This event is not taking signups. Signups need an organizer account, and this event does not have one.';
+                closed.textContent = archived
+                    ? 'Signups for this event are closed. The event is over; its results are on the board.'
+                    : 'This event is not taking signups. Signups need an organizer account, and this event does not have one.';
                 return;
             }
             // THE ORGANIZER'S SWITCHES (Wave 2b) decide which optional boxes are
@@ -4350,8 +4636,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function submitRegistration() {
         const pay = regWantsPay === true && !!(feesOf(registerEvent) || {}).collectByCard;
         regWantsPay = false;
-        if (!registerCode || !registerEvent || !registerEvent.ownerUid) {
-            alert('This event is not taking signups.');
+        if (!registerCode || !registerEvent || !registerEvent.ownerUid || Number(registerEvent.archivedAt) > 0) {
+            alert(Number(registerEvent && registerEvent.archivedAt) > 0 ? 'Signups for this event are closed.' : 'This event is not taking signups.');
             return;
         }
         if (!requireOnlineForSignup('SIGN-UP NOT SENT', 'Reconnect and tap Sign up again - nothing was saved.')) return;
@@ -9472,6 +9758,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             document.getElementById('lb-t-name').textContent = `🏆 ${currentData.name}`;
             document.getElementById('lb-t-sub').textContent = eventSubLine();   // bug hunt #5
             renderEventDetails();
+            renderEventAfterCard();   // DE-C
+            markFinal('manage-t-name'); markFinal('lb-t-name');
             if (APP_MODE) {
                 const tt = document.getElementById('ap-m-title'); if (tt) tt.textContent = currentData.name || 'Tournament';
                 const ts = document.getElementById('ap-m-sub'); if (ts) ts.textContent = `${eventCourseName() ? eventCourseName() + ' • ' : ''}code ${code}`;   // bug hunt #5
