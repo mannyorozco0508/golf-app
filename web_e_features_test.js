@@ -107,14 +107,14 @@ describe('1. the 25 cards', () => {
     });
 
     // 2.0.8 site (Nov 15): the Coming in 2.0.8 row is outside #features, so the counts above do not move (6 rows, 36
-    // cards, manifest screens 36). Its own counts: 2 cards with real pictures, 6 text-only items, manifest.coming 2.
-    test('2.0.8 site (Nov 15): the Coming row has 2 cards (real captures, in the manifest) and 6 more named in its list', () => {
+    // cards, manifest screens 36). Its own counts: 2 cards with real pictures, 7 text-only items (6 until the 3:22 PM re-pin), manifest.coming 2.
+    test('2.0.8 site (Nov 15): the Coming row has 2 cards (real captures, in the manifest) and 7 more named in its list', () => {
         const cs = [...coming208.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
         assert.deepEqual(cs.map((m) => m[2]), ['smooth-slope', 'ring-aside']);
         assert.match(coming208, /<span class="gn">2 &middot; swipe &rarr;<\/span>/);
         assert.equal((coming208.match(/<div class="dots"[^>]*>(<i[^>]*><\/i>)+<\/div>/) || [''])[0].match(/<i/g).length, 2);
         const also = (/<ul class="new207 soon208" aria-label="Also coming in 2\.0\.8">([\s\S]*?)<\/ul>/.exec(coming208) || [])[1] || '';
-        assert.equal((also.match(/<li>/g) || []).length, 6);
+        assert.equal((also.match(/<li>/g) || []).length, 7);   // Nov 15 3:22 PM re-pin: + the whole-course slope download (was in the old slope card's line)
         const manifest = JSON.parse(read('media/screens/manifest.json'));
         assert.equal(manifest.screens.length, 36, 'the coming screens are not in screens[] (that is the #features list)');
         assert.deepEqual(manifest.coming.screens.map((s) => s.key), cs.map((m) => m[2]));
@@ -122,11 +122,11 @@ describe('1. the 25 cards', () => {
             const body = m[3], img = (/<img\b[^>]*>/.exec(body) || [''])[0], k = m[2];
             assert.match(body, new RegExp('<button type="button" class="ph" data-open="' + k + '" aria-label="See [^"]+ full screen">'));
             assert.match(img, new RegExp('src="/media/screens/' + k + '-400\\.webp" srcset="/media/screens/' + k + '-400\\.webp 400w, /media/screens/' + k + '-940\\.webp 940w"'));
-            assert.match(img, /\bwidth="940" height="1938" loading="lazy"/);
+            assert.match(img, /\bwidth="940" height="(1896|1938)" loading="lazy"/);
             const alt = /\balt="([^"]*)"/.exec(img)[1];
             assert.ok(alt.length >= 30); assert.doesNotMatch(alt, /\bTest\b|\$/);
             const ms = manifest.coming.screens.find((x) => x.key === k);
-            assert.match(ms.captured, /scratchpad\/green72r\/ring\/after-(caledonia-18|homecourse-6)\.png/, k + ': not a real capture');
+            assert.match(ms.captured, /scratchpad\/(shots208\/raw\/07-green-slope-55|green72r\/ring\/after-homecourse-6)\.png/, k + ': not a real capture');
             ms.files.forEach((f) => {
                 const b = fs.readFileSync(path.join(ROOT, f.slice(1)));
                 assert.equal(b.slice(0, 4).toString('latin1') + b.slice(8, 12).toString('latin1'), 'RIFFWEBP', f);
@@ -255,18 +255,24 @@ describe('2. words', () => {
     test('2.0.8 (Nov 15): the Coming in 2.0.8 row says coming, on the row and on every card, and claims nothing is available', () => {
         const t = textOf(coming208);
         // the row's tag
-        assert.match(coming208, /<span class="gsoon" id="coming208-tag">Coming &middot; in review<\/span>/, 'the row tag does not say coming');
+        // Re-pinned 2.0.8 site, Manny's OK (Advisor, Nov 15 3:22 PM): the row tag and every card tag read exactly
+        // "New · coming in the next update (in review)", never "available".
+        assert.match(coming208, /<span class="gsoon" id="coming208-tag">New &middot; coming in the next update \(in review\)<\/span>/, 'the row tag does not say coming');
         assert.match(t, /Not in the app yet\./);
         assert.match(coming208, /<h2>Coming in 2\.0\.8<\/h2>/);
         // every card in the row carries the tag
         const cs = [...coming208.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
         assert.equal(cs.length, 2);
-        cs.forEach((m) => assert.match(m[3], /^<div class="cap"><div class="fsoon">COMING &middot; IN REVIEW<\/div>/, m[1] + ': no coming tag'));
+        cs.forEach((m) => assert.match(m[3], /^<div class="cap"><div class="fsoon">New &middot; coming in the next update \(in review\)<\/div>/, m[1] + ': no coming tag'));
+        assert.equal((coming208.match(/New &middot; coming in the next update \(in review\)/g) || []).length, 3, 'the row tag + 2 card tags, exactly');
+        // the green slope is the hero: the first card of the row (Manny, Nov 15 3:22 PM)
+        assert.equal(cs[0][2], 'smooth-slope');
+        assert.match(cs[0][3], /<span class="eb">GREEN SLOPE<\/span><h3>Read the green\.<\/h3><p>Slope from 1 m lidar, drawn smooth on the map: shading, contours and downhill arrows, with the putt read at the pin\. On by default\.<\/p>/);
         // no availability claim and no store wording inside the row
         assert.doesNotMatch(t, /\b(available|out now|now live|download (it )?now|get it|in the app now|on the App Store|on Google Play|update now)\b/i);
         assert.doesNotMatch(coming208, /apps\.apple\.com|play\.google\.com/);
         // every 2.0.8 feature of WHATS-NEW-2.0.8.txt is named in the row (positive control for the guard above)
-        [/1 m lidar slope, on by default/, /whole course saves/i, /The Home Course/, /target ring steps aside/, /round recap card/, /Messages or an Instagram story/,
+        [/Slope from 1 m lidar, drawn smooth/, /On by default\./, /whole course’s slope saves/i, /The Home Course/, /target ring steps aside/, /round recap card/, /Messages or an Instagram story/,
             /Money stays off the card unless you switch it on\./, /Lock Screen and Dynamic Island/, /GPS paused/, /center number/, /sponsor tee card/, /Easier course search/, /Under par in red/]
             .forEach((re) => assert.match(t, re, String(re)));
         // the only money sentence allowed in the row is that one

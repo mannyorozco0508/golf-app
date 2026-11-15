@@ -528,14 +528,14 @@
       {
         "key": "smooth-slope",
         "card": "f-smooth-slope",
-        "headline": "Every green, smooth.",
+        "headline": "Read the green.",
         "files": [
           "/media/screens/smooth-slope-400.webp",
           "/media/screens/smooth-slope-940.webp"
         ],
         "width": 940,
-        "height": 1938,
-        "captured": "72R-A branch feat-207-72ra (2.0.8 work, not yet in a store build), headless-Chrome capture at 402x874 @3x (1206x2622), scratchpad/green72r/ring/after-caledonia-18.png (after the ring-hide commit 112d2099): the top 136 px (the dev title bar) cut off, saved as WebP 940 and 400 wide with sharp; the original PNG is untouched. Shows the dev golfer name in the bottom bar."
+        "height": 1896,
+        "captured": "2.0.8 (1) App Store shoot raw, scratchpad/shots208/raw/07-green-slope-55.png (1320x2868 Simulator screen, Papago 10 from 55: smooth slope, key strip, ring hidden; Manny OK Nov 15 3:22 PM via Advisor): the top 205 px (status bar) cut off, saved as WebP 940 and 400 wide with sharp; the original PNG is untouched. Replaced in place the first cut from green72r/ring/after-caledonia-18.png (eb27b780, git history keeps it)."
       },
       {
         "key": "ring-aside",
