@@ -208,7 +208,12 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
             assert.doesNotMatch(stripComments(read(f)).replace(/<div class="fsoon">COMING SOON(?: · iPHONE 2\.0\.5)?<\/div>/g, ''), /Coming soon/i, f + ' still says Android is coming soon'));
         // Re-pinned 2026-11-12 (Manny): Ask caddie shipped, its tag is gone; Offline maps keeps one.
         // 2.0.7 site (Manny Nov 14): offline map download ships (release-206/207, both stores), so no card carries a tag.
-        assert.equal((read('hardpan-home.html').match(/<div class="fsoon">/g) || []).length, 0, 'a Coming soon tag on a shipped card');
+        // 2.0.8 site (Nov 15): the two cards of the "Coming in 2.0.8" row (#coming208, above EVERYTHING IN THE APP while
+        // 2.0.8 is in Apple's review) carry "COMING · IN REVIEW"; no card inside #features carries a tag.
+        const home = read('hardpan-home.html');
+        const coming = (/<section class="feat coming" id="coming208"[\s\S]*?<\/section>/.exec(home) || [''])[0];
+        assert.equal((coming.match(/<div class="fsoon">COMING &middot; IN REVIEW<\/div>/g) || []).length, 2, 'positive: the two 2.0.8 cards are tagged');
+        assert.equal((home.replace(coming, '').match(/<div class="fsoon">/g) || []).length, 0, 'a Coming soon tag on a shipped card');
         assert.match(read('hardpan-home.html'), /<li class="fc" id="f-offline" data-key="offline"><div class="cap"><span class="eb">OFFLINE MAPS<\/span>/, 'positive: the Offline maps card is there, untagged');
     });
 

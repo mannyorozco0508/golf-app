@@ -199,11 +199,12 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         await tab.key('ArrowRight');
         v = await tab.eval(VIEWER);
         assert.equal(v.n, 'Play · 2 / 6'); assert.equal(v.title, 'Hit the number it plays.');
-        const big = await tab.eval(`(() => { const li = document.querySelector('#fv-track .fv-s[data-i="5"] img'); return li ? { src: li.currentSrc, w: li.getBoundingClientRect().width } : null; })()`);
+        const big = await tab.eval(`(() => { const li = document.querySelector('#fv-track .fv-s[data-i="7"] img'); return li ? { src: li.currentSrc, w: li.getBoundingClientRect().width } : null; })()`);
         assert.ok(big && /plays-like-940\.webp$/.test(big.src) && big.w > 250, 'the viewer does not show the sharp screen: ' + JSON.stringify(big));
         // a swipe: the track is scrolled the way a finger scrolls it, to the 11th slide (Games 1).
         // 2.0.7 re-pin (2026-11-14): the four New in 2.0.7 slides come first, so Play 2 is slide 6 (data-i 5) and Games 1 is slide 11 (was 7).
-        await tab.eval(`(() => { const t = document.getElementById('fv-track'); t.scrollTo({ left: t.clientWidth * 10 }); return true; })()`);
+        // 2.0.8 site (Nov 15): the two Coming in 2.0.8 slides (#coming208, above #features) come before those: Play 2 is data-i 7, Games 1 slide 13.
+        await tab.eval(`(() => { const t = document.getElementById('fv-track'); t.scrollTo({ left: t.clientWidth * 12 }); return true; })()`);
         await sleep(700);
         v = await tab.eval(VIEWER);
         assert.equal(v.n, 'Games · 1 / 6', 'a swipe did not move to the next feature');

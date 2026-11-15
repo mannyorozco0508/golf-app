@@ -192,6 +192,10 @@
     .new207 { list-style:none; display:flex; flex-wrap:wrap; gap:8px 10px; margin:16px 0 6px; padding:0; }
     .new207 li { font-size:14px; line-height:1.35; color:var(--ink); background:#fff; border:1px solid #e3dfd2; border-radius:12px; padding:8px 12px; }
     @media (max-width:700px) { .new207 { padding:0 16px; } }
+    /* 2.0.8 site (web-208-site, Nov 15): the Coming in 2.0.8 row sits ABOVE "EVERYTHING IN THE APP" while 2.0.8 is in
+       Apple's review; its tag says so. scratchpad/web208/flip-to-released.sh moves it in on release day. */
+    .coming { padding:14px 0 0; }
+    .gsoon { display:inline-block; margin-right:8px; font-size:11px; font-weight:800; letter-spacing:.06em; color:var(--ink); background:#ffd76a; border-radius:8px; padding:3px 8px; vertical-align:1px; }
     .dots { display:flex; gap:5px; justify-content:center; padding:12px 0 0; }
     .dots i { width:6px; height:6px; border-radius:50%; background:#c9c4b4; }
     .dots i.on { width:18px; border-radius:3px; background:var(--g); }
@@ -306,6 +310,20 @@
     <p class="start-row hero-start"><a class="btn lime" id="hero-start-tournament" href="/tournament">Start a tournament &rarr;</a></p>
     <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
 </section>
+
+<!-- 2.0.8 site (web-208-site, Nov 15): NOT in the app yet. iOS 2.0.8 (1) goes to Apple's review today, so this row sits above
+     "EVERYTHING IN THE APP" with a "Coming · in review" tag and claims nothing is available. Pictures: real captures from the
+     72R-A branch (scratchpad/green72r/ring). Release day: scratchpad/web208/flip-to-released.sh. -->
+<section class="feat coming" id="coming208" aria-label="Coming in 2.0.8">
+    <div class="grp" id="g-coming">
+        <div class="ghd"><h2>Coming in 2.0.8</h2><span class="gn">2 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="Coming in 2.0.8: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="Coming in 2.0.8: more cards">&rsaquo;</button></span></div>
+        <p class="gln"><span class="gsoon" id="coming208-tag">Coming &middot; in review</span>The next update, with Apple for review now. Not in the app yet.</p>
+        <ul class="row" aria-label="Coming in 2.0.8 features"><li class="fc" id="f-smooth-slope" data-key="smooth-slope"><div class="cap"><div class="fsoon">COMING &middot; IN REVIEW</div><span class="eb">SMOOTH SLOPE</span><h3>Every green, smooth.</h3><p>1 m lidar slope, on by default. The whole course saves when a round opens.</p></div><button type="button" class="ph" data-open="smooth-slope" aria-label="See Every green, smooth full screen"><span class="s"><img src="/media/screens/smooth-slope-400.webp" srcset="/media/screens/smooth-slope-400.webp 400w, /media/screens/smooth-slope-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="1938" loading="lazy" decoding="async" alt="Caledonia hole 18 near the green with Slope on by default: smooth shading, contour lines every 5 cm and downhill arrows over the whole green, 40 to the middle, the lidar year and the slope key."></span></button></li><li class="fc" id="f-ring-aside" data-key="ring-aside"><div class="cap"><div class="fsoon">COMING &middot; IN REVIEW</div><span class="eb">RING STEPS ASIDE</span><h3>Nothing covers the arrows.</h3><p>While the slope is drawn, the target ring steps aside. The dot stays.</p></div><button type="button" class="ph" data-open="ring-aside" aria-label="See Nothing covers the arrows full screen"><span class="s"><img src="/media/screens/ring-aside-400.webp" srcset="/media/screens/ring-aside-400.webp 400w, /media/screens/ring-aside-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="1938" loading="lazy" decoding="async" alt="The Home Course hole 6 with Slope on: no target ring over the green, only the white dot at the middle, so every downhill arrow shows; 40 to the middle, B 57, F 22."></span></button></li></ul>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i></div>
+        <ul class="new207 soon208" aria-label="Also coming in 2.0.8"><li><b>The Home Course</b> (DuPont, WA) is added, with its green slope.</li><li>A <b>round recap card</b> for Messages or an Instagram story. Money stays off the card unless you switch it on.</li><li><b>Lock Screen and Dynamic Island</b> yardages with a tee-to-green bar. They turn grey and say &ldquo;GPS paused&rdquo; when the fix drops. Free golfers get the center number too.</li><li>A <b>sponsor tee card</b> in tournaments: who presents the hole, for a few seconds, then out of the way.</li><li><b>Easier course search</b>: it forgives spelling and typos, and shows nearby courses first.</li><li><b>Under par in red</b> on the GPS screen.</li></ul>
+    </div>
+</section>
+<!-- /2.0.8 coming -->
 
 <!-- website-e features (generated) -->
 <section class="feat" id="features">

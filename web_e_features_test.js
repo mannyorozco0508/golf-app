@@ -50,6 +50,10 @@ const stripComments = (h) => h.replace(/<!--[\s\S]*?-->/g, '');
 const html = stripComments(read('hardpan-home.html'));
 const JS = read('site-features.js');
 const feat = (/<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(html) || [])[1] || '';
+// 2.0.8 site (Nov 15): the "Coming in 2.0.8" row, a section of its own just above #features while 2.0.8 is in review.
+const coming208 = (/<section class="feat coming" id="coming208"[\s\S]*?<\/section>/.exec(html) || [''])[0];
+// Built on branches, in NO store build yet: never on the page outside #coming208.
+const UNSHIPPED_208 = /\b1\s?m(etre|eter)? (lidar|slope)|smooth(er)? (green )?slope|Home Course|whole[- ]course|prefetch|target ring|ring steps aside|round card to share|shareable round|recap card|Instagram|lock[- ]screen|Dynamic Island|Live Activit|GPS paused|sponsor(ed)? (tee|hole)|presents the hole|course search|under par in red|in review/i;
 const textOf = (h) => h.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<[^>]+>/g, ' ').replace(/&middot;/g, '·').replace(/&rsquo;/g, '’').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
 
@@ -100,6 +104,35 @@ describe('1. the 25 cards', () => {
         assert.ok(at > html.indexOf('class="wrap hero"') && at < html.indexOf('class="wrap split"'), 'the rows are not between the hero and the golfer/organizer panels');
         assert.match(html, /EVERYTHING IN THE APP/);
         groups.forEach((g) => assert.match(feat, new RegExp('<span class="gn">' + g.n + ' &middot; swipe &rarr;</span>'), g.name + ': no "N · swipe →"'));
+    });
+
+    // 2.0.8 site (Nov 15): the Coming in 2.0.8 row is outside #features, so the counts above do not move (6 rows, 36
+    // cards, manifest screens 36). Its own counts: 2 cards with real pictures, 6 text-only items, manifest.coming 2.
+    test('2.0.8 site (Nov 15): the Coming row has 2 cards (real captures, in the manifest) and 6 more named in its list', () => {
+        const cs = [...coming208.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
+        assert.deepEqual(cs.map((m) => m[2]), ['smooth-slope', 'ring-aside']);
+        assert.match(coming208, /<span class="gn">2 &middot; swipe &rarr;<\/span>/);
+        assert.equal((coming208.match(/<div class="dots"[^>]*>(<i[^>]*><\/i>)+<\/div>/) || [''])[0].match(/<i/g).length, 2);
+        const also = (/<ul class="new207 soon208" aria-label="Also coming in 2\.0\.8">([\s\S]*?)<\/ul>/.exec(coming208) || [])[1] || '';
+        assert.equal((also.match(/<li>/g) || []).length, 6);
+        const manifest = JSON.parse(read('media/screens/manifest.json'));
+        assert.equal(manifest.screens.length, 36, 'the coming screens are not in screens[] (that is the #features list)');
+        assert.deepEqual(manifest.coming.screens.map((s) => s.key), cs.map((m) => m[2]));
+        cs.forEach((m) => {
+            const body = m[3], img = (/<img\b[^>]*>/.exec(body) || [''])[0], k = m[2];
+            assert.match(body, new RegExp('<button type="button" class="ph" data-open="' + k + '" aria-label="See [^"]+ full screen">'));
+            assert.match(img, new RegExp('src="/media/screens/' + k + '-400\\.webp" srcset="/media/screens/' + k + '-400\\.webp 400w, /media/screens/' + k + '-940\\.webp 940w"'));
+            assert.match(img, /\bwidth="940" height="1938" loading="lazy"/);
+            const alt = /\balt="([^"]*)"/.exec(img)[1];
+            assert.ok(alt.length >= 30); assert.doesNotMatch(alt, /\bTest\b|\$/);
+            const ms = manifest.coming.screens.find((x) => x.key === k);
+            assert.match(ms.captured, /scratchpad\/green72r\/ring\/after-(caledonia-18|homecourse-6)\.png/, k + ': not a real capture');
+            ms.files.forEach((f) => {
+                const b = fs.readFileSync(path.join(ROOT, f.slice(1)));
+                assert.equal(b.slice(0, 4).toString('latin1') + b.slice(8, 12).toString('latin1'), 'RIFFWEBP', f);
+                assert.ok(b.length < 170 * 1024, f + ' is ' + b.length + ' bytes');
+            });
+        });
     });
 
     test('every card has its headline, one line, and a screen with alt text', () => {
@@ -205,10 +238,40 @@ describe('2. words', () => {
     // branches, in NO store build yet, so never on the page as available: the smooth 1 m slope, the Home Course
     // bundle, slope on by default + whole-course prefetch, the target ring hiding while slope is on, the shareable
     // round card, the Android-twin lock screen.
+    // 2.0.8 site (Nov 15): iOS 2.0.8 (1) goes to Apple's review today. Its features may now be NAMED, but only inside the
+    // "Coming in 2.0.8" row (#coming208), which sits above "EVERYTHING IN THE APP" and is tagged as coming. Everywhere
+    // else on the page they are still forbidden. The list grew with the 2.0.8 What's New (recap card to Messages /
+    // Instagram story, Lock Screen + Dynamic Island, GPS paused, sponsor tee card, course search, under par in red).
     test('2.0.7: nothing from the feature branches is shown as available', () => {
-        const t = textOf(html);
+        assert.ok(coming208.length > 500, 'positive: the Coming in 2.0.8 row is there');
+        const t = textOf(html.replace(coming208, ''));
         assert.match(t, /New in 2\.0\.7/, 'positive: the 2.0.7 row is there');
-        assert.doesNotMatch(t, /\b1\s?m(etre|eter)? slope|smooth(er)? slope|Home Course|whole[- ]course|prefetch|target ring|round card to share|shareable round|lock[- ]screen/i);
+        assert.match(t, /EVERYTHING IN THE APP/, 'positive: the slice still has the rest of the page');
+        assert.doesNotMatch(t, UNSHIPPED_208);
+        // and the 2.0.8 row is not inside EVERYTHING IN THE APP: it comes before it, outside #features
+        assert.ok(!feat.includes('id="coming208"') && html.indexOf('id="coming208"') < html.indexOf('id="features"'), 'the Coming row moved into the app list');
+    });
+
+    test('2.0.8 (Nov 15): the Coming in 2.0.8 row says coming, on the row and on every card, and claims nothing is available', () => {
+        const t = textOf(coming208);
+        // the row's tag
+        assert.match(coming208, /<span class="gsoon" id="coming208-tag">Coming &middot; in review<\/span>/, 'the row tag does not say coming');
+        assert.match(t, /Not in the app yet\./);
+        assert.match(coming208, /<h2>Coming in 2\.0\.8<\/h2>/);
+        // every card in the row carries the tag
+        const cs = [...coming208.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
+        assert.equal(cs.length, 2);
+        cs.forEach((m) => assert.match(m[3], /^<div class="cap"><div class="fsoon">COMING &middot; IN REVIEW<\/div>/, m[1] + ': no coming tag'));
+        // no availability claim and no store wording inside the row
+        assert.doesNotMatch(t, /\b(available|out now|now live|download (it )?now|get it|in the app now|on the App Store|on Google Play|update now)\b/i);
+        assert.doesNotMatch(coming208, /apps\.apple\.com|play\.google\.com/);
+        // every 2.0.8 feature of WHATS-NEW-2.0.8.txt is named in the row (positive control for the guard above)
+        [/1 m lidar slope, on by default/, /whole course saves/i, /The Home Course/, /target ring steps aside/, /round recap card/, /Messages or an Instagram story/,
+            /Money stays off the card unless you switch it on\./, /Lock Screen and Dynamic Island/, /GPS paused/, /center number/, /sponsor tee card/, /Easier course search/, /Under par in red/]
+            .forEach((re) => assert.match(t, re, String(re)));
+        // the only money sentence allowed in the row is that one
+        assert.doesNotMatch(t.replace('Money stays off the card unless you switch it on.', ''), /\b(money|settle|owes?)\b|\$/i);
+        assert.doesNotMatch(t, MONEY);
     });
 
     test('co-organizers and the season page stay out', () => {

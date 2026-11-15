@@ -521,5 +521,34 @@
       "unused_since": "ask-caddie re-capture (2026-11-12)",
       "note": "Older capture: a 786x460 crop of the Ask panel on a dark map. Replaced by ask-caddie-400 / ask-caddie-1170 from release-206. Kept in place, nothing serves it."
     }
-  ]
+  ],
+  "coming": {
+    "_about": "2.0.8 site (web-208-site, Nov 15): the Coming in 2.0.8 row (#coming208), above EVERYTHING IN THE APP while 2.0.8 is in review. Not in screens[] (that list is the cards inside #features, in page order). Release day: flip-to-released.sh moves the row into #features; then move these two into screens[] at the top.",
+    "screens": [
+      {
+        "key": "smooth-slope",
+        "card": "f-smooth-slope",
+        "headline": "Every green, smooth.",
+        "files": [
+          "/media/screens/smooth-slope-400.webp",
+          "/media/screens/smooth-slope-940.webp"
+        ],
+        "width": 940,
+        "height": 1938,
+        "captured": "72R-A branch feat-207-72ra (2.0.8 work, not yet in a store build), headless-Chrome capture at 402x874 @3x (1206x2622), scratchpad/green72r/ring/after-caledonia-18.png (after the ring-hide commit 112d2099): the top 136 px (the dev title bar) cut off, saved as WebP 940 and 400 wide with sharp; the original PNG is untouched. Shows the dev golfer name in the bottom bar."
+      },
+      {
+        "key": "ring-aside",
+        "card": "f-ring-aside",
+        "headline": "Nothing covers the arrows.",
+        "files": [
+          "/media/screens/ring-aside-400.webp",
+          "/media/screens/ring-aside-940.webp"
+        ],
+        "width": 940,
+        "height": 1938,
+        "captured": "72R-A branch feat-207-72ra (2.0.8 work, not yet in a store build), headless-Chrome capture at 402x874 @3x (1206x2622), scratchpad/green72r/ring/after-homecourse-6.png (ring hidden while slope is drawn): same crop and sizes; original untouched. Shows the dev golfer name in the bottom bar."
+      }
+    ]
+  }
 }
