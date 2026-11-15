@@ -610,6 +610,22 @@
         .my-event .me-n { font-weight: 800; }
         .my-event .me-c { font-size: 0.78rem; color: var(--text-muted); }
         .my-events-note { font-size: 0.75rem; color: var(--text-muted); margin: 4px 0 0; }
+        /* DE-B (2026-11-15): the row's ••• menu, the Hidden events list, the one-line note. */
+        .my-event-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+        .my-event-row .my-event { flex: 1; min-width: 0; margin-bottom: 0; }
+        .me-more { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--bg-card); border: 1.5px solid var(--border-mid); color: var(--brand-green); font: inherit; font-size: 0.7rem; font-weight: 900; letter-spacing: 1px; cursor: pointer; padding: 0; margin: 0; display: flex; align-items: center; justify-content: center; }
+        .me-more.on { border-color: var(--brand-green); }
+        .me-menu { flex-basis: 100%; background: var(--bg-card); border: 1px solid var(--border-mid); border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,.14); padding: 4px 0; margin: -2px 0 4px 40px; }
+        .me-menu button { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--border-mid); padding: 9px 14px; font: inherit; font-size: 0.85rem; font-weight: 600; color: inherit; cursor: pointer; margin: 0; border-radius: 0; }
+        .me-menu button:last-child { border-bottom: 0; }
+        .me-menu .me-sub { display: block; font-size: 0.72rem; font-weight: 400; color: var(--text-muted); margin-top: 2px; }
+        .my-events-line { font-size: 0.8rem; margin: 2px 0 6px; }
+        .me-undo { background: none; border: 0; padding: 0 2px; margin: 0; width: auto; font: inherit; font-size: 0.8rem; font-weight: 700; color: var(--brand-green); text-decoration: underline; cursor: pointer; }
+        .me-hidden-k { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 8px 0 4px; margin: 6px 0 0; font: inherit; font-size: 0.72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); cursor: pointer; }
+        .me-hidden { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px dashed var(--border-mid); border-radius: 10px; padding: 8px 12px; margin-bottom: 6px; opacity: .8; }
+        .me-hidden .me-n { font-weight: 800; flex: 1; min-width: 0; }
+        .me-hidden .me-c { font-size: 0.78rem; color: var(--text-muted); }
+        .me-hidden .me-show { width: auto; margin: 0; padding: 6px 12px; font-size: 0.78rem; }
         .open-code { margin-top: 10px; }
         .open-code label { font-size: 0.75rem; font-weight: 700; margin: 0 0 4px; display: block; }
         .open-code-row { display: flex; gap: 8px; }
@@ -1718,12 +1734,49 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         try { const v = JSON.parse(localStorage.getItem(MY_EVENTS_KEY) || '[]'); return Array.isArray(v) ? v.filter((e) => e && typeof e.code === 'string') : []; }
         catch (e) { return []; }
     }
+    function writeMyEvents(list) {
+        try { localStorage.setItem(MY_EVENTS_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) { /* storage full or off */ }
+    }
     function rememberMyEvent(code, name) {
         if (!code) return;
-        const list = readMyEvents().filter((e) => e.code !== code);
-        list.unshift({ code: code, name: String(name || code).slice(0, 120), at: Date.now() });
-        try { localStorage.setItem(MY_EVENTS_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) { /* storage full or off */ }
+        const all = readMyEvents();
+        const was = all.find((e) => e.code === code);
+        const list = all.filter((e) => e.code !== code);
+        const entry = { code: code, name: String(name || code).slice(0, 120), at: Date.now() };
+        // DE-B (Manny 2026-11-15, ADVISOR-20261115-0407): the owner opening a
+        // hidden event must not un-hide it. The entry is rebuilt here, so the
+        // flag rides across from the old one.
+        if (was && was.hidden === true) entry.hidden = true;
+        list.unshift(entry);
+        writeMyEvents(list);
         renderMyEvents();
+    }
+    // The flag on THIS device's entry. An event only on the account gets a local
+    // entry too, so the flag holds while the account snapshot lags (or, before
+    // the rules candidate is published, is refused).
+    function flagMyEvent(code, patch) {
+        if (!code) return;
+        const all = readMyEvents();
+        let entry = all.find((e) => e.code === code);
+        if (!entry) {
+            const acct = (accountEvents || []).find((e) => e.code === code);
+            entry = { code: code, name: String((acct && acct.name) || code).slice(0, 120), at: (acct && acct.at) || Date.now() };
+            all.push(entry);
+        }
+        Object.keys(patch).forEach((k) => { if (patch[k] === null || patch[k] === undefined) delete entry[k]; else entry[k] = patch[k]; });
+        writeMyEvents(all);
+    }
+    // The same flag on the account pointer, when signed in. update(), so the
+    // pointer's at/name/course stay; caught, as rememberOwnedEvent is, because
+    // live refuses the key until the My-events candidate is published.
+    function flagOwnedEvent(code, patch) {
+        const uid = authUser && authUser.uid;
+        if (!uid || !code) return Promise.resolve();
+        // The snapshot in hand is patched too, as the SDK raises the local
+        // event before the server answers; a refusal's snapshot puts it back.
+        const acct = (accountEvents || []).find((e) => e.code === code);
+        if (acct) Object.keys(patch).forEach((k) => { if (patch[k] === null || patch[k] === undefined) delete acct[k]; else acct[k] = patch[k]; });
+        return db.ref('organizers/' + uid + '/tournaments/' + code).update(patch).catch(() => { /* not published yet: this device's flag still holds */ });
     }
     // THE ACCOUNT'S EVENTS (P2-6, Advisor 2026-11-11 16:19): organizers/<uid>/
     // tournaments/<code> = {at, name, course}, written by the owner's own page
@@ -1742,7 +1795,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         db.ref('organizers/' + uid + '/tournaments').on('value', (snap) => {
             if (accountEventsUid !== uid) return;
             const v = (snap && snap.val()) || {};
-            accountEvents = Object.keys(v).filter((c) => v[c] && typeof v[c] === 'object').map((c) => ({ code: c, name: String(v[c].name || c), at: Number(v[c].at) || 0, account: true }));
+            accountEvents = Object.keys(v).filter((c) => v[c] && typeof v[c] === 'object').map((c) => ({ code: c, name: String(v[c].name || c), at: Number(v[c].at) || 0, account: true, hidden: v[c].hidden === true }));
             renderMyEvents();
         }, () => { accountEvents = null; renderMyEvents(); });
     }
@@ -1756,10 +1809,76 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     // One list, newest first: the account's events (any device) and this
     // device's (events it created or opened), the account winning a tie.
+    // A flag set by EITHER source counts (DE-B): the account snapshot can lag a
+    // tap on this phone, and before the candidate is published it never carries
+    // the flag at all. Show clears both, so a flag cannot come back from the
+    // side that was not cleared.
     function myEventsList() {
-        const seen = {}, out = [];
-        (accountEvents || []).concat(readMyEvents()).forEach((e) => { if (!seen[e.code]) { seen[e.code] = true; out.push(e); } });
+        const byCode = {}, out = [];
+        (accountEvents || []).concat(readMyEvents()).forEach((e) => {
+            if (!byCode[e.code]) { byCode[e.code] = Object.assign({}, e, { hidden: e.hidden === true }); out.push(byCode[e.code]); return; }
+            if (e.hidden === true) byCode[e.code].hidden = true;
+        });
         return out.sort((a, b) => (b.at || 0) - (a.at || 0));
+    }
+    // DE-B, "Hide from Home" (Manny 2026-11-15 4:06 AM, B then C; the picked
+    // sheet DE-delete-hide-ABC column B). Each row has a ••• menu: Open event,
+    // Share code (the same signup link the console hands out), Hide from Home.
+    // Hidden rows sit under a collapsed "Hidden events (n)" list with Show.
+    // Nothing is deleted: the event, its links, its board and its signups are
+    // untouched; only the two My-events sources carry hidden: true.
+    let myEventsMenuCode = null;     // the row whose ••• menu is open; null = none (the default)
+    let hiddenEventsOpen = false;    // the Hidden events list, collapsed until tapped
+    let myEventsLine = null;         // { text, undo } - the one-line note after a hide / share
+    function toggleMyEventMenu(code) {
+        myEventsMenuCode = myEventsMenuCode === code ? null : code;
+        renderMyEvents();
+    }
+    function toggleHiddenEvents() { hiddenEventsOpen = !hiddenEventsOpen; renderMyEvents(); }
+    function hideMyEvent(code) {
+        const e = myEventsList().find((x) => x.code === code);
+        flagMyEvent(code, { hidden: true });
+        flagOwnedEvent(code, { hidden: true });
+        myEventsMenuCode = null;
+        myEventsLine = { text: `${(e && e.name) || code} is hidden.`, undo: code };
+        renderMyEvents();
+    }
+    function showMyEvent(code) {
+        flagMyEvent(code, { hidden: null });
+        flagOwnedEvent(code, { hidden: null });
+        myEventsMenuCode = null;
+        myEventsLine = null;
+        renderMyEvents();
+    }
+    // The join link, as the console's Share builds it: the registration page
+    // on the public origin. The share sheet when the device has one, the
+    // clipboard otherwise, and the line under the list says which happened.
+    function shareMyEventCode(code) {
+        const url = shareBaseUrl() + 'tournament.html?register=' + encodeURIComponent(code);
+        const e = myEventsList().find((x) => x.code === code);
+        myEventsMenuCode = null;
+        const say = (t) => { myEventsLine = { text: t, undo: null }; renderMyEvents(); };
+        if (navigator.share) { renderMyEvents(); return navigator.share({ title: (e && e.name) || code, text: `Sign up for ${(e && e.name) || code}`, url: url }).catch(() => {}); }
+        if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(url).then(() => say('Join link copied.'), () => say(url));
+        say(url);
+    }
+    function myEventRowHtml(e) {
+        const c = escapeHtml(e.code);
+        const open = myEventsMenuCode === e.code;
+        return `<div class="my-event-row" data-code="${c}">`
+            + `<button type="button" class="my-event" data-code="${c}" onclick="openMyEvent(this.dataset.code)"><span class="me-n">${escapeHtml(e.name)}</span><span class="me-c">${c} ›</span></button>`
+            + `<button type="button" class="me-more${open ? ' on' : ''}" data-code="${c}" aria-label="More" aria-expanded="${open ? 'true' : 'false'}" onclick="toggleMyEventMenu(this.dataset.code)">•••</button>`
+            + (open ? `<div class="me-menu" role="menu">`
+                + `<button type="button" role="menuitem" data-code="${c}" onclick="openMyEvent(this.dataset.code)">Open event</button>`
+                + `<button type="button" role="menuitem" data-code="${c}" onclick="shareMyEventCode(this.dataset.code)">Share code<span class="me-sub">Text or copy the join link</span></button>`
+                + `<button type="button" role="menuitem" class="me-hide" data-code="${c}" onclick="hideMyEvent(this.dataset.code)">Hide from Home<span class="me-sub">Still open by code or link; nothing is deleted</span></button>`
+                + `</div>` : '')
+            + `</div>`;
+    }
+    function hiddenEventsHtml(hidden) {
+        if (!hidden.length) return '';
+        return `<button type="button" class="me-hidden-k" id="hidden-events-toggle" aria-expanded="${hiddenEventsOpen ? 'true' : 'false'}" onclick="toggleHiddenEvents()">Hidden events (${hidden.length}) <span aria-hidden="true">${hiddenEventsOpen ? '▾' : '▸'}</span></button>`
+            + (hiddenEventsOpen ? hidden.map((e) => `<div class="me-hidden" data-code="${escapeHtml(e.code)}"><span class="me-n">${escapeHtml(e.name)}</span><span class="me-c">${escapeHtml(e.code)}</span><button type="button" class="btn-outline me-show" data-code="${escapeHtml(e.code)}" onclick="showMyEvent(this.dataset.code)">Show</button></div>`).join('') : '');
     }
     function renderMyEvents() {
         const panel = document.getElementById('app-my-events');
@@ -1768,15 +1887,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // On the website the list needs a signed-in organizer; in the app it is
         // always there (this device's events at least).
         if (!APP_MODE && !authUser) { panel.style.display = 'none'; return; }
-        const list = myEventsList();
+        const all = myEventsList();
+        const list = all.filter((e) => !e.hidden);
+        const hidden = all.filter((e) => e.hidden);
         panel.style.display = 'block';
         const note = accountEvents
             ? 'Events you run, on any device you sign in on' + (APP_MODE ? ', and events this phone opened.' : '.')
             : (APP_MODE ? 'Events this phone created or opened as the organizer.' : 'Events this browser created or opened as the organizer.');
+        const line = myEventsLine
+            ? `<p class="my-events-line" id="my-events-line">${escapeHtml(myEventsLine.text)}${myEventsLine.undo ? ` <button type="button" class="me-undo" data-code="${escapeHtml(myEventsLine.undo)}" onclick="showMyEvent(this.dataset.code)">Undo</button>` : ''}</p>`
+            : '';
         box.innerHTML = `<div class="my-events-k">My events</div>` + (list.length
-            ? list.map((e) => `<button type="button" class="my-event" data-code="${escapeHtml(e.code)}" onclick="openMyEvent(this.dataset.code)"><span class="me-n">${escapeHtml(e.name)}</span><span class="me-c">${escapeHtml(e.code)} ›</span></button>`).join('')
-              + `<p class="my-events-note">${note}</p>`
-            : `<p class="my-events-note">No events yet. Create one below, or open an event you run by its code.</p>`);
+            ? list.map(myEventRowHtml).join('') + line + `<p class="my-events-note">${note}</p>`
+            : line + `<p class="my-events-note">No events yet. Create one below, or open an event you run by its code.</p>`)
+            + hiddenEventsHtml(hidden);
     }
     function openEventByCode() {
         const input = document.getElementById('open-code-input');

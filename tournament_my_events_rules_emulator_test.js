@@ -16,8 +16,23 @@
 //  6 CAND: the owner reads its own list; a stranger cannot read it
 //  7 CAND changes NOTHING else: a golfer's keyed score still lands; a
 //    stranger's score still does not (the scorecard lock, unchanged)
+//  8 DE-B (Hide from Home, ADVISOR-20261115-0407): CAND lets the uid write
+//    hidden:true on its own pointer by update() (at/name/course stay), and
+//    hidden:null removes it; another uid cannot; a string hidden is refused.
+//    LIVE refuses the same write.
+//  9 DE-C (Archive): CAND lets the uid write archivedAt (a past timestamp) on
+//    its own pointer; a future one, a string, and another uid are refused.
+//
+// ON LIVE TODAY the whole organizers/$uid/tournaments block is absent (test 1),
+// so the account half of Hide from Home - and of Archive's pointer flag - is
+// REFUSED and caught by the page: only the device's own list (localStorage)
+// hides or archives, until this candidate is published by the iOS lane after
+// Manny's OK. It is never published from this lane.
 //
 // Skipped when the emulator jar, Java, or the saved live rules are missing.
+// Baseline against dddb9565's candidate (hidden/archivedAt not yet accepted):
+// tests 8 and 9 FAIL (the positive writes answer 401), 1-7 PASS: 9 tests,
+// 7 PASS / 2 FAIL. With the candidate extended: 9 PASS / 0 FAIL.
 // ============================================================================
 'use strict';
 const { test, before, after } = require('node:test');
@@ -142,5 +157,31 @@ test('7 CAND changes nothing else: a keyed score lands, a stranger\'s does not (
         assert.equal(await req(ns, 'PUT', 'tournaments/OWN1/scores/team4_h2', 5, 'stranger'), 401, ns + ': a bare score');
         assert.equal(await req(ns, 'PUT', 'tournaments/OWN1/name', 'Renamed', 'stranger'), 401, ns + ': a stranger\'s rename');
     }
+    await reseed();
+});
+
+// A PATCH on the pointer, as the page's update() sends it: the other keys stay.
+const patch = (ns, uid, code, body, who) => req(ns, 'PATCH', `organizers/${uid}/tournaments/${code}`, body, who);
+
+test('8 DE-B: CAND takes hidden:true / null from the uid by update; a stranger and a string are refused; LIVE refuses', SKIP, async () => {
+    assert.equal(await put('CAND', 'u-org', 'OWN1', ptr(), 'owner'), OK, 'positive: the pointer exists');
+    assert.equal(await patch('CAND', 'u-org', 'OWN1', { hidden: true }, 'owner'), OK, 'hidden:true by update');
+    assert.equal(await req('CAND', 'GET', 'organizers/u-org/tournaments/OWN1/name', undefined, 'owner'), OK, 'the name is still there');
+    assert.equal(await patch('CAND', 'u-org', 'OWN1', { hidden: null }, 'owner'), OK, 'hidden:null removes it (Show)');
+    assert.equal(await patch('CAND', 'u-org', 'OWN1', { hidden: true }, 'stranger'), 401, 'another uid cannot');
+    assert.equal(await patch('CAND', 'u-org', 'OWN1', { hidden: 'yes' }, 'owner'), 401, 'a string hidden is refused');
+    assert.equal(await patch('CAND', 'u-org', 'OWN1', { hidden: 1 }, 'owner'), 401, 'a number hidden is refused');
+    assert.equal(await patch('LIVE', 'u-org', 'OWN1', { hidden: true }, 'owner'), 401, 'LIVE today: refused, so only the device hides');
+    await reseed();
+});
+
+test('9 DE-C: CAND takes archivedAt (a past timestamp) from the uid; a future one, a string, another uid are refused', SKIP, async () => {
+    assert.equal(await put('CAND', 'u-org', 'OWN1', ptr(), 'owner'), OK, 'positive: the pointer exists');
+    assert.equal(await patch('CAND', 'u-org', 'OWN1', { archivedAt: Date.now() - 1000 }, 'owner'), OK, 'archivedAt by update');
+    assert.equal(await patch('CAND', 'u-org', 'OWN1', { archivedAt: null }, 'owner'), OK, 'and removed (Restore)');
+    assert.equal(await patch('CAND', 'u-org', 'OWN1', { archivedAt: Date.now() + 86400000 }, 'owner'), 401, 'a future archivedAt is refused');
+    assert.equal(await patch('CAND', 'u-org', 'OWN1', { archivedAt: 'today' }, 'owner'), 401, 'a string is refused');
+    assert.equal(await patch('CAND', 'u-org', 'OWN1', { archivedAt: Date.now() - 1000 }, 'stranger'), 401, 'another uid cannot');
+    assert.equal(await patch('LIVE', 'u-org', 'OWN1', { archivedAt: Date.now() - 1000 }, 'owner'), 401, 'LIVE today: refused');
     await reseed();
 });

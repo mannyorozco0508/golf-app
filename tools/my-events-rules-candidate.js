@@ -5,7 +5,7 @@
 // device. A CANDIDATE: it is never published from this lane (the iOS lane
 // publishes rules, after Manny's OK).
 //
-//   ADD   /organizers/$uid/tournaments/$code = { at, name, course? }
+//   ADD   /organizers/$uid/tournaments/$code = { at, name, course?, hidden?, archivedAt? }
 //
 // It mirrors the block the live rules already hold for the round app,
 // organizers/$uid/rounds/$code (written by my-rounds.js), with one change:
@@ -29,6 +29,15 @@ const TOURNAMENTS = {
         at: { '.validate': 'newData.isNumber() && newData.val() <= now' },
         name: { '.validate': 'newData.isString() && newData.val().length > 0 && newData.val().length <= 80' },
         course: { '.validate': 'newData.isString() && newData.val().length <= 80' },
+        // DE-B / DE-C (Manny 2026-11-15, ADVISOR-20261115-0407): the two flags
+        // My events reads. hidden - the row sits under "Hidden events" on every
+        // device the uid signs in on; archivedAt - the row sits under "Past
+        // events". Both written by the uid's own page with update(), so at/name/
+        // course stay; a boolean and a past timestamp, nothing else. Until this
+        // candidate is published, live refuses both and only the device's own
+        // list carries the flag.
+        hidden: { '.validate': 'newData.isBoolean()' },
+        archivedAt: { '.validate': 'newData.isNumber() && newData.val() <= now' },
         $other: { '.validate': false }
     }
 };
