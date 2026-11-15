@@ -391,7 +391,7 @@ describe('C. THE TV CHECK-IN BOARD (tournament-tv.html?tourney=CODE&checkin=1)',
         const main = html(sb, 'tv-main');
         const text = plain(main);
         assert.match(text, /22 \/ 32 arrived · 10 to come/);
-        assert.match(text, /tournaments\.rattlegolf\.com\/tournament\?tourney=STK26&checkin=1/);
+        assert.match(text, /hardpangolf\.com\/tournament\?tourney=STK26&checkin=1/);   // re-pinned 2026-11-15 (one front door)
         assert.match(text, /Flight A Group 1 · Hole 1 All here Ana Diaz ✓7:22 Joe Fox ✓7:25 Sam Ortiz ✓7:31 Mia Chen ✓7:40 Group 2 · Hole 3 3 \/ 4 Dana Ruiz not yet Lee Park ✓7:28/);
         assert.match(text, /Flight B Group 5 · Hole 9 2 \/ 4 Matt Cole ✓7:27 Amy Shaw not yet/);
         assert.match(text, /Group 8 · Hole 15 2 \/ 4 Hal Young ✓7:24 Zoe King not yet Ross Day ✓7:32 Nina Cho not yet/);
