@@ -7,6 +7,22 @@
 // verification, paid gating + the free scans, the rate limits and monthly cap,
 // the request sent to Gemini (strict schema, temperature 0), the ONE Pro retry
 // only on validation failure, the route and the catch-all row.
+//
+// 2026-11-15, the event-day allowance (Manny OK "OK scan limit"; the describe
+// 'the event-day allowance for the event owner', 10 tests). Measured counts:
+//   this file, 50 tests. Branch preview-scan: 50 pass / 0 fail.
+//   Baseline against pre-build main dddb9565 (functions/api/_scan.js sha256
+//   fd86fe44afa23054...), the SAME 50-test file: 43 pass / 7 fail. The 7 red
+//   are tests 1-4, 6, 7 and 10 of the new describe. Its other 3 are green on
+//   dddb9565 on purpose - 'the event read failing: the 30 applies', 'the minute
+//   brake still...' and 'no event in the body: ...exactly as before' assert
+//   that nothing changed, which is as true of the old function as of the new.
+// Negative controls, each on a saved copy of the wave's _scan.js (sha256
+// c4b51c298c7058ec...) and restored from that copy (RESTORED-OK, same sha):
+//   1 owner check removed (any account gets the allowance)  -> 49/1, red: test 4
+//   2 date check removed (any day gets it)                  -> 48/2, red: tests 2, 3
+//   3 EVENT_DAY_MAX cap removed                             -> 49/1, red: test 6
+//   4 day key never switched to the event key              -> 47/3, red: tests 1, 6, 7
 // ============================================================================
 const { test, describe, before, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -98,6 +114,19 @@ function stubFetch(script) {
         if (u.startsWith('https://golfapp-9fb21-default-rtdb.firebaseio.com/organizers/')) {
             return reply(script.rtdb || { status: 200, json: script.pass === undefined ? null : script.pass });
         }
+        // The event-day allowance reads tournaments/<code>/<child>.json as the caller.
+        // script.tourney is the record; script.tourneyFail is the reply for every read.
+        // Without either, a tournament read is an unexpected call and fails the test.
+        const tr = /^https:\/\/golfapp-9fb21-default-rtdb\.firebaseio\.com\/tournaments\/([^/]+)\/([A-Za-z]+)\.json\?(.*)$/.exec(u);
+        if (tr) {
+            if (script.tourneyFail) return reply(script.tourneyFail);
+            if (!script.tourney) assert.fail('unexpected tournament read ' + u);
+            const v = script.tourney[tr[2]];
+            const shallow = /(^|&)shallow=true(&|$)/.test(tr[3]);
+            const json = v === undefined ? null
+                : (shallow && v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).map((k) => [k, true])) : v);
+            return reply({ status: 200, json });
+        }
         const g = /^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/([^:]+):generateContent$/.exec(u);
         if (g) {
             const which = /pro/.test(decodeURIComponent(g[1])) ? 'pro' : 'flash';
@@ -110,6 +139,7 @@ function stubFetch(script) {
     };
     fn.calls = calls;
     fn.gemini = () => calls.filter((c) => c.url.includes('generativelanguage'));
+    fn.tourney = () => calls.filter((c) => c.url.includes('firebaseio.com/tournaments/'));
     return fn;
 }
 
@@ -339,6 +369,153 @@ describe('rate limits and the monthly cost cap', () => {
         assert.equal(S.monthlyCap({ SCAN_MONTHLY_CAP: 'abc' }), 20000);
         assert.equal(S.monthlyCap({ SCAN_MONTHLY_CAP: '0' }), 20000);
         assert.equal(S.monthlyCap({ SCAN_MONTHLY_CAP: ' 900 ' }), 900);
+    });
+});
+
+// ============================================================================
+// THE EVENT-DAY ALLOWANCE (Manny OK 2026-11-15, "OK scan limit";
+// SCAN-ALLOWANCE-PROPOSAL.md). The event's owner, on the event's UTC day or the
+// day after, sending event:{code}, is capped at the field size (floor 30,
+// ceiling EVENT_DAY_MAX) under scan:event:<code>:<day>; the account's own
+// scan:day: key is not touched. Everyone and everything else: the 30, as before.
+// ============================================================================
+describe('the event-day allowance for the event owner', () => {
+    const PASS = { kind: 'season', expiresAt: NOW.getTime() + 86400000 };
+    const CODE = 'STARK7';
+    const TODAY = '2026-10-24', YESTERDAY = '2026-10-23', TOMORROW = '2026-10-25', TWO_AGO = '2026-10-22';
+    const entries = (n, prefix) => Object.fromEntries(Array.from({ length: n }, (_, i) => [prefix + (i + 1), { name: 'Entry ' + (i + 1) }]));
+    const tourney = (over) => Object.assign({ ownerUid: 'test-uid-1', eventDate: TODAY, scoringModel: 'player-v1', players: entries(130, 'p') }, over);
+    const WITH_EVENT = Object.assign({}, BODY, { event: { code: CODE } });
+    const dayUsedUp = (uid) => { const kv = fakeKV(); kv.m.set(S.dayKey(uid || 'test-uid-1', NOW), String(S.PER_DAY)); return kv; };
+    const refusedDaily = { status: 'refused', reason: 'daily_limit' };
+
+    test('the owner on event day, field 130: scans 31..130 answer ok, 131 is daily_limit, the account day key is untouched', async () => {
+        need();
+        const kv = dayUsedUp();                                  // the account's own 30 are already spent
+        kv.m.set(S.eventDayKey(CODE, NOW), '30');                // 30 cards of this event already scanned
+        // A fresh minute each scan so the burst brake is not what is under test; 100 minutes
+        // outlive the fixture token's 3000 s, so each token is minted against its own clock.
+        const tokenAt = (at) => { const t = Math.floor(at.getTime() / 1000); return idToken({ iat: t - 60, exp: t + 3000, auth_time: t - 60 }); };
+        for (let n = 31; n <= 130; n++) {
+            const at = new Date(NOW.getTime() + (n - 31) * 61000);
+            const fetch = stubFetch({ pass: PASS, tourney: tourney(), flash: [geminiOk(cardJson())] });
+            const out = await S.handleScan({ env: ENV, kv, fetch, clock: { date: () => at }, log: () => {},
+                body: WITH_EVENT, authorization: 'Bearer ' + await tokenAt(at) });
+            assert.equal(out.status, 'ok', 'scan ' + n + ': ' + JSON.stringify(out));
+            assert.equal(kv.m.get(S.eventDayKey(CODE, at)), String(n), 'the event key counts scan ' + n);
+        }
+        const at = new Date(NOW.getTime() + 100 * 61000);
+        const fetch = stubFetch({ pass: PASS, tourney: tourney() });
+        const out = await S.handleScan({ env: ENV, kv, fetch, clock: { date: () => at }, log: () => {},
+            body: WITH_EVENT, authorization: 'Bearer ' + await tokenAt(at) });
+        assert.deepEqual(out, refusedDaily, 'scan 131');
+        assert.equal(fetch.gemini().length, 0, 'no model call for the refused scan');
+        assert.equal(kv.m.get(S.eventDayKey(CODE, NOW)), '130');
+        assert.equal(kv.m.get(S.dayKey('test-uid-1', NOW)), String(S.PER_DAY), 'the account day key is exactly as seeded');
+        assert.equal([...kv.m.keys()].filter((k) => k.startsWith('scan:day:')).length, 1, 'no other scan:day: key appeared');
+    });
+
+    test('the event dated tomorrow: the 30 applies (and dated today, the same account scans)', async () => {
+        need();
+        const refused = await scan({ pass: PASS, tourney: tourney({ eventDate: TOMORROW }) }, { kv: dayUsedUp(), body: WITH_EVENT });
+        assert.deepEqual(refused.out, refusedDaily);
+        assert.equal(refused.fetch.gemini().length, 0);
+        const ok = await scan({ pass: PASS, tourney: tourney({ eventDate: TODAY }), flash: [geminiOk(cardJson())] }, { kv: dayUsedUp(), body: WITH_EVENT });
+        assert.equal(ok.out.status, 'ok');
+    });
+
+    test('the day after the event (UTC) still has the allowance; two days after does not', async () => {
+        need();
+        // NOW is 2026-10-24T18:00Z. An Arizona evening on the 23rd is the 24th in UTC.
+        const ok = await scan({ pass: PASS, tourney: tourney({ eventDate: YESTERDAY }), flash: [geminiOk(cardJson())] }, { kv: dayUsedUp(), body: WITH_EVENT });
+        assert.equal(ok.out.status, 'ok');
+        const refused = await scan({ pass: PASS, tourney: tourney({ eventDate: TWO_AGO }) }, { kv: dayUsedUp(), body: WITH_EVENT });
+        assert.deepEqual(refused.out, refusedDaily);
+    });
+
+    test('another account sending the owner\'s code: the 30 applies, and the read stops at ownerUid', async () => {
+        need();
+        const { out, fetch } = await scan({ pass: PASS, tourney: tourney() },
+            { kv: dayUsedUp('test-uid-2'), body: WITH_EVENT, claims: { sub: 'test-uid-2' } });
+        assert.deepEqual(out, refusedDaily);
+        assert.equal(fetch.gemini().length, 0);
+        assert.equal(fetch.tourney().length, 1, 'only ownerUid is read for a non-owner');
+        assert.match(fetch.tourney()[0].url, /\/tournaments\/STARK7\/ownerUid\.json\?auth=/);
+    });
+
+    test('the event read failing (HTTP error, network): the 30 applies, never unlimited', async () => {
+        need();
+        for (const fail of [{ status: 500, json: {} }, { status: 401, json: { error: 'Permission denied' } }, { throws: true }, { status: 200 }]) {
+            const { out, fetch } = await scan({ pass: PASS, tourneyFail: fail }, { kv: dayUsedUp(), body: WITH_EVENT });
+            assert.deepEqual(out, refusedDaily, JSON.stringify(fail));
+            assert.equal(fetch.gemini().length, 0);
+        }
+        // A record with no owner at all (legacy event) is not the caller's.
+        const noOwner = await scan({ pass: PASS, tourney: tourney({ ownerUid: undefined }) }, { kv: dayUsedUp(), body: WITH_EVENT });
+        assert.deepEqual(noOwner.out, refusedDaily);
+    });
+
+    test('a field of 400 is capped at EVENT_DAY_MAX (200); a field under 30 still gets 30', async () => {
+        need();
+        assert.equal(S.EVENT_DAY_MAX, 200);
+        const big = tourney({ players: entries(400, 'p') });
+        const kv = fakeKV();
+        kv.m.set(S.eventDayKey(CODE, NOW), '199');
+        assert.equal((await scan({ pass: PASS, tourney: big, flash: [geminiOk(cardJson())] }, { kv, body: WITH_EVENT })).out.status, 'ok', 'scan 200');
+        assert.equal(kv.m.get(S.eventDayKey(CODE, NOW)), '200');
+        const r = await scan({ pass: PASS, tourney: big }, { kv, body: WITH_EVENT });
+        assert.deepEqual(r.out, refusedDaily, 'scan 201');
+        assert.equal(r.fetch.gemini().length, 0);
+        // Four golfers: the floor is the ordinary 30, counted under the event key.
+        const small = tourney({ players: entries(4, 'p') });
+        const kv2 = fakeKV();
+        kv2.m.set(S.eventDayKey(CODE, NOW), '29');
+        assert.equal((await scan({ pass: PASS, tourney: small, flash: [geminiOk(cardJson())] }, { kv: kv2, body: WITH_EVENT })).out.status, 'ok');
+        assert.deepEqual((await scan({ pass: PASS, tourney: small }, { kv: kv2, body: WITH_EVENT })).out, refusedDaily);
+    });
+
+    test('a team event counts teams, not golfers (a legacy record with no scoringModel is a team event)', async () => {
+        need();
+        const teamEvent = { ownerUid: 'test-uid-1', eventDate: TODAY, teams: entries(40, 'team'), players: entries(160, 'p') };
+        const kv = fakeKV();
+        kv.m.set(S.eventDayKey(CODE, NOW), '39');
+        const ok = await scan({ pass: PASS, tourney: teamEvent, flash: [geminiOk(cardJson())] }, { kv, body: WITH_EVENT });
+        assert.equal(ok.out.status, 'ok', 'scan 40 of a 40-team field');
+        const shallowRead = ok.fetch.tourney().find((c) => /shallow=true/.test(c.url));
+        assert.match(shallowRead.url, /\/tournaments\/STARK7\/teams\.json\?shallow=true&auth=/);
+        assert.ok(ok.fetch.tourney().every((c) => c.init.method === undefined), 'GETs only - the Worker never writes the database');
+        assert.deepEqual((await scan({ pass: PASS, tourney: teamEvent }, { kv, body: WITH_EVENT })).out, refusedDaily, 'scan 41');
+    });
+
+    test('the minute brake still answers rate_limited at the 4th scan in a minute on event day', async () => {
+        need();
+        const kv = fakeKV();
+        for (let i = 0; i < 3; i++) {
+            assert.equal((await scan({ pass: PASS, tourney: tourney(), flash: [geminiOk(cardJson())] }, { kv, body: WITH_EVENT })).out.status, 'ok');
+        }
+        const { out, fetch } = await scan({ pass: PASS, tourney: tourney() }, { kv, body: WITH_EVENT });
+        assert.deepEqual(out, { status: 'refused', reason: 'rate_limited' });
+        assert.equal(fetch.gemini().length, 0);
+        assert.equal(fetch.tourney().length, 0, 'the brake refuses before any tournament read');
+    });
+
+    test('no event in the body: no tournament read, the account day key counts, exactly as before', async () => {
+        need();
+        const kv = fakeKV();
+        const { out, fetch } = await scan({ pass: PASS, flash: [geminiOk(cardJson())] }, { kv });
+        assert.equal(out.status, 'ok');
+        assert.equal(fetch.tourney().length, 0);
+        assert.equal(kv.m.get(S.dayKey('test-uid-1', NOW)), '1');
+        assert.equal([...kv.m.keys()].filter((k) => k.startsWith('scan:event:')).length, 0);
+    });
+
+    test('readBody keeps a well-formed event code and drops anything else', () => {
+        need();
+        assert.deepEqual(S.readBody(WITH_EVENT).event, { code: 'STARK7' });
+        for (const bad of [{ code: 'stark7' }, { code: 'ABCDEFGHI' }, { code: 'ABC' }, { code: 'ST AR' }, { code: 7 }, {}, 'STARK7', null]) {
+            assert.equal(S.readBody(Object.assign({}, BODY, { event: bad })).event, undefined, JSON.stringify(bad));
+        }
+        assert.equal(S.readBody(BODY).event, undefined);
     });
 });
 

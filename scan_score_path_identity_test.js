@@ -7,6 +7,18 @@
 // Every answer, every KV key and value, every log line and every byte sent to
 // Gemini must match. No network: an unexpected URL fails the test.
 // Skipped (not failed) only where git cannot show the base commit.
+//
+// RE-PINNED 2026-11-15 from 9eab1533 to dddb9565 (merged main) with Manny's
+// per-file OK ("OK scan limit", 2026-11-15, the event-day scan allowance,
+// SCAN-ALLOWANCE-PROPOSAL.md). What changed in the score path, on purpose: a
+// body carrying event:{code} now reads tournaments/<code>/{ownerUid,eventDate,
+// scoringModel,teams|players} as the caller and, for the event's owner on the
+// event's UTC day or the day after, counts the scan under scan:event:<code>:<day>
+// with the field size as the cap (floor PER_DAY, ceiling EVENT_DAY_MAX) instead
+// of the account's scan:day:<uid>:<day> and 30. A body WITHOUT event is held
+// byte-for-byte identical to dddb9565 below, and the last test pins that the
+// event body is exactly where the two diverge - so the re-pin is not a blank
+// cheque: a second divergence turns the no-event comparison red again.
 // ============================================================================
 const { test, before } = require('node:test');
 const assert = require('node:assert/strict');
@@ -18,7 +30,7 @@ const { pathToFileURL } = require('url');
 const { webcrypto } = require('crypto');
 const { REPO_ROOT } = require('./helpers/load-script.js');
 
-const BASE = '9eab1533';
+const BASE = 'dddb9565';   // was 9eab1533; re-pinned 2026-11-15, see the header
 let OLD = null, NEW = null, skip = '';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'scan-identity-'));
 before(async () => {
@@ -27,6 +39,7 @@ before(async () => {
         fs.mkdirSync(path.join(tmp, 'functions', 'api'), { recursive: true });
         fs.writeFileSync(path.join(tmp, 'functions', 'api', '_scan.js'), show('functions/api/_scan.js'));
         fs.writeFileSync(path.join(tmp, 'scorecard-validate.js'), show('scorecard-validate.js'));
+        fs.writeFileSync(path.join(tmp, 'course-card-validate.js'), show('course-card-validate.js'));   // dddb9565's _scan.js imports it (080 course mode)
         fs.writeFileSync(path.join(tmp, 'package.json'), fs.readFileSync(path.join(REPO_ROOT, 'package.json')));
     } catch (e) { skip = 'git cannot show ' + BASE; return; }
     OLD = await import(pathToFileURL(path.join(tmp, 'functions', 'api', '_scan.js')).href);
@@ -80,6 +93,14 @@ function stubFetch(script) {
         const reply = (r) => ({ ok: r.status >= 200 && r.status < 300, status: r.status, headers: { get: () => 'max-age=3600' }, json: async () => r.json });
         if (u.startsWith('https://www.googleapis.com/service_accounts/')) return reply({ status: 200, json: { keys: [KEYS.jwk] } });
         if (u.startsWith('https://golfapp-9fb21-default-rtdb.firebaseio.com/organizers/')) return reply({ status: 200, json: script.pass || null });
+        // The event-day allowance's reads (this branch only; dddb9565 never makes them).
+        const tr = /firebaseio\.com\/tournaments\/([^/]+)\/([A-Za-z]+)\.json\?/.exec(u);
+        if (tr && script.tourney) {
+            const v = script.tourney[tr[2]];
+            const json = v === undefined ? null : (/shallow=true/.test(u) && v && typeof v === 'object'
+                ? Object.fromEntries(Object.keys(v).map((k) => [k, true])) : v);
+            return reply({ status: 200, json });
+        }
         const g = /^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/([^:]+):generateContent$/.exec(u);
         if (g) {
             const which = /pro/.test(decodeURIComponent(g[1])) ? 'pro' : 'flash';
@@ -139,4 +160,31 @@ t('no sign-in / bad body, identical', async () => {
 });
 t('NEGATIVE CONTROL: a different answer is caught by the comparison', async () => {
     await assert.rejects(runBoth('neg', (() => { let n = 0; return () => ({ flash: [gem(cardJson(n++ ? 2 : 1))] }); })()));
+});
+
+// The one divergence the 2026-11-15 re-pin allows, pinned so it cannot widen
+// unnoticed: event:{code} from the event's owner on event day. dddb9565 drops the
+// key in readBody, reads nothing from tournaments/ and counts the account's day;
+// this branch reads the event and counts the event's day. Both still answer ok.
+t('WITH event:{code} the two diverge exactly as intended (dddb9565: ignored; this branch: the event allowance)', async () => {
+    const PASS = { kind: 'season', expiresAt: NOW.getTime() + 86400000 };
+    const tourney = { ownerUid: 'test-uid-088', eventDate: '2026-10-26', scoringModel: 'player-v1',
+        players: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [('p' + (i + 1)), { name: 'x' }])) };
+    const body = { image: IMAGE, round: ROUND, event: { code: 'STARK7' } };
+    const res = [];
+    for (const S of [OLD, NEW]) {
+        S.resetKeyCache();
+        const fetch = stubFetch({ pass: PASS, tourney, flash: [gem(cardJson())] });
+        const kv = fakeKV();
+        const out = await S.handleScan({ env: ENV, kv, fetch, clock, log: () => {}, body, authorization: 'Bearer ' + await idToken() });
+        res.push({ out, keys: [...kv.m.keys()].sort(), reads: fetch.calls.filter((c) => c.url.includes('/tournaments/')).length });
+    }
+    assert.equal(res[0].out.status, 'ok'); assert.equal(res[1].out.status, 'ok');
+    assert.equal(res[0].reads, 0, 'dddb9565 never reads the event');
+    assert.equal(res[1].reads, 4, 'this branch reads ownerUid, eventDate, scoringModel and the players keys');
+    assert.deepEqual(res[0].keys.filter((k) => /^scan:(day|event):/.test(k)), ['scan:day:test-uid-088:2026-10-26']);
+    assert.deepEqual(res[1].keys.filter((k) => /^scan:(day|event):/.test(k)), ['scan:event:STARK7:2026-10-26']);
+    // Everything that is not the day counter is still identical.
+    assert.deepEqual(res[1].keys.filter((k) => !/^scan:(day|event):/.test(k)), res[0].keys.filter((k) => !/^scan:(day|event):/.test(k)));
+    assert.deepEqual(res[1].out, res[0].out);
 });

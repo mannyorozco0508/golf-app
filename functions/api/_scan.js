@@ -45,6 +45,7 @@ export const SCAN_FREE_LIMIT = V.SCAN_FREE_LIMIT;
 export const COURSE_SCAN_FREE_LIMIT = C.COURSE_SCAN_FREE_LIMIT;   // its own, separate from the score scans
 export const PER_MINUTE = 3;          // burst brake per account
 export const PER_DAY = 30;            // per account per UTC day, paid or not
+export const EVENT_DAY_MAX = 200;     // ceiling on the event-day allowance below: a bad field size can never mean unlimited
 export const MONTHLY_CAP = 20000;     // global model calls a month; SCAN_MONTHLY_CAP overrides
 export const MAX_IMAGE_CHARS = 3000000;   // base64 ~2.2 MB; the app sends 300-600 KB
 export const DEFAULT_MODEL = 'gemini-2.5-flash';
@@ -128,7 +129,11 @@ export function readBody(body) {
             handicap: Number.isInteger(p.handicap) ? p.handicap : undefined
         }))
     };
-    return { image: { mimeType: mime, data }, round };
+    // Scan allowance on event day (Manny OK 2026-11-15): the event code, when the
+    // Desk sends one. Anything else-shaped is dropped and the 30 a day applies.
+    const event = b.event && typeof b.event === 'object' && /^[A-Z0-9]{4,8}$/.test(String(b.event.code || ''))
+        ? { code: String(b.event.code) } : undefined;
+    return { image: { mimeType: mime, data }, round, event };
 }
 
 // ---------------------------------------------------------------------------
@@ -212,6 +217,40 @@ export async function hasLivePass(w, uid, idToken) {
 }
 
 // ---------------------------------------------------------------------------
+// THE EVENT-DAY ALLOWANCE (Manny OK 2026-11-15, "OK scan limit"). The event's
+// owner, scanning cards of that event on its day, gets the field size as the
+// day's cap instead of PER_DAY (floor PER_DAY, ceiling EVENT_DAY_MAX), counted
+// under the event's own key so the account's 30 is untouched. Read AS the
+// caller, like the pass. Non-null ONLY when tournaments/<code>/ownerUid is the
+// caller and eventDate is the UTC date of now or the day before (an Arizona
+// evening is already the next UTC day). Any failure to read is null, which
+// means "the 30 applies", never "unlimited".
+// ---------------------------------------------------------------------------
+export async function eventAllowance(w, code, uid, idToken) {
+    const read = async (child, shallow) => {
+        let res;
+        try {
+            res = await w.doFetch(w.dbUrl + '/tournaments/' + encodeURIComponent(code) + '/' + child + '.json?'
+                + (shallow ? 'shallow=true&' : '') + 'auth=' + encodeURIComponent(idToken), { signal: AbortSignal.timeout(5000) });
+        } catch (e) { return { fail: true }; }
+        if (!res || !res.ok) return { fail: true };
+        try { return { value: await res.json() }; } catch (e) { return { fail: true }; }
+    };
+    const owner = await read('ownerUid');
+    if (owner.fail || typeof owner.value !== 'string' || owner.value !== uid) return null;
+    const date = await read('eventDate');
+    const today = w.now.toISOString().slice(0, 10);
+    const yesterday = new Date(w.now.getTime() - 24 * 3600 * 1000).toISOString().slice(0, 10);
+    if (date.fail || (date.value !== today && date.value !== yesterday)) return null;
+    const model = await read('scoringModel');
+    if (model.fail) return null;
+    const entries = await read(model.value === 'player-v1' ? 'players' : 'teams', true);
+    if (entries.fail || !entries.value || typeof entries.value !== 'object') return null;
+    const field = Object.keys(entries.value).length;
+    return field > 0 ? { owner: owner.value, date: date.value, field } : null;
+}
+
+// ---------------------------------------------------------------------------
 // COUNTERS (KV). Incremented BEFORE the model call, like the course proxy's -
 // a call that dies in flight was still billed. KV is eventually consistent, so
 // two scans in the same second can both slip under a limit; the monthly cap
@@ -227,6 +266,7 @@ export const freeKey = (uid) => 'scan:free:' + uid;
 export const courseFreeKey = (uid) => 'scan:course:' + uid;   // 080: never touches scan:free:
 export const minuteKey = (uid, d) => 'scan:min:' + uid + ':' + d.toISOString().slice(0, 16);
 export const dayKey = (uid, d) => 'scan:day:' + uid + ':' + d.toISOString().slice(0, 10);
+export const eventDayKey = (code, d) => 'scan:event:' + code + ':' + d.toISOString().slice(0, 10);   // no account id in it: scan-erase leaves it
 export const monthKey = (d) => 'scan:month:' + d.toISOString().slice(0, 7);
 
 // ---------------------------------------------------------------------------
@@ -324,11 +364,14 @@ export async function handleScan(d) {
     }
 
     if (await readCount(w.kv, minuteKey(who.uid, w.now)) >= PER_MINUTE) return refused('rate_limited');
-    if (await readCount(w.kv, dayKey(who.uid, w.now)) >= PER_DAY) return refused('daily_limit');
+    const ev = body.event ? await eventAllowance(w, body.event.code, who.uid, m[1].trim()) : null;
+    const dk = ev ? eventDayKey(body.event.code, w.now) : dayKey(who.uid, w.now);
+    const cap = ev ? Math.min(EVENT_DAY_MAX, Math.max(PER_DAY, ev.field)) : PER_DAY;
+    if (await readCount(w.kv, dk) >= cap) return refused('daily_limit');
     const mk = monthKey(w.now);
     if (await readCount(w.kv, mk) >= w.cap) return refused('monthly_cap');
     await bump(w.kv, minuteKey(who.uid, w.now), 120);
-    await bump(w.kv, dayKey(who.uid, w.now), 2 * 24 * 3600);
+    await bump(w.kv, dk, 2 * 24 * 3600);
     await bump(w.kv, mk, 40 * 24 * 3600);
 
     const started = Date.now();
