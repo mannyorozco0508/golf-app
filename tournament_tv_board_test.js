@@ -106,7 +106,7 @@ test('1 header, heads, the engine order in big type, the QR and the follow addre
     assert.ok(a.rows.length === 8, 'eight rows a page: ' + a.rows.length);
     assert.ok(a.rowPx >= 28, 'a row is big type: ' + a.rowPx + 'px');
     assert.equal(a.qr, true, 'the QR drew');
-    assert.equal(a.follow, 'tournaments.rattlegolf.com');
+    assert.equal(a.follow, 'hardpangolf.com');   // re-pinned 2026-11-15 (Manny: TV footer to hardpangolf.com)
 });
 
 test('2 flights: one page each, dots, Next names the other; the page turns at ?every=3', async () => {
@@ -192,7 +192,7 @@ test('10 a phone: QR hidden, nothing past the right edge, heads apart, no THRU',
     assert.ok(a.scrollW <= 390, 'scrollWidth ' + a.scrollW);
     assert.ok(a.posRight <= a.teamLeft, 'POS right ' + a.posRight + ' <= TEAM left ' + a.teamLeft);
     assert.equal(a.thruShown, false);
-    assert.match(a.body, /tournaments\.rattlegolf\.com/, 'the address still reads');
+    assert.match(a.body, /hardpangolf\.com/, 'the address still reads');
 });
 
 test('11 (#12) page ranges without flights; a tie reads with a space', async () => {

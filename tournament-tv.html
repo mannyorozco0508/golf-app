@@ -193,8 +193,10 @@
     const PAGE_ROWS = 8;
     // The follow link is the public board on the product's own host, whatever
     // host this TV page was opened from (a preview, the Pages host).
-    const FOLLOW_URL = 'https://tournaments.rattlegolf.com/tournament?tourney=' + encodeURIComponent(CODE);
-    const FOLLOW_TEXT = 'tournaments.rattlegolf.com';
+    // The one front door is hardpangolf.com (Manny 2026-11-15 9:18 AM: "TV footer to hardpangolf.com"); the
+    // old tournaments host still serves the same page, so printed QRs keep working.
+    const FOLLOW_URL = 'https://hardpangolf.com/tournament?tourney=' + encodeURIComponent(CODE);
+    const FOLLOW_TEXT = 'hardpangolf.com';
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -441,8 +443,8 @@
     // the leaderboard TV it always was. Flip both files in the publish commit.
     const CHECKIN_LIVE = false;
     const CHECKIN = CHECKIN_LIVE && params.get('checkin') === '1';
-    const CHECKIN_URL = 'https://tournaments.rattlegolf.com/tournament?tourney=' + encodeURIComponent(CODE) + '&checkin=1';
-    const CHECKIN_TEXT = 'tournaments.rattlegolf.com/tournament?tourney=' + CODE + '&checkin=1';
+    const CHECKIN_URL = 'https://hardpangolf.com/tournament?tourney=' + encodeURIComponent(CODE) + '&checkin=1';
+    const CHECKIN_TEXT = 'hardpangolf.com/tournament?tourney=' + CODE + '&checkin=1';
     const CI_GROUPS_PAGE = 8;
     // CHECKIN-ROSTER-BEGIN (byte-identical in tournament-tv.html: the two screens
     // a golfer and the clubhouse read must agree on who is in which group, and
