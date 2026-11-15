@@ -416,7 +416,11 @@
     // rather than showing everyone as not arrived. This page reads arrivedAt and
     // the record, and NOTHING about payment: no paid key is ever read here.
     // Writes nothing.
-    const CHECKIN = params.get('checkin') === '1';
+    // THE SWITCH: the same CHECKIN_LIVE as tournament.html (see its comment);
+    // off until the check-in rules candidate is published. Off, ?checkin=1 is
+    // the leaderboard TV it always was. Flip both files in the publish commit.
+    const CHECKIN_LIVE = false;
+    const CHECKIN = CHECKIN_LIVE && params.get('checkin') === '1';
     const CHECKIN_URL = 'https://tournaments.rattlegolf.com/tournament?tourney=' + encodeURIComponent(CODE) + '&checkin=1';
     const CHECKIN_TEXT = 'tournaments.rattlegolf.com/tournament?tourney=' + CODE + '&checkin=1';
     const CI_GROUPS_PAGE = 8;

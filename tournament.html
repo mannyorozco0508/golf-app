@@ -6175,11 +6175,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         showExport(true);
         const entriesOnly = all.map((x) => x[1]);
         const anyInField = entriesOnly.some(regInField);
-        if (tilesEl) tilesEl.innerHTML = anyInField ? checkinTilesHtml(entriesOnly) : '';
+        if (tilesEl) tilesEl.innerHTML = (CHECKIN_LIVE && anyInField) ? checkinTilesHtml(entriesOnly) : '';
         if (countsEl) countsEl.innerHTML = (feesOn ? payTilesHtml(entriesOnly) : '') + registrationCountsHtml(registrationCounts(entriesOnly));
         const filters = deskFilters();
         if (!photosOnDesk && !filters.some((f) => f.key === registrationFilter)) registrationFilter = 'all';
-        if (chipsEl) chipsEl.innerHTML = filters.filter((f) => (!f.teamOnly || !recordIsIndividual()) && (!f.fieldOnly || anyInField)).map((f) => {
+        if (chipsEl) chipsEl.innerHTML = filters.filter((f) => (!f.teamOnly || !recordIsIndividual()) && (!f.fieldOnly || (CHECKIN_LIVE && anyInField))).map((f) => {
             const n = entriesOnly.filter(f.test).length;
             return `<button class="reg-chip${f.key === registrationFilter ? ' active' : ''}" onclick="setRegistrationFilter('${f.key}')">${f.label} ${n}</button>`;
         }).join('') + photosChipHtml();
@@ -8871,6 +8871,18 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     // CHECKIN-ROSTER-END
 
+    // THE SWITCH (merge to main, Advisor relay ADVISOR-20261114-1851). OFF until
+    // the check-in rules candidate (tools/checkin-rules-candidate.js) is
+    // published - the iOS lane publishes rules, on Manny's OK. While it is off
+    // nothing check-in is on the page: ?checkin=1 opens the ordinary board, the
+    // Desk has no QR card, no Arrived / Not arrived chips or tiles and no Mark
+    // arrived, and arrivedAt is never written. The Desk still keeps
+    // tournaments/<code>/checkin (an owner write, no rules change), so the list
+    // is fresh the day the switch flips. Flip to true in tournament.html AND
+    // tournament-tv.html in the same commit as the publish;
+    // tournament_checkin_switch_test.js pins the off state, tournament_checkin_test.js
+    // runs with it flipped on.
+    const CHECKIN_LIVE = false;
     function regArrivedAt(e) { const v = Number(e && e.arrivedAt); return v > 0 ? v : 0; }
     function checkinUrl() { return shareBaseUrl() + 'tournament.html?tourney=' + encodeURIComponent(currentCode || '') + '&checkin=1'; }
     function checkinTvUrl() { return shareBaseUrl() + 'tournament-tv.html?tourney=' + encodeURIComponent(currentCode || '') + '&checkin=1'; }
@@ -8895,7 +8907,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             + `</div>`;
     }
     function checkinRowHtml(id, e) {
-        if (!regInField(e)) return '';
+        if (!CHECKIN_LIVE || !regInField(e)) return '';
         const eid = escReg(id);
         const at = regArrivedAt(e);
         if (at > 0) {
@@ -8914,7 +8926,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     const arrivalsInFlight = {};
     function markArrived(entryId) {
-        if (!currentCode || !canManage()) return;
+        if (!CHECKIN_LIVE || !currentCode || !canManage()) return;
         const e = (registrationData || {})[entryId];
         if (!e || !regInField(e) || regArrivedAt(e) > 0 || arrivalsInFlight[entryId]) return;
         arrivalsInFlight[entryId] = true;
@@ -8924,7 +8936,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 (err) => { delete arrivalsInFlight[entryId]; checkinDeskSay('Arrival not saved: ' + ((err && err.message) || err)); });
     }
     function undoArrival(entryId) {
-        if (!currentCode || !canManage()) return;
+        if (!CHECKIN_LIVE || !currentCode || !canManage()) return;
         const e = (registrationData || {})[entryId];
         if (!e || !(regArrivedAt(e) > 0)) return;
         checkinDeskSay('');
@@ -8935,7 +8947,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function renderCheckinCard() {
         const card = document.getElementById('checkin-card');
         if (!card) return;
-        const on = !!(currentCode && registrationAllowed());
+        const on = CHECKIN_LIVE && !!(currentCode && registrationAllowed());
         card.style.display = on ? 'flex' : 'none';
         if (!on) return;
         const tv = document.getElementById('checkin-tv');
@@ -9460,7 +9472,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // PO: &me=<key> opens that golfer's My results on the same page.
         myResultsKey = urlParams.get('me') || null;
         openRecap(tourneyParam.toUpperCase());
-    } else if (tourneyParam && urlParams.get('checkin') === '1') {
+    } else if (tourneyParam && CHECKIN_LIVE && urlParams.get('checkin') === '1') {
         // CI-FINAL: the table QR's name list. Never the console, whoever opens it.
         openCheckin(tourneyParam.toUpperCase());
     } else if (tourneyParam) {

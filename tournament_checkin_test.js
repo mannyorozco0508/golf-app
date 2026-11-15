@@ -41,6 +41,19 @@ const path = require('path');
 const vm = require('vm');
 const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 
+// THE SWITCH (merge to main, 2026-11-14): both pages ship `const CHECKIN_LIVE =
+// false;` until the rules candidate is published, so a live device shows no
+// check-in at all. These tests are about the feature, so every page here loads
+// with the switch flipped ON (a source rewrite before the script runs);
+// tournament_checkin_switch_test.js pins what a device sees while it is off.
+const SWITCH_OFF = 'const CHECKIN_LIVE = false;';
+function flipOn(code) {
+    const on = code.replace(SWITCH_OFF, 'const CHECKIN_LIVE = true;');
+    if (on === code) throw new Error('the page has no "' + SWITCH_OFF + '" line to flip');
+    return on;
+}
+const loadLive = (page, deps, opts) => loadHtmlInlineScript(page, deps, Object.assign({ transform: flipOn }, opts || {}));
+
 const PAGE = 'tournament.html';
 const TV = 'tournament-tv.html';
 const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
@@ -126,7 +139,7 @@ const plain = (s) => String(s).replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').r
 // the record lands, then each arrival the page asked for.
 function arriveTable(f, opts) {
     opts = opts || {};
-    const sb = loadHtmlInlineScript(PAGE, [], { search: '?tourney=' + CODE + '&checkin=1', beforeRun(s) { s.__dbReads = Object.assign({}, opts.reads || {}); } });
+    const sb = loadLive(PAGE, [], { search: '?tourney=' + CODE + '&checkin=1', beforeRun(s) { s.__dbReads = Object.assign({}, opts.reads || {}); } });
     fire(sb, new RegExp('^tournaments/' + CODE + '$'), f.rec);
     sb.__dbHandlers.filter((h) => /^registrations\/STK26\/[^/]+\/arrivedAt$/.test(h.path)).forEach((h) => {
         const id = h.path.split('/')[2];
@@ -245,7 +258,7 @@ describe('A. THE TABLE PAGE, ?tourney=CODE&checkin=1 (a golfer with the phone ca
 // The organizer: ?tourney=CODE signed in, the record, then the signup list.
 function arriveOwner(f, opts) {
     opts = opts || {};
-    const sb = loadHtmlInlineScript(PAGE, [], { search: '?tourney=' + CODE });
+    const sb = loadLive(PAGE, [], { search: '?tourney=' + CODE });
     sb.__auth.setUser(ORGANIZER);
     fire(sb, new RegExp('^tournaments/' + CODE + '$'), f.rec);
     if (opts.regs !== false) fire(sb, new RegExp('^registrations/' + CODE + '$'), f.regs);
@@ -349,7 +362,7 @@ describe('B. THE DESK (the organizer, a tap on the Desk tab)', () => {
 
     test('B7 a visitor on the board link (not the owner) gets no arrival control and no table QR', () => {
         const f = fixture();
-        const sb = loadHtmlInlineScript(PAGE, [], { search: '?tourney=' + CODE });
+        const sb = loadLive(PAGE, [], { search: '?tourney=' + CODE });
         fire(sb, new RegExp('^tournaments/' + CODE + '$'), f.rec);
         assert.ok(!/markArrived|undoArrival/.test(html(sb, 'registration-list')), 'no arrival control');
         assert.notEqual(shown(sb, 'checkin-card') && /markArrived/.test(html(sb, 'registration-list')), true);
@@ -360,7 +373,7 @@ describe('B. THE DESK (the organizer, a tap on the Desk tab)', () => {
 // The TV: tournament-tv.html?tourney=CODE&checkin=1. Its 15-second clock and
 // page timer are real intervals; the realm gets no-op ones so a test can end.
 function arriveTv(f, search) {
-    const sb = loadHtmlInlineScript(TV, [], { search: search || '?tourney=' + CODE + '&checkin=1', beforeRun(s) { s.setInterval = () => 0; } });
+    const sb = loadLive(TV, [], { search: search || '?tourney=' + CODE + '&checkin=1', beforeRun(s) { s.setInterval = () => 0; } });
     fire(sb, new RegExp('^tournaments/' + CODE + '$'), f.rec);
     sb.__dbHandlers.filter((h) => /^registrations\/STK26\/[^/]+\/arrivedAt$/.test(h.path)).forEach((h) => {
         const v = f.regs[h.path.split('/')[2]].arrivedAt;
@@ -403,7 +416,7 @@ describe('C. THE TV CHECK-IN BOARD (tournament-tv.html?tourney=CODE&checkin=1)',
 
     test('C3 without ?checkin=1 the TV is the leaderboard it was (no check-in board)', () => {
         const f = fixture();
-        const sb = loadHtmlInlineScript(TV, [], { search: '?tourney=' + CODE, beforeRun(s) { s.setInterval = () => 0; } });
+        const sb = loadLive(TV, [], { search: '?tourney=' + CODE, beforeRun(s) { s.setInterval = () => 0; } });
         fire(sb, new RegExp('^tournaments/' + CODE + '$'), f.rec);
         assert.equal(el(sb, 'tv-name').textContent, 'Starkey Cup');
         assert.ok(!/ci-side|Check in here/.test(html(sb, 'tv-main') + el(sb, 'tv-name').textContent));

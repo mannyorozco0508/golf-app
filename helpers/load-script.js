@@ -316,7 +316,13 @@ function loadHtmlInlineScript(relativePath, dependencies, options) {
     if (matches.length === 0) {
         throw new Error(`No inline <script> block found in ${relativePath}`);
     }
-    const inlineCode = matches.map(m => m[1]).join('\n');
+    const joined = matches.map(m => m[1]).join('\n');
+    // options.transform(code): a test may rewrite the page's source before it
+    // runs - for a page SWITCH (a const the page ships OFF, e.g. CHECKIN_LIVE)
+    // that the test flips ON to reach the screen behind it. The transform must
+    // change the text it was given (a no-op would test the wrong state), so
+    // callers assert that themselves.
+    const inlineCode = (options && typeof options.transform === 'function') ? options.transform(joined) : joined;
 
     const sandbox = makeStubSandbox();
     // THE PAGE'S OWN QUERY STRING. Pages read `const urlParams = new
