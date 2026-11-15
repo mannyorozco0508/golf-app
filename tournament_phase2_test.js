@@ -210,6 +210,6 @@ test('9 money = base: the engines are origin/main 97698412 byte for byte', () =>
     // copy of the tree (the baseline run) as in the repo.
     const sha = (f) => crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname, f))).digest('hex');
     assert.equal(sha('payouts.js'), 'c35e34f571e564c025be2a509b8c0aa8cf165c765edc54a61a21987064a004e8');
-    assert.equal(sha('tournament-engine.js'), '1c659c46d0f91ca3dc61beb231e1356ea0a572fd7c3c40399399d36e2ff89f57');
+    assert.equal(sha('tournament-engine.js'), '44a4cba4449df2804a0aa87a854d53d869d9a8e7c865bdd2f4c03c5eff1f908f');   // RE-PINNED 2026-11-15 (was 1c659c46): Net on the combined board, Manny's per-file OK - computeEventStandings/aggregateAvailability/resolveLeaderboardView gained opts.basis; no caller without opts changed a number (tournament_multiround_test.js section 10)
     assert.equal(sha('handicap.js'), '2d3b2f7fd916a4b83a10491e822ece946203d2bbb11264962e7d888a7b450f17');
 });

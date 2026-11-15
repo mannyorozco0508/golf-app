@@ -11,11 +11,11 @@
 // under that round. Nothing is re-scored here: a number in a column is the
 // number the round board already showed. The engine is read, never edited.
 //
-// GROSS ONLY. The column shows the round board's strokes for that golfer. On a
-// gross round that is gross; on a net round the engine's rows are net rows, and
-// the column follows the round's own scoring as the combined board does today.
-// A Net view of a GROSS combined board needs per-hole stroke allocation inside
-// the engine (protected); that is proposed separately and not built here.
+// AS SCORED by default: the column shows the round board's strokes for that
+// golfer, the round read the way its own setting says, as the combined board
+// does. opts.basis ('net' | 'gross', Manny's per-file OK 2026-11-15) reads every
+// round on that basis through the engine's own roundViewOnBasis, so a cell gains
+// the strokes received and the net for that round; nothing is allocated here.
 //
 // COLOR AND MARKS are not decided here. Callers render; this returns numbers.
 // ============================================================================
@@ -31,18 +31,22 @@
 
     // columns: [{ rid, name, short, holes, status }], in the event's round order
     // (countable rounds only: open or closed, the same set the engine sums).
-    // byPlayer: { playerId: { rid: { strokes, thru, toPar, complete, hasScores } } }
-    function eventRoundColumns(data, fns) {
+    // byPlayer: { playerId: { rid: { strokes, thru, toPar, complete, hasScores, strokesReceived, net } } }
+    // (strokes is gross; strokesReceived is 0 and net equals strokes unless the round is read as net)
+    function eventRoundColumns(data, fns, opts) {
         const countable = pick(fns, 'countableRoundIds');
         const view = pick(fns, 'roundView');
         const board = pick(fns, 'computeTournamentLeaderboard');
+        const onBasis = pick(fns, 'roundViewOnBasis');
+        const basis = opts && (opts.basis === 'net' || opts.basis === 'gross') ? opts.basis : 'as-scored';
         const out = { columns: [], byPlayer: {} };
         if (!data || !countable || !view || !board) return out;
+        if (basis !== 'as-scored' && !onBasis) return out;
         const ids = countable(data) || [];
         const rounds = data.rounds || {};
         ids.forEach((rid, i) => {
             const r = rounds[rid] || {};
-            const v = view(data, rid);
+            const v = basis === 'as-scored' ? view(data, rid) : onBasis(data, rid, basis);
             if (!v) return;
             const holes = (v.courseData || r.courseData || []).length || 18;
             out.columns.push({ rid: rid, name: r.name || ('Round ' + (i + 1)), short: 'R' + (i + 1), holes: holes,
@@ -51,7 +55,9 @@
                 if (row.entryType !== 'player' || !row.playerId) return;
                 const p = out.byPlayer[row.playerId] || (out.byPlayer[row.playerId] = {});
                 p[rid] = { strokes: row.hasScores ? row.strokes : null, thru: row.hasScores ? row.thru : 0,
-                    toPar: row.hasScores ? row.toPar : null, complete: !!row.hasScores && row.thru === holes, hasScores: !!row.hasScores };
+                    toPar: row.hasScores ? row.toPar : null, complete: !!row.hasScores && row.thru === holes, hasScores: !!row.hasScores,
+                    strokesReceived: row.hasScores ? (row.strokesReceived || 0) : 0,
+                    net: row.hasScores ? row.strokes - (row.strokesReceived || 0) : null };
             });
         });
         return out;

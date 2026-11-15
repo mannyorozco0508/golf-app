@@ -38,6 +38,23 @@
 //   (c5) the TV's `.row .tp.under { color: var(--red) }` set back to lime -> C2
 //        red here and test 2 of tournament_tv_event_columns_test.js (the
 //        computed colour) red in Chrome.
+//
+// NET ON THE COMBINED BOARD (2026-11-15, Manny's per-file OK for
+// tournament-engine.js - the paragraph "THE ENGINE IS NOT EDITED" above describes
+// the 11-14 build; this wave edits it, see tournament_multiround_test.js s.10).
+// D1 is re-pinned (Net ENABLED), D5-D7 and F6 are new, E1 and F1 re-pinned (the
+// card says "Gross and Net"; a cell carries strokesReceived and net). Every test
+// still arrives through ?tourney=STK and taps rendered onclick text; the Net
+// numbers asserted are hand-checked against the fixture (stroke index = hole
+// number, Ana 4 and Dana 15: 4 + 4 and 15 + 9 of 15 on the nine played).
+// BASELINE against main dddb9565 (tournament.html sha256 507acbddaa14777d...,
+// engine 1c659c46d0f91ca3...), run in a clean worktree at that commit: 27 tests - 20 pass /
+// 7 fail (D1, D5, D6, D7, E1, F1, F6). With the build: 27 pass / 0 fail.
+// CONTROLS (each restored by sha from a saved copy, RESTORED-OK printed):
+//   (n1)-(n3) the engine controls listed in tournament_multiround_test.js s.10:
+//        n1 -> D5, D7, F6 red; n2 -> D6 red; n3 -> D6 red;
+//   (p1) renderLeaderboardBasis keeps the Net half disabled (enabled flag false)
+//        -> D1, D5, D7 red (94 / 3 across the two files).
 // ============================================================================
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
@@ -191,13 +208,74 @@ describe('C. the colour rule at the source, both pages', () => {
 });
 
 describe('D. Gross | Net above the combined board', () => {
-    test('D1 default: shown on the Event chip, Gross active, Net disabled with the sentence', () => {
+    // RE-PINNED 2026-11-15 (Net on the combined board, Manny's per-file OK for
+    // tournament-engine.js): the Net half is ENABLED on a gross event whose rounds
+    // can all allocate strokes; the "not available yet" sentence is gone from the
+    // default state and comes back only naming a round that refuses (D6).
+    test('D1 default: shown on the Event chip, Gross active, Net enabled; the board is still gross', () => {
         const sb = arrive(record());
         assert.equal(el(sb, 'lb-basis').style.display, 'flex');
         const h = el(sb, 'lb-basis').innerHTML;
         assert.match(h, /<button type="button" class="active" aria-pressed="true" >Gross<\/button>/);
+        assert.match(h, /<button type="button" class="" aria-pressed="false" onclick="setLeaderboardBasis\('net'\)">Net<\/button>/);
+        assert.ok(!/disabled/.test(h), 'neither half is disabled');
+        assert.equal(el(sb, 'lb-basis-note').textContent, 'Gross across the rounds. Tap Net for each round’s net from its own handicap and course.');
+        assert.ok(!/not available/.test(el(sb, 'lb-basis-note').textContent));
+        const b = board(sb);
+        assert.equal(text(b.split('</div>')[0]), 'Pos Golfer R1 R2 Tot To Par', 'the default board is the gross one');
+        assert.ok(!/lb-strokes/.test(b), 'no strokes line until Net is tapped');
+        assert.match(rowsOf(b)[0], /Ana Diaz[\s\S]*<span class="lb-tot">106<\/span>/);
+    });
+    test('D5 tap Net: per-round net cells, the Net total, the strokes line under each name, net to par; the order is the engine\'s net order; Gross brings it back', () => {
+        const sb = arrive(record());
+        tap(sb, el(sb, 'lb-basis').innerHTML, (t) => /setLeaderboardBasis\('net'\)/.test(t));
+        const h = el(sb, 'lb-basis').innerHTML;
+        assert.match(h, /<button type="button" class="" aria-pressed="false" onclick="setLeaderboardBasis\('as-scored'\)">Gross<\/button>/);
+        assert.match(h, /<button type="button" class="active" aria-pressed="true" >Net<\/button>/);
+        assert.equal(el(sb, 'lb-basis-note').textContent, 'Gross so far · strokes received so far → net. Strokes are each course’s handicap for that round; on a round in play only holes played count.');
+        const b = board(sb);
+        assert.equal(text(b.split('</div>')[0]), 'Pos Golfer R1 R2 Net To Par');
+        const rows = rowsOf(b);
+        // Ana, handicap 4, stroke index = hole number on both cards: 4 strokes at
+        // Cascade (70 -> 66) and 4 on Olympic's front nine (36 -> 32): 106 - 8 = 98.
+        assert.match(rows[0], /lb-pos">1<\/span>[\s\S]*Ana Diaz[\s\S]*<small class="lb-strokes">106 · 8 strokes → 98<\/small>/);
+        assert.match(rows[0], /<span class="lb-rnd">66<\/span><span class="lb-rnd">32<small>thru 9<\/small><\/span><span class="lb-tot">98<\/span>\s*<span class="lb-score under">-10<\/span>/);
+        // Dana, handicap 15: 15 strokes at Cascade (84 -> 69) but only 9 of them on
+        // Olympic thru 9 (44 -> 35) - the holes-played rule: 128 - 24 = 104, not 128 - 30.
+        const dana = rows.find((r) => /Dana Ruiz/.test(r));
+        assert.match(dana, /<small class="lb-strokes">128 · 24 strokes → 104<\/small>/);
+        assert.match(dana, /<span class="lb-rnd">69<\/span><span class="lb-rnd">35<small>thru 9<\/small><\/span><span class="lb-tot">104<\/span>/);
+        assert.match(dana, /lb-pos">4<\/span>/, 'Dana is 4th net (6th gross)');
+        assert.match(rows.find((r) => /Sam Ortiz/.test(r)), /lb-pos">5<\/span>/, 'Sam is 5th net (2nd gross)');
+        assert.equal(rows.filter((r) => /lb-score under/.test(r)).length, 5, 'five golfers under par net; the class still sits only on negative to-par cells');
+        assert.ok(!/lb-score over/.test(b));
+        tap(sb, el(sb, 'lb-basis').innerHTML, (t) => /setLeaderboardBasis\('as-scored'\)/.test(t));
+        const g = board(sb);
+        assert.equal(text(g.split('</div>')[0]), 'Pos Golfer R1 R2 Tot To Par');
+        assert.ok(!/lb-strokes/.test(g));
+        assert.match(rowsOf(g)[1], /Sam Ortiz/, 'the gross order is back');
+    });
+    test('D6 a round whose course has no real stroke index: Net disabled, the note names the round; the Rounds card says the same', () => {
+        const rec = record(); rec.rounds.r2.courseIndexSynthetic = true;
+        const sb = arrive(rec);
+        const h = el(sb, 'lb-basis').innerHTML;
+        assert.match(h, /class="active" aria-pressed="true" >Gross<\/button>/);
         assert.match(h, /<button type="button" class="" aria-pressed="false" disabled>Net<\/button>/);
-        assert.equal(el(sb, 'lb-basis-note').textContent, 'Gross across the rounds. Net on the combined board is not available yet.');
+        assert.equal(el(sb, 'lb-basis-note').textContent, 'Gross across the rounds. Olympic is on a course with no real stroke index, so net strokes can’t be allocated for it. Net on the combined board needs a real scorecard for that round.'.replace('’', "'"));
+        assert.match(text(el(sb, 'rounds-card').innerHTML), /Board shows Event total · R1 · R2 · Tot · Gross \(Olympic is on a course with no real stroke index/);
+        // Tapping Net (nothing to tap: the half is disabled) cannot happen; the
+        // state the page is left in is still gross even if the basis were set.
+        assert.equal(text(board(sb).split('</div>')[0]), 'Pos Golfer R1 R2 Tot To Par');
+    });
+    test('D7 in Net view the sheet\'s round lines read gross · strokes → net with net to par', () => {
+        const sb = arrive(record());
+        tap(sb, el(sb, 'lb-basis').innerHTML, (t) => /setLeaderboardBasis\('net'\)/.test(t));
+        tap(sb, board(sb), (t) => /data-entry="pD"/.test(t));
+        assert.equal(el(sb, 'lb-sheet-name').textContent, 'Dana Ruiz');
+        assert.equal(el(sb, 'lb-sheet-sub').textContent, 'B Flight · handicap 15 · 4th · Event -4');
+        const ex = el(sb, 'lb-sheet-body').innerHTML;
+        assert.match(ex, /Cascade · Cascade Golf Course · 84 · 15 strokes → 69 <span class="under">\(-3\)<\/span><small>complete · handicap 15<\/small>/);
+        assert.match(ex, /Olympic · Olympic Course · 44 · 9 strokes → 35 <span class="under">\(-1\)<\/span><small>thru 9 · handicap 15<\/small>/);
     });
     test('D2 a round chip hides the switch; back on Event it returns', () => {
         const sb = arrive(record());
@@ -232,7 +310,8 @@ describe('E. the Rounds card on Setup', () => {
         assert.match(t, /^2 rounds · 36 holes · each round has its own course/);
         assert.match(t, /Cascade Cascade Golf Course · 18 holes Individual Stroke Play · Gross ✓ Closed · 8 of 8 cards/);
         assert.match(t, /Olympic Olympic Course · 18 holes Individual Stroke Play · Gross ● Open · in play, 8 of 8 scoring/);
-        assert.match(t, /Board shows Event total · R1 · R2 · Tot · Gross \(Net on the combined board is not available yet\)/);
+        // RE-PINNED 2026-11-15 (Net on the combined board): both bases are on the board.
+        assert.match(t, /Board shows Event total · R1 · R2 · Tot · Gross and Net Flights/);
         assert.match(t, /Flights A Flight \(4\) · B Flight \(4\)/);
         assert.match(t, /Prizes go by Event total · trophies and pro shop credit$/);
         assert.ok(!/\$\d/.test(t), 'no amounts on the card');
@@ -260,9 +339,19 @@ describe('F. event-columns.js, the one builder both pages read', () => {
         need();
         const c = ec.eventRoundColumns(record(), fns);
         assert.deepEqual(c.columns.map((x) => [x.short, x.name, x.holes, x.status]), [['R1', 'Cascade', 18, 'closed'], ['R2', 'Olympic', 18, 'open']]);
-        assert.deepEqual(c.byPlayer.pA.r1, { strokes: 70, thru: 18, toPar: -2, complete: true, hasScores: true });
-        assert.deepEqual(c.byPlayer.pA.r2, { strokes: 36, thru: 9, toPar: 0, complete: false, hasScores: true });
+        // RE-PINNED 2026-11-15: a cell also carries strokesReceived and net (0 and
+        // the gross strokes with no basis asked for). Every number above is unchanged.
+        assert.deepEqual(c.byPlayer.pA.r1, { strokes: 70, thru: 18, toPar: -2, complete: true, hasScores: true, strokesReceived: 0, net: 70 });
+        assert.deepEqual(c.byPlayer.pA.r2, { strokes: 36, thru: 9, toPar: 0, complete: false, hasScores: true, strokesReceived: 0, net: 36 });
         assert.equal(c.byPlayer.pF.r2.thru, 7);
+    });
+    test('F6 basis net: each cell is that round\'s net from its own snapshot and card; a round in play allocates on holes played only', () => {
+        need();
+        const fnsNet = Object.assign({}, fns, { roundViewOnBasis: engine.roundViewOnBasis });
+        const c = ec.eventRoundColumns(record(), fnsNet, { basis: 'net' });
+        assert.deepEqual(c.byPlayer.pD.r1, { strokes: 84, thru: 18, toPar: -3, complete: true, hasScores: true, strokesReceived: 15, net: 69 });
+        assert.deepEqual(c.byPlayer.pD.r2, { strokes: 44, thru: 9, toPar: -1, complete: false, hasScores: true, strokesReceived: 9, net: 35 });
+        assert.deepEqual(ec.eventRoundColumns(record(), fns, { basis: 'net' }), { columns: [], byPlayer: {} }, 'without the engine\'s basis view it returns the empty shape, never a gross cell labelled net');
     });
     test('F2 a round still in setup is not a column (the engine does not count it either)', () => {
         need();

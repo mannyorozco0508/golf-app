@@ -818,7 +818,9 @@ describe('EVENT VIEW — one renderer, three sources', () => {
         const ev = fnBody(src(), 'renderEventBoardRows');
         assert.ok(ev.length > 200, 'positive: the slice is the event renderer');
         assert.match(ev, /<small>thru \$\{x\.thru\}<\/small>/, 'a round in play says thru N under its score');
-        assert.match(ev, /eventRoundColumns\(currentData\)/, 'the columns come from the one builder');
+        // RE-PINNED 2026-11-15 (Net on the combined board): the builder is asked on
+        // the board's basis; 'as-scored' is the default and today's numbers.
+        assert.match(ev, /eventRoundColumns\(currentData, null, \{ basis: lbLast\.basis \}\)/, 'the columns come from the one builder, on the board’s basis');
     });
 
     test('every board caches the UNFILTERED field for the prize calculator', () => {
@@ -833,5 +835,170 @@ describe('EVENT VIEW — one renderer, three sources', () => {
         assert.ok(!/lbFlightId|lbRoundId/.test(prizeLine[1]),
             'the prize rows must be the UNFILTERED field on every view');
         assert.doesNotMatch(src(), /cachedLeaderboardRows/);
+    });
+});
+
+// ===========================================================================
+// 10. NET ON THE COMBINED BOARD (Manny's per-file OK for tournament-engine.js,
+//     2026-11-15; MR-NET-ENGINE-PROPOSAL.md)
+//
+// computeEventStandings(data, flightId, opts) and aggregateAvailability(data, opts)
+// take opts.basis: 'as-scored' (the default - every caller that passes nothing
+// gets the numbers pinned by sections 1-9, byte for byte), 'net' or 'gross'. An
+// explicit basis reads every countable round on that basis through the round's
+// own view (roundViewOnBasis), so the strokes come from THAT round's handicap
+// snapshot and THAT course's stroke index, allocated per hole played.
+//
+// BASELINE (CLAUDE.md: the FINAL run of the FINAL file) against main dddb9565
+// (tournament-engine.js sha256 1c659c46d0f91ca3...), run in a clean worktree at
+// that commit: 70 tests - 64 pass / 6 fail. The six: five of the seven below
+// ("the default call is unchanged" and "the basis never writes back" are true of
+// the old engine too, which is the point of them) and the re-pinned
+// eventRoundColumns regex in section 9. With the build: 70 pass / 0 fail.
+// The engine's sha after the build is 44a4cba4449df280...; the 23 tests that
+// froze 1c659c46 are re-pinned to it with a dated note.
+//
+// NEGATIVE CONTROLS (tournament-engine.js mutated, each restored by sha from a
+// saved copy, RESTORED-OK 44a4cba4449df280 each time; measured 2026-11-15 on this
+// file and tournament_event_board_test.js together, 97 tests):
+//   (n1) strokes allocated on every hole, not only holes played (the
+//        `if (useNet) received += ...` moved out of the scored-hole block in
+//        normalizePlayerEntries) -> "a golfer thru 9 receives only the strokes of
+//        the nine holes played" red, and D5, D7, F6 of the board test (93 / 4);
+//   (n2) the refused-round check removed from aggregateAvailability's net branch
+//        -> "a round that cannot allocate makes the net basis unavailable" red,
+//        and D6 of the board test (95 / 2);
+//   (n3) the default altered (standingsBasis returns 'net' when no opts is passed)
+//        -> "the default call is unchanged" red, the section-5 pins "gross and net
+//        rounds cannot be added up" and "round leaderboards keep working when
+//        combined standings are refused" red beside it, three more section-10
+//        tests and D6 (90 / 7).
+// ===========================================================================
+
+describe('NET ON THE COMBINED BOARD — an explicit basis reads every round that way', () => {
+
+    // Both rounds GROSS as scored; Round 1 snapshotted Bob off 18, Cal live off 9.
+    function grossEvent() {
+        const d = twoRoundEvent();
+        d.rounds.r1.scoringMode = 'gross';
+        d.rounds.r2.scoringMode = 'gross';
+        return d;
+    }
+    const onBasis = (d, basis, fid) => plain(engine.computeEventStandings(d, fid || null, { basis }));
+
+    test('the default call is unchanged: no opts, {} and basis as-scored are the same rows', () => {
+        const d = grossEvent();
+        const before = standings(d);
+        assert.deepEqual(plain(engine.computeEventStandings(d, null, {})), before);
+        assert.deepEqual(onBasis(d, 'as-scored'), before);
+        assert.deepEqual(plain(engine.computeEventStandings(d, null, { basis: 'nonsense' })), before, 'an unknown basis is the default, never a guess');
+        assert.equal(byName(before.rows, 'Bob').strokesReceived, 0, 'the gross event stays gross by default');
+        assert.equal(byName(before.rows, 'Bob').toPar, 36);
+        // and the as-scored refusal of a Gross/Net mix still stands
+        const mixed = twoRoundEvent(); mixed.rounds.r2.scoringMode = 'gross';
+        assert.equal(standings(mixed).available, false);
+        assert.match(standings(mixed).reason, /Gross and Net/);
+        assert.equal(plain(engine.aggregateAvailability(mixed)).available, false);
+    });
+
+    test('basis net on a two-round gross event: each round nets its OWN snapshot and stroke index', () => {
+        const d = grossEvent();
+        const r = onBasis(d, 'net');
+        assert.equal(r.available, true);
+        const bob = byName(r.rows, 'Bob');
+        // Round 1: snapshot 18 -> 18 strokes on 90 (E). Round 2: live scratch -> 0 strokes on 90 (+18).
+        assert.equal(bob.strokes, 180);
+        assert.equal(bob.strokesReceived, 18, 'Saturday’s 18 and Sunday’s 0, not 36 and not 0');
+        assert.equal(bob.toPar, 18);
+        const ann = byName(r.rows, 'Ann');
+        assert.equal(ann.strokesReceived, 0);
+        assert.equal(ann.toPar, 0);
+        const cal = byName(r.rows, 'Cal');
+        assert.equal(cal.strokesReceived, 9, 'Cal, live 9, netted on the one round he played');
+        assert.equal(cal.toPar, 9);
+        // The per-round rows the total was built from say the same thing.
+        const r1 = plain(engine.computeTournamentLeaderboard(engine.roundViewOnBasis(d, 'r1', 'net')));
+        assert.equal(byName(r1, 'Bob').strokesReceived, 18);
+        assert.equal(byName(r1, 'Bob').net, 72);
+        const r2 = plain(engine.computeTournamentLeaderboard(engine.roundViewOnBasis(d, 'r2', 'net')));
+        assert.equal(byName(r2, 'Bob').strokesReceived, 0);
+        // Ranking is the same rule: completed rounds first, then to par.
+        assert.deepEqual(r.rows.map(x => x.playerName), ['Ann', 'Bob', 'Cal']);
+        assert.equal(engine.aggregateAvailability(d, { basis: 'net' }).family, 'individual:net');
+    });
+
+    test('a golfer thru 9 receives only the strokes of the nine holes played', () => {
+        const d = grossEvent();
+        // Cal (9) plays Sunday's first nine at 5 a hole. Those nine holes carry stroke
+        // indexes 12, 8, 14, 6, 2, 16, 4, 10, 18 - four of them at or under 9.
+        d.rounds.r2.scores = Object.assign({}, d.rounds.r2.scores, scoresFor('pC', 5, 9));
+        const cal = byName(onBasis(d, 'net').rows, 'Cal');
+        assert.equal(cal.holesPlayed, 27);
+        assert.equal(cal.strokes, 135);
+        assert.equal(cal.strokesReceived, 13, '9 on Saturday + 4 on the nine played, not 9 + 9');
+        assert.equal(cal.toPar, 135 - 13 - 108);
+        const r2 = byName(plain(engine.computeTournamentLeaderboard(engine.roundViewOnBasis(d, 'r2', 'net'))), 'Cal');
+        assert.equal(r2.strokesReceived, 4);
+        assert.equal(r2.thru, 9);
+    });
+
+    test('a round that cannot allocate makes the net basis unavailable, with its reason; the default is untouched', () => {
+        const d = grossEvent();
+        d.rounds.r2.courseIndexSynthetic = true;   // the placeholder card
+        const a = plain(engine.aggregateAvailability(d, { basis: 'net' }));
+        assert.equal(a.available, false);
+        assert.match(a.reason, /^Sunday is on a course with no real stroke index/);
+        assert.match(a.reason, /Net on the combined board needs a real scorecard for that round\./);
+        const r = onBasis(d, 'net');
+        assert.equal(r.available, false);
+        assert.deepEqual(r.rows, []);
+        assert.equal(r.reason, a.reason);
+        // The gross event is still combinable as scored and as gross.
+        assert.equal(standings(d).available, true);
+        assert.equal(onBasis(d, 'gross').available, true);
+        // A structurally bad index refuses the same way (no flag needed).
+        const d2 = grossEvent();
+        d2.rounds.r1.courseData = CD18.map(h => Object.assign({}, h, { hcpIndex: 1 }));
+        assert.match(plain(engine.aggregateAvailability(d2, { basis: 'net' })).reason, /^Saturday is on a course/);
+    });
+
+    test('an explicit basis makes a Gross/Net mix one competition; basis gross reads a net event raw', () => {
+        const mixed = twoRoundEvent(); mixed.rounds.r2.scoringMode = 'gross';
+        assert.equal(standings(mixed).available, false, 'as scored, still refused');
+        const net = onBasis(mixed, 'net');
+        assert.equal(net.available, true);
+        assert.equal(byName(net.rows, 'Bob').strokesReceived, 18);
+        const gross = onBasis(twoRoundEvent(), 'gross');
+        assert.equal(gross.available, true);
+        assert.equal(byName(gross.rows, 'Bob').strokesReceived, 0);
+        assert.equal(byName(gross.rows, 'Bob').toPar, 36, 'two 90s on par 72, no strokes');
+        assert.equal(engine.aggregateAvailability(twoRoundEvent(), { basis: 'gross' }).family, 'individual:gross');
+    });
+
+    test('resolveLeaderboardView passes the basis to the event view only; prizes keep the saved basis', () => {
+        const d = grossEvent();
+        const ev = plain(engine.resolveLeaderboardView(d, 'event', null, { basis: 'net' }));
+        assert.equal(ev.kind, 'event');
+        assert.equal(byName(ev.rows, 'Bob').strokesReceived, 18);
+        const rd = plain(engine.resolveLeaderboardView(d, 'r1', null, { basis: 'net' }));
+        assert.equal(byName(rd.rows, 'Bob').strokesReceived, 0, 'a round is scored the way its own setting says');
+        assert.deepEqual(plain(engine.resolveLeaderboardView(d, 'event', null)), plain(engine.resolveLeaderboardView(d, 'event', null, { basis: 'as-scored' })));
+        // resolvePrizeView has no opts and reads the saved basis: the viewer's switch never reaches the prizes.
+        assert.equal(engine.resolvePrizeView.length, 1);
+        assert.equal(byName(plain(engine.resolvePrizeView(d)).rows, 'Bob').strokesReceived, 0);
+        assert.ok(!/opts|standingsBasis|roundViewOnBasis/.test(fnBody(codeOf('tournament-engine.js'), 'resolvePrizeView')), 'resolvePrizeView takes no opts and asks no basis helper (its own `basis` field is the saved prize basis)');
+        assert.match(fnBody(codeOf('tournament-engine.js'), 'resolvePrizeView'), /computeEventStandings\(data\)/, 'positive: it still asks for the event total');
+    });
+
+    test('the basis never writes back, and the ranking code is the one path', () => {
+        const d = grossEvent();
+        const snapshot = JSON.stringify(d);
+        engine.computeEventStandings(d, null, { basis: 'net' });
+        engine.computeEventStandings(d, null, { basis: 'gross' });
+        assert.equal(JSON.stringify(d), snapshot, 'reading on a basis must not modify the event or its rounds');
+        assert.equal(d.rounds.r1.scoringMode, 'gross');
+        const eng = codeOf('tournament-engine.js');
+        assert.equal((eng.match(/function rankRows\(/g) || []).length, 1);
+        assert.equal((eng.match(/\.sort\(/g) || []).length, 5, 'five .sort( calls on dddb9565 (measured); no new sort arrived with the basis');
     });
 });
