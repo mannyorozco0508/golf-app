@@ -4552,7 +4552,8 @@ const APP_SHELL_ALIASES = ['./', './app'];
 // Moved to v412-2.0 (Stripe Connect on tournament.html, Manny OK by phone relay 2026-11-13): the Get paid card, the service-fee lines on the register form, the state-labelled Stripe box and the honest Connect error copy; a device on v411 keeps the page without them.
 // Moved to v413-2.0 (the Nov 14 Tournaments batch, Manny OK by phone relay 2026-11-14 18:51): tournament.html gains the Leaderboard / Skins / Pairings tabs, the scorecard sheet, the Gross | Net header, the R1 / R2 event board, the prize cards (credit, cash switch) and the Desk's prize settings, and loses the web sponsor displays; tournament-scorecard.html the posted results and sponsor line removal; three new shared files event-columns.js, skins.js, tournament-prizes.js are precached; a device on v412 keeps the old board, old recap and would load the new page without its engines. Check-in ships OFF (CHECKIN_LIVE = false).
 // Moved to v414-2.0 (Net on the combined board, Manny go 2026-11-15 09:18 via Advisor: tournament.html and tournament-tv.html gain the Gross | Net switch on every multi-round board and tournament-engine.js the basis; event-columns.js the per-round net cells; a device on v413 keeps the Net half disabled)
-const CACHE_VERSION = 'golfapp-v414-2.0';
+// Moved to v415-2.0 (Hide from Home + Archive after the event and the one-scorer watch card, Manny go 2026-11-15 09:18 via Advisor: tournament.html gains the My events ••• menu, Hidden / Past events, the Setup card Event day and after, the Desk Scorers card and the Watch QR buttons; tournament-scorecard.html the watch link, That's me and the viewer card; a device on v414 keeps the old Home and card)
+const CACHE_VERSION = 'golfapp-v415-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
