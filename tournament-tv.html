@@ -216,16 +216,32 @@
         const selections = [];
         if (multi) {
             const ev = resolveLeaderboardView(d, 'event', null);
-            if (ev.available) selections.push({ sel: 'event', title: (ev.title || 'Event total') + ' \u00b7 ' + (typeof aggregateFamily === 'function' && aggregateFamily(d) === 'individual:net' ? 'Net' : 'Gross') });
-            else Object.keys(d.rounds || {}).forEach((rid) => selections.push({ sel: rid, title: (d.rounds[rid] && d.rounds[rid].name) || 'Round' }));
+            const title = ev.title || 'Event total';
+            const fam = typeof aggregateFamily === 'function' ? aggregateFamily(d) : null;
+            const can = (b) => typeof aggregateAvailability === 'function' && aggregateAvailability(d, { basis: b }).available;
+            // BOTH BASES ON THE ROTATION (Manny's per-file OK 2026-11-15; switch on
+            // everywhere 09:18): the scored basis first, the other after it. An all-gross
+            // event: Gross (as scored) then Net when every round can allocate; an all-net
+            // event: Net (as scored) then Gross; a Gross/Net mix: Gross then Net, the
+            // engine combining on the explicit basis. A round with no real stroke index
+            // keeps the Net pages off the rotation.
+            if (ev.available && fam === 'individual:net') {
+                selections.push({ sel: 'event', title: title + ' \u00b7 Net', display: 'net' });
+                selections.push({ sel: 'event', title: title + ' \u00b7 Gross', opts: { basis: 'gross' }, display: 'gross' });
+            } else if (ev.available || can('gross')) {
+                selections.push({ sel: 'event', title: title + ' \u00b7 Gross', opts: ev.available ? undefined : { basis: 'gross' }, display: 'gross' });
+                if (can('net')) selections.push({ sel: 'event', title: title + ' \u00b7 Net', opts: { basis: 'net' }, display: 'net' });
+            } else Object.keys(d.rounds || {}).forEach((rid) => selections.push({ sel: rid, title: (d.rounds[rid] && d.rounds[rid].name) || 'Round' }));
         } else selections.push({ sel: null, title: '' });
-        selections.forEach(({ sel, title }) => {
+        selections.forEach(({ sel, title, opts, display }) => {
             const scopes = fids.length ? fids.map((f) => ({ fid: f, name: flights[f].name || 'Flight' })) : [{ fid: null, name: '' }];
             scopes.forEach(({ fid, name }) => {
-                const v = resolveLeaderboardView(d, sel, fid);
+                const v = resolveLeaderboardView(d, sel, fid, opts);
+                const net = display === 'net';
+                const cols = v.kind === 'event' && typeof eventRoundColumns === 'function' ? eventRoundColumns(d, null, net ? { basis: 'net' } : opts) : null;
                 const rows = v.available ? v.rows : [];
                 const label = [title, name].filter(Boolean).join(' · ');
-                if (!rows.length) { out.push({ kind: 'board', label: label || 'Leaderboard', display: label || 'Leaderboard', rows: [], thruHead: v.kind === 'event' ? 'Rds' : 'Thru', cols: v.kind === 'event' && typeof eventRoundColumns === 'function' ? eventRoundColumns(d) : null, note: v.available ? 'No scores yet.' : (v.reason || '') }); return; }
+                if (!rows.length) { out.push({ kind: 'board', label: label || 'Leaderboard', display: label || 'Leaderboard', rows: [], thruHead: v.kind === 'event' ? 'Rds' : 'Thru', cols, net, note: v.available ? 'No scores yet.' : (v.reason || '') }); return; }
                 // EIGHT ROWS A PAGE: ten with the names line under each team ran
                 // 117 px past the footer at 720p (measured); eight fit with room.
                 for (let i = 0; i < rows.length; i += PAGE_ROWS) {
@@ -234,7 +250,7 @@
                     // (#12) the page's name in the footer: the flight (and its range
                     // when it runs past ten), or the range alone when there are no flights.
                     const display = label ? (rows.length > PAGE_ROWS ? label + ' \u00b7 ' + range : label) : range;
-                    out.push({ kind: 'board', key: label + '#' + i, label: label || 'Leaderboard', display, rows: chunk, from: i + 1, to: i + chunk.length, of: rows.length, thruHead: v.kind === 'event' ? 'Rds' : 'Thru', cols: v.kind === 'event' && typeof eventRoundColumns === 'function' ? eventRoundColumns(d) : null });
+                    out.push({ kind: 'board', key: label + '#' + i, label: label || 'Leaderboard', display, rows: chunk, from: i + 1, to: i + chunk.length, of: rows.length, thruHead: v.kind === 'event' ? 'Rds' : 'Thru', cols, net });
                 }
             });
         });
@@ -317,16 +333,20 @@
                 const entryHead = esc(typeof entryColumnLabel === 'function' ? entryColumnLabel(data) : 'Team');
                 // THE EVENT PAGE (MR-FINAL, Manny 2026-11-14): R1 / R2 / Tot replace the Rds
                 // count; a round in play shows "thru N" under its score. Round pages unchanged.
-                if (cols) h += '<div class="row h' + ev + '"><span class="pos">Pos</span><span class="nm">' + entryHead + '</span>' + cols.columns.map((c) => '<span class="rd">' + esc(c.short) + '</span>').join('') + '<span class="tot">Tot</span><span class="tp">To par</span></div>';
+                // A NET page (per-file OK 2026-11-15): each round cell is that round's net,
+                // the total column reads Net, and the strokes line sits under the name.
+                if (cols) h += '<div class="row h' + ev + '"><span class="pos">Pos</span><span class="nm">' + entryHead + '</span>' + cols.columns.map((c) => '<span class="rd">' + esc(c.short) + '</span>').join('') + '<span class="tot">' + (p.net ? 'Net' : 'Tot') + '</span><span class="tp">To par</span></div>';
                 else h += '<div class="row h"><span class="pos">Pos</span><span class="nm">' + entryHead + '</span><span class="th">' + esc(p.thruHead) + '</span><span class="tp">To par</span></div>';
                 p.rows.forEach((r) => {
                     const tie = (r.rank && rc[r.rank] > 1) ? '<small> tied</small>' : '';
                     const who = teamNames(r);
-                    const name = '<span class="nm"><span class="nm1">' + esc(r.teamName || r.name || '') + tie + '</span>' + (who ? '<span class="nm2">' + esc(who) + '</span>' : '') + '</span>';
+                    const received = r.strokesReceived || 0;
+                    const strokesLine = p.net && r.hasScores ? '<span class="nm2">' + esc(r.strokes + ' \u00b7 ' + received + ' stroke' + (received === 1 ? '' : 's') + ' \u2192 ' + (r.strokes - received)) + '</span>' : '';
+                    const name = '<span class="nm"><span class="nm1">' + esc(r.teamName || r.name || '') + tie + '</span>' + (who ? '<span class="nm2">' + esc(who) + '</span>' : '') + strokesLine + '</span>';
                     if (cols) {
                         const mine = cols.byPlayer[r.entryKey] || {};
-                        const cells = cols.columns.map((c) => { const x = mine[c.rid]; return '<span class="rd">' + (x && x.hasScores ? esc(x.strokes) + (x.complete ? '' : '<small>thru ' + esc(x.thru) + '</small>') : '\u2013') + '</span>'; }).join('');
-                        h += '<div class="row' + (r.rank === 1 ? ' lead' : '') + ev + '"><span class="pos">' + esc(r.rank || '-') + '</span>' + name + cells + '<span class="tot">' + (r.hasScores ? esc(r.strokes) : '\u2013') + '</span><span class="tp ' + toParClass(r) + '">' + esc(toParText(r)) + '</span></div>';
+                        const cells = cols.columns.map((c) => { const x = mine[c.rid]; return '<span class="rd">' + (x && x.hasScores ? esc(p.net ? x.net : x.strokes) + (x.complete ? '' : '<small>thru ' + esc(x.thru) + '</small>') : '\u2013') + '</span>'; }).join('');
+                        h += '<div class="row' + (r.rank === 1 ? ' lead' : '') + ev + '"><span class="pos">' + esc(r.rank || '-') + '</span>' + name + cells + '<span class="tot">' + (r.hasScores ? esc(p.net ? r.strokes - received : r.strokes) : '\u2013') + '</span><span class="tp ' + toParClass(r) + '">' + esc(toParText(r)) + '</span></div>';
                     } else {
                         const thru = p.thruHead === 'Rds' ? (r.hasScores ? r.roundsComplete + '/' + r.countableRounds : '-') : (r.hasScores ? r.thru : '-');
                         h += '<div class="row' + (r.rank === 1 ? ' lead' : '') + '"><span class="pos">' + esc(r.rank || '-') + '</span>' + name + '<span class="th">' + esc(thru) + '</span><span class="tp ' + toParClass(r) + '">' + esc(toParText(r)) + '</span></div>';

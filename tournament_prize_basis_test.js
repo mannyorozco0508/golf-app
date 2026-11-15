@@ -214,7 +214,9 @@ describe('5. WIRED (A1 approved 2026-11-08; this section pinned the unwired stat
     test('no board view feeds the prize list any more', () => {
         const src = SRC();
         const lb = body(src, 'function renderLeaderboard()');
-        assert.ok(lb.length > 200 && /resolveLeaderboardView\(currentData, lbRoundId, lbFlightId\)/.test(lb),
+        // RE-PINNED 2026-11-15 (Net on the combined board): the board asks on the
+        // switch's basis (lbEventOpts); the prize renderers below still do not.
+        assert.ok(lb.length > 200 && /resolveLeaderboardView\(currentData, lbRoundId, lbFlightId, lbEventOpts\(\)\)/.test(lb),
             'positive: the slice is the board renderer');
         assert.doesNotMatch(src, /cachedLeaderboardRows/);
         // LB-FINAL (2026-11-14): the board keeps lbLast for its scorecard sheet; the

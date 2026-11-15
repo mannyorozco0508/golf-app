@@ -638,7 +638,30 @@ function computeRoundLeaderboard(data, roundId, flightId) {
 // WHY combined standings are or are not available. A bare false is
 // indistinguishable from a bug to the organizer looking at the screen, so every
 // refusal carries a sentence they can act on.
-function aggregateAvailability(data) {
+//
+// THE BASIS A COMBINED BOARD IS READ ON (Net on the combined board, Manny's
+// per-file OK 2026-11-15). opts.basis is 'as-scored' (the default - every caller
+// that passes nothing gets exactly the numbers it always did), 'net' or 'gross'.
+// An explicit basis reads EVERY countable round on that basis, so the Gross/Net
+// mix is one competition and that refusal does not apply; a round whose course
+// cannot carry an allocation (netWasRefused on the net view) keeps the whole net
+// basis unavailable, with its reason, rather than mixing a net round with a gross
+// one under a Net label.
+function standingsBasis(opts) {
+    const b = opts && opts.basis;
+    return (b === 'net' || b === 'gross') ? b : 'as-scored';
+}
+
+// The round's own view, read on the chosen basis: the same handicap snapshot and
+// stroke index, so computeTournamentLeaderboard allocates per hole played exactly
+// as that round's card would if it were scored that way.
+function roundViewOnBasis(data, roundId, basis) {
+    const view = roundView(data, roundId);
+    if (!view || basis === 'as-scored') return view;
+    return Object.assign({}, view, { scoringMode: basis });
+}
+
+function aggregateAvailability(data, opts) {
     if (!isMultiRound(data)) {
         return { available: false, rows: [], reason:
             'This event is a single round, so there are no rounds to combine. Round results are the event results.' };
@@ -663,6 +686,15 @@ function aggregateAvailability(data) {
         return { available: false, rows: [], reason:
             'Combined standings are only worked out for Individual Stroke Play at the moment. Each team round still has its own leaderboard.' };
     }
+    const basis = standingsBasis(opts);
+    if (basis === 'net') {
+        const refused = ids.find(rid => netWasRefused(roundViewOnBasis(data, rid, 'net')));
+        if (refused) {
+            return { available: false, rows: [], reason:
+                `${rounds[refused].name || 'A round'} is on a course with no real stroke index, so net strokes can't be allocated for it. Net on the combined board needs a real scorecard for that round.` };
+        }
+    }
+    if (basis !== 'as-scored') return { available: true, reason: null, family: 'individual:' + basis };
     const modes = ids.map(rid => (rounds[rid].scoringMode === 'net' ? 'net' : 'gross'));
     if (!modes.every(m => m === modes[0])) {
         return { available: false, rows: [], reason:
@@ -699,19 +731,22 @@ function canAggregate(data) {
 //
 // That keeps a mid-round field ordered sensibly while a round is open, and stops a
 // golfer who skipped Saturday from leading on Sunday afternoon.
-function computeEventStandings(data, flightId) {
-    const availability = aggregateAvailability(data);
+function computeEventStandings(data, flightId, opts) {
+    const availability = aggregateAvailability(data, opts);
     if (!availability.available) return availability;
     const ids = countableRoundIds(data);
     const players = data.players || {};
     const totals = {};
+    const basis = standingsBasis(opts);
 
     ids.forEach(rid => {
-        const view = roundView(data, rid);
+        const view = roundViewOnBasis(data, rid, basis);
         const holeCount = (view.courseData || []).length;
         // The round's OWN leaderboard rows - same normalization, same handicap
         // snapshot, same net decision - so a player's event total is built from the
-        // exact numbers their round card showed.
+        // exact numbers their round card showed. On an explicit basis the same rows
+        // with the round read as net or gross; strokes are allocated per hole
+        // played, so a round in play receives only the strokes of its holes played.
         computeTournamentLeaderboard(view).forEach(row => {
             if (row.entryType !== 'player') return;
             const t = totals[row.playerId] || (totals[row.playerId] = {
@@ -774,14 +809,16 @@ function computeEventStandings(data, flightId) {
 //
 // selection is null or 'event' for the combined standings, or a round id.
 // A single-round record ignores it entirely and returns what it always did.
-function resolveLeaderboardView(data, selection, flightId) {
+// opts ({ basis }) reaches the combined standings only; a round is scored the way
+// its own setting says.
+function resolveLeaderboardView(data, selection, flightId, opts) {
     if (!isMultiRound(data)) {
         return { kind: 'round', scope: 'single', available: true, reason: null,
                  rows: computeTournamentLeaderboard(data, flightId), title: null };
     }
     const viewing = selection || 'event';
     if (viewing === 'event') {
-        const r = computeEventStandings(data, flightId);
+        const r = computeEventStandings(data, flightId, opts);
         return { kind: 'event', scope: 'event', available: r.available,
                  reason: r.reason, rows: r.rows || [], title: 'Event total' };
     }

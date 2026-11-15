@@ -411,6 +411,7 @@
         .lb-tot { width: 44px; text-align: right; font-weight: bold; font-variant-numeric: tabular-nums; }
         .lb-caret { width: 14px; text-align: right; color: var(--text-muted); font-size: 0.7rem; }
         .lb-row.lb-event { cursor: pointer; }
+        .lb-team small.lb-strokes { display: block; font-size: 0.68rem; color: var(--text-muted); font-weight: normal; line-height: 1.2; }
         .lb-row.lb-event.open { background: #fffbe6; }
         .lb-expand { padding: 8px 6px 10px; border-bottom: 1px solid var(--border-faint); background: #fafbfa; font-size: 0.78rem; }
         .lb-expand .rh { font-weight: bold; margin: 6px 0 4px; }
@@ -6559,7 +6560,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (note) { note.style.display = 'none'; note.textContent = ''; }
 
         // ONE RESOLUTION, shared with the printed sheet and the golfer's card.
-        let view = resolveLeaderboardView(currentData, lbRoundId, lbFlightId);
+        // The combined board reads the basis the switch chose (Net on the combined
+        // board, Manny's per-file OK 2026-11-15); 'as-scored' is today's numbers.
+        let view = resolveLeaderboardView(currentData, lbRoundId, lbFlightId, lbEventOpts());
         // LB-FINAL: a NET round viewed as gross (the header tap). The same engine
         // function, the same rows, with the round's scoring read as gross strokes.
         // The other direction (a gross round as net) needs stroke allocation the
@@ -6568,7 +6571,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const base = lbRoundViewFor();
             view = Object.assign({}, view, { rows: computeTournamentLeaderboard(Object.assign({}, base, { scoringMode: 'gross' }), lbFlightId), grossOfNet: true });
         }
-        lbLast = { rows: view.rows || [], kind: view.kind, rid: lbLastRoundId(view), available: !!view.available };
+        lbLast = { rows: view.rows || [], kind: view.kind, rid: lbLastRoundId(view), available: !!view.available, basis: lbDisplayBasis() };
         renderLeaderboardSubtabs();
 
         // PRIZES DO NOT READ THIS VIEW (audit #1, A1, 2026-11-08). The prize
@@ -6599,6 +6602,41 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     let lbSub = 'board';
     let lbLast = { rows: [], kind: 'round', rid: null, available: false };
     let lbRoundGross = false;
+    // GROSS | NET on the combined board (Manny's per-file OK 2026-11-15). 'as-scored'
+    // is the engine's default and today's numbers; 'net' asks the engine to read
+    // every round as net from its own handicap snapshot and stroke index. The
+    // engine decides whether Net is available (a round with no real stroke index
+    // refuses it, with the reason); the page only asks.
+    // SWITCH ON EVERYWHERE (Manny's go 2026-11-15 09:18, ADVISOR-20261115-0919): an
+    // all-net event gets its Gross half (basis 'gross'); a Gross/Net mix gets the
+    // switch with Gross selected and the real board instead of the refusal.
+    let lbEventBasis = 'as-scored';   // the viewer's choice: 'as-scored' (nothing tapped), 'gross' or 'net'
+    function lbNetAvailability() { return recordIsMultiRound() ? aggregateAvailability(currentData, { basis: 'net' }) : { available: false, reason: null }; }
+    // WHAT THE EVENT IS: 'gross' (every round gross), 'net' (every round net), 'mixed'
+    // (a Gross/Net mix the engine combines on an explicit basis) or null (no combined
+    // board at all: a single round, team rounds, nothing open).
+    function lbEventFamily() {
+        if (!recordIsMultiRound()) return null;
+        const fam = aggregateFamily(currentData);
+        if (fam === 'individual:net') return 'net';
+        if (fam === 'individual:gross') return 'gross';
+        return aggregateAvailability(currentData, { basis: 'gross' }).available ? 'mixed' : null;
+    }
+    // THE BASIS THE ENGINE IS ASKED FOR. Nothing tapped: 'as-scored' (today's numbers)
+    // on a gross or a net event, 'gross' on a mixed one (the switch's default half).
+    function lbEventOpts() {
+        const fam = lbEventFamily();
+        if (!fam) return { basis: 'as-scored' };
+        if (lbEventBasis === 'net') return { basis: lbNetAvailability().available ? 'net' : (fam === 'mixed' ? 'gross' : 'as-scored') };
+        if (lbEventBasis === 'gross') return { basis: fam === 'gross' ? 'as-scored' : 'gross' };
+        return { basis: fam === 'mixed' ? 'gross' : 'as-scored' };
+    }
+    // THE BASIS THE BOARD SHOWS, 'gross' or 'net': as-scored resolves to the family's own.
+    function lbDisplayBasis() {
+        const b = lbEventOpts().basis;
+        return b === 'as-scored' ? (lbEventFamily() === 'net' ? 'net' : 'gross') : b;
+    }
+    function setLeaderboardBasis(b) { lbEventBasis = b === 'net' ? 'net' : (b === 'gross' ? 'gross' : 'as-scored'); renderLeaderboard(); }
     function setLeaderboardSub(sub) { lbSub = ['board', 'skins', 'pairings'].includes(sub) ? sub : 'board'; renderLeaderboard(); }
     function renderLeaderboardSubtabs() {
         const panels = { board: 'lb-board-panel', skins: 'lb-skins-panel', pairings: 'lb-pairings-panel' };
@@ -6752,14 +6790,27 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!view || view.kind !== 'event' || !view.available) {
             el.style.display = 'none'; el.innerHTML = ''; note.style.display = 'none'; note.textContent = ''; return;
         }
-        const net = aggregateFamily(currentData) === 'individual:net';
-        const seg = (label, on) => `<button type="button" class="${on ? 'active' : ''}" aria-pressed="${on}" ${on ? '' : 'disabled'}>${label}</button>`;
+        // SWITCH ON EVERYWHERE (per-file OK 2026-11-15; Manny's go 09:18): Gross is
+        // always tappable (the engine reads any individual round as raw strokes); Net
+        // is tappable when every round can allocate, and disabled with the round named
+        // when one cannot.
+        const fam = lbEventFamily();
+        if (!fam) { el.style.display = 'none'; el.innerHTML = ''; note.style.display = 'none'; note.textContent = ''; return; }
+        const netAvail = fam === 'net' ? { available: true, reason: null } : lbNetAvailability();
+        const onNet = lbDisplayBasis() === 'net';
+        // The active half carries no handler (tapping it changes nothing); the other
+        // half taps across when the engine allows it and is disabled when it does not.
+        const seg = (label, on, enabled, basis) => `<button type="button" class="${on ? 'active' : ''}" aria-pressed="${on}" ${on ? '' : (enabled ? `onclick="setLeaderboardBasis('${basis}')"` : 'disabled')}>${label}</button>`;
         el.style.display = 'flex';
-        el.innerHTML = seg('Gross', !net) + seg('Net', net);
+        el.innerHTML = seg('Gross', !onNet, true, 'gross') + seg('Net', onNet, netAvail.available, 'net');
         note.style.display = 'block';
-        note.textContent = net
-            ? 'Net across the rounds, as each round is scored. A gross view of this board is not available yet.'
-            : 'Gross across the rounds. Net on the combined board is not available yet.';
+        const NET_NOTE = 'Gross so far · strokes received so far → net. Strokes are each course’s handicap for that round; on a round in play only holes played count.';
+        const TAP_NET = 'Tap Net for each round’s net from its own handicap and course.';
+        note.textContent = onNet
+            ? (fam === 'net' ? 'Net across the rounds, as each round is scored. Tap Gross for the raw strokes with no handicap.' : NET_NOTE)
+            : fam === 'net'
+                ? 'Gross across the rounds: the raw strokes with no handicap. Tap Net for the board as each round is scored.'
+                : `${fam === 'mixed' ? 'Gross across the rounds: every round read as raw strokes, the Net rounds too.' : 'Gross across the rounds.'} ${netAvail.available ? TAP_NET : netAvail.reason}`;
     }
 
     // ONE ROW RENDERER for every board. A round, a flight and the combined standings
@@ -6820,21 +6871,27 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // expand of the first MR build; the cards are the same markup).
     function renderEventBoardRows(container, rows, fmt) {
         const { tieTagOf, pendingTagOf, toParText, toParClass } = fmt;
-        const cols = eventRoundColumns(currentData);
+        // NET VIEW (the switch, Manny's per-file OK 2026-11-15): each round cell is that
+        // round's net, the total column reads Net, and the strokes line under the
+        // name is "gross · strokes received → net" from the engine's own row.
+        const netView = lbLast.basis === 'net';
+        const cols = eventRoundColumns(currentData, null, { basis: lbLast.basis });
         const rc = cols.columns;
         let html = `<div class="lb-row" style="font-weight:bold; color:var(--text-muted); font-size:0.75rem; text-transform:uppercase;">
-            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span>${rc.map(c => `<span class="lb-rnd" title="${escapeHtml(c.name)}">${c.short}</span>`).join('')}<span class="lb-tot">Tot</span><span class="lb-score">To Par</span><span class="lb-caret"></span>
+            <span class="lb-pos">Pos</span><span class="lb-team">${entryColumnLabel(currentData)}</span>${rc.map(c => `<span class="lb-rnd" title="${escapeHtml(c.name)}">${c.short}</span>`).join('')}<span class="lb-tot">${netView ? 'Net' : 'Tot'}</span><span class="lb-score">To Par</span><span class="lb-caret"></span>
         </div>`;
         rows.forEach(r => {
             const mine = cols.byPlayer[r.entryKey] || {};
             const cells = rc.map(c => {
                 const x = mine[c.rid];
                 if (!x || !x.hasScores) return '<span class="lb-rnd">–</span>';
-                return `<span class="lb-rnd">${x.strokes}${x.complete ? '' : `<small>thru ${x.thru}</small>`}</span>`;
+                return `<span class="lb-rnd">${netView ? x.net : x.strokes}${x.complete ? '' : `<small>thru ${x.thru}</small>`}</span>`;
             }).join('');
+            const received = r.strokesReceived || 0;
+            const strokesLine = netView && r.hasScores ? `<small class="lb-strokes">${r.strokes} · ${received} stroke${received === 1 ? '' : 's'} → ${r.strokes - received}</small>` : '';
             html += `<div class="lb-row lb-event lb-tap ${r.rank === 1 ? 'leader' : ''}" data-entry="${escapeHtml(r.entryKey)}" onclick="openLeaderboardSheet(this.dataset.entry)">
                 <span class="lb-pos">${r.rank || '-'}</span>
-                <span class="lb-team">${escapeHtml(r.teamName)}${tieTagOf(r)}${pendingTagOf(r)}</span>${cells}<span class="lb-tot">${r.hasScores ? r.strokes : '–'}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${tieTagOf(r)}${pendingTagOf(r)}${strokesLine}</span>${cells}<span class="lb-tot">${r.hasScores ? (netView ? r.strokes - received : r.strokes) : '–'}</span>
                 <span class="${toParClass(r)}">${toParText(r)}</span><span class="lb-caret">›</span>
             </div>`;
         });
@@ -6843,19 +6900,26 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     // BOTH ROUNDS' CARDS under an opened row: hole, par, score with the ring the
     // live card draws (circle under par, square over; the number keeps its colour).
+    // In Net view the round line reads "70 · 4 strokes → 66" (the same cell the
+    // board showed, eventRoundColumns on the same basis) and its to par is net.
     function renderEventEntryCards(r, rc) {
         const players = currentData.players || {};
         const hcp = players[r.entryKey] ? players[r.entryKey].handicap : null;
+        const netView = lbLast.basis === 'net';
+        const netCells = netView ? (eventRoundColumns(currentData, null, { basis: 'net' }).byPlayer[r.entryKey] || {}) : {};
         let html = '<div class="lb-expand">';
         rc.forEach(c => {
             const card = playerRoundHoles(currentData, c.rid, r.entryKey);
             const played = card.thru;
             const parPlayed = card.holes.filter(h => h.score > 0).reduce((a, h) => a + h.par, 0);
-            const tp = card.total - parPlayed;
+            const x = netCells[c.rid];
+            const received = x && x.hasScores ? x.strokesReceived : 0;
+            const tp = card.total - received - parPlayed;
             const tpText = tp === 0 ? 'E' : (tp > 0 ? `+${tp}` : String(tp));
             const state = !played ? 'not started' : (played === card.holes.length ? 'complete' : `thru ${played}`);
             const where = c.courseName && c.courseName !== c.name ? ` · ${escapeHtml(c.courseName)}` : '';
-            html += `<div class="rh">${escapeHtml(c.name)}${where} · ${played ? card.total : '–'}${played ? ` <span class="${tp < 0 ? 'under' : ''}">(${tpText})</span>` : ''}<small>${state}${hcp !== null && hcp !== undefined && hcp !== '' ? ` · handicap ${escapeHtml(String(hcp))}` : ''}</small></div>`;
+            const score = !played ? '–' : (netView ? `${card.total} · ${received} stroke${received === 1 ? '' : 's'} → ${card.total - received}` : card.total);
+            html += `<div class="rh">${escapeHtml(c.name)}${where} · ${score}${played ? ` <span class="${tp < 0 ? 'under' : ''}">(${tpText})</span>` : ''}<small>${state}${hcp !== null && hcp !== undefined && hcp !== '' ? ` · handicap ${escapeHtml(String(hcp))}` : ''}</small></div>`;
             html += lbHolesGrid(card.holes.slice(0, 9), 'Out', card.out, card.parOut);
             if (card.holes.length > 9) html += lbHolesGrid(card.holes.slice(9, 18), 'In', card.inn, card.parIn);
         });
@@ -7464,11 +7528,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const scoring = r.format === 'individual' ? (netIsInPlay(r) ? 'Net' : 'Gross') : '';
             return `<div class="rc-tile"><b>${escapeHtml(r.name || 'Round')}</b>${escapeHtml(r.courseName || 'No course set')}${holes ? ` · ${holes} holes` : ''}<br>${formatLabelFor(r.format)}${scoring ? ' · ' + scoring : ''}<br><span class="st">${state}</span></div>`;
         }).join('');
-        const avail = aggregateAvailability(currentData);
-        const fam = aggregateFamily(currentData);
-        const board = avail.available
-            ? `Event total · ${cols.columns.map((c) => c.short).join(' · ')} · Tot · ${fam === 'individual:net' ? 'Net' : 'Gross'}${fam === 'individual:net' ? '' : ' (Net on the combined board is not available yet)'}`
-            : avail.reason;
+        // Net on the combined board (per-file OK 2026-11-15; switch on everywhere 09:18):
+        // the engine says whether every round can be read as net; a round that cannot
+        // names itself here. A Gross/Net mix is a board now, not a refusal.
+        const fam = lbEventFamily();
+        const netAvail = fam === 'net' ? { available: true } : aggregateAvailability(currentData, { basis: 'net' });
+        const board = fam
+            ? `Event total · ${cols.columns.map((c) => c.short).join(' · ')} · Tot · ${fam === 'net' ? 'Net and Gross' : (netAvail.available ? 'Gross and Net' : `Gross (${netAvail.reason})`)}`
+            : aggregateAvailability(currentData).reason;
         const flights = currentData.flights || {};
         const fids = Object.keys(flights).sort((a, b) => (flights[a].createdAt || 0) - (flights[b].createdAt || 0));
         const flightLine = fids.length

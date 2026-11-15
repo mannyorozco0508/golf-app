@@ -31,6 +31,12 @@
 //   (k3) the Skins tab passes no {tab:true} (owner controls leak in) -> B1, B2 red;
 //   (k4) stepLeaderboardSheet ignores its direction -> E2 red here and B2 of
 //        tournament_event_board_test.js red.
+// RE-PIN 2026-11-15 09:18 (Manny: "go net (switch on everywhere)"): C3's mixed
+// arm flipped - a Gross/Net mix now shows the switch with Gross selected instead
+// of the refusal. BASELINE against preview-net 62f9e19e (tournament.html sha256
+// 25d00b9a501adea9...): 18 tests - 17 pass / 1 fail (C3). With the build: 18 / 0.
+// CONTROL (q2 in tournament_event_board_test.js: the mix treated as no board) ->
+// C3 red; tournament.html restored by sha (c0953d7a50209181).
 // ============================================================================
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
@@ -174,7 +180,10 @@ describe('C. the score header on a round board', () => {
         assert.match(text(b.split('</div>')[0]), /^Pos Golfer Thru Net ⇄$/);
         assert.equal(firstToPar(b), netFirst, 'back to the net board');
     });
-    test('C3 the Event chip keeps the Gross | Net switch and a plain header (both rounds net); one net + one gross round is refused, as the engine says', () => {
+    // RE-PINNED 2026-11-15 09:18 (Manny: "go net (switch on everywhere)"): a Gross/Net
+    // mix is no longer refused on the Event chip - the switch shows with Gross
+    // selected and the engine combines on that basis (tournament_event_board_test.js D9).
+    test('C3 the Event chip keeps the Gross | Net switch and a plain header (both rounds net); one net + one gross round gets the switch too, Gross selected', () => {
         const both = netRound(record());
         both.rounds.r2.scoringMode = 'net'; both.rounds.r2.handicaps = both.rounds.r1.handicaps;
         const sb = arrive(both);
@@ -182,8 +191,11 @@ describe('C. the score header on a round board', () => {
         assert.match(el(sb, 'lb-basis').innerHTML, /class="active" aria-pressed="true" >Net</);
         assert.ok(!/lb-th-tap/.test(board(sb)), 'the event board has no tappable header');
         const mixed = arrive(netRound(record()));
-        assert.equal(el(mixed, 'lb-basis').style.display, 'none', 'no switch on a refused board');
-        assert.match(el(mixed, 'lb-combined-note').textContent, /mixes Gross and Net rounds/);
+        assert.equal(el(mixed, 'lb-basis').style.display, 'flex', 'the switch shows on a mixed event');
+        assert.match(el(mixed, 'lb-basis').innerHTML, /class="active" aria-pressed="true" >Gross</);
+        assert.equal(el(mixed, 'lb-combined-note').style.display, 'none', 'no refusal sentence');
+        assert.ok(!/mixes Gross and Net rounds/.test(el(mixed, 'lb-combined-note').textContent));
+        assert.ok(!/lb-th-tap/.test(board(mixed)), 'and still no tappable header on the event board');
     });
 });
 
