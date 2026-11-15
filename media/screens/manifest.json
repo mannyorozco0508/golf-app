@@ -25,8 +25,12 @@
       ],
       "width": 940,
       "height": 2040,
-      "recaptured": "2026-11-14 (2.0.7 site update, web-207-site)",
-      "captured": "release-207 2.0.7 (3) App Store screenshot outbox/appstore-207-submit/iphone-6.9/07-green-slope.png (1320x2868, as submitted to Apple): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040, rounded corners clear) and saved as WebP 940 and 400 wide in headless Chrome; the original PNG is untouched."
+      "recaptured": "2026-11-15 (old slope pictures replaced, ADVISOR-20261115-1643, Manny 4:42 PM)",
+      "captured": "release-208 2.0.8 (1) App Store screenshot outbox/appstore-208-submit/iphone-6.9/07-green-slope.png (1320x2868, as uploaded 2026-11-15): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040) with sips and saved as WebP 940 and 400 wide in headless Chrome (canvas, quality .82); the original PNG is untouched. Why: the 2.0.7 frame drew the old blocky slope with the target ring over the arrows and Net 35 (−1) in GREEN; the site shows under par in red only.",
+      "previous": {
+        "recaptured": "2026-11-14 (2.0.7 site update, web-207-site)",
+        "captured": "release-207 2.0.7 (3) App Store screenshot outbox/appstore-207-submit/iphone-6.9/07-green-slope.png (1320x2868, as submitted to Apple): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040, rounded corners clear) and saved as WebP 940 and 400 wide in headless Chrome; the original PNG is untouched."
+      }
     },
     {
       "key": "green-size",
@@ -38,8 +42,12 @@
       ],
       "width": 940,
       "height": 2040,
-      "recaptured": "2026-11-14 (2.0.7 site update, web-207-site)",
-      "captured": "release-207 2.0.7 (3) App Store screenshot outbox/appstore-207-submit/iphone-6.9/06-aim-tip.png (1320x2868, as submitted to Apple): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040, rounded corners clear) and saved as WebP 940 and 400 wide in headless Chrome; the original PNG is untouched."
+      "recaptured": "2026-11-15 (old slope pictures replaced, ADVISOR-20261115-1643, Manny 4:42 PM)",
+      "captured": "release-208 2.0.8 (1) App Store screenshot outbox/appstore-208-submit/iphone-6.9/06-aim-tip.png (1320x2868, as uploaded 2026-11-15): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040) with sips and saved as WebP 940 and 400 wide in headless Chrome (canvas, quality .82); the original PNG is untouched. Why: the 2.0.7 frame (06-aim-tip of that shoot) showed Net 51 (−1) in GREEN; the site shows under par in red only.",
+      "previous": {
+        "recaptured": "2026-11-14 (2.0.7 site update, web-207-site)",
+        "captured": "release-207 2.0.7 (3) App Store screenshot outbox/appstore-207-submit/iphone-6.9/06-aim-tip.png (1320x2868, as submitted to Apple): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040, rounded corners clear) and saved as WebP 940 and 400 wide in headless Chrome; the original PNG is untouched."
+      }
     },
     {
       "key": "team-card",
@@ -77,8 +85,12 @@
       ],
       "width": 940,
       "height": 2040,
-      "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
-      "captured": "release-207 895da9fc: Dobson Ranch hole 2, 140 yds out, My bag + the shot log seeded as coach1_aim_tip_chrome_test.js does (Aim tip: 8 yds left), the green size line, the Slope switch under Ask; same harness as gps."
+      "recaptured": "2026-11-15 (old slope pictures replaced, ADVISOR-20261115-1643, Manny 4:42 PM)",
+      "captured": "release-208 2.0.8 (1) App Store screenshot outbox/appstore-208-submit/iphone-6.9/06-aim-tip.png (1320x2868, as uploaded 2026-11-15): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040) with sips and saved as WebP 940 and 400 wide in headless Chrome (canvas, quality .82); the original PNG is untouched. Why: the 2.0.7 web-app capture (Dobson Ranch 2) showed Thru 1 · 4 (−1) · Net 3 (−2) in GREEN; the 2.0.8 aim-tip frame is the same feature (plays-like + aim tip + green size), so green-size and plays-like now share one frame until a 2.0.8 web capture exists; the site shows under par in red only.",
+      "previous": {
+        "recaptured": "2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-20261113-1246)",
+        "captured": "release-207 895da9fc: Dobson Ranch hole 2, 140 yds out, My bag + the shot log seeded as coach1_aim_tip_chrome_test.js does (Aim tip: 8 yds left), the green size line, the Slope switch under Ask; same harness as gps."
+      }
     },
     {
       "key": "hazards",
