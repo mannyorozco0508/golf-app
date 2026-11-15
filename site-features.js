@@ -67,12 +67,27 @@
         each(cs, function (c, k) {
             var img = c.querySelector('.ph img'), vid = c.querySelector('.ph video');
             var set = (img.getAttribute('srcset') || '').split(',').map(function (s) { return s.trim().split(' ')[0]; });
-            items.push({ card: c, group: name, n: k + 1, of: cs.length, title: c.querySelector('h3').textContent,
+            items.push({ card: c, key: c.getAttribute('data-key'), group: name, n: k + 1, of: cs.length, title: c.querySelector('h3').textContent,
                 full: set[set.length - 1] || img.getAttribute('src'), alt: img.getAttribute('alt'),
                 w: img.getAttribute('width'), h: img.getAttribute('height'), clip: vid ? vid.getAttribute('data-src') : null,
                 fit: c.querySelector('.ph .s.fit') ? c.querySelector('.ph .s').style.background : '' });
         });
     });
+    // HOMEPAGE A (Nov 15): the pictures the rows do not have (the scene sheets' [data-shot] buttons: media/home/) are viewer
+    // items too, after the cards, grouped by their sheet. A wide one (the TV board) gets a 16:9 slide.
+    (function () {
+        var shots = document.querySelectorAll('[data-shot]'), byGroup = {};
+        each(shots, function (b) { var g = b.getAttribute('data-group') || 'More'; (byGroup[g] = byGroup[g] || []).push(b); });
+        Object.keys(byGroup).forEach(function (g) {
+            byGroup[g].forEach(function (b, k) {
+                var img = b.querySelector('img');
+                var set = (img.getAttribute('srcset') || '').split(',').map(function (s) { return s.trim().split(' ')[0]; });
+                items.push({ card: null, key: b.getAttribute('data-shot'), group: g, n: k + 1, of: byGroup[g].length, title: b.querySelector('b').textContent,
+                    full: set[set.length - 1] || img.getAttribute('src'), alt: img.getAttribute('alt'),
+                    w: img.getAttribute('width'), h: img.getAttribute('height'), clip: null, fit: '', wide: b.hasAttribute('data-wide') });
+            });
+        });
+    })();
     var cur = -1, opener = null, built = false, ourState = false, ignorePop = false;
 
     function build() {
@@ -83,7 +98,7 @@
             li.setAttribute('aria-roledescription', 'slide');
             li.setAttribute('aria-label', it.group + ' ' + it.n + ' of ' + it.of + ': ' + it.title);
             var box = document.createElement('div');
-            box.className = 'fv-img' + (it.fit ? ' fit' : '');
+            box.className = 'fv-img' + (it.fit ? ' fit' : '') + (it.wide ? ' wide' : '');
             if (it.fit) box.style.background = it.fit;
             li.appendChild(box);
             track.appendChild(li);
@@ -155,6 +170,17 @@
         var i = items.map(function (x) { return x.card; }).indexOf(c);
         c.addEventListener('click', function (ev) { ev.preventDefault(); open(i, b); });
     });
+    // HOMEPAGE A: anything with data-open-key opens the viewer at that feature (a tile in "at a glance", a picture in a scene sheet).
+    function openKey(key, from) {
+        var i = -1;
+        items.some(function (x, k) { if (x.key === key) { i = k; return true; } return false; });
+        if (i >= 0) open(i, from);
+        return i >= 0;
+    }
+    document.addEventListener('click', function (ev) {
+        var b = ev.target.closest && ev.target.closest('[data-open-key]');
+        if (b) { ev.preventDefault(); openKey(b.getAttribute('data-open-key'), b); }
+    });
     $('fv-x').addEventListener('click', function () { close(false); });
     $('fv-prev').addEventListener('click', function () { show(cur - 1, true); });
     $('fv-next').addEventListener('click', function () { show(cur + 1, true); });
@@ -188,6 +214,39 @@
             f[(k + (ev.shiftKey ? -1 : 1) + f.length) % f.length].focus();
         }
     });
+
+    // ---- 2b. THE SCENE SHEETS (homepage A, Nov 15) -------------------------------------
+    // A mosaic tile or a scene card ([data-sheet="x"]) opens #sheet-x: that scene's pictures as thumbnails, each a
+    // [data-open-key] button into the viewer above (which stacks over the sheet; closing it returns focus to the thumbnail).
+    // X, Esc or a tap on the dark backdrop closes the sheet and focus returns to what opened it. One sheet at a time.
+    var sheetOpener = null;
+    function closeSheet() {
+        var s = document.querySelector('.sheet:not([hidden])');
+        if (!s) return;
+        s.hidden = true;
+        document.documentElement.classList.remove('sheet-open');
+        if (sheetOpener && sheetOpener.focus) sheetOpener.focus();
+        sheetOpener = null;
+    }
+    document.addEventListener('click', function (ev) {
+        if (!ev.target.closest) return;
+        var t = ev.target.closest('[data-sheet]');
+        if (t) {
+            var s = $('sheet-' + t.getAttribute('data-sheet'));
+            if (!s) return;
+            ev.preventDefault();
+            closeSheet();
+            sheetOpener = t;
+            s.hidden = false;
+            document.documentElement.classList.add('sheet-open');
+            var x = s.querySelector('.sh-x'); if (x) x.focus();
+            return;
+        }
+        if (ev.target.closest('.sh-x') || (ev.target.classList && ev.target.classList.contains('sheet'))) closeSheet();
+    });
+    // Esc with the viewer open closes the viewer only (its own handler above; the key bubbles up from inside it with
+    // fv already hidden, so the sheet must not read that same key): the sheet closes on the NEXT Esc.
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && fv.hidden && !fv.contains(ev.target)) closeSheet(); });
 
     // ---- 3. TRY THE GPS ----------------------------------------------------------
     var map = $('tg-map');
