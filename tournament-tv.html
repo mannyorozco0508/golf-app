@@ -216,22 +216,29 @@
         const selections = [];
         if (multi) {
             const ev = resolveLeaderboardView(d, 'event', null);
-            if (ev.available) selections.push({ sel: 'event', title: (ev.title || 'Event total') + ' \u00b7 ' + (typeof aggregateFamily === 'function' && aggregateFamily(d) === 'individual:net' ? 'Net' : 'Gross') });
-            else Object.keys(d.rounds || {}).forEach((rid) => selections.push({ sel: rid, title: (d.rounds[rid] && d.rounds[rid].name) || 'Round' }));
-            // THE NET PAGES (Manny's per-file OK 2026-11-15): after the Gross pages, the
-            // same board with every round read as net, when the engine allows it (a
-            // round with no real stroke index keeps them off the rotation).
-            if (ev.available && typeof aggregateFamily === 'function' && aggregateFamily(d) !== 'individual:net'
-                && typeof aggregateAvailability === 'function' && aggregateAvailability(d, { basis: 'net' }).available) {
-                selections.push({ sel: 'event', title: (ev.title || 'Event total') + ' · Net', opts: { basis: 'net' } });
-            }
+            const title = ev.title || 'Event total';
+            const fam = typeof aggregateFamily === 'function' ? aggregateFamily(d) : null;
+            const can = (b) => typeof aggregateAvailability === 'function' && aggregateAvailability(d, { basis: b }).available;
+            // BOTH BASES ON THE ROTATION (Manny's per-file OK 2026-11-15; switch on
+            // everywhere 09:18): the scored basis first, the other after it. An all-gross
+            // event: Gross (as scored) then Net when every round can allocate; an all-net
+            // event: Net (as scored) then Gross; a Gross/Net mix: Gross then Net, the
+            // engine combining on the explicit basis. A round with no real stroke index
+            // keeps the Net pages off the rotation.
+            if (ev.available && fam === 'individual:net') {
+                selections.push({ sel: 'event', title: title + ' \u00b7 Net', display: 'net' });
+                selections.push({ sel: 'event', title: title + ' \u00b7 Gross', opts: { basis: 'gross' }, display: 'gross' });
+            } else if (ev.available || can('gross')) {
+                selections.push({ sel: 'event', title: title + ' \u00b7 Gross', opts: ev.available ? undefined : { basis: 'gross' }, display: 'gross' });
+                if (can('net')) selections.push({ sel: 'event', title: title + ' \u00b7 Net', opts: { basis: 'net' }, display: 'net' });
+            } else Object.keys(d.rounds || {}).forEach((rid) => selections.push({ sel: rid, title: (d.rounds[rid] && d.rounds[rid].name) || 'Round' }));
         } else selections.push({ sel: null, title: '' });
-        selections.forEach(({ sel, title, opts }) => {
+        selections.forEach(({ sel, title, opts, display }) => {
             const scopes = fids.length ? fids.map((f) => ({ fid: f, name: flights[f].name || 'Flight' })) : [{ fid: null, name: '' }];
             scopes.forEach(({ fid, name }) => {
                 const v = resolveLeaderboardView(d, sel, fid, opts);
-                const net = !!(opts && opts.basis === 'net');
-                const cols = v.kind === 'event' && typeof eventRoundColumns === 'function' ? eventRoundColumns(d, null, opts) : null;
+                const net = display === 'net';
+                const cols = v.kind === 'event' && typeof eventRoundColumns === 'function' ? eventRoundColumns(d, null, net ? { basis: 'net' } : opts) : null;
                 const rows = v.available ? v.rows : [];
                 const label = [title, name].filter(Boolean).join(' · ');
                 if (!rows.length) { out.push({ kind: 'board', label: label || 'Leaderboard', display: label || 'Leaderboard', rows: [], thruHead: v.kind === 'event' ? 'Rds' : 'Thru', cols, net, note: v.available ? 'No scores yet.' : (v.reason || '') }); return; }

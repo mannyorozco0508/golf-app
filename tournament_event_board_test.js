@@ -55,6 +55,19 @@
 //        n1 -> D5, D7, F6 red; n2 -> D6 red; n3 -> D6 red;
 //   (p1) renderLeaderboardBasis keeps the Net half disabled (enabled flag false)
 //        -> D1, D5, D7 red (94 / 3 across the two files).
+//
+// SWITCH ON EVERYWHERE (Manny's go 2026-11-15 09:18, ADVISOR-20261115-0919): D3
+// re-pinned (the Gross half of an all-net event is enabled, the default board is
+// the net one), D8 (tap Gross on an all-net event) and D9 (a Gross/Net mix gets the
+// switch, Gross selected, the real board) new; D5's Gross onclick re-pinned to
+// 'gross'. No engine change. BASELINE against preview-net 62f9e19e (tournament.html
+// sha256 25d00b9a501adea9..., engine 44a4cba4...), clean worktree at that commit:
+// 29 tests - 25 pass / 4 fail (D3, D5, D8, D9). With the build: 29 pass / 0 fail.
+// CONTROLS (tournament.html restored by sha from a saved copy, RESTORED-OK
+// c0953d7a50209181; measured with tournament_leaderboard_tabs_test.js, 47 tests):
+//   (q1) the Gross half kept disabled on an all-net event -> D3, D8 red (45 / 2);
+//   (q2) lbEventFamily treats a Gross/Net mix as no board (returns null) -> D9 red
+//        here and C3 of the tabs test red (45 / 2).
 // ============================================================================
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
@@ -230,7 +243,7 @@ describe('D. Gross | Net above the combined board', () => {
         const sb = arrive(record());
         tap(sb, el(sb, 'lb-basis').innerHTML, (t) => /setLeaderboardBasis\('net'\)/.test(t));
         const h = el(sb, 'lb-basis').innerHTML;
-        assert.match(h, /<button type="button" class="" aria-pressed="false" onclick="setLeaderboardBasis\('as-scored'\)">Gross<\/button>/);
+        assert.match(h, /<button type="button" class="" aria-pressed="false" onclick="setLeaderboardBasis\('gross'\)">Gross<\/button>/);
         assert.match(h, /<button type="button" class="active" aria-pressed="true" >Net<\/button>/);
         assert.equal(el(sb, 'lb-basis-note').textContent, 'Gross so far · strokes received so far → net. Strokes are each course’s handicap for that round; on a round in play only holes played count.');
         const b = board(sb);
@@ -249,7 +262,7 @@ describe('D. Gross | Net above the combined board', () => {
         assert.match(rows.find((r) => /Sam Ortiz/.test(r)), /lb-pos">5<\/span>/, 'Sam is 5th net (2nd gross)');
         assert.equal(rows.filter((r) => /lb-score under/.test(r)).length, 5, 'five golfers under par net; the class still sits only on negative to-par cells');
         assert.ok(!/lb-score over/.test(b));
-        tap(sb, el(sb, 'lb-basis').innerHTML, (t) => /setLeaderboardBasis\('as-scored'\)/.test(t));
+        tap(sb, el(sb, 'lb-basis').innerHTML, (t) => /setLeaderboardBasis\('gross'\)/.test(t));
         const g = board(sb);
         assert.equal(text(g.split('</div>')[0]), 'Pos Golfer R1 R2 Tot To Par');
         assert.ok(!/lb-strokes/.test(g));
@@ -285,14 +298,56 @@ describe('D. Gross | Net above the combined board', () => {
         tap(sb, el(sb, 'lb-round-filter').innerHTML, (t) => /setLeaderboardRound\('event'\)/.test(t));
         assert.equal(el(sb, 'lb-basis').style.display, 'flex');
     });
-    test('D3 all-net rounds: Net is the active half and Gross is the disabled one', () => {
-        const rec = record();
-        rec.rounds.r1.scoringMode = 'net'; rec.rounds.r2.scoringMode = 'net';
-        const sb = arrive(rec);
+    // RE-PINNED 2026-11-15 09:18 (Manny: "go net (switch on everywhere)"): the Gross
+    // half of an all-net event is ENABLED; the "not available yet" sentence is gone.
+    const allNet = () => { const rec = record(); rec.rounds.r1.scoringMode = 'net'; rec.rounds.r2.scoringMode = 'net'; return rec; };
+    test('D3 all-net rounds: Net is the active half, Gross is enabled; the default board is the net one with the strokes line', () => {
+        const sb = arrive(allNet());
         const h = el(sb, 'lb-basis').innerHTML;
-        assert.match(h, /class="" aria-pressed="false" disabled>Gross<\/button>/);
-        assert.match(h, /class="active" aria-pressed="true" >Net<\/button>/);
-        assert.match(el(sb, 'lb-basis-note').textContent, /^Net across the rounds/);
+        assert.match(h, /<button type="button" class="" aria-pressed="false" onclick="setLeaderboardBasis\('gross'\)">Gross<\/button>/);
+        assert.match(h, /<button type="button" class="active" aria-pressed="true" >Net<\/button>/);
+        assert.ok(!/disabled/.test(h));
+        assert.equal(el(sb, 'lb-basis-note').textContent, 'Net across the rounds, as each round is scored. Tap Gross for the raw strokes with no handicap.');
+        const b = board(sb);
+        assert.equal(text(b.split('</div>')[0]), 'Pos Golfer R1 R2 Net To Par');
+        assert.match(rowsOf(b)[0], /lb-pos">1<\/span>[\s\S]*Ana Diaz[\s\S]*<small class="lb-strokes">106 · 8 strokes → 98<\/small>[\s\S]*<span class="lb-tot">98<\/span>/);
+    });
+    test('D8 all-net rounds, tap Gross: the raw-strokes board (Tot, gross cells, no strokes line, gross to par); Net brings it back', () => {
+        const sb = arrive(allNet());
+        tap(sb, el(sb, 'lb-basis').innerHTML, (t) => /setLeaderboardBasis\('gross'\)/.test(t));
+        const h = el(sb, 'lb-basis').innerHTML;
+        assert.match(h, /<button type="button" class="active" aria-pressed="true" >Gross<\/button>/);
+        assert.match(h, /<button type="button" class="" aria-pressed="false" onclick="setLeaderboardBasis\('net'\)">Net<\/button>/);
+        assert.equal(el(sb, 'lb-basis-note').textContent, 'Gross across the rounds: the raw strokes with no handicap. Tap Net for the board as each round is scored.');
+        const b = board(sb);
+        assert.equal(text(b.split('</div>')[0]), 'Pos Golfer R1 R2 Tot To Par');
+        assert.ok(!/lb-strokes/.test(b), 'no strokes line on the gross board');
+        assert.match(rowsOf(b)[0], /lb-pos">1<\/span>[\s\S]*Ana Diaz[\s\S]*<span class="lb-rnd">70<\/span><span class="lb-rnd">36<small>thru 9<\/small><\/span><span class="lb-tot">106<\/span>\s*<span class="lb-score under">-2<\/span>/);
+        assert.match(rowsOf(b)[1], /Sam Ortiz/, 'the gross order: Sam second');
+        assert.equal(rowsOf(b).filter((r) => /lb-score under/.test(r)).length, 1, 'one golfer under par gross');
+        tap(sb, el(sb, 'lb-basis').innerHTML, (t) => /setLeaderboardBasis\('net'\)/.test(t));
+        assert.equal(text(board(sb).split('</div>')[0]), 'Pos Golfer R1 R2 Net To Par');
+        assert.match(rowsOf(board(sb))[0], /106 · 8 strokes → 98/);
+    });
+    test('D9 a Gross/Net mix: the switch with Gross selected and the real board, not the refusal; Net is enabled and nets every round', () => {
+        const rec = record(); rec.rounds.r1.scoringMode = 'net';   // Cascade net, Olympic gross
+        const sb = arrive(rec);
+        assert.equal(el(sb, 'lb-combined-note').style.display, 'none', 'no refusal sentence');
+        assert.equal(el(sb, 'lb-combined-note').textContent, '');
+        const h = el(sb, 'lb-basis').innerHTML;
+        assert.match(h, /<button type="button" class="active" aria-pressed="true" >Gross<\/button>/);
+        assert.match(h, /<button type="button" class="" aria-pressed="false" onclick="setLeaderboardBasis\('net'\)">Net<\/button>/);
+        assert.equal(el(sb, 'lb-basis-note').textContent, 'Gross across the rounds: every round read as raw strokes, the Net rounds too. Tap Net for each round’s net from its own handicap and course.');
+        const b = board(sb);
+        assert.equal(text(b.split('</div>')[0]), 'Pos Golfer R1 R2 Tot To Par');
+        assert.match(rowsOf(b)[0], /Ana Diaz[\s\S]*<span class="lb-rnd">70<\/span><span class="lb-rnd">36<small>thru 9<\/small><\/span><span class="lb-tot">106<\/span>\s*<span class="lb-score under">-2<\/span>/, 'Cascade read as raw strokes although it is a Net round');
+        assert.equal(rowsOf(b).length, 8);
+        assert.match(text(el(sb, 'rounds-card').innerHTML), /Board shows Event total · R1 · R2 · Tot · Gross and Net Flights/);
+        tap(sb, el(sb, 'lb-basis').innerHTML, (t) => /setLeaderboardBasis\('net'\)/.test(t));
+        const n = board(sb);
+        assert.equal(text(n.split('</div>')[0]), 'Pos Golfer R1 R2 Net To Par');
+        assert.match(rowsOf(n)[0], /Ana Diaz[\s\S]*<small class="lb-strokes">106 · 8 strokes → 98<\/small>[\s\S]*<span class="lb-rnd">66<\/span><span class="lb-rnd">32<small>thru 9<\/small><\/span><span class="lb-tot">98<\/span>/);
+        assert.equal(el(sb, 'lb-basis-note').textContent, 'Gross so far · strokes received so far → net. Strokes are each course’s handicap for that round; on a round in play only holes played count.');
     });
     test('D4 a single-round event shows no switch at all', () => {
         const rec = record();

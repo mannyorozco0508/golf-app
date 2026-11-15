@@ -28,6 +28,12 @@
 // clean worktree at that commit: 4 tests - 3 pass / 1 fail (four reads of the
 // rotation came back GROSS · A, GROSS · A, GROSS · B, GROSS · A - no Net page
 // exists). With the build: 4 pass / 0 fail.
+//   5 (switch on everywhere, Manny's go 2026-11-15 09:18) an all-net event: the
+//     Net pages lead (strokes line, NET for Tot) and the Gross pages (raw strokes,
+//     TOT) follow on the same rotation. BASELINE against preview-net 62f9e19e
+//     (tournament-tv.html sha256 db795013245bb16d...), clean worktree at that
+//     commit: 5 tests - 4 pass / 1 fail (test 5: no Gross page exists for an
+//     all-net event there). With the build: 5 pass / 0 fail.
 // ============================================================================
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
@@ -99,4 +105,25 @@ test('4 the Net pages follow the Gross pages on the rotation: Net in the head, t
     under.forEach((c) => assert.equal(c.color, 'rgb(255, 107, 107)', 'under par is the red on the Net page too: ' + c.text));
     netA.tps.forEach((c) => assert.notEqual(c.color, 'rgb(212, 242, 138)', 'nothing lime: ' + c.text));
     assert.match(netA.pageLabel, /^Event total · Net · A Flight/);
+});
+
+// SWITCH ON EVERYWHERE (Manny's go 2026-11-15 09:18): an all-net event rotates its
+// Net pages (as scored, with the strokes line) and then its Gross pages (raw
+// strokes). Same four reads on the page's own 3 s timer; nothing is called.
+test('5 an all-net event: Net pages first (strokes line), then Gross pages (raw strokes, Tot), on the rotation', async () => {
+    const db = F.db(); db.tournaments.STK.rounds.r1.scoringMode = 'net'; db.tournaments.STK.rounds.r2.scoringMode = 'net';
+    const steps = [READ, { sleep: 3100 }, READ, { sleep: 3100 }, READ, { sleep: 3100 }, READ];
+    const r = await arriveCold({ url: fileUrl('tournament-tv.html', 'tourney=STK&every=3'), db, auth: { uid: 'u-tv', isAnonymous: true }, viewport: TV, settleMs: 3000, steps });
+    assert.ok(r.ok, r.reason);
+    const reads = r.value.filter((v) => typeof v === 'string' && v[0] === '{').map((v) => JSON.parse(v));
+    const titles = reads.map((a) => a.title);
+    assert.match(titles[0], /^EVENT TOTAL · NET · A FLIGHT$/, 'the scored basis leads: ' + titles.join(' | '));
+    assert.equal(reads[0].head, 'POS GOLFER R1 R2 NET TO PAR');
+    assert.match(reads[0].rows[0], /^1 Ana Diaz 106 · 8 strokes → 98 66 32 thru 9 98 -10$/);
+    const grossA = reads.find((a) => /^EVENT TOTAL · GROSS · A FLIGHT$/.test(a.title));
+    assert.ok(grossA, 'a Gross · A Flight page came round within four reads: ' + titles.join(' | '));
+    assert.equal(grossA.head, 'POS GOLFER R1 R2 TOT TO PAR');
+    assert.match(grossA.rows[0], /^1 Ana Diaz 70 36 thru 9 106 -2$/, 'raw strokes, no strokes line');
+    assert.ok(!/strokes/.test(grossA.rows.join(' ')), 'no strokes line on the Gross page');
+    grossA.tps.filter((c) => /^-\d/.test(c.text)).forEach((c) => assert.equal(c.color, 'rgb(255, 107, 107)', 'under par red on the Gross page: ' + c.text));
 });

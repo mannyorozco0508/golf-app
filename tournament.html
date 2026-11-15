@@ -6571,7 +6571,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const base = lbRoundViewFor();
             view = Object.assign({}, view, { rows: computeTournamentLeaderboard(Object.assign({}, base, { scoringMode: 'gross' }), lbFlightId), grossOfNet: true });
         }
-        lbLast = { rows: view.rows || [], kind: view.kind, rid: lbLastRoundId(view), available: !!view.available, basis: lbEventOpts().basis };
+        lbLast = { rows: view.rows || [], kind: view.kind, rid: lbLastRoundId(view), available: !!view.available, basis: lbDisplayBasis() };
         renderLeaderboardSubtabs();
 
         // PRIZES DO NOT READ THIS VIEW (audit #1, A1, 2026-11-08). The prize
@@ -6607,13 +6607,36 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // every round as net from its own handicap snapshot and stroke index. The
     // engine decides whether Net is available (a round with no real stroke index
     // refuses it, with the reason); the page only asks.
-    let lbEventBasis = 'as-scored';
+    // SWITCH ON EVERYWHERE (Manny's go 2026-11-15 09:18, ADVISOR-20261115-0919): an
+    // all-net event gets its Gross half (basis 'gross'); a Gross/Net mix gets the
+    // switch with Gross selected and the real board instead of the refusal.
+    let lbEventBasis = 'as-scored';   // the viewer's choice: 'as-scored' (nothing tapped), 'gross' or 'net'
     function lbNetAvailability() { return recordIsMultiRound() ? aggregateAvailability(currentData, { basis: 'net' }) : { available: false, reason: null }; }
-    function lbEventOpts() {
-        const net = lbEventBasis === 'net' && aggregateFamily(currentData) !== 'individual:net' && lbNetAvailability().available;
-        return { basis: net ? 'net' : 'as-scored' };
+    // WHAT THE EVENT IS: 'gross' (every round gross), 'net' (every round net), 'mixed'
+    // (a Gross/Net mix the engine combines on an explicit basis) or null (no combined
+    // board at all: a single round, team rounds, nothing open).
+    function lbEventFamily() {
+        if (!recordIsMultiRound()) return null;
+        const fam = aggregateFamily(currentData);
+        if (fam === 'individual:net') return 'net';
+        if (fam === 'individual:gross') return 'gross';
+        return aggregateAvailability(currentData, { basis: 'gross' }).available ? 'mixed' : null;
     }
-    function setLeaderboardBasis(b) { lbEventBasis = b === 'net' ? 'net' : 'as-scored'; renderLeaderboard(); }
+    // THE BASIS THE ENGINE IS ASKED FOR. Nothing tapped: 'as-scored' (today's numbers)
+    // on a gross or a net event, 'gross' on a mixed one (the switch's default half).
+    function lbEventOpts() {
+        const fam = lbEventFamily();
+        if (!fam) return { basis: 'as-scored' };
+        if (lbEventBasis === 'net') return { basis: lbNetAvailability().available ? 'net' : (fam === 'mixed' ? 'gross' : 'as-scored') };
+        if (lbEventBasis === 'gross') return { basis: fam === 'gross' ? 'as-scored' : 'gross' };
+        return { basis: fam === 'mixed' ? 'gross' : 'as-scored' };
+    }
+    // THE BASIS THE BOARD SHOWS, 'gross' or 'net': as-scored resolves to the family's own.
+    function lbDisplayBasis() {
+        const b = lbEventOpts().basis;
+        return b === 'as-scored' ? (lbEventFamily() === 'net' ? 'net' : 'gross') : b;
+    }
+    function setLeaderboardBasis(b) { lbEventBasis = b === 'net' ? 'net' : (b === 'gross' ? 'gross' : 'as-scored'); renderLeaderboard(); }
     function setLeaderboardSub(sub) { lbSub = ['board', 'skins', 'pairings'].includes(sub) ? sub : 'board'; renderLeaderboard(); }
     function renderLeaderboardSubtabs() {
         const panels = { board: 'lb-board-panel', skins: 'lb-skins-panel', pairings: 'lb-pairings-panel' };
@@ -6767,25 +6790,27 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!view || view.kind !== 'event' || !view.available) {
             el.style.display = 'none'; el.innerHTML = ''; note.style.display = 'none'; note.textContent = ''; return;
         }
-        // NET ENABLED (Manny's per-file OK 2026-11-15). On a gross event the Net half
-        // asks the engine for every round as net; when a round's course cannot carry
-        // an allocation the half is disabled and the note names that round. On an
-        // all-net event Net is already the board and a Gross view of it stays
-        // disabled (not asked for yet).
-        const netFamily = aggregateFamily(currentData) === 'individual:net';
-        const netAvail = netFamily ? { available: false, reason: null } : lbNetAvailability();
-        const onNet = netFamily || lbEventOpts().basis === 'net';
+        // SWITCH ON EVERYWHERE (per-file OK 2026-11-15; Manny's go 09:18): Gross is
+        // always tappable (the engine reads any individual round as raw strokes); Net
+        // is tappable when every round can allocate, and disabled with the round named
+        // when one cannot.
+        const fam = lbEventFamily();
+        if (!fam) { el.style.display = 'none'; el.innerHTML = ''; note.style.display = 'none'; note.textContent = ''; return; }
+        const netAvail = fam === 'net' ? { available: true, reason: null } : lbNetAvailability();
+        const onNet = lbDisplayBasis() === 'net';
         // The active half carries no handler (tapping it changes nothing); the other
         // half taps across when the engine allows it and is disabled when it does not.
         const seg = (label, on, enabled, basis) => `<button type="button" class="${on ? 'active' : ''}" aria-pressed="${on}" ${on ? '' : (enabled ? `onclick="setLeaderboardBasis('${basis}')"` : 'disabled')}>${label}</button>`;
         el.style.display = 'flex';
-        el.innerHTML = seg('Gross', !onNet, !netFamily, 'as-scored') + seg('Net', onNet, netAvail.available, 'net');
+        el.innerHTML = seg('Gross', !onNet, true, 'gross') + seg('Net', onNet, netAvail.available, 'net');
         note.style.display = 'block';
-        note.textContent = netFamily
-            ? 'Net across the rounds, as each round is scored. A gross view of this board is not available yet.'
-            : onNet
-                ? 'Gross so far · strokes received so far → net. Strokes are each course’s handicap for that round; on a round in play only holes played count.'
-                : (netAvail.available ? 'Gross across the rounds. Tap Net for each round’s net from its own handicap and course.' : `Gross across the rounds. ${netAvail.reason}`);
+        const NET_NOTE = 'Gross so far · strokes received so far → net. Strokes are each course’s handicap for that round; on a round in play only holes played count.';
+        const TAP_NET = 'Tap Net for each round’s net from its own handicap and course.';
+        note.textContent = onNet
+            ? (fam === 'net' ? 'Net across the rounds, as each round is scored. Tap Gross for the raw strokes with no handicap.' : NET_NOTE)
+            : fam === 'net'
+                ? 'Gross across the rounds: the raw strokes with no handicap. Tap Net for the board as each round is scored.'
+                : `${fam === 'mixed' ? 'Gross across the rounds: every round read as raw strokes, the Net rounds too.' : 'Gross across the rounds.'} ${netAvail.available ? TAP_NET : netAvail.reason}`;
     }
 
     // ONE ROW RENDERER for every board. A round, a flight and the combined standings
@@ -7503,14 +7528,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const scoring = r.format === 'individual' ? (netIsInPlay(r) ? 'Net' : 'Gross') : '';
             return `<div class="rc-tile"><b>${escapeHtml(r.name || 'Round')}</b>${escapeHtml(r.courseName || 'No course set')}${holes ? ` · ${holes} holes` : ''}<br>${formatLabelFor(r.format)}${scoring ? ' · ' + scoring : ''}<br><span class="st">${state}</span></div>`;
         }).join('');
-        const avail = aggregateAvailability(currentData);
-        const fam = aggregateFamily(currentData);
-        // Net on the combined board (per-file OK 2026-11-15): the engine says whether
-        // every round can be read as net; a round that cannot names itself here.
-        const netAvail = fam === 'individual:net' ? { available: true } : aggregateAvailability(currentData, { basis: 'net' });
-        const board = avail.available
-            ? `Event total · ${cols.columns.map((c) => c.short).join(' · ')} · Tot · ${fam === 'individual:net' ? 'Net' : (netAvail.available ? 'Gross and Net' : `Gross (${netAvail.reason})`)}`
-            : avail.reason;
+        // Net on the combined board (per-file OK 2026-11-15; switch on everywhere 09:18):
+        // the engine says whether every round can be read as net; a round that cannot
+        // names itself here. A Gross/Net mix is a board now, not a refusal.
+        const fam = lbEventFamily();
+        const netAvail = fam === 'net' ? { available: true } : aggregateAvailability(currentData, { basis: 'net' });
+        const board = fam
+            ? `Event total · ${cols.columns.map((c) => c.short).join(' · ')} · Tot · ${fam === 'net' ? 'Net and Gross' : (netAvail.available ? 'Gross and Net' : `Gross (${netAvail.reason})`)}`
+            : aggregateAvailability(currentData).reason;
         const flights = currentData.flights || {};
         const fids = Object.keys(flights).sort((a, b) => (flights[a].createdAt || 0) - (flights[b].createdAt || 0));
         const flightLine = fids.length
