@@ -646,6 +646,9 @@
         .sl-when input { width: 56px; padding: 6px; font-size: 0.85rem; text-align: center; }
         .sl-team { font-size: 0.9rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .sl-acts { display: flex; gap: 6px; }
+        /* ONE SCORER PER GROUP, A: the watch link on its own line, so the team name keeps its room. */
+        .sl-watch-line { grid-column: 2 / -1; justify-self: end; font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+        .sl-watch-line button { width: auto; padding: 6px 10px; font-size: 0.75rem; margin: 0; min-height: 32px; }
         .sl-acts button { width: auto; padding: 6px 10px; font-size: 0.75rem; margin: 0; min-width: 44px; min-height: 32px; }   /* #14 */
         .tee-times-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 10px; }
         .tee-times-box label { font-size: 0.75rem; }
@@ -720,6 +723,17 @@
         .ci-card-b { display: flex; flex-wrap: wrap; gap: 6px; }
         .ci-card-b .btn-outline, .ci-card-b .btn-primary { width: auto; margin: 0; padding: 7px 12px; font-size: 0.8rem; text-decoration: none; display: inline-block; }
         .ci-msg { font-size: 0.85rem; color: var(--accent-red); margin: 8px 0 0 0; }
+        /* ONE SCORER PER GROUP, A (ADVISOR-20261114-1527): the Desk's Scorers card. */
+        .scd-card { border: 1px solid var(--border-mid); border-radius: 12px; padding: 10px 12px; margin: 8px 0 4px 0; }
+        .scd-h { font-weight: bold; font-size: 0.92rem; }
+        .scd-s { font-size: 0.78rem; color: var(--text-muted); margin: 2px 0 4px 0; }
+        .scd-row { border-top: 1px solid var(--border-faint, #e5e7eb); padding: 8px 0; }
+        .scd-name { font-weight: bold; font-size: 0.88rem; }
+        .scd-sub { font-size: 0.78rem; color: var(--text-muted); }
+        .scd-b { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+        .scd-b .btn-outline, .scd-b .btn-primary { width: auto; margin: 0; padding: 6px 10px; font-size: 0.78rem; }
+        .scd-pick { background: var(--nassau-box-bg); border-radius: 10px; padding: 8px 10px; margin-top: 6px; font-size: 0.8rem; }
+        .scd-pick .btn-outline { width: auto; margin: 4px 6px 0 0; padding: 6px 10px; font-size: 0.78rem; }
         #ci-search { width: 100%; box-sizing: border-box; margin: 0 0 6px 0; -webkit-appearance: none; appearance: none; }
         .ci-count { font-size: 0.8rem; color: var(--text-muted); margin: 6px 0 8px 0; }
         .ci-flight { font-size: 0.76rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--brand-green); margin: 16px 0 0 0; }
@@ -1445,6 +1459,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             </div>
         </div>
         <p class="ci-msg" id="checkin-desk-msg" role="alert" style="display:none;"></p>
+        <!-- ONE SCORER PER GROUP, A (ADVISOR-20261114-1527): per team / group,
+             who scores, how many have joined on the watch link, Switch scorer
+             and the Watch QR. Drawn by renderScorerDesk on each Desk render. -->
+        <div class="scd-card" id="scorer-desk" style="display:none;"></div>
         <div id="registration-chips"></div>
         <input type="search" id="registration-search" placeholder="Search a name or email" autocomplete="off" autocapitalize="off" spellcheck="false">
         <!-- THE EDITOR (2026-10-06). STATIC MARKUP, for the same reason the search
@@ -2974,6 +2992,18 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const k = teamKeyOf(t.num);
         return `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}${roundPart}${k ? `&k=${k}` : ''}`;
     }
+    // ONE SCORER PER GROUP, A (ADVISOR-20261114-1527): THE WATCH LINK. The same
+    // card with NO key and &watch=1: the golfer taps their own name and sees
+    // the live scores read-only. It never carries &k=, so it cannot score on a
+    // locked event, and the card itself writes nothing in watch mode.
+    function watchTeamUrl(t, rid) {
+        return `${scorecardBaseUrl()}?tourney=${currentCode}&team=${t.num}${rid ? `&round=${rid}` : ''}&watch=1`;
+    }
+    // The Watch QR: the same share modal, titled "Watch Link".
+    function openWatchModal(url, name) { openShareModal(url, name, 'watch'); }
+    function watchGroupUrl(gid, rid) {
+        return `${scorecardBaseUrl()}?tourney=${currentCode}&group=${gid}${rid ? `&round=${rid}` : ''}&watch=1`;
+    }
     // The rounds of a multi-round event in play order, one shape for every list
     // that needs a set of links per round.
     function roundsInOrder() {
@@ -3024,6 +3054,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <span style="display:flex; align-items:center; gap:6px;">
                 ${hcpInput}${qrBox}
                 <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-share-url="${escapeHtml(url)}" data-share-name="${escapeHtml(teamName)}" onclick="openShareModal(this.dataset.shareUrl, this.dataset.shareName)">📤 Share</button>
+                ${editable ? '' : `<button class="btn-outline team-watch" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-watch-url="${escapeHtml(watchTeamUrl(t, roundId))}" data-watch-name="${escapeHtml(teamName)}" onclick="openWatchModal(this.dataset.watchUrl, this.dataset.watchName)">Watch QR</button>`}
             </span>
         </div>`;
     }
@@ -3353,6 +3384,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 <button type="button" class="btn-primary sl-send" data-share-url="${escapeHtml(url)}" data-share-name="${escapeHtml(teamName)}" onclick="sendTeamLink(this.dataset.shareUrl, this.dataset.shareName)">Send</button>
                 <button type="button" class="btn-outline sl-qr" data-share-url="${escapeHtml(url)}" data-share-name="${escapeHtml(teamName)}" onclick="openShareModal(this.dataset.shareUrl, this.dataset.shareName)">QR</button>
             </span>
+            <span class="sl-watch-line">The others in the group: <button type="button" class="btn-outline sl-watch" data-watch-url="${escapeHtml(watchTeamUrl(t))}" data-watch-name="${escapeHtml(teamName)}" onclick="openWatchModal(this.dataset.watchUrl, this.dataset.watchName)">Watch QR</button></span>
         </div>`;
     }
     function renderShotgunAssignments() {
@@ -3536,7 +3568,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // apps and would leave someone with literally no way to get the link. The modal OPENS
     // whatever the QR does: the link and the Copy button never depend on the library.
     function openShareModal(url, teamName, kind) {
-        const suffix = kind === 'register' ? 'Signup Link' : (kind === 'leaderboard' ? 'Leaderboard Link' : 'Scorecard Link');
+        const suffix = kind === 'register' ? 'Signup Link' : (kind === 'leaderboard' ? 'Leaderboard Link' : (kind === 'watch' ? 'Watch Link' : 'Scorecard Link'));
         document.getElementById('share-modal-title').textContent = `${teamName} — ${suffix}`;
         document.getElementById('share-link-text').textContent = url;
         drawQrInto(document.getElementById('share-qr-box'), url, 180);
@@ -5774,6 +5806,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // &k=; the Leaderboard rows, redrawn here, had it.
             renderTeamCards();
             renderLockPanel();
+            renderScorerDesk();   // Switch scorer re-keys from what is held here
         };
         db.ref('tournamentKeys/' + code).on('value', keysCb);
         keysBoundCode = code;
@@ -6142,6 +6175,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const showExport = (on) => { if (exportBtn) exportBtn.style.display = on ? 'block' : 'none'; };
         showExport(false);
         const photosOnDesk = registrationFilter === 'photos';
+        renderScorerDesk();   // ONE SCORER PER GROUP, A: drawn with or without signups
         renderDeskPhotos(photosOnDesk);
         renderCheckinCard();
         syncCheckinIndex();
@@ -7997,6 +8031,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                     <span style="display:flex; align-items:center; gap:6px;">
                         <a class="rc-link" href="${groupScorecardUrl(gid, sec.rid)}">Open scoring link ▶</a>
                         <button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-share-url="${groupScorecardUrl(gid, sec.rid)}" data-share-name="${escapeHtml((g.name || 'Group') + (sec.label ? ' \u2014 ' + sec.label : ''))}" onclick="openShareModal(this.dataset.shareUrl, this.dataset.shareName)">📤 Share</button>
+                        <button class="btn-outline group-watch" style="width:auto; padding:6px 10px; font-size:0.75rem; margin:0;" data-watch-url="${watchGroupUrl(gid, sec.rid)}" data-watch-name="${escapeHtml((g.name || 'Group') + (sec.label ? ' \u2014 ' + sec.label : ''))}" onclick="openWatchModal(this.dataset.watchUrl, this.dataset.watchName)">Watch QR</button>
                     </span>
                 </div>`;
             });
@@ -8932,6 +8967,117 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             .catch((err) => checkinDeskSay('Undo not saved: ' + ((err && err.message) || err)));
     }
     let checkinQrDrawnFor = null;
+    // ===== ONE SCORER PER GROUP, A (ADVISOR-20261114-1527): THE DESK'S SCORERS ====
+    //
+    // Per team (team event) or group (individual event; on a multi-round event
+    // the day's round): the scorer's name - tournaments/<code>/scorers/<entry>,
+    // written here by Switch scorer - or "scoring link" when nobody has been
+    // named; "Joined n of m" from tournaments/<code>/joins/<entry> (written by
+    // the watch card; the named scorer counts as joined); Switch scorer; Watch QR.
+    //
+    // SWITCH SCORER, keys on: the organizer picks the new scorer; ONE update
+    // writes a NEW key for that team / group (tournamentKeys/<code>/t/team<N>,
+    // or g/<gid> and every golfer's p/<pid> or r/<rid>/<pid> - the shapes
+    // lockScoringLinks writes) and the scorer's name; the new link opens in the
+    // share sheet. The old link's next score is refused by the rules already
+    // live (its proof carries the old key) and its card says "Not saved - this
+    // link can't score this card." The owner's write to tournamentKeys/<code>
+    // is allowed by the live rules at any time (".write": owner of the event;
+    // only "on" is validated), so this needs no rules change.
+    // Keys off: there is no key to replace, so it records the name only and
+    // says that any link can still score.
+    let scorerPickFor = null;   // the entry whose name list is open on the Desk
+    function scorerEntries() {
+        const data = currentData || {};
+        if (!recordIsIndividual()) {
+            return sortedTeams().map((t) => ({ entry: 'team' + t.num, label: t.name || `Team ${t.num}`, kind: 'team', num: t.num, rid: isMultiRound(data) ? dayRoundId() : null,
+                roster: (t.players || []).map((n, i) => ({ slot: 'p' + i, name: String(n || '') })), watchUrl: watchTeamUrl(t, isMultiRound(data) ? dayRoundId() : null) }));
+        }
+        const rid = isMultiRound(data) ? dayRoundId() : null;
+        const groups = rid ? (((data.rounds || {})[rid] || {}).scoringGroups || {}) : (data.scoringGroups || {});
+        const players = data.players || {};
+        return Object.keys(groups).sort((a, b) => (groups[a].createdAt || 0) - (groups[b].createdAt || 0)).map((gid) => ({
+            entry: rid ? rid + '_' + gid : gid, label: groups[gid].name || 'Group', kind: 'group', gid: gid, rid: rid,
+            roster: (groups[gid].playerIds || []).filter((pid) => players[pid]).map((pid) => ({ slot: pid, name: String(players[pid].name || '') })),
+            watchUrl: watchGroupUrl(gid, rid) }));
+    }
+    function scorerOf(entry) {
+        const s = ((currentData || {}).scorers || {})[entry];
+        return (s && typeof s.name === 'string' && s.name.trim()) ? s.name.trim() : null;
+    }
+    function joinedCount(e) {
+        const joins = ((currentData || {}).joins || {})[e.entry] || {};
+        const scorer = scorerOf(e.entry);
+        const named = e.roster.filter((r) => r.name.trim());
+        return { n: named.filter((r) => joins[r.slot] || (scorer && r.name.trim() === scorer)).length, of: named.length };
+    }
+    function renderScorerDesk() {
+        const box = document.getElementById('scorer-desk');
+        if (!box) return;
+        const on = !!(currentCode && currentData && currentData.ownerUid && canManage());
+        const entries = on ? scorerEntries() : [];
+        if (!entries.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        box.style.display = 'block';
+        const kindWord = recordIsIndividual() ? 'group' : 'team';
+        box.innerHTML = `<div class="scd-h">Scorers</div><div class="scd-s">One phone scores each ${kindWord} on its scoring link. The others open the Watch QR, tap their name and follow the scores.</div>`
+            + entries.map((e) => {
+                const sc = scorerOf(e.entry);
+                const j = joinedCount(e);
+                const pick = scorerPickFor === e.entry
+                    ? `<div class="scd-pick" id="scd-pick-${escapeHtml(e.entry)}">Who is scoring ${escapeHtml(e.label)} now?<br>`
+                        + e.roster.filter((r) => r.name.trim()).map((r) => `<button type="button" class="btn-outline scd-make" data-entry="${escapeHtml(e.entry)}" data-slot="${escapeHtml(r.slot)}" onclick="switchScorer(this.dataset.entry, this.dataset.slot)">${escapeHtml(r.name)}</button>`).join('')
+                        + `<button type="button" class="btn-outline" onclick="closeScorerPick()">Cancel</button></div>`
+                    : '';
+                return `<div class="scd-row" data-entry="${escapeHtml(e.entry)}"><div class="scd-name">${escapeHtml(e.label)}</div>`
+                    + `<div class="scd-sub">Scorer ${sc ? escapeHtml(sc) : 'scoring link'} · Joined ${j.n} of ${j.of}</div>`
+                    + `<div class="scd-b"><button type="button" class="btn-outline scd-switch" data-entry="${escapeHtml(e.entry)}" onclick="openScorerPick(this.dataset.entry)">Switch scorer</button>`
+                    + `<button type="button" class="btn-outline scd-watch" data-watch-url="${escapeHtml(e.watchUrl)}" data-watch-name="${escapeHtml(e.label)}" onclick="openWatchModal(this.dataset.watchUrl, this.dataset.watchName)">Watch QR</button></div>`
+                    + pick + '</div>';
+            }).join('');
+    }
+    function openScorerPick(entry) { if (!canManage()) return; scorerPickFor = entry; renderScorerDesk(); }
+    function closeScorerPick() { scorerPickFor = null; renderScorerDesk(); }
+    function switchScorer(entry, slot) {
+        if (!currentCode || !canManage() || !keysWritable()) return;
+        const e = scorerEntries().find((x) => x.entry === entry);
+        const who = e && e.roster.find((r) => r.slot === slot);
+        if (!who || !who.name.trim()) return;
+        const name = who.name.trim();
+        const changes = { [`tournaments/${currentCode}/scorers/${entry}`]: { name: name, at: firebase.database.ServerValue.TIMESTAMP } };
+        let fresh = null;
+        if (keysLocked()) {
+            fresh = newScoringKey();
+            if (!fresh) { alert('Could not make a new scoring link on this device.'); return; }
+            if (e.kind === 'team') {
+                changes[`${keysBase()}/t/team${e.num}`] = fresh;
+            } else {
+                changes[`${keysBase()}/g/${e.gid}`] = fresh;
+                // The golfer keys the rules check, in every place this group id
+                // is drawn (a copied draw shares its id across rounds).
+                const data = currentData || {};
+                if (isMultiRound(data)) {
+                    Object.keys(data.rounds || {}).forEach((rid) => {
+                        const g = (((data.rounds[rid] || {}).scoringGroups) || {})[e.gid];
+                        if (g) (g.playerIds || []).forEach((pid) => { changes[playerKeyPath(pid, rid)] = fresh; });
+                    });
+                } else {
+                    (((data.scoringGroups || {})[e.gid] || {}).playerIds || []).forEach((pid) => { changes[playerKeyPath(pid, null)] = fresh; });
+                }
+            }
+            if (!confirm(`Make ${name} the scorer for ${e.label}? A new scoring link is made for ${name}; the old link stops saving scores.`)) return;
+        } else if (!confirm(`Note ${name} as the scorer for ${e.label}? Keys are off on this event, so any scoring link can still score.`)) return;
+        scorerPickFor = null;
+        db.ref().update(changes).then(() => {
+            if (!fresh) return;
+            const roundPart = e.rid ? `&round=${e.rid}` : '';
+            const url = e.kind === 'team'
+                ? `${scorecardBaseUrl()}?tourney=${currentCode}&team=${e.num}${roundPart}&k=${fresh}`
+                : `${scorecardBaseUrl()}?tourney=${currentCode}&group=${e.gid}${roundPart}&k=${fresh}`;
+            openShareModal(url, `${e.label} — ${name}`);
+        }).catch((err) => alert(`Error: ${err.message}`));
+        renderScorerDesk();
+    }
+
     function renderCheckinCard() {
         const card = document.getElementById('checkin-card');
         if (!card) return;

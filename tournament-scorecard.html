@@ -298,6 +298,23 @@
         .ap-lb .ap-th { color: #4b6a5f; text-align: center; font-size: 13px; }
         .ap-lb.ap-me { background: #fffbe6; margin: 0 -14px; padding: 9px 14px; }
         .ap-red { color: #b91c1c; }
+        /* ONE SCORER PER GROUP, A (ADVISOR-20261114-1527): the watch link's
+           name list and the viewer card's lines. */
+        .sc-join { border: 1px solid var(--border-mid); border-radius: 14px; padding: 12px 14px; margin: 0 0 14px 0; background: var(--bg-card); }
+        .sc-join-h { font-weight: bold; font-size: 0.95rem; margin: 0 0 8px 0; }
+        .sc-join-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border-faint); }
+        .sc-join-row:first-of-type { border-top: 0; }
+        .sc-join-nm { font-weight: bold; font-size: 0.95rem; }
+        .sc-join-sub { font-size: 0.75rem; color: var(--text-muted); font-weight: normal; }
+        .sc-join-me { background: var(--brand-green); color: #fff; border: 0; border-radius: 10px; padding: 9px 14px; font-weight: bold; font-size: 0.85rem; min-height: 40px; cursor: pointer; }
+        .sc-join-chip { font-size: 0.75rem; color: var(--brand-green); border: 1px solid var(--border-mid); border-radius: 8px; padding: 4px 8px; white-space: nowrap; }
+        .sc-join-foot { background: var(--nassau-box-bg); border-radius: 10px; padding: 10px; font-size: 0.82rem; margin-top: 8px; }
+        .sc-join-skip { background: none; border: 0; color: var(--text-muted); text-decoration: underline; font-size: 0.8rem; padding: 10px 0 0 0; cursor: pointer; }
+        .sc-viewer-line { font-weight: bold; color: var(--brand-green); }
+        .sc-renotice { background: none; border: 0; color: var(--text-muted); text-decoration: underline; font-size: 0.78rem; padding: 0 0 0 6px; cursor: pointer; }
+        .sc-gps { display: none; border: 1px solid var(--border-mid); border-radius: 14px; padding: 12px 14px; margin: 14px 0 0 0; background: var(--bg-card); font-size: 0.85rem; }
+        .sc-gps-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .sc-gps-open { background: var(--brand-green); color: #fff; border-radius: 10px; padding: 9px 14px; font-weight: bold; text-decoration: none; white-space: nowrap; }
     </style>
 </head>
 <body>
@@ -368,6 +385,11 @@
              stored team name because on a shamble or best-ball the four names are a
              group of individuals, not a side - but the STORAGE is untouched: every key
              is still team{n}_… and every field still comes from teams.team{n}. -->
+        <!-- ONE SCORER PER GROUP, A (ADVISOR-20261114-1527). On the WATCH link
+             (&watch=1, no &k=) the golfer taps their own name here first; the
+             card below then shows the live scores read-only. Hidden on every
+             other link. -->
+        <div class="sc-join" id="sc-join" style="display:none;"></div>
         <div class="scoring-for-label" id="scoring-for"></div>
         <!-- WHAT THIS LINK IS (Option A, 2026-09-16). The team number is a URL
              parameter and nothing checks who holds it; the database accepts the
@@ -375,7 +397,7 @@
              place it says whose card it is - a sentence, not a padlock. -->
         <div class="scoring-for-label" id="link-truth">Anyone with this link can score this card.</div>
         <div class="team-roster-box" id="team-roster"></div>
-        <div class="status-bar">
+        <div class="status-bar" id="status-bar">
             <div class="status-main" id="status-main">Thru 0</div>
             <div class="status-sub" id="status-sub"></div>
         </div>
@@ -415,6 +437,11 @@
         <div class="pace-note-foot" id="pace-note-foot" style="display:none;">Only your team sees this. It goes away after you score the next hole.</div>
         <div id="holes-list"></div>
         <div class="play-order-note" id="play-order-note" style="display:none;"></div>
+        <!-- ONE SCORER PER GROUP, A: the HardPan GPS door on the viewer card.
+             THE NATIVE FREE DAY HOOKS IN HERE (iOS/Android lanes + a server
+             check of the join record). Until then it is a plain door to the app:
+             it says what the app does today and grants nothing. -->
+        <div class="sc-gps" id="sc-gps"></div>
         <!-- GET HARDPAN, B (Manny 2026-11-12): the reasons card after the last hole. -->
         <div class="getapp-card" id="getapp-card-card"></div>
     </div>
@@ -497,6 +524,12 @@
     // keys are on, a score is accepted only with a proof carrying it, written
     // in the same update (keyedScore). Absent on links built before the lock.
     const myScoreKey = urlParams.get('k') || null;
+    // ONE SCORER PER GROUP, A (ADVISOR-20261114-1527): the WATCH link. It is
+    // the card link with no &k= and with &watch=1. A keyless link WITHOUT
+    // &watch=1 is left exactly as it was: on an event whose keys are off that
+    // link is how the group scores, and links already sent must keep working.
+    // A link that carries a key is never a watch link, whatever else it says.
+    const WATCH_MODE = !myScoreKey && urlParams.get('watch') === '1';
     // APP MODE (P1-c, 2026-11-10): the T1A card and the T2C board. On when this
     // page runs inside the Capacitor app, or with ?app=1 (testing and previews).
     // Everything else about the page - the snapshot, the lock, the writers, the
@@ -705,6 +738,7 @@
             drainScoreQueue();
             lastSnapshotAt = Date.now();
             if (group) renderGroup(group); else renderAll();
+            renderScorerViews();   // ONE SCORER PER GROUP, A: the watch card, or the scorer's "watching" line
             renderWaitingChip();
             renderOrgNotes();
             renderPaceNote();
@@ -993,8 +1027,180 @@
     // Every holes render goes through setHolesListPreservingFocus; this runs at
     // its two exits, so a snapshot cannot hand the boxes back.
     function enforceKeylessLock() {
-        if (!keylessRefused) return;
+        if (!keylessRefused && !WATCH_MODE) return;
         document.querySelectorAll('#holes-list input').forEach((i) => { i.disabled = true; });
+    }
+
+    // ===== ONE SCORER PER GROUP, A (ADVISOR-20261114-1527) =====================
+    //
+    // THE SCORER keeps the keyed link (&k=), as today. THE OTHERS open the WATCH
+    // link (&watch=1, no key), tap their own name once, and get a viewer card:
+    // the live scores with every box disabled from the start, the line "<Scorer>
+    // is scoring for your group." and the Board tab. The viewer card never
+    // writes a score: the writers return in WATCH_MODE, and the boxes are
+    // disabled at both exits of every holes render (enforceKeylessLock).
+    //
+    // THE JOIN RECORD: tournaments/<code>/joins/<entry>/<slot> = { name, at }.
+    //   entry  team<N> (a team, every round) | <gid> (a group, one round) |
+    //          <rid>_<gid> (a group in one round of a multi-round event)
+    //   slot   p<i> (the golfer's place on a team card, as the score keys use)
+    //          | <pid> (an individual event's player id)
+    //   name   the roster's own name for that slot, as stored; at = server time.
+    // No email, phone or uid. A phone may tap again to change its name; the
+    // name it tapped before stays on the record (only the organizer can delete
+    // one - see tools/scorer-rules-candidate.js). UNTIL THAT CANDIDATE IS
+    // PUBLISHED the live rules refuse this write: the card is still this
+    // phone's viewer card (the name is kept on the phone), and the organizer's
+    // Desk simply does not count it.
+    //
+    // THE SCORER'S NAME is tournaments/<code>/scorers/<entry> = { name, at },
+    // written by the organizer from the Desk ("Switch scorer" / "Set scorer").
+    // Without it the viewer line names nobody it does not know.
+    function joinEntryKey() {
+        if (myTeamNum) return 'team' + myTeamNum;
+        if (!myGroupId) return null;
+        return myRoundId ? myRoundId + '_' + myGroupId : myGroupId;
+    }
+    function joinRoster() {
+        const scope = roundScope || currentData || {};
+        if (myTeamNum) {
+            const team = (scope.teams || {})['team' + myTeamNum] || {};
+            return (team.players || []).map((n, i) => ({ slot: 'p' + i, name: String(n || '') }));
+        }
+        const group = (scope.scoringGroups || {})[myGroupId] || {};
+        const players = scope.players || {};
+        return (group.playerIds || []).filter((pid) => players[pid]).map((pid) => ({ slot: pid, name: String(players[pid].name || '') }));
+    }
+    function joinsHere() {
+        const all = (currentData && currentData.joins) || {};
+        const mine = all[joinEntryKey()];
+        return (mine && typeof mine === 'object') ? mine : {};
+    }
+    function scorerNameHere() {
+        const s = ((currentData && currentData.scorers) || {})[joinEntryKey()];
+        return (s && typeof s.name === 'string' && s.name.trim()) ? s.name.trim() : null;
+    }
+    function scFirst(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
+    function scList(names) {
+        if (names.length <= 1) return names.join('');
+        return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    }
+    const JOIN_LS_PREFIX = 'hp_join_';
+    function joinStoreKey() { return JOIN_LS_PREFIX + currentCode + '_' + joinEntryKey(); }
+    let joinMine;            // undefined = not read yet; null = not tapped; { slot, name } (slot null = just watching)
+    let joinPicking = false; // "Not you?" reopened the list
+    let playOrderHeld = null;
+    function readJoinMine() {
+        if (joinMine !== undefined) return joinMine;
+        joinMine = null;
+        try {
+            const v = JSON.parse(localStorage.getItem(joinStoreKey()) || 'null');
+            if (v && typeof v === 'object' && ('slot' in v)) joinMine = { slot: v.slot || null, name: v.name || null };
+        } catch (e) { /* no storage: ask again */ }
+        return joinMine;
+    }
+    function joinAs(slot) {
+        if (!WATCH_MODE || !currentCode) return;
+        const entry = joinEntryKey();
+        if (!slot) {
+            joinMine = { slot: null, name: null };   // just watching: nothing is written
+        } else {
+            const who = joinRoster().find((r) => r.slot === slot);
+            if (!who || !who.name.trim()) return;
+            joinMine = { slot: slot, name: who.name };
+            db.ref(`tournaments/${currentCode}/joins/${entry}/${slot}`)
+                .set({ name: who.name, at: firebase.database.ServerValue.TIMESTAMP })
+                .catch(() => { /* refused until the rules candidate is published: the viewer card stands */ });
+        }
+        try { localStorage.setItem(joinStoreKey(), JSON.stringify(joinMine)); } catch (e) { /* this visit only */ }
+        joinPicking = false;
+        renderScorerViews();
+    }
+    function joinPickAgain() { joinPicking = true; renderScorerViews(); }
+    function scorerSentence() {
+        const s = scorerNameHere();
+        return s ? `${s} is scoring for your group.` : 'One phone in your group is scoring; this card shows its scores live.';
+    }
+    function joinListHtml() {
+        const joins = joinsHere();
+        const scorer = scorerNameHere();
+        const rows = joinRoster().filter((r) => r.name.trim()).map((r) => {
+            const j = joins[r.slot];
+            const isScorer = !!(scorer && scorer === r.name.trim());
+            const right = isScorer
+                ? '<span class="sc-join-chip">Scoring</span>'
+                : `<button type="button" class="sc-join-me" data-slot="${escapeHtml(r.slot)}" onclick="joinAs(this.dataset.slot)">That’s me</button>`;
+            const sub = isScorer ? '<div class="sc-join-sub">Has the scoring link</div>'
+                : (j && typeof j.at === 'number' ? `<div class="sc-join-sub">Joined ${escapeHtml(new Date(j.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }))}</div>` : '');
+            return `<div class="sc-join-row"><div><div class="sc-join-nm">${escapeHtml(r.name)}</div>${sub}</div>${right}</div>`;
+        }).join('');
+        return `<div class="sc-join-h">${escapeHtml(cardLabel())} \u00b7 Tap your own name.</div>` + (rows || '<div class="sc-join-sub">No golfers on this card yet.</div>')
+            + `<div class="sc-join-foot"><b>${escapeHtml(scorerSentence())}</b> This card shows the live scores; it can’t enter them.</div>`
+            + '<button type="button" class="sc-join-skip" onclick="joinAs(\'\')">Not playing? Just watch</button>';
+    }
+    function cardLabel() {
+        const scope = roundScope || currentData || {};
+        if (myTeamNum) { const t = (scope.teams || {})['team' + myTeamNum] || {}; return t.name || `Team ${myTeamNum}`; }
+        return ((scope.scoringGroups || {})[myGroupId] || {}).name || 'your group';
+    }
+    function renderGpsDoor(on) {
+        const box = document.getElementById('sc-gps');
+        if (!box) return;
+        // THE NATIVE FREE DAY HOOKS IN HERE. Today this is a door to the app
+        // and says only what the app does (the store page opens the app when
+        // it is installed). Nothing here unlocks anything.
+        if (!on || APP_MODE) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        box.style.display = 'block';
+        box.innerHTML = '<div class="sc-gps-row"><div><b>HardPan GPS</b><div class="sc-join-sub">Yardages to the front, middle and back of every green, in the HardPan app.</div></div>'
+            + `<a class="sc-gps-open" id="sc-gps-open" href="${escapeHtml(getAppStoreHref())}" rel="noopener">Open in HardPan</a></div>`
+            + '<div class="getapp-badges"><a href="' + GETAPP_APPLE + '" rel="noopener"><img src="app-store-badge.svg" alt="Download on the App Store"></a>'
+            + '<a href="' + GETAPP_PLAY + '" rel="noopener"><img src="google-play-badge.png" alt="Get it on Google Play"></a></div>';
+    }
+    function renderScorerViews() {
+        const joinBox = document.getElementById('sc-join');
+        const forEl = document.getElementById('scoring-for');
+        if (!WATCH_MODE) {
+            // THE SCORER'S CARD: unchanged, plus who is watching once anyone is.
+            if (joinBox) { joinBox.style.display = 'none'; joinBox.innerHTML = ''; }
+            renderGpsDoor(false);
+            const scorer = scorerNameHere();
+            const joins = joinsHere();
+            const watching = joinRoster().filter((r) => joins[r.slot] && r.name.trim() && r.name.trim() !== scorer).map((r) => scFirst(r.name));
+            if (forEl && watching.length) {
+                forEl.innerHTML += ` <span class="sc-join-sub" id="sc-watching">· ${escapeHtml(scList(watching))} ${watching.length === 1 ? 'is' : 'are'} watching</span>`;
+            }
+            return;
+        }
+        const me = readJoinMine();
+        const picking = !me || joinPicking;
+        const hide = (id, off) => { const el = document.getElementById(id); if (el) el.style.display = off ? 'none' : ''; };
+        ['scoring-for', 'link-truth', 'team-roster', 'status-bar', 'holes-list'].forEach((id) => hide(id, picking));
+        // The play-order note keeps its own display (applyPlayState): held while
+        // the list is up, given back as it was.
+        const po = document.getElementById('play-order-note');
+        if (po && picking && po.style.display !== 'none') { playOrderHeld = po.style.display; po.style.display = 'none'; }
+        else if (po && !picking && playOrderHeld !== null) { po.style.display = playOrderHeld; playOrderHeld = null; }
+        if (joinBox) {
+            joinBox.style.display = picking ? 'block' : 'none';
+            joinBox.innerHTML = picking ? joinListHtml() : '';
+        }
+        enforceKeylessLock();
+        renderGpsDoor(!picking);
+        if (picking) return;
+        if (forEl) {
+            forEl.innerHTML = (me.name
+                ? `You're <strong>${escapeHtml(me.name)}</strong> · watching <strong>${escapeHtml(cardLabel())}</strong>`
+                : `Watching <strong>${escapeHtml(cardLabel())}</strong>`)
+                + '<button type="button" class="sc-renotice" onclick="joinPickAgain()">Not you?</button>';
+        }
+        const truth = document.getElementById('link-truth');
+        if (truth) { truth.className = 'scoring-for-label sc-viewer-line'; truth.textContent = scorerSentence(); }
+        // The scorer's prompts ("Enter Hole 8", "Enter gross scores") are not
+        // this phone's to follow: the viewer reads where the card is.
+        const main = document.getElementById('status-main');
+        if (main) main.textContent = String(main.textContent || '').replace(/^Enter Hole (\d+)$/, 'Next: Hole $1');
+        const sub = document.getElementById('status-sub');
+        if (sub && /^Enter /.test(String(sub.textContent || ''))) sub.textContent = 'Live from the scorer’s card';
     }
 
     // THE KEYED WRITE (scorecard-lock wave). Each writer below still builds its
@@ -1248,6 +1454,7 @@
     // in storage as it was played.
     function saveHoleScore(holeNum, val) {
         if (roundLocked) return;
+        if (WATCH_MODE) return;   // the watch card enters nothing
         const ref = db.ref(scorePath(`team${myTeamNum}_h${holeNum}`));
         trackWrite(durableScoreWrite(scorePath(`team${myTeamNum}_h${holeNum}`), val, () => (myScoreKey
             ? db.ref().update(keyedScore(scorePath(`team${myTeamNum}_h${holeNum}`), val))
@@ -1256,6 +1463,7 @@
 
     function savePlayerHoleScore(holeNum, playerIdx, val) {
         if (roundLocked) return;
+        if (WATCH_MODE) return;   // the watch card enters nothing
         const ref = db.ref(scorePath(`team${myTeamNum}_p${playerIdx}_h${holeNum}`));
         trackWrite(durableScoreWrite(scorePath(`team${myTeamNum}_p${playerIdx}_h${holeNum}`), val, () => (myScoreKey
             ? db.ref().update(keyedScore(scorePath(`team${myTeamNum}_p${playerIdx}_h${holeNum}`), val))
@@ -1276,7 +1484,8 @@
     // refusal (#2) owns the line once it has fired.
     function renderLinkTruth(status) {
         const el = document.getElementById('link-truth');
-        if (!el || keylessRefused) return;
+        if (!el || keylessRefused || WATCH_MODE) return;   // the watch card's line is renderScorerViews'
+
         el.textContent = status === 'closed' ? 'This round is closed; scores are final.'
             : (status !== 'open' ? 'This round isn\u2019t open for scoring yet.' : 'Anyone with this link can score this card.');
     }
@@ -1292,6 +1501,7 @@
 
     function saveIndividualScore(playerId, holeNum, val) {
         if (roundLocked) return;
+        if (WATCH_MODE) return;   // the watch card enters nothing
         const scope = roundScope || currentData;
         const group = (scope.scoringGroups || {})[myGroupId] || {};
         if ((group.playerIds || []).indexOf(playerId) === -1) return;   // not this group's golfer
@@ -1768,6 +1978,7 @@
 
     function contestsOn() {
         const data = currentData || {};
+        if (WATCH_MODE) return false;   // the watch card enters nothing
         return !isMultiRound(data) && TournamentContests.contestList(data).length > 0;
     }
     function contestSkipKey(hole) {
@@ -2216,7 +2427,7 @@
     // SAVE · NEXT HOLE: the website card's writers, one call per stepper, then
     // the next hole in play order.
     function appSave() {
-        if (roundLocked || !cardState || !appDraft) return;
+        if (roundLocked || WATCH_MODE || !cardState || !appDraft) return;
         const next = appNextHole();
         if (!next || next.hole !== appDraft.hole) return;
         const hole = next.hole;
