@@ -12,8 +12,8 @@
 //  4 tapping "golfers unpaid" opens the Desk on its Unpaid chip
 //  5 multi-round, amounts saved, no basis the engine can use: "Pick what prizes
 //    go by", and its tap reaches the basis control on the board
-//  6 money = base: payouts.js, tournament-engine.js, handicap.js are main
-//    09a51a93 byte for byte; the home shows no prize amount
+//  6 money = base: payouts.js, handicap.js are main 09a51a93 byte for byte and
+//    tournament-engine.js is 62f9e19e (re-pinned 2026-11-15, Net basis, per-file OK); the home shows no prize amount
 //
 // Baseline against main 09a51a93 (before the build): all 6 tests: 1 PASS / 5 FAIL.
 // The 1 is test 3: on main no golfer sees an Event day pill, because there is none.
@@ -102,7 +102,12 @@ test('5 multi-round, prize amounts saved, no usable basis: the home asks, and it
 });
 
 test('6 money = base; the home shows no prize amount', async () => {
-    execFileSync('git', ['diff', '--quiet', '09a51a93', '--', 'payouts.js', 'tournament-engine.js', 'handicap.js'], { cwd: __dirname });
+    // RE-PINNED 2026-11-15: tournament-engine.js moved once, with Manny's per-file OK (Net on the
+    // combined board: opts.basis on computeEventStandings / aggregateAvailability / resolveLeaderboardView,
+    // merged as c348fcb7); it is held to that commit's engine (62f9e19e). payouts.js and handicap.js stay
+    // held to 09a51a93 byte for byte.
+    execFileSync('git', ['diff', '--quiet', '09a51a93', '--', 'payouts.js', 'handicap.js'], { cwd: __dirname });
+    execFileSync('git', ['diff', '--quiet', '62f9e19e', '--', 'tournament-engine.js'], { cwd: __dirname });
     const [a] = await go(liveDb(), 'SCR', OWNER, OPEN.concat([READ]));
     assert.ok(a.homeText && a.homeText.includes('teams scoring'), 'positive: the home rendered');
     assert.doesNotMatch(a.homeText, /\$|pro shop|credit/);
