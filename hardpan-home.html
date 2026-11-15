@@ -285,6 +285,89 @@
         .fv-ar { width:36px; height:36px; font-size:22px; }
         .fv-prev { left:4px; } .fv-next { right:4px; }
     }
+    /* HOMEPAGE A (Manny's pick, ADVISOR-20261115-1534): the fold, the scene cards and their sheets, the at-a-glance tiles.
+       Real sizes from the mockup: body text 15 px or larger, every button 44 px or taller; phone first, desktop at 900+. */
+    .fold { text-align:left; padding:10px 28px 0; }
+    .fold h1.one { font-size:56px; letter-spacing:-.02em; line-height:1.06; max-width:900px; }
+    .fold .sub { margin:14px 0 0; max-width:640px; }
+    .doors2 { display:grid; grid-template-columns:220px 220px; gap:14px; margin-top:22px; }
+    .door { display:flex; align-items:center; justify-content:center; min-height:52px; border-radius:14px; font-weight:800; font-size:18px; }
+    .door.go { background:var(--g); color:#fff; }
+    .door.org { border:2px solid var(--g); color:var(--g); background:#fff; }
+    .fold .hb { justify-content:flex-start; margin-top:18px; }
+    .fold .webapp { margin-top:14px; }
+    .mosaic { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:26px 0 0; }
+    .mt { position:relative; display:block; height:270px; border:0; padding:0; border-radius:18px; overflow:hidden; background:#0b0f0d; cursor:pointer; text-align:left; font:inherit; }
+    .mt img { width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
+    .mt.c img { object-position:center; }
+    .mt b { position:absolute; left:0; right:0; bottom:0; padding:40px 14px 12px; background:linear-gradient(transparent,rgba(0,0,0,.78)); color:#fff; font-size:18px; line-height:1.2; }
+    .mt:focus-visible, .scene:focus-visible, .gt:focus-visible, .shot:focus-visible, .sh-x:focus-visible, .door:focus-visible { outline:3px solid var(--lime); outline-offset:3px; }
+    .how { padding:44px 0 10px; }
+    .how h2, .glance h2 { font-size:34px; font-weight:900; letter-spacing:-.02em; }
+    .hsub { color:var(--mut); font-size:15px; margin:4px 0 18px; }
+    .scenes { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .scene { display:grid; grid-template-columns:150px 1fr; gap:18px; align-items:center; padding:16px; border:1px solid var(--line); border-radius:20px; background:#fff; text-align:left; cursor:pointer; font:inherit; color:var(--ink); }
+    .scene .dev { display:block; width:150px; height:270px; border-radius:22px; overflow:hidden; background:#0b0f0d; border:5px solid #0b0f0d; }
+    .scene .dev img { width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
+    .scene.tvscene { grid-template-columns:1fr; }   /* the club day picture is the TV board at its own 16:9, full width of the card */
+    .scene .dev.tv { width:100%; height:auto; aspect-ratio:1400/844; border-radius:10px; border-width:6px; }
+    .scene .dev.tv img { object-position:center; }
+    .scene .tx b { display:block; font-size:20px; line-height:1.2; margin-bottom:4px; }
+    .scene .tx span { display:block; font-size:15px; line-height:1.4; color:var(--mut); }
+    .scene .tx .more { display:inline-flex; align-items:center; margin-top:12px; min-height:44px; padding:0 16px; border:1.5px solid var(--g); color:var(--g); border-radius:12px; font-weight:800; font-size:15px; }
+    .glance { padding:30px 0 10px; }
+    .glance-tiles { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:16px; }   /* its own name: the Try the GPS map already uses the plain tile-layer class */
+    .gt { display:flex; align-items:center; gap:10px; padding:8px; border:1px solid var(--line); border-radius:14px; background:#fff; text-align:left; font:inherit; font-size:15px; font-weight:700; color:var(--ink); line-height:1.2; cursor:pointer; min-height:64px; }
+    .gt img, .gt .ic { width:44px; height:44px; border-radius:10px; flex:0 0 44px; }
+    .gt img { object-fit:cover; object-position:top; background:#dfe8e4; }
+    .gt .ic { background:#eef1ec; display:flex; align-items:center; justify-content:center; font-size:18px; color:var(--mut); }
+    .gt.plain { cursor:default; }
+    .gt small { display:block; font-size:11.5px; font-weight:800; letter-spacing:.06em; color:#8a4b00; }
+    .gt.soon { background:#fff8ec; border-color:#f0b060; color:#8a4b00; cursor:default; }
+    .strip { margin:22px 0 0; }
+    .strip a { display:block; background:#e8f5ee; border:1px solid #b9dcc8; border-radius:14px; padding:12px 14px; font-size:15px; color:var(--g); font-weight:700; line-height:1.4; }
+    .sheet { position:fixed; inset:0; z-index:40; background:rgba(11,15,13,.55); display:flex; align-items:flex-end; justify-content:center; }
+    .sheet[hidden] { display:none; }
+    html.sheet-open, html.sheet-open body { overflow:hidden; }
+    .sh-card { width:100%; max-width:720px; max-height:86vh; overflow:auto; background:var(--cream); border-radius:22px 22px 0 0; padding:14px 16px 24px; }
+    .sh-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .sh-top h3 { font-size:22px; font-weight:900; line-height:1.15; }
+    .sh-x { width:44px; height:44px; flex:0 0 44px; border-radius:50%; border:0; background:#dfe5dc; color:var(--g); font-size:18px; cursor:pointer; }
+    .sh-card p { color:var(--mut); font-size:15px; line-height:1.45; margin:6px 0 14px; }
+    .shots { list-style:none; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .shot { display:block; width:100%; border:0; padding:0; background:transparent; text-align:left; font:inherit; color:var(--ink); cursor:pointer; }
+    /* height:auto: the five new pictures carry width/height attributes for the viewer, and the height one would otherwise
+       stay as the box height (2040 px) under width:100%, zooming the thumbnail in (seen 2026-11-15, now pinned in 2.2 / 2.4). */
+    .shot img { display:block; width:100%; height:auto; aspect-ratio:400/868; object-fit:cover; object-position:top; border-radius:14px; background:#dfe8e4; }
+    .shots .wide { grid-column:1 / -1; }
+    .shots .wide img { aspect-ratio:1400/844; }
+    .shot b { display:block; font-size:15px; font-weight:700; line-height:1.25; margin-top:6px; }
+    .shots .note { grid-column:1 / -1; font-size:15px; color:var(--mut); line-height:1.4; }
+    .shots .cmg { color:#8a4b00; font-weight:800; }
+    .fv-img.wide { aspect-ratio:1400/844; width:100%; height:auto; max-height:100%; }
+    @media (min-width:900px) { .sheet { align-items:center; } .sh-card { border-radius:22px; } }
+    @media (max-width:980px) { .mosaic { grid-template-columns:1fr 1fr; } .mt { height:220px; } .glance-tiles { grid-template-columns:repeat(3,1fr); } .scenes { grid-template-columns:1fr; } }
+    @media (max-width:700px) {
+        .fold { padding:4px 16px 0; }
+        .fold h1.one { font-size:28px; line-height:1.12; }
+        .fold .sub { font-size:15px; margin-top:8px; }
+        .doors2 { grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+        .door { min-height:48px; font-size:16px; border-radius:12px; }
+        .fold .hb { margin-top:12px; }
+        .fold .webapp { margin-top:10px; font-size:15px; }
+        .mosaic { gap:6px; margin-top:16px; }
+        .mt { height:136px; border-radius:12px; }
+        .mt b { font-size:15px; padding:22px 8px 6px; }
+        .how { padding:26px 0 0; }
+        .how h2, .glance h2 { font-size:24px; }
+        .hsub { margin-bottom:12px; }
+        .scenes { gap:12px; }
+        .scene { grid-template-columns:130px 1fr; gap:12px; padding:12px; border-radius:16px; }
+        .scene .dev { width:130px; height:236px; }
+        .scene .tx b { font-size:17px; }
+        .glance-tiles { grid-template-columns:repeat(2,1fr); gap:8px; }
+        .shots { grid-template-columns:repeat(2,1fr); }
+    }
 </style>
 </head>
 <body>
@@ -303,12 +386,119 @@
     <a class="btn lime" id="nav-get-app" href="#get-the-app">Get the app</a>
 </nav>
 
-<section class="wrap hero">
-    <h1>Play it. Run it.<br><span>HardPan does the math.</span></h1>
-    <p class="sub">GPS, games and live scoring for your group, and a full tournament tool for the people who organize the day.</p>
+<!-- HOMEPAGE A (Manny's pick 2026-11-15 15:33, ADVISOR-20261115-1534; mockups tournaments/mockups-home/HP-homepage-ABC):
+     the fold is one line, two doors (Golfers scrolls to the scenes; Organizers is the same /tournament button as before, so
+     hardpan_home_52a_test.js's hero check still holds), the store badges, the web-app link, and a 3x2 mosaic of six REAL
+     screens standing in for the course photo (not shot yet); under it "How you'll use it" (five scene cards, each opening a
+     sheet of that scene's pictures; a picture opens the full-screen viewer below at that feature) and "Everything in the
+     app, at a glance" (one tile per feature, each opening the viewer; two tiles say COMING, two have no picture yet). The
+     rows under them (Coming in 2.0.8, EVERYTHING IN THE APP, the try-it boxes), the viewer, pricing, Get the app and the
+     footer are unchanged. The header is unchanged too: the bigger-logo pick (HP-header-logo-ABC) is separate. Five pictures
+     the rows do not have live in media/home/ (its manifest.json says where each came from). Guard: hardpan_home_scenes_test.js. -->
+<section class="wrap hero fold" id="top">
+    <h1 class="one">Every yard. Every game. One live board.</h1>
+    <p class="sub">The golf app for the group you play with: GPS on the tee, the side games scored as you go, the board live for everyone.</p>
+    <div class="doors2"><a class="door go" id="door-golfers" href="#how">Golfers</a><a class="door org" id="hero-start-tournament" href="/tournament">Organizers</a></div>
     <div class="badges hb"><a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a><a class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app" data-store="google"><img src="/google-play-badge.png" alt="Get it on Google Play" width="170" height="66"></a></div>
-    <p class="start-row hero-start"><a class="btn lime" id="hero-start-tournament" href="/tournament">Start a tournament &rarr;</a></p>
     <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
+    <div class="mosaic" aria-label="Six real screens; tap one for more pictures">
+        <button type="button" class="mt" data-sheet="weekly"><img src="/media/home/round-recap-400.webp" width="400" alt="The Round recap card for Papago Golf Club: four golfers with gross, net and to par (the under-par numbers in red), the 2v2 best ball result, skins and birdies, and Share recap."><b>Weekly game with your buddies</b></button>
+        <button type="button" class="mt c" data-sheet="club"><img src="/media/home/live-tv-700.webp" width="400" alt="The event board on a clubhouse TV: Test 46A at Papago Golf Club, Scramble, 2 teams, LIVE, waiting for first scores, both teams on hole 1, and the Follow on your phone QR for hardpangolf.com in the corner."><b>Club day on the clubhouse TV</b></button>
+        <button type="button" class="mt" data-sheet="trip"><img src="/media/screens/trip-400.webp" width="400" alt="The Road Trip page: one leaderboard across every day of a trip, with Start a New Trip and Open Trip."><b>Buddies trip, one board</b></button>
+        <button type="button" class="mt" data-sheet="tournaments"><img src="/media/home/multi-group-board-400.webp" width="400" alt="The event leaderboard in the app: Net and Gross, All, Groups and Flights switches, Leading the field: Andy, and the field by position with score, to par (under par in red) and thru."><b>Tournaments and charity events</b></button>
+        <button type="button" class="mt" data-sheet="gps"><img src="/media/home/gps-every-yard-400.webp" width="400" alt="The GPS map on hole 2 at Papago from the tee: 380 to the middle with front 360 and back 398, 133 and 250 to the bunkers, Plays like 263 with the driver, and the Card, GPS, Games and Board tabs on top."><b>Just you and the GPS</b></button>
+        <button type="button" class="mt" data-sheet="gps"><img src="/media/screens/green-slope-400.webp" width="400" alt="Papago hole 10 near the green with Slope on: shading and contours on the green, arrows that run downhill, 55 to the middle, and the Slope switch under Ask."><b>Read the green</b></button>
+    </div>
+</section>
+
+<section class="how" id="how" aria-labelledby="how-h">
+    <div class="wrap">
+        <h2 id="how-h">How you&rsquo;ll use it</h2>
+        <p class="hsub">Tap a scene for more pictures.</p>
+        <div class="scenes">
+            <button type="button" class="scene" data-sheet="weekly"><span class="dev"><img src="/media/home/round-recap-400.webp" loading="lazy" decoding="async" alt="The Round recap card for Papago Golf Club: four golfers with gross, net and to par (the under-par numbers in red), the 2v2 best ball result, skins and birdies, and Share recap."></span><span class="tx"><b>Weekly game with your buddies</b><span>Skins, Nassau, 2v2: scored as you play, settled when you’re done.</span><span class="more">See more</span></span></button>
+            <button type="button" class="scene tvscene" data-sheet="club"><span class="dev tv"><img src="/media/home/live-tv-700.webp" loading="lazy" decoding="async" alt="The event board on a clubhouse TV: Test 46A at Papago Golf Club, Scramble, 2 teams, LIVE, waiting for first scores, both teams on hole 1, and the Follow on your phone QR for hardpangolf.com in the corner."></span><span class="tx"><b>Men’s / women’s club day</b><span>Flights on one board, the board on the clubhouse TV, prizes by flight.</span><span class="more">See more</span></span></button>
+            <button type="button" class="scene" data-sheet="trip"><span class="dev"><img src="/media/screens/trip-400.webp" loading="lazy" decoding="async" alt="The Road Trip page: one leaderboard across every day of a trip, with Start a New Trip and Open Trip."></span><span class="tx"><b>Buddies trip</b><span>One board across every day of the trip, not one round at a time.</span><span class="more">See more</span></span></button>
+            <button type="button" class="scene" data-sheet="tournaments"><span class="dev"><img src="/media/home/multi-group-board-400.webp" loading="lazy" decoding="async" alt="The event leaderboard in the app: Net and Gross, All, Groups and Flights switches, Leading the field: Andy, and the field by position with score, to par (under par in red) and thru."></span><span class="tx"><b>Tournaments and charity events</b><span>Sign-up desk, a link per team, every group on one board, 36 holes if you need it.</span><span class="more">See more</span></span></button>
+            <button type="button" class="scene" data-sheet="gps"><span class="dev"><img src="/media/screens/green-slope-400.webp" loading="lazy" decoding="async" alt="Papago hole 10 near the green with Slope on: shading and contours on the green, arrows that run downhill, 55 to the middle, and the Slope switch under Ask."></span><span class="tx"><b>Just you and the GPS</b><span>Every yard, the plays-like number in the wind, the slope of the green. No signal needed.</span><span class="more">See more</span></span></button>
+        </div>
+    </div>
+</section>
+<div class="sheet" id="sheet-weekly" role="dialog" aria-modal="true" aria-labelledby="sheet-weekly-h" hidden>
+    <div class="sh-card"><div class="sh-top"><h3 id="sheet-weekly-h">Weekly game with your buddies</h3><button type="button" class="sh-x" aria-label="Close">&#10005;</button></div>
+    <p>Skins, Nassau, 2v2 and KPs scored as you play; the recap and who-owes-who at the end.</p>
+    <ul class="shots"><li><button type="button" class="shot" data-open-key="round-recap" data-shot="round-recap" data-group="Weekly game"><img src="/media/home/round-recap-400.webp" srcset="/media/home/round-recap-400.webp 400w, /media/home/round-recap-940.webp 940w" sizes="(max-width:700px) 45vw, 220px" width="940" height="2040" loading="lazy" decoding="async" alt="The Round recap card for Papago Golf Club: four golfers with gross, net and to par (the under-par numbers in red), the 2v2 best ball result, skins and birdies, and Share recap."><b>Round recap</b></button></li><li><button type="button" class="shot" data-open-key="live-games"><img src="/media/screens/live-games-400.webp" loading="lazy" decoding="async" alt="The Games sheet over the map, Games tab on top: Manny and Josh against Bob and Paul in a live Nassau, all square through 3, and the round’s skins with who has one so far."><b>Every game, as it happens.</b></button></li><li><button type="button" class="shot" data-open-key="group-scoring"><img src="/media/screens/group-scoring-400.webp" loading="lazy" decoding="async" alt="The score sheet for hole 4 over the map, Card tab on top: Manny, Josh, Bob and Paul through 3, Josh’s 4 just entered, an Undo chip and the 1 to 7+ keypad."><b>Score the whole group in one tap.</b></button></li><li><button type="button" class="shot" data-open-key="settle"><img src="/media/screens/settle-400.webp" loading="lazy" decoding="async" alt="The Settle up card on the Round Receipt: the one line left between Josh and you, with Request on Venmo and Mark done, and your own Venmo or Cash App handle below it."><b>Who owes who, done.</b></button></li><li><button type="button" class="shot" data-open-key="results"><img src="/media/screens/results-400.webp" loading="lazy" decoding="async" alt="The round receipt: final scores out, in, gross and net for four golfers, then the skins results."><b>The final word, ready to share.</b></button></li><li><button type="button" class="shot" data-open-key="chat"><img src="/media/screens/chat-400.webp" loading="lazy" decoding="async" alt="Round chat over the GPS map, under the Card, GPS, Games and Board tabs: Josh and Manny on the pin at 7, the wind on 8 and the beer cart on 9."><b>Talk to the round.</b></button></li><li><button type="button" class="shot" data-open-key="weekly-code"><img src="/media/screens/weekly-code-400.webp" loading="lazy" decoding="async" alt="Home with the Tuesday weekly game at Papago, a Start this week button, and its join code that stays the same every week."><b>Same game. Same code. Every week.</b></button></li><li><button type="button" class="shot" data-open-key="play-again"><img src="/media/screens/play-again-400.webp" loading="lazy" decoding="async" alt="Home with a Play again card for today at Papago Golf Club and a Start button."><b>Same group? One tap.</b></button></li></ul></div>
+</div>
+<div class="sheet" id="sheet-club" role="dialog" aria-modal="true" aria-labelledby="sheet-club-h" hidden>
+    <div class="sh-card"><div class="sh-top"><h3 id="sheet-club-h">Men’s / women’s club day</h3><button type="button" class="sh-x" aria-label="Close">&#10005;</button></div>
+    <p>Flights on one board, the board on the clubhouse TV, prizes by flight.</p>
+    <ul class="shots"><li class="wide"><button type="button" class="shot" data-open-key="live-tv" data-shot="live-tv" data-group="Club day" data-wide><img src="/media/home/live-tv-700.webp" srcset="/media/home/live-tv-700.webp 400w, /media/home/live-tv-1400.webp 1400w" sizes="(max-width:700px) 45vw, 220px" width="1400" height="844" loading="lazy" decoding="async" alt="The event board on a clubhouse TV: Test 46A at Papago Golf Club, Scramble, 2 teams, LIVE, waiting for first scores, both teams on hole 1, and the Follow on your phone QR for hardpangolf.com in the corner."><b>The board on the clubhouse TV</b></button></li><li><button type="button" class="shot" data-open-key="live-board-phone" data-shot="live-board-phone" data-group="Club day"><img src="/media/home/live-board-phone-400.webp" srcset="/media/home/live-board-phone-400.webp 400w, /media/home/live-board-phone-780.webp 780w" sizes="(max-width:700px) 45vw, 220px" width="780" height="1976" loading="lazy" decoding="async" alt="The live board for Test 46A on a phone: Leaderboard, Skins and Pairings tabs, Team 1.1 and Team 2 before the first score, Share live leaderboard, and the Prize results card."><b>The same board on a phone</b></button></li><li><button type="button" class="shot" data-open-key="prizes"><img src="/media/screens/prizes-400.webp" loading="lazy" decoding="async" alt="The live tournament leaderboard in the app, with Card, Board and GPS tabs on top: Team 4 in 1st at 3 under through 4, leading by 2, and the teams around it."><b>Every flight, live.</b></button></li><li><button type="button" class="shot" data-open-key="event-board"><img src="/media/screens/event-board-400.webp" loading="lazy" decoding="async" alt="A tournament leaderboard, net, with every group on one board: Andy leads at 4 under through 13."><b>Every group. One board.</b></button></li><li><button type="button" class="shot" data-open-key="card-board"><img src="/media/screens/card-board-400.webp" loading="lazy" decoding="async" alt="A team’s card in the app for Desert Classic: Card, Board and GPS tabs, next to play Hole 8 · Par 5, the team score with minus and plus buttons, and Save · Next hole."><b>Your card and the board, one link.</b></button></li><li><button type="button" class="shot" data-open-key="my-events"><img src="/media/screens/my-events-400.webp" loading="lazy" decoding="async" alt="The organizer home with My events listing Hope Foundation Scramble and Club Championship, and an Open an event by code box."><b>Your events, on any device.</b></button></li></ul></div>
+</div>
+<div class="sheet" id="sheet-trip" role="dialog" aria-modal="true" aria-labelledby="sheet-trip-h" hidden>
+    <div class="sh-card"><div class="sh-top"><h3 id="sheet-trip-h">Buddies trip</h3><button type="button" class="sh-x" aria-label="Close">&#10005;</button></div>
+    <p>One board across every day of the trip, not one round at a time.</p>
+    <ul class="shots"><li><button type="button" class="shot" data-open-key="trip"><img src="/media/screens/trip-400.webp" loading="lazy" decoding="async" alt="The Road Trip page: one leaderboard across every day of a trip, with Start a New Trip and Open Trip."><b>One board for the whole trip.</b></button></li><li><button type="button" class="shot" data-open-key="history"><img src="/media/screens/history-400.webp" loading="lazy" decoding="async" alt="History: a past round at Dobson Ranch Golf Course with its golfers and final scores."><b>Every round you’ve played.</b></button></li><li><button type="button" class="shot" data-open-key="play-again"><img src="/media/screens/play-again-400.webp" loading="lazy" decoding="async" alt="Home with a Play again card for today at Papago Golf Club and a Start button."><b>Same group? One tap.</b></button></li><li><button type="button" class="shot" data-open-key="chat"><img src="/media/screens/chat-400.webp" loading="lazy" decoding="async" alt="Round chat over the GPS map, under the Card, GPS, Games and Board tabs: Josh and Manny on the pin at 7, the wind on 8 and the beer cart on 9."><b>Talk to the round.</b></button></li></ul></div>
+</div>
+<div class="sheet" id="sheet-tournaments" role="dialog" aria-modal="true" aria-labelledby="sheet-tournaments-h" hidden>
+    <div class="sh-card"><div class="sh-top"><h3 id="sheet-tournaments-h">Tournaments and charity events</h3><button type="button" class="sh-x" aria-label="Close">&#10005;</button></div>
+    <p>Sign-up desk, a link per team, every group on one board, 36 holes if you need it.</p>
+    <ul class="shots"><li><button type="button" class="shot" data-open-key="multi-group-board" data-shot="multi-group-board" data-group="Tournaments"><img src="/media/home/multi-group-board-400.webp" srcset="/media/home/multi-group-board-400.webp 400w, /media/home/multi-group-board-940.webp 940w" sizes="(max-width:700px) 45vw, 220px" width="940" height="2040" loading="lazy" decoding="async" alt="The event leaderboard in the app: Net and Gross, All, Groups and Flights switches, Leading the field: Andy, and the field by position with score, to par (under par in red) and thru."><b>Every group on one board</b></button></li><li><button type="button" class="shot" data-open-key="create-event"><img src="/media/screens/create-event-400.webp" loading="lazy" decoding="async" alt="Creating a tournament, question four: pick the format, Scramble, Best ball, Shamble or Individual."><b>A tournament in four questions.</b></button></li><li><button type="button" class="shot" data-open-key="join-event"><img src="/media/screens/join-event-400.webp" loading="lazy" decoding="async" alt="Joining the Papago Fall Scramble: Which team are you on?, with Teams 1 to 8 and their starting holes."><b>Join the tournament.</b></button></li><li><button type="button" class="shot" data-open-key="registration-desk"><img src="/media/screens/registration-desk-400.webp" loading="lazy" decoding="async" alt="The Desk tab: 4 signups, filters All, Unpaid, Paid and Approved, and each golfer with Approve into field, Correct and Remove buttons."><b>Sign-ups and check-in, one desk.</b></button></li><li><button type="button" class="shot" data-open-key="team-qr-links"><img src="/media/screens/team-qr-links-400.webp" loading="lazy" decoding="async" alt="Setup on the organizer page: Team 4’s scorecard link on hardpangolf.com shown as a QR code with a Copy Link button, from the shotgun start list."><b>Every team gets its own link.</b></button></li><li><button type="button" class="shot" data-open-key="contests"><img src="/media/screens/contests-400.webp" loading="lazy" decoding="async" alt="The organizer’s Contests tab suggesting closest to the pin on every par 3 and long drive on 18, with a Use these button."><b>Closest to the pin, long drive.</b></button></li><li><button type="button" class="shot" data-open-key="announcements"><img src="/media/screens/announcements-400.webp" loading="lazy" decoding="async" alt="A golfer’s card covered by a full-screen weather note: Stop play, lightning in the area, with a Got it button."><b>A note on every card.</b></button></li><li><button type="button" class="shot" data-open-key="photos-after"><img src="/media/screens/photos-after-400.webp" loading="lazy" decoding="async" alt="A finished team card asking Round done, add photos from today?, with a photo picker, a caption box and a Send to the organizer button."><b>Photos when the round is done.</b></button></li><li><button type="button" class="shot" data-open-key="tournaments"><img src="/media/screens/tournaments-400.webp" loading="lazy" decoding="async" alt="HardPan Home with the Golf GPS card for Papago Golf Club and the organizer’s event card under it: Desert Classic, shotgun 8:10 AM, 8 teams, the join code, Share code and Manage."><b>Run the day from your phone.</b></button></li><li><button type="button" class="shot" data-open-key="team-card"><img src="/media/screens/team-card-400.webp" loading="lazy" decoding="async" alt="The Desert Classic team card for Team 4 in the app: the Card, Board and GPS switch, Hole 8 · Par 5 next to play, the team score with minus and plus, and Save · Next hole."><b>Your team card, in the app.</b></button></li><li class="note"><b>36-hole events:</b> two rounds on one board, Gross or Net. Picture coming.</li><li class="note"><span class="cmg">COMING</span> Check-in at the table on event day.</li></ul></div>
+</div>
+<div class="sheet" id="sheet-gps" role="dialog" aria-modal="true" aria-labelledby="sheet-gps-h" hidden>
+    <div class="sh-card"><div class="sh-top"><h3 id="sheet-gps-h">Just you and the GPS</h3><button type="button" class="sh-x" aria-label="Close">&#10005;</button></div>
+    <p>Every yard, the plays-like number in the wind, the slope of the green. No signal needed.</p>
+    <ul class="shots"><li><button type="button" class="shot" data-open-key="gps-every-yard" data-shot="gps-every-yard" data-group="GPS"><img src="/media/home/gps-every-yard-400.webp" srcset="/media/home/gps-every-yard-400.webp 400w, /media/home/gps-every-yard-940.webp 940w" sizes="(max-width:700px) 45vw, 220px" width="940" height="2040" loading="lazy" decoding="async" alt="The GPS map on hole 2 at Papago from the tee: 380 to the middle with front 360 and back 398, 133 and 250 to the bunkers, Plays like 263 with the driver, and the Card, GPS, Games and Board tabs on top."><b>Every yard, from the tee</b></button></li><li><button type="button" class="shot" data-open-key="green-slope"><img src="/media/screens/green-slope-400.webp" loading="lazy" decoding="async" alt="Papago hole 10 near the green with Slope on: shading and contours on the green, arrows that run downhill, 55 to the middle, and the Slope switch under Ask."><b>Read the green.</b></button></li><li><button type="button" class="shot" data-open-key="plays-like"><img src="/media/screens/plays-like-400.webp" loading="lazy" decoding="async" alt="The GPS map on hole 2 at Dobson Ranch: 140 to the middle, Plays like 140 with a 9-iron and the aim tip 8 yards left, the green’s size line, and the Slope switch under Ask."><b>Hit the number it plays.</b></button></li><li><button type="button" class="shot" data-open-key="hazards"><img src="/media/screens/hazards-400.webp" loading="lazy" decoding="async" alt="The Hazards sheet on hole 1 at Talking Stick, over the GPS map: reach and carry yards for the bunker left and the water right, and lay-up distances with a club for each."><b>Know what you can carry.</b></button></li><li><button type="button" class="shot" data-open-key="offline"><img src="/media/screens/offline-400.webp" loading="lazy" decoding="async" alt="The course picker with a Download for offline button for Dobson Ranch Golf Course."><b>No signal? Still every yard.</b></button></li><li><button type="button" class="shot" data-open-key="my-bag"><img src="/media/screens/my-bag-400.webp" loading="lazy" decoding="async" alt="My bag for Sam: a carry yardage for each club, Driver 245, 3-wood 225, 5-wood 210, with a switch to keep each club in the bag and Type my carries."><b>Your real carries.</b></button></li><li><button type="button" class="shot" data-open-key="green-size"><img src="/media/screens/green-size-400.webp" loading="lazy" decoding="async" alt="Papago hole 14, 149 to the middle: the line Green 34 yds deep and 27 yds wide on the map, and Plays like 156 with an 8-iron."><b>How big is the green?</b></button></li><li><button type="button" class="shot" data-open-key="best-miss"><img src="/media/screens/best-miss-400.webp" loading="lazy" decoding="async" alt="The GPS map on Papago’s first green with Slope on: the green’s slope arrows and shading, 41 to the middle, carry bunker 43, and Best miss: right."><b>Miss on the right side.</b></button></li></ul></div>
+</div>
+
+<section class="glance" id="everything" aria-labelledby="glance-h">
+    <div class="wrap">
+        <h2 id="glance-h">Everything in the app, at a glance</h2>
+        <p class="hsub">Tap a tile for the picture. Every one is in the app today, except the two marked COMING.</p>
+        <div class="glance-tiles">
+            <button type="button" class="gt" data-open-key="gps"><img src="/media/screens/gps-400.webp" loading="lazy" decoding="async" alt=""><span>Every yard GPS</span></button>
+            <button type="button" class="gt" data-open-key="plays-like"><img src="/media/screens/plays-like-400.webp" loading="lazy" decoding="async" alt=""><span>Plays-like number</span></button>
+            <button type="button" class="gt" data-open-key="green-slope"><img src="/media/screens/green-slope-400.webp" loading="lazy" decoding="async" alt=""><span>Green slope</span></button>
+            <button type="button" class="gt" data-open-key="hazards"><img src="/media/screens/hazards-400.webp" loading="lazy" decoding="async" alt=""><span>Hazard carries</span></button>
+            <button type="button" class="gt" data-open-key="offline"><img src="/media/screens/offline-400.webp" loading="lazy" decoding="async" alt=""><span>Works offline</span></button>
+            <button type="button" class="gt" data-open-key="green-size"><img src="/media/screens/green-size-400.webp" loading="lazy" decoding="async" alt=""><span>Green size</span></button>
+            <button type="button" class="gt" data-open-key="my-bag"><img src="/media/screens/my-bag-400.webp" loading="lazy" decoding="async" alt=""><span>My bag</span></button>
+            <button type="button" class="gt" data-open-key="best-miss"><img src="/media/screens/best-miss-400.webp" loading="lazy" decoding="async" alt=""><span>Best miss</span></button>
+            <button type="button" class="gt" data-open-key="ask-caddie"><img src="/media/screens/ask-caddie-400.webp" loading="lazy" decoding="async" alt=""><span>Ask HardPan</span></button>
+            <button type="button" class="gt" data-open-key="range"><img src="/media/screens/range-400.webp" loading="lazy" decoding="async" alt=""><span>Range practice</span></button>
+            <button type="button" class="gt" data-open-key="strokes-gained"><img src="/media/screens/strokes-gained-400.webp" loading="lazy" decoding="async" alt=""><span>Strokes gained</span></button>
+            <button type="button" class="gt" data-open-key="round-tabs"><img src="/media/screens/round-tabs-400.webp" loading="lazy" decoding="async" alt=""><span>Round tabs</span></button>
+            <button type="button" class="gt" data-open-key="set-up-card"><img src="/media/screens/set-up-card-400.webp" loading="lazy" decoding="async" alt=""><span>Just say it</span></button>
+            <button type="button" class="gt" data-open-key="add-a-game"><img src="/media/screens/add-a-game-400.webp" loading="lazy" decoding="async" alt=""><span>Add a game</span></button>
+            <button type="button" class="gt" data-open-key="live-games"><img src="/media/screens/live-games-400.webp" loading="lazy" decoding="async" alt=""><span>Live games</span></button>
+            <button type="button" class="gt" data-open-key="group-scoring"><img src="/media/screens/group-scoring-400.webp" loading="lazy" decoding="async" alt=""><span>Group scoring</span></button>
+            <button type="button" class="gt" data-open-key="results"><img src="/media/screens/results-400.webp" loading="lazy" decoding="async" alt=""><span>Results &amp; recap</span></button>
+            <button type="button" class="gt" data-open-key="settle"><img src="/media/screens/settle-400.webp" loading="lazy" decoding="async" alt=""><span>Settle up</span></button>
+            <button type="button" class="gt" data-open-key="weekly-code"><img src="/media/screens/weekly-code-400.webp" loading="lazy" decoding="async" alt=""><span>Weekly code</span></button>
+            <button type="button" class="gt" data-open-key="chat"><img src="/media/screens/chat-400.webp" loading="lazy" decoding="async" alt=""><span>Round chat</span></button>
+            <button type="button" class="gt" data-open-key="play-again"><img src="/media/screens/play-again-400.webp" loading="lazy" decoding="async" alt=""><span>Play again</span></button>
+            <button type="button" class="gt" data-open-key="history"><img src="/media/screens/history-400.webp" loading="lazy" decoding="async" alt=""><span>History</span></button>
+            <button type="button" class="gt" data-open-key="trip"><img src="/media/screens/trip-400.webp" loading="lazy" decoding="async" alt=""><span>Trip board</span></button>
+            <button type="button" class="gt" data-open-key="tournaments"><img src="/media/screens/tournaments-400.webp" loading="lazy" decoding="async" alt=""><span>Tournaments on Home</span></button>
+            <button type="button" class="gt" data-open-key="create-event"><img src="/media/screens/create-event-400.webp" loading="lazy" decoding="async" alt=""><span>Create event</span></button>
+            <button type="button" class="gt" data-open-key="join-event"><img src="/media/screens/join-event-400.webp" loading="lazy" decoding="async" alt=""><span>Join event</span></button>
+            <button type="button" class="gt" data-open-key="event-board"><img src="/media/screens/event-board-400.webp" loading="lazy" decoding="async" alt=""><span>Event board</span></button>
+            <button type="button" class="gt" data-open-key="prizes"><img src="/media/screens/prizes-400.webp" loading="lazy" decoding="async" alt=""><span>Prizes by flight</span></button>
+            <button type="button" class="gt" data-open-key="team-qr-links"><img src="/media/screens/team-qr-links-400.webp" loading="lazy" decoding="async" alt=""><span>Team QR links</span></button>
+            <button type="button" class="gt" data-open-key="my-events"><img src="/media/screens/my-events-400.webp" loading="lazy" decoding="async" alt=""><span>My events</span></button>
+            <button type="button" class="gt" data-open-key="team-card"><img src="/media/screens/team-card-400.webp" loading="lazy" decoding="async" alt=""><span>Team card</span></button>
+            <button type="button" class="gt" data-open-key="card-board"><img src="/media/screens/card-board-400.webp" loading="lazy" decoding="async" alt=""><span>Card &amp; board link</span></button>
+            <button type="button" class="gt" data-open-key="contests"><img src="/media/screens/contests-400.webp" loading="lazy" decoding="async" alt=""><span>KP &amp; long drive</span></button>
+            <button type="button" class="gt" data-open-key="photos-after"><img src="/media/screens/photos-after-400.webp" loading="lazy" decoding="async" alt=""><span>Photos after</span></button>
+            <button type="button" class="gt" data-open-key="announcements"><img src="/media/screens/announcements-400.webp" loading="lazy" decoding="async" alt=""><span>Announcements</span></button>
+            <button type="button" class="gt" data-open-key="registration-desk"><img src="/media/screens/registration-desk-400.webp" loading="lazy" decoding="async" alt=""><span>Sign-up desk</span></button>
+            <button type="button" class="gt" data-open-key="live-tv"><img src="/media/home/live-tv-700.webp" loading="lazy" decoding="async" alt=""><span>TV board</span></button>
+            <span class="gt plain"><span class="ic">&#9679;</span><span>36-hole board<small>picture coming</small></span></span>
+            <span class="gt plain"><span class="ic">&#9679;</span><span>Skins &amp; pairings tabs<small>picture coming</small></span></span>
+            <span class="gt soon"><span class="ic">&#8230;</span><span><small>COMING</small>Check-in</span></span>
+            <span class="gt soon"><span class="ic">&#8230;</span><span><small>COMING</small>Scan check</span></span>
+        </div>
+        <p class="strip"><a href="#pricing"><span data-price="pro-label"></span> <b data-price="pro-headline"></b> &middot; the first 1,000 golfers &middot; locked for as long as you stay subscribed. Pricing &darr;</a></p>
+    </div>
 </section>
 
 <!-- 2.0.8 site (web-208-site, Nov 15): NOT in the app yet. iOS 2.0.8 (1) goes to Apple's review today, so this row sits above

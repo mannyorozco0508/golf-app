@@ -130,8 +130,15 @@ class Tab {
     }
     async tapEl(sel) {
         const r = await this.eval(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: 'center', inline: 'center' }); const b = e.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
-        await sleep(400);
-        const r2 = await this.eval(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+        // Homepage A (2026-11-15): the rows now sit about 4,700 px further down, and html has scroll-behavior:smooth,
+        // so a fixed 400 ms was no longer enough for the smooth scroll to arrive: wait until the target stops moving.
+        let r2 = null, same = 0;
+        for (let i = 0; i < 40 && same < 3; i++) {
+            await sleep(100);
+            const n = await this.eval(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+            if (r2 && n.x === r2.x && n.y === r2.y) same++; else same = 0;
+            r2 = n;
+        }
         await this.tap(r2.x, r2.y);
         return r;
     }
