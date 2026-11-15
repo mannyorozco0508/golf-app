@@ -245,6 +245,9 @@ const TOURNAMENT_SHELL = [
     'tournament-contests.js',
     // E4 photo wall: the paths and builders both tournament pages load.
     'tournament-photos.js',
+    // The Nov 14 batch (sw.js v413): the event-board columns, skins and prizes
+    // engines tournament.html and tournament-scorecard.html load.
+    'event-columns.js', 'skins.js', 'tournament-prizes.js',
     // 58A tournament offer (Manny OK 2026-11-12): the one price table both
     // tournament pages read for the renewal price (founding / regular). Without
     // it the pages fall back to typed literals, and build-shell refuses the output.

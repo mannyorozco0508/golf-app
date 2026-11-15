@@ -297,7 +297,8 @@ const PRODUCTS = {
         // Moved to v74 FOR BUG-HUNT #10 + #14 (2026-11-13, Manny OK): see sw.js v410.
         // Moved to v75 FOR THE WEBSITE PICTURES VS iOS 2.0.7 (2026-11-13, Manny OK by phone relay): see sw.js v411.
         // Moved to v76 FOR STRIPE CONNECT ON tournament.html (2026-11-13, Manny OK by phone relay): see sw.js v412.
-        cacheName: 'tournament-v76-connect',
+        // Moved to v77 FOR THE NOV 14 TOURNAMENTS BATCH (2026-11-14, Manny OK by phone relay): see sw.js v413.
+        cacheName: 'tournament-v77-batch',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
