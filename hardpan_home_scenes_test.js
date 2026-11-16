@@ -2,11 +2,14 @@
 // HOMEPAGE A: THE FOLD, THE SCENE SHEETS AND THE AT-A-GLANCE TILES (Manny's pick 2026-11-15 15:33,
 // ADVISOR-20261115-1534; mockups tournaments/mockups-home/HP-homepage-ABC)
 //
-// hardpan-home.html's fold is one line, two doors, the store badges, the web-app link and a 3x2
-// mosaic of six real screens; under it five scene cards, each opening a sheet of that scene's
+// hardpan-home.html's fold (F2, Manny's pick 2026-11-15 5:19 PM, ADVISOR-20261115-1720-OK-build-F2) is a fan of
+// three real 2.0.8 phones with the HardPan Golf lockup on a cream plate over their top edge, then one line, two
+// doors, the store badges and the web-app link; a sticky bar (small lockup, links, Get the app) slides in once the
+// fold has scrolled past; under it five scene cards, each opening a sheet of that scene's
 // pictures, and one tile per feature; a picture or a tile opens the full-screen viewer the rows
 // already had (site-features.js). The rows, the viewer, pricing, Get the app and the footer are
-// the ones main had. The header is unchanged (the bigger-logo pick is a separate sheet).
+// the ones main had. The old icon + two-line header is gone from this page (the lockup is the brand now;
+// marketing_home_test.js keeps that header on the help pages).
 //
 // 1. Source: the fold's parts and their targets; every data-open-key resolves to a card the rows
 //    have or to one of the five new pictures (media/home, each once, with a real alt and files on
@@ -23,7 +26,7 @@
 // WHAT IT CANNOT PROVE: Safari, a real Cloudflare edge, pinch zoom.
 // BASELINE against pre-build main 55077321 (hardpan-home.html without the fold), measured with
 // this exact file copied there: the file cannot load (the fold section is not on the page, so the module-level
-// slice assertion throws: 1 fail, 0 of the 18 tests run); here: 18 pass / 0 fail (11 source + 7 Chrome).
+// slice assertion throws: 1 fail, 0 of the 18 tests run); here: 19 pass / 0 fail (11 source + 8 Chrome).
 // NEGATIVE CONTROLS (run by hand 2026-11-15, each restored by cp from a scratchpad copy, sha printed RESTORED-OK):
 //   - site-features.js with the data-open-key handler emptied: 13 pass / 5 fail (2.2 to 2.6: no picture and no
 //     tile opens the viewer, and the taps after them land on a page in the wrong state).
@@ -63,6 +66,8 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
     test('the fold: one line, two doors (Golfers -> #how, Organizers -> /tournament, the same id as before), badges Apple then Google, the web-app link', () => {
         assert.match(fold, /<h1 class="one">Every yard\. Every game\. One live board\.<\/h1>/);
         assert.match(fold, /<a class="door go" id="door-golfers" href="#how">Golfers<\/a><a class="door org" id="hero-start-tournament" href="\/tournament">Organizers<\/a>/);
+        assert.match(fold, /<img class="lk" src="\/media\/home\/hardpan-golf-lockup\.png" alt="HardPan Golf" width="1278" height="222">/);
+        assert.ok(exists('media/home/hardpan-golf-lockup.png'));
         const apple = fold.indexOf('class="store-apple" href="https://apps.apple.com/app/id6808220335"'), google = fold.indexOf('class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app"');
         assert.ok(apple > 0 && google > apple, 'badges: Apple first, then Google');
         assert.match(fold, /<img src="\/app-store-badge\.svg" alt="Download on the App Store" width="132" height="44">/);
@@ -70,12 +75,14 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
         assert.match(fold, /<a class="webapp" id="open-web-app" href="\/admin">Have a round code\? Open the web app &rarr;<\/a>/);
         assert.doesNotMatch(body, /Play it\. Run it\./);
     });
-    test('the mosaic: six real screens, each a button into a sheet that exists, each file on disk, each with a real alt', () => {
-        const tiles = [...fold.matchAll(/<button type="button" class="mt( c)?" data-sheet="([a-z]+)"><img src="([^"]+)" width="400" alt="([^"]*)"><b>([^<]*)<\/b><\/button>/g)];
-        assert.equal(tiles.length, 6);
-        assert.deepEqual(tiles.map((t) => t[5]), ['Weekly game with your buddies', 'Club day on the clubhouse TV', 'Buddies trip, one board', 'Tournaments and charity events', 'Just you and the GPS', 'Read the green']);
-        tiles.forEach((t) => { assert.ok(exists(t[3].slice(1)), t[3]); assert.ok(t[4].length >= 60, 'alt too short: ' + t[4]); assert.ok(body.includes('id="sheet-' + t[2] + '"'), 'no sheet ' + t[2]); });
-        assert.equal(tiles.filter((t) => t[1]).length, 1, 'only the TV tile is centre-cropped');
+    test('the fan: three real 2.0.8 phones (recap, the smooth slope, the event board), each a button into a sheet that exists, files on disk, real alts', () => {
+        const fan = [...fold.matchAll(/<button type="button" class="fp ([lcr])" data-sheet="([a-z]+)"><img src="([^"]+)" srcset="([^"]+)" sizes="[^"]+" width="940" height="2040" alt="([^"]*)"><\/button>/g)];
+        assert.deepEqual(fan.map((t) => t[1]), ['l', 'c', 'r']);
+        assert.deepEqual(fan.map((t) => t[2]), ['weekly', 'gps', 'tournaments']);
+        assert.deepEqual(fan.map((t) => t[3]), ['/media/home/round-recap-400.webp', '/media/screens/green-slope-400.webp', '/media/home/multi-group-board-400.webp']);
+        fan.forEach((t) => { t[4].split(',').map((x) => x.trim().split(' ')[0]).forEach((f) => assert.ok(exists(f.slice(1)), f)); assert.ok(t[5].length >= 80, 'alt: ' + t[5]); assert.ok(body.includes('id="sheet-' + t[2] + '"'), 'no sheet ' + t[2]); });
+        assert.match(fan[1][5], /ring hidden[\s\S]*\(−1\) with the under-par number in red/, 'the centre phone is the 2.0.8 slope frame');
+        assert.doesNotMatch(fold, /class="mt|mosaic|weekly-results/);
     });
     test('five scenes in order, each a button into its sheet, each with a real picture', () => {
         const sc = [...how.matchAll(/<button type="button" class="scene( tvscene)?" data-sheet="([a-z]+)"><span class="dev( tv)?"><img src="([^"]+)" loading="lazy" decoding="async" alt="([^"]*)"><\/span><span class="tx"><b>([^<]*)<\/b><span>([^<]*)<\/span><span class="more">See more<\/span><\/span><\/button>/g)];
@@ -140,8 +147,11 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
         const iGlance = body.indexOf('id="everything"'), i208 = body.indexOf('id="coming208"'), iFeat = body.indexOf('<section class="feat" id="features">'), iFv = body.indexOf('<div class="fv" id="fv"');
         assert.ok(iGlance > 0 && i208 > iGlance && iFeat > i208 && iFv > iFeat, [iGlance, i208, iFeat, iFv].join(' '));
         assert.equal((body.match(/<div class="fv" id="fv"/g) || []).length, 1);
-        assert.match(body, /<nav class="wrap top" aria-label="Main">\s*<a class="logo" href="\/"><img src="\/hardpan-icon\.svg" alt="" width="36" height="36">/);
+        assert.match(body, /<nav class="wrap toplinks" aria-label="Main">\s*<div class="links">/);
+        assert.match(body, /<div class="stick" id="stick" aria-label="HardPan Golf">\s*<div class="wrap stick-in">\s*<a class="logo" href="\/"><img src="\/media\/home\/hardpan-golf-lockup\.png" alt="HardPan Golf" width="1278" height="222"><\/a>/);
+        assert.equal((body.match(/id="nav-get-app"/g) || []).length, 1);
         assert.match(body, /<a class="btn lime" id="nav-get-app" href="#get-the-app">Get the app<\/a>/);
+        assert.doesNotMatch(body, /<nav class="wrap top" |hardpan-icon\.svg" alt="" width="36"/, 'the old icon + two-line header is gone from the homepage');
         assert.ok(body.includes('id="pricing"') && body.includes('id="get-the-app"') && body.includes('<footer>'));
     });
     test('the grid is .glance-tiles, never .tiles (the Try the GPS map\'s tile layer); the new CSS keeps real sizes', () => {
@@ -150,7 +160,7 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
         const mine = CSS.slice(CSS.indexOf('HOMEPAGE A'));
         assert.ok(mine.length > 2000, 'the HOMEPAGE A CSS block');
         assert.doesNotMatch(mine, /(^|[^-\w])\.tiles\b/, 'a .tiles rule would move the map\'s tile layer');
-        ['.door { display:flex; align-items:center; justify-content:center; min-height:52px;', '.door { min-height:48px;', '.gt { display:flex;', 'min-height:64px;', '.sh-x { width:44px; height:44px;', '.scene .tx .more { display:inline-flex; align-items:center; margin-top:12px; min-height:44px;']
+        ['.door { display:flex; align-items:center; justify-content:center; min-height:52px;', '.door { min-height:48px;', '.gt { display:flex;', 'min-height:64px;', '.sh-x { width:44px; height:44px;', '.scene .tx .more { display:inline-flex; align-items:center; margin-top:12px; min-height:44px;', '.fold .lk { height:60px; }', '.fold .lk { position:absolute; left:50%; top:0;', '.stick { position:fixed;', '.stick.on { transform:none; }']
             .forEach((s) => assert.ok(mine.includes(s), s));
         assert.deepEqual(mine.match(/font-size:1[0-4](\.\d+)?px/g), ['font-size:11.5px'], 'text under 15 px: only the COMING / picture-coming tag (11.5 px, a label, not a sentence)');
     });
@@ -160,6 +170,7 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
         assert.ok(JS.includes('function openKey(key, from)') && JS.includes("ev.target.closest('[data-open-key]')"));
         assert.ok(JS.includes("ev.target.closest('[data-sheet]')") && JS.includes('function closeSheet()') && JS.includes("if (ev.key === 'Escape' && fv.hidden && !fv.contains(ev.target)) closeSheet();"));
         assert.ok(JS.includes("(it.wide ? ' wide' : '')"));
+        assert.ok(JS.includes("new IntersectionObserver(function (es) { es.forEach(function (e) { stick.classList.toggle('on', !e.isIntersecting && e.boundingClientRect.top < 0); }); }, { threshold: 0 }).observe(top);"), 'the sticky bar follows the fold');
         assert.ok(CSS.includes('.fv-img.wide { aspect-ratio:1400/844;'));
     });
 });
@@ -269,15 +280,18 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
             const small = [...document.querySelectorAll('.door, .mt, .scene, .gt, .shot')].filter((e) => e.getBoundingClientRect().height < 44 && e.getBoundingClientRect().height > 0).map((e) => e.className);
             const text = [...document.querySelectorAll('.fold, .how, .glance')].flatMap((s) => [...s.querySelectorAll('h1, h2, p, b, span, a, button')]).filter((e) => e.children.length === 0 && e.textContent.trim() && !e.closest('.sheet') && !e.matches('small'))
                 .map((e) => e.tagName + '.' + e.className + ':' + parseFloat(getComputedStyle(e).fontSize)).filter((x) => parseFloat(x.split(':').pop()) < 15);
-            return { sw: document.documentElement.scrollWidth, h1: parseFloat(getComputedStyle(document.querySelector('h1.one')).fontSize), g: r('#door-golfers'), o: r('#hero-start-tournament'), badges: r('.fold .badges'), mosaic: r('.mosaic'), tiles: document.querySelectorAll('.mt').length, small, text }; })()`);
+            return { sw: document.documentElement.scrollWidth, h1: parseFloat(getComputedStyle(document.querySelector('h1.one')).fontSize), g: r('#door-golfers'), o: r('#hero-start-tournament'), badges: r('.fold .badges'), fan: r('.fan'), lk: r('.fold .lk'), lkTop: Math.round(document.querySelector('.fold .lk').getBoundingClientRect().top), fanTop: Math.round(document.querySelector('.fan').getBoundingClientRect().top), phones: document.querySelectorAll('.fp').length, stick: document.getElementById('stick').className, stickTop: Math.round(document.getElementById('stick').getBoundingClientRect().bottom), small, text }; })()`);
         assert.equal(m.sw, 390, 'sideways scroll');
         assert.ok(m.h1 >= 28, 'h1 ' + m.h1);
         assert.ok(m.g.h >= 44 && m.o.h >= 44 && m.g.b <= 844 && m.o.b <= 844, 'doors ' + JSON.stringify([m.g, m.o]));
         assert.ok(m.badges.b <= 844 && m.badges.h >= 44, 'badges ' + JSON.stringify(m.badges));
-        // Safari on an iPhone shows 714 px of page (47 status + 83 address bar): the mosaic starts inside that and runs past it, so the
-        // fold cuts it on purpose (measured here: top 385, bottom 805 in an 844 viewport, which has no browser chrome).
-        assert.ok(m.mosaic.t < 714 && m.mosaic.b > 714, 'the mosaic is cut by Safari\'s fold on purpose: ' + JSON.stringify(m.mosaic));
-        assert.equal(m.tiles, 6);
+        // F2: the fan (three phones) comes first, the lockup plate overlaps its top edge, and in Safari's 714 px of page the doors
+        // and the badges are still inside the fold (the F2 sheet measured badges ending at 712).
+        assert.equal(m.phones, 3);
+        assert.ok(m.fan.b < 714 && m.lk.t < m.fanTop + 10 && m.lk.b > m.fanTop, 'fan ' + JSON.stringify(m.fan) + ' lockup ' + JSON.stringify(m.lk) + ' fanTop ' + m.fanTop);
+        assert.ok(m.lk.h >= 60 && m.lk.h <= 80, 'lockup plate height ' + m.lk.h);
+        assert.ok(m.badges.b <= 714, 'badges end at ' + m.badges.b + ' (Safari fold 714)');
+        assert.equal(m.stick, 'stick', 'the sticky bar is off on arrival'); assert.ok(m.stickTop <= 0, 'the sticky bar is off screen on arrival: ' + m.stickTop);
         assert.deepEqual(m.small, [], 'tap targets under 44 px');
         assert.deepEqual(m.text, [], 'text under 15 px');
     });
@@ -304,8 +318,8 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         s = await tab.eval(STATE);
         assert.equal(s.sheet, null); assert.equal(s.sheetOpen, false); assert.equal(s.focusScene, true, 'focus: ' + s.focus);
     });
-    test('2.4 the TV tile of the mosaic opens the club sheet; its first picture is the TV board on the wide slide; the X closes the sheet', async () => {
-        await tab.tapEl('.mt[data-sheet="club"]');
+    test('2.4 the club day scene opens its sheet; its first picture is the TV board on the wide slide; the X closes the sheet', async () => {
+        await tab.tapEl('.scene[data-sheet="club"]');
         let s = await tab.eval(STATE);
         assert.equal(s.sheet, 'sheet-club');
         const tv = await tab.eval(`(() => { const b = document.querySelector('#sheet-club .wide .shot img').getBoundingClientRect(); return Math.round(b.height / b.width * 100) / 100; })()`);
@@ -332,6 +346,23 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         assert.equal(s.sheet, null);
         const slides = await tab.eval(`document.querySelectorAll('#fv-track .fv-s').length`);
         assert.equal(slides, 38 + 5, 'the viewer holds the 38 cards and the 5 new pictures, each once');
+        // a phone of the fan is a door into its sheet too
+        await tab.tapEl('.fp.c');
+        s = await tab.eval(STATE);
+        assert.equal(s.sheet, 'sheet-gps');
+        await tab.key('Escape');
+        s = await tab.eval(STATE);
+        assert.equal(s.sheet, null);
+    });
+    test('2.5b scrolled past the fold, the sticky bar is on screen with the lockup and Get the app; back at the top it is gone', async () => {
+        await tab.eval(`(() => { window.scrollTo(0, 1400); return true; })()`);
+        await sleep(700);
+        let b = await tab.eval(`(() => { const s = document.getElementById('stick'); const r = s.getBoundingClientRect(); const lk = s.querySelector('.logo img').getBoundingClientRect(); const g = document.getElementById('nav-get-app').getBoundingClientRect(); return { on: s.classList.contains('on'), top: Math.round(r.top), h: Math.round(r.height), lk: Math.round(lk.height), get: Math.round(g.height), getOn: g.right <= 390 && g.left > 0 }; })()`);
+        assert.ok(b.on && b.top === 0 && b.h >= 44 && b.lk >= 28 && b.get >= 36 && b.getOn, JSON.stringify(b));
+        await tab.eval(`(() => { window.scrollTo(0, 0); return true; })()`);
+        await sleep(700);
+        b = await tab.eval(`(() => { const s = document.getElementById('stick'); return { on: s.classList.contains('on'), bottom: Math.round(s.getBoundingClientRect().bottom) }; })()`);
+        assert.ok(!b.on && b.bottom <= 0, JSON.stringify(b));
     });
     test('2.6 the Golfers door lands on #how; the Organizers door is /tournament', async () => {
         await tab.tapEl('#door-golfers');
@@ -341,15 +372,18 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         assert.equal(await tab.eval(`document.getElementById('hero-start-tournament').getAttribute('href')`), '/tournament');
         assert.deepEqual(tab.errors, []);
     });
-    test('2.7 1280x800: no sideways scroll, the mosaic 3 across, the scenes 2 across, the tiles 6 across; the map\'s tile layer still at 0', async () => {
+    test('2.7 1280x800: no sideways scroll, the lockup 110 px over the fan (centre phone highest), the links row, the scenes 2 across, the tiles 6 across; the map\'s tile layer still at 0', async () => {
         await tab.metrics(1280, 800);
         await tab.go(base + '/');
         const m = await tab.eval(`(() => { const tops = (s) => [...document.querySelectorAll(s)].map((e) => Math.round(e.getBoundingClientRect().top));
             const row = (s, n) => new Set(tops(s).slice(0, n)).size === 1 && new Set(tops(s).slice(0, n + 1)).size === 2;
             const tl = document.querySelector('#tg-map .tiles'); const cs = getComputedStyle(tl);
-            return { sw: document.documentElement.scrollWidth, mosaic3: row('.mt', 3), scenes2: row('.scene', 2), tiles6: row('.glance-tiles .gt', 6), mapTop: tl.offsetTop, mapMargin: cs.marginTop, mapDisplay: cs.display }; })()`);
+            const fp = (s) => document.querySelector(s).getBoundingClientRect();
+            return { sw: document.documentElement.scrollWidth, scenes2: row('.scene', 2), tiles6: row('.glance-tiles .gt', 6), mapTop: tl.offsetTop, mapMargin: cs.marginTop, mapDisplay: cs.display,
+                lk: Math.round(fp('.fold .lk').height), centreTop: Math.round(fp('.fp.c').top), leftTop: Math.round(fp('.fp.l').top), rightTop: Math.round(fp('.fp.r').top), links: document.querySelector('.toplinks .links').getBoundingClientRect().height > 0 }; })()`);
         assert.equal(m.sw, 1280);
-        assert.ok(m.mosaic3 && m.scenes2 && m.tiles6, JSON.stringify(m));
+        assert.ok(m.scenes2 && m.tiles6, JSON.stringify(m));
+        assert.ok(m.lk >= 110 && m.lk <= 130 && m.centreTop < m.leftTop && m.centreTop < m.rightTop && m.links, 'desktop fold: ' + JSON.stringify(m));
         assert.equal(m.mapTop, 0); assert.equal(m.mapMargin, '0px'); assert.equal(m.mapDisplay, 'block');
         assert.deepEqual(tab.errors, []);
     });

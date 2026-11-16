@@ -287,21 +287,34 @@
     }
     /* HOMEPAGE A (Manny's pick, ADVISOR-20261115-1534): the fold, the scene cards and their sheets, the at-a-glance tiles.
        Real sizes from the mockup: body text 15 px or larger, every button 44 px or taller; phone first, desktop at 900+. */
-    .fold { text-align:left; padding:10px 28px 0; }
-    .fold h1.one { font-size:56px; letter-spacing:-.02em; line-height:1.06; max-width:900px; }
-    .fold .sub { margin:14px 0 0; max-width:640px; }
-    .doors2 { display:grid; grid-template-columns:220px 220px; gap:14px; margin-top:22px; }
+    /* F2 (Manny 2026-11-15 5:19 PM): the fan of three real phones first, the lockup on a cream plate over the fan's top edge,
+       the headline under the fan, then the doors and the badges on one row (desktop) / stacked (phone). Sizes from the F2 sheet. */
+    .toplinks { display:flex; justify-content:center; padding:16px 0 0; }
+    .stick { position:fixed; left:0; right:0; top:0; z-index:30; background:var(--cream); box-shadow:0 1px 0 var(--line), 0 4px 14px rgba(0,0,0,.08); transform:translateY(-110%); transition:transform .25s; }
+    .stick.on { transform:none; }
+    .stick-in { display:flex; align-items:center; justify-content:space-between; height:64px; gap:16px; }
+    .stick .logo img { height:44px; width:auto; display:block; border-radius:0; }
+    .stick .btn { min-height:44px; padding:0 16px; }
+    .fold { text-align:center; padding:0 28px; overflow-x:clip; }   /* the tilted side phones would otherwise poke past the page edge on a phone (measured: 406 of 390) */
+    @supports not (overflow-x:clip) { .fold { overflow:hidden; } }
+    .fanwrap { position:relative; }
+    .fan { position:relative; margin:50px auto 0; width:820px; height:492px; }
+    .fp { position:absolute; display:block; padding:0; border:7px solid #0b0f0d; border-radius:36px; overflow:hidden; background:#000; box-shadow:0 18px 40px rgba(0,0,0,.28); cursor:pointer; }
+    .fp img { display:block; width:100%; height:100%; object-fit:cover; object-position:top; }
+    .fp.l { width:190px; height:408px; left:80px; top:70px; border-width:6px; border-radius:32px; transform:rotate(-9deg); transform-origin:bottom center; }
+    .fp.r { width:190px; height:408px; right:80px; top:70px; border-width:6px; border-radius:32px; transform:rotate(9deg); transform-origin:bottom center; }
+    .fp.c { width:230px; height:494px; left:295px; top:0; z-index:2; }
+    .fold .lk { position:absolute; left:50%; top:0; transform:translateX(-50%); z-index:3; height:110px; width:auto; box-sizing:content-box; padding:8px 18px; border-radius:18px; background:rgba(244,241,232,.9); filter:drop-shadow(0 0 10px #f4f1e8); }
+    .fold h1.one { font-size:56px; letter-spacing:-.015em; line-height:1.05; max-width:900px; margin:10px auto 0; }
+    .fold .sub { margin:14px auto 0; max-width:640px; }
+    .cta { display:flex; gap:28px; justify-content:center; align-items:center; margin-top:18px; flex-wrap:wrap; }
+    .doors2 { display:grid; grid-template-columns:220px 220px; gap:14px; }
     .door { display:flex; align-items:center; justify-content:center; min-height:52px; border-radius:14px; font-weight:800; font-size:18px; }
     .door.go { background:var(--g); color:#fff; }
     .door.org { border:2px solid var(--g); color:var(--g); background:#fff; }
-    .fold .hb { justify-content:flex-start; margin-top:18px; }
+    .fold .hb { justify-content:center; margin-top:0; }
     .fold .webapp { margin-top:14px; }
-    .mosaic { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:26px 0 0; }
-    .mt { position:relative; display:block; height:270px; border:0; padding:0; border-radius:18px; overflow:hidden; background:#0b0f0d; cursor:pointer; text-align:left; font:inherit; }
-    .mt img { width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
-    .mt.c img { object-position:center; }
-    .mt b { position:absolute; left:0; right:0; bottom:0; padding:40px 14px 12px; background:linear-gradient(transparent,rgba(0,0,0,.78)); color:#fff; font-size:18px; line-height:1.2; }
-    .mt:focus-visible, .scene:focus-visible, .gt:focus-visible, .shot:focus-visible, .sh-x:focus-visible, .door:focus-visible { outline:3px solid var(--lime); outline-offset:3px; }
+    .fp:focus-visible, .scene:focus-visible, .gt:focus-visible, .shot:focus-visible, .sh-x:focus-visible, .door:focus-visible { outline:3px solid var(--lime); outline-offset:3px; }
     .how { padding:44px 0 10px; }
     .how h2, .glance h2 { font-size:34px; font-weight:900; letter-spacing:-.02em; }
     .hsub { color:var(--mut); font-size:15px; margin:4px 0 18px; }
@@ -346,18 +359,24 @@
     .shots .cmg { color:#8a4b00; font-weight:800; }
     .fv-img.wide { aspect-ratio:1400/844; width:100%; height:auto; max-height:100%; }
     @media (min-width:900px) { .sheet { align-items:center; } .sh-card { border-radius:22px; } }
-    @media (max-width:980px) { .mosaic { grid-template-columns:1fr 1fr; } .mt { height:220px; } .glance-tiles { grid-template-columns:repeat(3,1fr); } .scenes { grid-template-columns:1fr; } }
+    @media (max-width:980px) { .glance-tiles { grid-template-columns:repeat(3,1fr); } .scenes { grid-template-columns:1fr; } }
     @media (max-width:700px) {
-        .fold { padding:4px 16px 0; }
-        .fold h1.one { font-size:28px; line-height:1.12; }
-        .fold .sub { font-size:15px; margin-top:8px; }
-        .doors2 { grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
-        .door { min-height:48px; font-size:16px; border-radius:12px; }
+        .fold { padding:0 16px; }
+        .fan { margin-top:40px; width:358px; height:398px; }
+        .fp.l { width:140px; height:300px; left:14px; top:70px; border-width:5px; border-radius:26px; }
+        .fp.r { width:140px; height:300px; right:14px; top:70px; border-width:5px; border-radius:26px; }
+        .fp.c { width:180px; height:388px; left:89px; border-width:5px; border-radius:26px; }
+        .fold .lk { height:60px; }
+        .fold h1.one { font-size:28px; line-height:1.12; margin-top:6px; }
+        .fold .sub { font-size:15px; margin-top:6px; }
+        .cta { display:block; margin-top:12px; }   /* badges end at 712 of Safari's 714 (measured) */
+        .doors2 { grid-template-columns:1fr 1fr; gap:10px; }
         .fold .hb { margin-top:12px; }
+        .stick-in { height:48px; }
+        .stick .logo img { height:30px; }
+        .stick .btn { padding:0 14px; }
+        .door { min-height:48px; font-size:16px; border-radius:12px; }
         .fold .webapp { margin-top:10px; font-size:15px; }
-        .mosaic { gap:6px; margin-top:16px; }
-        .mt { height:136px; border-radius:12px; }
-        .mt b { font-size:15px; padding:22px 8px 6px; }
         .how { padding:26px 0 0; }
         .how h2, .glance h2 { font-size:24px; }
         .hsub { margin-bottom:12px; }
@@ -372,8 +391,10 @@
 </head>
 <body>
 
-<nav class="wrap top" aria-label="Main">
-    <a class="logo" href="/"><img src="/hardpan-icon.svg" alt="" width="36" height="36"><span class="logo-name"><span class="logo-1">HardPan:</span><span class="logo-2">Golf GPS &amp; Games</span></span></a>
+<!-- F2 (Manny's pick 2026-11-15 5:19 PM, ADVISOR-20261115-1720-OK-build-F2): the brand is the lockup on the fold (below), so the
+     top row is the links only (hidden under 700 px, as before). The sticky bar (#stick) slides in once the fold has scrolled past:
+     the small lockup to /, the links, Get the app. site-features.js toggles it (IntersectionObserver on #top). -->
+<nav class="wrap toplinks" aria-label="Main">
     <div class="links">
         <a href="#features">Features</a>
         <a href="#golfers">Games</a>
@@ -383,8 +404,22 @@
         <a href="/help">Help</a>
         <a href="/support">Support</a>
     </div>
-    <a class="btn lime" id="nav-get-app" href="#get-the-app">Get the app</a>
 </nav>
+<div class="stick" id="stick" aria-label="HardPan Golf">
+    <div class="wrap stick-in">
+        <a class="logo" href="/"><img src="/media/home/hardpan-golf-lockup.png" alt="HardPan Golf" width="1278" height="222"></a>
+        <div class="links">
+            <a href="#features">Features</a>
+            <a href="#golfers">Games</a>
+            <a href="#golfers">GPS &amp; Coaching</a>
+            <a href="#organizers">Tournaments</a>
+            <a href="#pricing">Pricing</a>
+            <a href="/help">Help</a>
+            <a href="/support">Support</a>
+        </div>
+        <a class="btn lime" id="nav-get-app" href="#get-the-app">Get the app</a>
+    </div>
+</div>
 
 <!-- HOMEPAGE A (Manny's pick 2026-11-15 15:33, ADVISOR-20261115-1534; mockups tournaments/mockups-home/HP-homepage-ABC):
      the fold is one line, two doors (Golfers scrolls to the scenes; Organizers is the same /tournament button as before, so
@@ -396,19 +431,21 @@
      footer are unchanged. The header is unchanged too: the bigger-logo pick (HP-header-logo-ABC) is separate. Five pictures
      the rows do not have live in media/home/ (its manifest.json says where each came from). Guard: hardpan_home_scenes_test.js. -->
 <section class="wrap hero fold" id="top">
+    <div class="fanwrap">
+        <div class="fan" aria-label="Three real screens; tap one for more pictures">
+            <button type="button" class="fp l" data-sheet="weekly"><img src="/media/home/round-recap-400.webp" srcset="/media/home/round-recap-400.webp 400w, /media/home/round-recap-940.webp 940w" sizes="(max-width:700px) 140px, 190px" width="940" height="2040" alt="The Round recap card for Papago Golf Club: four golfers with gross, net and to par (the under-par numbers in red), the 2v2 best ball result, skins and birdies, and Share recap."></button>
+            <button type="button" class="fp c" data-sheet="gps"><img src="/media/screens/green-slope-400.webp" srcset="/media/screens/green-slope-400.webp 400w, /media/screens/green-slope-940.webp 940w" sizes="(max-width:700px) 180px, 230px" width="940" height="2040" alt="Papago hole 10 near the green with Slope on: smooth shading, contour lines and arrows that run downhill, the target ring hidden, 55 to the middle, Thru 9 · 38 (+2) · Net 35 (−1) with the under-par number in red, and the Slope switch under Ask."></button>
+            <button type="button" class="fp r" data-sheet="tournaments"><img src="/media/home/multi-group-board-400.webp" srcset="/media/home/multi-group-board-400.webp 400w, /media/home/multi-group-board-940.webp 940w" sizes="(max-width:700px) 140px, 190px" width="940" height="2040" alt="The event leaderboard in the app: Net and Gross, All, Groups and Flights switches, Leading the field: Andy, and the field by position with score, to par (under par in red) and thru."></button>
+        </div>
+        <img class="lk" src="/media/home/hardpan-golf-lockup.png" alt="HardPan Golf" width="1278" height="222">
+    </div>
     <h1 class="one">Every yard. Every game. One live board.</h1>
     <p class="sub">The golf app for the group you play with: GPS on the tee, the side games scored as you go, the board live for everyone.</p>
-    <div class="doors2"><a class="door go" id="door-golfers" href="#how">Golfers</a><a class="door org" id="hero-start-tournament" href="/tournament">Organizers</a></div>
-    <div class="badges hb"><a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a><a class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app" data-store="google"><img src="/google-play-badge.png" alt="Get it on Google Play" width="170" height="66"></a></div>
-    <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
-    <div class="mosaic" aria-label="Six real screens; tap one for more pictures">
-        <button type="button" class="mt" data-sheet="weekly"><img src="/media/home/round-recap-400.webp" width="400" alt="The Round recap card for Papago Golf Club: four golfers with gross, net and to par (the under-par numbers in red), the 2v2 best ball result, skins and birdies, and Share recap."><b>Weekly game with your buddies</b></button>
-        <button type="button" class="mt c" data-sheet="club"><img src="/media/home/live-tv-700.webp" width="400" alt="The event board on a clubhouse TV: Test 46A at Papago Golf Club, Scramble, 2 teams, LIVE, waiting for first scores, both teams on hole 1, and the Follow on your phone QR for hardpangolf.com in the corner."><b>Club day on the clubhouse TV</b></button>
-        <button type="button" class="mt" data-sheet="trip"><img src="/media/screens/trip-400.webp" width="400" alt="The Road Trip page: one leaderboard across every day of a trip, with Start a New Trip and Open Trip."><b>Buddies trip, one board</b></button>
-        <button type="button" class="mt" data-sheet="tournaments"><img src="/media/home/multi-group-board-400.webp" width="400" alt="The event leaderboard in the app: Net and Gross, All, Groups and Flights switches, Leading the field: Andy, and the field by position with score, to par (under par in red) and thru."><b>Tournaments and charity events</b></button>
-        <button type="button" class="mt" data-sheet="gps"><img src="/media/home/gps-every-yard-400.webp" width="400" alt="The GPS map on hole 2 at Papago from the tee: 380 to the middle with front 360 and back 398, 133 and 250 to the bunkers, Plays like 263 with the driver, and the Card, GPS, Games and Board tabs on top."><b>Just you and the GPS</b></button>
-        <button type="button" class="mt" data-sheet="gps"><img src="/media/screens/green-slope-400.webp" width="400" alt="Papago hole 10 near the green with Slope on: shading and contours on the green, arrows that run downhill, 55 to the middle, and the Slope switch under Ask."><b>Read the green</b></button>
+    <div class="cta">
+        <div class="doors2"><a class="door go" id="door-golfers" href="#how">Golfers</a><a class="door org" id="hero-start-tournament" href="/tournament">Organizers</a></div>
+        <div class="badges hb"><a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a><a class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app" data-store="google"><img src="/google-play-badge.png" alt="Get it on Google Play" width="170" height="66"></a></div>
     </div>
+    <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
 </section>
 
 <section class="how" id="how" aria-labelledby="how-h">
