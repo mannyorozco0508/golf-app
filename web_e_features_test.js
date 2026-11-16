@@ -183,7 +183,9 @@ describe('1. the 25 cards', () => {
             const m = manifest.screens.find((s) => s.key === k);
             // RE-PINNED 2026-11-13 (website pics vs iOS 2.0.7, Manny by phone relay ADVISOR-1246): hazards and
             // ask-caddie are now 2.0.7 captures (release-207 895da9fc); range, my-bag, weekly-code stay 205.
-            assert.ok(m && /release-20[567]/.test(m.captured) && m.recaptured, k + ': the manifest does not say where it came from');
+            // RE-PINNED 2026-11-15 (web-208-pics, ADVISOR-20261115-1643): hazards and ask-caddie are 2.0.8 captures
+            // (release-208 fa176a69, under par in red); the old entry stays under "previous".
+            assert.ok(m && /release-20[5678]/.test(m.captured) && m.recaptured, k + ': the manifest does not say where it came from');
             assert.deepEqual(m.files, ['/media/screens/' + k + '-400.webp', '/media/screens/' + k + '-1170.webp']);
         });
         manifest.screens.forEach((s) => s.files.forEach((f) => assert.ok(exists(f.slice(1)), f + ' is missing')));
