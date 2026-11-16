@@ -26,7 +26,7 @@
 // WHAT IT CANNOT PROVE: Safari, a real Cloudflare edge, pinch zoom.
 // BASELINE against pre-build main 55077321 (hardpan-home.html without the fold), measured with
 // this exact file copied there: the file cannot load (the fold section is not on the page, so the module-level
-// slice assertion throws: 1 fail, 0 of the 18 tests run); here: 19 pass / 0 fail (11 source + 8 Chrome).
+// slice assertion throws: 1 fail, 0 of the 18 tests run); here: 23 pass / 0 fail (13 source + 10 Chrome).
 // NEGATIVE CONTROLS (run by hand 2026-11-15, each restored by cp from a scratchpad copy, sha printed RESTORED-OK):
 //   - site-features.js with the data-open-key handler emptied: 13 pass / 5 fail (2.2 to 2.6: no picture and no
 //     tile opens the viewer, and the taps after them land on a page in the wrong state).
@@ -65,7 +65,8 @@ const textOf = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ').repla
 describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
     test('the fold: one line, two doors (Golfers -> #how, Organizers -> /tournament, the same id as before), badges Apple then Google, the web-app link', () => {
         assert.match(fold, /<h1 class="one">Every yard\. Every game\. One live board\.<\/h1>/);
-        assert.match(fold, /<a class="door go" id="door-golfers" href="#how">Golfers<\/a><a class="door org" id="hero-start-tournament" href="\/tournament">Organizers<\/a>/);
+        // ADVISOR-20261115-2017: Organizers -> the organizer landing (/organizers), never straight into the tool.
+        assert.match(fold, /<a class="door go" id="door-golfers" href="#how">Golfers<\/a><a class="door org" id="hero-start-tournament" href="\/organizers">Organizers<\/a>/);
         assert.match(fold, /<img class="lk" src="\/media\/home\/hardpan-golf-lockup\.png" alt="HardPan Golf" width="1278" height="222">/);
         assert.ok(exists('media/home/hardpan-golf-lockup.png'));
         const apple = fold.indexOf('class="store-apple" href="https://apps.apple.com/app/id6808220335"'), google = fold.indexOf('class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app"');
@@ -175,6 +176,35 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
     });
 });
 
+describe('1b. organizers.html, the organizer landing (ADVISOR-20261115-2017): one way into the tool, real pictures, COMING tags, no event', () => {
+    const org = stripComments(read('organizers.html'));
+    test('the page: lockup to /, the buttons to /tournament (three, nothing else goes there), badges Apple then Google, the price slots, no dollar figure of its own', () => {
+        assert.match(org, /<a class="logo" href="\/"><img src="\/media\/home\/hardpan-golf-lockup\.png" alt="HardPan Golf"/);
+        assert.deepEqual([...org.matchAll(/href="\/tournament"/g)].length, 3);
+        assert.match(org, /id="run-an-event" href="\/tournament">Run an event/);
+        assert.ok(org.indexOf('store-apple') < org.indexOf('store-google'));
+        assert.match(org, /data-price="pro-label"[\s\S]*data-price="pro-headline"/);
+        assert.doesNotMatch(textOf(org), /\$\d/, 'no dollar figure typed into the page');
+        // this page names Venmo and PayPal on purpose (two COMING cards); every other money word stays out
+        const MONEY_ORG = /\$|\b(bet|bets|betting|wager\w*|gambl\w*|pot|pots|buy-?ins?|stake|stakes|dollars?|bucks|cash)\b/i;
+        assert.doesNotMatch(textOf(org), MONEY_ORG, (MONEY_ORG.exec(textOf(org)) || [])[0]);
+        // "locked for as long as you stay subscribed" is the Founding price wording (the homepage strip says it too); the words that
+        // may never appear in a UI string are protected / secure.
+        assert.doesNotMatch(org, /R7SK48|Test 46A|NA4EZB|KHPSL4|3MKUCF|P7S2BE|VETDEMO|protected|secure\b/i);
+        assert.doesNotMatch(org, /site-features\.js|firebase|sw\.js/i, 'a static page: no viewer script, no app plumbing');
+    });
+    test('every picture is a real file on disk; the two Venmo cards and check-in are tagged COMING; the 36-hole card has no picture and no tag', () => {
+        const pics = [...org.matchAll(/<img src="(\/media\/[^"]+)"/g)].map((m) => m[1]);
+        assert.equal(pics.length, 11, 'the lockup + 10 cards');
+        pics.forEach((f) => assert.ok(exists(f.slice(1)), f));
+        const cards = [...org.matchAll(/<div class="card( plain)?">([\s\S]*?)<\/div><\/div>/g)];
+        assert.equal(cards.length, 12);
+        const coming = cards.filter((c) => /class="cmg">COMING</.test(c[2])).map((c) => /<h2>([^<]*)<\/h2>/.exec(c[2])[1]);
+        assert.deepEqual(coming, ['Check-in at the table', 'Entry fees by Venmo or PayPal', 'Pay-outs from the results']);
+        assert.match(org, /<div class="card plain"><div class="tx"><h2>36-hole events<\/h2>/);
+    });
+});
+
 // ---------------------------------------------------------------------------
 // 2. Chrome. --use-mock-keychain: without it Chrome on this Mac waits on the login keychain for any
 // http navigation (website-d, measured). The page is scrolled with scrollIntoView (smooth on this
@@ -246,6 +276,17 @@ class Tab {
         const hit = await this.eval(`(() => { const e = document.elementFromPoint(${last[0]}, ${last[1]}); return e ? (e.closest(${JSON.stringify(sel)}) ? 'self' : e.tagName + '.' + e.className) : null; })()`);
         assert.equal(hit, 'self', sel + ' is covered by ' + hit + ' at ' + last.join(','));
         await this.tap(last[0], last[1]);
+    }
+    // a real finger: touch emulation on, touchStart/touchEnd at the point (no mouse events at all)
+    async touchOn() { await this.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 }); }
+    async fingerTap(sel) {
+        await this.eval(`(() => { document.querySelector(${JSON.stringify(sel)}).scrollIntoView({ block: 'center', behavior: 'instant' }); return true; })()`);
+        await sleep(350);
+        const p = await this.eval(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+        await this.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y }] });
+        await sleep(50);
+        await this.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await sleep(350);
     }
     async key(key) {
         await this.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: { Escape: 27 }[key] || 0 });
@@ -364,12 +405,48 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         b = await tab.eval(`(() => { const s = document.getElementById('stick'); return { on: s.classList.contains('on'), bottom: Math.round(s.getBoundingClientRect().bottom) }; })()`);
         assert.ok(!b.on && b.bottom <= 0, JSON.stringify(b));
     });
-    test('2.6 the Golfers door lands on #how; the Organizers door is /tournament', async () => {
+    test('2.6 the Golfers door lands on #how; the Organizers door is /organizers', async () => {
         await tab.tapEl('#door-golfers');
         await sleep(600);
         const s = await tab.eval(STATE);
         assert.equal(s.hash, '#how');
-        assert.equal(await tab.eval(`document.getElementById('hero-start-tournament').getAttribute('href')`), '/tournament');
+        assert.equal(await tab.eval(`document.getElementById('hero-start-tournament').getAttribute('href')`), '/organizers');
+        assert.deepEqual(tab.errors, []);
+    });
+    test('2.8 390x844 with a FINGER (touch events, no mouse): every tile with a picture opens the viewer on the right item (a still, or the clip with its poster for the six clip features), top to bottom; a touch on the X closes it (ADVISOR-20261115-2015)', async () => {
+        await tab.metrics(390, 844);
+        await tab.touchOn();
+        await tab.go(base + '/');
+        const keys = await tab.eval(`[...document.querySelectorAll('.glance-tiles .gt[data-open-key]')].map((b) => b.getAttribute('data-open-key'))`);
+        assert.equal(keys.length, 37);
+        const bad = [];
+        for (const k of keys) {
+            await tab.fingerTap('.glance-tiles .gt[data-open-key="' + k + '"]');
+            const s = await tab.eval(STATE);
+            const cur = await tab.eval(`(() => { const t = document.getElementById('fv-track'); const i = Math.round(t.scrollLeft / Math.max(1, t.clientWidth)); const li = t.querySelector('.fv-s[data-i="' + i + '"]'); const im = li && (li.querySelector('img') || li.querySelector('video')); return { i, img: im ? (im.getAttribute('src') || im.getAttribute('poster')) : null, w: im ? Math.round(im.getBoundingClientRect().width) : 0 }; })()`);
+            if (!s.fv || !s.title || !cur.img || cur.w < 200) bad.push(k + ':' + JSON.stringify({ fv: s.fv, title: s.title, cur }));
+            await tab.fingerTap('#fv-x');
+            const c = await tab.eval(STATE);
+            if (c.fv) bad.push(k + ': X did not close');
+        }
+        assert.deepEqual(bad, [], 'tiles that did not open on a finger tap: ' + bad.join(' | '));
+        assert.deepEqual(tab.errors, []);
+    });
+    test('2.9 /organizers at 390x844: no sideways scroll, every button 44 px or taller, text 15 px or larger, a finger on Run an event goes to /tournament', async () => {
+        await tab.metrics(390, 844);
+        await tab.touchOn();
+        await tab.go(base + '/organizers.html');
+        const m = await tab.eval(`(() => { const small = [...document.querySelectorAll('.btn')].filter((e) => e.getBoundingClientRect().height < 44).length;
+            const text = [...document.querySelectorAll('h1, h2, p, a, span')].filter((e) => e.children.length === 0 && e.textContent.trim() && !e.closest('footer') && !e.matches('.k, .cmg')).map((e) => parseFloat(getComputedStyle(e).fontSize)).filter((px) => px < 15).length;
+            return { sw: document.documentElement.scrollWidth, small, text, h1: parseFloat(getComputedStyle(document.querySelector('h1')).fontSize), price: document.querySelector('[data-price="pro-headline"]').textContent }; })()`);
+        assert.equal(m.sw, 390); assert.equal(m.small, 0); assert.equal(m.text, 0); assert.ok(m.h1 >= 28);
+        assert.match(m.price, /^\$\d+\.\d\d\/yr$/, 'the price slot filled from site-pricing.js: ' + m.price);
+        const under = await tab.eval(`(() => { document.getElementById('run-an-event').scrollIntoView({ block: 'center', behavior: 'instant' }); const b = document.getElementById('run-an-event').getBoundingClientRect(); const e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return { id: e && (e.id || e.tagName + '.' + e.className), href: e && e.closest('a') && e.closest('a').getAttribute('href'), rect: [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)] }; })()`);
+        assert.equal(under.href, '/tournament', 'under the finger: ' + JSON.stringify(under));
+        // the finger's click reaches the link (recorded by a listener that also keeps the test on the page: the local server has no /tournament route)
+        await tab.eval(`(() => { window.__tapped = null; document.addEventListener('click', (ev) => { const a = ev.target.closest('a'); window.__tapped = a ? a.getAttribute('href') : 'none'; ev.preventDefault(); }, true); return true; })()`);
+        await tab.fingerTap('#run-an-event');
+        assert.equal(await tab.eval('window.__tapped'), '/tournament', 'the finger\'s click did not reach Run an event (under the finger: ' + JSON.stringify(under) + ')');
         assert.deepEqual(tab.errors, []);
     });
     test('2.7 1280x800: no sideways scroll, the lockup 110 px over the fan (centre phone highest), the links row, the scenes 2 across, the tiles 6 across; the map\'s tile layer still at 0', async () => {
