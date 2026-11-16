@@ -54,8 +54,15 @@ window.HARDPAN_SITE_PRICING = {
     }
 };
 
-// Fill every [data-price] slot on the page. Unknown key = an en dash, never a
-// made-up number.
+// Fill every [data-price] slot on the page. The page carries the SAME figures as
+// text inside each slot (hardpan_home_price_test.js binds the two), so with no
+// script at all the visitor still reads real prices; this fill only brings a
+// slot up to date. An unknown key, or an empty value, KEEPS the page's text:
+// 2026-11-16 15:46 Manny's iPhone read the new homepage with an older cached
+// copy of this file, and the old fill wrote an en dash into every slot it did
+// not know ("then –", "up to – a year less", "charge up to –"). Never again:
+// nothing here blanks a slot. The page also loads this file by a versioned URL
+// (site-pricing.js?v=<sha>) so a cached older copy is not a match.
 window.HardPanSitePricingFill = function (root) {
     var P = window.HARDPAN_SITE_PRICING || {};
     var pro = P.pro || {};
@@ -89,6 +96,6 @@ window.HardPanSitePricingFill = function (root) {
     var nodes = (root || document).querySelectorAll('[data-price]');
     for (var i = 0; i < nodes.length; i++) {
         var v = values[nodes[i].getAttribute('data-price')];
-        nodes[i].textContent = v ? v : '–';
+        if (v && nodes[i].textContent !== v) nodes[i].textContent = v;
     }
 };

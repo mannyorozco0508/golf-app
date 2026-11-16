@@ -8,10 +8,19 @@
 //    the fold: nine rows + a price row, HardPan next to a "Typical golf GPS app".
 //
 // What this file holds:
-//  1. Every figure comes through site-pricing.js slots: the page carries no literal dollar
-//     figure; the saving is COMPUTED from compare.othersUpTo and the headline price ($75 with
-//     the founding price, $50 once founding closes), never typed; a missing figure shows the
-//     dash, never a wrong number.
+//  1. Every figure comes from site-pricing.js: each data-price slot on the page holds, as text,
+//     EXACTLY the value the fill computes for its key (so the page reads right with no script, a
+//     slow one or a stale one), and no dollar figure sits outside a slot. The saving is COMPUTED
+//     from compare.othersUpTo and the headline price ($75 with the founding price, $50 once
+//     founding closes), never typed in site-pricing.js. A missing value KEEPS the page's text:
+//     the fill never writes a dash.
+//  5. THE DASHES (2026-11-16 15:46, ADVISOR-20261116-1547-URGENT-price-dashes): Manny's iPhone
+//     read the new page with an older cached site-pricing.js, whose fill wrote an en dash into
+//     every slot it did not know ("then –", "up to – a year less", "charge up to –"). Three
+//     locks, each tested here: the slots carry their text; the script URL carries the file's
+//     sha256 prefix (site-pricing.js?v=<8 hex>), so a cached older copy is never a match; and
+//     the page's inline call skips a fill whose data lacks compare.othersUpTo. The last one is
+//     tested by running the page's OWN inline script against a stand-in for the old file.
 //  2. The band sits inside the fold's .cta right after the badges and links to #pricing; the
 //     block is the first section after #top and before #how.
 //  3. No competitor is named anywhere on the page, and no negative word; every "typical" cell
@@ -23,13 +32,15 @@
 //     page's rule). Layout is NOT measured here (mini-dom has none); it was measured in headless
 //     Chrome against a local copy on 2026-11-16: see the build log line.
 //
-// BASELINE against main 1cc0128e (the page before the build): 1 pass / 10 fail of 11, measured
-// with this file copied there after the last test was written (the one pass is the "no
-// competitor name" scan, true of the old page too). 11 / 0 on the branch.
-// NEGATIVE CONTROLS (each restored by sha): saving typed instead of computed -> 1 red; the
-// block moved below #how -> 1 red; a literal "$75" in the band -> 1 red; "18Birdies" in a
-// cell -> 1 red; a cell reworded without the sources file -> 1 red; the phone fan rule
-// deleted -> 1 red; a 13 px size in the new CSS -> hardpan_home_scenes_test goes red (its rule, not this file's).
+// BASELINE (price B + D, 2026-11-16 14:30) against main 1cc0128e: 1 pass / 10 fail of the 11 tests
+// then in the file. BASELINE (the dashes fix, 2026-11-16) against main e2ad0df8, the page as it
+// went live with the dashes: 8 pass / 5 fail of 13, measured with this file copied there after the last test was written (red: the slot text, the kept-not-dashed fill, the ?v= URL, the old-script inline run, the band regexes). 13 / 0 on the branch. NEGATIVE CONTROLS (each restored by
+// sha): saving typed instead of computed -> 1 red; the block moved below #how -> 1 red; a slot's
+// text changed to another figure -> 1 red; a dollar figure typed outside a slot -> 1 red; the
+// ?v= dropped from the script URL -> 1 red; the inline guard on compare removed -> 1 red; the
+// fill's dash put back -> 1 red; "18Birdies" in a cell -> 1 red; a cell reworded without the
+// sources file -> 1 red; the phone fan rule deleted -> 1 red; a 13 px size in the new CSS ->
+// hardpan_home_scenes_test goes red (its rule, not this file's).
 // ============================================================================
 const { test, describe, before } = require('node:test');
 const assert = require('node:assert/strict');
@@ -53,7 +64,7 @@ function pricing(mutate) {
     if (mutate) mutate(sb.window.HARDPAN_SITE_PRICING);
     const keys = [];
     html.replace(/data-price="([^"]+)"/g, (_, k) => { keys.push(k); return ''; });
-    const slots = keys.map((k) => ({ key: k, textContent: '', getAttribute: () => k }));
+    const slots = keys.map((k) => ({ key: k, textContent: 'KEPT', getAttribute: () => k }));   // 'KEPT' = the page's own text, untouched
     sb.window.HardPanSitePricingFill({ querySelectorAll: (s) => (s === '[data-price]' ? slots : []) });
     const by = {};
     slots.forEach((s) => { by[s.key] = s.textContent; });
@@ -61,8 +72,15 @@ function pricing(mutate) {
 }
 
 describe('1. every figure through site-pricing.js; the saving is computed', () => {
-    test('the page carries no literal dollar figure; the band and the block use slots', () => {
-        assert.doesNotMatch(noComments.replace(/<script[\s\S]*?<\/script>/g, ''), /\$\s?[0-9]/, 'a typed dollar figure on the page');
+    test('every slot holds, as text, the value the fill computes; no dollar figure outside a slot', () => {
+        const { by } = pricing();
+        const found = [];
+        html.replace(/<(\w+)[^>]*data-price="([^"]+)"[^>]*>([^<]*)<\/\1>/g, (_, tag, key, text) => { found.push({ key, text }); return ''; });
+        assert.ok(found.length >= 20, 'positive: the slots are there (' + found.length + ')');
+        found.forEach((s) => assert.ok(s.text.length > 0, 'slot ' + s.key + ' is empty: a stale script shows nothing'));
+        found.forEach((s) => assert.equal(s.text, by[s.key], 'slot ' + s.key + ' text differs from site-pricing.js'));
+        const outside = noComments.replace(/<script[\s\S]*?<\/script>/g, '').replace(/(<(\w+)[^>]*data-price="[^"]+"[^>]*>)[^<]*(<\/\2>)/g, '$1$3');
+        assert.doesNotMatch(outside, /\$\s?[0-9]/, 'a typed dollar figure outside a slot');
         const band = slice('<a class="pband"', '</a>');
         ['pro-headline', 'pro-label', 'pro-after', 'compare-save', 'compare-others'].forEach((k) => assert.match(band, new RegExp('data-price="' + k + '"'), 'band slot ' + k));
         const block = slice('<section class="wrap cmp" id="compare"', '</section>');
@@ -85,14 +103,50 @@ describe('1. every figure through site-pricing.js; the saving is computed', () =
         assert.equal(by['compare-save'], '$50');
         assert.equal(by['pro-after'], P.pro.monthly + '/mo');
     });
-    test('a saving is never typed: a changed comparison figure moves it; a missing one shows the dash', () => {
+    test('a saving is never typed: a changed comparison figure moves it; a missing one keeps the page\'s text, never a dash', () => {
         assert.equal(pricing((p) => { p.compare.othersUpTo = '$79.99'; }).by['compare-save'], '$55');
         assert.equal(pricing((p) => { p.compare.othersUpTo = '$89.49'; }).by['compare-save'], '$64.50');
         const gone = pricing((p) => { delete p.compare; });
-        assert.equal(gone.by['compare-save'], '–');
-        assert.equal(gone.by['compare-others'], '–');
-        assert.equal(pricing((p) => { p.compare.othersUpTo = '$9.99'; }).by['compare-save'], '–', 'a figure below ours is not a saving');
+        assert.equal(gone.by['compare-save'], 'KEPT');
+        assert.equal(gone.by['compare-others'], 'KEPT');
+        assert.equal(gone.by['compare-checked'], 'KEPT');
+        assert.equal(pricing((p) => { p.compare.othersUpTo = '$9.99'; }).by['compare-save'], 'KEPT', 'a figure below ours is not a saving');
         assert.doesNotMatch(read('site-pricing.js'), /'\$75'|"\$75"/, 'the saving is typed in site-pricing.js');
+        assert.doesNotMatch(read('site-pricing.js').replace(/\/\/[^\n]*/g, ''), /[–—]/, 'the fill still carries a dash to write');
+        const unknown = [{ getAttribute: () => 'no-such-key', textContent: 'KEPT' }];
+        const sb = { window: {} }; vm.createContext(sb); vm.runInContext(read('site-pricing.js'), sb);
+        sb.window.HardPanSitePricingFill({ querySelectorAll: () => unknown });
+        assert.equal(unknown[0].textContent, 'KEPT', 'an unknown key must keep the page text');
+    });
+    test('the script URL carries the sha256 prefix of site-pricing.js, so a cached older copy is never a match', () => {
+        const sha8 = require('crypto').createHash('sha256').update(fs.readFileSync(path.join(REPO_ROOT, 'site-pricing.js'))).digest('hex').slice(0, 8);
+        const m = /<script src="\/site-pricing\.js\?v=([0-9a-f]{8})"><\/script>/.exec(html);
+        assert.ok(m, 'the versioned script tag');
+        assert.equal(m[1], sha8, 'site-pricing.js changed: update ?v= on hardpan-home.html to ' + sha8);
+        assert.doesNotMatch(html, /<script src="\/site-pricing\.js"><\/script>/, 'the unversioned tag is back');
+    });
+    test('the page\'s own inline call, run against a stand-in for the OLD site-pricing.js, leaves every slot as written', () => {
+        // What Manny's iPhone ran on 2026-11-16 15:46: the new page, an old script whose fill dashes unknown keys.
+        const inline = /<script src="\/site-pricing\.js\?v=[0-9a-f]{8}"><\/script>\s*<script>([\s\S]*?)<\/script>/.exec(html);
+        assert.ok(inline, 'the inline call follows the script tag');
+        assert.match(inline[1], /HardPanSitePricingFill\(document\)/, 'positive: the page still fills its prices');
+        const run = (pricingObj, fill) => {
+            const slots = [];
+            html.replace(/<(\w+)[^>]*data-price="([^"]+)"[^>]*>([^<]*)<\/\1>/g, (_, tag, key, text) => { slots.push({ key, textContent: text, getAttribute: () => key }); return ''; });
+            const sb = { window: { HARDPAN_SITE_PRICING: pricingObj, HardPanSitePricingFill: fill }, document: { querySelectorAll: (s) => (s === '[data-price]' ? slots : []) } };
+            sb.window.document = sb.document; vm.createContext(sb); vm.runInContext(inline[1], sb);
+            return slots;
+        };
+        const old = { pro: { foundingOpen: true, founding: '$24.99', yearly: '$49.99', monthly: '$7.99' }, freeGolfers: 5 };   // no compare, like main 1cc0128e
+        const oldFill = function (root) { const n = root.querySelectorAll('[data-price]'); for (let i = 0; i < n.length; i++) n[i].textContent = n[i].getAttribute('data-price') === 'pro-headline' ? '$24.99/yr' : '–'; };
+        const kept = run(old, oldFill);
+        kept.forEach((s) => assert.notEqual(s.textContent, '–', 'slot ' + s.key + ' dashed by the old script'));
+        kept.forEach((s) => assert.match(s.textContent, /\S/, 'slot ' + s.key + ' blank'));
+        // Positive control: the current file, run the same way, fills (a changed figure reaches the slot).
+        const sb = { window: {} }; vm.createContext(sb); vm.runInContext(read('site-pricing.js'), sb);
+        sb.window.HARDPAN_SITE_PRICING.compare.othersUpTo = '$89.99';
+        const live = run(sb.window.HARDPAN_SITE_PRICING, sb.window.HardPanSitePricingFill);
+        assert.equal(live.find((s) => s.key === 'compare-save').textContent, '$65', 'the current fill did not run through the inline call');
     });
 });
 
@@ -104,8 +158,8 @@ describe('2. where they sit', () => {
         const ctaEnd = fold.indexOf('<a class="webapp"');
         assert.ok(badges > 0 && band > badges && band < ctaEnd, 'band not between the badges and the web-app link: ' + [badges, band, ctaEnd]);
         assert.match(fold.slice(badges, band), /<\/div>\s*$/, 'the band does not directly follow the badges');
-        assert.match(fold, /up to <span data-price="compare-save"><\/span> a year less/);
-        assert.match(fold, /Popular golf GPS apps charge up to <span data-price="compare-others"><\/span>/);
+        assert.match(fold, /up to <span data-price="compare-save">\$[0-9.]+<\/span> a year less/);
+        assert.match(fold, /Popular golf GPS apps charge up to <span data-price="compare-others">\$[0-9.]+\/yr<\/span>/);
     });
     test('the block is the first section after the fold and before How you\'ll use it', () => {
         const top = at('<section class="wrap hero fold" id="top">');

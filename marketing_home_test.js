@@ -255,11 +255,14 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         assert.ok(Math.abs(Number(m[2]) - Number(m[1]) * 41 / 250) < 0.1, 'the pull-in is not the PNG\'s own clear space');
     });
 
-    test('the page has no dollar figure of its own (prices come from site-pricing.js)', () => {
+    test('every dollar figure on the page sits inside a data-price slot (prices come from site-pricing.js; the slot text is bound to it by hardpan_home_price_test.js)', () => {
+        // 2026-11-16 (ADVISOR-20261116-1547-URGENT-price-dashes): the slots now carry their figure as text, so a stale or missing
+        // script shows real prices, never a dash. The text of each slot must equal the fill's value: hardpan_home_price_test.js.
         const visible = stripScripts(html);
-        assert.doesNotMatch(visible, /\$\s?\d/, 'a hard-coded price is back in the page');
+        const outside = visible.replace(/(<(\w+)[^>]*data-price="[^"]+"[^>]*>)[^<]*(<\/\2>)/g, '$1$3');
+        assert.doesNotMatch(outside, /\$\s?\d/, 'a hard-coded price outside a slot');
         assert.ok((visible.match(/data-price="/g) || []).length >= 8, 'the price slots are gone');
-        assert.match(html, /<script src="\/site-pricing\.js"><\/script>/);
+        assert.match(html, /<script src="\/site-pricing\.js\?v=[0-9a-f]{8}"><\/script>/, 'the versioned site-pricing.js tag');
     });
 
     test('the refund page is filled: no data-todo, no blanks, dated, still noindex until the live OK', () => {
