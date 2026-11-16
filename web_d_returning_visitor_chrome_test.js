@@ -190,7 +190,9 @@ describe('a returning visitor with the v393 (live main) worker gets website-d on
             const s = await tab.go(O + '/', 3000);
             assert.equal(s.path, '/', 'the visitor was sent somewhere else: ' + s.path);
             assert.equal(s.title, 'HardPan: Golf GPS & Games', 'first visit after the deploy showed: ' + s.title + ' / ' + s.text);
-            assert.match(s.text, /HardPan/, 'the page is blank');
+            // F2 (Manny 2026-11-15 5:19 PM): the brand on the first screen is the HardPan Golf lockup picture (its alt is not innerText),
+            // so "not blank" is the fold's one line.
+            assert.match(s.text, /Every yard\. Every game\. One live board\./, 'the page is blank');
         });
 
         test('the v394 worker takes over by itself and the v393 cache is deleted', async () => {

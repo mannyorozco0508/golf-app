@@ -1,0 +1,56 @@
+{
+  "_about": "The homepage A pictures the feature rows do not have (hardpan-home.html: the fold's mosaic, the five scene cards and their sheets, the TV board tile). Real captures only. The four phone screens are the 2.0.7 App Store captures (outbox/appstore-207-submit/iphone-6.9, iPhone 6.9-inch), the phone screen cut out of Apple's frame (x 190-1130, y 722-2762 of 1320x2868 = 940x2040) with sips, encoded to WebP in Chrome (canvas, quality .82): 940 for the viewer, 400 for the card. The two board pictures were shot from hardpangolf.com on 2026-11-15 15:44 (event R7SK48, Test 46A at Papago, a demo event with no scores): tournament-tv at 1400x844 at 2x (1400 + 700 WebP) and tournament at 390 wide at 2x (780 + 400 WebP). Not in sw.js's shell list, not in the native bundle. The weekly-results App Store capture (as-04) is NOT used: it shows dollar amounts and the marketing page carries none.",
+  "folder": "/media/home/",
+  "shots": [
+    {
+      "key": "round-recap",
+      "source": "appstore-207 08-round-recap.png",
+      "files": [
+        "/media/home/round-recap-400.webp",
+        "/media/home/round-recap-940.webp"
+      ],
+      "width": 940,
+      "height": 2040
+    },
+    {
+      "key": "multi-group-board",
+      "source": "appstore-207 03-multi-group-board.png",
+      "files": [
+        "/media/home/multi-group-board-400.webp",
+        "/media/home/multi-group-board-940.webp"
+      ],
+      "width": 940,
+      "height": 2040
+    },
+    {
+      "key": "gps-every-yard",
+      "source": "appstore-207 01-gps-every-yard.png",
+      "files": [
+        "/media/home/gps-every-yard-400.webp",
+        "/media/home/gps-every-yard-940.webp"
+      ],
+      "width": 940,
+      "height": 2040
+    },
+    {
+      "key": "live-tv",
+      "source": "hardpangolf.com/tournament-tv?tourney=R7SK48, 2026-11-15 15:44, QR corner reads hardpangolf.com",
+      "files": [
+        "/media/home/live-tv-700.webp",
+        "/media/home/live-tv-1400.webp"
+      ],
+      "width": 1400,
+      "height": 844
+    },
+    {
+      "key": "live-board-phone",
+      "source": "hardpangolf.com/tournament?tourney=R7SK48 at 390 wide, 2026-11-15 15:44",
+      "files": [
+        "/media/home/live-board-phone-400.webp",
+        "/media/home/live-board-phone-780.webp"
+      ],
+      "width": 780,
+      "height": 1976
+    }
+  ]
+}

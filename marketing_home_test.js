@@ -125,14 +125,18 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         // 41A (Manny, Nov 11): the header shows the full name on two lines, "HardPan:" over "Golf GPS & Games".
         // Was: "HardPan Golf" on one line. Same header on help.html and help/*.html.
         const HDR41 = /<a class="logo" href="[^"]*"><img src="\/hardpan-icon\.svg" alt="" width="36" height="36"><span class="logo-name"><span class="logo-1">HardPan:<\/span><span class="logo-2">Golf GPS &amp; Games<\/span><\/span><\/a>/;
-        assert.match(html, HDR41);
-        assert.doesNotMatch(html, /<a class="logo"[^>]*>[\s\S]{0,120}HardPan Golf<\/a>/, 'header still says HardPan Golf');
+        // F2 (Manny 2026-11-15 5:19 PM, ADVISOR-20261115-1720-OK-build-F2): the homepage's brand is the HardPan Golf lockup on the
+        // fold and in the sticky bar (hardpan_home_scenes_test.js pins both); the 41A icon + two-line header stays on the help pages.
+        assert.match(html, /<div class="stick" id="stick" aria-label="HardPan Golf">[\s\S]*?<a class="logo" href="\/"><img src="\/media\/home\/hardpan-golf-lockup\.png" alt="HardPan Golf"/);
+        assert.doesNotMatch(html, HDR41, 'the homepage still carries the 41A header beside the lockup');
         // the help pages share the footer: same full name there
         ['help.html'].concat(fs.readdirSync(path.join(ROOT, 'help')).filter((f) => f.endsWith('.html')).map((f) => 'help/' + f)).forEach((f) => {
             assert.match(read(f), /<b style="color:#fff">HardPan: Golf GPS &amp; Games<\/b> &middot; HardPan is a product of Rattle Golf LLC &middot; Scottsdale, AZ/, f + ': footer is not the full name');
             assert.match(read(f), HDR41, f + ': header is not the 41A two-line name');
         });
-        assert.match(html, /Play it\. Run it\./);
+        // Homepage A (Manny's pick 2026-11-15, ADVISOR-20261115-1534): the fold's one line replaces "Play it. Run it.".
+        assert.match(html, /<h1 class="one">Every yard\. Every game\. One live board\.<\/h1>/);
+        assert.doesNotMatch(html, /Play it\. Run it\./);
         // Not the scorecard, not the front door: no Firebase, no app script.
         assert.doesNotMatch(html, /firebase|auth-boot|pwa-boot|sw\.js/i,
             'the marketing page loads app plumbing; it is meant to be a static page');
