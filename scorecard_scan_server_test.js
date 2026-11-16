@@ -11,6 +11,8 @@
 // 2026-11-15, the event-day allowance (Manny OK "OK scan limit"; the describe
 // 'the event-day allowance for the event owner', 10 tests). Measured counts:
 //   this file, 50 tests. Branch preview-scan: 50 pass / 0 fail.
+//   2026-11-16 ("OK fix scanner"): 53 tests (+ the configured 3.x models' thinking level, thinkingFor by
+//   family, the 503 timeout answer); 53 / 0 here, 49 / 4 against the pre-fix _scan.js of main 70ab63d2.
 //   Baseline against pre-build main dddb9565 (functions/api/_scan.js sha256
 //   fd86fe44afa23054...), the SAME 50-test file: 43 pass / 7 fail. The 7 red
 //   are tests 1-4, 6, 7 and 10 of the new describe. Its other 3 are green on
@@ -101,7 +103,7 @@ function stubFetch(script) {
         const u = String(url);
         calls.push({ url: u, init });
         const reply = (r) => {
-            if (r && r.throws) throw new Error('offline');
+            if (r && r.throws) { const e = new Error('offline'); if (typeof r.throws === 'string') e.name = r.throws; throw e; }   // throws: 'TimeoutError' = the abort signal
             return {
                 ok: r.status >= 200 && r.status < 300, status: r.status,
                 headers: { get: (h) => (h.toLowerCase() === 'cache-control' ? 'public, max-age=3600' : null) },
@@ -544,6 +546,39 @@ describe('the Gemini request', () => {
         assert.match(urls[0], /gemini-9-flash-test/);
         assert.match(urls[1], /gemini-9-pro-test/);
     });
+    // 2026-11-16 (Manny "OK fix scanner"): the cap follows the CONFIGURED model. The Pages environment runs
+    // gemini-3.8-flash / gemini-3.1-pro-preview; before this only the two 2.5 names were capped, and the 3.8
+    // Flash thought past the 25 s abort on every real card (scan-test/papago-RESULT.md).
+    test('the configured Gemini 3 models get a thinking LEVEL (low), both calls', async () => {
+        need();
+        const { fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true }))], pro: [geminiOk(cardJson())] },
+            { env: { SCAN_MODEL: 'gemini-3.8-flash', SCAN_RETRY_MODEL: 'gemini-3.1-pro-preview' } });
+        const sent = fetch.gemini().map((c) => JSON.parse(c.init.body).generationConfig.thinkingConfig);
+        assert.deepEqual(sent, [{ thinkingLevel: 'low' }, { thinkingLevel: 'low' }]);
+        assert.ok(!('thinkingBudget' in sent[0]), 'a budget and a level in one request is a 400 from Google');
+    });
+    test('thinkingFor by family: 2.5 keeps its budgets, 3+ takes a level, an unknown family gets nothing', () => {
+        need();
+        assert.deepEqual(S.thinkingFor('gemini-2.5-flash'), { thinkingBudget: 0 });
+        assert.deepEqual(S.thinkingFor('gemini-2.5-flash-lite'), { thinkingBudget: 0 });
+        assert.deepEqual(S.thinkingFor('gemini-2.5-pro'), { thinkingBudget: 512 });
+        assert.deepEqual(S.thinkingFor('gemini-3.8-flash'), { thinkingLevel: 'low' });
+        assert.deepEqual(S.thinkingFor('gemini-3.1-pro-preview'), { thinkingLevel: 'low' });
+        assert.deepEqual(S.thinkingFor('gemini-9-flash-test'), { thinkingLevel: 'low' });
+        assert.equal(S.thinkingFor('gemini-1.5-flash'), null);
+        assert.equal(S.thinkingFor('some-other-model'), null);
+        assert.equal(S.thinkingFor(undefined), null);
+    });
+    test('the Flash call running into its own abort answers 503 timeout (JSON the app can read), not 504, and spends no Pro call', async () => {
+        need();
+        const kv = fakeKV();
+        const { out, fetch, logs } = await scan({ flash: [{ throws: 'TimeoutError' }] }, { kv });
+        assert.deepEqual(out, { status: 'unavailable', reason: 'timeout' });
+        assert.equal(S.statusFor(out), 503);
+        assert.equal(fetch.gemini().length, 1);
+        assert.equal(JSON.parse(logs[0]).outcome, 'timeout');
+        assert.equal(kv.m.get(S.freeKey('test-uid-1')), undefined, 'no free scan spent');
+    });
     test('the log line has no image bytes, no names and no account id', async () => {
         need();
         const { logs } = await scan({ flash: [geminiOk(cardJson())] });
@@ -612,7 +647,7 @@ describe('ONE Pro retry, only on a validation failure', () => {
     });
     test('a Flash network / HTTP failure is NOT a validation failure: no Pro call', async () => {
         need();
-        for (const [resp, reason] of [[{ throws: true }, 'network'], [{ status: 429, json: {} }, 'busy'], [{ status: 400, json: {} }, 'upstream_error']]) {
+        for (const [resp, reason] of [[{ throws: true }, 'network'], [{ throws: 'TimeoutError' }, 'timeout'], [{ status: 429, json: {} }, 'busy'], [{ status: 400, json: {} }, 'upstream_error']]) {
             const { out, fetch } = await scan({ flash: [resp] });
             assert.deepEqual(out, { status: 'unavailable', reason });
             assert.equal(fetch.gemini().length, 1, reason);
@@ -665,6 +700,8 @@ describe('the route and the catch-all', () => {
         assert.equal(S.statusFor({ status: 'refused', reason: 'needs_pass' }), 402);
         assert.equal(S.statusFor({ status: 'refused', reason: 'rate_limited' }), 429);
         assert.equal(S.statusFor({ status: 'unavailable', reason: 'bad_image' }), 400);
+        assert.equal(S.statusFor({ status: 'unavailable', reason: 'timeout' }), 503, 'a 504 would come back as Cloudflare\'s own page');
+        assert.equal(S.statusFor({ status: 'unavailable', reason: 'network' }), 504);
     });
 });
 

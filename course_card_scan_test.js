@@ -231,6 +231,9 @@ describe('course mode in the handler (fake Gemini: good / bad / retry)', () => {
         assert.equal(fetch.gemini().length, 1);
         const sent = JSON.parse(fetch.gemini()[0].init.body);
         assert.deepEqual(sent.generationConfig.responseSchema, C.responseSchema());
+        // 2026-11-16: the configured 3.8 Flash is capped with a thinking LEVEL (it got no cap before, and thought
+        // past the 25 s abort on every real card: scan-test/papago-RESULT.md).
+        assert.deepEqual(sent.generationConfig.thinkingConfig, { thinkingLevel: 'low' });
         assert.match(sent.contents[0].parts[0].text, /BLANK printed golf scorecard/);
         assert.equal(fetch.gemini()[0].init.headers['x-goog-api-key'], 'stub-key-for-tests');
         assert.ok(!fetch.gemini()[0].url.includes('key='), 'the key never goes in a URL');
@@ -247,6 +250,7 @@ describe('course mode in the handler (fake Gemini: good / bad / retry)', () => {
         assert.equal(out.model, 'gemini-3.1-pro-preview');
         assert.deepEqual(out.validation.hard, []);
         assert.equal(fetch.gemini().length, 2);
+        assert.deepEqual(JSON.parse(fetch.gemini()[1].init.body).generationConfig.thinkingConfig, { thinkingLevel: 'low' }, 'the Pro retry is capped too');
         assert.equal(JSON.parse(logs[0]).tokens.length, 2);
     });
     test('BAD then RETRY worse: the Flash read is kept, never a third call', async () => {

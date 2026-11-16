@@ -19,6 +19,15 @@
 // byte-for-byte identical to dddb9565 below, and the last test pins that the
 // event body is exactly where the two diverge - so the re-pin is not a blank
 // cheque: a second divergence turns the no-event comparison red again.
+//
+// RE-PINNED AGAIN 2026-11-16 under Manny's "OK fix scanner" (ADVISOR-20261116-
+// 1045-OK-fix-scanner): the configured Gemini 3 models now get a thinking cap
+// ({ thinkingLevel: 'low' }; dddb9565 sent none for them, and the 3.8 Flash ran
+// past the 25 s abort on every real card), and a call that hits its own abort
+// answers 503 "timeout" instead of 504 "network" (Cloudflare serves its own page
+// for a 504). The byte comparison below removes generationConfig.thinkingConfig
+// from both sides and compares everything else as before; the two tests at the
+// bottom pin those two divergences exactly, so a third one turns this red.
 // ============================================================================
 const { test, before } = require('node:test');
 const assert = require('node:assert/strict');
@@ -90,7 +99,10 @@ function stubFetch(script) {
     const fn = async (url, init) => {
         const u = String(url);
         calls.push({ url: u, body: init && init.body, headers: init && init.headers });
-        const reply = (r) => ({ ok: r.status >= 200 && r.status < 300, status: r.status, headers: { get: () => 'max-age=3600' }, json: async () => r.json });
+        const reply = (r) => {
+            if (r && r.throws) { const e = new Error('offline'); if (typeof r.throws === 'string') e.name = r.throws; throw e; }
+            return { ok: r.status >= 200 && r.status < 300, status: r.status, headers: { get: () => 'max-age=3600' }, json: async () => r.json };
+        };
         if (u.startsWith('https://www.googleapis.com/service_accounts/')) return reply({ status: 200, json: { keys: [KEYS.jwk] } });
         if (u.startsWith('https://golfapp-9fb21-default-rtdb.firebaseio.com/organizers/')) return reply({ status: 200, json: script.pass || null });
         // The event-day allowance's reads (this branch only; dddb9565 never makes them).
@@ -115,6 +127,14 @@ function stubFetch(script) {
 }
 const ENV = { GEMINI_API_KEY: 'stub-key-for-tests', SCAN_MODEL: 'gemini-3.8-flash', SCAN_RETRY_MODEL: 'gemini-3.1-pro-preview' };
 
+// 2026-11-16: the thinking cap is the one allowed difference in a Gemini body (pinned below); the rest of the
+// body, and every other request, still has to match byte for byte.
+function sansThinking(url, body) {
+    if (!body || !/generativelanguage/.test(url)) return body || null;
+    const o = JSON.parse(body);
+    if (o.generationConfig) delete o.generationConfig.thinkingConfig;
+    return JSON.stringify(o);
+}
 async function runBoth(name, scriptFn, opts) {
     const o = opts || {};
     const res = [];
@@ -125,7 +145,7 @@ async function runBoth(name, scriptFn, opts) {
         const logs = [];
         const out = await S.handleScan({ env: ENV, kv, fetch, clock, log: (l) => logs.push(l.replace(/"ms":\d+/g, '"ms":0')),
             body: o.body || { image: IMAGE, round: ROUND }, authorization: o.auth === undefined ? 'Bearer ' + await idToken() : o.auth });
-        res.push({ out, kv: [...kv.m.entries()].sort(), logs, sent: fetch.calls.map((c) => [c.url, c.body || null]) });
+        res.push({ out, kv: [...kv.m.entries()].sort(), logs, sent: fetch.calls.map((c) => [c.url, sansThinking(c.url, c.body)]) });
     }
     assert.deepEqual(res[1].out, res[0].out, name + ': the answer');
     assert.deepEqual(res[1].kv, res[0].kv, name + ': the KV counters');
@@ -160,6 +180,36 @@ t('no sign-in / bad body, identical', async () => {
 });
 t('NEGATIVE CONTROL: a different answer is caught by the comparison', async () => {
     await assert.rejects(runBoth('neg', (() => { let n = 0; return () => ({ flash: [gem(cardJson(n++ ? 2 : 1))] }); })()));
+});
+
+// The two divergences the 2026-11-16 re-pin allows ("OK fix scanner"), pinned exactly.
+t('THE THINKING CAP: dddb9565 sent the configured 3.8 Flash / 3.1 Pro no thinkingConfig; this branch sends { thinkingLevel: "low" } on both calls, and nothing else in the body moves', async () => {
+    const bodies = [];
+    for (const S of [OLD, NEW]) {
+        S.resetKeyCache();
+        const fetch = stubFetch({ flash: [gem('not json')], pro: [gem(cardJson())] });
+        await S.handleScan({ env: ENV, kv: fakeKV(), fetch, clock, log: () => {}, body: { image: IMAGE, round: ROUND }, authorization: 'Bearer ' + await idToken() });
+        bodies.push(fetch.calls.filter((c) => /generativelanguage/.test(c.url)).map((c) => JSON.parse(c.body)));
+    }
+    assert.equal(bodies[0].length, 2); assert.equal(bodies[1].length, 2);
+    bodies[0].forEach((b) => assert.equal(b.generationConfig.thinkingConfig, undefined, 'dddb9565: no cap for a 3.x model'));
+    bodies[1].forEach((b) => assert.deepEqual(b.generationConfig.thinkingConfig, { thinkingLevel: 'low' }, 'this branch: a level'));
+    bodies[1].forEach((b, i) => { const a = JSON.parse(JSON.stringify(b)); delete a.generationConfig.thinkingConfig; assert.deepEqual(a, bodies[0][i], 'the rest of the body is identical'); });
+});
+t('THE TIMEOUT ANSWER: a Flash call hitting its abort was 504 network on dddb9565 and is 503 timeout here; a plain network failure is still network on both', async () => {
+    const outs = {};
+    for (const [label, S] of [['old', OLD], ['new', NEW]]) {
+        for (const kind of ['TimeoutError', true]) {
+            S.resetKeyCache();
+            const fetch = stubFetch({ flash: [{ throws: kind }] });
+            const out = await S.handleScan({ env: ENV, kv: fakeKV(), fetch, clock, log: () => {}, body: { image: IMAGE, round: ROUND }, authorization: 'Bearer ' + await idToken() });
+            outs[label + ':' + kind] = [out, S.statusFor(out)];
+        }
+    }
+    assert.deepEqual(outs['old:TimeoutError'], [{ status: 'unavailable', reason: 'network' }, 504]);
+    assert.deepEqual(outs['new:TimeoutError'], [{ status: 'unavailable', reason: 'timeout' }, 503]);
+    assert.deepEqual(outs['old:true'], [{ status: 'unavailable', reason: 'network' }, 504]);
+    assert.deepEqual(outs['new:true'], [{ status: 'unavailable', reason: 'network' }, 504]);
 });
 
 // The one divergence the 2026-11-15 re-pin allows, pinned so it cannot widen

@@ -58,7 +58,11 @@ const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'ima
 
 const STATUS_CODE = {
     not_configured: 503, sign_in: 401, needs_pass: 402, rate_limited: 429, daily_limit: 429,
-    monthly_cap: 503, bad_request: 400, bad_image: 400, busy: 503, upstream_error: 502, network: 504
+    monthly_cap: 503, bad_request: 400, bad_image: 400, busy: 503, upstream_error: 502, network: 504,
+    // The model did not answer inside the call's own time limit. 503, not 504: Cloudflare serves its own
+    // text/plain page in place of an origin 504 (measured 2026-11-16: six real-photo scans, "error code: 504"
+    // after 26-30 s), so the app never saw the JSON. A 503 passes through, and the app can offer "try again".
+    timeout: 503
 };
 const notConfigured = () => ({ status: 'not_configured' });
 const refused = (reason) => ({ status: 'refused', reason });
@@ -271,17 +275,31 @@ export const monthKey = (d) => 'scan:month:' + d.toISOString().slice(0, 7);
 
 // ---------------------------------------------------------------------------
 // ONE GEMINI CALL. Strict JSON via responseMimeType + responseSchema,
-// temperature 0. Thinking is capped: off on 2.5 Flash, the minimum-ish on 2.5
-// Pro (which cannot turn it off). Other model families get no thinkingConfig.
+// temperature 0. Thinking is capped for the CONFIGURED model, whatever its
+// generation: 2.5 takes a budget (off on Flash, the minimum-ish on Pro, which
+// cannot turn it off); Gemini 3 and later take a level instead (a budget is only
+// "accepted for backwards compatibility" there), and get "low". Before
+// 2026-11-16 only the two 2.5 names were capped, so the 3.8 Flash the Pages
+// environment configures thought at length on a real card and ran past the 25 s
+// abort every time (scan-test/papago-RESULT.md: 6 of 6 photos, 0 numbers read).
+// An unknown family gets no thinkingConfig, as before.
 // ---------------------------------------------------------------------------
+export function thinkingFor(model) {
+    const m = String(model || '');
+    if (/^gemini-2\.5-flash/.test(m)) return { thinkingBudget: 0 };
+    if (/^gemini-2\.5-pro/.test(m)) return { thinkingBudget: 512 };
+    const gen = /^gemini-(\d+)/.exec(m);
+    if (gen && Number(gen[1]) >= 3) return { thinkingLevel: 'low' };
+    return null;
+}
 export function geminiRequest(model, image, round) {
     const generationConfig = {
         temperature: 0,
         responseMimeType: 'application/json',
         responseSchema: V.responseSchema()
     };
-    if (/^gemini-2\.5-flash/.test(model)) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-    else if (/^gemini-2\.5-pro/.test(model)) generationConfig.thinkingConfig = { thinkingBudget: 512 };
+    const thinking = thinkingFor(model);
+    if (thinking) generationConfig.thinkingConfig = thinking;
     return {
         contents: [{ role: 'user', parts: [
             { text: V.buildPrompt(round) },
@@ -302,7 +320,11 @@ export async function callGemini(w, model, image, round, spec) {
             body: JSON.stringify(spec ? spec.request(model, image, round) : geminiRequest(model, image, round)),
             signal: AbortSignal.timeout(/pro/.test(model) ? 45000 : 25000)
         });
-    } catch (e) { return { error: 'network' }; }
+    } catch (e) {
+        // The abort above is a TimeoutError; anything else is the network. The two
+        // answer differently (503 timeout vs 504 network) and log differently.
+        return { error: (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) ? 'timeout' : 'network' };
+    }
     if (!res) return { error: 'upstream_error' };
     if (res.status === 429) return { error: 'busy' };
     if (!res.ok) {
@@ -449,8 +471,8 @@ export function readCourseBody(body) {
 
 export function courseGeminiRequest(model, image, course) {
     const generationConfig = { temperature: 0, responseMimeType: 'application/json', responseSchema: C.responseSchema() };
-    if (/^gemini-2\.5-flash/.test(model)) generationConfig.thinkingConfig = { thinkingBudget: 0 };
-    else if (/^gemini-2\.5-pro/.test(model)) generationConfig.thinkingConfig = { thinkingBudget: 512 };
+    const thinking = thinkingFor(model);   // the same cap as the score call, for the configured model
+    if (thinking) generationConfig.thinkingConfig = thinking;
     return {
         contents: [{ role: 'user', parts: [
             { text: C.buildCoursePrompt(course) },
