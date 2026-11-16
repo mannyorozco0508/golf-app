@@ -100,6 +100,23 @@
             .row { grid-template-columns: 32px minmax(0, 1fr) 56px; }
             .row .th { display: none; }
         }
+        /* VETERANS A (ADVISOR-20261115-1647): the opening ceremony page (a flag drawn in CSS)
+           and the branch leaderboard page. Shown only when the event's switches are on. */
+        .cer { flex: 1; display: flex; align-items: center; gap: 4vw; padding: 2vh 2vw; }
+        .cer .flag { flex: 0 0 26vw; aspect-ratio: 19/10; position: relative; background: repeating-linear-gradient(180deg, #b22234 0 7.69%, #fff 7.69% 15.38%); border-radius: .6vh; box-shadow: 0 1vh 3vh rgba(0,0,0,.4); overflow: hidden; }
+        .cer .flag::before { content: ""; position: absolute; left: 0; top: 0; width: 40%; height: 53.85%; background: #3c3b6e; }
+        .cer .flag::after { content: "\2605 \2605 \2605 \2605 \2605 \2605\A\2605 \2605 \2605 \2605 \2605\A\2605 \2605 \2605 \2605 \2605 \2605\A\2605 \2605 \2605 \2605 \2605\A\2605 \2605 \2605 \2605 \2605 \2605"; white-space: pre; position: absolute; left: 0; top: 0; width: 40%; height: 53.85%; color: #fff; font-size: 1.5vh; line-height: 1.35; display: flex; align-items: center; justify-content: center; text-align: center; letter-spacing: .1em; }
+        .cer .k { font-size: 2.2vh; font-weight: 800; letter-spacing: .14em; color: var(--lime); text-transform: uppercase; }
+        .cer .t { font-size: 6.4vh; font-weight: 800; line-height: 1.08; margin: .8vh 0 1.4vh; letter-spacing: -.01em; }
+        .cer .s { font-size: 3.4vh; line-height: 1.3; }
+        .cer .s2 { font-size: 2.4vh; color: var(--mute); margin-top: 1.4vh; }
+        .cer .s3 { font-size: 2vh; color: var(--mute); margin-top: 3vh; }
+        .row.br { grid-template-columns: minmax(44px, 6vw) minmax(0, 1fr) minmax(0, 1fr) minmax(64px, 9vw) minmax(64px, 10vw) minmax(64px, 12vw); }
+        .row .bt { display: inline-block; width: .8vw; height: 3.4vh; border-radius: .3vw; vertical-align: middle; margin-right: 1vw; background: #4b5a52; }
+        .bt.army { background: #6b7a2a; } .bt.navy { background: #1d3357; } .bt.af { background: #2b4b9b; } .bt.usmc { background: #9b1e2a; } .bt.uscg { background: #1f4e79; } .bt.ussf { background: #2a2f5b; }
+        .row .ld { color: var(--mute); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .row .av { text-align: right; font-weight: 800; font-size: 1.2em; font-variant-numeric: tabular-nums; color: var(--lime); } .row .av.under { color: var(--red); }
+        @media (max-width: 700px) { .cer { flex-direction: column; align-items: flex-start; } .cer .flag { flex: none; width: 60vw; } .cer .t { font-size: 26px; } .cer .s { font-size: 16px; } .row.br { grid-template-columns: 32px minmax(0, 1fr) 44px 56px; } .row .ld, .row .br .c { display: none; } }
         .dots { display: flex; gap: .8vw; }
         .dots i { width: 3.2vw; height: .9vh; border-radius: .5vh; background: rgba(255,255,255,.18); }
         .dots i.on { background: var(--lime); }
@@ -186,6 +203,20 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    // VETERANS A DEMO (preview only): ?tourney=VETDEMO&demo=veterans reads veterans-demo.js (fake data) instead
+    // of the database; nothing is written. Without ?demo=veterans this block does nothing (see tournament.html).
+    if (new URLSearchParams(window.location.search).get('demo') === 'veterans') {
+        const realRef = db.ref.bind(db);
+        const give = (cb) => {
+            const go = () => cb({ val: () => JSON.parse(JSON.stringify(window.VETERANS_DEMO || null)), exists: () => !!window.VETERANS_DEMO });
+            if (window.VETERANS_DEMO) { go(); return; }
+            const sc = document.createElement('script'); sc.src = 'veterans-demo.js'; sc.onload = go; sc.onerror = () => cb({ val: () => null, exists: () => false }); document.head.appendChild(sc);
+        };
+        db.ref = function (p) {
+            if (!/^tournaments\/VETDEMO$/.test(String(p || ''))) return realRef(p);
+            return { on: (ev, cb) => { if (ev === 'value') give(cb); }, off() {}, once: () => new Promise((res) => give(res)) };
+        };
+    }
 
     const params = new URLSearchParams(window.location.search);
     const CODE = String(params.get('tourney') || '').trim().toUpperCase();
@@ -275,7 +306,7 @@
         // PO: posted results lead the rotation.
         const post = window.TournamentPrizes ? TournamentPrizes.posted(d) : null;
         if (post) pages.unshift({ kind: 'results', key: 'results', label: 'Results', display: 'Results', post: post });
-        return pages;
+        return vetPages(d, pages);   // VETERANS A: the ceremony first and the branch page, each only when its switch is on
     }
 
     // THE GOLFERS UNDER A TEAM. A team row carries its players; a player row is
@@ -316,11 +347,89 @@
     }
     function rankCounts(rows) { const c = {}; rows.forEach((r) => { if (r.rank) c[r.rank] = (c[r.rank] || 0) + 1; }); return c; }
 
+
+    // ===== VETERANS A (ADVISOR-20261115-1647-OK-veterans-A) ===============================================
+    // Two pages, each only when the event's own switch is on (tournaments/<code>/veterans, see tournament.html):
+    //  - ceremony: the first page, held until a tap / key or the set minutes pass (default 10), then the rotation
+    //    continues from the next page (the branch board when branch teams are on). A flag drawn in CSS only.
+    //  - branch: one row a branch (Army, Navy, Air Force, Marines, Coast Guard, Space Force): the leading team,
+    //    teams, best to par, average to par; read from the rows the board already computed, under par red.
+    const VET_NAMES = { army: 'Army', navy: 'Navy', af: 'Air Force', usmc: 'Marines', uscg: 'Coast Guard', ussf: 'Space Force' };
+    let ceremonyDone = false, ceremonyShownAt = 0;
+    function vetOf(d) { return (d && d.veterans && typeof d.veterans === 'object') ? d.veterans : {}; }
+    function vetStandings(rows, teams) {
+        const by = {};
+        (rows || []).forEach((r) => {
+            if (!r || r.entryType === 'player' || r.entryType === 'event') return;
+            const tm = (teams || {})['team' + Number(r.num)]; const b = tm && VET_NAMES[tm.branch] ? tm.branch : '';
+            if (!b) return;
+            const s = by[b] = by[b] || { branch: b, name: VET_NAMES[b], teams: 0, scored: 0, best: null, bestTeam: '', sum: 0 };
+            s.teams++;
+            if (!r.hasScores) return;
+            s.scored++; s.sum += r.toPar;
+            if (s.best === null || r.toPar < s.best) { s.best = r.toPar; s.bestTeam = r.teamName || ''; }
+        });
+        return Object.keys(by).map((k) => { const s = by[k]; s.avg = s.scored ? s.sum / s.scored : null; return s; })
+            .sort((a, b) => ((a.avg === null) - (b.avg === null)) || (a.avg - b.avg) || ((a.best === null ? 99 : a.best) - (b.best === null ? 99 : b.best)) || a.name.localeCompare(b.name));
+    }
+    function vetPages(d, out) {
+        const v = vetOf(d);
+        let pages = out;
+        if (v.branchTeams === true) {
+            const first = pages.find((p) => p.kind === 'board');
+            const rows = first ? pages.filter((p) => p.kind === 'board' && p.label === first.label).reduce((a, p) => a.concat(p.rows), []) : [];
+            const teamRows = rows.length ? rows : Object.keys(d.teams || {}).map((k) => ({ num: (d.teams[k] || {}).num, teamName: (d.teams[k] || {}).name, hasScores: false, toPar: 0 }));
+            const page = { kind: 'branch', key: 'branch', label: 'Branch leaderboard', display: 'Branch leaderboard', rows: vetStandings(teamRows, d.teams) };
+            const at = first ? pages.indexOf(first) + 1 : pages.length;
+            pages = pages.slice(0, at).concat([page], pages.slice(at));
+        }
+        if (v.ceremony === true && !ceremonyDone) {
+            pages = [{ kind: 'ceremony', key: 'ceremony', label: 'Opening ceremony', display: 'Opening ceremony', mins: Math.max(1, Math.min(60, Number(v.ceremonyMinutes) || 10)), charity: v.charity && v.charity.show === true ? v.charity : null }].concat(pages);
+        }
+        return pages;
+    }
+    function vetHold() {
+        const p = pages.length ? pages[pageIdx % pages.length] : null;
+        if (!p || p.kind !== 'ceremony') return false;
+        if (!ceremonyShownAt) ceremonyShownAt = Date.now();
+        if (Date.now() - ceremonyShownAt < p.mins * 60000) return true;
+        vetDismiss();
+        return true;
+    }
+    function vetDismiss() {
+        if (ceremonyDone || !pages.some((p) => p.kind === 'ceremony')) return;
+        ceremonyDone = true;
+        pages = buildPages(data);
+        const br = pages.findIndex((p) => p.kind === 'branch');   // the board after the anthem is the branch board when there is one
+        pageIdx = br >= 0 ? br : 0;
+        renderPage();
+    }
+    function vetCeremonyHtml(p, d) {
+        const when = [d.eventDate || '', d.courseName || ''].filter(Boolean).join(' · ');
+        return '<div class="cer" id="tv-ceremony"><div class="flag" role="img" aria-label="The flag of the United States"></div><div><div class="k">Opening ceremony</div><div class="t">' + esc(d.name || 'Tournament') + '</div><div class="s">Please rise for the presentation of the colors and the National Anthem.</div><div class="s2">' + esc([p.charity && p.charity.name ? 'Supporting ' + p.charity.name : '', when].filter(Boolean).join(' · ')) + '</div><div class="s3">Tap the screen or press any key to start the board · it starts by itself after ' + p.mins + ' minute' + (p.mins === 1 ? '' : 's') + '</div></div></div>';
+    }
+    function vetBranchHtml(p) {
+        const tp = (v) => (v === null || v === undefined) ? '—' : (v === 0 ? 'E' : (v > 0 ? '+' + v : String(v)));
+        const av = (v) => v === null ? '—' : (Math.abs(v) < 0.05 ? 'E' : (v > 0 ? '+' : '') + (Math.round(v * 10) / 10).toFixed(1));
+        const un = (v) => (typeof v === 'number' && v < 0) ? ' under' : '';
+        let h = '<div class="ttl"><span class="n">Branch leaderboard</span><span>best and average to par</span></div>';
+        if (!p.rows.length) return h + '<div class="empty">Give each team a branch on Setup; the branch board fills in from the first scores.</div>';
+        h += '<div class="row h br"><span class="pos">Pos</span><span class="nm">Branch</span><span class="ld">Leading team</span><span class="th">Teams</span><span class="tp">Best</span><span class="av">Avg</span></div>';
+        p.rows.forEach((x, i) => { h += '<div class="row br' + (i === 0 ? ' lead' : '') + '"><span class="pos">' + (i + 1) + '</span><span class="nm"><span class="bt ' + esc(x.branch) + '"></span>' + esc(x.name) + '</span><span class="ld">' + esc(x.bestTeam || '') + '</span><span class="th">' + x.teams + '</span><span class="tp' + un(x.best) + '">' + esc(tp(x.best)) + '</span><span class="av' + un(x.avg) + '">' + esc(av(x.avg)) + '</span></div>'; });
+        return h;
+    }
+    document.addEventListener('click', vetDismiss);
+    document.addEventListener('keydown', vetDismiss);
+
     function renderPage() {
         const board = $('tv-board');
         if (!pages.length) { board.innerHTML = '<div class="err">No scores yet.</div>'; return; }
         const p = pages[pageIdx % pages.length];
-        if (p.kind === 'results') {
+        if (p.kind === 'ceremony') {
+            board.innerHTML = vetCeremonyHtml(p, data);
+        } else if (p.kind === 'branch') {
+            board.innerHTML = vetBranchHtml(p);
+        } else if (p.kind === 'results') {
             board.innerHTML = resultsHtml(p.post, data);
         } else if (p.kind === 'waiting') {
             const list = (p.lines || []).map((l) => '<div class="wt"><span class="a">' + esc(l.name) + '</span><span class="b">' + esc(l.who) + '</span><span class="c">' + esc(l.hole) + '</span></div>').join('');
@@ -425,7 +534,7 @@
         renderHeader(d);
         drawQr();
         renderPage();
-        if (!timer && pages.length > 1) timer = setInterval(() => { pageIdx = (pageIdx + 1) % Math.max(1, pages.length); renderPage(); }, EVERY);
+        if (!timer && pages.length > 1) timer = setInterval(() => { if (vetHold()) return; pageIdx = (pageIdx + 1) % Math.max(1, pages.length); renderPage(); }, EVERY);   // VETERANS A: the ceremony page holds
     }
 
 

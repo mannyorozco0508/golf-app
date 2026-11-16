@@ -323,6 +323,38 @@
         .rc-title { font-size: 1.6rem; margin: 6px 0 4px 0; color: var(--text-main); }
         .rc-sub { color: var(--text-muted); margin: 0 0 14px 0; font-size: 1rem; }
         .rc-card { border: 1px solid var(--border-mid); border-radius: 14px; padding: 4px 14px; margin-bottom: 12px; background: var(--bg-card); }
+        /* VETERANS EVENT, OPTION A (ADVISOR-20261115-1647-OK-veterans-A, preview-veterans-a): the public cards,
+           the branch badges (text only), the Setup editor. Under par is red, nothing else. */
+        .vet-card { background: var(--bg-card, #fff); border: 1px solid var(--border-faint, #e5e5e5); border-radius: 14px; padding: 12px 14px; margin: 0 0 12px; }
+        .vet-k { font-size: 0.7rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); }
+        .vet-t { font-size: 1.1rem; font-weight: 800; margin: 2px 0 6px; }
+        .vet-amt { font-size: 0.95rem; color: var(--text-muted); } .vet-amt b { font-size: 1.6rem; color: var(--text-main, #14201b); margin-right: 6px; }
+        .vet-bar { height: 10px; border-radius: 6px; background: var(--border-faint, #e5e5e5); overflow: hidden; margin: 8px 0 10px; } .vet-bar span { display: block; height: 100%; background: var(--primary-green, #0f4a36); border-radius: 6px; }
+        .vet-don { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border-faint, #e5e5e5); border-radius: 10px; padding: 8px 10px; font-size: 0.85rem; }
+        .vet-tick { background: var(--primary-green, #0f4a36); color: #fff; font-weight: 800; font-size: 0.72rem; letter-spacing: .06em; border-radius: 6px; padding: 4px 8px; white-space: nowrap; }
+        .vet-rcpt { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; margin-left: auto; }
+        .vet-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .vet-two .vet-card { margin: 0 0 12px; }
+        .vet-s { font-size: 0.85rem; color: var(--text-muted); line-height: 1.35; margin-top: 2px; } .vet-s b { color: var(--text-main, #14201b); }
+        .vet-five { font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; margin: 0 0 12px; }
+        .vet-hero { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--border-faint, #e5e5e5); font-size: 0.9rem; }
+        .vet-hero img, .vet-hero-ph { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex: 0 0 44px; }
+        .vet-hero-ph { display: flex; align-items: center; justify-content: center; background: var(--border-faint, #e5e5e5); color: var(--text-muted); font-size: 1.2rem; }
+        .vet-sp { font-weight: 700; }
+        .vet-br { display: inline-block; font-size: 0.62rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #fff; border-radius: 5px; padding: 2px 6px; margin-left: 6px; vertical-align: middle; background: #4b5a52; }
+        .vet-army { background: #4b5320; } .vet-navy { background: #1d3357; } .vet-af { background: #2b4b9b; } .vet-usmc { background: #7d1e2a; } .vet-uscg { background: #1f4e79; } .vet-ussf { background: #2a2f5b; }
+        .vet-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) 52px 56px 64px; gap: 6px; align-items: center; padding: 7px 0; border-top: 1px solid var(--border-faint, #e5e5e5); font-size: 0.9rem; }
+        .vet-row.h { font-size: 0.68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); border-top: 0; }
+        .vet-row .r { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; } .vet-row .r.under { color: var(--accent-red, #c0392b); }
+        .vet-row .c { text-align: center; color: var(--text-muted); }
+        .vet-setup .ev-after-row { margin-top: 10px; } .vet-setup .vet-sub { margin: 6px 0 0 0; padding: 8px 10px; border-left: 3px solid var(--border-faint, #e5e5e5); }
+        .vet-setup label.vl { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin: 8px 0 3px; }
+        .vet-setup input[type=text], .vet-setup input[type=number], .vet-setup select, .vet-setup textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 0.9rem; padding: 8px 10px; border: 1px solid var(--border-faint, #ccc); border-radius: 8px; background: var(--bg-card, #fff); color: inherit; }
+        .vet-setup .vet-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .vet-setup .vet-trow { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 8px; align-items: center; padding: 4px 0; font-size: 0.9rem; }
+        .vet-setup .vet-hrow { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 6px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border-faint, #e5e5e5); font-size: 0.85rem; }
+        .vet-setup .vet-err { color: var(--accent-red, #c0392b); font-size: 0.8rem; margin-top: 6px; }
+        .vet-setup .vet-note { font-size: 0.78rem; color: var(--text-muted); margin-top: 6px; line-height: 1.35; }
+        .vet-setup .btn-outline.sm { min-height: 44px; padding: 8px 12px; font-size: 0.85rem; margin-top: 8px; }
         /* 57: sponsors (Setup) and the TV link (Board). */
         .sp-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-faint); font-size: 0.88rem; }
         .sp-row .sp-h { width: 58px; color: var(--text-muted); font-size: 0.78rem; font-weight: 700; flex: none; }
@@ -1297,6 +1329,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <button type="button" class="btn-outline" id="archive-restore-btn" style="display:none;" onclick="restoreEventNow()">Restore</button>
             <p class="course-note">Refunds still work from the Desk on an archived event.</p>
         </div>
+        <!-- VETERANS EVENT, OPTION A (ADVISOR-20261115-1647-OK-veterans-A, Manny's OK 2026-11-15 4:45 PM):
+             tournaments/<code>/veterans, written by the owner under the record's existing owner write (no
+             rules change). Three switches, all OFF when the key is absent: Branch teams, Honor a Hero holes,
+             the TV opening ceremony. The charity tracker is the backlog "Show charity total" setting, per
+             event, OFF by default. renderVeteransSetup() fills this from the record; an older event has no
+             veterans key and reads exactly as before. -->
+        <div class="team-card vet-setup" id="veterans-block" style="margin-top:12px;">
+            <div class="team-card-header"><span class="team-label">★ Veterans event</span></div>
+            <div id="veterans-setup"></div>
+        </div>
         <!-- SCORING LINKS LOCK (scorecard-lock wave). Owner only; hidden otherwise,
              in the tree. renderLockPanel decides the sentence and the button. -->
         <!-- M4 (Stripe Phase 1): the Entry fees card. tournaments/<code>/fees,
@@ -1589,6 +1631,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <!-- LB-FINAL (Manny 2026-11-14): Leaderboard / Skins / Pairings. The board is the
              default; Skins reads skins.js through the prize builder (gross, the organizer's
              carryover setting); Pairings reads the same rows the printed sheet does. -->
+        <!-- VETERANS A: the Supporting card and the branch standings, drawn by renderVeteransPublic() only when the event turns them on. -->
+        <div id="vet-public-top" style="display:none;"></div>
+        <div id="vet-branch-card" style="display:none;"></div>
         <div class="lb-subtabs" id="lb-subtabs" role="tablist">
             <button type="button" class="active" id="lb-sub-board" role="tab" aria-selected="true" onclick="setLeaderboardSub('board')">Leaderboard</button>
             <button type="button" id="lb-sub-skins" role="tab" aria-selected="false" onclick="setLeaderboardSub('skins')">Skins</button>
@@ -1611,6 +1656,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         <div id="lb-basis-note" class="lb-basis-note" style="display:none;"></div>
         <div id="leaderboard-list"></div>
 
+        <!-- VETERANS A: field text, volunteers, the $5 line, Honor a Hero holes (renderVeteransPublic). -->
+        <div id="vet-public-after" style="display:none;"></div>
         <!-- THE WATCH LINK (Wave 1, A3). The board itself, for family and the
              clubhouse TV. Shown to everyone: a watcher forwarding it is the point. -->
         <button class="btn-outline" id="lb-watch-share" onclick="openShareModal(leaderboardWatchUrl(), (currentData && currentData.name) || 'Event', 'leaderboard')">📣 Share live leaderboard</button>
@@ -1750,6 +1797,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+    // VETERANS A DEMO (preview only; ADVISOR-20261115-1647): ?tourney=VETDEMO&demo=veterans reads the record
+    // from veterans-demo.js (clearly fake data, built by tools/veterans-demo-seed.js) instead of the database.
+    // Every other path still goes to the database, the demo is never anyone's event, so nothing is written;
+    // no live database write seeds it. Without ?demo=veterans this block does nothing.
+    const VET_DEMO = new URLSearchParams(window.location.search).get('demo') === 'veterans';
+    if (VET_DEMO) {
+        const realRef = db.ref.bind(db);
+        const give = (cb) => {
+            const go = () => cb({ val: () => JSON.parse(JSON.stringify(window.VETERANS_DEMO || null)), exists: () => !!window.VETERANS_DEMO });
+            if (window.VETERANS_DEMO) { go(); return; }
+            const sc = document.createElement('script'); sc.src = 'veterans-demo.js'; sc.onload = go; sc.onerror = () => cb({ val: () => null, exists: () => false }); document.head.appendChild(sc);
+        };
+        const no = () => Promise.reject(new Error('The demo event is read-only.'));
+        db.ref = function (p) {
+            if (!/^tournaments\/VETDEMO$/.test(String(p || ''))) return realRef(p);
+            return { on: (ev, cb) => { if (ev === 'value') give(cb); }, off() {}, once: () => new Promise((res) => give(res)), set: no, update: no, remove: no, child: (c) => realRef(p + '/' + c) };
+        };
+    }
 
     // ---- PHASE 2, P2-0: APP MODE (2026-11-11) ------------------------------
     // On inside the Capacitor app, or with ?app=1 (tests and previews). Same
@@ -5918,6 +5983,172 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     // The chosen image becomes a 96 px PNG data URL (JPEG if that is smaller);
     // over 24 KB it is refused with a sentence, so the record stays small.
+    // ===== VETERANS EVENT, OPTION A (ADVISOR-20261115-1647-OK-veterans-A, preview-veterans-a) ==========
+    // tournaments/<code>/veterans = { branchTeams, heroHoles, ceremony (switches; absent = OFF),
+    //   ceremonyMinutes, charity: { show, name, goal, raised, donated: { amount, date, note, receipt } },
+    //   volunteers: { in, total, note }, fee: { five: '' | 'included' | 'added', military },
+    //   heroes: { "<hole>": { name, rank, story, sponsor, photo, permission } } }
+    // A team's branch is teams/teamN/branch (army navy af usmc uscg ussf). Everything is an owner write
+    // under the record's existing owner write (no rules change). Nothing here touches scores, prizes or
+    // money: the standings are read from the rows the board already drew; the $5 line is a sentence.
+    const VET_BRANCHES = [['army', 'Army'], ['navy', 'Navy'], ['af', 'Air Force'], ['usmc', 'Marines'], ['uscg', 'Coast Guard'], ['ussf', 'Space Force']];
+    const VET_BRANCH_NAME = {}; VET_BRANCHES.forEach(([k, n]) => { VET_BRANCH_NAME[k] = n; });
+    function veteransOf(d) { return (d && d.veterans && typeof d.veterans === 'object') ? d.veterans : {}; }
+    function vetOn(d, key) { return veteransOf(d)[key] === true; }
+    function vetNum(v) { const n = Number(v); return isFinite(n) && n >= 0 ? n : 0; }
+    function vetMoney(n) { return '$' + Math.round(vetNum(n)).toLocaleString('en-US'); }
+    function vetWhen(at) { const d = new Date(Number(at)); if (!at || isNaN(d.getTime())) return ''; let h = d.getHours(), m = d.getMinutes(); const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ap; }
+    function vetTeamBranch(num) { const t = ((currentData && currentData.teams) || {})['team' + Number(num)]; return t && VET_BRANCH_NAME[t.branch] ? t.branch : ''; }
+    function vetBadgeHtml(r) {
+        if (!vetOn(currentData, 'branchTeams') || !r || r.entryType === 'player' || r.entryType === 'event') return '';
+        const b = vetTeamBranch(r.num);
+        return b ? ` <span class="vet-br vet-${b}">${escapeHtml(VET_BRANCH_NAME[b])}</span>` : '';
+    }
+    let vetRows = [];
+    function vetBranchStandings(rows, teams) {
+        const by = {};
+        (rows || []).forEach((r) => {
+            if (!r || r.entryType === 'player' || r.entryType === 'event') return;
+            const t = (teams || {})['team' + Number(r.num)]; const b = t && VET_BRANCH_NAME[t.branch] ? t.branch : '';
+            if (!b) return;
+            const s = by[b] = by[b] || { branch: b, name: VET_BRANCH_NAME[b], teams: 0, scored: 0, best: null, bestTeam: '', sum: 0 };
+            s.teams++;
+            if (!r.hasScores) return;
+            s.scored++; s.sum += r.toPar;
+            if (s.best === null || r.toPar < s.best) { s.best = r.toPar; s.bestTeam = r.teamName || ''; }
+        });
+        return Object.keys(by).map((k) => { const s = by[k]; s.avg = s.scored ? s.sum / s.scored : null; return s; })
+            .sort((a, b) => ((a.avg === null) - (b.avg === null)) || (a.avg - b.avg) || ((a.best === null ? 99 : a.best) - (b.best === null ? 99 : b.best)) || a.name.localeCompare(b.name));
+    }
+    function vetToPar(v) { return (v === null || v === undefined) ? '—' : (v === 0 ? 'E' : (v > 0 ? '+' + v : String(v))); }
+    function vetUnder(v) { return (typeof v === 'number' && v < 0) ? ' under' : ''; }
+    function vetAvg(v) { return v === null ? '—' : (Math.abs(v) < 0.05 ? 'E' : (v > 0 ? '+' : '') + (Math.round(v * 10) / 10).toFixed(1)); }
+    function renderVetBranchCard() {
+        const box = document.getElementById('vet-branch-card');
+        if (!box) return;
+        if (!vetOn(currentData, 'branchTeams')) { box.innerHTML = ''; box.style.display = 'none'; return; }
+        box.style.display = 'block';
+        const st = vetBranchStandings(vetRows, currentData.teams);
+        if (!st.length) { box.innerHTML = '<div class="vet-card"><div class="vet-k">Branch standings</div><div class="vet-s">Give each team a branch on Setup; the standings appear with the first scores.</div></div>'; return; }
+        box.innerHTML = '<div class="vet-card"><div class="vet-k">Branch standings</div><div class="vet-row h"><span></span><span>Branch</span><span class="c">Teams</span><span class="r">Best</span><span class="r">Avg</span></div>'
+            + st.map((x, i) => `<div class="vet-row"><span>${i + 1}</span><span><span class="vet-br vet-${x.branch}" style="margin:0 6px 0 0">${escapeHtml(x.name)}</span>${x.bestTeam ? `<small style="color:var(--text-muted);">${escapeHtml(x.bestTeam)}</small>` : ''}</span><span class="c">${x.teams}</span><span class="r${vetUnder(x.best)}">${vetToPar(x.best)}</span><span class="r${vetUnder(x.avg)}">${vetAvg(x.avg)}</span></div>`).join('') + '</div>';
+    }
+    function vetHeroList(v) {
+        const h = (v && v.heroes && typeof v.heroes === 'object') ? v.heroes : {};
+        return Object.keys(h).map((k) => Object.assign({ hole: Number(k) }, h[k] || {})).filter((x) => x.hole > 0 && x.name).sort((a, b) => a.hole - b.hole);
+    }
+    // THE PUBLIC PAGE: Supporting (charity) and the branch standings above the board; field text,
+    // volunteers, the $5 line and the Honor a Hero holes under it. Every part draws only when its
+    // own switch or value is set, so an event without the veterans key shows nothing new.
+    function renderVeteransPublic() {
+        const top = document.getElementById('vet-public-top'), after = document.getElementById('vet-public-after');
+        if (!top || !after) return;
+        const d = currentData || {}, v = veteransOf(d);
+        const charity = v.charity && v.charity.show === true ? v.charity : null;
+        let h = '';
+        if (charity) {
+            const goal = vetNum(charity.goal), raised = vetNum(charity.raised), pct = goal > 0 ? Math.max(0, Math.min(100, Math.round(raised / goal * 100))) : 0;
+            const dn = charity.donated || {};
+            h += `<div class="vet-card vet-charity"><div class="vet-k">Supporting</div><div class="vet-t">${escapeHtml(charity.name || d.beneficiary || 'the beneficiary')}</div>
+                <div class="vet-amt"><b>${vetMoney(raised)}</b>${goal > 0 ? `raised of ${vetMoney(goal)} goal` : 'raised'}</div>
+                ${goal > 0 ? `<div class="vet-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100" aria-label="${pct}% of the goal"><span style="width:${pct}%"></span></div>` : ''}
+                ${vetNum(dn.amount) > 0 ? `<div class="vet-don"><span class="vet-tick">✓ Donated</span><span><b>${vetMoney(dn.amount)}</b>${dn.date ? ` · ${escapeHtml(dn.date)}` : ''}${dn.note ? ` · ${escapeHtml(dn.note)}` : ''}</span>${dn.receipt ? `<img class="vet-rcpt" src="${escapeHtml(dn.receipt)}" alt="Receipt">` : ''}</div>` : ''}
+            </div>`;
+        }
+        top.innerHTML = h;
+        top.style.display = h ? 'block' : 'none';
+        renderVetBranchCard();   // its own container under this one (a sibling, so the harness and the page see the same element)
+        let a = '';
+        const ann = typeof announcementsSorted === 'function' ? announcementsSorted(d) : [];
+        const last = ann && ann.length ? ann[0] : null;
+        const vol = v.volunteers || {};
+        const tiles = [];
+        if (last && v.fieldText === true) tiles.push(`<div class="vet-card"><div class="vet-k">Field text</div><div class="vet-s">${last.at ? escapeHtml(vetWhen(last.at)) + ' · ' : ''}${escapeHtml(last.text || '')}</div></div>`);
+        if (vetNum(vol.total) > 0) tiles.push(`<div class="vet-card"><div class="vet-k">Volunteers</div><div class="vet-s"><b>${vetNum(vol.in)} of ${vetNum(vol.total)} checked in</b>${vol.note ? `<br>${escapeHtml(vol.note)}` : ''}</div></div>`);
+        if (tiles.length) a += `<div class="vet-two">${tiles.join('')}</div>`;
+        if (v.fee && (v.fee.five === 'included' || v.fee.five === 'added')) a += `<p class="vet-five"><b>$5 per golfer</b> includes event-day app access. ${v.fee.five === 'included' ? 'The host takes it out of the entry fee.' : 'The host adds it on at sign-up.'}${v.fee.military ? ' Military rate and comped fees available: ask the organizer.' : ''}</p>`;
+        if (v.heroHoles === true) {
+            const list = vetHeroList(v);
+            if (list.length) a += `<div class="vet-card"><div class="vet-k">Honor a Hero holes</div>${list.map((x) => `<div class="vet-hero">${x.photo && x.permission === true ? `<img src="${escapeHtml(x.photo)}" alt="">` : '<span class="vet-hero-ph">★</span>'}<div><b>Hole ${x.hole} · ${escapeHtml(x.name)}</b>${x.rank ? `<div class="vet-s">${escapeHtml(x.rank)}</div>` : ''}${x.story ? `<div class="vet-s">${escapeHtml(x.story)}</div>` : ''}${x.sponsor ? `<div class="vet-s vet-sp">Presented by ${escapeHtml(x.sponsor)}</div>` : ''}</div></div>`).join('')}</div>`;
+        }
+        after.innerHTML = a;
+        after.style.display = a ? 'block' : 'none';
+    }
+    // THE SETUP CARD. Owner only (the Setup tab is gated). A snapshot never eats a half-typed field:
+    // while something in the card has focus the card is left alone (own=true from its own controls).
+    let vetErr = '';
+    function renderVeteransSetup(own) {
+        const box = document.getElementById('veterans-setup');
+        if (!box) return;
+        const card = document.getElementById('veterans-block');
+        if (!own && card && document.activeElement && card.contains(document.activeElement)) return;
+        const d = currentData || {}, v = veteransOf(d);
+        const c = v.charity || {}, dn = c.donated || {}, vol = v.volunteers || {}, fee = v.fee || {};
+        const sw = (id, key, on, title, sub) => `<div class="ev-after-row"><label class="toggle-switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''} onchange="setVetFlag('${key}', this.checked)"><span class="toggle-slider"></span></label><label for="${id}" style="text-transform:none; letter-spacing:normal; margin:0;"><div class="ev-after-t">${title}</div><div class="ev-after-s">${sub}</div></label></div>`;
+        const opt = (val, cur, label) => `<option value="${val}" ${String(cur || '') === val ? 'selected' : ''}>${label}</option>`;
+        let h = '<p class="vet-note" style="margin-top:0;">For veterans events: branch teams, Honor a Hero holes, the TV opening ceremony, a charity total, volunteers and the $5 line. Everything here is off until you turn it on; golfers see only what is on.</p>';
+        h += sw('vet-sw-branch', 'branchTeams', v.branchTeams === true, 'Branch teams', 'Army, Navy, Air Force, Marines, Coast Guard and Space Force as text badges beside each team, and a branch standings card (best and average to par) on the board.');
+        if (v.branchTeams === true) {
+            const teams = typeof sortedTeams === 'function' ? sortedTeams() : [];
+            h += `<div class="vet-sub">${teams.length ? teams.map((t) => `<div class="vet-trow"><span>${escapeHtml(t.name || ('Team ' + t.num))}</span><select aria-label="Branch of ${escapeHtml(t.name || ('Team ' + t.num))}" onchange="setTeamBranch(${Number(t.num)}, this.value)">${opt('', t.branch, 'No branch')}${VET_BRANCHES.map(([k, n]) => opt(k, t.branch, n)).join('')}</select></div>`).join('') : '<div class="vet-note">Add teams first; each team then gets a branch here.</div>'}</div>`;
+        }
+        h += sw('vet-sw-hero', 'heroHoles', v.heroHoles === true, 'Honor a Hero holes', 'A hole dedicated to a veteran: name, rank or unit, a short story, a photo with permission, and the sponsor. Shown on the event page.');
+        if (v.heroHoles === true) {
+            const list = vetHeroList(v);
+            h += `<div class="vet-sub">${list.map((x) => `<div class="vet-hrow"><span><b>Hole ${x.hole} · ${escapeHtml(x.name)}</b>${x.rank ? ` · ${escapeHtml(x.rank)}` : ''}${x.sponsor ? `<br><small>Presented by ${escapeHtml(x.sponsor)}</small>` : ''}${x.photo ? (x.permission === true ? ' · photo' : ' · photo (not shown: no permission ticked)') : ''}</span><button type="button" class="sp-x" aria-label="Remove the hero on hole ${x.hole}" onclick="removeVetHero(${x.hole})">✕</button></div>`).join('')}
+                <div class="vet-grid2"><div><label class="vl" for="vet-h-hole">Hole</label><select id="vet-h-hole">${[...Array(18)].map((_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}</select></div><div><label class="vl" for="vet-h-name">Name</label><input type="text" id="vet-h-name" maxlength="80" placeholder="Name"></div></div>
+                <label class="vl" for="vet-h-rank">Rank / unit (optional)</label><input type="text" id="vet-h-rank" maxlength="80" placeholder="e.g. Sgt., 1st Marine Division">
+                <label class="vl" for="vet-h-story">Short story (optional, 240 characters)</label><textarea id="vet-h-story" rows="2" maxlength="240" placeholder="A sentence or two"></textarea>
+                <label class="vl" for="vet-h-sponsor">Sponsor (optional)</label><input type="text" id="vet-h-sponsor" maxlength="80" placeholder="Presented by">
+                <label class="vl" for="vet-h-photo">Photo (optional)</label><input type="file" id="vet-h-photo" accept="image/*">
+                <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:normal; font-size:0.85rem; margin-top:8px;"><input type="checkbox" id="vet-h-perm"> I have permission to show this photo</label>
+                <button type="button" class="btn-outline sm" onclick="addVetHero()">Add hero</button>${vetErr ? `<div class="vet-err">${escapeHtml(vetErr)}</div>` : ''}</div>`;
+        }
+        h += sw('vet-sw-cer', 'ceremony', v.ceremony === true, 'TV opening ceremony', 'The TV board opens on a flag and "Please rise for the presentation of the colors and the National Anthem", then goes to the branch board when someone taps the screen or the time below passes.');
+        if (v.ceremony === true) h += `<div class="vet-sub"><label class="vl" for="vet-cer-min">Hold the ceremony page for (minutes)</label><input type="number" id="vet-cer-min" min="1" max="60" step="1" value="${vetNum(v.ceremonyMinutes) || 10}" onchange="setVetValue('ceremonyMinutes', Math.max(1, Math.min(60, parseInt(this.value, 10) || 10)))"></div>`;
+        h += sw('vet-sw-charity', 'charity/show', c.show === true, 'Show charity total', 'A Supporting card on the event page: the beneficiary, what is raised against the goal, and the first donation once it is made. Numbers you type; HardPan never moves money.');
+        if (c.show === true) h += `<div class="vet-sub"><label class="vl" for="vet-c-name">Charity</label><input type="text" id="vet-c-name" maxlength="120" value="${escapeHtml(c.name || d.beneficiary || '')}" placeholder="e.g. Veterans Charity" onchange="setVetValue('charity/name', this.value.trim())">
+            <div class="vet-grid2"><div><label class="vl" for="vet-c-goal">Goal ($)</label><input type="number" id="vet-c-goal" min="0" step="1" value="${vetNum(c.goal) || ''}" onchange="setVetValue('charity/goal', vetNum(this.value))"></div><div><label class="vl" for="vet-c-raised">Raised so far ($)</label><input type="number" id="vet-c-raised" min="0" step="1" value="${vetNum(c.raised) || ''}" onchange="setVetValue('charity/raised', vetNum(this.value))"></div></div>
+            <div class="vet-grid2"><div><label class="vl" for="vet-c-don">Donated to the charity ($)</label><input type="number" id="vet-c-don" min="0" step="1" value="${vetNum(dn.amount) || ''}" onchange="setVetValue('charity/donated/amount', vetNum(this.value))"></div><div><label class="vl" for="vet-c-date">Donated on</label><input type="text" id="vet-c-date" maxlength="40" value="${escapeHtml(dn.date || '')}" placeholder="e.g. Apr 30, 2027" onchange="setVetValue('charity/donated/date', this.value.trim())"></div></div>
+            <label class="vl" for="vet-c-note">Note (optional)</label><input type="text" id="vet-c-note" maxlength="80" value="${escapeHtml(dn.note || '')}" placeholder="e.g. Receipt on file" onchange="setVetValue('charity/donated/note', this.value.trim())">
+            <label class="vl" for="vet-c-rcpt">Receipt or photo (optional, small)</label><input type="file" id="vet-c-rcpt" accept="image/*" onchange="setVetImage('charity/donated/receipt', this.files[0])">${dn.receipt ? '<div class="vet-note">A receipt image is on the card. <button type="button" class="btn-outline sm" onclick="setVetValue(&#39;charity/donated/receipt&#39;, null)">Remove it</button></div>' : ''}</div>`;
+        h += `<div class="vet-sub" style="margin-top:12px;"><div class="ev-after-t">Volunteers</div><div class="vet-grid2"><div><label class="vl" for="vet-v-in">Checked in</label><input type="number" id="vet-v-in" min="0" step="1" value="${vetNum(vol.in) || ''}" onchange="setVetValue('volunteers/in', vetNum(this.value))"></div><div><label class="vl" for="vet-v-total">Expected</label><input type="number" id="vet-v-total" min="0" step="1" value="${vetNum(vol.total) || ''}" onchange="setVetValue('volunteers/total', vetNum(this.value))"></div></div>
+            <label class="vl" for="vet-v-note">Line under it (optional)</label><input type="text" id="vet-v-note" maxlength="80" value="${escapeHtml(vol.note || '')}" placeholder="e.g. Check-in is open at the tent." onchange="setVetValue('volunteers/note', this.value.trim())">
+            <button type="button" class="btn-outline sm" onclick="setVetValue('volunteers/in', vetNum((veteransOf(currentData).volunteers || {}).in) + 1)">+1 checked in</button><div class="vet-note">Shown on the event page as "N of M checked in" once Expected is set.</div></div>`;
+        h += `<div class="vet-sub" style="margin-top:12px;"><div class="ev-after-t">The $5 per golfer line</div><label class="vl" for="vet-f-five">On the event page</label><select id="vet-f-five" onchange="setVetValue('fee/five', this.value)">${opt('', fee.five, 'Not shown')}${opt('included', fee.five, 'The host takes it out of the entry fee')}${opt('added', fee.five, 'The host adds it on at sign-up')}</select>
+            <label style="display:flex; gap:8px; align-items:center; text-transform:none; letter-spacing:normal; font-size:0.85rem; margin-top:8px;"><input type="checkbox" id="vet-f-mil" ${fee.military === true ? 'checked' : ''} onchange="setVetValue('fee/military', this.checked)"> Say that a military rate and comped fees are available</label>
+            <div class="vet-note">A sentence only. The entry fee itself is the Entry fee field above; a comped golfer is marked paid on the Desk as today.</div></div>`;
+        h += sw('vet-sw-text', 'fieldText', v.fieldText === true, 'Field text on the event page', 'Shows the latest announcement you send from Event day as a "Field text" card for everyone.');
+        box.innerHTML = h;
+    }
+    function vetWrite(path, value) {
+        if (!currentCode || !canManage()) return Promise.resolve();
+        return db.ref(`tournaments/${currentCode}/veterans/${path}`).set(value).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function setVetFlag(key, on) { vetWrite(key, !!on).then(() => renderVeteransSetup(true)); }
+    function setVetValue(path, value) { vetWrite(path, value === '' ? null : value); }
+    function setTeamBranch(num, branch) {
+        if (!currentCode || !canManage()) return;
+        db.ref(`tournaments/${currentCode}/teams/team${Number(num)}/branch`).set(VET_BRANCH_NAME[branch] ? branch : null).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function setVetImage(path, file) {
+        if (!file) return;
+        sponsorLogoDataUrl(file, (url, why) => { if (!url) { vetErr = why || 'That image could not be used.'; renderVeteransSetup(true); return; } vetErr = ''; vetWrite(path, url); });
+    }
+    function addVetHero() {
+        if (!currentCode || !canManage()) return;
+        const val = (id) => { const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+        const hole = parseInt(val('vet-h-hole'), 10), name = val('vet-h-name');
+        if (!(hole >= 1 && hole <= 18) || !name) { vetErr = 'A hole and a name are needed.'; renderVeteransSetup(true); return; }
+        const perm = !!(document.getElementById('vet-h-perm') && document.getElementById('vet-h-perm').checked);
+        const rec = { name, rank: val('vet-h-rank'), story: val('vet-h-story'), sponsor: val('vet-h-sponsor'), permission: perm };
+        const fileEl = document.getElementById('vet-h-photo'), file = fileEl && fileEl.files && fileEl.files[0];
+        const save = () => { vetErr = ''; vetWrite(`heroes/${hole}`, rec).then(() => renderVeteransSetup(true)); };
+        if (file) sponsorLogoDataUrl(file, (url, why) => { if (!url) { vetErr = why || 'That photo could not be used.'; renderVeteransSetup(true); return; } rec.photo = url; save(); });
+        else save();
+    }
+    function removeVetHero(hole) { vetWrite(`heroes/${Number(hole)}`, null).then(() => renderVeteransSetup(true)); }
+
     function setSponsorLogo(which, file) {
         if (!currentCode || !canManage() || !file) return;
         const path = which === 'event' ? 'event' : `holes/${String(which).replace(/\D/g, '')}`;
@@ -7138,6 +7369,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // about what "tied" looks like. Only the Thru column differs, because "thru 14"
     // means holes in a round and rounds in an event.
     function renderLeaderboardRows(container, rows, kind, grossOfNet) {
+        vetRows = rows; renderVetBranchCard();   // VETERANS A: the branch standings read the same rows this board shows
         if (rows.length === 0) {
             const flights = currentData.flights || {};
             container.innerHTML = lbFlightId && flights[lbFlightId]
@@ -7171,7 +7403,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // eighteen holes reads as a bug; the pending tag says it is waiting on a number.
             html += `<div class="lb-row lb-tap ${r.rank === 1 ? 'leader' : ''}" data-entry="${escapeHtml(lbRowKey(r))}" onclick="openLeaderboardSheet(this.dataset.entry)">
                 <span class="lb-pos">${r.rank || '-'}</span>
-                <span class="lb-team">${escapeHtml(r.teamName)}${tieTagOf(r)}${pendingTagOf(r)}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${vetBadgeHtml(r)}${tieTagOf(r)}${pendingTagOf(r)}</span>
                 <span class="lb-thru">${r.hasScores ? r.thru : '-'}</span>
                 <span class="${toParClass(r)}">${toParText(r)}</span>
             </div>`;
@@ -7211,7 +7443,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const strokesLine = netView && r.hasScores ? `<small class="lb-strokes">${r.strokes} · ${received} stroke${received === 1 ? '' : 's'} → ${r.strokes - received}</small>` : '';
             html += `<div class="lb-row lb-event lb-tap ${r.rank === 1 ? 'leader' : ''}" data-entry="${escapeHtml(r.entryKey)}" onclick="openLeaderboardSheet(this.dataset.entry)">
                 <span class="lb-pos">${r.rank || '-'}</span>
-                <span class="lb-team">${escapeHtml(r.teamName)}${tieTagOf(r)}${pendingTagOf(r)}${strokesLine}</span>${cells}<span class="lb-tot">${r.hasScores ? (netView ? r.strokes - received : r.strokes) : '–'}</span>
+                <span class="lb-team">${escapeHtml(r.teamName)}${vetBadgeHtml(r)}${tieTagOf(r)}${pendingTagOf(r)}${strokesLine}</span>${cells}<span class="lb-tot">${r.hasScores ? (netView ? r.strokes - received : r.strokes) : '–'}</span>
                 <span class="${toParClass(r)}">${toParText(r)}</span><span class="lb-caret">›</span>
             </div>`;
         });
@@ -9905,6 +10137,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             document.getElementById('lb-t-sub').textContent = eventSubLine();   // bug hunt #5
             renderEventDetails();
             renderEventAfterCard();   // DE-C
+            renderVeteransSetup(); renderVeteransPublic();   // VETERANS A: both read the record; both draw nothing when the switches are off
             markFinal('manage-t-name'); markFinal('lb-t-name');
             if (APP_MODE) {
                 const tt = document.getElementById('ap-m-title'); if (tt) tt.textContent = currentData.name || 'Tournament';
