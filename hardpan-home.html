@@ -50,7 +50,7 @@
     the website-e report. Not in sw.js's shell list, not in the native bundle.
   STILL TO FILL (grep data-todo):
     data-todo="copy-approve"    claims Grok flagged for Manny's wording OK
-  Prices: none in this file. site-pricing.js fills every data-price slot.
+  Prices: every data-price slot holds its figure as text, the same figure site-pricing.js computes (hardpan_home_price_test.js binds them); the script only brings a slot up to date.
 -->
 <style>
     :root { --g:#0f4a36; --g2:#163f31; --lime:#d9f07a; --cream:#f4f1e8; --navy:#1d3357; --ink:#14201b; --mut:#5d6b64; --card:#fff; --line:#e3e0d6; }
@@ -497,7 +497,7 @@
     <div class="cta">
         <div class="doors2"><a class="door go" id="door-golfers" href="#how">Golfers</a><a class="door org" id="hero-start-tournament" href="/organizers">Organizers</a></div>
         <div class="badges hb"><a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a><a class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app" data-store="google"><img src="/google-play-badge.png" alt="Get it on Google Play" width="170" height="66"></a></div>
-        <a class="pband" id="pband" href="#pricing"><span class="pb-l"><b data-price="pro-headline"></b><span>HardPan Pro &middot; <span data-price="pro-label"></span> &middot; the first 1,000 golfers &middot; locked while you stay subscribed &middot; then <span data-price="pro-after"></span></span></span><span class="pb-r"><em>up to <span data-price="compare-save"></span> a year less</em><br>Popular golf GPS apps charge up to <span data-price="compare-others"></span></span></a>
+        <a class="pband" id="pband" href="#pricing"><span class="pb-l"><b data-price="pro-headline">$24.99/yr</b><span>HardPan Pro &middot; <span data-price="pro-label">Founding price</span> &middot; the first 1,000 golfers &middot; locked while you stay subscribed &middot; then <span data-price="pro-after">$49.99/yr</span></span></span><span class="pb-r"><em>up to <span data-price="compare-save">$75</span> a year less</em><br>Popular golf GPS apps charge up to <span data-price="compare-others">$99.99/yr</span></span></a>
     </div>
     <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
 </section>
@@ -509,7 +509,7 @@
      negative word. Prices through site-pricing.js slots only. On a phone each row is the HardPan line plus one grey line. -->
 <section class="wrap cmp" id="compare" aria-labelledby="cmp-h">
     <h2 id="cmp-h">Everything your group needs, in one app</h2>
-    <p class="cmp-sub">HardPan next to a typical golf GPS app. Checked against the popular apps' own pages on <span data-price="compare-checked"></span>.</p>
+    <p class="cmp-sub">HardPan next to a typical golf GPS app. Checked against the popular apps' own pages on <span data-price="compare-checked">Nov 16, 2026</span>.</p>
     <table>
         <thead><tr><th>What you get</th><th class="us">HardPan</th><th>Typical golf GPS app</th></tr></thead>
         <tbody>
@@ -521,8 +521,8 @@
             <tr><td class="what">Tournaments: live 36-hole board, the board on a TV, check-in, entry fees by Venmo</td><td class="us">Included</td><td class="them">A live board, often through a partner site; TV board, check-in and entry fees not found</td></tr>
             <tr><td class="what">Ask HardPan, in plain words</td><td class="us">Included</td><td class="them">AI labels vary; an ask-the-app chat was not found</td></tr>
             <tr><td class="what">Works with no signal</td><td class="us">Included</td><td class="them">Most do, with limits (start the round with signal)</td></tr>
-            <tr><td class="what">One group of up to <span data-price="free-golfers"></span> golfers, free</td><td class="us">Free forever</td><td class="them">Free tiers vary</td></tr>
-            <tr class="cmp-price"><td class="what">Price</td><td class="us"><b data-price="pro-headline"></b><span class="fine"><span data-price="pro-label"></span>, the first 1,000 golfers, locked while you stay subscribed; then <span data-price="pro-after"></span></span></td><td class="them"><b>up to <span data-price="compare-others"></span></b><span class="fine">for the premium tier</span></td></tr>
+            <tr><td class="what">One group of up to <span data-price="free-golfers">5</span> golfers, free</td><td class="us">Free forever</td><td class="them">Free tiers vary</td></tr>
+            <tr class="cmp-price"><td class="what">Price</td><td class="us"><b data-price="pro-headline">$24.99/yr</b><span class="fine"><span data-price="pro-label">Founding price</span>, the first 1,000 golfers, locked while you stay subscribed; then <span data-price="pro-after">$49.99/yr</span></span></td><td class="them"><b>up to <span data-price="compare-others">$99.99/yr</span></b><span class="fine">for the premium tier</span></td></tr>
         </tbody>
     </table>
     <p class="cmp-foot">No names, no knocks: every row is what HardPan has in the app today, next to what the popular apps say on their own pages.</p>
@@ -615,7 +615,7 @@
             <button type="button" class="gt" data-open-key="checkin-table"><img src="/media/home/checkin-table-400.webp" loading="lazy" decoding="async" alt=""><span>Check-in</span></button>
             <span class="gt soon"><span class="ic">&#8230;</span><span><small>COMING</small>Scan check</span></span>
         </div>
-        <p class="strip"><a href="#pricing"><span data-price="pro-label"></span> <b data-price="pro-headline"></b> &middot; the first 1,000 golfers &middot; locked for as long as you stay subscribed. Pricing &darr;</a></p>
+        <p class="strip"><a href="#pricing"><span data-price="pro-label">Founding price</span> <b data-price="pro-headline">$24.99/yr</b> &middot; the first 1,000 golfers &middot; locked for as long as you stay subscribed. Pricing &darr;</a></p>
     </div>
 </section>
 
@@ -757,11 +757,11 @@
     <div class="wrap">
         <div class="h2">Simple pricing</div>
         <div class="price">
-            <div class="pc"><span class="nm">Free</span><b data-price="free"></b>One group of up to <span data-price="free-golfers"></span>. Scores, games, leaderboard.</div>
-            <div class="pc hi"><span class="nm">HardPan Pro</span><b data-price="pro-headline"></b><span data-price="pro-label"></span>. Full GPS map, coaching, hosting. <span data-price="pro-trial-days"></span>-day free trial.
-                <small>Or <span data-price="pro-yearly"></span>/yr, or <span data-price="pro-monthly"></span>/mo.</small></div>
-            <div class="pc"><span class="nm">Host Pro</span><b data-price="host-yearly"></b>Host bigger games and events all year.</div>
-            <div class="pc"><span class="nm">Trip Pass</span><b data-price="trip-pass"></b>One golf trip, <span data-price="trip-pass-days"></span> days of hosting.</div>
+            <div class="pc"><span class="nm">Free</span><b data-price="free">$0</b>One group of up to <span data-price="free-golfers">5</span>. Scores, games, leaderboard.</div>
+            <div class="pc hi"><span class="nm">HardPan Pro</span><b data-price="pro-headline">$24.99/yr</b><span data-price="pro-label">Founding price</span>. Full GPS map, coaching, hosting. <span data-price="pro-trial-days">7</span>-day free trial.
+                <small>Or <span data-price="pro-yearly">$49.99</span>/yr, or <span data-price="pro-monthly">$7.99</span>/mo.</small></div>
+            <div class="pc"><span class="nm">Host Pro</span><b data-price="host-yearly">$29.99/yr</b>Host bigger games and events all year.</div>
+            <div class="pc"><span class="nm">Trip Pass</span><b data-price="trip-pass">$14.99</b>One golf trip, <span data-price="trip-pass-days">7</span> days of hosting.</div>
         </div>
         <p class="note">US prices. The App Store or Google Play shows the price in your country before you confirm. Subscriptions renew automatically until cancelled in your store account; the free trial is for new subscribers. Joining a round and scoring are always free.</p>
     </div>
@@ -792,9 +792,16 @@
 <script src="/site-esri-config.js" defer></script>
 <script src="/site-features.js" defer></script>
 <script src="/site-fresh.js" defer></script>
-<script src="/site-pricing.js"></script>
+<!-- Prices: every data-price slot already holds its figure as text (bound to site-pricing.js by hardpan_home_price_test.js),
+     so the page reads right with no script, a slow script or a stale one. The script URL carries the file's sha, so a cached
+     older copy is never a match; and the fill is skipped unless the loaded copy knows the comparison figures (an older copy
+     wrote dashes into the slots it did not know: Manny's iPhone, 2026-11-16 15:46, ADVISOR-20261116-1547-URGENT-price-dashes). -->
+<script src="/site-pricing.js?v=22ed522b"></script>
 <script>
-    if (typeof window.HardPanSitePricingFill === 'function') window.HardPanSitePricingFill(document);
+    (function () {
+        var P = window.HARDPAN_SITE_PRICING;
+        if (P && P.compare && P.compare.othersUpTo && typeof window.HardPanSitePricingFill === 'function') window.HardPanSitePricingFill(document);
+    })();
 </script>
 </body>
 </html>

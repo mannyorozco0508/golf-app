@@ -62,7 +62,10 @@ const cardKeys = [...body.matchAll(/<li class="fc" id="[^"]+" data-key="([^"]+)"
 const shots = [...body.matchAll(/<button type="button" class="shot" data-open-key="([^"]+)" data-shot="([^"]+)" data-group="([^"]+)"( data-wide)?>([\s\S]*?)<\/button>/g)]
     .map((m) => ({ key: m[1], shot: m[2], group: m[3], wide: !!m[4], img: attrs(/<img\b[^>]*>/.exec(m[5])[0]), title: (/<b>([^<]*)<\/b>/.exec(m[5]) || [])[1] }));
 const MONEY = /\$|\b(bet|bets|betting|wager\w*|gambl\w*|pot|pots|buy-?ins?|stake|stakes|dollars?|bucks|cash|venmo|paypal)\b/i;
-const textOf = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ');
+// A data-price slot's text is a price from site-pricing.js (since 2026-11-16 the page carries it as text, bound to the
+// fill by hardpan_home_price_test.js), so it is removed before the money scan: the scan is for a figure TYPED on the page.
+const noSlotText = (h) => h.replace(/(<(\w+)[^>]*data-price="[^"]+"[^>]*>)[^<]*(<\/\2>)/g, '$1$3');
+const textOf = (h) => noSlotText(h).replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ');
 
 describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
     test('the fold: one line, two doors (Golfers -> #how, Organizers -> /organizers, the same id as before), badges Apple then Google, the web-app link', () => {
@@ -140,7 +143,7 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
         assert.ok(glance.includes('data-open-key="board36"><img src="/media/home/board36-400.webp"') && glance.includes('data-open-key="skins-tab"><img src="/media/home/skins-tab-400.webp"'), 'the two former picture-coming tiles carry their pictures');
         assert.deepEqual([...glance.matchAll(/<span class="gt soon"><span class="ic">[^<]*<\/span><span><small>COMING<\/small>([^<]*)<\/span><\/span>/g)].map((m) => m[1]), ['Scan check']);
         assert.equal((glance.match(/class="gt/g) || []).length, 41);
-        assert.match(glance, /<p class="strip"><a href="#pricing"><span data-price="pro-label"><\/span> <b data-price="pro-headline"><\/b> &middot; the first 1,000 golfers &middot; locked for as long as you stay subscribed\. Pricing &darr;<\/a><\/p>/);
+        assert.match(glance, /<p class="strip"><a href="#pricing"><span data-price="pro-label">[^<]+<\/span> <b data-price="pro-headline">\$[0-9.]+\/yr<\/b> &middot; the first 1,000 golfers &middot; locked for as long as you stay subscribed\. Pricing &darr;<\/a><\/p>/);
         assert.doesNotMatch(glance, /class="soon"/, 'marketing_home_test.js reads class="soon" as the old Android tile');
     });
     test('nothing new says $, a betting word, cash, Venmo or PayPal; no "Coming soon"', () => {
