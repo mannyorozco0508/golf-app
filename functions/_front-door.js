@@ -55,6 +55,12 @@ export function isHomepageVisit(url) {
     return u.pathname === '/' && isHomepageQuery(u.search);
 }
 
+export const BUILD_HEADER = 'X-HardPan-Build';
+export function buildOf(env) {
+    const sha = String((env && env.CF_PAGES_COMMIT_SHA) || '').trim();
+    return /^[0-9a-f]{7,40}$/i.test(sha) ? sha.slice(0, 12).toLowerCase() : 'dev';
+}
+
 async function fromAssets(context, assetPath, pageName) {
     const env = context.env || {};
     if (!env.ASSETS || typeof env.ASSETS.fetch !== 'function') return null;
@@ -71,6 +77,16 @@ async function fromAssets(context, assetPath, pageName) {
     if (!res || (res.status !== 200 && res.status !== 304)) return null;
     const headers = new Headers(res.headers);
     headers.set(PAGE_HEADER, pageName);
+    if (pageName === 'home') {
+        // THE BUILD ON THE ANSWER (ADVISOR-20261116-0049: Manny's iPhone kept showing an old homepage in a tab it had open).
+        // site-features.js reads the build this page was served from (Server-Timing is readable from the page's own
+        // navigation entry) and, when the tab comes back to the front, asks `/` with a HEAD for the build now live; a
+        // different build reloads the page. Pages sets CF_PAGES_COMMIT_SHA on every deploy; 'dev' where it is not set
+        // (wrangler pages dev without a binding), which never differs from itself, so nothing reloads in a local run.
+        const build = buildOf(env);
+        headers.set(BUILD_HEADER, build);
+        headers.append('Server-Timing', 'build;desc="' + build + '"');
+    }
     if (res.status === 304) return new Response(null, { status: 304, statusText: res.statusText, headers });
     return new Response(context.request.method === 'HEAD' ? null : res.body, {
         status: 200, statusText: res.statusText, headers
