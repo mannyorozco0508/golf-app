@@ -148,7 +148,36 @@ export function isBareAppDocument(url) {
     return (u.pathname === '/index.html' || u.pathname === '/index') && isHomepageQuery(u.search);
 }
 
+// ============================================================================
+// DOMAIN SWITCH (Manny 2026-11-15 5:41 PM: "hardpangolf.com/tournaments would be a good address"; ADVISOR-20261115-1742
+// part 2). tournaments.rattlegolf.com (and any host under it) is a 301 to the SAME path and query on hardpangolf.com, so
+// every QR code, share link, TV link and Stripe return URL printed with the old host keeps working; its root (`/`,
+// /index, /index.html) goes to https://hardpangolf.com/tournaments (the _redirects rewrite of tournament.html). Kept on
+// the old host, not redirected: /api/* (a push or scan in flight), /__/auth/* and /__/firebase/* (a sign-in in flight).
+// _routes.json routes /tournament, /tournament-scorecard, /tournament-tv, /tournaments and /tournaments/ through
+// Functions for this: on hardpangolf.com they still fall through next() to the static files. functions/index.js's own
+// `/ -> /tournament` 302 for the old host is unreachable while this runs (left in place for the first weeks; its removal
+// is a second step once the cutover has proven out). The 301 carries a one-hour cache so a rollback (revert the merge)
+// is a one-hour wait at worst, and even a cached 301 lands on a hardpangolf.com page that works.
+// ============================================================================
+export const NEW_ORIGIN = 'https://hardpangolf.com';
+export const TOURNAMENTS_FRONT = '/tournaments';
+export const OLD_HOST_KEEP = ['/api/', '/__/auth/', '/__/firebase/'];
+
+export function oldHostRedirect(request) {
+    if (!isTournamentsRequest(request)) return null;
+    let u;
+    try { u = new URL(request.url); } catch (e) { return null; }
+    if (OLD_HOST_KEEP.some((p) => u.pathname.startsWith(p))) return null;
+    // the root spellings, and /app (the Consumer web app, which this host never dealt with), land on the Tournaments front page
+    const root = u.pathname === '/' || u.pathname === '/index' || u.pathname === '/index.html' || u.pathname === '/index.htm' || u.pathname === '/app' || u.pathname.startsWith('/app/');
+    const dest = NEW_ORIGIN + (root ? TOURNAMENTS_FRONT : u.pathname) + u.search;
+    return new Response(null, { status: 301, headers: { Location: dest, 'Cache-Control': 'public, max-age=3600' } });
+}
+
 export async function onRequest(context) {
+    const moved = oldHostRedirect(context.request);
+    if (moved) return moved;
     if (isBareAppDocument(context.request.url) && !isTournamentsRequest(context.request)) {
         const app = await serveApp(context);
         if (app) return app;
