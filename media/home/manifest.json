@@ -51,6 +51,26 @@
       ],
       "width": 780,
       "height": 1976
+    },
+    {
+      "key": "checkin-table",
+      "source": "the shipped tournament.html?tourney=CODE&checkin=1 rendered in Chrome at 390x844 with the check-in guard's stand-in event (Hope Foundation Scramble, 32 golfers, 22 arrived), 2026-11-16, tools/lib/cold-arrival.js; nothing on the page called",
+      "files": [
+        "/media/home/checkin-table-400.webp",
+        "/media/home/checkin-table-940.webp"
+      ],
+      "width": 940,
+      "height": 2034
+    },
+    {
+      "key": "checkin-tv",
+      "source": "the shipped tournament-tv.html?tourney=CODE&checkin=1 rendered in Chrome at 1400x844 with the same stand-in event, 2026-11-16",
+      "files": [
+        "/media/home/checkin-tv-700.webp",
+        "/media/home/checkin-tv-1400.webp"
+      ],
+      "width": 1400,
+      "height": 844
     }
   ]
 }
