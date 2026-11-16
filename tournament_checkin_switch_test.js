@@ -42,10 +42,13 @@ const TVHTML = read(TV);
 const CODE = 'STK26';
 const ORGANIZER = { uid: 'u-org', email: 'org@example.com', isAnonymous: false };
 const SWITCH_OFF = 'const CHECKIN_LIVE = false;';
-function flipOn(code) {
-    const on = code.replace(SWITCH_OFF, 'const CHECKIN_LIVE = true;');
-    if (on === code) throw new Error('the page has no "' + SWITCH_OFF + '" line to flip');
-    return on;
+const SWITCH_ON = 'const CHECKIN_LIVE = true;';
+// 2026-11-15 (local-checkin-flip, after Manny's go and the combined rules candidate): the page SHIPS the switch ON. S2-S4 now flip it
+// OFF by transform (the control that the switch still gates everything); S5-S6 run the page as shipped.
+function flipOff(code) {
+    const off = code.replace(SWITCH_ON, SWITCH_OFF);
+    if (off === code) throw new Error('the page has no "' + SWITCH_ON + '" line to flip');
+    return off;
 }
 
 // A small individual event: one group of four, three approved, one arrived.
@@ -110,10 +113,11 @@ function arriveTv(f, opts) {
     return sb;
 }
 
-describe('THE CHECK-IN SWITCH, OFF (what main ships until the rules candidate is published)', () => {
-    test('S1 SOURCE: each page declares the switch off exactly once, and the two entry points read it', () => {
-        assert.equal(HTML.split(SWITCH_OFF).length - 1, 1, 'tournament.html: one switch line');
-        assert.equal(TVHTML.split(SWITCH_OFF).length - 1, 1, 'tournament-tv.html: one switch line');
+describe('THE CHECK-IN SWITCH FLIPPED OFF BY TRANSFORM (the control: the switch still gates every check-in screen)', () => {
+    test('S1 SOURCE: each page declares the switch ON exactly once (and never off), and the two entry points read it', () => {
+        assert.equal(HTML.split(SWITCH_ON).length - 1, 1, 'tournament.html: one switch line');
+        assert.equal(TVHTML.split(SWITCH_ON).length - 1, 1, 'tournament-tv.html: one switch line');
+        assert.equal(HTML.split(SWITCH_OFF).length - 1, 0); assert.equal(TVHTML.split(SWITCH_OFF).length - 1, 0);
         assert.match(HTML, /tourneyParam && CHECKIN_LIVE && urlParams\.get\('checkin'\) === '1'/, 'the router asks the switch first');
         assert.match(TVHTML, /const CHECKIN = CHECKIN_LIVE && params\.get\('checkin'\) === '1';/, 'the TV asks the switch first');
         // Positive: the feature is behind the switch, not removed.
@@ -124,7 +128,7 @@ describe('THE CHECK-IN SWITCH, OFF (what main ships until the rules candidate is
     });
 
     test('S2 the table QR address, ?tourney=CODE&checkin=1, opens the ordinary board: no check-in screen, no arrival listeners', () => {
-        const sb = arriveTable(fixture());
+        const sb = arriveTable(fixture(), { transform: flipOff });
         // mini-dom does not parse the static style="display:none;" on #checkin-screen,
         // so the hidden state is the markup (asserted in source) plus "the page never
         // set display on it" - openCheckin is what sets it to block (S5 sees that).
@@ -139,7 +143,7 @@ describe('THE CHECK-IN SWITCH, OFF (what main ships until the rules candidate is
     });
 
     test('S3 the organizer\'s Desk: no QR card, no Arrived chips or tiles, no Mark arrived; the roster itself is there', () => {
-        const sb = arriveOwnerDesk(fixture());
+        const sb = arriveOwnerDesk(fixture(), { transform: flipOff });
         assert.equal(shown(sb, 'manage-tab-desk'), true, 'positive: the Desk opened');
         assert.equal(shown(sb, 'checkin-card'), false);
         assert.equal(html(sb, 'checkin-tiles'), '');
@@ -156,7 +160,7 @@ describe('THE CHECK-IN SWITCH, OFF (what main ships until the rules candidate is
     });
 
     test('S4 the TV on ?checkin=1 is the leaderboard it always was', () => {
-        const sb = arriveTv(fixture());
+        const sb = arriveTv(fixture(), { transform: flipOff });
         assert.equal(el(sb, 'tv-name').textContent, 'Starkey Cup');
         assert.ok(!/ci-side|Check in here/.test(html(sb, 'tv-main') + el(sb, 'tv-name').textContent));
         assert.match(html(sb, 'tv-board'), /Waiting for first scores/, 'positive: the board drew');
@@ -164,18 +168,18 @@ describe('THE CHECK-IN SWITCH, OFF (what main ships until the rules candidate is
     });
 });
 
-describe('THE SAME ARRIVALS WITH THE SWITCH FLIPPED ON (the control that proves S2-S4 are about the switch)', () => {
+describe('THE PAGE AS SHIPPED, SWITCH ON: the check-in screens appear', () => {
     test('S5 table page and TV: the check-in screens appear', () => {
         const f = fixture();
-        const sb = arriveTable(f, { transform: flipOn });
+        const sb = arriveTable(f);
         assert.equal((el(sb, 'checkin-screen').style || {}).display, 'block', 'openCheckin ran and showed the screen');
         assert.equal(el(sb, 'ci-title').textContent, 'Starkey Cup · Check in');
-        const tv = arriveTv(f, { transform: flipOn });
+        const tv = arriveTv(f);
         assert.equal(el(tv, 'tv-name').textContent, 'Starkey Cup · Check in here');
     });
 
     test('S6 the Desk: QR card, Arrived and Not arrived chips, Mark arrived on a row', () => {
-        const sb = arriveOwnerDesk(fixture(), { transform: flipOn });
+        const sb = arriveOwnerDesk(fixture());
         assert.equal(shown(sb, 'checkin-card'), true);
         assert.match(html(sb, 'registration-chips'), /Arrived \d+<\/button><button[^>]*>Not arrived \d+</);
         assert.notEqual(html(sb, 'checkin-tiles'), '');

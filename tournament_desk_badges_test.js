@@ -173,8 +173,9 @@ describe('4. THE CHIPS AND THE COUNTS', () => {
         // Re-pinned 2026-11-14 (merge to main): the check-in SWITCH ships off (CHECKIN_LIVE = false,
         // the rules are a candidate), so a device sees the six chips it saw before check-in; the
         // eight with the switch on are tournament_checkin_switch_test.js S6 and checkin B1.
-        assert.equal(count(html(sb, 'registration-chips'), /reg-chip/g), 6);
-        assert.doesNotMatch(html(sb, 'registration-chips'), /Arrived/);
+        // Re-pinned 2026-11-15 (local-checkin-flip): the switch ships ON, so the eight chips (Arrived, Not arrived join).
+        assert.equal(count(html(sb, 'registration-chips'), /reg-chip/g), 8);
+        assert.match(html(sb, 'registration-chips'), /Arrived/);
         assert.match(html(sb, 'registration-chips'), /Photos 0/);
     });
 });

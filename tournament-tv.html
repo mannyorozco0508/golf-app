@@ -441,7 +441,8 @@
     // THE SWITCH: the same CHECKIN_LIVE as tournament.html (see its comment);
     // off until the check-in rules candidate is published. Off, ?checkin=1 is
     // the leaderboard TV it always was. Flip both files in the publish commit.
-    const CHECKIN_LIVE = false;
+    // Flipped ON 2026-11-15 (Manny's go 09:19 "Go check-in"; merged only after the combined rules candidate is live, RULES-READY-20261115).
+    const CHECKIN_LIVE = true;
     const CHECKIN = CHECKIN_LIVE && params.get('checkin') === '1';
     const CHECKIN_URL = 'https://hardpangolf.com/tournament?tourney=' + encodeURIComponent(CODE) + '&checkin=1';
     const CHECKIN_TEXT = 'hardpangolf.com/tournament?tourney=' + CODE + '&checkin=1';
