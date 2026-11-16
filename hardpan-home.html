@@ -310,6 +310,33 @@
     .fold .hb { justify-content:center; margin-top:0; }
     .fold .webapp { margin-top:14px; }
     .fp:focus-visible, .scene:focus-visible, .gt:focus-visible, .shot:focus-visible, .sh-x:focus-visible, .door:focus-visible { outline:3px solid var(--lime); outline-offset:3px; }
+    /* PRICE B (Manny's pick 2026-11-16 13:34 via the Advisor): the price band under the badges, with the saving computed in
+       site-pricing.js from the comparison figure. On a phone the fan is drawn at 66 % so the band sits above the fold
+       (measured 566-710 of Safari's 714 on the mockup). */
+    .pband { display:flex; justify-content:space-between; align-items:center; gap:16px; background:var(--g); color:#fff; border-radius:16px; padding:14px 18px; margin:14px auto 0; max-width:720px; text-align:left; flex-basis:100%; min-height:44px; }
+    .pband b { font-size:36px; font-weight:900; line-height:1; letter-spacing:-.02em; }
+    .pb-l { display:flex; gap:12px; align-items:center; }
+    .pb-l > span { font-size:15px; line-height:1.3; opacity:.92; }
+    .pb-r { text-align:right; font-size:15px; opacity:.92; line-height:1.3; }
+    .pb-r em { display:inline-block; font-style:normal; background:var(--lime); color:var(--g); font-weight:800; padding:4px 10px; border-radius:999px; margin-bottom:4px; font-size:15px; }
+    /* PRICE D: the comparison block, the first section after the fold. */
+    .cmp { margin:26px auto 0; background:#fff; border:1px solid var(--line); border-radius:22px; padding:26px 28px; max-width:900px; scroll-margin-top:80px; }   /* an anchor jump lands the heading under the 64 px sticky bar otherwise (ADVISOR-20261116-1416) */
+    .cmp h2 { font-size:30px; font-weight:900; letter-spacing:-.02em; text-align:center; line-height:1.1; }
+    .cmp-sub { text-align:center; color:var(--mut); font-size:15px; margin:8px 0 18px; }
+    .cmp table { width:100%; border-collapse:collapse; font-size:15px; }
+    .cmp th { font-size:15px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--mut); text-align:left; padding:0 10px 10px; border-bottom:2px solid var(--line); }
+    .cmp th.us { color:var(--g); }
+    .cmp td { padding:11px 10px; border-bottom:1px solid var(--line); vertical-align:top; line-height:1.35; }
+    .cmp tr:last-child td { border-bottom:0; }
+    .cmp td.what { font-weight:700; width:38%; }
+    .cmp td.us { color:var(--g); font-weight:800; width:27%; }
+    .cmp td.us::before { content:"\2713  "; font-weight:900; }
+    .cmp td.them { color:var(--mut); width:35%; }
+    .cmp tr.cmp-price td { font-size:17px; padding-top:14px; }
+    .cmp tr.cmp-price td.us b { font-size:26px; letter-spacing:-.02em; }
+    .cmp tr.cmp-price td.them b { color:#8a4b00; }
+    .cmp .fine { display:block; font-weight:600; font-size:15px; line-height:1.35; margin-top:2px; }
+    .cmp-foot { margin:16px 0 0; text-align:center; font-size:15px; color:var(--mut); }
     .how { padding:44px 0 10px; }
     .how h2, .glance h2 { font-size:34px; font-weight:900; letter-spacing:-.02em; }
     .hsub { color:var(--mut); font-size:15px; margin:4px 0 18px; }
@@ -372,6 +399,35 @@
         .stick .btn { padding:0 14px; }
         .door { min-height:48px; font-size:16px; border-radius:12px; }
         .fold .webapp { margin-top:10px; font-size:15px; }
+        /* PRICE B on a phone: the fan at 66 % so the band clears the fold; the band stacks and centres. */
+        .fan { margin-top:14px; width:222px; height:247px; }
+        .fp.l { width:87px; height:186px; left:9px; top:43px; border-width:3px; border-radius:16px; }
+        .fp.r { width:87px; height:186px; right:9px; top:43px; border-width:3px; border-radius:16px; }
+        .fp.c { width:112px; height:241px; left:55px; border-width:3px; border-radius:16px; }
+        .pband { flex-direction:column; gap:5px; padding:9px 12px; margin-top:6px; text-align:center; }
+        .pb-l { flex-direction:column; gap:2px; }
+        .pb-l > span { text-align:center; line-height:1.3; }
+        .pb-r { text-align:center; line-height:1.3; }
+        .pb-r em { margin-bottom:2px; }
+        /* PRICE D on a phone: each row is the HardPan line (what + Included) and one grey "typical" line. */
+        .cmp { margin:16px 16px 0; padding:16px 14px; border-radius:18px; scroll-margin-top:60px; }
+        .cmp h2 { font-size:24px; }
+        .cmp-sub { font-size:15px; margin-bottom:10px; }
+        .cmp table, .cmp tbody, .cmp tr, .cmp td { display:block; width:auto; }
+        .cmp thead { display:none; }
+        .cmp tr { padding:9px 0; border-bottom:1px solid var(--line); }
+        .cmp tr:last-child { border-bottom:0; }
+        .cmp td { padding:0; border:0; }
+        .cmp td.what { display:inline; width:auto; font-size:15px; }
+        .cmp td.us { display:inline; width:auto; font-size:15px; white-space:nowrap; }
+        .cmp td.us::before { content:"\00a0\2713\00a0"; }
+        .cmp td.them { display:block; width:auto; font-size:15px; margin-top:2px; }
+        .cmp tr.cmp-price td { font-size:15px; padding-top:4px; }
+        .cmp tr.cmp-price td.what { display:block; margin-top:4px; }
+        .cmp tr.cmp-price td.us { display:block; white-space:normal; }
+        .cmp tr.cmp-price td.us::before { content:""; }
+        .cmp tr.cmp-price td.us b { font-size:24px; }
+        .cmp tr.cmp-price td.them { margin-top:6px; }
         .how { padding:26px 0 0; }
         .how h2, .glance h2 { font-size:24px; }
         .hsub { margin-bottom:12px; }
@@ -441,8 +497,35 @@
     <div class="cta">
         <div class="doors2"><a class="door go" id="door-golfers" href="#how">Golfers</a><a class="door org" id="hero-start-tournament" href="/organizers">Organizers</a></div>
         <div class="badges hb"><a class="store-apple" href="https://apps.apple.com/app/id6808220335" data-store="apple"><img src="/app-store-badge.svg" alt="Download on the App Store" width="132" height="44"></a><a class="store-google" href="https://play.google.com/store/apps/details?id=com.rattlegolf.app" data-store="google"><img src="/google-play-badge.png" alt="Get it on Google Play" width="170" height="66"></a></div>
+        <a class="pband" id="pband" href="#pricing"><span class="pb-l"><b data-price="pro-headline"></b><span>HardPan Pro &middot; <span data-price="pro-label"></span> &middot; the first 1,000 golfers &middot; locked while you stay subscribed &middot; then <span data-price="pro-after"></span></span></span><span class="pb-r"><em>up to <span data-price="compare-save"></span> a year less</em><br>Popular golf GPS apps charge up to <span data-price="compare-others"></span></span></a>
     </div>
     <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
+</section>
+
+<!-- PRICE D (Manny's pick 2026-11-16 13:34 via the Advisor, ADVISOR-20261116-1335-OK-build-price-BD; mockups
+     tournaments/mockups-price/price-ABCD): HardPan next to a typical golf GPS app, the first section after the fold. Every
+     HardPan row is in the app today. Every "typical" cell is what the popular apps say on their own pages, read on the date
+     the compare-checked slot shows; site-compare-sources.md lists each with its URL. No competitor name on the page, no
+     negative word. Prices through site-pricing.js slots only. On a phone each row is the HardPan line plus one grey line. -->
+<section class="wrap cmp" id="compare" aria-labelledby="cmp-h">
+    <h2 id="cmp-h">Everything your group needs, in one app</h2>
+    <p class="cmp-sub">HardPan next to a typical golf GPS app. Checked against the popular apps' own pages on <span data-price="compare-checked"></span>.</p>
+    <table>
+        <thead><tr><th>What you get</th><th class="us">HardPan</th><th>Typical golf GPS app</th></tr></thead>
+        <tbody>
+            <tr><td class="what">Every yard, every hole, and the number it plays (wind + elevation)</td><td class="us">Included</td><td class="them">GPS in all of them; the plays-like number is often a paid upgrade</td></tr>
+            <tr><td class="what">Green slope from lidar, with the safe side to miss</td><td class="us">Included</td><td class="them">Green maps are often a paid upgrade, not on every course</td></tr>
+            <tr><td class="what">Side games scored live: skins, Nassau, 2v2, match play, with the money</td><td class="us">Included</td><td class="them">Varies; often a paid upgrade, and the money is worked out by hand</td></tr>
+            <tr><td class="what">One live board for the whole group</td><td class="us">Included</td><td class="them">Most have one</td></tr>
+            <tr><td class="what">Settle up with Venmo from the recap</td><td class="us">Included</td><td class="them">Not found in the popular apps</td></tr>
+            <tr><td class="what">Tournaments: live 36-hole board, the board on a TV, check-in, entry fees by Venmo</td><td class="us">Included</td><td class="them">A live board, often through a partner site; TV board, check-in and entry fees not found</td></tr>
+            <tr><td class="what">Ask HardPan, in plain words</td><td class="us">Included</td><td class="them">AI labels vary; an ask-the-app chat was not found</td></tr>
+            <tr><td class="what">Works with no signal</td><td class="us">Included</td><td class="them">Most do, with limits (start the round with signal)</td></tr>
+            <tr><td class="what">One group of up to <span data-price="free-golfers"></span> golfers, free</td><td class="us">Free forever</td><td class="them">Free tiers vary</td></tr>
+            <tr class="cmp-price"><td class="what">Price</td><td class="us"><b data-price="pro-headline"></b><span class="fine"><span data-price="pro-label"></span>, the first 1,000 golfers, locked while you stay subscribed; then <span data-price="pro-after"></span></span></td><td class="them"><b>up to <span data-price="compare-others"></span></b><span class="fine">for the premium tier</span></td></tr>
+        </tbody>
+    </table>
+    <p class="cmp-foot">No names, no knocks: every row is what HardPan has in the app today, next to what the popular apps say on their own pages.</p>
 </section>
 
 <section class="how" id="how" aria-labelledby="how-h">
