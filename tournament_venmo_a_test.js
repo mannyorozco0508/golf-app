@@ -24,12 +24,18 @@
 // string, no layout, static attributes unparsed; the Chrome shots in
 // build-venmo-a/ are the pictures.
 //
-// BASELINE (final file, CLAUDE.md count rule): against main 2f732bb3
-// (tournament.html sha256 33e79aa9... swapped in by cp, restored by sha): 11 tests
-// - 1 pass / 10 fail. The 1 that passes is V10 (arriving as the owner writes
-// nothing), true of a page with no Venmo A at all: a guard that stays green. V2,
-// V4 and V8 read elements the old page does not have, so they fail there even
-// though their OFF state is also true of it. On preview-venmo-a: 11 pass / 0 fail.
+// BASELINE (final file, CLAUDE.md count rule), 2026-11-16 after Manny's two fixes
+// and the switch flip: against preview-venmo-a eb616398 (tournament.html sha256
+// 433b6fee..., swapped in by cp, restored by sha 77495f06): 13 tests - 5 pass /
+// 8 fail. Passing there: V2, V3, V4, V8, V10 (true of the page either way).
+// Failing there: V1 (switch), V5 / V6 / V7 / V9 (the ON page), V7a (no ON line to
+// flip), V11 (the tile left the card payment out: $300 beside Fees collected
+// $400), V12 (no tel in the input rule). On local-venmo-merge: 13 pass / 0 fail.
+// Controls, each restored by sha: the tile's old filter back -> V7 + V11 red;
+// tel dropped from the rule -> V12 red; the counts line counting its own way
+// (paid with a method only) -> V11 red; the switch back to false -> 7 red.
+// The first baseline (11 tests against main 2f732bb3, 1 pass / 10 fail; on
+// preview-venmo-a 11 / 0) stands in the 2026-11-15 commit message.
 // ============================================================================
 'use strict';
 const { test, describe } = require('node:test');
@@ -44,8 +50,10 @@ const PAGE = 'tournament.html';
 const HTML = fs.readFileSync(path.join(REPO_ROOT, PAGE), 'utf8');
 const CODE = 'STK';
 const clone = (o) => JSON.parse(JSON.stringify(o));
-const SWITCH_OFF = 'const VENMO_RULES_LIVE = false;';
-const flipOn = (code) => { const on = code.replace(SWITCH_OFF, 'const VENMO_RULES_LIVE = true;'); if (on === code) throw new Error('no switch line'); return on; };
+// THE SWITCH IS ON since the combined rules went live 2026-11-16 00:30 (the page as shipped). flipOff is the
+// rollback: the page with the switch set back to false, which must write nothing the old rules would refuse.
+const SWITCH_ON = 'const VENMO_RULES_LIVE = true;';
+const flipOff = (code) => { const off = code.replace(SWITCH_ON, 'const VENMO_RULES_LIVE = false;'); if (off === code) throw new Error('no switch line'); return off; };
 
 const el = (sb, id) => sb.document.getElementById(id);
 const html = (sb, id) => String(el(sb, id).innerHTML || '');
@@ -126,8 +134,9 @@ function postedCash(sb0) {
 }
 
 describe('V. VENMO A', () => {
-    test('V1 the source: the switch is OFF, the sentence on Setup, the Desk note, no money the page moves, no forbidden word', () => {
-        assert.equal((HTML.match(/const VENMO_RULES_LIVE = false;/g) || []).length, 1);
+    test('V1 the source: the switch is ON (the rules are live), the sentence on Setup, the Desk note, no money the page moves, no forbidden word', () => {
+        assert.equal((HTML.match(/const VENMO_RULES_LIVE = true;/g) || []).length, 1);
+        assert.equal((HTML.match(/const VENMO_RULES_LIVE = /g) || []).length, 1);
         assert.match(HTML, /Venmo&rsquo;s user agreement treats many entry fees into a personal account as business payments; a Venmo business profile \(1\.9% \+ \$0\.10 a payment\) is the account type for that\./);
         assert.match(HTML, /HardPan never holds or moves money; these buttons open Venmo or PayPal\./);
         assert.ok(HTML.includes("'venmo://paycharge?txn=pay&recipients='") && HTML.includes("'https://venmo.com/'") && HTML.includes("'https://www.paypal.com/paypalme/'"));
@@ -185,7 +194,7 @@ describe('V. VENMO A', () => {
         const box = html(sb, 'reg-paylink');
         assert.equal(el(sb, 'reg-paylink').style.display, '');
         assert.match(plain(box), /^Pay your \$100 buy-in to @Scott-Starkey \(Venmo\) or ScottStarkey \(PayPal\) ?\. The organizer marks you paid when it lands\. Pay on Venmo Pay on PayPal Venmo opens with the amount and a note \(this event and your name\) filled in\. PayPal carries the amount only: add your name in its note\. HardPan never holds or moves money\.$/);
-        assert.equal(el(sb, 'reg-payhandle-wrap').style.display, 'none', 'the golfer handle box waits for the rules');
+        assert.equal(el(sb, 'reg-payhandle-wrap').style.display, '', 'the golfer handle box shows: the rules are live and the event has a handle');
         el(sb, 'reg-name').value = 'Dan Barker';
         tap(sb, box, byId('reg-pay-venmo'));
         assert.equal(sb.location.href, 'venmo://paycharge?txn=pay&recipients=Scott-Starkey&amount=100&note=Starkey%20Cup%20-%20Dan%20Barker');
@@ -202,7 +211,7 @@ describe('V. VENMO A', () => {
     });
 
     test('V6 the sign-up payload: with the switch ON and a handle on the event the box shows and a typed @LeePark is written as payHandle; a bad handle is refused before the write; OFF it is never written', async () => {
-        const on = arriveSignup(rec({ payTo: PAY_TO }), { transform: flipOn });
+        const on = arriveSignup(rec({ payTo: PAY_TO }));
         await settle();
         assert.equal(el(on, 'reg-payhandle-wrap').style.display, '');
         ['reg-name', 'reg-email', 'reg-phone'].forEach((id, i) => { el(on, id).value = ['Dan Barker', 'dan@example.com', '6025559999'][i]; });
@@ -221,8 +230,9 @@ describe('V. VENMO A', () => {
         await settle();
         assert.match(said, /letters, numbers, dots, dashes and underscores/);
         assert.equal(writes(on, /^registrations\/STK\//).length, 1, 'nothing more was written');
-        const off = arriveSignup(rec({ payTo: PAY_TO }));
+        const off = arriveSignup(rec({ payTo: PAY_TO }), { transform: flipOff });   // the rollback page
         await settle();
+        assert.equal(el(off, 'reg-payhandle-wrap').style.display, 'none', 'OFF hides the box again');
         ['reg-name', 'reg-email', 'reg-phone'].forEach((id, i) => { el(off, id).value = ['Dan Barker', 'dan@example.com', '6025559999'][i]; });
         el(off, 'reg-payhandle').value = '@LeePark';   // typed into a hidden box: never sent
         off.navigator.onLine = true;
@@ -233,8 +243,8 @@ describe('V. VENMO A', () => {
         assert.ok(!('payHandle' in w2[0].value), 'OFF: the closed schema is never asked for payHandle');
     });
 
-    test('V7a the Desk with a handle but the rules NOT live (today): the cash tick as before, no Venmo button, no method chips, and setPaidVia refuses venmo / paypal in the page before the database would', () => {
-        const sb = arriveOwner(rec({ payTo: PAY_TO }));
+    test('V7a the Desk with a handle on the ROLLBACK page (the switch set back to false): the cash tick as before, no Venmo button, no method chips, and setPaidVia refuses venmo / paypal in the page before the database would', () => {
+        const sb = arriveOwner(rec({ payTo: PAY_TO }), undefined, { transform: flipOff });
         deskTab(sb);
         const list = html(sb, 'registration-list');
         assert.match(rowOf(list, 'e3'), /<input type="checkbox" onchange="setRegistrationPaid\('e3', this\.checked\)"> Paid/);
@@ -248,7 +258,7 @@ describe('V. VENMO A', () => {
     });
 
     test('V7 the Desk with a handle, rules live: Paid by Venmo / PayPal / Cash beside an unpaid golfer (one write each), Paid (Venmo) + Undo, the Stripe row untouched, the method chips, the in-so-far tile, the handle beside the name, the sentence', () => {
-        const sb = arriveOwner(rec({ payTo: PAY_TO }), undefined, { transform: flipOn });
+        const sb = arriveOwner(rec({ payTo: PAY_TO }));
         deskTab(sb);
         const list = html(sb, 'registration-list');
         const joe = rowOf(list, 'e3');
@@ -271,10 +281,12 @@ describe('V. VENMO A', () => {
         assert.deepEqual(w[0].value, { paid: false, paidAt: null, paidVia: null });
         assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Unpaid 1 Paid 4 Venmo 1 PayPal 1 Cash 1 Approved 5 Not yet approved 0 Photos 0');
         const counts = html(sb, 'registration-counts');
-        assert.match(counts, /<b id="pay-tile-in">\$300<\/b><span>in so far \(3 paid · \$100 each\)<\/span>/, 'three organizer ticks times the fee; the Stripe entry is the server\'s');
-        assert.match(counts, /<b id="pay-tile-by">1 · 1 · 1<\/b><span>Venmo · PayPal · cash<\/span>/);
+        // Manny 2026-11-16: the tile and the "Fees collected" line count the SAME payers - four paid, the card one too.
+        assert.match(counts, /<b id="pay-tile-in">\$400<\/b><span>in so far \(4 paid · \$100 each\)<\/span>/, 'every paid entry times the fee, the card payment included');
+        assert.match(counts, /<b id="pay-tile-by">1 · 1 · 1 · 1<\/b><span>Venmo · PayPal · cash · card<\/span>/, 'the split adds up to the four');
+        assert.match(counts, /Fees collected \$400 · 4 paid × \$100 per golfer/);
         assert.match(el(sb, 'registration-desk-note').textContent, /Tap Venmo, PayPal or Cash beside a golfer when the money lands, then approve golfers into the field\. HardPan never holds or moves money; these buttons open Venmo or PayPal\.$/);
-        const vm2 = arriveOwner(rec({ payTo: PAY_TO }), regs(), { transform: flipOn });
+        const vm2 = arriveOwner(rec({ payTo: PAY_TO }), regs());
         vm.runInContext("setPaidVia('e5', 'venmo')", vm2);
         assert.deepEqual(writes(vm2, /e5$/), [], 'a Stripe entry is never re-marked here');
     });
@@ -294,7 +306,7 @@ describe('V. VENMO A', () => {
         const sb = arriveOwner(rec({ prizeType: 'cash', payTo: PAY_TO, prizeResults: posted }), regsWithHandle);
         const card = html(sb, 'prize-payout-card');
         assert.equal(el(sb, 'prize-payout-card').style.display, 'block');
-        assert.match(plain(card), /^Pay out HardPan never holds or moves money; these buttons open Venmo or PayPal with the amount filled in, and the tick is yours\. Golfers’ handles arrive once the sign-up field is live; until then, Mark paid out\. 1st · A Flight · Ana Diaz @AnaDiaz · \$100 Pay \$100 on Venmo on PayPal Mark paid out 2nd · A Flight · Sam Ortiz · \$60 Mark paid out/);
+        assert.match(plain(card), /^Pay out HardPan never holds or moves money; these buttons open Venmo or PayPal with the amount filled in, and the tick is yours\. 1st · A Flight · Ana Diaz @AnaDiaz · \$100 Pay \$100 on Venmo on PayPal Mark paid out 2nd · A Flight · Sam Ortiz · \$60 Mark paid out/);
         assert.match(plain(card), /Paid out \$0 of \$\d+ · (\d+) of \1 left$/);
         const rowAna = card.slice(card.indexOf('data-spot="place-0-1-pA"'), card.indexOf('data-spot="place-0-2-pS"'));
         tap(sb, rowAna, byClass('pz-pay-venmo'));
@@ -322,5 +334,53 @@ describe('V. VENMO A', () => {
         const sb = arriveOwner(rec({ prizeType: 'cash', payTo: PAY_TO, prizeResults: posted }));
         deskTab(sb);
         assert.deepEqual(writes(sb, /payTo|prizePaidOut|paidVia|registrations/), []);
+    });
+
+    // Manny 2026-11-16, before the merge: (1) the Desk's two totals must count the same payers; (2) the sign-up
+    // Phone box must be styled like the other fields.
+    test('V11 the Desk totals agree whatever mix of ticks is in: the "in so far" tile, its split and the "Fees collected" line are one count, and no card figure shows when no card payment is in', () => {
+        // regs(): Ana Venmo, Sam cash, Joe unpaid, Lee PayPal, Dana card (Stripe); plus an old checkbox tick with no
+        // method (Bo) and a second unpaid golfer (Cy): 7 sign-ups, 5 paid, $100 a golfer.
+        const mix = regs({
+            e6: { fullName: 'Bo Hale', email: 'bo@example.com', phone: '6025551006', createdAt: 1006, approvedAt: 2006, playerId: 'pF', paid: true, paidAt: 3006 },
+            e7: { fullName: 'Cy Nash', email: 'cy@example.com', phone: '6025551007', createdAt: 1007, approvedAt: 2007, playerId: 'pG', paid: false },
+        });
+        const sb = arriveOwner(rec({ payTo: PAY_TO }), mix);
+        deskTab(sb);
+        const counts = html(sb, 'registration-counts');
+        const tile = /<b id="pay-tile-in">\$([\d,]+)<\/b><span>in so far \((\d+) paid · \$100 each\)<\/span>/.exec(counts);
+        const line = /Fees collected \$([\d,]+) · (\d+) paid × \$100 per golfer/.exec(counts);
+        const main = /(\d+) signups · (\d+) paid · /.exec(plain(counts));
+        assert.ok(tile && line && main, 'the tile, the fees line and the count line all render');
+        assert.equal(tile[2], '5'); assert.equal(line[2], tile[2]); assert.equal(main[2], tile[2]);
+        assert.equal(tile[1], '500'); assert.equal(line[1], tile[1]);
+        const by = /<b id="pay-tile-by">([\d · ]+)<\/b><span>([^<]+)<\/span>/.exec(counts);
+        assert.equal(by[1], '1 · 1 · 2 · 1'); assert.equal(by[2], 'Venmo · PayPal · cash · card');
+        assert.equal(by[1].split(' · ').reduce((a, n) => a + Number(n), 0), 5, 'the split adds up to the count');
+        assert.equal(plain(html(sb, 'registration-chips')), 'All 7 Unpaid 2 Paid 5 Venmo 1 PayPal 1 Cash 2 Approved 7 Not yet approved 0 Photos 0');
+        // no card payment in: three figures, three words
+        const noCard = regs({ e5: Object.assign(regs().e5, { paid: false, paidVia: null, amountCents: null }) });
+        const sb2 = arriveOwner(rec({ payTo: PAY_TO }), noCard);
+        deskTab(sb2);
+        const c2 = html(sb2, 'registration-counts');
+        assert.match(c2, /<b id="pay-tile-in">\$300<\/b><span>in so far \(3 paid · \$100 each\)<\/span>/);
+        assert.match(c2, /<b id="pay-tile-by">1 · 1 · 1<\/b><span>Venmo · PayPal · cash<\/span>/);
+        assert.match(c2, /Fees collected \$300 · 3 paid × \$100 per golfer/);
+    });
+
+    test('V12 the sign-up Phone box takes the page\'s input rule like Full name and Email (the rule names input[type="tel"]); both tel boxes are type="tel"', () => {
+        // Source half (CLAUDE.md: a source scan beside the rendered check). The one rule that styles the sign-up
+        // boxes (width, padding, border, radius, 16px) must list tel with text and email; before 2026-11-16 it did
+        // not, and the Phone box showed in the browser's default border beside two styled ones. The rendered half
+        // is the Chrome computed-style read in build-venmo-a/phone-box-styles.json.
+        const at = HTML.indexOf('input[type="text"], input[type="number"], input[type="email"]');
+        assert.ok(at > 0, 'the sign-up input rule exists');
+        const selector = HTML.slice(at, HTML.indexOf('{', at));
+        assert.match(selector, /input\[type="tel"\]/, 'tel is in the same selector list');
+        assert.match(selector, /input\[type="email"\]/);
+        assert.match(HTML.slice(HTML.indexOf('{', at), HTML.indexOf('}', at)), /width: 100%; padding: 10px; border: 1px solid var\(--border-mid\)/);
+        assert.match(HTML, /<input type="tel" id="reg-phone" placeholder="Mobile number"/);
+        assert.match(HTML, /<input type="tel" id="reg-edit-phone"/);
+        assert.equal((HTML.match(/<input type="tel"/g) || []).length, 2, 'the two phone boxes, both covered');
     });
 });

@@ -153,7 +153,7 @@
 
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
-        input[type="text"], input[type="number"], input[type="email"], input[type="search"], select {
+        input[type="text"], input[type="number"], input[type="email"], input[type="tel"], input[type="search"], select {
             width: 100%; padding: 10px; border: 1px solid var(--border-mid);
             border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main);
         }
@@ -5054,15 +5054,17 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // and a note filled in, and the organizer ticks what arrived.
     //
     //   tournaments/<code>/payTo = { venmo, paypal }      the organizer's handles (Setup; owner write; public read)
-    //   registrations/<code>/<id>/payHandle                the golfer's handle (sign-up). BEHIND VENMO_RULES_LIVE: the
+    //   registrations/<code>/<id>/payHandle                the golfer's handle (sign-up). Behind VENMO_RULES_LIVE: the
     //                                                      entry schema is closed, an unnamed key refuses the whole
-    //                                                      sign-up, so the box stays hidden until the candidate
-    //                                                      (tools/venmo-rules-candidate.js) is live.
+    //                                                      sign-up, so the box stayed hidden until the candidate
+    //                                                      (tools/venmo-rules-candidate.js) was live.
     //   registrations/<code>/<id>/paidVia                  gains 'venmo' | 'paypal' beside 'cash' (the Desk's tick).
-    //                                                      ALSO BEHIND VENMO_RULES_LIVE: the live rules type paidVia as
-    //                                                      'cash' | 'stripe' (read-back 2026-11-13), so a Venmo tick
-    //                                                      would be refused today; the Desk keeps its cash tick until
-    //                                                      the candidate widens it. The Stripe path is untouched.
+    //                                                      Also behind VENMO_RULES_LIVE: the rules typed paidVia as
+    //                                                      'cash' | 'stripe' (read-back 2026-11-13). The Stripe path
+    //                                                      is untouched.
+    //   VENMO_RULES_LIVE = true since the combined candidate went live 2026-11-16 00:30 (Manny's typed OK; the
+    //   read-back names payHandle and types paidVia cash | stripe | venmo | paypal). Set it back to false and the
+    //   page returns to the cash tick and the hidden handle box, writing nothing those rules would refuse.
     //   tournaments/<code>/prizePaidOut/<spot> = { at, via }  the owner's paid-out tick on a posted cash prize
     //
     // THE LINK (measured 2026-11-15, Manny's iPhone): the app scheme
@@ -5073,7 +5075,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // this page is still the visible one about a second later (no app took
     // over), the https page. PayPal.Me carries the amount only.
     // ======================================================================
-    const VENMO_RULES_LIVE = false;
+    const VENMO_RULES_LIVE = true;
     const PAY_HANDLE_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,59}$/;
     function payHandleClean(v) {
         const s = String(v == null ? '' : v).trim().replace(/^@+/, '');
@@ -5169,18 +5171,30 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const eid = escReg(id);
         return `<span class="reg-paid-via">Paid by <button type="button" class="btn-outline reg-via-venmo" onclick="setPaidVia('${eid}', 'venmo')">Venmo</button><button type="button" class="btn-outline reg-via-paypal" onclick="setPaidVia('${eid}', 'paypal')">PayPal</button><button type="button" class="btn-outline reg-via-cash" onclick="setPaidVia('${eid}', 'cash')">Cash</button></span>`;
     }
-    // "In so far": ticks times the fee, per golfer only (a per-team fee is not a per-signup amount). Never a ledger.
+    // THE DESK'S ONE PAID COUNT (Manny 2026-11-16: "in so far" and "Fees collected" must count the same payers).
+    // Every entry marked paid, whoever ticked it - the organizer's Venmo / PayPal / cash tick or the server's card
+    // payment - because both lines answer "how much of the entry fee is in". The "in so far" tile used to leave the
+    // server-paid entries out ($300 beside a "Fees collected $400" two lines down, on the same Desk). The Paid chip
+    // and the "N paid" count line read the same flag.
+    function deskPaidCount(entries) { return (entries || []).filter((e) => e && e.paid === true).length; }
+    // "In so far": the one paid count times the fee, per golfer only (a per-team fee is not a per-signup amount).
+    // Never a ledger. The second tile splits the same count by method; "card" appears only when a server-paid
+    // entry is in it, so the figures always add up to the count beside them.
     function payInTileHtml(entries) {
         const data = currentData || {};
         const fee = regFeeAmount(data);
         if (!(fee > 0)) return '';
-        const paid = entries.filter((e) => e && e.paid === true && !entryPaidByServer(e)).length;
-        const by = { venmo: 0, paypal: 0, cash: 0 };
-        entries.forEach((e) => { const st = payState(e); if (by[st] !== undefined) by[st]++; });
+        const paid = deskPaidCount(entries);
+        const by = { venmo: 0, paypal: 0, cash: 0, stripe: 0 };
+        // venmo / paypal / cash are the organizer's ticks; everything else a paid entry can be (stripe, or a refund /
+        // dispute state the server put on a card payment) is the card's.
+        entries.forEach((e) => { if (!(e && e.paid === true)) return; const st = payState(e); by[(st === 'venmo' || st === 'paypal' || st === 'cash') ? st : 'stripe']++; });
         const amount = feePer(data) === 'golfer' ? payDollars(paid * fee) : String(paid) + ' paid';
         const sub = feePer(data) === 'golfer' ? `in so far (${paid} paid · ${payDollars(fee)} each)` : `entries marked paid (${payDollars(fee)} a team)`;
+        const byNums = `${by.venmo} · ${by.paypal} · ${by.cash}` + (by.stripe ? ` · ${by.stripe}` : '');
+        const byWords = 'Venmo · PayPal · cash' + (by.stripe ? ' · card' : '');
         return `<div class="pay-tiles" id="pay-in-tiles"><div class="pay-tile"><b id="pay-tile-in">${amount}</b><span>${sub}</span></div>`
-            + `<div class="pay-tile"><b id="pay-tile-by">${by.venmo} · ${by.paypal} · ${by.cash}</b><span>Venmo · PayPal · cash</span></div></div>`;
+            + `<div class="pay-tile"><b id="pay-tile-by">${byNums}</b><span>${byWords}</span></div></div>`;
     }
     // THE OWNER'S PAY-OUT ROWS: the posted results, when the prize type is cash. A winner whose entry carries a handle
     // gets Pay on Venmo / PayPal (the amount and "event - name prize" filled in); everyone gets Mark paid out; the
@@ -6671,9 +6685,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // Every number the counts row shows, from registrationData and nothing else.
     const REG_SHIRT_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];   // the rule's list, in its order
     function registrationCounts(entries) {
-        const c = { signups: entries.length, paid: 0, inField: 0, needsTeam: 0, dinnerGuests: 0, dinnerAnswered: 0, shirtAnswered: 0, shirts: {} };
+        // paid: deskPaidCount, the same count the "in so far" tile multiplies - one function, so the two cannot drift.
+        const c = { signups: entries.length, paid: deskPaidCount(entries), inField: 0, needsTeam: 0, dinnerGuests: 0, dinnerAnswered: 0, shirtAnswered: 0, shirts: {} };
         entries.forEach((e) => {
-            if (e.paid === true) c.paid++;
             if (regInField(e)) c.inField++;
             if (regNeedsTeam(e)) c.needsTeam++;
             if (typeof e.dinnerCount === 'number' && isFinite(e.dinnerCount)) { c.dinnerGuests += e.dinnerCount; c.dinnerAnswered++; }
