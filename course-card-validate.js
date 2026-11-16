@@ -9,10 +9,18 @@
 // (window.CourseCardValidate), so the server's retry decision and the app's
 // amber cells come from the same code.
 //
-// WHAT IS READ (DECISIONS.md, Oct 26): tee NAMES + YARDAGES only. Course
-// rating and slope are never read or returned - they move handicap strokes,
-// which moves money. Nothing here writes anywhere: the app saves the card
-// through its normal typed-pars path after the golfer has looked at it.
+// WHAT IS READ. Oct 26 (DECISIONS.md): tee NAMES + YARDAGES only; rating and
+// slope were left out because they move handicap strokes, which moves money.
+// Nov 16 2026 (Manny, typed in the tournaments tab: "OK scanner reads course
+// rating + slope per tee (front or back of the card)"): each tee's printed
+// Course Rating and Slope ARE read now - the men's pair (or the only pair
+// printed) as rating / slope, a ladies' pair as rating_ladies / slope_ladies -
+// from wherever the card prints them: the tee-name cell ("Copper 72.1/128"),
+// a ratings table, or the BACK of the card, which the caller may send as a
+// second photo. They are checked SOFTLY only (below): a wrong rating is amber
+// for the golfer to look at, never a Pro retry. Nothing here writes anywhere:
+// the app saves the card through its normal typed path after the golfer has
+// looked at it.
 //
 // HARD CHECKS (any one earns the ONE Pro retry; Save stays off in the app):
 //   par_range       a par that is not a whole number 3-6 (or is missing)
@@ -27,7 +35,11 @@
 //                   (tfweb-2, Manny Oct 26: AMBER for the golfer to fix, not
 //                   a block or a retry - a soft warning in the response)
 //   yards_range     a yardage outside 50-700
-//   unsure          a cell the model itself said it was not sure of
+//   rating_range    a tee's course rating outside 55.0-85.0 (who: men | ladies)
+//   slope_range     a tee's slope outside 55-155, the USGA range (who: men | ladies)
+//   rating_pair     a rating without its slope, or a slope without its rating
+//   unsure          a cell the model itself said it was not sure of (hole 0 =
+//                   that tee's rating / slope cell)
 // ============================================================================
 (function () {
     'use strict';
@@ -38,8 +50,11 @@
 
     var PAR_TOTAL = { 18: [60, 75], 9: [27, 38] };
     var YARDS = [50, 700];
+    var RATING = [55, 85];      // course rating, one decimal
+    var SLOPE = [55, 155];      // the USGA slope range
 
     function isInt(n) { return typeof n === 'number' && isFinite(n) && Math.floor(n) === n; }
+    function isNum(n) { return typeof n === 'number' && isFinite(n); }
 
     // ------------------------------------------------------------------------
     // THE RESPONSE SCHEMA (Gemini OpenAPI subset). Compact on purpose: no
@@ -72,7 +87,12 @@
                         properties: {
                             name: { type: 'STRING' },
                             yards: ints,
-                            written: written
+                            written: written,
+                            // Nov 16: the tee's printed Course Rating / Slope (men's, or the only pair), and the ladies' pair.
+                            rating: { type: 'NUMBER', nullable: true },
+                            slope: { type: 'INTEGER', nullable: true },
+                            rating_ladies: { type: 'NUMBER', nullable: true },
+                            slope_ladies: { type: 'INTEGER', nullable: true }
                         },
                         required: ['name', 'yards']
                     }
@@ -92,14 +112,18 @@
     }
 
     // ------------------------------------------------------------------------
-    // THE PROMPT. Built from the hole count and an optional course name only -
-    // nothing about the golfer, and no location.
+    // THE PROMPT. Built from the hole count, an optional course name and the
+    // number of photos (1, or 2 when the back of the card came too) - nothing
+    // about the golfer, and no location.
     // ------------------------------------------------------------------------
     function buildCoursePrompt(ctx) {
         var c = ctx || {};
         var n = c.holes === 9 ? 9 : 18;
+        var two = c.photos === 2;
         return [
-            'You are reading a photo of a BLANK printed golf scorecard to learn the course\'s card.',
+            (two
+                ? 'You are reading two photos of the same BLANK printed golf scorecard to learn the course\'s card: the FRONT of the card (the hole grid) and the BACK of the same card. Read each row from whichever side prints it; the course rating and slope are often on the back.'
+                : 'You are reading a photo of a BLANK printed golf scorecard to learn the course\'s card.'),
             (c.name ? 'The golfer says the course is: ' + String(c.name).slice(0, 120) + '.' : 'The course name is not known.'),
             'The card should have ' + n + ' holes. Return arrays of exactly ' + n + ' entries, hole 1 first.',
             'Read ONLY these printed rows:',
@@ -108,9 +132,10 @@
             '- hcp_men: the men\'s Handicap / HCP / Hdcp / Stroke Index row. If there is only one handicap row, it goes here.',
             '- hcp_ladies: the ladies\' / women\'s handicap row, if the card prints one separately; else an empty array. Never copy the men\'s row into it.',
             '- tees: every tee yardage row (the rows named for a tee color or name, e.g. Black, Blue, White, Gold, Red, or combos like Blue/White). name = the tee name exactly as printed, without any rating or slope. yards = one yardage per hole. written = that row\'s printed OUT, IN and TOTAL yardage exactly as printed.',
+            '- rating / slope: that tee\'s printed Course Rating (a number with one decimal, e.g. 72.1) and Slope (a whole number, e.g. 128), wherever the card prints them: in the tee-name cell (e.g. "Copper 72.1/128"), in a ratings table, or on the back of the card. The men\'s pair (or the only pair printed) goes in rating / slope; a ladies\' / women\'s pair goes in rating_ladies / slope_ladies. null for a pair the card does not print. A rating printed for a tee that has no yardage row goes in notes, not in tees.',
             'Rows can be anywhere on the card: a tee or handicap row may be printed BELOW the empty score boxes, and the Par row may sit in the middle. Check the whole card.',
-            'Ignore: course rating and slope numbers, the empty score boxes, any handwriting, column headings such as HCP / NET / INITIAL, logos, ads and watermarks or text printed across the card.',
-            'Never guess or calculate a number. If a cell cannot be read, return null for it and add {row, hole} to unsure (row = "par", "hcp_men", "hcp_ladies" or the tee name). Also list any cell you are not sure of.',
+            'Ignore: the empty score boxes, any handwriting, column headings such as HCP / NET / INITIAL, logos, ads and watermarks or text printed across the card.',
+            'Never guess or calculate a number. If a cell cannot be read, return null for it and add {row, hole} to unsure (row = "par", "hcp_men", "hcp_ladies" or the tee name; hole = 0 for a rating or slope cell). Also list any cell you are not sure of.',
             'Do not calculate OUT, IN or TOTAL; copy them as printed, or null if not printed.',
             'holes = ' + n + '. notes: anything odd about the card, in a few words.'
         ].join('\n');
@@ -127,6 +152,9 @@
         var o = w && typeof w === 'object' ? w : {};
         return { out: isInt(o.out) ? o.out : null, 'in': isInt(o['in']) ? o['in'] : null, total: isInt(o.total) ? o.total : null };
     }
+    // A course rating is a number to one decimal (72.1); a slope a whole number. Anything else is null.
+    function ratingOf(v) { return isNum(v) ? Math.round(v * 10) / 10 : null; }
+    function slopeOf(v) { return isInt(v) ? v : null; }
     function parseCourseOutput(raw) {
         var obj = raw;
         if (typeof raw === 'string') {
@@ -137,7 +165,11 @@
         for (var i = 0; i < obj.tees.length; i++) {
             var t = obj.tees[i];
             if (!t || typeof t !== 'object' || typeof t.name !== 'string' || !Array.isArray(t.yards)) return { ok: false, error: 'bad_shape' };
-            tees.push({ name: t.name.trim().slice(0, 40), yards: intsOrNull(t.yards), written: writtenOf(t.written) });
+            tees.push({
+                name: t.name.trim().slice(0, 40), yards: intsOrNull(t.yards), written: writtenOf(t.written),
+                rating: ratingOf(t.rating), slope: slopeOf(t.slope),
+                rating_ladies: ratingOf(t.rating_ladies), slope_ladies: slopeOf(t.slope_ladies)
+            });
         }
         var unsure = (Array.isArray(obj.unsure) ? obj.unsure : []).filter(function (u) {
             return u && typeof u.row === 'string' && isInt(u.hole);
@@ -184,6 +216,15 @@
             if (written.total !== null && s !== written.total) bad.push('total');
         }
         return bad;
+    }
+    // A tee's rating / slope pair, SOFT only: both null is a card that does not print
+    // one; one of the two missing is rating_pair; a value outside the USGA range is
+    // rating_range / slope_range. who = 'men' | 'ladies'.
+    function ratingFlags(row, rating, slope, who, soft) {
+        if (rating === null && slope === null) return;
+        if (rating === null || slope === null) soft.push({ code: 'rating_pair', row: row, who: who });
+        if (rating !== null && (rating < RATING[0] || rating > RATING[1])) soft.push({ code: 'rating_range', row: row, who: who });
+        if (slope !== null && (slope < SLOPE[0] || slope > SLOPE[1])) soft.push({ code: 'slope_range', row: row, who: who });
     }
     // 1..n each exactly once.
     function isPermutation(row, n) {
@@ -232,6 +273,8 @@
             t.yards.forEach(function (y, i) {
                 if (!isInt(y) || y < YARDS[0] || y > YARDS[1]) soft.push({ code: 'yards_range', row: t.name, hole: i + 1 });
             });
+            ratingFlags(t.name, t.rating, t.slope, 'men', soft);
+            ratingFlags(t.name, t.rating_ladies, t.slope_ladies, 'ladies', soft);
         });
 
         v.unsure.forEach(function (u) { soft.push({ code: 'unsure', row: u.row, hole: u.hole }); });

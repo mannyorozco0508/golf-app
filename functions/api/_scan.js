@@ -449,37 +449,49 @@ export async function handleScan(d) {
 
 // ============================================================================
 // 080 COURSE MODE: a photo of a blank printed card -> par, men's + ladies'
-// HCP rows, tee names + per-hole yardages (never rating / slope). Same auth,
-// rate limits and monthly cap as the score scan; its OWN free allowance
-// (scan:course:<uid>, COURSE_SCAN_FREE_LIMIT). The body is an allow-list:
-// the image, an optional course name and the hole count - no location.
+// HCP rows, tee names + per-hole yardages, and (Manny OK 2026-11-16, typed in
+// the tournaments tab) each tee's course rating + slope, read from the front
+// or from the BACK of the card, which the caller may send as a second photo
+// (`back`, the same shape as `image`). Same auth, rate limits and monthly cap
+// as the score scan; its OWN free allowance (scan:course:<uid>,
+// COURSE_SCAN_FREE_LIMIT) - two photos are still ONE scan. The body is an
+// allow-list: the image(s), an optional course name and the hole count - no
+// location.
 // ============================================================================
+function readCourseImage(img) {
+    if (!img || typeof img !== 'object' || typeof img.data !== 'string') return null;
+    const data = img.data.replace(/^data:[^;,]+;base64,/, '').replace(/\s+/g, '');
+    const mime = String(img.mimeType || 'image/jpeg').toLowerCase();
+    if (IMAGE_TYPES.indexOf(mime) === -1) return null;
+    if (!data || data.length > MAX_IMAGE_CHARS || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return null;
+    return { mimeType: mime, data };
+}
 export function readCourseBody(body) {
     const b = body && typeof body === 'object' ? body : null;
     if (!b) return { error: 'bad_request' };
-    const img = b.image && typeof b.image === 'object' ? b.image : null;
-    if (!img || typeof img.data !== 'string') return { error: 'bad_image' };
-    const data = img.data.replace(/^data:[^;,]+;base64,/, '').replace(/\s+/g, '');
-    const mime = String(img.mimeType || 'image/jpeg').toLowerCase();
-    if (IMAGE_TYPES.indexOf(mime) === -1) return { error: 'bad_image' };
-    if (!data || data.length > MAX_IMAGE_CHARS || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return { error: 'bad_image' };
+    const front = readCourseImage(b.image);
+    if (!front) return { error: 'bad_image' };
+    const images = [front];
+    if (b.back !== undefined && b.back !== null) {
+        const back = readCourseImage(b.back);   // a back that is sent has to be a real image too
+        if (!back) return { error: 'bad_image' };
+        images.push(back);
+    }
     const c = b.course && typeof b.course === 'object' ? b.course : {};
     const holes = c.holes === undefined ? 18 : c.holes;
     if (holes !== 9 && holes !== 18) return { error: 'bad_request' };
-    return { image: { mimeType: mime, data }, course: { holes, name: typeof c.name === 'string' ? c.name.trim().slice(0, 120) : '' } };
+    return { images, course: { holes, name: typeof c.name === 'string' ? c.name.trim().slice(0, 120) : '' } };
 }
 
-export function courseGeminiRequest(model, image, course) {
+// `images` is [front] or [front, back]; the prompt is told how many photos it has.
+export function courseGeminiRequest(model, images, course) {
     const generationConfig = { temperature: 0, responseMimeType: 'application/json', responseSchema: C.responseSchema() };
     const thinking = thinkingFor(model);   // the same cap as the score call, for the configured model
     if (thinking) generationConfig.thinkingConfig = thinking;
-    return {
-        contents: [{ role: 'user', parts: [
-            { text: C.buildCoursePrompt(course) },
-            { inline_data: { mime_type: image.mimeType, data: image.data } }
-        ] }],
-        generationConfig
-    };
+    const list = Array.isArray(images) ? images : [images];
+    const parts = [{ text: C.buildCoursePrompt(Object.assign({}, course, { photos: list.length })) }];
+    list.forEach((image) => parts.push({ inline_data: { mime_type: image.mimeType, data: image.data } }));
+    return { contents: [{ role: 'user', parts }], generationConfig };
 }
 export const COURSE_SPEC = { request: courseGeminiRequest, parse: (t) => C.parseCourseOutput(t) };
 
@@ -506,7 +518,7 @@ async function handleCourseScan(w, d) {
     await bump(w.kv, mk, 40 * 24 * 3600);
 
     const started = Date.now();
-    const first = await callGemini(w, w.model, body.image, body.course, COURSE_SPEC);
+    const first = await callGemini(w, w.model, body.images, body.course, COURSE_SPEC);
     if (first.error) {
         w.log(JSON.stringify({ ev: 'course_scan', outcome: first.error, model: w.model, ms: Date.now() - started, upstream: first.upstream }));
         return unavailable(first.error);
@@ -519,7 +531,7 @@ async function handleCourseScan(w, d) {
     if (C.needsRetry(pick.validation) && await readCount(w.kv, mk) < w.cap) {
         retried = true;
         await bump(w.kv, mk, 40 * 24 * 3600);
-        const second = await callGemini(w, w.retryModel, body.image, body.course, COURSE_SPEC);
+        const second = await callGemini(w, w.retryModel, body.images, body.course, COURSE_SPEC);
         if (!second.error) {
             tokens.push(Object.assign({ model: w.retryModel }, second.tokens));
             const v2 = C.validateCourse(second.parsed, body.course);
@@ -541,7 +553,9 @@ async function handleCourseScan(w, d) {
         ev: 'course_scan', outcome: 'ok', model: pick.model, retried, paid,
         ms: Date.now() - started, tokens,
         hard: pick.validation.hard.map((x) => x.code), soft: pick.validation.suspectCount,
-        tees: pick.parsed.value.tees.length
+        tees: pick.parsed.value.tees.length,
+        photos: body.images.length,   // 1, or 2 with the back of the card
+        ratings: pick.parsed.value.tees.filter((t) => t.rating !== null && t.slope !== null).length
     }));
     return {
         status: 'ok',
