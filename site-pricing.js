@@ -43,6 +43,14 @@ window.HARDPAN_SITE_PRICING = {
         name: 'Trip Pass',
         price: '$14.99',      // gps-config.js iapHostFallbackPrices.trip
         days: 7
+    },
+    // Price B + D (Manny's pick 2026-11-16 13:34 via the Advisor, ADVISOR-20261116-1335-OK-build-price-BD): the one
+    // comparison figure the homepage shows beside the founding price. The top yearly premium tier of the popular golf
+    // GPS apps, read from their own pages (site-compare-sources.md has each one with its URL and the date). No name
+    // goes on the page. The saving the band shows is COMPUTED below from this and the headline price, never typed.
+    compare: {
+        othersUpTo: '$99.99',          // per year: 18Birdies Premium, SwingU Pro, Golfshot Champions, Hole19 Intelligence
+        checkedOn: 'Nov 16, 2026'
     }
 };
 
@@ -51,6 +59,16 @@ window.HARDPAN_SITE_PRICING = {
 window.HardPanSitePricingFill = function (root) {
     var P = window.HARDPAN_SITE_PRICING || {};
     var pro = P.pro || {};
+    var cmp = P.compare || {};
+    var headline = pro.foundingOpen ? pro.founding : pro.yearly;
+    // The comparison figure minus the headline price, in whole dollars when it is one (today it is) and with cents when
+    // it is not. Empty when either figure is missing or ours is not lower, so the slot shows the dash, never a wrong saving.
+    var saving = '';
+    var cents = function (t) { var m = /^\$([0-9]+)\.([0-9]{2})$/.exec(String(t || '')); return m ? parseInt(m[1], 10) * 100 + parseInt(m[2], 10) : null; };
+    if (cents(cmp.othersUpTo) !== null && cents(headline) !== null && cents(cmp.othersUpTo) > cents(headline)) {
+        var d = cents(cmp.othersUpTo) - cents(headline);
+        saving = '$' + (d % 100 === 0 ? String(d / 100) : (d / 100).toFixed(2));
+    }
     var values = {
         'free': '$0',
         'free-golfers': String(P.freeGolfers || ''),
@@ -61,7 +79,12 @@ window.HardPanSitePricingFill = function (root) {
         'pro-trial-days': String(pro.trialDays || ''),
         'host-yearly': (P.host && P.host.yearly) ? P.host.yearly + '/yr' : '',
         'trip-pass': P.tripPass && P.tripPass.price,
-        'trip-pass-days': String((P.tripPass && P.tripPass.days) || '')
+        'trip-pass-days': String((P.tripPass && P.tripPass.days) || ''),
+        // Price B + D
+        'pro-after': pro.foundingOpen ? (pro.yearly + '/yr') : (pro.monthly + '/mo'),   // the band's "then ..." while founding is open; the monthly option after
+        'compare-others': cmp.othersUpTo ? (cmp.othersUpTo + '/yr') : '',
+        'compare-save': saving,
+        'compare-checked': cmp.checkedOn || ''
     };
     var nodes = (root || document).querySelectorAll('[data-price]');
     for (var i = 0; i < nodes.length; i++) {
