@@ -248,6 +248,14 @@
     // fv already hidden, so the sheet must not read that same key): the sheet closes on the NEXT Esc.
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && fv.hidden && !fv.contains(ev.target)) closeSheet(); });
 
+    // ---- 2c. THE STICKY BAR (F2, Nov 15) -------------------------------------------
+    // The brand sits on the fold (the lockup over the phone fan); once #top has scrolled past, #stick slides in with the
+    // small lockup, the links and Get the app, and slides out again when the fold is back. No observer = no bar.
+    var stick = $('stick'), top = $('top');
+    if (stick && top && 'IntersectionObserver' in window) {
+        new IntersectionObserver(function (es) { es.forEach(function (e) { stick.classList.toggle('on', !e.isIntersecting && e.boundingClientRect.top < 0); }); }, { threshold: 0 }).observe(top);
+    }
+
     // ---- 3. TRY THE GPS ----------------------------------------------------------
     var map = $('tg-map');
     if (map) {
