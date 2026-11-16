@@ -181,10 +181,16 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
             return { n: cs.length, rows: [...document.querySelectorAll('#features .row')].map((r) => r.children.length),
               bad: cs.filter((c) => !c.querySelector('h3').textContent.trim() || !c.querySelector('p').textContent.trim() || !(c.querySelector('.ph img').alt || '').trim()).map((c) => c.id),
               sideways: document.documentElement.scrollWidth > window.innerWidth,
-              text: document.body.innerText }; })()`);
+              text: document.body.innerText, c209: (document.getElementById('coming209') || {}).innerText || '',
+              c209n: document.querySelectorAll('#coming209 .fc').length, c209before: !!document.getElementById('coming209') && !!(document.getElementById('coming209').compareDocumentPosition(document.getElementById('features')) & 4) }; })()`);
         assert.equal(r.n, 38);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin (2026-11-14): + New in 2.0.7 (4); 2.0.8 release: + New in 2.0.8 (2), first
         assert.deepEqual(r.rows, [2, 4, 6, 6, 5, 12, 3]);
-        assert.doesNotMatch(r.text, /coming in 2\.0\.8|coming in the next update|in review|not in the app yet/i, '2.0.8 release: nothing on the page says 2.0.8 is coming any more');
+        // 2.0.9 site (web-209-coming, Nov 16): the Coming in 2.0.9 row (#coming209, 2 cards, above #features) says coming on
+        // purpose; outside it nothing says coming / in review, and it never says available or in review.
+        assert.equal(r.c209n, 2); assert.equal(r.c209before, true, 'the Coming in 2.0.9 row is not above #features');
+        assert.match(r.c209, /Coming in 2\.0\.9/); assert.equal((r.c209.match(/New · coming in the next update/gi) || []).length, 3, r.c209);
+        assert.doesNotMatch(r.c209, /\b(available|in review|new in 2\.0\.9)\b/i);
+        assert.doesNotMatch(r.text.replace(r.c209, ''), /coming in 2\.0\.[89]|coming in the next update|in review|not in the app yet/i, '2.0.8 release: nothing on the page says 2.0.8 is coming any more');
         assert.deepEqual(r.bad, []);
         assert.equal(r.sideways, false, 'the page scrolls sideways at 390');
         assert.doesNotMatch(r.text, /\bIDEA\b/, 'a mockup IDEA tag is on the page');
@@ -207,14 +213,16 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         await tab.key('ArrowRight');
         v = await tab.eval(VIEWER);
         assert.equal(v.n, 'Play · 2 / 6'); assert.equal(v.title, 'Hit the number it plays.');
-        const big = await tab.eval(`(() => { const li = document.querySelector('#fv-track .fv-s[data-i="7"] img'); return li ? { src: li.currentSrc, w: li.getBoundingClientRect().width } : null; })()`);
+        // 2.0.9 site (web-209-coming, Nov 16): the two Coming in 2.0.9 slides (#coming209, above #features) come first now:
+        // Play 2 is data-i 9 (was 7), Games 1 is slide 15 = scrollTo 14 widths (was 12).
+        const big = await tab.eval(`(() => { const li = document.querySelector('#fv-track .fv-s[data-i="9"] img'); return li ? { src: li.currentSrc, w: li.getBoundingClientRect().width } : null; })()`);
         assert.ok(big && /plays-like-940\.webp$/.test(big.src) && big.w > 250, 'the viewer does not show the sharp screen: ' + JSON.stringify(big));
         // a swipe: the track is scrolled the way a finger scrolls it, to the 11th slide (Games 1).
         // 2.0.7 re-pin (2026-11-14): the four New in 2.0.7 slides come first, so Play 2 is slide 6 (data-i 5) and Games 1 is slide 11 (was 7).
         // 2.0.8 site (Nov 15): the two Coming in 2.0.8 slides (#coming208, above #features) come before those: Play 2 is data-i 7, Games 1 slide 13.
         // 2.0.8 release re-pin: the viewer walks every .fc on the page in order; the two 2.0.8 slides moved from #coming208 into
         // #features but stay first, so the indexes do not move (Play 2 data-i 7, Games 1 slide 13 = scrollTo 12 widths).
-        await tab.eval(`(() => { const t = document.getElementById('fv-track'); t.scrollTo({ left: t.clientWidth * 12 }); return true; })()`);
+        await tab.eval(`(() => { const t = document.getElementById('fv-track'); t.scrollTo({ left: t.clientWidth * 14 }); return true; })()`);
         await sleep(700);
         v = await tab.eval(VIEWER);
         assert.equal(v.n, 'Games · 1 / 6', 'a swipe did not move to the next feature');

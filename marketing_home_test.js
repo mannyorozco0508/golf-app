@@ -217,9 +217,19 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         // 2.0.8 was in Apple's review) carried the coming tag.
         // 2.0.8 release re-pin: iOS 2.0.8 is released, the row is "New in 2.0.8" inside #features, and NO card on the page
         // carries a tag any more: zero <div class="fsoon">, no coming208 section, no gsoon row tag, not even the CSS.
-        const home = read('hardpan-home.html');
+        // 2.0.9 site (web-209-coming, Nov 16): iOS 2.0.9 (1) is uploaded to App Store Connect, so a "Coming in 2.0.9" row
+        // (#coming209, its comment, its section and its three CSS lines .fsoon / .coming / .gsoon) sits above EVERYTHING IN
+        // THE APP again: its two cards carry the tag, exactly; outside that block the page is held to the release rule above.
+        const homeAll = read('hardpan-home.html');
+        const block209 = (/<!-- 2\.0\.9 site \(web-209-coming[^\n]*\n(?:[^\n]*\n)*?<!-- \/2\.0\.9 coming -->\n/.exec(homeAll) || [''])[0];
+        const fsoonCss = (/    \.fsoon \{[^\n]*\n/.exec(homeAll) || [''])[0];
+        const css209 = (/    \/\* 2\.0\.9 site \(web-209-coming[\s\S]*?    \.gsoon \{[^\n]*\n/.exec(homeAll) || [''])[0];
+        assert.ok(block209.length > 1500 && fsoonCss && css209.length > 300, 'positive: the Coming in 2.0.9 row and its CSS are there');
+        assert.equal((block209.match(/<div class="fsoon">New &middot; coming in the next update<\/div>/g) || []).length, 2, 'positive: the two 2.0.9 cards are tagged');
+        assert.ok(homeAll.indexOf('id="coming209"') > 0 && homeAll.indexOf('id="coming209"') < homeAll.indexOf('<h2 class="ftitle">EVERYTHING IN THE APP'), 'the Coming in 2.0.9 row moved into EVERYTHING IN THE APP');
+        const home = homeAll.replace(block209, '').replace(fsoonCss, '').replace(css209, '');
         assert.equal((home.match(/<div class="fsoon">/g) || []).length, 0, 'a Coming soon tag on a shipped card');
-        assert.doesNotMatch(home, /fsoon|gsoon|coming208|Coming in 2\.0\.8|in review/i, 'coming wording left on the home page');
+        assert.doesNotMatch(home, /fsoon|gsoon|coming208|coming209|Coming in 2\.0\.[89]|in review/i, 'coming wording left on the home page');
         assert.match(home, /<h2>New in 2\.0\.8<\/h2>/, 'positive: the New in 2.0.8 row is there');
         assert.ok(home.indexOf('<h2>New in 2.0.8</h2>') > home.indexOf('EVERYTHING IN THE APP') && home.indexOf('<h2>New in 2.0.8</h2>') < home.indexOf('<h2>New in 2.0.7</h2>'), 'New in 2.0.8 is not the first row of EVERYTHING IN THE APP');
         assert.match(read('hardpan-home.html'), /<li class="fc" id="f-offline" data-key="offline"><div class="cap"><span class="eb">OFFLINE MAPS<\/span>/, 'positive: the Offline maps card is there, untagged');

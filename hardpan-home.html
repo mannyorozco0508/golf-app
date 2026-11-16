@@ -176,6 +176,7 @@
     .fc .cap { width:100%; }
     .eb { display:inline-block; font-size:11.5px; font-weight:800; letter-spacing:.14em; color:var(--lime); border:1.5px solid rgba(217,240,122,.5); border-radius:999px; padding:3px 10px; }
     .clipchip { display:inline-block; font-size:11.5px; font-weight:800; color:var(--g); background:var(--lime); border-radius:999px; padding:4px 9px; margin-left:4px; vertical-align:top; }
+    .fsoon { display:table; margin:0 auto 8px; font-size:11px; font-weight:800; letter-spacing:.08em; color:var(--ink); background:#ffd76a; border-radius:8px; padding:4px 8px; }
     .fc h3 { font-size:22px; font-weight:900; line-height:1.12; letter-spacing:-.02em; margin:9px 0 5px; }
     .fc p { font-size:13px; color:#cfe0d6; line-height:1.38; }
     .ph { display:block; flex:0 0 auto; width:206px; margin-top:14px; padding:7px; border:0; border-radius:34px; background:#0b0f0d; box-shadow:0 18px 40px rgba(0,0,0,.35); cursor:pointer; }
@@ -191,6 +192,10 @@
     .new207 { list-style:none; display:flex; flex-wrap:wrap; gap:8px 10px; margin:16px 0 6px; padding:0; }
     .new207 li { font-size:14px; line-height:1.35; color:var(--ink); background:#fff; border:1px solid #e3dfd2; border-radius:12px; padding:8px 12px; }
     @media (max-width:700px) { .new207 { padding:0 16px; } }
+    /* 2.0.9 site (web-209-coming, Nov 16): the Coming in 2.0.9 row sits ABOVE "EVERYTHING IN THE APP" while 2.0.9 waits for
+       Apple; its tag says so. scratchpad/web209/flip-209-to-released.sh moves it in on release day. */
+    .coming { padding:14px 0 0; }
+    .gsoon { display:table; margin:0 0 6px; font-size:11px; font-weight:800; letter-spacing:.06em; color:var(--ink); background:#ffd76a; border-radius:8px; padding:3px 8px; vertical-align:1px; }
     .dots { display:flex; gap:5px; justify-content:center; padding:12px 0 0; }
     .dots i { width:6px; height:6px; border-radius:50%; background:#c9c4b4; }
     .dots i.on { width:18px; border-radius:3px; background:var(--g); }
@@ -480,7 +485,7 @@
      screens standing in for the course photo (not shot yet); under it "How you'll use it" (five scene cards, each opening a
      sheet of that scene's pictures; a picture opens the full-screen viewer below at that feature) and "Everything in the
      app, at a glance" (one tile per feature, each opening the viewer; two tiles say COMING, two have no picture yet). The
-     rows under them (EVERYTHING IN THE APP, led by New in 2.0.8 since the 2.0.8 release, the try-it boxes), the viewer, pricing, Get the app and the
+     rows under them (the 2.0.9 coming row while 2.0.9 waits for Apple, EVERYTHING IN THE APP, led by New in 2.0.8 since the 2.0.8 release, the try-it boxes), the viewer, pricing, Get the app and the
      footer are unchanged. The header is unchanged too: the bigger-logo pick (HP-header-logo-ABC) is separate. Five pictures
      the rows do not have live in media/home/ (its manifest.json says where each came from). Guard: hardpan_home_scenes_test.js. -->
 <section class="wrap hero fold" id="top">
@@ -618,6 +623,20 @@
         <p class="strip"><a href="#pricing"><span data-price="pro-label">Founding price</span> <b data-price="pro-headline">$24.99/yr</b> &middot; the first 1,000 golfers &middot; locked for as long as you stay subscribed. Pricing &darr;</a></p>
     </div>
 </section>
+
+<!-- 2.0.9 site (web-209-coming, Nov 16): NOT in the app yet. iOS 2.0.9 (1) is uploaded to App Store Connect, so this row sits above
+     "EVERYTHING IN THE APP", tagged "New · coming in the next update", and claims nothing is available. Pictures: real captures
+     from the 2.0.9 build (release-207 639f7c35, headless Chrome on the repo's stub phone server, stand-in golfers). Release day:
+     scratchpad/web209/flip-209-to-released.sh. -->
+<section class="feat coming" id="coming209" aria-label="Coming in 2.0.9">
+    <div class="grp" id="g-coming">
+        <div class="ghd"><h2>Coming in 2.0.9</h2><span class="gn">2 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="Coming in 2.0.9: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="Coming in 2.0.9: more cards">&rsaquo;</button></span></div>
+        <p class="gln"><span class="gsoon" id="coming209-tag">New &middot; coming in the next update</span>Not in the app yet.</p>
+        <ul class="row" aria-label="Coming in 2.0.9 features"><li class="fc" id="f-red-under" data-key="red-under"><div class="cap"><div class="fsoon">New &middot; coming in the next update</div><span class="eb">UNDER PAR IN RED</span><h3>Red means under.</h3><p>Every under-par number on the Receipt, the boards and the leaderboard shows in red. Even and over par stay plain. Birdies are still circles, bogeys squares.</p></div><button type="button" class="ph" data-open="red-under" aria-label="See Red means under full screen"><span class="s"><img src="/media/screens/red-under-400.webp" srcset="/media/screens/red-under-400.webp 400w, /media/screens/red-under-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="1910" loading="lazy" decoding="async" alt="The live leaderboard at Papago thru 9, ranked by net: Leading the Field: Alex P. −6 thru 9, and the To Par column −6, −4, −3, −3 in red for the four stand-in golfers."></span></button></li><li class="fc" id="f-ask-red" data-key="ask-red"><div class="cap"><div class="fsoon">New &middot; coming in the next update</div><span class="eb">ASK HARDPAN</span><h3>HardPan&rsquo;s replies read the same way.</h3><p>Ask who&rsquo;s winning - the &minus;2 inside the answer is red too. Same on the live chip and the tournament card.</p></div><button type="button" class="ph" data-open="ask-red" aria-label="See HardPan&rsquo;s replies read the same way full screen"><span class="s"><img src="/media/screens/ask-red-400.webp" srcset="/media/screens/ask-red-400.webp 400w, /media/screens/ask-red-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="1910" loading="lazy" decoding="async" alt="Ask HardPan in a round at Papago: Who’s winning? Alex leads at −6 net (thru 9). Sam −4 · Casey −3 · Jordan −3, with only the under-par numbers in red inside the sentence."></span></button></li></ul>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i></div>
+    </div>
+</section>
+<!-- /2.0.9 coming -->
 
 <!-- website-e features (generated) -->
 <section class="feat" id="features">
