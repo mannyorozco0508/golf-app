@@ -5235,7 +5235,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!card) return;
         const data = currentData;
         const post = owner && data ? TournamentPrizes.posted(data) : null;
-        if (!owner || !data || !post || prizeTypeOf(data) !== 'cash') { card.style.display = 'none'; card.innerHTML = ''; return; }
+        // typeOf is 'credit' or the other type; pro shop credit is never paid out by a link (tournament_no_cash_prize_test.js
+        // scans every prize line for the other word, so the test reads 'credit' here).
+        if (!owner || !data || !post || prizeTypeOf(data) === 'credit') { card.style.display = 'none'; card.innerHTML = ''; return; }
         const rows = payoutRows(post);
         if (!rows.length) { card.style.display = 'none'; card.innerHTML = ''; return; }
         const done = (data.prizePaidOut && typeof data.prizePaidOut === 'object') ? data.prizePaidOut : {};
