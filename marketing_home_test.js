@@ -153,8 +153,9 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         const run = a.find((x) => x.attrs.id === 'run-an-event');
         assert.ok(run, 'the Run an event button is gone');
         assert.match(run.text, /^Run an event/);
-        assert.equal(run.attrs.href, '/tournament');
-        assert.ok(exists('tournament.html'), '/tournament has no page behind it');
+        // DOMAIN SWITCH (2026-11-15): the doors go to /tournaments, the rewrite of tournament.html (tournament_domain_switch_test.js).
+        assert.equal(run.attrs.href, '/tournaments');
+        assert.ok(exists('tournament.html'), '/tournaments has no page behind it');
     });
 
     test('the footer links to support, privacy, terms and the refund policy, all real pages', () => {
@@ -350,10 +351,14 @@ describe('2. PRICES: one config, the same as the app and the terms', () => {
 // The one rule a _redirects line must never break: it cannot reach /, the app
 // pages, a game or tournament link, /api or the sign-in proxy.
 const APP_PATHS = /^\/($|index|admin|tournament|leaderboard|settlement|sidematches|skins|stats|game|trip|season|shared|instructions|start\b)/i;
+const TOURNAMENTS_RULES = [['/tournaments', '/tournament', '200'], ['/tournaments/', '/tournament', '200']];
 function redirectsProblems(text) {
     const rules = text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((l) => l.split(/\s+/));
     const bad = [];
     rules.forEach(([from, to, code]) => {
+        // DOMAIN SWITCH (2026-11-15): the one other sanctioned rewrite, /tournaments (and /tournaments/) -> tournament.html
+        // with a 200. Exactly these two; anything else aimed at an app path is still refused below.
+        if (TOURNAMENTS_RULES.some((x) => x[0] === from && x[1] === to && x[2] === code)) return;
         if (APP_PATHS.test(from)) bad.push(from + ' rewrites an app path');
         if (/^\/(__|api)(\/|$)/.test(from)) bad.push(from + ' is the sign-in proxy or the API');
         if (/[*?:]/.test(from)) bad.push(from + ' is a wildcard/placeholder/query rule');
@@ -377,9 +382,11 @@ describe('3. ROUTING: / and every app link are served as before', () => {
         };
     };
 
-    test('_redirects holds only the /home rewrite, and nothing that reaches the app', () => {
+    test('_redirects holds only the /home rewrite and the /tournaments rewrite, and nothing that reaches the app', () => {
+        // DOMAIN SWITCH (2026-11-15): /tournaments and /tournaments/ -> tournament.html, 200 (tournament_domain_switch_test.js).
         const { rules, bad } = redirectsProblems(read('_redirects'));
-        assert.deepEqual(rules.map((r) => r[0]), ['/home', '/home/']);
+        assert.deepEqual(rules.map((r) => r[0]), ['/home', '/home/', '/tournaments', '/tournaments/']);
+        assert.deepEqual(rules.slice(2), [['/tournaments', '/tournament', '200'], ['/tournaments/', '/tournament', '200']]);
         assert.deepEqual(bad, []);
         assert.ok(exists(PAGE), 'the rewrite target is missing');
     });
@@ -400,6 +407,9 @@ describe('3. ROUTING: / and every app link are served as before', () => {
         const inc = JSON.parse(read('_routes.json')).include;
         ['/home', '/home/*', '/hardpan-home', '/site-pricing.js', '/app-store-badge.svg'].forEach((p) =>
             assert.ok(!inc.includes(p), p + ' now runs a Function'));
+        // DOMAIN SWITCH (2026-11-15): the tournament pages DO pass through Functions now (the old-host 301 needs to see them);
+        // on hardpangolf.com they fall through next() to the static files (tournament_domain_switch_test.js).
+        ['/tournament', '/tournament-scorecard', '/tournament-tv', '/tournaments', '/tournaments/'].forEach((p) => assert.ok(inc.includes(p), p));
         assert.ok(inc.includes('/'));
         assert.ok(inc.includes('/__/auth/*'));
         assert.ok(inc.includes('/__/firebase/*'));
@@ -720,7 +730,7 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
     test('the new pages and media are static: no Function, no rewrite, not in the app shell or the native bundle', () => {
         const inc = JSON.parse(read('_routes.json')).include;
         ['/help', '/help/*', '/media/*', '/site-clips.js', '/site-features.js', '/google-play-badge.png'].forEach((p) => assert.ok(!inc.includes(p), p));
-        assert.deepEqual(redirectsProblems(read('_redirects')).rules.map((r) => r[0]), ['/home', '/home/']);
+        assert.deepEqual(redirectsProblems(read('_redirects')).rules.map((r) => r[0]), ['/home', '/home/', '/tournaments', '/tournaments/']);   // DOMAIN SWITCH 2026-11-15
         const shell = read('sw.js');
         assert.doesNotMatch(shell.slice(shell.indexOf('const SHELL_FILES = ['), shell.indexOf('];', shell.indexOf('const SHELL_FILES = ['))),
             /help|media\/|site-clips|site-features|google-play-badge/);

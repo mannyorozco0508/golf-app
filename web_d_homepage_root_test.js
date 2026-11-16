@@ -120,7 +120,11 @@ async function visit(pathAndQuery, hostHeader) {
         const res = await pagesHop(url, hostHeader);
         if (res.status >= 300 && res.status < 400) {
             hops.push(res.status);
-            url = new URL(res.headers.get('location'), url).toString();
+            const next = new URL(res.headers.get('location'), url);
+            // DOMAIN SWITCH (2026-11-15): a hop to another host is a new request with THAT host (the old-host 301 to
+            // hardpangolf.com); carrying the first Host header over would loop on the middleware.
+            if (hostHeader && next.host !== hostHeader) hostHeader = null;
+            url = next.toString();
             continue;
         }
         const body = await res.text();
@@ -246,13 +250,16 @@ describe('1. THE LINK INVENTORY: every app link opens what it always opened; onl
         assert.equal(app.headers.get('x-hardpan-page'), 'app');
     });
 
-    test('the Tournaments host: / and bare /index.html still go to /tournament; /app does too (never the Consumer app)', async () => {
+    test('the Tournaments host: / and bare /index.html land on tournament.html, now via a 301 to hardpangolf.com/tournaments; /app too (never the Consumer app)', async () => {
+        // DOMAIN SWITCH (2026-11-15): the old host is a 301 to hardpangolf.com (its root and /app to /tournaments, the rewrite of
+        // tournament.html); the page a visitor ends on is the same, the address is hardpangolf.com's.
         for (const u of ['/', '/?tourney=TEST', '/index.html', '/app', '/app?tourney=TEST']) {
             const r = await visit(u, 'tournaments.rattlegolf.com');
             assert.equal(r.page, 'tournament.html', u + ' on the Tournaments host rendered ' + r.page);
+            assert.equal(r.hops[0], 301, u + ' first hop is the 301 off the old host');
         }
         const q = await visit('/?tourney=TEST&k=abc', 'tournaments.rattlegolf.com');
-        assert.equal(q.final, '/tournament?tourney=TEST&k=abc', 'the query rides along');
+        assert.equal(q.final, '/tournaments?tourney=TEST&k=abc', 'the query rides along, the address stays /tournaments');
     });
 
     test('/__/auth/*, /__/firebase/* and /api/* are not the homepage or the app (the middleware proxies / the API answers)', () => {
@@ -292,11 +299,15 @@ describe('1b. THE CLASSIFIER and the routing files', () => {
     });
     test('_routes.json sends /, /app, /app/*, /index and /index.html to Functions, and nothing about /home', () => {
         ['/', '/app', '/app/*', '/index', '/index.html'].forEach((r) => assert.ok(ROUTES.include.includes(r), r));
-        ['/home', '/home/*', '/hardpan-home', '/admin', '/tournament', '/*'].forEach((r) => assert.ok(!ROUTES.include.includes(r), r));
+        // DOMAIN SWITCH (2026-11-15): /tournament, /tournament-scorecard, /tournament-tv, /tournaments(/) now run through the
+        // middleware (the old-host 301); /admin, /home and /* still do not.
+        ['/home', '/home/*', '/hardpan-home', '/admin', '/*'].forEach((r) => assert.ok(!ROUTES.include.includes(r), r));
+        ['/tournament', '/tournament-scorecard', '/tournament-tv', '/tournaments', '/tournaments/'].forEach((r) => assert.ok(ROUTES.include.includes(r), r));
         assert.ok(ROUTES.include.length <= 100, 'Pages caps include+exclude at 100');
     });
-    test('_redirects still holds only the two /home rewrites (no rule can reach /, /app or an app page)', () => {
-        assert.deepEqual(REDIRECT_RULES, [['/home', '/hardpan-home', '200'], ['/home/', '/hardpan-home', '200']]);
+    test('_redirects holds the two /home rewrites and the two /tournaments rewrites (no rule can reach /, /app or an app page)', () => {
+        // DOMAIN SWITCH (2026-11-15): /tournaments -> tournament.html, 200 (tournament_domain_switch_test.js pins what it serves).
+        assert.deepEqual(REDIRECT_RULES, [['/home', '/hardpan-home', '200'], ['/home/', '/hardpan-home', '200'], ['/tournaments', '/tournament', '200'], ['/tournaments/', '/tournament', '200']]);
     });
     test('the Function files exist where Pages routes them', () => {
         assert.ok(exists('functions/index.js'));
