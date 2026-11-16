@@ -9270,7 +9270,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // tournament-tv.html in the same commit as the publish;
     // tournament_checkin_switch_test.js pins the off state, tournament_checkin_test.js
     // runs with it flipped on.
-    const CHECKIN_LIVE = false;
+    // Flipped ON 2026-11-15 (Manny's go 09:19 "Go check-in"; merged only after the combined rules candidate is live, RULES-READY-20261115).
+    const CHECKIN_LIVE = true;
     function regArrivedAt(e) { const v = Number(e && e.arrivedAt); return v > 0 ? v : 0; }
     function checkinUrl() { return shareBaseUrl() + 'tournament.html?tourney=' + encodeURIComponent(currentCode || '') + '&checkin=1'; }
     function checkinTvUrl() { return shareBaseUrl() + 'tournament-tv.html?tourney=' + encodeURIComponent(currentCode || '') + '&checkin=1'; }

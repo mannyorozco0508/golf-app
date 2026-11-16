@@ -48,6 +48,9 @@ const { loadHtmlInlineScript, REPO_ROOT } = require('./helpers/load-script.js');
 // tournament_checkin_switch_test.js pins what a device sees while it is off.
 const SWITCH_OFF = 'const CHECKIN_LIVE = false;';
 function flipOn(code) {
+    // 2026-11-15: the page ships the switch ON (local-checkin-flip); the transform is then a no-op, and it still refuses a page
+    // with neither line (the switch must exist, on or off: tournament_checkin_switch_test.js S1 pins which).
+    if (code.includes('const CHECKIN_LIVE = true;')) return code;
     const on = code.replace(SWITCH_OFF, 'const CHECKIN_LIVE = true;');
     if (on === code) throw new Error('the page has no "' + SWITCH_OFF + '" line to flip');
     return on;
