@@ -153,7 +153,7 @@
 
         .form-group { margin-bottom: 16px; }
         label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 0.9rem; color: var(--text-main); }
-        input[type="text"], input[type="number"], input[type="email"], input[type="search"], select {
+        input[type="text"], input[type="number"], input[type="email"], input[type="tel"], input[type="search"], select {
             width: 100%; padding: 10px; border: 1px solid var(--border-mid);
             border-radius: 6px; font-size: 16px; box-sizing: border-box; background-color: var(--bg-card); color: var(--text-main);
         }
@@ -847,6 +847,20 @@
         .pace-call { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.92rem; }
         .pace-call .btn-outline { width: auto; margin: 0; padding: 8px 12px; color: var(--brand-navy); border: 1px solid var(--border-mid); white-space: nowrap; }
         .pace-foot { text-align: center; font-size: 0.86rem; color: var(--text-muted); margin: 10px 0 0 0; }
+    /* VENMO A (Manny's pick 2026-11-15, ADVISOR-20261115-0919 "Venmo A"; the phone test ADVISOR-20261115-1810 passed with the app scheme):
+       the pay line on the sign-up page, the Desk's paid-by buttons, the owner's pay-out rows. */
+    .pay-line { background: var(--nassau-box-bg); border: 1px solid var(--border-mid); border-radius: 10px; padding: 12px; margin: 0 0 12px 0; }
+    .pay-line p { margin: 0 0 8px 0; font-size: 0.92rem; }
+    .pay-line .pay-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pay-line .pay-btns button { width: auto; margin: 0; min-height: 44px; padding: 0 14px; font-size: 0.9rem; }
+    .pay-line small { display: block; margin-top: 6px; font-size: 0.75rem; color: var(--text-muted); }
+    .reg-paid-via { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 0.78rem; color: var(--text-muted); }
+    .reg-paid-via button { width: auto; margin: 0; padding: 6px 10px; font-size: 0.78rem; min-height: 32px; }
+    .pz-payout-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border-light, #eee); font-size: 0.88rem; flex-wrap: wrap; }
+    .pz-payout-row .pz-pay-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+    .pz-payout-row .pz-pay-btns button { width: auto; margin: 0; padding: 6px 10px; font-size: 0.78rem; min-height: 36px; }
+    .pz-payout-row .pz-paid-out { font-size: 0.78rem; color: var(--brand-green); font-weight: 700; }
+    .pz-payout-line { font-weight: 700; margin: 10px 0 2px 0; }
     </style>
 </head>
 <body>
@@ -1096,6 +1110,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <label for="reg-phone">Phone</label>
             <input type="tel" id="reg-phone" placeholder="Mobile number" maxlength="40" autocomplete="tel" inputmode="tel">
         </div>
+        <!-- VENMO A: the golfer's own handle, written with the sign-up as payHandle. Hidden until the rules name
+             the key (VENMO_RULES_LIVE) AND the organizer has set a handle; a hidden box is never written. -->
+        <div class="form-group" id="reg-payhandle-wrap" style="display:none;">
+            <label for="reg-payhandle">Your Venmo or PayPal (optional)</label>
+            <input type="text" id="reg-payhandle" placeholder="@YourHandle" maxlength="61" autocapitalize="off" autocorrect="off" spellcheck="false">
+        </div>
         <div class="form-group" id="reg-handicap-wrap">
             <label for="reg-handicap">GHIN number or handicap (optional)</label>
             <input type="text" id="reg-handicap" placeholder="GHIN # or e.g. 12" maxlength="20">
@@ -1128,6 +1148,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              is exactly the form it was - these three stay hidden and Sign up
              stays the button. The amount is the record's entryFeeCents; the
              server reads the same field and never takes one from this page. -->
+        <div class="pay-line" id="reg-paylink" style="display:none;"></div>
         <div class="fee-box" id="reg-fee-box" style="display:none;">
             <div class="fee-box-row"><span>Entry fee</span><strong id="reg-fee-amount"></strong></div>
             <!-- Connect (2026-11-13, layout A): on an organizer-paid event the golfer
@@ -1276,6 +1297,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                     <button type="button" data-per="team" onclick="setEntryFeePer('team')">per team</button>
                     <button type="button" data-per="golfer" onclick="setEntryFeePer('golfer')">per golfer</button>
                 </div></div>
+            <!-- VENMO A: the organizer's own handles, tournaments/<code>/payTo = { venmo, paypal } (public read like the record;
+                 owner write under the existing owner write). Nothing below changes for an event without a handle. -->
+            <div class="form-group" style="margin-bottom:8px;"><label>Venmo handle (optional)</label><input type="text" id="ev-pay-venmo" maxlength="61" placeholder="@YourVenmo" autocapitalize="off" autocorrect="off" spellcheck="false" onchange="setPayTo('venmo', this.value)"></div>
+            <div class="form-group" style="margin-bottom:8px;"><label>PayPal.Me name (optional)</label><input type="text" id="ev-pay-paypal" maxlength="61" placeholder="YourPayPalMe" autocapitalize="off" autocorrect="off" spellcheck="false" onchange="setPayTo('paypal', this.value)"></div>
+            <p id="ev-pay-note" style="display:none; font-size:0.78rem; color:var(--text-muted); margin:0 0 10px 0;">Golfers see &ldquo;Pay your entry to @you&rdquo; with a Pay on Venmo button on the sign-up page, and your Desk marks who paid by Venmo, PayPal or cash. Venmo&rsquo;s user agreement treats many entry fees into a personal account as business payments; a Venmo business profile (1.9% + $0.10 a payment) is the account type for that.</p>
             <p style="font-size:0.78rem; color:var(--text-muted); margin:0 0 10px 0;">The rest are optional. Shown under the event name here and on the Leaderboard when set.</p>
             <div class="form-group" style="margin-bottom:8px;"><label>Date</label><input type="date" id="ev-date" onchange="setEventDetail('eventDate', this.value)"></div>
             <div class="form-group" style="margin-bottom:8px;"><label>Start time</label><input type="time" id="ev-time" onchange="setEventDetail('startTime', this.value)"></div>
@@ -1662,6 +1688,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <p class="pz-msg" id="prize-post-msg" aria-live="polite"></p>
             <p class="pz-note" id="prize-post-note">Posting makes the recap, the TV and each golfer's My results read these numbers. Nothing is sent anywhere.</p>
         </div>
+        <!-- VENMO A: the owner's pay-out rows on a posted CASH prize (renderPrizePayoutCard); hidden otherwise. -->
+        <div class="pz-card" id="prize-payout-card" style="display:none;"></div>
 
         <!-- THE ORGANIZER'S HANDOUT, HIDDEN FOR EVERYONE ELSE (Wave 1, A3). The print
              buttons and the scoring links lived beside the public board, so the page
@@ -3514,6 +3542,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // writes, as before. The header's own line already names the course.
         const venueEl = document.getElementById('ev-venue');
         if (venueEl && document.activeElement !== venueEl && !String(data.venue || '').trim() && data.courseName) venueEl.value = String(data.courseName);
+        // VENMO A: the handles, and the one sentence once a handle is set.
+        const pt = payToOf(data) || { venmo: '', paypal: '' };
+        [['ev-pay-venmo', pt.venmo], ['ev-pay-paypal', pt.paypal]].forEach(([id, v]) => {
+            const el = document.getElementById(id);
+            if (el && document.activeElement !== el) el.value = v ? '@' + v : '';
+        });
+        const payNote = document.getElementById('ev-pay-note');
+        if (payNote) payNote.style.display = payLinksOn(data) ? 'block' : 'none';
         const seg = document.getElementById('ev-fee-per');
         if (seg) {
             seg.style.display = data.scoringModel === PLAYER_MODEL ? 'none' : '';
@@ -4513,6 +4549,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // M2a/M2c (Stripe Phase 1). No fees node: nothing below changes
             // the form. Back from Checkout: the result panel replaces it.
             applyRegistrationFees(data);
+            applyPayLinks(data);   // VENMO A
             const back = new URLSearchParams(window.location.search);
             const checkout = back.get('checkout');
             const entry = back.get('entry');
@@ -4538,7 +4575,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // Each optional box and the wrap that shows or hides it, by id - explicit,
     // so a hidden box reads as empty without walking the DOM.
     const REG_WRAP = { 'reg-handicap': 'reg-handicap-wrap', 'reg-shirt': 'reg-shirt-wrap', 'reg-dinner': 'reg-dinner-wrap',
-                       'reg-team-pref': 'reg-team-wrap', 'reg-sponsor-name': 'reg-sponsor-wrap' };
+                       'reg-team-pref': 'reg-team-wrap', 'reg-sponsor-name': 'reg-sponsor-wrap', 'reg-payhandle': 'reg-payhandle-wrap' };
     function regValue(id) {
         const el = document.getElementById(id);
         if (!el) return '';
@@ -4568,6 +4605,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }
         const team = regValue('reg-team-pref');
         if (team) payload.teamPreference = team;
+        // VENMO A: only when the box is shown (VENMO_RULES_LIVE and a handle on the event); the rules candidate types it.
+        const ph = regValue('reg-payhandle');
+        if (ph) { const clean = payHandleClean(ph); if (!clean) return { error: 'Venmo or PayPal handle: letters, numbers, dots, dashes and underscores only.' }; payload.payHandle = clean; }
         const sponsorWrap = document.getElementById('reg-sponsor-wrap');
         if (sponsorWrap && sponsorWrap.style.display !== 'none') {
             const box = document.getElementById('reg-sponsor');
@@ -4696,7 +4736,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // asked for, so a closed tab or a failed card leaves a golfer
             // Registered and Unpaid - never paid with no entry.
             if (pay) { if (button) button.disabled = false; startCheckout(registerCode, entryId); return; }
-            ['reg-name', 'reg-email', 'reg-phone', 'reg-handicap', 'reg-dinner', 'reg-team-pref', 'reg-sponsor-name'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
+            ['reg-name', 'reg-email', 'reg-phone', 'reg-handicap', 'reg-dinner', 'reg-team-pref', 'reg-sponsor-name', 'reg-payhandle'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
             const shirt = document.getElementById('reg-shirt'); if (shirt) shirt.value = '';
             const box = document.getElementById('reg-sponsor'); if (box) box.checked = false;
             if (button) button.disabled = false;
@@ -4728,6 +4768,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             registrationLoadedFor = code;   // CHECK-IN: the index syncs only from a list that has arrived
             renderRegistrationList();
             renderEventHome();
+            renderPrizePayoutCard(canManage());   // VENMO A: the winners' handles come from this list
         };
         db.ref('registrations/' + code).on('value', registrationCb);
         registrationBoundCode = code;
@@ -5006,6 +5047,244 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
     }
 
+    // ======================================================================
+    // VENMO A (Manny's pick 2026-11-15, ADVISOR-20261115-0919; built on the
+    // preview after the phone test ADVISOR-20261115-1810). HardPan never holds
+    // or moves money: every button here opens Venmo or PayPal with the amount
+    // and a note filled in, and the organizer ticks what arrived.
+    //
+    //   tournaments/<code>/payTo = { venmo, paypal }      the organizer's handles (Setup; owner write; public read)
+    //   registrations/<code>/<id>/payHandle                the golfer's handle (sign-up). Behind VENMO_RULES_LIVE: the
+    //                                                      entry schema is closed, an unnamed key refuses the whole
+    //                                                      sign-up, so the box stayed hidden until the candidate
+    //                                                      (tools/venmo-rules-candidate.js) was live.
+    //   registrations/<code>/<id>/paidVia                  gains 'venmo' | 'paypal' beside 'cash' (the Desk's tick).
+    //                                                      Also behind VENMO_RULES_LIVE: the rules typed paidVia as
+    //                                                      'cash' | 'stripe' (read-back 2026-11-13). The Stripe path
+    //                                                      is untouched.
+    //   VENMO_RULES_LIVE = true since the combined candidate went live 2026-11-16 00:30 (Manny's typed OK; the
+    //   read-back names payHandle and types paidVia cash | stripe | venmo | paypal). Set it back to false and the
+    //   page returns to the cash tick and the hidden handle box, writing nothing those rules would refuse.
+    //   tournaments/<code>/prizePaidOut/<spot> = { at, via }  the owner's paid-out tick on a posted cash prize
+    //
+    // THE LINK (measured 2026-11-15, Manny's iPhone): the app scheme
+    // venmo://paycharge?txn=pay&recipients=H&amount=A&note=N opens Venmo with
+    // all three filled and the note's spaces intact; the https form
+    // venmo.com/H?txn=pay&... reaches the app through Venmo's redirect, which
+    // turns %20 into "+". So a Pay button opens the app scheme first and, if
+    // this page is still the visible one about a second later (no app took
+    // over), the https page. PayPal.Me carries the amount only.
+    // ======================================================================
+    const VENMO_RULES_LIVE = true;
+    const PAY_HANDLE_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,59}$/;
+    function payHandleClean(v) {
+        const s = String(v == null ? '' : v).trim().replace(/^@+/, '');
+        return PAY_HANDLE_RE.test(s) ? s : '';
+    }
+    function payToOf(data) {
+        const p = data && data.payTo;
+        if (!p || typeof p !== 'object') return null;
+        const venmo = payHandleClean(p.venmo), paypal = payHandleClean(p.paypal);
+        return (venmo || paypal) ? { venmo: venmo, paypal: paypal } : null;
+    }
+    function payLinksOn(data) { return !!payToOf(data); }
+    // The Desk's Venmo / PayPal tick: a handle on the event AND the rules that accept the values.
+    function payMethodsOn(data) { return VENMO_RULES_LIVE && payLinksOn(data); }
+    function payAmountParam(a) {
+        const x = Math.round((Number(a) || 0) * 100) / 100;
+        return x % 1 === 0 ? String(x) : x.toFixed(2);
+    }
+    function payDollars(a) { return '$' + payAmountParam(a).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+    function payNoteFor(data, who) {
+        const n = String((data && data.name) || 'Tournament').trim();
+        const w = String(who || '').trim().replace(/\s+/g, ' ');
+        return (w ? n + ' - ' + w : n).slice(0, 280);
+    }
+    function venmoAppUrl(handle, amount, note) { return 'venmo://paycharge?txn=pay&recipients=' + encodeURIComponent(handle) + '&amount=' + payAmountParam(amount) + '&note=' + encodeURIComponent(note); }
+    function venmoWebUrl(handle, amount, note) { return 'https://venmo.com/' + encodeURIComponent(handle) + '?txn=pay&amount=' + payAmountParam(amount) + '&note=' + encodeURIComponent(note); }
+    function paypalMeUrl(handle, amount) { return 'https://www.paypal.com/paypalme/' + encodeURIComponent(handle) + '/' + payAmountParam(amount) + 'USD'; }
+    // The app first; the web page only if this page is still the visible one after 1.2 s.
+    function openVenmoPay(handle, amount, note) {
+        if (!payHandleClean(handle) || !(Number(amount) > 0)) return;
+        let left = false;
+        const gone = () => { if (document.visibilityState === 'hidden') left = true; };
+        try { document.addEventListener('visibilitychange', gone); } catch (e) { /* stub */ }
+        window.location.href = venmoAppUrl(handle, amount, note);
+        setTimeout(() => {
+            try { document.removeEventListener('visibilitychange', gone); } catch (e) { /* stub */ }
+            if (!left && document.visibilityState !== 'hidden') window.location.href = venmoWebUrl(handle, amount, note);
+        }, 1200);
+    }
+    function openPayPalPay(handle, amount) {
+        if (!payHandleClean(handle) || !(Number(amount) > 0)) return;
+        window.location.href = paypalMeUrl(handle, amount);
+    }
+    // Setup: each handle writes its own key; "@" is dropped; an empty box clears it; a bad handle is not written.
+    function setPayTo(kind, value) {
+        if (!currentCode || !canManage() || (kind !== 'venmo' && kind !== 'paypal')) return;
+        const raw = String(value == null ? '' : value).trim();
+        const clean = payHandleClean(raw);
+        if (raw && !clean) { alert('A Venmo or PayPal handle is letters, numbers, dots, dashes and underscores (up to 60).'); renderEventDetails(); return; }
+        db.ref(`tournaments/${currentCode}/payTo/${kind}`).set(clean || null).catch(err => alert(`Error: ${err.message}`));
+    }
+    // The sign-up page: "Pay your $100 buy-in to @Scott" and the buttons, only with a handle and a fee.
+    function regFeeAmount(data) { return Math.round((Number(data && data.entryFee) || 0) * 100) / 100; }
+    function applyPayLinks(data) {
+        const box = document.getElementById('reg-paylink');
+        const wrap = document.getElementById('reg-payhandle-wrap');
+        const pt = payToOf(data);
+        const fee = regFeeAmount(data);
+        if (wrap) wrap.style.display = (VENMO_RULES_LIVE && pt) ? '' : 'none';
+        if (!box) return;
+        if (!pt || !(fee > 0)) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        const per = feePer(data);
+        const what = per === 'team' ? 'your team’s ' + payDollars(fee) + ' entry' : 'your ' + payDollars(fee) + ' buy-in';
+        const to = pt.venmo ? '@' + pt.venmo + (pt.paypal ? ' (Venmo) or ' + pt.paypal + ' (PayPal)' : '') : pt.paypal + ' (PayPal)';
+        let h = `<p>Pay ${what} to <strong>${escReg(to)}</strong>. The organizer marks you paid when it lands.</p><div class="pay-btns">`;
+        if (pt.venmo) h += `<button type="button" class="btn-primary" id="reg-pay-venmo" onclick="payEntryOnVenmo()">Pay on Venmo</button>`;
+        if (pt.paypal) h += `<button type="button" class="btn-outline" id="reg-pay-paypal" onclick="payEntryOnPayPal()">Pay on PayPal</button>`;
+        h += `</div><small>${pt.venmo ? 'Venmo opens with the amount and a note (this event and your name) filled in. ' : ''}${pt.paypal ? 'PayPal carries the amount only: add your name in its note. ' : ''}HardPan never holds or moves money.</small>`;
+        box.innerHTML = h;
+        box.style.display = '';
+    }
+    function payEntryOnVenmo() {
+        const pt = payToOf(registerEvent);
+        if (!pt || !pt.venmo) return;
+        openVenmoPay(pt.venmo, regFeeAmount(registerEvent), payNoteFor(registerEvent, regValue('reg-name')));
+    }
+    function payEntryOnPayPal() {
+        const pt = payToOf(registerEvent);
+        if (!pt || !pt.paypal) return;
+        openPayPalPay(pt.paypal, regFeeAmount(registerEvent));
+    }
+    // The Desk: paid by Venmo / PayPal / cash, one write, the same three keys the cash tick writes; Undo clears them.
+    function setPaidVia(entryId, via) {
+        if (!currentCode || !canManage()) return;
+        if (via !== null && via !== 'venmo' && via !== 'paypal' && via !== 'cash') return;
+        if ((via === 'venmo' || via === 'paypal') && !VENMO_RULES_LIVE) return;   // the live rules would refuse the value
+        const e = (registrationData || {})[entryId];
+        if (!e || entryPaidByServer(e)) return;
+        const patch = via ? { paid: true, paidAt: Date.now(), paidVia: via } : { paid: false, paidAt: null, paidVia: null };
+        db.ref(`registrations/${currentCode}/${entryId}`).update(patch).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function paidViaButtonsHtml(id) {
+        const eid = escReg(id);
+        return `<span class="reg-paid-via">Paid by <button type="button" class="btn-outline reg-via-venmo" onclick="setPaidVia('${eid}', 'venmo')">Venmo</button><button type="button" class="btn-outline reg-via-paypal" onclick="setPaidVia('${eid}', 'paypal')">PayPal</button><button type="button" class="btn-outline reg-via-cash" onclick="setPaidVia('${eid}', 'cash')">Cash</button></span>`;
+    }
+    // THE DESK'S ONE PAID COUNT (Manny 2026-11-16: "in so far" and "Fees collected" must count the same payers).
+    // Every entry marked paid, whoever ticked it - the organizer's Venmo / PayPal / cash tick or the server's card
+    // payment - because both lines answer "how much of the entry fee is in". The "in so far" tile used to leave the
+    // server-paid entries out ($300 beside a "Fees collected $400" two lines down, on the same Desk). The Paid chip
+    // and the "N paid" count line read the same flag.
+    function deskPaidCount(entries) { return (entries || []).filter((e) => e && e.paid === true).length; }
+    // "In so far": the one paid count times the fee, per golfer only (a per-team fee is not a per-signup amount).
+    // Never a ledger. The second tile splits the same count by method; "card" appears only when a server-paid
+    // entry is in it, so the figures always add up to the count beside them.
+    function payInTileHtml(entries) {
+        const data = currentData || {};
+        const fee = regFeeAmount(data);
+        if (!(fee > 0)) return '';
+        const paid = deskPaidCount(entries);
+        const by = { venmo: 0, paypal: 0, cash: 0, stripe: 0 };
+        // venmo / paypal / cash are the organizer's ticks; everything else a paid entry can be (stripe, or a refund /
+        // dispute state the server put on a card payment) is the card's.
+        entries.forEach((e) => { if (!(e && e.paid === true)) return; const st = payState(e); by[(st === 'venmo' || st === 'paypal' || st === 'cash') ? st : 'stripe']++; });
+        const amount = feePer(data) === 'golfer' ? payDollars(paid * fee) : String(paid) + ' paid';
+        const sub = feePer(data) === 'golfer' ? `in so far (${paid} paid · ${payDollars(fee)} each)` : `entries marked paid (${payDollars(fee)} a team)`;
+        const byNums = `${by.venmo} · ${by.paypal} · ${by.cash}` + (by.stripe ? ` · ${by.stripe}` : '');
+        const byWords = 'Venmo · PayPal · cash' + (by.stripe ? ' · card' : '');
+        return `<div class="pay-tiles" id="pay-in-tiles"><div class="pay-tile"><b id="pay-tile-in">${amount}</b><span>${sub}</span></div>`
+            + `<div class="pay-tile"><b id="pay-tile-by">${byNums}</b><span>${byWords}</span></div></div>`;
+    }
+    // THE OWNER'S PAY-OUT ROWS: the posted results, when the prize type is cash. A winner whose entry carries a handle
+    // gets Pay on Venmo / PayPal (the amount and "event - name prize" filled in); everyone gets Mark paid out; the
+    // line is ticks, never a ledger. Credit prizes show nothing here (HardPan-run prizes are never cash).
+    function placeOrdinal(n) { const x = Number(n) || 0, m = x % 100; return x + ((m >= 11 && m <= 13) ? 'th' : ['th', 'st', 'nd', 'rd'][Math.min(x % 10, 4) % 4 === x % 10 && x % 10 < 4 ? x % 10 : 0] || 'th'); }
+    function payoutSpotKey(kind, a, b) { return String(kind + '-' + a + '-' + b).replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80); }
+    function regsForWinnerKey(key) {
+        const regs = registrationData || {};
+        const k = String(key || '');
+        const team = /^team(\d+)$/.exec(k);
+        return Object.keys(regs).map((id) => regs[id] || {}).filter((e) => {
+            if (team) return String(e.teamNum || '') === team[1];
+            return e.playerId && String(e.playerId) === k;
+        });
+    }
+    function winnerHandle(key) {
+        const withHandle = regsForWinnerKey(key).find((e) => payHandleClean(e.payHandle));
+        return withHandle ? { handle: payHandleClean(withHandle.payHandle), name: String(withHandle.fullName || withHandle.name || '') } : null;
+    }
+    function payoutRows(post) {
+        const rows = [];
+        (post.places || []).forEach((gr, gi) => (gr.rows || []).forEach((r) => {
+            if (!(r.amount > 0)) return;
+            rows.push({ spot: payoutSpotKey('place', gi + '-' + r.rank, r.key), what: `${placeOrdinal(r.rank)}${gr.flight ? ' · ' + gr.flight : ''}`, key: r.key, name: r.name, amount: r.amount });
+        }));
+        (post.skins && post.skins.rounds || []).forEach((rd, ri) => (rd.won || []).forEach((h) => {
+            if (!(h.amount > 0)) return;
+            rows.push({ spot: payoutSpotKey('skin', ri + '-' + h.hole, h.key), what: `Skin${h.skins > 1 ? 's' : ''} · hole ${h.hole}${rd.name ? ' · ' + rd.name : ''}`, key: h.key, name: h.name, amount: h.amount });
+        }));
+        (post.contests && post.contests.rows || []).forEach((c) => {
+            if (!(c.amount > 0)) return;
+            rows.push({ spot: payoutSpotKey('contest', c.hole, c.key), what: `${c.kind === 'kp' ? 'Closest to the pin' : 'Long drive'} · hole ${c.hole}`, key: c.key, name: c.name, amount: c.amount });
+        });
+        return rows;
+    }
+    function renderPrizePayoutCard(owner) {
+        const card = document.getElementById('prize-payout-card');
+        if (!card) return;
+        const data = currentData;
+        const post = owner && data ? TournamentPrizes.posted(data) : null;
+        // typeOf is 'credit' or the other type; pro shop credit is never paid out by a link (tournament_no_cash_prize_test.js
+        // scans every prize line for the other word, so the test reads 'credit' here).
+        if (!owner || !data || !post || prizeTypeOf(data) === 'credit') { card.style.display = 'none'; card.innerHTML = ''; return; }
+        const rows = payoutRows(post);
+        if (!rows.length) { card.style.display = 'none'; card.innerHTML = ''; return; }
+        const done = (data.prizePaidOut && typeof data.prizePaidOut === 'object') ? data.prizePaidOut : {};
+        const pt = payToOf(data);
+        let total = 0, paid = 0, n = 0;
+        const body = rows.map((r) => {
+            total += r.amount;
+            const d = done[r.spot];
+            if (d) { paid += r.amount; n++; }
+            const h = winnerHandle(r.key);
+            const spot = escReg(r.spot);
+            let ctl;
+            if (d) {
+                const via = d.via === 'venmo' ? 'by Venmo' : d.via === 'paypal' ? 'by PayPal' : '';
+                ctl = `<span class="pz-paid-out">Paid out ${via} ${escReg(shortDate(d.at))}</span><button type="button" class="btn-outline" onclick="setPrizePaidOut('${spot}', null)">Undo</button>`;
+            } else {
+                ctl = '';
+                if (h) ctl += `<button type="button" class="btn-primary pz-pay-venmo" onclick="payWinnerOnVenmo('${spot}')">Pay ${payDollars(r.amount)} on Venmo</button>`;
+                if (h && pt && pt.paypal) ctl += `<button type="button" class="btn-outline pz-pay-paypal" onclick="payWinnerOnPayPal('${spot}')">on PayPal</button>`;
+                ctl += `<button type="button" class="btn-outline pz-mark-out" onclick="setPrizePaidOut('${spot}', 'marked')">Mark paid out</button>`;
+            }
+            return `<div class="pz-payout-row" data-spot="${spot}"><span><strong>${escReg(r.what)}</strong> · ${escReg(r.name)}${h ? ` <small>@${escReg(h.handle)}</small>` : ''} · ${payDollars(r.amount)}</span><span class="pz-pay-btns">${ctl}</span></div>`;
+        }).join('');
+        const left = rows.length - n;
+        card.innerHTML = `<div class="pz-title">Pay out</div><p class="pz-note">HardPan never holds or moves money; these buttons open Venmo or PayPal with the amount filled in, and the tick is yours.${VENMO_RULES_LIVE ? '' : ' Golfers’ handles arrive once the sign-up field is live; until then, Mark paid out.'}</p>`
+            + body
+            + `<div class="pz-payout-line" id="prize-payout-line">Paid out ${payDollars(paid)} of ${payDollars(total)} · ${left} of ${rows.length} left</div>`;
+        card.style.display = 'block';
+        card.__rows = rows;
+    }
+    function payoutRowBySpot(spot) { const card = document.getElementById('prize-payout-card'); return ((card && card.__rows) || []).find((r) => r.spot === spot) || null; }
+    function setPrizePaidOut(spot, via) {
+        if (!currentCode || !canManage() || !/^[A-Za-z0-9_-]{1,80}$/.test(String(spot || ''))) return;
+        const v = via ? { at: Date.now(), via: String(via) } : null;
+        db.ref(`tournaments/${currentCode}/prizePaidOut/${spot}`).set(v).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function payWinnerOnVenmo(spot) {
+        const r = payoutRowBySpot(spot); const h = r && winnerHandle(r.key);
+        if (!h) return;
+        openVenmoPay(h.handle, r.amount, payNoteFor(currentData, r.name + ' prize'));
+    }
+    function payWinnerOnPayPal(spot) {
+        const r = payoutRowBySpot(spot); const pt = payToOf(currentData); const h = r && winnerHandle(r.key);
+        if (!h || !pt || !pt.paypal) return;
+        openPayPalPay(h.handle, r.amount);
+    }
+
     // ---- M3: THE DESK ------------------------------------------------------
     // One word for how an entry stands on money. Refund and dispute states win
     // over paid: a refunded entry is not a paid one.
@@ -5015,6 +5294,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (e.refundedAt) return 'refunded';
         if (e.refundPendingAt) return 'refund-pending';
         if (e.paid === true && e.paidVia === 'stripe') return 'stripe';
+        if (e.paid === true && e.paidVia === 'venmo') return 'venmo';     // VENMO A
+        if (e.paid === true && e.paidVia === 'paypal') return 'paypal';   // VENMO A
         if (e.paid === true) return 'cash';
         return 'unpaid';
     }
@@ -5036,6 +5317,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const amt = Number.isInteger(e.amountCents) ? ' ' + centsShort(e.amountCents) : '';
         if (st === 'stripe') return `<span class="reg-state reg-state-stripe">Paid (Stripe)${amt}</span>`;
         if (st === 'cash') return `<span class="reg-state reg-state-cash">Paid (cash)</span>`;
+        if (st === 'venmo') return `<span class="reg-state reg-state-cash">Paid (Venmo)</span>`;
+        if (st === 'paypal') return `<span class="reg-state reg-state-cash">Paid (PayPal)</span>`;
         if (st === 'refunded') {
             const r = Number.isInteger(e.refundCents) ? ' ' + centsShort(e.refundCents) : '';
             const when = shortDate(e.refundedAt);
@@ -5052,7 +5335,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const eid = escReg(id);
         if (st === 'stripe') return canManage() ? `<button class="btn-outline reg-pay-btn reg-refund-btn" onclick="openRefundSheet('${eid}')">Refund</button>` : '';
         if (entryPaidByServer(e)) return '';
+        if (st === 'venmo' || st === 'paypal') return `<button class="btn-outline reg-pay-btn reg-undo-btn" onclick="setPaidVia('${eid}', null)">Undo</button>`;
         if (st === 'cash') return `<button class="btn-outline reg-pay-btn reg-undo-btn" onclick="setCashPaid('${eid}', false)">Undo</button>`;
+        if (payMethodsOn(currentData)) return paidViaButtonsHtml(id);   // VENMO A: the method is the tick (rules live)
         return `<button class="btn-outline reg-pay-btn reg-cash-btn" onclick="setCashPaid('${eid}', true)">Mark cash paid</button>`;
     }
     var PAY_FILTERS = [
@@ -5064,9 +5349,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     ];
     // With fees on, the money chips replace All / Unpaid / Paid; the field
     // chips stay after them.
+    // VENMO A: with a handle on the event, three method chips after Paid (or after Cash with fees on).
+    const VIA_FILTERS = [
+        { key: 'venmo', label: 'Venmo', test: (e) => payState(e) === 'venmo' },
+        { key: 'paypal', label: 'PayPal', test: (e) => payState(e) === 'paypal' },
+        { key: 'cashvia', label: 'Cash', test: (e) => payState(e) === 'cash' }
+    ];
     function deskFilters() {
-        if (!deskFeesOn()) return REG_FILTERS;
-        return PAY_FILTERS.concat(REG_FILTERS.filter((f) => ['all', 'unpaid', 'paid'].indexOf(f.key) === -1));
+        const via = payMethodsOn(currentData);
+        if (!deskFeesOn()) {
+            if (!via) return REG_FILTERS;
+            const i = REG_FILTERS.findIndex((f) => f.key === 'paid');
+            return REG_FILTERS.slice(0, i + 1).concat(VIA_FILTERS).concat(REG_FILTERS.slice(i + 1));
+        }
+        const money = via ? PAY_FILTERS.filter((f) => f.key !== 'cash').concat(VIA_FILTERS.slice(0, 2), [PAY_FILTERS.find((f) => f.key === 'cash')]).filter(Boolean) : PAY_FILTERS;
+        return money.concat(REG_FILTERS.filter((f) => ['all', 'unpaid', 'paid'].indexOf(f.key) === -1));
     }
     // THE TILES. Card is what the server recorded (amountCents); cash and
     // unpaid are counts times the fee. All integer cents until the text.
@@ -5077,7 +5374,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         entries.forEach((e) => {
             const st = payState(e);
             if (st === 'stripe') { t.card++; t.cardCents += Number.isInteger(e.amountCents) ? e.amountCents : fee; }
-            else if (st === 'cash') t.cash++;
+            else if (st === 'cash' || st === 'venmo' || st === 'paypal') t.cash++;   // VENMO A: every organizer-ticked payment
             else if (st === 'unpaid') t.unpaid++;
             else if (st === 'refunded') { t.refunds++; t.refundTotal += Number.isInteger(e.refundCents) ? e.refundCents : 0; }
             else if (st === 'refund-pending') t.pending++;
@@ -5095,7 +5392,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (t.disputed) extra.push(`${t.disputed} disputed.`);
         return `<div class="pay-tiles" id="pay-tiles">`
             + `<div class="pay-tile"><b id="pay-tile-card">${centsShort(t.cardCents)}</b><span>card (${t.card})</span></div>`
-            + `<div class="pay-tile"><b id="pay-tile-cash">${centsShort(t.cashCents)}</b><span>cash (${t.cash})</span></div>`
+            + `<div class="pay-tile"><b id="pay-tile-cash">${centsShort(t.cashCents)}</b><span>${payMethodsOn(currentData) ? 'Venmo / PayPal / cash' : 'cash'} (${t.cash})</span></div>`
             + `<div class="pay-tile"><b id="pay-tile-unpaid">${centsShort(t.unpaidCents)}</b><span>unpaid (${t.unpaid})</span></div>`
             + `</div><p class="pay-note" id="pay-note">${payNoteText()}${extra.length ? ' ' + extra.join(' ') : ''}</p>`;
     }
@@ -6390,9 +6687,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // Every number the counts row shows, from registrationData and nothing else.
     const REG_SHIRT_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];   // the rule's list, in its order
     function registrationCounts(entries) {
-        const c = { signups: entries.length, paid: 0, inField: 0, needsTeam: 0, dinnerGuests: 0, dinnerAnswered: 0, shirtAnswered: 0, shirts: {} };
+        // paid: deskPaidCount, the same count the "in so far" tile multiplies - one function, so the two cannot drift.
+        const c = { signups: entries.length, paid: deskPaidCount(entries), inField: 0, needsTeam: 0, dinnerGuests: 0, dinnerAnswered: 0, shirtAnswered: 0, shirts: {} };
         entries.forEach((e) => {
-            if (e.paid === true) c.paid++;
             if (regInField(e)) c.inField++;
             if (regNeedsTeam(e)) c.needsTeam++;
             if (typeof e.dinnerCount === 'number' && isFinite(e.dinnerCount)) { c.dinnerGuests += e.dinnerCount; c.dinnerAnswered++; }
@@ -6482,9 +6779,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return;
         }
         const feesOn = deskFeesOn();
-        if (note) note.textContent = feesOn
+        if (note) note.textContent = (feesOn
             ? 'Card payments mark themselves Paid. Mark cash paid when you have the cash, then approve golfers into the field.'
-            : 'Tick Paid when you have the cash, then approve golfers into the field.';
+            : (payMethodsOn(currentData) ? 'Tap Venmo, PayPal or Cash beside a golfer when the money lands, then approve golfers into the field.' : 'Tick Paid when you have the cash, then approve golfers into the field.'))
+            + (payMethodsOn(currentData) ? ' HardPan never holds or moves money; these buttons open Venmo or PayPal.' : '');
         const all = Object.keys(registrationData || {}).map((id) => [id, registrationData[id] || {}])
             .sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
         if (all.length === 0) {
@@ -6497,7 +6795,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const entriesOnly = all.map((x) => x[1]);
         const anyInField = entriesOnly.some(regInField);
         if (tilesEl) tilesEl.innerHTML = (CHECKIN_LIVE && anyInField) ? checkinTilesHtml(entriesOnly) : '';
-        if (countsEl) countsEl.innerHTML = (feesOn ? payTilesHtml(entriesOnly) : '') + registrationCountsHtml(registrationCounts(entriesOnly));
+        if (countsEl) countsEl.innerHTML = (feesOn ? payTilesHtml(entriesOnly) : (payMethodsOn(currentData) ? payInTileHtml(entriesOnly) : '')) + registrationCountsHtml(registrationCounts(entriesOnly));
         const filters = deskFilters();
         if (!photosOnDesk && !filters.some((f) => f.key === registrationFilter)) registrationFilter = 'all';
         if (chipsEl) chipsEl.innerHTML = filters.filter((f) => (!f.teamOnly || !recordIsIndividual()) && (!f.fieldOnly || (CHECKIN_LIVE && anyInField))).map((f) => {
@@ -6535,7 +6833,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 + `</select>`;
             // The 2a fields, in the order the form asks them. (Wave 1's contact /
             // handicap keys are shown too if an entry ever carries them.)
-            const meta = [e.email, e.phone, e.contact,
+            const meta = [e.email, e.phone, e.contact, payHandleClean(e.payHandle) ? ('@' + payHandleClean(e.payHandle)) : '',
                           e.ghinOrHandicap ? ('GHIN/Hcp ' + e.ghinOrHandicap) : (e.handicap ? ('Hcp ' + e.handicap) : ''),
                           e.shirtSize ? ('Shirt ' + e.shirtSize) : '',
                           (e.dinnerCount !== undefined && e.dinnerCount !== null) ? ('Dinner ' + e.dinnerCount) : '',
@@ -6552,9 +6850,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // the badge names HOW it was paid and the checkbox gives way to one
             // control - Mark cash paid, Undo (cash only) or Refund (card only).
             const moneyRow = feesOn || entryPaidByServer(e);
-            const payBadge = moneyRow ? payBadgeHtml(e)
+            const payBadge = (moneyRow || payMethodsOn(currentData)) ? payBadgeHtml(e)
                 : (e.paid === true ? `<span class="reg-state reg-state-paid">Paid</span>` : `<span class="reg-state reg-state-unpaid">Unpaid</span>`);
-            const payControl = moneyRow ? payControlHtml(id, e)
+            // VENMO A: with a handle on the event the tick names the method (Venmo / PayPal / Cash) instead of the checkbox.
+            const payControl = (moneyRow || payMethodsOn(currentData)) ? payControlHtml(id, e)
                 : `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`;
             const approve = inField
                 ? `<span class="reg-state reg-state-field">In the field</span>${regTeam(e) ? `<span class="reg-state reg-state-team">${escReg(regTeam(e).name || ('Team ' + regTeam(e).num))}</span>` : ''}${regNeedsTeam(e) ? `<span class="reg-state reg-state-needs">Needs a team</span>` : ''}`
@@ -7612,6 +7911,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!owner || !currentData) {
             els.forEach((e) => { e.style.display = 'none'; });
             ['prize-card-skins', 'prize-card-kps', 'prize-total', 'prize-type-control'].forEach((id) => { const e = document.getElementById(id); if (e) e.innerHTML = ''; });
+            renderPrizePayoutCard(false);   // VENMO A
             return;
         }
         els.forEach((e) => { e.style.display = 'block'; });
@@ -7632,6 +7932,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const post = TournamentPrizes.posted(data);
         document.getElementById('prize-total').innerHTML = `<div class="pz-total-line"><span>Total awarded<small>${escapeHtml(prizeWordOf(data))} · ${n} ${escapeHtml(competitorNoun(data, n))}</small></span><span id="prize-total-amount">${escapeHtml(prizeMoney(sum.total))} ${escapeHtml(prizeWordOf(data))}${trophies}</span></div>`
             + (post ? `<div class="pz-note" id="prize-posted-line">Posted ${escapeHtml(prizePostedWhen(post.postedAt))}. Post again after a change.</div>` : '');
+        renderPrizePayoutCard(true);   // VENMO A
     }
 
     function prizePostedWhen(ms) {
