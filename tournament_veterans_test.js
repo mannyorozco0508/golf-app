@@ -174,6 +174,15 @@ describe('VETERANS A', () => {
         assert.match(first, /Please rise for the presentation of the colors and the National Anthem\./);
         assert.match(first, /Supporting \[Veterans Charity\] \(DEMO\)/);
         assert.match(first, /after 10 minutes/);
+        // the flag (ADVISOR-20261115-1738): 50 stars in 9 rows of 6 and 5, 13 stripes (7 red), the canton 7 stripes tall and 0.4 of the fly wide
+        const flag = (/<div class="flag"[^>]*>([\s\S]*?)<\/div>/.exec(first) || [])[1] || '';
+        assert.equal((flag.match(/<polygon class="st"/g) || []).length, 50, 'stars');
+        assert.equal((flag.match(/<rect class="sp r"/g) || []).length, 7, 'red stripes');
+        assert.equal((flag.match(/<rect class="sp w"/g) || []).length, 6, 'white stripes');
+        const cn = /<rect class="cn" x="0" y="0" width="760" height="538\.46"\/>/.test(flag);
+        assert.ok(cn, 'the canton is 0.4 x 1900 wide and 7 of 13 stripes tall');
+        const rows = {}; [...flag.matchAll(/<polygon class="st" points="([\d.]+),([\d.]+) /g)].forEach((m) => { const y = Math.round(Number(m[2]) - 30.8); rows[y] = (rows[y] || 0) + 1; });
+        assert.deepEqual(Object.keys(rows).sort((a, b) => a - b).map((k) => rows[k]), [6, 5, 6, 5, 6, 5, 6, 5, 6], 'star rows: ' + JSON.stringify(rows));
         assert.equal(el(sb, 'tv-page-label').textContent.indexOf('Opening ceremony'), 0);
         // a tap on the screen: the document's own click listener
         const ev = sb.document.createEvent ? sb.document.createEvent('Event') : { type: 'click' };
