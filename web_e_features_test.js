@@ -337,7 +337,7 @@ describe('2. words', () => {
         const cs = [...coming209.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
         assert.deepEqual(cs.map((m) => [m[1], m[2]]), [['f-red-under', 'red-under'], ['f-ask-red', 'ask-red']]);
         assert.match(cs[0][3], /<span class="eb">UNDER PAR IN RED<\/span><h3>Red means under\.<\/h3><p>Every under-par number on the Receipt, the boards and the leaderboard shows in red\. Even and over par stay plain\. Birdies are still circles, bogeys squares\.<\/p>/);
-        assert.match(cs[1][3], /<span class="eb">ASK HARDPAN<\/span><h3>HardPan&rsquo;s replies read the same way\.<\/h3><p>Ask who&rsquo;s winning - the &minus;2 inside the answer is red too\. Same on the live chip and the tournament card\.<\/p>/);
+        assert.match(cs[1][3], /<span class="eb">ASK HARDPAN<\/span><h3>HardPan&rsquo;s replies read the same way\.<\/h3><p>Ask who&rsquo;s winning - the under-par number inside the answer is red too\. Same on the live chip and the tournament card\.<\/p>/);
         // none of the 2.0.9 cards is inside #features (they move there on release day)
         assert.ok(!cards.some((c) => c.key === 'red-under' || c.key === 'ask-red'));
         // the pictures: real captures of the 2.0.9 build, 940 x 1910 and 400 x 813 WebP, listed in manifest.coming
@@ -386,7 +386,7 @@ describe('2. words', () => {
         assert.doesNotMatch(coming209, /apps\.apple\.com|play\.google\.com/);
         // the copy names what 2.0.9 changes (positive control for the guard below)
         [/Red means under\./, /under-par number on the Receipt, the boards and the leaderboard shows in red/, /Even and over par stay plain\./, /Birdies are still circles, bogeys squares\./,
-            /HardPan’s replies read the same way\./, /the −2 inside the answer is red too/, /live chip and the tournament card/]
+            /HardPan’s replies read the same way\./, /the under-par number inside the answer is red too/, /live chip and the tournament card/]
             .forEach((re) => assert.match(t.replace(/&minus;/g, '−'), re, String(re)));
         // never green for under par, and no money in the row
         assert.doesNotMatch(t, /\bgreen\b/i);
