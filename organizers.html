@@ -38,7 +38,8 @@
     .card { background:#fff; border:1px solid var(--line); border-radius:20px; overflow:hidden; display:flex; flex-direction:column; }
     .card .pic { background:#0b0f0d; height:280px; overflow:hidden; }
     .card .pic img { width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
-    .card .pic.tv img { object-position:center; }
+    /* the TV capture is of the demo event: the card shows the board's middle and the QR footer, not the title row (no event name on this page) */
+    .card .pic.tv img { height:160%; object-position:50% 100%; }
     .card .tx { padding:14px 16px 16px; }
     .card h2 { font-size:20px; line-height:1.2; margin-bottom:4px; }
     .card p { color:var(--mut); font-size:15px; }
@@ -79,7 +80,7 @@
 <section class="wrap" aria-label="What HardPan does for an event">
     <div class="grid">
         <div class="card"><div class="pic"><img src="/media/screens/registration-desk-400.webp" loading="lazy" decoding="async" alt="The Desk: four sign-ups with Unpaid and Paid ticks, Approve into field, Needs a team, the counts on top."></div><div class="tx"><h2>Sign-up desk</h2><p>Golfers sign up from a link or a QR; you approve them into the field, tick who has paid, build the teams.</p></div></div>
-        <div class="card"><div class="pic"><img src="/media/home/live-board-phone-400.webp" loading="lazy" decoding="async" alt="The live board on a phone: Leaderboard, Skins and Pairings tabs, the teams by position, Share live leaderboard."></div><div class="tx"><h2>A live board on every phone</h2><p>Every group posts from its own card; the board updates for everyone with the link, no account needed.</p></div></div>
+        <div class="card"><div class="pic"><img src="/media/screens/event-board-400.webp" loading="lazy" decoding="async" alt="The event leaderboard in the app: Net and Gross, All, Groups and Flights switches, Leading the field: Andy, and the field by position with score, to par (under par in red) and thru."></div><div class="tx"><h2>A live board on every phone</h2><p>Every group posts from its own card; the board updates for everyone with the link, no account needed.</p></div></div>
         <div class="card"><div class="pic tv"><img src="/media/home/live-tv-700.webp" loading="lazy" decoding="async" alt="The event board on a clubhouse TV, LIVE, with the follow QR in the corner."></div><div class="tx"><h2>The board on the clubhouse TV</h2><p>Open one link on the TV: the leaderboard rotates by flight with a QR golfers scan to follow on their phones.</p></div></div>
         <div class="card"><div class="pic"><img src="/media/screens/prizes-400.webp" loading="lazy" decoding="async" alt="Prize results by flight: 1st, −3 thru 4, leading by 2, the teams around you."></div><div class="tx"><h2>Prizes by flight</h2><p>Flights, gross or net, skins and KPs: the results post to the board when you say so.</p></div></div>
         <div class="card"><div class="pic"><img src="/media/screens/team-qr-links-400.webp" loading="lazy" decoding="async" alt="A team's scorecard link with its QR, Copy Link and Send all scorecard links."></div><div class="tx"><h2>A link per team</h2><p>Each team gets its own card link and QR; one tap sends them all.</p></div></div>
