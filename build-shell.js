@@ -303,7 +303,8 @@ const PRODUCTS = {
         // Moved to v80 (Check-in at the table ON, Manny typed OK 2026-11-16 00): see sw.js v416.
         // Moved to v81 (Venmo A): see sw.js v417.
         // Moved to v82 (Veterans A): see sw.js v418.
-        cacheName: 'tournament-v82-veterans',
+        // Moved to v83 (price B + D, Manny OK 2026-11-16 14): see sw.js v419.
+        cacheName: 'tournament-v83-price',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
