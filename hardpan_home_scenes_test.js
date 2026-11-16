@@ -26,7 +26,7 @@
 // WHAT IT CANNOT PROVE: Safari, a real Cloudflare edge, pinch zoom.
 // BASELINE against pre-build main 55077321 (hardpan-home.html without the fold), measured with
 // this exact file copied there: the file cannot load (the fold section is not on the page, so the module-level
-// slice assertion throws: 1 fail, 0 of the 18 tests run); here: 19 pass / 0 fail (11 source + 8 Chrome).
+// slice assertion throws: 1 fail, 0 of the 18 tests run); here: 20 pass / 0 fail (11 source + 9 Chrome).
 // NEGATIVE CONTROLS (run by hand 2026-11-15, each restored by cp from a scratchpad copy, sha printed RESTORED-OK):
 //   - site-features.js with the data-open-key handler emptied: 13 pass / 5 fail (2.2 to 2.6: no picture and no
 //     tile opens the viewer, and the taps after them land on a page in the wrong state).
@@ -247,6 +247,17 @@ class Tab {
         assert.equal(hit, 'self', sel + ' is covered by ' + hit + ' at ' + last.join(','));
         await this.tap(last[0], last[1]);
     }
+    // a real finger: touch emulation on, touchStart/touchEnd at the point (no mouse events at all)
+    async touchOn() { await this.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 }); }
+    async fingerTap(sel) {
+        await this.eval(`(() => { document.querySelector(${JSON.stringify(sel)}).scrollIntoView({ block: 'center', behavior: 'instant' }); return true; })()`);
+        await sleep(350);
+        const p = await this.eval(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+        await this.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y }] });
+        await sleep(50);
+        await this.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await sleep(350);
+    }
     async key(key) {
         await this.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: { Escape: 27 }[key] || 0 });
         await this.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key });
@@ -370,6 +381,25 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         const s = await tab.eval(STATE);
         assert.equal(s.hash, '#how');
         assert.equal(await tab.eval(`document.getElementById('hero-start-tournament').getAttribute('href')`), '/tournament');
+        assert.deepEqual(tab.errors, []);
+    });
+    test('2.8 390x844 with a FINGER (touch events, no mouse): every tile with a picture opens the viewer on the right item (a still, or the clip with its poster for the six clip features), top to bottom; a touch on the X closes it (ADVISOR-20261115-2015)', async () => {
+        await tab.metrics(390, 844);
+        await tab.touchOn();
+        await tab.go(base + '/');
+        const keys = await tab.eval(`[...document.querySelectorAll('.glance-tiles .gt[data-open-key]')].map((b) => b.getAttribute('data-open-key'))`);
+        assert.equal(keys.length, 37);
+        const bad = [];
+        for (const k of keys) {
+            await tab.fingerTap('.glance-tiles .gt[data-open-key="' + k + '"]');
+            const s = await tab.eval(STATE);
+            const cur = await tab.eval(`(() => { const t = document.getElementById('fv-track'); const i = Math.round(t.scrollLeft / Math.max(1, t.clientWidth)); const li = t.querySelector('.fv-s[data-i="' + i + '"]'); const im = li && (li.querySelector('img') || li.querySelector('video')); return { i, img: im ? (im.getAttribute('src') || im.getAttribute('poster')) : null, w: im ? Math.round(im.getBoundingClientRect().width) : 0 }; })()`);
+            if (!s.fv || !s.title || !cur.img || cur.w < 200) bad.push(k + ':' + JSON.stringify({ fv: s.fv, title: s.title, cur }));
+            await tab.fingerTap('#fv-x');
+            const c = await tab.eval(STATE);
+            if (c.fv) bad.push(k + ': X did not close');
+        }
+        assert.deepEqual(bad, [], 'tiles that did not open on a finger tap: ' + bad.join(' | '));
         assert.deepEqual(tab.errors, []);
     });
     test('2.7 1280x800: no sideways scroll, the lockup 110 px over the fan (centre phone highest), the links row, the scenes 2 across, the tiles 6 across; the map\'s tile layer still at 0', async () => {

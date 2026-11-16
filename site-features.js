@@ -145,7 +145,7 @@
     function open(i, from) {
         build();
         opener = from || null;
-        fv.hidden = false;
+        fv.hidden = false; fv.removeAttribute('hidden'); fv.style.display = 'flex';
         document.documentElement.classList.add('fv-open');
         show(i, false);
         try { history.pushState({ hpViewer: true }, ''); ourState = true; } catch (e) { ourState = false; }
@@ -155,7 +155,7 @@
         if (fv.hidden) return;
         each(track.querySelectorAll('video'), function (v) { v.pause(); });
         each(track.querySelectorAll('.fv-img.zoom'), function (b) { b.classList.remove('zoom'); });
-        fv.hidden = true;
+        fv.hidden = true; fv.style.display = '';
         document.documentElement.classList.remove('fv-open');
         if (!fromPop && ourState) { ignorePop = true; try { history.back(); } catch (e) { ignorePop = false; } }
         ourState = false;
@@ -177,10 +177,22 @@
         if (i >= 0) open(i, from);
         return i >= 0;
     }
-    document.addEventListener('click', function (ev) {
-        var b = ev.target.closest && ev.target.closest('[data-open-key]');
-        if (b) { ev.preventDefault(); openKey(b.getAttribute('data-open-key'), b); }
-    });
+    // ADVISOR-20261115-2015 (Manny, iPhone Chrome: the lower tiles "don't lead to anything"; not reproduced in Chrome's touch
+    // emulation, and WebKit cannot be driven on the Mac): the tile opens on the finger's touchend as well as on click, the second
+    // of the pair within 700 ms being ignored, and the viewer is shown by removing hidden AND setting display, so neither a
+    // swallowed click nor a stale [hidden] style leaves a dead tile. Mouse and keyboard still arrive as click.
+    var lastKeyTap = 0;
+    function tileHit(ev) {
+        var b = ev.target && ev.target.closest && ev.target.closest('[data-open-key]');
+        if (!b) return;
+        var now = Date.now();
+        if (now - lastKeyTap < 700) { ev.preventDefault(); return; }
+        lastKeyTap = now;
+        ev.preventDefault();
+        openKey(b.getAttribute('data-open-key'), b);
+    }
+    document.addEventListener('click', tileHit);
+    document.addEventListener('touchend', tileHit, { passive: false });
     $('fv-x').addEventListener('click', function () { close(false); });
     $('fv-prev').addEventListener('click', function () { show(cur - 1, true); });
     $('fv-next').addEventListener('click', function () { show(cur + 1, true); });
