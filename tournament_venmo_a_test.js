@@ -31,6 +31,8 @@
 // Failing there: V1 (switch), V5 / V6 / V7 / V9 (the ON page), V7a (no ON line to
 // flip), V11 (the tile left the card payment out: $300 beside Fees collected
 // $400), V12 (no tel in the input rule). On local-venmo-merge: 13 pass / 0 fail.
+// On main 9c258e8c (the check-in flip 0215de17 went live tonight) the Desk chip row
+// gained "Arrived 0 Not arrived N" before Unpaid; the four chip pins carry it: 13 / 0 there.
 // Controls, each restored by sha: the tile's old filter back -> V7 + V11 red;
 // tel dropped from the rule -> V12 red; the counts line counting its own way
 // (paid with a method only) -> V11 red; the switch back to false -> 7 red.
@@ -151,7 +153,7 @@ describe('V. VENMO A', () => {
         deskTab(sb);
         const list = html(sb, 'registration-list');
         assert.match(rowOf(list, 'e3'), /<input type="checkbox" onchange="setRegistrationPaid\('e3', this\.checked\)"> Paid/);
-        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Unpaid 1 Paid 4 Approved 5 Not yet approved 0 Photos 0');
+        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Arrived 0 Not arrived 5 Unpaid 1 Paid 4 Approved 5 Not yet approved 0 Photos 0');
         assert.doesNotMatch(plain(html(sb, 'manage-tab-desk')), /venmo|paypal/i);
         assert.equal(html(sb, 'pay-in-tiles' in sb.document.__registry ? 'pay-in-tiles' : 'registration-counts').indexOf('in so far'), -1);
         assert.equal(el(sb, 'ev-pay-note').style.display, 'none');
@@ -249,7 +251,7 @@ describe('V. VENMO A', () => {
         const list = html(sb, 'registration-list');
         assert.match(rowOf(list, 'e3'), /<input type="checkbox" onchange="setRegistrationPaid\('e3', this\.checked\)"> Paid/);
         assert.doesNotMatch(list, /reg-via-venmo|Paid \(Venmo\)/);
-        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Unpaid 1 Paid 4 Approved 5 Not yet approved 0 Photos 0');
+        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Arrived 0 Not arrived 5 Unpaid 1 Paid 4 Approved 5 Not yet approved 0 Photos 0');
         assert.doesNotMatch(html(sb, 'registration-counts'), /in so far/);
         vm.runInContext("setPaidVia('e3', 'venmo')", sb);
         assert.deepEqual(writes(sb, /registrations\/STK\/e3$/), [], 'no value the live rules would refuse');
@@ -279,7 +281,7 @@ describe('V. VENMO A', () => {
         tap(sb, rowOf(list, 'e1'), byClass('reg-undo-btn'));
         w = writes(sb, /registrations\/STK\/e1$/);
         assert.deepEqual(w[0].value, { paid: false, paidAt: null, paidVia: null });
-        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Unpaid 1 Paid 4 Venmo 1 PayPal 1 Cash 1 Approved 5 Not yet approved 0 Photos 0');
+        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Arrived 0 Not arrived 5 Unpaid 1 Paid 4 Venmo 1 PayPal 1 Cash 1 Approved 5 Not yet approved 0 Photos 0');
         const counts = html(sb, 'registration-counts');
         // Manny 2026-11-16: the tile and the "Fees collected" line count the SAME payers - four paid, the card one too.
         assert.match(counts, /<b id="pay-tile-in">\$400<\/b><span>in so far \(4 paid · \$100 each\)<\/span>/, 'every paid entry times the fee, the card payment included');
@@ -357,7 +359,7 @@ describe('V. VENMO A', () => {
         const by = /<b id="pay-tile-by">([\d · ]+)<\/b><span>([^<]+)<\/span>/.exec(counts);
         assert.equal(by[1], '1 · 1 · 2 · 1'); assert.equal(by[2], 'Venmo · PayPal · cash · card');
         assert.equal(by[1].split(' · ').reduce((a, n) => a + Number(n), 0), 5, 'the split adds up to the count');
-        assert.equal(plain(html(sb, 'registration-chips')), 'All 7 Unpaid 2 Paid 5 Venmo 1 PayPal 1 Cash 2 Approved 7 Not yet approved 0 Photos 0');
+        assert.equal(plain(html(sb, 'registration-chips')), 'All 7 Arrived 0 Not arrived 7 Unpaid 2 Paid 5 Venmo 1 PayPal 1 Cash 2 Approved 7 Not yet approved 0 Photos 0');
         // no card payment in: three figures, three words
         const noCard = regs({ e5: Object.assign(regs().e5, { paid: false, paidVia: null, amountCents: null }) });
         const sb2 = arriveOwner(rec({ payTo: PAY_TO }), noCard);
