@@ -63,7 +63,7 @@ const MONEY = /\$|\b(bet|bets|betting|wager\w*|gambl\w*|pot|pots|buy-?ins?|stake
 const textOf = (h) => h.replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ');
 
 describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
-    test('the fold: one line, two doors (Golfers -> #how, Organizers -> /tournament, the same id as before), badges Apple then Google, the web-app link', () => {
+    test('the fold: one line, two doors (Golfers -> #how, Organizers -> /organizers, the same id as before), badges Apple then Google, the web-app link', () => {
         assert.match(fold, /<h1 class="one">Every yard\. Every game\. One live board\.<\/h1>/);
         // ADVISOR-20261115-2017: Organizers -> the organizer landing (/organizers), never straight into the tool.
         assert.match(fold, /<a class="door go" id="door-golfers" href="#how">Golfers<\/a><a class="door org" id="hero-start-tournament" href="\/organizers">Organizers<\/a>/);
@@ -178,10 +178,10 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
 
 describe('1b. organizers.html, the organizer landing (ADVISOR-20261115-2017): one way into the tool, real pictures, COMING tags, no event', () => {
     const org = stripComments(read('organizers.html'));
-    test('the page: lockup to /, the buttons to /tournament (three, nothing else goes there), badges Apple then Google, the price slots, no dollar figure of its own', () => {
+    test('the page: lockup to /, the buttons to /tournaments (three, nothing else goes there; the domain switch of 2026-11-16), badges Apple then Google, the price slots, no dollar figure of its own', () => {
         assert.match(org, /<a class="logo" href="\/"><img src="\/media\/home\/hardpan-golf-lockup\.png" alt="HardPan Golf"/);
-        assert.deepEqual([...org.matchAll(/href="\/tournament"/g)].length, 3);
-        assert.match(org, /id="run-an-event" href="\/tournament">Run an event/);
+        assert.deepEqual([...org.matchAll(/href="\/tournaments"/g)].length, 3);
+        assert.match(org, /id="run-an-event" href="\/tournaments">Run an event/);
         assert.ok(org.indexOf('store-apple') < org.indexOf('store-google'));
         assert.match(org, /data-price="pro-label"[\s\S]*data-price="pro-headline"/);
         assert.doesNotMatch(textOf(org), /\$\d/, 'no dollar figure typed into the page');
@@ -432,7 +432,7 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         assert.deepEqual(bad, [], 'tiles that did not open on a finger tap: ' + bad.join(' | '));
         assert.deepEqual(tab.errors, []);
     });
-    test('2.9 /organizers at 390x844: no sideways scroll, every button 44 px or taller, text 15 px or larger, a finger on Run an event goes to /tournament', async () => {
+    test('2.9 /organizers at 390x844: no sideways scroll, every button 44 px or taller, text 15 px or larger, a finger on Run an event goes to /tournaments (the domain switch of 2026-11-16)', async () => {
         await tab.metrics(390, 844);
         await tab.touchOn();
         await tab.go(base + '/organizers.html');
@@ -442,11 +442,11 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         assert.equal(m.sw, 390); assert.equal(m.small, 0); assert.equal(m.text, 0); assert.ok(m.h1 >= 28);
         assert.match(m.price, /^\$\d+\.\d\d\/yr$/, 'the price slot filled from site-pricing.js: ' + m.price);
         const under = await tab.eval(`(() => { document.getElementById('run-an-event').scrollIntoView({ block: 'center', behavior: 'instant' }); const b = document.getElementById('run-an-event').getBoundingClientRect(); const e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return { id: e && (e.id || e.tagName + '.' + e.className), href: e && e.closest('a') && e.closest('a').getAttribute('href'), rect: [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)] }; })()`);
-        assert.equal(under.href, '/tournament', 'under the finger: ' + JSON.stringify(under));
-        // the finger's click reaches the link (recorded by a listener that also keeps the test on the page: the local server has no /tournament route)
+        assert.equal(under.href, '/tournaments', 'under the finger: ' + JSON.stringify(under));
+        // the finger's click reaches the link (recorded by a listener that also keeps the test on the page: the local server has no /tournaments route)
         await tab.eval(`(() => { window.__tapped = null; document.addEventListener('click', (ev) => { const a = ev.target.closest('a'); window.__tapped = a ? a.getAttribute('href') : 'none'; ev.preventDefault(); }, true); return true; })()`);
         await tab.fingerTap('#run-an-event');
-        assert.equal(await tab.eval('window.__tapped'), '/tournament', 'the finger\'s click did not reach Run an event (under the finger: ' + JSON.stringify(under) + ')');
+        assert.equal(await tab.eval('window.__tapped'), '/tournaments', 'the finger\'s click did not reach Run an event (under the finger: ' + JSON.stringify(under) + ')');
         assert.deepEqual(tab.errors, []);
     });
     test('2.7 1280x800: no sideways scroll, the lockup 110 px over the fan (centre phone highest), the links row, the scenes 2 across, the tiles 6 across; the map\'s tile layer still at 0', async () => {

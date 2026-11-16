@@ -326,7 +326,7 @@ describe('4. THE PROXY (functions/_middleware.js, Firebase option 3)', () => {
         assert.equal(blocked.status, 404);
         assert.equal(nexted, 1);
         const at = read('functions/_middleware.js').indexOf('export async function onRequest');
-        const fn = read('functions/_middleware.js').slice(at, at + 400);
+        const fn = read('functions/_middleware.js').slice(at, at + 700);   // 400 -> 700: the DOMAIN SWITCH 301 (2026-11-15) comes first in onRequest
         assert.match(fn, /isAuthProxyPath\(pathname\)\) return authProxy\(context\.request\)/);
     });
     test('_routes.json sends /__/auth/* and /__/firebase/* to the Function, and still holds every old rule', () => {

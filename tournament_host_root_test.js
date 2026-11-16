@@ -1,6 +1,12 @@
 // ============================================================================
 // tournaments.rattlegolf.com `/` MUST NOT BE THE CONSUMER APP.
 //
+// DOMAIN SWITCH (Manny 2026-11-15 5:41 PM, ADVISOR-20261115-1742 part 2): functions/_middleware.js now answers every
+// request on this host with a 301 to the same path on hardpangolf.com (the root to /tournaments) BEFORE this Function
+// runs, so in production the 302 below is unreachable; it stays until the cutover has proven out. The tests on
+// index.js alone below are the inner layer and still hold; the last describe drives the chain Pages runs
+// (middleware, then this file) and pins the 301. tournament_domain_switch_test.js has the full matrix.
+//
 // Same Cloudflare Pages project hosts both products. functions/index.js is
 // the Pages mapping for `/`. On Host tournaments.rattlegolf.com it 302s to
 // /tournament; on every other host it calls next() so index.html (Live
@@ -198,5 +204,35 @@ describe('isolation: the redirect is what this file does, not a platform default
         assert.equal(r.status, 302);
         assert.notEqual(r.status, 301);
         assert.notEqual(r.status, 308);
+    });
+});
+
+// ===========================================================================
+describe('DOMAIN SWITCH (2026-11-15): through the middleware, the old host is a 301 to hardpangolf.com before this file runs', () => {
+    let MW = null;
+    before(async () => { MW = await import(pathToFileURL(path.join(REPO_ROOT, 'functions', '_middleware.js')).href); });
+    async function chain(url, headerHost) {
+        need();
+        const c = ctx(url, headerHost);
+        const inner = c.next;
+        const res = await MW.onRequest({ request: c.request, env: {}, next: async () => MOD.onRequest({ request: c.request, env: {}, next: inner }) });
+        return { status: res.status, location: res.headers.get('location'), nextCalls: c.nextCalls() };
+    }
+    test('`/` on the old host: 301 to https://hardpangolf.com/tournaments, the Consumer document never asked for', async () => {
+        const r = await chain('https://tournaments.rattlegolf.com/?register=ABCD');
+        assert.equal(r.status, 301);
+        assert.equal(r.location, 'https://hardpangolf.com/tournaments?register=ABCD');
+        assert.equal(r.nextCalls, 0);
+    });
+    test('the same through a Host header against localhost (wrangler / curl -H)', async () => {
+        const r = await chain('http://127.0.0.1:8788/', 'tournaments.rattlegolf.com');
+        assert.equal(r.status, 301);
+        assert.equal(r.location, 'https://hardpangolf.com/tournaments');
+    });
+    test('hardpangolf.com `/` is still this file\'s business (the middleware calls through)', async () => {
+        const r = await chain('https://hardpangolf.com/?tourney=ABCD');
+        assert.equal(r.status, 200, 'the app shell for a tourney link, as before');
+        assert.equal(r.location, null);
+        assert.equal(r.nextCalls, 1);
     });
 });

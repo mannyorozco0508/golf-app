@@ -150,9 +150,13 @@ describe('tfweb-2 _routes.json', () => {
         // website-d: /index.html is routed too - a BARE /index.html must stay the app
         // now that a bare / is the homepage (functions/_middleware.js serves it;
         // with a query it falls through to the static 308 as before).
-        const pages = PAGES.filter((p) => p !== '/' && p !== '/index.html');
+        // DOMAIN SWITCH (2026-11-15): the tournament pages are routed on purpose too (the middleware 301s the old host;
+        // on hardpangolf.com they fall through next() to the static file, tournament_domain_switch_test.js).
+        const ROUTED_ON_PURPOSE = ['/tournament', '/tournament-scorecard', '/tournament-tv', '/tournaments', '/tournaments/'];
+        const pages = PAGES.filter((p) => p !== '/' && p !== '/index.html' && !ROUTED_ON_PURPOSE.includes(p));
+        ROUTED_ON_PURPOSE.filter((p) => PAGES.includes(p)).forEach((p) => assert.ok(routed(p), 'positive: ' + p + ' is routed on purpose'));
         assert.ok(routed('/index.html'), 'positive: /index.html is the one page routed on purpose');
         assert.deepEqual(pages.filter(routed), []);
-        assert.deepEqual(swPrecache().filter((p) => p !== '/' && p !== '/index.html' && routed(p)), []);
+        assert.deepEqual(swPrecache().filter((p) => p !== '/' && p !== '/index.html' && !ROUTED_ON_PURPOSE.includes(p) && routed(p)), []);
     });
 });

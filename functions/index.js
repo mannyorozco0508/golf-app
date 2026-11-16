@@ -39,6 +39,9 @@
 
 import { isHomepageVisit, serveHomepage } from './_front-door.js';
 
+// DOMAIN SWITCH (2026-11-15): functions/_middleware.js now 301s every request on this host to hardpangolf.com
+// (its root to /tournaments) before this file runs, so the 302 below is unreachable in production. It stays until the
+// cutover has proven out (a second, separate step removes it); isTournamentsRequest is still read by the middleware.
 const TOURNAMENTS_HOST = 'tournaments.rattlegolf.com';
 
 function hostnamesOf(request) {

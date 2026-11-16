@@ -6,3 +6,10 @@
 # functions/ (index.js, app/[[path]].js), because _redirects cannot read a query.
 /home   /hardpan-home  200
 /home/  /hardpan-home  200
+# DOMAIN SWITCH (Manny 2026-11-15 5:41 PM: "hardpangolf.com/tournaments would be a good address"; ADVISOR-20261115-1742
+# part 2, built locally 1840): /tournaments (and /tournaments/) show the Tournaments front page, tournament.html, with a
+# 200 and the address bar on /tournaments; the query (?register=, ?tourney=) is carried. /tournament, /tournament-scorecard
+# and /tournament-tv are NOT renamed: every QR code, share link and Stripe return URL printed to date keeps working.
+# The old host, tournaments.rattlegolf.com, is 301'd to the same path on hardpangolf.com in functions/_middleware.js.
+/tournaments   /tournament  200
+/tournaments/  /tournament  200
