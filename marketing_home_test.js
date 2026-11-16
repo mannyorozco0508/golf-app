@@ -214,12 +214,14 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         // Re-pinned 2026-11-12 (Manny): Ask caddie shipped, its tag is gone; Offline maps keeps one.
         // 2.0.7 site (Manny Nov 14): offline map download ships (release-206/207, both stores), so no card carries a tag.
         // 2.0.8 site (Nov 15): the two cards of the "Coming in 2.0.8" row (#coming208, above EVERYTHING IN THE APP while
-        // 2.0.8 is in Apple's review) carry the coming tag; no card inside #features carries a tag.
+        // 2.0.8 was in Apple's review) carried the coming tag.
+        // 2.0.8 release re-pin: iOS 2.0.8 is released, the row is "New in 2.0.8" inside #features, and NO card on the page
+        // carries a tag any more: zero <div class="fsoon">, no coming208 section, no gsoon row tag, not even the CSS.
         const home = read('hardpan-home.html');
-        const coming = (/<section class="feat coming" id="coming208"[\s\S]*?<\/section>/.exec(home) || [''])[0];
-        // Re-pinned (Manny's OK, Nov 15 3:22 PM): the tag reads "New · coming in the next update (in review)".
-        assert.equal((coming.match(/<div class="fsoon">New &middot; coming in the next update \(in review\)<\/div>/g) || []).length, 2, 'positive: the two 2.0.8 cards are tagged');
-        assert.equal((home.replace(coming, '').match(/<div class="fsoon">/g) || []).length, 0, 'a Coming soon tag on a shipped card');
+        assert.equal((home.match(/<div class="fsoon">/g) || []).length, 0, 'a Coming soon tag on a shipped card');
+        assert.doesNotMatch(home, /fsoon|gsoon|coming208|Coming in 2\.0\.8|in review/i, 'coming wording left on the home page');
+        assert.match(home, /<h2>New in 2\.0\.8<\/h2>/, 'positive: the New in 2.0.8 row is there');
+        assert.ok(home.indexOf('<h2>New in 2.0.8</h2>') > home.indexOf('EVERYTHING IN THE APP') && home.indexOf('<h2>New in 2.0.8</h2>') < home.indexOf('<h2>New in 2.0.7</h2>'), 'New in 2.0.8 is not the first row of EVERYTHING IN THE APP');
         assert.match(read('hardpan-home.html'), /<li class="fc" id="f-offline" data-key="offline"><div class="cap"><span class="eb">OFFLINE MAPS<\/span>/, 'positive: the Offline maps card is there, untagged');
     });
 
@@ -571,8 +573,8 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
         assert.match(home, /EVERYTHING IN THE APP/);
         const sec = /<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(home)[1];
         assert.deepEqual((sec.match(/<div class="grp" id="g-[a-z]+">\s*<div class="ghd"><h2>([^<]*)<\/h2>/g) || []).map((t) => />([^<]*)<\/h2>/.exec(t)[1]),
-            ['New in 2.0.7', 'Play', 'Games', 'Your group', 'Organize', 'Get better']);   // 2.0.7 re-pin (2026-11-14): the New in 2.0.7 row leads
-        assert.equal((sec.match(/<li class="fc"/g) || []).length, 36);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin: + 4
+            ['New in 2.0.8', 'New in 2.0.7', 'Play', 'Games', 'Your group', 'Organize', 'Get better']);   // 2.0.7 re-pin (2026-11-14): the New in 2.0.7 row leads; 2.0.8 release re-pin: New in 2.0.8 leads
+        assert.equal((sec.match(/<li class="fc"/g) || []).length, 38);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin: + 4; 2.0.8 release: + 2
         assert.equal(videos(sec).length, 6, 'the six features with a clip');
     });
 

@@ -39,6 +39,9 @@ const NEW = ['f-team-links', 'f-my-events', 'f-card-board', 'f-contests', 'f-pho
 // 2.0.7 re-pin (2026-11-14, web-207-site): the New in 2.0.7 row's four cards are not main-at-0f11073c cards either;
 // test 3 leaves them out the same way (the 25 old cards keep their headlines and order).
 const NEW_207 = ['f-round-tabs', 'f-green-slope', 'f-green-size', 'f-team-card'];
+// 2.0.8 release re-pin: the New in 2.0.8 row (two cards) moved into #features above New in 2.0.7 on release day;
+// test 3 leaves those two out the same way.
+const NEW_208 = ['f-smooth-slope', 'f-ring-aside'];
 const READ = { expression: `JSON.stringify((function () {
   var $ = function (s) { return document.querySelector(s); };
   var rect = function (e) { if (!e) return null; var r = e.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top + window.scrollY), w: Math.round(r.width), h: Math.round(r.height) }; };
@@ -100,7 +103,8 @@ test('3 the 25 cards main had keep their headlines and order', async () => {
     const a = await go();
     const wasH3 = [...baseHtml().matchAll(/<li class="fc"[^>]*>[\s\S]*?<h3>([^<]*)<\/h3>/g)].map((m) => m[1].replace(/&amp;/g, '&'));
     assert.equal(wasH3.length, 25, 'positive: main had 25');
-    const mineOld = a.allH3.filter((h, i) => !NEW.includes(a.allIds[i]) && !NEW_207.includes(a.allIds[i]));
+    const mineOld = a.allH3.filter((h, i) => !NEW.includes(a.allIds[i]) && !NEW_207.includes(a.allIds[i]) && !NEW_208.includes(a.allIds[i]));
+    assert.equal(a.allIds.length, 25 + NEW.length + NEW_207.length + NEW_208.length, 'positive: the 2.0.8 cards are inside #features');
     assert.deepEqual(mineOld, wasH3);
 });
 

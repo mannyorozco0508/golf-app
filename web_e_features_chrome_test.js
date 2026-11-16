@@ -175,15 +175,16 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         if (srv) { srv.closeAllConnections(); srv.close(); }
     });
 
-    test('36 cards render in six rows, each with its headline and a described screen', async () => {
+    test('38 cards render in seven rows, each with its headline and a described screen', async () => {
         await tab.go(base + '/');
         const r = await tab.eval(`(() => { const cs = [...document.querySelectorAll('#features .fc')];
             return { n: cs.length, rows: [...document.querySelectorAll('#features .row')].map((r) => r.children.length),
               bad: cs.filter((c) => !c.querySelector('h3').textContent.trim() || !c.querySelector('p').textContent.trim() || !(c.querySelector('.ph img').alt || '').trim()).map((c) => c.id),
               sideways: document.documentElement.scrollWidth > window.innerWidth,
               text: document.body.innerText }; })()`);
-        assert.equal(r.n, 36);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin (2026-11-14): + New in 2.0.7 (4)
-        assert.deepEqual(r.rows, [4, 6, 6, 5, 12, 3]);
+        assert.equal(r.n, 38);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin (2026-11-14): + New in 2.0.7 (4); 2.0.8 release: + New in 2.0.8 (2), first
+        assert.deepEqual(r.rows, [2, 4, 6, 6, 5, 12, 3]);
+        assert.doesNotMatch(r.text, /coming in 2\.0\.8|coming in the next update|in review|not in the app yet/i, '2.0.8 release: nothing on the page says 2.0.8 is coming any more');
         assert.deepEqual(r.bad, []);
         assert.equal(r.sideways, false, 'the page scrolls sideways at 390');
         assert.doesNotMatch(r.text, /\bIDEA\b/, 'a mockup IDEA tag is on the page');
@@ -211,6 +212,8 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         // a swipe: the track is scrolled the way a finger scrolls it, to the 11th slide (Games 1).
         // 2.0.7 re-pin (2026-11-14): the four New in 2.0.7 slides come first, so Play 2 is slide 6 (data-i 5) and Games 1 is slide 11 (was 7).
         // 2.0.8 site (Nov 15): the two Coming in 2.0.8 slides (#coming208, above #features) come before those: Play 2 is data-i 7, Games 1 slide 13.
+        // 2.0.8 release re-pin: the viewer walks every .fc on the page in order; the two 2.0.8 slides moved from #coming208 into
+        // #features but stay first, so the indexes do not move (Play 2 data-i 7, Games 1 slide 13 = scrollTo 12 widths).
         await tab.eval(`(() => { const t = document.getElementById('fv-track'); t.scrollTo({ left: t.clientWidth * 12 }); return true; })()`);
         await sleep(700);
         v = await tab.eval(VIEWER);

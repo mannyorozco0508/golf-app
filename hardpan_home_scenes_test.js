@@ -149,9 +149,12 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
         assert.doesNotMatch(newParts, /Coming soon/i);
         assert.doesNotMatch(JS, /\$\d|venmo/i);
     });
-    test('the rows, the 2.0.8 row and the viewer are still there, after the new sections; the header is unchanged', () => {
-        const iGlance = body.indexOf('id="everything"'), i208 = body.indexOf('id="coming208"'), iFeat = body.indexOf('<section class="feat" id="features">'), iFv = body.indexOf('<div class="fv" id="fv"');
-        assert.ok(iGlance > 0 && i208 > iGlance && iFeat > i208 && iFv > iFeat, [iGlance, i208, iFeat, iFv].join(' '));
+    // 2.0.8 release re-pin: the Coming in 2.0.8 section (#coming208, between the tiles and #features) moved INTO #features as
+    // its first row, "New in 2.0.8" (#g-update); the order is now tiles, #features (starting with #g-update), the viewer.
+    test('the rows, the New in 2.0.8 row (first inside #features) and the viewer are still there, after the new sections; the header is unchanged', () => {
+        const iGlance = body.indexOf('id="everything"'), iFeat = body.indexOf('<section class="feat" id="features">'), i208 = body.indexOf('<div class="grp" id="g-update">'), iNew = body.indexOf('<div class="grp" id="g-new">'), iFv = body.indexOf('<div class="fv" id="fv"');
+        assert.ok(iGlance > 0 && iFeat > iGlance && i208 > iFeat && iNew > i208 && iFv > iNew, [iGlance, iFeat, i208, iNew, iFv].join(' '));
+        assert.equal(body.indexOf('id="coming208"'), -1, 'the Coming in 2.0.8 section is still on the page');
         assert.equal((body.match(/<div class="fv" id="fv"/g) || []).length, 1);
         assert.match(body, /<nav class="wrap toplinks" aria-label="Main">\s*<div class="links">/);
         assert.match(body, /<div class="stick" id="stick" aria-label="HardPan Golf">\s*<div class="wrap stick-in">\s*<a class="logo" href="\/"><img src="\/media\/home\/hardpan-golf-lockup\.png" alt="HardPan Golf" width="1278" height="222"><\/a>/);

@@ -3,6 +3,32 @@
   "folder": "/media/screens/",
   "screens": [
     {
+      "key": "smooth-slope",
+      "card": "f-smooth-slope",
+      "headline": "Read the green.",
+      "files": [
+        "/media/screens/smooth-slope-400.webp",
+        "/media/screens/smooth-slope-940.webp"
+      ],
+      "width": 940,
+      "height": 1896,
+      "captured": "2.0.8 (1) App Store shoot raw, scratchpad/shots208/raw/07-green-slope-55.png (1320x2868 Simulator screen, Papago 10 from 55: smooth slope, key strip, ring hidden; Manny OK Nov 15 3:22 PM via Advisor): the top 205 px (status bar) cut off, saved as WebP 940 and 400 wide with sharp; the original PNG is untouched. Replaced in place the first cut from green72r/ring/after-caledonia-18.png (eb27b780, git history keeps it).",
+      "released": "2.0.8 release day: moved from manifest.coming into screens[] (New in 2.0.8, the first row of #features) when flip-to-released.sh moved the row in."
+    },
+    {
+      "key": "ring-aside",
+      "card": "f-ring-aside",
+      "headline": "Nothing covers the arrows.",
+      "files": [
+        "/media/screens/ring-aside-400.webp",
+        "/media/screens/ring-aside-940.webp"
+      ],
+      "width": 940,
+      "height": 1938,
+      "captured": "72R-A branch feat-207-72ra (2.0.8 work, not yet in a store build), headless-Chrome capture at 402x874 @3x (1206x2622), scratchpad/green72r/ring/after-homecourse-6.png (ring hidden while slope is drawn): same crop and sizes; original untouched. Shows the dev golfer name in the bottom bar.",
+      "released": "2.0.8 release day: moved from manifest.coming into screens[] (New in 2.0.8, the first row of #features) when flip-to-released.sh moved the row in."
+    },
+    {
       "key": "round-tabs",
       "card": "f-round-tabs",
       "headline": "Card, GPS, Games, Board.",
@@ -18,7 +44,7 @@
     {
       "key": "green-slope",
       "card": "f-green-slope",
-      "headline": "Read the green.",
+      "headline": "Slope on the green.",
       "files": [
         "/media/screens/green-slope-400.webp",
         "/media/screens/green-slope-940.webp"
@@ -30,7 +56,8 @@
       "previous": {
         "recaptured": "2026-11-14 (2.0.7 site update, web-207-site)",
         "captured": "release-207 2.0.7 (3) App Store screenshot outbox/appstore-207-submit/iphone-6.9/07-green-slope.png (1320x2868, as submitted to Apple): the phone screen cropped out of the frame (x 190-1130, y 722-2762 = 940x2040, rounded corners clear) and saved as WebP 940 and 400 wide in headless Chrome; the original PNG is untouched."
-      }
+      },
+      "renamed": "2.0.8 release: was \"Read the green.\" (the 2.0.8 smooth-slope card now carries that headline); the older, blockier 2.0.7 drawing."
     },
     {
       "key": "green-size",
@@ -554,34 +581,5 @@
       "unused_since": "ask-caddie re-capture (2026-11-12)",
       "note": "Older capture: a 786x460 crop of the Ask panel on a dark map. Replaced by ask-caddie-400 / ask-caddie-1170 from release-206. Kept in place, nothing serves it."
     }
-  ],
-  "coming": {
-    "_about": "2.0.8 site (web-208-site, Nov 15): the Coming in 2.0.8 row (#coming208), above EVERYTHING IN THE APP while 2.0.8 is in review. Not in screens[] (that list is the cards inside #features, in page order). Release day: flip-to-released.sh moves the row into #features; then move these two into screens[] at the top.",
-    "screens": [
-      {
-        "key": "smooth-slope",
-        "card": "f-smooth-slope",
-        "headline": "Read the green.",
-        "files": [
-          "/media/screens/smooth-slope-400.webp",
-          "/media/screens/smooth-slope-940.webp"
-        ],
-        "width": 940,
-        "height": 1896,
-        "captured": "2.0.8 (1) App Store shoot raw, scratchpad/shots208/raw/07-green-slope-55.png (1320x2868 Simulator screen, Papago 10 from 55: smooth slope, key strip, ring hidden; Manny OK Nov 15 3:22 PM via Advisor): the top 205 px (status bar) cut off, saved as WebP 940 and 400 wide with sharp; the original PNG is untouched. Replaced in place the first cut from green72r/ring/after-caledonia-18.png (eb27b780, git history keeps it)."
-      },
-      {
-        "key": "ring-aside",
-        "card": "f-ring-aside",
-        "headline": "Nothing covers the arrows.",
-        "files": [
-          "/media/screens/ring-aside-400.webp",
-          "/media/screens/ring-aside-940.webp"
-        ],
-        "width": 940,
-        "height": 1938,
-        "captured": "72R-A branch feat-207-72ra (2.0.8 work, not yet in a store build), headless-Chrome capture at 402x874 @3x (1206x2622), scratchpad/green72r/ring/after-homecourse-6.png (ring hidden while slope is drawn): same crop and sizes; original untouched. Shows the dev golfer name in the bottom bar."
-      }
-    ]
-  }
+  ]
 }
