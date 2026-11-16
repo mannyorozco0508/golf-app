@@ -300,7 +300,8 @@ const PRODUCTS = {
         // Moved to v77 FOR THE NOV 14 TOURNAMENTS BATCH (2026-11-14, Manny OK by phone relay): see sw.js v413.
         // Moved to v78 (Net on the combined board, Manny go 2026-11-15 09): see sw.js v414.
         // Moved to v79 FOR HIDE / ARCHIVE + THE ONE-SCORER CARD (2026-11-15, Manny go via Advisor): see sw.js v415.
-        cacheName: 'tournament-v79-de-sc',
+        // Moved to v80 (Check-in at the table ON, Manny typed OK 2026-11-16 00): see sw.js v416.
+        cacheName: 'tournament-v80-checkin',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',
