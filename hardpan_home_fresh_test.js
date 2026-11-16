@@ -3,7 +3,7 @@
 // showing the old homepage, with the old tiles, in a tab it had open since before the deploy; ?v=416 in a new tab was fine)
 //
 // functions/_front-door.js stamps the homepage answer with the deploy's build: X-HardPan-Build and Server-Timing
-// build;desc="<sha12>" (from CF_PAGES_COMMIT_SHA; 'dev' where Pages did not set it). site-features.js remembers the build the
+// build;desc="<sha12>" (from CF_PAGES_COMMIT_SHA; 'dev' where Pages did not set it). site-fresh.js remembers the build the
 // page was loaded from (the navigation entry's serverTiming, else the first HEAD answer) and, when the tab comes back to the
 // front (visibilitychange, pageshow from the back-forward cache, online), at most once a minute, asks `/` with a HEAD
 // (cache: no-store) for the build now live; a different build reloads the page unless the viewer or a sheet is open.
@@ -16,9 +16,9 @@
 //    Controls in the same run: the same back-and-front with the build unchanged -> no reload; with the viewer open (a real
 //    click on a tile) and a new build -> no reload while it is open.
 // WHAT IT CANNOT PROVE: Safari / iOS (the Simulator run is by hand: tournaments/build-home-fresh/), Cloudflare's own headers.
-// BASELINE against origin/main 91d0f2b7 (this exact file copied there, final run, 2026-11-16 01:09): 1 pass / 8 fail of the 9 that
-// ran (describe 2's module-level "the block exists" throws there, so its two tests never start; the one pass is "serveApp
-// carries no build header", true before and after). Here, the final file: 11 pass / 0 fail.
+// BASELINE against origin/main 91d0f2b7 (this exact file copied there, final run, 2026-11-16 01:31): 1 pass / 8 fail of the 9 that
+// ran (describe 2 reads site-fresh.js at module level, which does not exist there, so its three tests never start; the one pass
+// is "serveApp carries no build header", true before and after). Here, the final file: 12 pass / 0 fail.
 // iOS (by hand, iPhone 17 Simulator, iOS 26.5, Safari, wrangler pages dev with --binding CF_PAGES_COMMIT_SHA): build A loaded;
 // server moved to build B with a visible fold line; Safari sent to the back (Settings) and brought to the front: the page shows
 // B; control: the file changed again under the SAME build id: no reload; build C: reloaded. tournaments/build-home-fresh/.
@@ -73,12 +73,14 @@ describe('1. the Function stamps the homepage answer with the build', () => {
     });
 });
 
-describe('2. source: the check in site-features.js', () => {
-    const js = read('site-features.js');
-    const at = js.indexOf('2a. A NEW RELEASE REACHES A TAB THAT IS ALREADY OPEN');
-    const end = js.indexOf('2b. THE SCENE SHEETS', at);
-    assert.ok(at > 0 && end > at, 'the block exists');
-    const block = js.slice(at, end);
+describe('2. source: the check in site-fresh.js (its own file: site-features.js keeps its promise that it sends nothing anywhere)', () => {
+    const block = read('site-fresh.js');
+    assert.ok(block.length > 1000, 'the file exists');
+    test('the homepage loads it, after site-features.js; site-features.js itself has no fetch', () => {
+        assert.match(read('hardpan-home.html'), /<script src="\/site-features\.js" defer><\/script>\n<script src="\/site-fresh\.js" defer><\/script>/);
+        assert.doesNotMatch(read('site-features.js'), /\bfetch\(/);
+        assert.equal((block.match(/\bfetch\(/g) || []).length, 1, 'one request in the file: the HEAD');
+    });
     test('listens for the tab coming to the front, never polls, asks with a HEAD and no-store, reloads', () => {
         assert.match(block, /document\.addEventListener\('visibilitychange', check\)/);
         assert.match(block, /window\.addEventListener\('pageshow', function \(ev\) \{ if \(ev\.persisted\)/);
