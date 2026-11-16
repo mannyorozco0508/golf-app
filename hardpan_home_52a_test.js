@@ -89,7 +89,9 @@ test('2 Start a tournament: over the Organize row and in the hero, on screen at 
     assert.equal(a.btnHref, '/tournament'); assert.match(a.btnText, /^Start a tournament/);
     assert.ok(a.btn.h >= 44 && a.btn.w >= 160, 'size ' + JSON.stringify(a.btn));
     assert.ok(a.btn.l >= 0 && a.btn.r <= a.vw, 'inside the screen: ' + JSON.stringify(a.btn));
-    assert.ok(a.hero && a.heroHref === '/tournament' && a.hero.h >= 44 && a.hero.r <= a.vw, 'the hero button: ' + JSON.stringify(a.hero));
+    // 2026-11-15 (ADVISOR-20261115-2017, Manny: "the organizers button shouldn't lead to my Test"): the hero's Organizers door goes to
+    // /organizers, the organizer landing page, whose one button goes to /tournament; the Organize row's button still goes straight there.
+    assert.ok(a.hero && a.heroHref === '/organizers' && a.hero.h >= 44 && a.hero.r <= a.vw, 'the hero button: ' + JSON.stringify(a.hero));
 });
 
 test('3 the 25 cards main had keep their headlines and order', async () => {
