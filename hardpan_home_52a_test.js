@@ -83,13 +83,14 @@ test('1 the Organize row: the old 5 then the 7 new cards, each complete, each sc
     });
 });
 
-test('2 Start a tournament: over the Organize row and in the hero, on screen at 390 px, href /tournament, thumb-size', async () => {
+// DOMAIN SWITCH (2026-11-15): the doors go to /tournaments (the rewrite of tournament.html), not /tournament.
+test('2 Start a tournament: over the Organize row and in the hero, on screen at 390 px, href /tournaments, thumb-size', async () => {
     const a = await go();
     assert.ok(a.btn, 'the Organize button exists');
-    assert.equal(a.btnHref, '/tournament'); assert.match(a.btnText, /^Start a tournament/);
+    assert.equal(a.btnHref, '/tournaments'); assert.match(a.btnText, /^Start a tournament/);
     assert.ok(a.btn.h >= 44 && a.btn.w >= 160, 'size ' + JSON.stringify(a.btn));
     assert.ok(a.btn.l >= 0 && a.btn.r <= a.vw, 'inside the screen: ' + JSON.stringify(a.btn));
-    assert.ok(a.hero && a.heroHref === '/tournament' && a.hero.h >= 44 && a.hero.r <= a.vw, 'the hero button: ' + JSON.stringify(a.hero));
+    assert.ok(a.hero && a.heroHref === '/tournaments' && a.hero.h >= 44 && a.hero.r <= a.vw, 'the hero button: ' + JSON.stringify(a.hero));
 });
 
 test('3 the 25 cards main had keep their headlines and order', async () => {
