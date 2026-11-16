@@ -302,7 +302,8 @@ const PRODUCTS = {
         // Moved to v79 FOR HIDE / ARCHIVE + THE ONE-SCORER CARD (2026-11-15, Manny go via Advisor): see sw.js v415.
         // Moved to v80 (Check-in at the table ON, Manny typed OK 2026-11-16 00): see sw.js v416.
         // Moved to v81 (Venmo A): see sw.js v417.
-        cacheName: 'tournament-v81-venmo',
+        // Moved to v82 (Veterans A): see sw.js v418.
+        cacheName: 'tournament-v82-veterans',
         appName: 'HardPan Tournaments',
         shortName: 'Tournaments',
         description: 'Tournament scoring and live leaderboard',

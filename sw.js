@@ -4555,7 +4555,8 @@ const APP_SHELL_ALIASES = ['./', './app'];
 // Moved to v415-2.0 (Hide from Home + Archive after the event and the one-scorer watch card, Manny go 2026-11-15 09:18 via Advisor: tournament.html gains the My events ••• menu, Hidden / Past events, the Setup card Event day and after, the Desk Scorers card and the Watch QR buttons; tournament-scorecard.html the watch link, That's me and the viewer card; a device on v414 keeps the old Home and card)
 // Moved to v416-2.0 (Check-in at the table ON, Manny typed OK 2026-11-16 00:28 after the combined rules went live: tournament.html and tournament-tv.html run with CHECKIN_LIVE = true; a device on v415 keeps the switch off and never shows the arrived ticks)
 // Moved to v417-2.0 (Venmo A: the pay line, the golfer handle box, the Desk's Venmo / PayPal tick with one paid count, and the styled Phone box; an installed device would otherwise keep the page without them)
-const CACHE_VERSION = 'golfapp-v417-2.0';
+// Moved to v418-2.0 (Veterans A: the per-event Veterans switches on Setup, the branch badges and standings, the Honor a Hero holes and the TV ceremony page, all off until an organizer turns them on; an installed device would otherwise keep the page without them)
+const CACHE_VERSION = 'golfapp-v418-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
