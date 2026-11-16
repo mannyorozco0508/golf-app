@@ -4,10 +4,24 @@
 // and an unexpected URL fails the test.
 //
 // Held: the course validator (good card passes; each mutation fails - the
-// negative controls), the prompt never asks for rating/slope, the body
-// allow-list, the ONE Pro retry only on a failed check (good / bad / retry),
-// the course scans' own free counter (never scan:free:), and that a body
-// without mode:'course' still takes the score path.
+// negative controls), the prompt and schema, the body allow-list, the ONE Pro
+// retry only on a failed check (good / bad / retry), the course scans' own
+// free counter (never scan:free:), and that a body without mode:'course'
+// still takes the score path.
+//
+// 2026-11-16 (Manny, typed in the tournaments tab: "OK scanner reads course
+// rating + slope per tee (front or back of the card)"): the prompt now ASKS
+// for each tee's rating / slope (it said "Ignore" them before), the schema
+// carries rating, slope, rating_ladies, slope_ladies per tee, the body takes
+// an optional `back` photo (two photos, ONE scan, one Gemini call with two
+// image parts), and the validator flags a bad pair SOFTLY (rating_range,
+// slope_range, rating_pair - never a Pro retry). Baseline: this whole file
+// against main 15640949's course-card-validate.js + _scan.js + privacy.html
+// (the pre-build files, measured after the last test was written): 32 pass /
+// 21 fail of 53; 53 / 0 on the branch. Negative controls (each restored by
+// sha): RATING cap widened -> 1 red; the ladies pair unchecked -> 2; slopeOf
+// taking any number -> 1; the back photo dropped from the Gemini parts -> 2;
+// the rating dropped from the parse -> 10; the old privacy sentence -> 1.
 // ============================================================================
 const { test, describe, before, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -134,6 +148,54 @@ describe('course-card-validate: good card passes, every mutation fails (negative
         nine.hcp_men[0] = 10;
         assert.ok(codes(check(nine, { holes: 9 })).includes('hcp_men'));
     });
+    // 2026-11-16: each tee's course rating / slope, checked SOFTLY only.
+    const soft = (v) => v.soft.map((s) => s.code + ':' + s.row + ':' + (s.who || ''));
+    test('RATINGS: a good men\'s pair and a good ladies\' pair pass clean, rounded to one decimal, and come back on the tee', () => {
+        const v = check(card((c) => {
+            c.tees[0].rating = 72.1; c.tees[0].slope = 128;
+            c.tees[1].rating = 67.44; c.tees[1].slope = 115; c.tees[1].rating_ladies = 72.5; c.tees[1].slope_ladies = 122;
+        }));
+        assert.deepEqual(v.hard, []);
+        assert.deepEqual(v.soft, []);
+        assert.equal(v.ok, true);
+        const p = C.parseCourseOutput(JSON.stringify(card((c) => { c.tees[0].rating = 72.14; c.tees[0].slope = 128; c.tees[1].rating_ladies = 72.5; c.tees[1].slope_ladies = 122; })));
+        assert.deepEqual([p.value.tees[0].rating, p.value.tees[0].slope, p.value.tees[0].rating_ladies, p.value.tees[0].slope_ladies], [72.1, 128, null, null]);
+        assert.deepEqual([p.value.tees[1].rating, p.value.tees[1].slope, p.value.tees[1].rating_ladies, p.value.tees[1].slope_ladies], [null, null, 72.5, 122]);
+    });
+    test('RATINGS: a card that prints none is clean - every field null, nothing flagged', () => {
+        const p = C.parseCourseOutput(JSON.stringify(card()));
+        assert.deepEqual([p.value.tees[0].rating, p.value.tees[0].slope, p.value.tees[0].rating_ladies, p.value.tees[0].slope_ladies], [null, null, null, null]);
+        assert.deepEqual(check(card()).soft, []);
+    });
+    test('RATINGS: a string, a fractional slope or a bool is not a number -> null (then rating_pair if the other half is there)', () => {
+        const p = C.parseCourseOutput(JSON.stringify(card((c) => { c.tees[0].rating = '72.1'; c.tees[0].slope = 128.5; c.tees[1].rating = true; })));
+        assert.deepEqual([p.value.tees[0].rating, p.value.tees[0].slope, p.value.tees[1].rating], [null, null, null]);
+        const v = check(card((c) => { c.tees[0].rating = '72.1'; c.tees[0].slope = 128; }));
+        assert.deepEqual(soft(v), ['rating_pair:Blue:men']);
+    });
+    const ratingCases = [
+        ['rating 95.0 (men)', (c) => { c.tees[0].rating = 95; c.tees[0].slope = 128; }, ['rating_range:Blue:men']],
+        ['rating 54.9 (men)', (c) => { c.tees[0].rating = 54.9; c.tees[0].slope = 128; }, ['rating_range:Blue:men']],
+        ['slope 40 (men)', (c) => { c.tees[0].rating = 72.1; c.tees[0].slope = 40; }, ['slope_range:Blue:men']],
+        ['slope 156 (men)', (c) => { c.tees[0].rating = 72.1; c.tees[0].slope = 156; }, ['slope_range:Blue:men']],
+        ['rating without its slope', (c) => { c.tees[1].rating = 67.4; }, ['rating_pair:White:men']],
+        ['slope without its rating', (c) => { c.tees[1].slope = 115; }, ['rating_pair:White:men']],
+        ['ladies slope 200', (c) => { c.tees[1].rating_ladies = 76.3; c.tees[1].slope_ladies = 200; }, ['slope_range:White:ladies']],
+        ['ladies rating alone', (c) => { c.tees[1].rating_ladies = 76.3; }, ['rating_pair:White:ladies']],
+        ['two bad on one tee', (c) => { c.tees[0].rating = 20; c.tees[0].slope = 500; }, ['rating_range:Blue:men', 'slope_range:Blue:men']]
+    ];
+    for (const [name, mut, want] of ratingCases) {
+        test('RATINGS: ' + name + ' -> SOFT ' + want.join(' + ') + ', no hard, no retry', () => {
+            const v = check(card(mut));
+            assert.deepEqual(soft(v), want);
+            assert.deepEqual(v.hard, []);
+            assert.equal(v.ok, false, 'amber');
+            assert.equal(C.needsRetry(v), false, 'a rating never earns the Pro retry');
+        });
+    }
+    test('RATINGS: the boundaries 55.0 / 85.0 and 55 / 155 are inside the range', () => {
+        assert.deepEqual(check(card((c) => { c.tees[0].rating = 55; c.tees[0].slope = 55; c.tees[1].rating = 85; c.tees[1].slope = 155; })).soft, []);
+    });
     test('not JSON / wrong shape -> parse_error', () => {
         assert.deepEqual(codes(C.validateCourse(C.parseCourseOutput('nope'))), ['parse_error']);
         assert.deepEqual(codes(C.validateCourse(C.parseCourseOutput('{"players":[]}'))), ['parse_error']);
@@ -141,17 +203,33 @@ describe('course-card-validate: good card passes, every mutation fails (negative
 });
 
 describe('the course prompt and schema', () => {
-    test('asks for par, both HCP rows and tees; never for rating or slope', () => {
+    test('asks for par, both HCP rows, tees AND each tee\'s rating + slope (Manny OK 2026-11-16)', () => {
         const p = C.buildCoursePrompt({ holes: 18 });
         assert.match(p, /Par row/);
         assert.match(p, /hcp_men/);
         assert.match(p, /hcp_ladies/);
         assert.match(p, /BELOW the empty score boxes/);
-        assert.match(p, /Ignore: course rating and slope/);
+        assert.match(p, /- rating \/ slope: that tee's printed Course Rating/);
+        assert.match(p, /rating_ladies \/ slope_ladies/);
+        assert.match(p, /on the back of the card/);
+        assert.ok(!/Ignore: course rating/.test(p), 'the old "Ignore" sentence is gone');
+        assert.match(p, /hole = 0 for a rating or slope cell/);
         const props = Object.keys(C.responseSchema().properties);
-        assert.ok(!props.some((k) => /rating|slope/i.test(k)), props.join());
-        const teeProps = Object.keys(C.responseSchema().properties.tees.items.properties);
-        assert.deepEqual(teeProps.sort(), ['name', 'written', 'yards']);
+        assert.ok(!props.some((k) => /rating|slope/i.test(k)), 'ratings live on the tee, not the top level: ' + props.join());
+        const teeItems = C.responseSchema().properties.tees.items;
+        assert.deepEqual(Object.keys(teeItems.properties).sort(), ['name', 'rating', 'rating_ladies', 'slope', 'slope_ladies', 'written', 'yards']);
+        assert.deepEqual(teeItems.properties.rating, { type: 'NUMBER', nullable: true });
+        assert.deepEqual(teeItems.properties.slope, { type: 'INTEGER', nullable: true });
+        assert.deepEqual(teeItems.required, ['name', 'yards'], 'a card without ratings is still a complete answer');
+    });
+    test('one photo vs two: the prompt says so, and only the two-photo prompt mentions the back', () => {
+        const one = C.buildCoursePrompt({ holes: 18 });
+        const two = C.buildCoursePrompt({ holes: 18, photos: 2 });
+        assert.match(one, /^You are reading a photo of a BLANK printed golf scorecard/);
+        assert.ok(!/BACK of the same card/.test(one));
+        assert.match(two, /two photos of the same BLANK printed golf scorecard/);
+        assert.match(two, /the FRONT of the card \(the hole grid\) and the BACK of the same card/);
+        assert.match(two, /course rating and slope are often on the back/);
     });
     test('the course name is the only free text that reaches the prompt', () => {
         assert.match(C.buildCoursePrompt({ holes: 18, name: 'Test Links' }), /Test Links/);
@@ -235,6 +313,8 @@ describe('course mode in the handler (fake Gemini: good / bad / retry)', () => {
         // past the 25 s abort on every real card: scan-test/papago-RESULT.md).
         assert.deepEqual(sent.generationConfig.thinkingConfig, { thinkingLevel: 'low' });
         assert.match(sent.contents[0].parts[0].text, /BLANK printed golf scorecard/);
+        assert.equal(sent.contents[0].parts.length, 2, 'one photo: the prompt and one image part');
+        assert.ok(!/BACK of the same card/.test(sent.contents[0].parts[0].text), 'no back sent: the one-photo prompt');
         assert.equal(fetch.gemini()[0].init.headers['x-goog-api-key'], 'stub-key-for-tests');
         assert.ok(!fetch.gemini()[0].url.includes('key='), 'the key never goes in a URL');
         assert.equal(kv.m.get('scan:course:test-uid-080'), '1');
@@ -298,8 +378,63 @@ describe('course mode in the handler (fake Gemini: good / bad / retry)', () => {
     test('the course body is an allow-list; 9 or 18 only', () => {
         const r = S.readCourseBody({ mode: 'course', image: IMAGE, course: { holes: 18, name: 'X', lat: 1, lng: 2 }, players: ['A'] });
         assert.deepEqual(Object.keys(r.course).sort(), ['holes', 'name']);
+        assert.deepEqual(Object.keys(r).sort(), ['course', 'images']);
+        assert.equal(r.images.length, 1, 'no back sent: one photo');
         assert.deepEqual(S.readCourseBody({ mode: 'course', image: IMAGE, course: { holes: 12 } }), { error: 'bad_request' });
         assert.deepEqual(S.readCourseBody({ mode: 'course' }), { error: 'bad_image' });
+    });
+    // 2026-11-16: the back of the card as a second photo.
+    const BACK = { mimeType: 'image/png', data: Buffer.from('the back of the card').toString('base64') };
+    test('BACK: an optional second photo rides along; a bad one is bad_image, not silently dropped', () => {
+        const r = S.readCourseBody({ mode: 'course', image: IMAGE, back: BACK, course: { holes: 18 } });
+        assert.equal(r.images.length, 2);
+        assert.deepEqual(r.images[1], { mimeType: 'image/png', data: BACK.data });
+        assert.deepEqual(S.readCourseBody({ mode: 'course', image: IMAGE, back: { mimeType: 'image/jpeg', data: 'not base64!!' }, course: { holes: 18 } }), { error: 'bad_image' });
+        assert.deepEqual(S.readCourseBody({ mode: 'course', image: IMAGE, back: { mimeType: 'image/gif', data: BACK.data }, course: { holes: 18 } }), { error: 'bad_image' });
+        assert.deepEqual(S.readCourseBody({ mode: 'course', image: IMAGE, back: 'nope', course: { holes: 18 } }), { error: 'bad_image' });
+        assert.equal(S.readCourseBody({ mode: 'course', image: IMAGE, back: null, course: { holes: 18 } }).images.length, 1, 'null = no back');
+    });
+    test('BACK: two photos -> ONE Gemini call with the two-photo prompt and two image parts, ONE course scan used', async () => {
+        const { out, fetch, kv } = await scan({ flash: [gem(card((c) => { c.tees[0].rating = 72.1; c.tees[0].slope = 128; }))] },
+            { body: { mode: 'course', image: IMAGE, back: BACK, course: { holes: 18, name: 'Test Links' } } });
+        assert.equal(out.status, 'ok');
+        assert.equal(fetch.gemini().length, 1);
+        const parts = JSON.parse(fetch.gemini()[0].init.body).contents[0].parts;
+        assert.equal(parts.length, 3);
+        assert.match(parts[0].text, /the FRONT of the card \(the hole grid\) and the BACK of the same card/);
+        assert.deepEqual(parts[1].inline_data, { mime_type: 'image/jpeg', data: IMAGE.data });
+        assert.deepEqual(parts[2].inline_data, { mime_type: 'image/png', data: BACK.data });
+        assert.equal(kv.m.get('scan:course:test-uid-080'), '1');
+        assert.equal(out.courseScansLeft, 2);
+    });
+    test('BACK: the Pro retry carries both photos too', async () => {
+        const { out, fetch } = await scan({ flash: [gem(card((c) => { c.par[0] = 9; }))], pro: [gem(card())] },
+            { body: { mode: 'course', image: IMAGE, back: BACK, course: { holes: 18 } } });
+        assert.equal(out.retried, true);
+        assert.equal(fetch.gemini().length, 2);
+        assert.equal(JSON.parse(fetch.gemini()[1].init.body).contents[0].parts.length, 3);
+    });
+    test('RATINGS: the response carries each tee\'s rating / slope and the log line counts the pairs, never the values', async () => {
+        const { out, logs } = await scan({ flash: [gem(card((c) => {
+            c.tees[0].rating = 72.1; c.tees[0].slope = 128;
+            c.tees[1].rating = 67.4; c.tees[1].slope = 115; c.tees[1].rating_ladies = 72.5; c.tees[1].slope_ladies = 122;
+        }))] });
+        assert.equal(out.status, 'ok');
+        assert.deepEqual(out.result.tees.map((t) => [t.name, t.rating, t.slope, t.rating_ladies, t.slope_ladies]),
+            [['Blue', 72.1, 128, null, null], ['White', 67.4, 115, 72.5, 122]]);
+        assert.deepEqual(out.validation.soft, []);
+        const line = JSON.parse(logs[0]);
+        assert.equal(line.ratings, 2);
+        assert.equal(line.photos, 1);
+        assert.ok(!logs[0].includes('72.1') && !logs[0].includes('128'), 'the log carries counts only');
+    });
+    test('RATINGS: a bad slope is amber in the response and spends NO Pro call', async () => {
+        const { out, fetch } = await scan({ flash: [gem(card((c) => { c.tees[0].rating = 72.1; c.tees[0].slope = 12; }))] });
+        assert.equal(out.status, 'ok');
+        assert.equal(out.retried, false);
+        assert.equal(fetch.gemini().length, 1);
+        assert.deepEqual(out.validation.hard, []);
+        assert.deepEqual(out.validation.soft, [{ code: 'slope_range', row: 'Blue', who: 'men' }]);
     });
     test('no mode -> the score path (a course-only body is refused as a score body)', async () => {
         const fetch = stubFetch({});
@@ -316,6 +451,9 @@ describe('privacy page: the course-card scan sentence', () => {
         const li = (/<li><strong>Scanning a course's printed card\.<\/strong>[^<]*<\/li>/.exec(html) || [''])[0];
         assert.ok(li, 'the course-card sentence is on the page');
         assert.match(li, /Only that photo, the course name and the number of holes/);
+        // 2026-11-16: the optional back photo and the ratings it is for.
+        assert.match(li, /plus a photo of the back of the card, if you add one so the tee ratings can be read/);
+        assert.match(li, /tee yardages and each tee's course rating and slope/);
         assert.match(li, /No player names, scores, handicaps or location are sent/);
         assert.match(li, /photo is not stored/);
         assert.match(li, /own free count/);
