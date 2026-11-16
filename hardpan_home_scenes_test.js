@@ -26,7 +26,9 @@
 // WHAT IT CANNOT PROVE: Safari, a real Cloudflare edge, pinch zoom.
 // BASELINE against pre-build main 55077321 (hardpan-home.html without the fold), measured with
 // this exact file copied there: the file cannot load (the fold section is not on the page, so the module-level
-// slice assertion throws: 1 fail, 0 of the 18 tests run); here: 23 pass / 0 fail (13 source + 10 Chrome).
+// slice assertion throws: 1 fail, 0 of the 18 tests run); here: 24 pass / 0 fail (13 source + 11 Chrome).
+// 2.8b (ADVISOR-20261116-1000, a scroll that begins on a tile must open nothing) against main 91d0f2b7, which opened on
+// touchend: 0 pass / 1 fail ("a scroll opened something: gps, weekly-code, live-tv, scene weekly, scene tournaments"); here it passes.
 // NEGATIVE CONTROLS (run by hand 2026-11-15, each restored by cp from a scratchpad copy, sha printed RESTORED-OK):
 //   - site-features.js with the data-open-key handler emptied: 13 pass / 5 fail (2.2 to 2.6: no picture and no
 //     tile opens the viewer, and the taps after them land on a page in the wrong state).
@@ -288,6 +290,17 @@ class Tab {
         await this.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
         await sleep(350);
     }
+    // a scroll that begins on the element: the finger lands on it, moves up `dy` px in a few steps, lifts (touch events only)
+    async fingerSwipeUp(sel, dy) {
+        await this.eval(`(() => { document.querySelector(${JSON.stringify(sel)}).scrollIntoView({ block: 'center', behavior: 'instant' }); return true; })()`);
+        await sleep(350);
+        const p = await this.eval(`(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }; })()`);
+        await this.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y }] });
+        for (let i = 1; i <= 6; i++) { await sleep(25); await this.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: p.x, y: p.y - Math.round(dy * i / 6) }] }); }
+        await sleep(25);
+        await this.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await sleep(450);
+    }
     async key(key) {
         await this.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code: key, windowsVirtualKeyCode: { Escape: 27 }[key] || 0 });
         await this.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: key });
@@ -430,6 +443,34 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
             if (c.fv) bad.push(k + ': X did not close');
         }
         assert.deepEqual(bad, [], 'tiles that did not open on a finger tap: ' + bad.join(' | '));
+        assert.deepEqual(tab.errors, []);
+    });
+    test('2.8b 390x844 with a FINGER: a scroll that begins on a tile or on a scene card scrolls the page and opens NOTHING (ADVISOR-20261116-1000: "swipe up to scroll down, it opens up the closest tile"); the same finger tapping the tile afterwards still opens it', async () => {
+        await tab.metrics(390, 844);
+        await tab.touchOn();
+        await tab.go(base + '/');
+        const keys = await tab.eval(`[...document.querySelectorAll('.glance-tiles .gt[data-open-key]')].map((b) => b.getAttribute('data-open-key'))`);
+        const opened = [];
+        for (const k of [keys[0], keys[Math.floor(keys.length / 2)], keys[keys.length - 1]]) {
+            const sel = '.glance-tiles .gt[data-open-key="' + k + '"]';
+            const before = await tab.eval('Math.round(window.scrollY)');
+            await tab.fingerSwipeUp(sel, 160);
+            const s = await tab.eval(STATE);
+            const after = await tab.eval('Math.round(window.scrollY)');
+            if (s.fv || s.sheet) opened.push(k + ':' + JSON.stringify({ fv: s.fv, sheet: s.sheet }));
+            assert.ok(after > before, k + ': the swipe scrolled the page (' + before + ' -> ' + after + ')');
+        }
+        for (const d of ['weekly', 'tournaments']) {
+            await tab.fingerSwipeUp('.scene[data-sheet="' + d + '"]', 160);
+            const s = await tab.eval(STATE);
+            if (s.fv || s.sheet) opened.push('scene ' + d + ':' + JSON.stringify({ fv: s.fv, sheet: s.sheet }));
+        }
+        assert.deepEqual(opened, [], 'a scroll opened something: ' + opened.join(' | '));
+        // positive: the finger that only taps still opens the tile
+        await tab.fingerTap('.glance-tiles .gt[data-open-key="' + keys[keys.length - 1] + '"]');
+        const t = await tab.eval(STATE);
+        assert.ok(t.fv && t.title, 'a tap on the last tile opens the viewer: ' + JSON.stringify(t));
+        await tab.fingerTap('#fv-x');
         assert.deepEqual(tab.errors, []);
     });
     test('2.9 /organizers at 390x844: no sideways scroll, every button 44 px or taller, text 15 px or larger, a finger on Run an event goes to /tournaments (the domain switch of 2026-11-16)', async () => {

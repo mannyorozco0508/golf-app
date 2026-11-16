@@ -177,22 +177,19 @@
         if (i >= 0) open(i, from);
         return i >= 0;
     }
-    // ADVISOR-20261115-2015 (Manny, iPhone Chrome: the lower tiles "don't lead to anything"; not reproduced in Chrome's touch
-    // emulation, and WebKit cannot be driven on the Mac): the tile opens on the finger's touchend as well as on click, the second
-    // of the pair within 700 ms being ignored, and the viewer is shown by removing hidden AND setting display, so neither a
-    // swallowed click nor a stale [hidden] style leaves a dead tile. Mouse and keyboard still arrive as click.
-    var lastKeyTap = 0;
+    // A TILE OPENS ON A TAP, NEVER ON A SCROLL (ADVISOR-20261116-1000, Manny 00:59: "if I tap near one of them and swipe up to
+    // scroll down, it opens up the closest tile"). 1d68eeb0 had opened on touchend too (ADVISOR-20261115-2015, the "dead" tiles,
+    // which turned out to be an old page in an open tab, ADVISOR-20261116-0049); a touchend arrives at the end of a swipe as well,
+    // so a scroll that began on a tile opened it. The tile is a <button>: the browser's own click is the tap and nothing else
+    // (iOS fires click only for a tap, never at the end of a scroll; Chrome the same), and a mouse or the keyboard arrive as
+    // click too. The viewer is still shown by removing hidden AND setting display. No touch listener here at all.
     function tileHit(ev) {
         var b = ev.target && ev.target.closest && ev.target.closest('[data-open-key]');
         if (!b) return;
-        var now = Date.now();
-        if (now - lastKeyTap < 700) { ev.preventDefault(); return; }
-        lastKeyTap = now;
         ev.preventDefault();
         openKey(b.getAttribute('data-open-key'), b);
     }
     document.addEventListener('click', tileHit);
-    document.addEventListener('touchend', tileHit, { passive: false });
     $('fv-x').addEventListener('click', function () { close(false); });
     $('fv-prev').addEventListener('click', function () { show(cur - 1, true); });
     $('fv-next').addEventListener('click', function () { show(cur + 1, true); });
