@@ -320,7 +320,7 @@
     .pb-r { text-align:right; font-size:15px; opacity:.92; line-height:1.3; }
     .pb-r em { display:inline-block; font-style:normal; background:var(--lime); color:var(--g); font-weight:800; padding:4px 10px; border-radius:999px; margin-bottom:4px; font-size:15px; }
     /* PRICE D: the comparison block, the first section after the fold. */
-    .cmp { margin:26px auto 0; background:#fff; border:1px solid var(--line); border-radius:22px; padding:26px 28px; max-width:900px; }
+    .cmp { margin:26px auto 0; background:#fff; border:1px solid var(--line); border-radius:22px; padding:26px 28px; max-width:900px; scroll-margin-top:80px; }   /* an anchor jump lands the heading under the 64 px sticky bar otherwise (ADVISOR-20261116-1416) */
     .cmp h2 { font-size:30px; font-weight:900; letter-spacing:-.02em; text-align:center; line-height:1.1; }
     .cmp-sub { text-align:center; color:var(--mut); font-size:15px; margin:8px 0 18px; }
     .cmp table { width:100%; border-collapse:collapse; font-size:15px; }
@@ -410,7 +410,7 @@
         .pb-r { text-align:center; line-height:1.3; }
         .pb-r em { margin-bottom:2px; }
         /* PRICE D on a phone: each row is the HardPan line (what + Included) and one grey "typical" line. */
-        .cmp { margin:16px 16px 0; padding:16px 14px; border-radius:18px; }
+        .cmp { margin:16px 16px 0; padding:16px 14px; border-radius:18px; scroll-margin-top:60px; }
         .cmp h2 { font-size:24px; }
         .cmp-sub { font-size:15px; margin-bottom:10px; }
         .cmp table, .cmp tbody, .cmp tr, .cmp td { display:block; width:auto; }
