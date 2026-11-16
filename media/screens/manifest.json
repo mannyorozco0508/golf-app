@@ -211,7 +211,12 @@
         "/media/screens/results-886.webp"
       ],
       "width": 886,
-      "height": 1920
+      "height": 1920,
+      "recaptured": "2026-11-16 (ADVISOR-20261115-2017, local branch web-208-recap-pics)",
+      "captured": "feat-207-recap-red (release-207 fa176a69 + the colour-rule fix) settlement.html in headless Chrome 390x844 @3x (scratchpad recapred/cap.js: tools/lib/journey.js stand-in database, nothing live, 0 writes): the Round Receipt of a stake-free round EZS6HH at Grayhawk Golf Club (Talon), Tuesday Nov 10, Palo verde tees, 'This is me' = Sam; FINAL SCORES Sam 8.4 34/38 72 64 -8 and Paul 20 45/43 88 68 -4 in red, Josh 12 and Bob 15 +1 in ink; skins net no carry (no amounts). 1170x2532 resized with sharp to 886x1920 and 400x867 (cover, top), WebP 78 / 80. Why: the old picture showed the +/- under par (-8, -3 / -4) in GREEN; the standing rule (Manny Nov 14) is under par red, even / over the normal colour (ADVISOR-20261115-2017).",
+      "previous": {
+        "captured": "unrecorded (the entry had no captured line): the same Grayhawk Talon EZS6HH scene, +/- under par in green"
+      }
     },
     {
       "key": "settle",

@@ -4,13 +4,17 @@
   "shots": [
     {
       "key": "round-recap",
-      "source": "appstore-207 08-round-recap.png",
+      "source": "feat-207-recap-red (release-207 fa176a69 + the colour-rule fix) settlement.html in headless Chrome 390x844 @3x (scratchpad recapred/cap.js: tools/lib/journey.js stand-in database, nothing live, 0 writes): the 40A / 70 test round FM9GHW at Papago (demo golfers Sam, Josh, Bob, Paul; Wednesday Nov 11, White tees), the Receipt's Recap card button tapped -> the Round recap screen, Include money off (no amount on screen): Sam 72 / 64 / -8 and Paul 89 / 69 / -3 in red, Josh and Bob +1 in ink. 1170x2532 resized with sharp to 940x2040 and 400x868 (cover, top), WebP 78 / 80. The screen is the current app's (Include money switch, Messages / Instagram story), not the 2.0.6 App Store frame. Why: the old picture showed the +/- under par (-8, -3 / -4) in GREEN; the standing rule (Manny Nov 14) is under par red, even / over the normal colour (ADVISOR-20261115-2017).",
       "files": [
         "/media/home/round-recap-400.webp",
         "/media/home/round-recap-940.webp"
       ],
       "width": 940,
-      "height": 2040
+      "height": 2040,
+      "recaptured": "2026-11-16 (ADVISOR-20261115-2017, local branch web-208-recap-pics)",
+      "previous": {
+        "source": "appstore-207 08-round-recap.png"
+      }
     },
     {
       "key": "multi-group-board",
