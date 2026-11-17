@@ -3,6 +3,32 @@
   "folder": "/media/screens/",
   "screens": [
     {
+      "key": "red-under",
+      "card": "f-red-under",
+      "headline": "Red means under.",
+      "files": [
+        "/media/screens/red-under-400.webp",
+        "/media/screens/red-under-940.webp"
+      ],
+      "width": 940,
+      "height": 1910,
+      "captured": "2.0.9 build (release-207 639f7c35, the build uploaded to App Store Connect as 2.0.9 (1)), gps-beta/www copied to scratchpad, headless Chrome on the repo's stub phone server (tools/sim/lib/phone.js, every Firebase URL blocked, nothing live), iPhone 6.9-inch 440x956 @3x = 1320x2868, stand-in golfers Alex P., Jordan K., Sam R., Casey M. at Papago thru 9 (code HPDEMO, a stand-in), no money game on the round. Scene: the round's Board tab -> Leaderboard, ranked Net: the To Par column -6 / -4 / -3 / -3 and the Leading the Field banner's -6 in red. The same raw capture as the FB post shot 06-live-games (Manny approved), scratchpad/fbshots/raw/06-live-games.png: the top 186 px (the drawn status bar) cut off, saved as WebP 940 and 400 wide with sharp (scratchpad/web209/make-webp.js); the original PNG is untouched.",
+      "released": "2.0.9 release day (Nov 17 2026): moved from manifest.coming into screens[] (New in 2.0.9, the first row of #features) when iOS 2.0.9 (1) went Ready for Distribution (Grok 3:08 PM AZ) on Manny's typed 'OK web flip 2.0.9'."
+    },
+    {
+      "key": "ask-red",
+      "card": "f-ask-red",
+      "headline": "HardPan’s replies read the same way.",
+      "files": [
+        "/media/screens/ask-red-400.webp",
+        "/media/screens/ask-red-940.webp"
+      ],
+      "width": 940,
+      "height": 1910,
+      "captured": "2.0.9 build (release-207 639f7c35, the build uploaded to App Store Connect as 2.0.9 (1)), gps-beta/www copied to scratchpad, headless Chrome on the repo's stub phone server (tools/sim/lib/phone.js, every Firebase URL blocked, nothing live), iPhone 6.9-inch 440x956 @3x = 1320x2868, stand-in golfers Alex P., Jordan K., Sam R., Casey M. at Papago thru 9 (code HPDEMO, a stand-in), no money game on the round. Scene: Menu -> Ask HardPan, five questions asked (who's winning the skins, how am I doing, who's leading, where do I stand, the Who's winning? chip) so the log scrolls past its intro; the replies 'Alex leads at -6 net (thru 9). Sam -4 · Casey -3 · Jordan -3' and 'You're 1 at -6 net' with only the under-par figures in the red span (tp-under, #b3261e). scratchpad/web209/raw/209-ask-red.png (scratchpad/web209/cap.js ask): the top 186 px cut off, WebP 940 and 400 wide with sharp; the original PNG is untouched.",
+      "released": "2.0.9 release day (Nov 17 2026): moved from manifest.coming into screens[] (New in 2.0.9, the first row of #features) when iOS 2.0.9 (1) went Ready for Distribution (Grok 3:08 PM AZ) on Manny's typed 'OK web flip 2.0.9'."
+    },
+    {
       "key": "smooth-slope",
       "card": "f-smooth-slope",
       "headline": "Read the green.",
@@ -512,35 +538,6 @@
       }
     }
   ],
-  "coming": {
-    "_about": "2.0.9 site (web-209-coming, Nov 16): the Coming in 2.0.9 row (#coming209), above EVERYTHING IN THE APP while 2.0.9 waits for Apple. Not in screens[] (that list is the cards inside #features, in page order). Release day: flip-209-to-released.sh moves the row into #features; then move these two into screens[] at the top.",
-    "screens": [
-      {
-        "key": "red-under",
-        "card": "f-red-under",
-        "headline": "Red means under.",
-        "files": [
-          "/media/screens/red-under-400.webp",
-          "/media/screens/red-under-940.webp"
-        ],
-        "width": 940,
-        "height": 1910,
-        "captured": "2.0.9 build (release-207 639f7c35, the build uploaded to App Store Connect as 2.0.9 (1)), gps-beta/www copied to scratchpad, headless Chrome on the repo's stub phone server (tools/sim/lib/phone.js, every Firebase URL blocked, nothing live), iPhone 6.9-inch 440x956 @3x = 1320x2868, stand-in golfers Alex P., Jordan K., Sam R., Casey M. at Papago thru 9 (code HPDEMO, a stand-in), no money game on the round. Scene: the round's Board tab -> Leaderboard, ranked Net: the To Par column -6 / -4 / -3 / -3 and the Leading the Field banner's -6 in red. The same raw capture as the FB post shot 06-live-games (Manny approved), scratchpad/fbshots/raw/06-live-games.png: the top 186 px (the drawn status bar) cut off, saved as WebP 940 and 400 wide with sharp (scratchpad/web209/make-webp.js); the original PNG is untouched."
-      },
-      {
-        "key": "ask-red",
-        "card": "f-ask-red",
-        "headline": "HardPan’s replies read the same way.",
-        "files": [
-          "/media/screens/ask-red-400.webp",
-          "/media/screens/ask-red-940.webp"
-        ],
-        "width": 940,
-        "height": 1910,
-        "captured": "2.0.9 build (release-207 639f7c35, the build uploaded to App Store Connect as 2.0.9 (1)), gps-beta/www copied to scratchpad, headless Chrome on the repo's stub phone server (tools/sim/lib/phone.js, every Firebase URL blocked, nothing live), iPhone 6.9-inch 440x956 @3x = 1320x2868, stand-in golfers Alex P., Jordan K., Sam R., Casey M. at Papago thru 9 (code HPDEMO, a stand-in), no money game on the round. Scene: Menu -> Ask HardPan, five questions asked (who's winning the skins, how am I doing, who's leading, where do I stand, the Who's winning? chip) so the log scrolls past its intro; the replies 'Alex leads at -6 net (thru 9). Sam -4 · Casey -3 · Jordan -3' and 'You're 1 at -6 net' with only the under-par figures in the red span (tp-under, #b3261e). scratchpad/web209/raw/209-ask-red.png (scratchpad/web209/cap.js ask): the top 186 px cut off, WebP 940 and 400 wide with sharp; the original PNG is untouched."
-      }
-    ]
-  },
   "try_gps": {
     "file": null,
     "deleted": "2026-11-10 (Manny typed OK delete saved Esri picture)",

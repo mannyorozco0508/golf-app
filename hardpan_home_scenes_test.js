@@ -115,8 +115,8 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
         assert.ok(keys.length >= 70, keys.length);
         const known = new Set(cardKeys.concat(shots.map((s) => s.shot)));
         keys.forEach((k) => assert.ok(known.has(k), 'nothing opens for ' + k));
-        // 2.0.9 site (web-209-coming, Nov 16): + the two cards of the Coming in 2.0.9 row (#coming209, above #features) = 40.
-        assert.equal(cardKeys.length, 40, 'the rows still hold the 38 cards main had, + the 2 of Coming in 2.0.9');
+        // 2.0.9 site (web-209-coming, Nov 16): + the two cards of the Coming in 2.0.9 row = 40; 2.0.9 release (Nov 17): the same two, now the New in 2.0.9 row inside #features.
+        assert.equal(cardKeys.length, 40, 'the rows still hold the 38 cards main had, + the 2 of New in 2.0.9');
     });
     test('the eleven pictures of media/home: each once, its group, a real alt, files on disk at the manifest\'s sizes, the three TV ones wide; no weekly-results (it shows amounts)', () => {
         assert.deepEqual(shots.map((s) => s.shot), ['round-recap', 'live-tv', 'live-board-phone', 'multi-group-board', 'board36', 'board36-tv', 'skins-tab', 'pairings-tab', 'checkin-table', 'checkin-tv', 'gps-every-yard']);
@@ -159,9 +159,11 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
         const iGlance = body.indexOf('id="everything"'), iFeat = body.indexOf('<section class="feat" id="features">'), i208 = body.indexOf('<div class="grp" id="g-update">'), iNew = body.indexOf('<div class="grp" id="g-new">'), iFv = body.indexOf('<div class="fv" id="fv"');
         assert.ok(iGlance > 0 && iFeat > iGlance && i208 > iFeat && iNew > i208 && iFv > iNew, [iGlance, iFeat, i208, iNew, iFv].join(' '));
         assert.equal(body.indexOf('id="coming208"'), -1, 'the Coming in 2.0.8 section is still on the page');
-        // 2.0.9 site (web-209-coming, Nov 16): the Coming in 2.0.9 section sits between the tiles and #features, as #coming208 did.
-        const i209 = body.indexOf('<section class="feat coming" id="coming209"');
-        assert.ok(i209 > iGlance && i209 < iFeat, 'the Coming in 2.0.9 row is not between the tiles and #features: ' + [iGlance, i209, iFeat].join(' '));
+        // 2.0.9 release re-pin (Nov 17): the Coming in 2.0.9 section moved INTO #features as "New in 2.0.9" (#g-update, first);
+        // the 2.0.8 row is #g-update208 right under it, then New in 2.0.7 (#g-new).
+        assert.equal(body.indexOf('id="coming209"'), -1, 'the Coming in 2.0.9 section is still on the page');
+        const i208b = body.indexOf('<div class="grp" id="g-update208">');
+        assert.ok(i208b > i208 && i208b < iNew, 'New in 2.0.8 is not between New in 2.0.9 and New in 2.0.7: ' + [i208, i208b, iNew].join(' '));
         assert.equal((body.match(/<div class="fv" id="fv"/g) || []).length, 1);
         assert.match(body, /<nav class="wrap toplinks" aria-label="Main">\s*<div class="links">/);
         assert.match(body, /<div class="stick" id="stick" aria-label="HardPan Golf">\s*<div class="wrap stick-in">\s*<a class="logo" href="\/"><img src="\/media\/home\/hardpan-golf-lockup\.png" alt="HardPan Golf" width="1278" height="222"><\/a>/);
@@ -412,8 +414,8 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         s = await tab.eval(STATE);
         assert.equal(s.sheet, null);
         const slides = await tab.eval(`document.querySelectorAll('#fv-track .fv-s').length`);
-        // 2.0.9 site (web-209-coming, Nov 16): + the two Coming in 2.0.9 cards (the viewer walks every .fc on the page).
-        assert.equal(slides, 40 + 11, 'the viewer holds the 40 cards (38 + 2 coming in 2.0.9) and the 11 media/home pictures (six added 2026-11-16), each once');
+        // 2.0.9 site (web-209-coming, Nov 16): + the two 2.0.9 cards (the viewer walks every .fc on the page); 2.0.9 release (Nov 17): the same two, now inside #features first.
+        assert.equal(slides, 40 + 11, 'the viewer holds the 40 cards (38 + 2 New in 2.0.9) and the 11 media/home pictures (six added 2026-11-16), each once');
         // a phone of the fan is a door into its sheet too
         await tab.tapEl('.fp.c');
         s = await tab.eval(STATE);

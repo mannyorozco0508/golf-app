@@ -52,19 +52,17 @@ const JS = read('site-features.js');
 const feat = (/<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(html) || [])[1] || '';
 // 2.0.8 site (Nov 15): the "Coming in 2.0.8" row was a section of its own just above #features while 2.0.8 was in review.
 // 2.0.8 release re-pin: flip-to-released.sh moved it INTO #features as "New in 2.0.8" (#g-update), the first row, tags gone.
-const update208 = (/<div class="grp" id="g-update">[\s\S]*?<\/div>(?=\n    <div class="grp" id="g-new">)/.exec(feat) || [''])[0];
+// 2.0.9 release re-pin (Nov 17): the New in 2.0.9 row is now #g-update (first); the 2.0.8 row moved to #g-update208.
+const update208 = (/<div class="grp" id="g-update208">[\s\S]*?<\/div>(?=\n    <div class="grp" id="g-new">)/.exec(feat) || [''])[0];
+const update209 = (/<div class="grp" id="g-update">[\s\S]*?<\/div>(?=\n    <div class="grp" id="g-update208">)/.exec(feat) || [''])[0];
 // The 2.0.8 features: named ONLY in the New in 2.0.8 row (its two cards and its Also new list), nowhere else on the page.
-// 2.0.9 site (web-209-coming, Nov 16): iOS 2.0.9 (1) is uploaded to App Store Connect (not yet in review). Its two
-// golfer-visible changes (under par in red on every board, and the same red inside HardPan's sentences) sit in a
-// "Coming in 2.0.9" row, a section of its own just above #features, tagged, exactly as #coming208 did. Release day:
-// scratchpad/web209/flip-209-to-released.sh moves it in as "New in 2.0.9".
-const coming209 = (/<section class="feat coming" id="coming209"[\s\S]*?<\/section>/.exec(html) || [''])[0];
+// 2.0.9 site (web-209-coming, Nov 16): iOS 2.0.9 (1) was uploaded to App Store Connect; its two golfer-visible changes
+// (under par in red on every board, and the same red inside HardPan's sentences) sat in a "Coming in 2.0.9" row above
+// #features, tagged. 2.0.9 RELEASE RE-PIN (Nov 17, iOS 2.0.9 (1) Ready for Distribution 3:08 PM AZ, Manny's typed
+// "OK web flip 2.0.9"): the row moved INTO #features as "New in 2.0.9" (#g-update), first, tags and their CSS gone,
+// manifest.coming gone (its two screens lead screens[]).
 const rawHome = read('hardpan-home.html');
-// the raw block (its comment, the section, the end marker) and its CSS (.fsoon, and the commented .coming / .gsoon pair)
-const block209 = (/<!-- 2\.0\.9 site \(web-209-coming[^\n]*\n(?:[^\n]*\n)*?<!-- \/2\.0\.9 coming -->\n/.exec(rawHome) || [''])[0];
-const css209 = [(/    \.fsoon \{[^\n]*\n/.exec(rawHome) || [''])[0], (/    \/\* 2\.0\.9 site \(web-209-coming[\s\S]*?    \.gsoon \{[^\n]*\n/.exec(rawHome) || [''])[0]];
-const rawHomeNo209 = css209.reduce((h, c) => h.replace(c, ''), rawHome.replace(block209, ''));
-// The 2.0.9 features: named ONLY in the Coming in 2.0.9 row, never anywhere else on the page as available. (The 2.0.8
+// The 2.0.9 features: named ONLY in the New in 2.0.9 row, never anywhere else on the page. (The 2.0.8
 // row's own "Under par in red on the GPS screen." is 2.0.8's and is taken out with that row before this is matched.)
 // The All-in / GPS v2 plans ladder is in the 2.0.9 code but behind a live switch that is off: never on the page.
 const UNSHIPPED_209 = /red means under|replies read the same way|under[- ]par (numbers? )?(in|shows? in) red|\bin red\b|is red too|coming in 2\.0\.9|new in 2\.0\.9|2\.0\.9/i;
@@ -84,7 +82,7 @@ for (const m of feat.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([
         video: (/<video\b[^>]*>/.exec(body) || [null])[0],
         soon: (/<div class="fsoon">([^<]*)<\/div>/.exec(body) || [])[1] || null });
 }
-const groups = [...feat.matchAll(/<div class="grp" id="g-([a-z]+)">[\s\S]*?<h2>([^<]+)<\/h2>[\s\S]*?<ul class="row"[^>]*>([\s\S]*?)<\/ul>/g)]
+const groups = [...feat.matchAll(/<div class="grp" id="g-([a-z0-9]+)">[\s\S]*?<h2>([^<]+)<\/h2>[\s\S]*?<ul class="row"[^>]*>([\s\S]*?)<\/ul>/g)]
     .map((m) => ({ id: m[1], name: m[2], n: (m[3].match(/<li class="fc"/g) || []).length }));
 
 // The Just say it table, read out of the script exactly as the page runs it.
@@ -97,6 +95,8 @@ function sayTable() {
 const HEADLINES = {
     // 2.0.8 release re-pin: the Coming in 2.0.8 row moved into #features as 'New in 2.0.8', first. Its slope card keeps
     // "Read the green."; the 2.0.7 slope card (the older, blockier drawing) was renamed "Slope on the green." the same day.
+    // 2.0.9 release re-pin (Nov 17): the Coming in 2.0.9 row moved into #features as 'New in 2.0.9', first.
+    'New in 2.0.9': ['Red means under.', 'HardPan’s replies read the same way.'],
     'New in 2.0.8': ['Read the green.', 'Nothing covers the arrows.'],
     // 2.0.7 site update (web-207-site, Manny's standing rule 2026-11-14 15:57: what ships goes on the site in the same
     // release cycle, with real screenshots): a 'New in 2.0.7' row of four cards cut from the 2.0.7 App Store screenshots.
@@ -118,8 +118,9 @@ describe('1. the 25 cards', () => {
         // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12, 32 cards.
         // 2.0.7 re-pin (2026-11-14): New in 2.0.7 (4) leads, 36 cards.
         // 2.0.8 release re-pin: New in 2.0.8 (2) leads, 38 cards.
-        assert.deepEqual(groups.map((g) => g.n), [2, 4, 6, 6, 5, 12, 3]);
-        assert.equal(cards.length, 38);
+        // 2.0.9 release re-pin (Nov 17): New in 2.0.9 (2) leads, 40 cards.
+        assert.deepEqual(groups.map((g) => g.n), [2, 2, 4, 6, 6, 5, 12, 3]);
+        assert.equal(cards.length, 40);
         const at = html.indexOf('id="features"');
         assert.ok(at > html.indexOf('class="wrap hero"') && at < html.indexOf('class="wrap split"'), 'the rows are not between the hero and the golfer/organizer panels');
         assert.match(html, /EVERYTHING IN THE APP/);
@@ -137,10 +138,10 @@ describe('1. the 25 cards', () => {
         const also = (/<ul class="new207" aria-label="Also new in 2\.0\.8">([\s\S]*?)<\/ul>/.exec(update208) || [])[1] || '';
         assert.equal((also.match(/<li>/g) || []).length, 7);   // Nov 15 3:22 PM re-pin: + the whole-course slope download (was in the old slope card's line)
         const manifest = JSON.parse(read('media/screens/manifest.json'));
-        assert.equal(manifest.screens.length, 38, 'the two 2.0.8 screens are in screens[] (that is the #features list)');
-        // 2.0.9 site (web-209-coming, Nov 16): manifest.coming is back, holding the two Coming in 2.0.9 screens (not screens[]).
-        assert.deepEqual(manifest.coming.screens.map((s) => s.key), ['red-under', 'ask-red'], 'manifest.coming holds only the 2.0.9 screens');
-        assert.deepEqual(manifest.screens.slice(0, 2).map((s) => s.key), cs.map((m) => m[2]), 'the 2.0.8 screens lead screens[]');
+        // 2.0.9 release re-pin (Nov 17): the two 2.0.9 screens lead screens[] (40); manifest.coming is gone again.
+        assert.equal(manifest.screens.length, 40, 'the 2.0.8 and 2.0.9 screens are in screens[] (that is the #features list)');
+        assert.equal(manifest.coming, undefined, 'manifest.coming is gone: nothing is coming any more');
+        assert.deepEqual(manifest.screens.slice(2, 4).map((s) => s.key), cs.map((m) => m[2]), 'the 2.0.8 screens follow the 2.0.9 pair in screens[]');
         cs.forEach((m) => {
             const body = m[3], img = (/<img\b[^>]*>/.exec(body) || [''])[0], k = m[2];
             assert.match(body, new RegExp('<button type="button" class="ph" data-open="' + k + '" aria-label="See [^"]+ full screen">'));
@@ -166,7 +167,9 @@ describe('1. the 25 cards', () => {
             // 2.0.8 release re-pin: the smooth-slope card carries Manny's own line (OK via Advisor, Nov 15 3:22 PM; 136
             // characters, two sentences), shown and previewed in the Coming in 2.0.8 row before it moved in here. That
             // one card is allowed its line; every other card keeps the 20-90 bound.
-            assert.ok(c.p.length >= 20 && c.p.length <= (c.key === 'smooth-slope' ? 140 : 90), c.h + ': the one line is "' + c.p + '"');
+            // 2.0.9 release re-pin (Nov 17): the two New in 2.0.9 cards keep the lines Manny saw on the Coming in 2.0.9 row since
+            // Nov 16 (three short sentences each, up to 170 characters); every other card keeps the 20-90 bound.
+            assert.ok(c.p.length >= 20 && c.p.length <= (c.key === 'smooth-slope' ? 140 : (c.key === 'red-under' || c.key === 'ask-red') ? 170 : 90), c.h + ': the one line is "' + c.p + '" (' + c.p.length + ')');
             assert.ok(/<span class="eb">[A-Z ]+<\/span>/.test(c.body), c.h + ': no tag');
             assert.ok(c.img, c.h + ': no screen image');
             const alt = (/\balt="([^"]*)"/.exec(c.img) || [])[1];
@@ -190,7 +193,8 @@ describe('1. the 25 cards', () => {
         // 52A batch 1 re-pin (2026-11-12): seven Tournaments cards joined the Organize row, each a 780-wide @2x capture.
         // 2.0.7 re-pin (2026-11-14): + the four New in 2.0.7 screens, 940 wide.
         // 2.0.8 release re-pin: + the two New in 2.0.8 screens, 940 wide.
-        assert.equal(wide, 38, 'only ' + wide + ' of 38 screens are 2x or sharper');
+        // 2.0.9 release re-pin (Nov 17): + the two New in 2.0.9 screens, 940 wide.
+        assert.equal(wide, 40, 'only ' + wide + ' of 40 screens are 2x or sharper');
     });
 
     // RE-CAPTURE (Nov 10): hazards, range, my-bag and weekly-code were re-shot from the 2.0.5 web app
@@ -201,7 +205,7 @@ describe('1. the 25 cards', () => {
     test('the four re-captured screens are the 3x captures; the screens manifest lists all 25 and marks the old files unused', () => {
         const manifest = JSON.parse(read('media/screens/manifest.json'));
         assert.equal(manifest.folder, '/media/screens/');
-        assert.equal(manifest.screens.length, 38);   // 52A batch 1 re-pin (2026-11-12): 25 + 7 Tournaments screens; 2.0.7 re-pin (2026-11-14): + 4 New in 2.0.7; 2.0.8 release: + 2 New in 2.0.8
+        assert.equal(manifest.screens.length, 40);   // 52A batch 1 re-pin (2026-11-12): 25 + 7 Tournaments screens; 2.0.7 re-pin (2026-11-14): + 4 New in 2.0.7; 2.0.8 release: + 2 New in 2.0.8; 2.0.9 release (Nov 17): + 2 New in 2.0.9
         assert.deepEqual(manifest.screens.map((s) => s.key), cards.map((c) => c.key), 'the manifest lists the cards in page order');
         ['hazards', 'range', 'my-bag', 'weekly-code', 'ask-caddie'].forEach((k) => {
             const c = cards.find((x) => x.key === k);
@@ -274,17 +278,17 @@ describe('2. words', () => {
     // cards and its Also new list) and nowhere else on the page, and nothing on the page says coming / in review.
     test('2.0.8 release: the 2.0.8 features are named only in the New in 2.0.8 row, the first row of EVERYTHING IN THE APP', () => {
         assert.ok(update208.length > 500, 'positive: the New in 2.0.8 row is there');
-        // 2.0.9 site re-pin: the Coming in 2.0.9 row (its UNDER PAR IN RED eyebrow) is taken out too; it is held by the 2.0.9 tests.
-        const t = textOf(html.replace(update208, '').replace(coming209, ''));
-        assert.ok(coming209.length > 1500, 'positive: the Coming in 2.0.9 row is there');
+        // 2.0.9 release re-pin: the New in 2.0.9 row (its UNDER PAR IN RED eyebrow) is taken out too; it is held by the 2.0.9 tests.
+        const t = textOf(html.replace(update208, '').replace(update209, ''));
+        assert.ok(update209.length > 1200, 'positive: the New in 2.0.9 row is there');
         assert.match(t, /New in 2\.0\.7/, 'positive: the 2.0.7 row is there');
         assert.match(t, /EVERYTHING IN THE APP/, 'positive: the slice still has the rest of the page');
         assert.doesNotMatch(t, UNSHIPPED_208);
         // the row sits inside EVERYTHING IN THE APP, first, right above New in 2.0.7; the old section is gone
-        assert.equal(groups[0].id, 'update'); assert.equal(groups[0].name, 'New in 2.0.8'); assert.equal(groups[1].name, 'New in 2.0.7');
-        assert.ok(feat.indexOf('id="g-update"') > feat.indexOf('EVERYTHING IN THE APP') && feat.indexOf('id="g-update"') < feat.indexOf('id="g-new"'));
-        // 2.0.9 site re-pin: the Coming in 2.0.9 section reuses class="feat coming" / id="g-coming"; outside it, none.
-        assert.doesNotMatch(html.replace(coming209, ''), /id="coming208"|class="feat coming"|id="g-coming"|coming208-tag/, 'the Coming in 2.0.8 section is still on the page');
+        // 2.0.9 release re-pin: New in 2.0.9 leads (#g-update), the 2.0.8 row is second (#g-update208), then New in 2.0.7.
+        assert.equal(groups[0].id, 'update'); assert.equal(groups[0].name, 'New in 2.0.9'); assert.equal(groups[1].name, 'New in 2.0.8'); assert.equal(groups[2].name, 'New in 2.0.7');
+        assert.ok(feat.indexOf('id="g-update208"') > feat.indexOf('EVERYTHING IN THE APP') && feat.indexOf('id="g-update208"') < feat.indexOf('id="g-new"'));
+        assert.doesNotMatch(html, /id="coming208"|id="coming209"|class="feat coming"|id="g-coming"|coming208-tag|coming209-tag/, 'a Coming section is still on the page');
     });
 
     test('2.0.8 release: the New in 2.0.8 row says new, carries no coming tag on the row or any card, and the green slope leads it', () => {
@@ -294,11 +298,10 @@ describe('2. words', () => {
         assert.match(update208, /<ul class="new207" aria-label="Also new in 2\.0\.8">/);
         // the tags are gone, here and everywhere: nothing on the page says coming, in review, or not in the app yet
         assert.doesNotMatch(update208, /gsoon|fsoon|soon208/);
-        // 2.0.9 site re-pin: the Coming in 2.0.9 block and its CSS bring the tag wording back on purpose; outside them, none.
-        assert.ok(block209.length > 1500 && css209.every((c) => c.length > 50), 'positive: the 2.0.9 block and its CSS were found (else this guard would test nothing new)');
-        assert.doesNotMatch(rawHomeNo209, /gsoon|fsoon|soon208|coming in 2\.0\.8|in review|Not in the app yet/i, 'coming wording left on the page (markup, CSS or comments)');
-        // (the at-a-glance tiles may say COMING about Check-in / Scan check: that is not the 2.0.8 row's wording)
-        assert.doesNotMatch(textOf(html.replace(coming209, '')), /coming in 2\.0\.8|coming in the next update|in review|not in the app yet/i);
+        // 2.0.9 release re-pin: the Coming in 2.0.9 block and its CSS are gone too; nothing on the page says coming any more.
+        assert.doesNotMatch(rawHome, /gsoon|fsoon|soon208|coming in 2\.0\.[89]|in review|Not in the app yet/i, 'coming wording left on the page (markup, CSS or comments)');
+        // (the at-a-glance tiles may say COMING about Check-in / Scan check: that is not a release row's wording)
+        assert.doesNotMatch(textOf(html), /coming in 2\.0\.[89]|coming in the next update|in review|not in the app yet/i);
         const cs = [...update208.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
         assert.equal(cs.length, 2);
         cs.forEach((m) => assert.match(m[3], /^<div class="cap"><span class="eb">/, m[1] + ': the caption does not start with its eyebrow (a tag is still there)'));
@@ -319,31 +322,31 @@ describe('2. words', () => {
         assert.doesNotMatch(t, MONEY);
     });
 
-    // 2.0.9 site (web-209-coming, Nov 16): iOS 2.0.9 (1) is uploaded to App Store Connect, not yet released. Its two cards
-    // sit in "Coming in 2.0.9" (#coming209), a section of its own above EVERYTHING IN THE APP, tagged on the row and on
-    // each card "New · coming in the next update"; nothing in it says available, new in 2.0.9, or in review.
-    test('2.0.9 coming: the Coming in 2.0.9 row sits above EVERYTHING IN THE APP with its two cards, real pictures at the pinned sizes, in manifest.coming', () => {
-        assert.ok(coming209.length > 1500, 'positive: the Coming in 2.0.9 row is there');
-        assert.match(coming209, /^<section class="feat coming" id="coming209" aria-label="Coming in 2\.0\.9">/);
-        assert.match(coming209, /<div class="grp" id="g-coming">/);
-        assert.match(coming209, /<h2>Coming in 2\.0\.9<\/h2>/);
-        assert.match(coming209, /<span class="gn">2 &middot; swipe &rarr;<\/span>/);
-        assert.equal((coming209.match(/<div class="dots"[^>]*>(<i[^>]*><\/i>)+<\/div>/) || [''])[0].match(/<i/g).length, 2);
-        // outside #features, right above it, after the at-a-glance tiles
-        assert.ok(!feat.includes('id="coming209"'), 'the Coming in 2.0.9 row moved into EVERYTHING IN THE APP');
-        const at = html.indexOf('id="coming209"');
-        assert.ok(at > html.indexOf('id="everything"') && at < html.indexOf('<section class="feat" id="features">'), 'the Coming in 2.0.9 row is not between the tiles and #features');
-        assert.equal(html.indexOf('id="coming208"'), -1);
-        const cs = [...coming209.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
+    // 2.0.9 site (web-209-coming, Nov 16): the two 2.0.9 cards sat in "Coming in 2.0.9" (#coming209) above EVERYTHING IN
+    // THE APP, tagged. 2.0.9 RELEASE RE-PIN (Nov 17, Manny's typed "OK web flip 2.0.9"; iOS 2.0.9 (1) Ready for
+    // Distribution 3:08 PM AZ): the row is "New in 2.0.9", the first row of #features (#g-update), untagged; the 2.0.8 row
+    // is #g-update208 under it; the two screens lead screens[]; manifest.coming is gone.
+    test('2.0.9 release: the New in 2.0.9 row is the first row of EVERYTHING IN THE APP with its two cards, real pictures at the pinned sizes, first in the manifest', () => {
+        assert.ok(update209.length > 1200, 'positive: the New in 2.0.9 row is there, right above New in 2.0.8');
+        assert.match(update209, /^<div class="grp" id="g-update">/);
+        assert.match(update209, /<h2>New in 2\.0\.9<\/h2>/);
+        assert.match(update209, /<p class="gln">What changed in this update\.<\/p>/);
+        assert.match(update209, /<span class="gn">2 &middot; swipe &rarr;<\/span>/);
+        assert.equal((update209.match(/<div class="dots"[^>]*>(<i[^>]*><\/i>)+<\/div>/) || [''])[0].match(/<i/g).length, 2);
+        assert.equal(groups[0].name, 'New in 2.0.9'); assert.equal(groups[1].name, 'New in 2.0.8');
+        assert.equal(html.indexOf('id="coming209"'), -1); assert.equal(html.indexOf('id="coming208"'), -1);
+        const cs = [...update209.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
         assert.deepEqual(cs.map((m) => [m[1], m[2]]), [['f-red-under', 'red-under'], ['f-ask-red', 'ask-red']]);
-        assert.match(cs[0][3], /<span class="eb">UNDER PAR IN RED<\/span><h3>Red means under\.<\/h3><p>Every under-par number on the Receipt, the boards and the leaderboard shows in red\. Even and over par stay plain\. Birdies are still circles, bogeys squares\.<\/p>/);
-        assert.match(cs[1][3], /<span class="eb">ASK HARDPAN<\/span><h3>HardPan&rsquo;s replies read the same way\.<\/h3><p>Ask who&rsquo;s winning - the under-par number inside the answer is red too\. Same on the live chip and the tournament card\.<\/p>/);
-        // none of the 2.0.9 cards is inside #features (they move there on release day)
-        assert.ok(!cards.some((c) => c.key === 'red-under' || c.key === 'ask-red'));
-        // the pictures: real captures of the 2.0.9 build, 940 x 1910 and 400 x 813 WebP, listed in manifest.coming
+        cs.forEach((m) => assert.match(m[3], /^<div class="cap"><span class="eb">/, m[1] + ': the caption does not start with its eyebrow (a tag is still there)'));
+        assert.match(cs[0][3], /<span class="eb">UNDER PAR IN RED<\/span><h3>Red means under\.<\/h3><p>Every under-par number on the Receipt, the boards and the leaderboard shows in red\. Even and over par stay plain\. B/);
+        assert.match(cs[1][3], /<span class="eb">ASK HARDPAN<\/span><h3>HardPan&rsquo;s replies read the same way\.<\/h3><p>Ask who&rsquo;s winning - the under-par number inside the answer is red too\./);
+        // both 2.0.9 cards are inside #features now, first
+        assert.deepEqual(cards.slice(0, 2).map((c) => c.key), ['red-under', 'ask-red']);
+        // the pictures: real captures of the 2.0.9 build, 940 x 1910 and 400 x 813 WebP, first in screens[]
         const manifest = JSON.parse(read('media/screens/manifest.json'));
-        assert.deepEqual(manifest.coming.screens.map((s) => s.key), cs.map((m) => m[2]));
-        assert.equal(manifest.screens.length, 38, 'the coming screens are not in screens[] (that is the #features list)');
+        assert.equal(manifest.coming, undefined);
+        assert.deepEqual(manifest.screens.slice(0, 2).map((s) => s.key), cs.map((m) => m[2]));
+        assert.equal(manifest.screens.length, 40);
         const webpSize = (b) => {
             const kind = b.slice(12, 16).toString('latin1');
             if (kind === 'VP8X') return [1 + b.readUIntLE(24, 3), 1 + b.readUIntLE(27, 3)];
@@ -358,11 +361,12 @@ describe('2. words', () => {
             assert.match(img, /\bwidth="940" height="1910" loading="lazy"/);
             const alt = /\balt="([^"]*)"/.exec(img)[1];
             assert.ok(alt.length >= 30); assert.doesNotMatch(alt, /\bTest\b|\$/); assert.doesNotMatch(alt, MONEY);
-            const ms = manifest.coming.screens.find((x) => x.key === k);
+            const ms = manifest.screens.find((x) => x.key === k);
             assert.deepEqual(ms.files, ['/media/screens/' + k + '-400.webp', '/media/screens/' + k + '-940.webp']);
             assert.equal(ms.width, 940); assert.equal(ms.height, 1910);
             assert.match(ms.captured, /release-207 639f7c35/, k + ': not a capture of the 2.0.9 build');
             assert.match(ms.captured, /scratchpad\/(fbshots\/raw\/06-live-games|web209\/raw\/209-ask-red)\.png/, k + ': not a real capture');
+            assert.match(ms.released, /2\.0\.9 release day/, k + ': the manifest does not say it moved in on release day');
             [[ms.files[0], [400, 813]], [ms.files[1], [940, 1910]]].forEach(([f, wh]) => {
                 const b = fs.readFileSync(path.join(ROOT, f.slice(1)));
                 assert.equal(b.slice(0, 4).toString('latin1') + b.slice(8, 12).toString('latin1'), 'RIFFWEBP', f);
@@ -372,19 +376,15 @@ describe('2. words', () => {
         });
     });
 
-    test('2.0.9 coming: the row says coming on the row and on both cards, claims nothing is available or new, and its features are named nowhere else', () => {
-        const t = textOf(coming209);
-        assert.match(coming209, /<p class="gln"><span class="gsoon" id="coming209-tag">New &middot; coming in the next update<\/span>Not in the app yet\.<\/p>/, 'the row tag does not say coming');
-        const cs = [...coming209.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
-        assert.equal(cs.length, 2);
-        cs.forEach((m) => assert.match(m[3], /^<div class="cap"><div class="fsoon">New &middot; coming in the next update<\/div><span class="eb">/, m[1] + ': no coming tag'));
-        assert.equal((coming209.match(/New &middot; coming in the next update/g) || []).length, 3, 'the row tag + 2 card tags, exactly');
-        // every "New" in the row is the tag's "New · coming in the next update"; never "New in 2.0.9", "available", "in review"
-        assert.equal((t.match(/\bNew\b/g) || []).length, 3);
-        assert.equal((t.match(/New · coming in the next update/g) || []).length, 3);
-        assert.doesNotMatch(t, /new in 2\.0\.9|\b(available|out now|now live|download (it )?now|get it|in the app now|on the App Store|on Google Play|update now|in review)\b/i);
-        assert.doesNotMatch(coming209, /apps\.apple\.com|play\.google\.com/);
-        // the copy names what 2.0.9 changes (positive control for the guard below)
+    test('2.0.9 release: the New in 2.0.9 row says new, carries no coming tag anywhere, and the 2.0.9 features are named only in it', () => {
+        const t = textOf(update209);
+        assert.doesNotMatch(update209, /gsoon|fsoon|soon208|coming/i, 'a coming tag or word is still in the row');
+        // the only "New" in the row is its title
+        assert.equal((t.match(/\bNew\b/g) || []).length, 1);
+        assert.match(t, /New in 2\.0\.9/);
+        assert.doesNotMatch(t, /coming in the next update|not in the app yet|\b(available|out now|now live|download (it )?now|get it|in the app now|on the App Store|on Google Play|update now|in review)\b/i);
+        assert.doesNotMatch(update209, /apps\.apple\.com|play\.google\.com/);
+        // the copy names what 2.0.9 changed (positive control for the guard below)
         [/Red means under\./, /under-par number on the Receipt, the boards and the leaderboard shows in red/, /Even and over par stay plain\./, /Birdies are still circles, bogeys squares\./,
             /HardPan’s replies read the same way\./, /the under-par number inside the answer is red too/, /live chip and the tournament card/]
             .forEach((re) => assert.match(t.replace(/&minus;/g, '−'), re, String(re)));
@@ -392,9 +392,9 @@ describe('2. words', () => {
         assert.doesNotMatch(t, /\bgreen\b/i);
         assert.doesNotMatch(t, MONEY);
         assert.doesNotMatch(t, /\b(settle|owes?|pool|payout|wager)\b|\$/i);
-        // UNSHIPPED guard: the 2.0.9 features are coming, so they are named only inside #coming209 (the 2.0.8 row's own
-        // "Under par in red on the GPS screen." shipped in 2.0.8 and is taken out with that row)
-        const rest = textOf(html.replace(coming209, '').replace(update208, ''));
+        // the 2.0.9 features are named only inside the New in 2.0.9 row (the 2.0.8 row's own "Under par in red on the GPS
+        // screen." shipped in 2.0.8 and is taken out with that row)
+        const rest = textOf(html.replace(update209, '').replace(update208, ''));
         assert.match(rest, /EVERYTHING IN THE APP/, 'positive: the slice still has the rest of the page');
         assert.doesNotMatch(rest, UNSHIPPED_209);
         // the All-in / GPS v2 plans ladder is in the 2.0.9 code behind a live switch that is off: not a feature, never named
