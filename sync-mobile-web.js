@@ -252,6 +252,10 @@ const TOURNAMENT_SHELL = [
     // tournament pages read for the renewal price (founding / regular). Without
     // it the pages fall back to typed literals, and build-shell refuses the output.
     'site-pricing.js',
+    // The Desk scan (sw.js v421, tournament-v85, Manny OK 2026-11-16): the card-vs-app
+    // compare tournament.html loads for the Scan check and Use the whole card. Without
+    // it build-shell refuses the tournament output.
+    'scan-compare.js',
     // qrcode.min.js (qrcodejs 1.0.0, MIT): the QR library tournament.html draws
     // the share modal, the inline codes and the tee sheet with. Vendored
     // 2026-09-18 - it was a runtime CDN script, and without the CDN the share
