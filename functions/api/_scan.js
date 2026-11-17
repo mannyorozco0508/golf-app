@@ -93,6 +93,9 @@ function wire(d) {
         log: typeof d.log === 'function' ? d.log : (line) => { try { console.log(line); } catch (e) {} },
         model: env.SCAN_MODEL || DEFAULT_MODEL,
         retryModel: env.SCAN_RETRY_MODEL || DEFAULT_RETRY_MODEL,
+        // 2026-11-17: the second, FOCUSED Flash read for a nine that does not add up
+        // (rewritten digits). On unless SCAN_FOCUS_PASS=off - a switch, not a deploy.
+        focus: String(env.SCAN_FOCUS_PASS || '').toLowerCase() !== 'off',
         projectId: env.FIREBASE_PROJECT_ID || DEFAULT_PROJECT_ID,
         dbUrl: String(env.FIREBASE_DB_URL || DEFAULT_DB_URL).replace(/\/+$/, ''),
         cap: monthlyCap(env)
@@ -292,7 +295,9 @@ export function thinkingFor(model) {
     if (gen && Number(gen[1]) >= 3) return { thinkingLevel: 'low' };
     return null;
 }
-export function geminiRequest(model, image, round) {
+// `focus` (2026-11-17, rewritten digits): the FOCUS block of the second, careful
+// Flash read - V.focusFor's list. Without it this is the first read's request.
+export function geminiRequest(model, image, round, focus) {
     const generationConfig = {
         temperature: 0,
         responseMimeType: 'application/json',
@@ -302,7 +307,7 @@ export function geminiRequest(model, image, round) {
     if (thinking) generationConfig.thinkingConfig = thinking;
     return {
         contents: [{ role: 'user', parts: [
-            { text: V.buildPrompt(round) },
+            { text: V.buildPrompt(round, focus) },
             { inline_data: { mime_type: image.mimeType, data: image.data } }
         ] }],
         generationConfig
@@ -311,13 +316,13 @@ export function geminiRequest(model, image, round) {
 
 // `spec` (080 course mode) swaps the request and the parser; without it this
 // is exactly the score call.
-export async function callGemini(w, model, image, round, spec) {
+export async function callGemini(w, model, image, round, spec, focus) {
     let res;
     try {
         res = await w.doFetch(GEMINI_BASE + encodeURIComponent(model) + ':generateContent', {
             method: 'POST',
             headers: { 'content-type': 'application/json', 'x-goog-api-key': w.key },
-            body: JSON.stringify(spec ? spec.request(model, image, round) : geminiRequest(model, image, round)),
+            body: JSON.stringify(spec ? spec.request(model, image, round) : geminiRequest(model, image, round, focus)),
             signal: AbortSignal.timeout(/pro/.test(model) ? 45000 : 25000)
         });
     } catch (e) {
@@ -419,9 +424,31 @@ export async function handleScan(d) {
         }
     }
 
+    // REWRITTEN DIGITS (2026-11-17, scorecard-validate.js header): a nine that
+    // still does not add up after the swaps, with no reason for the Pro retry,
+    // gets ONE second read on the same Flash model with a FOCUS block naming
+    // the row, the holes and both figures. Same cap bookkeeping as the retry;
+    // the better read wins, a tie keeps the first. Never a third call.
+    let focused = false;
+    if (!retried && w.focus && pick.parsed.ok) {
+        const focus = V.focusFor(pick.validation, body.round);
+        if (focus.length && await readCount(w.kv, mk) < w.cap) {
+            focused = true;
+            await bump(w.kv, mk, 40 * 24 * 3600);
+            const again = await callGemini(w, w.model, body.image, body.round, null, focus);
+            if (!again.error) {
+                tokens.push(Object.assign({ model: w.model, focus: true }, again.tokens));
+                // A second read that did not parse can never replace one that did (betterOf would
+                // count its one parse_error as fewer hard failures than two sum mismatches).
+                const v3 = again.parsed.ok ? V.validateScan(again.parsed, body.round) : null;
+                if (v3 && V.betterOf(pick.validation, v3) === 'second') pick = { model: w.model, parsed: again.parsed, validation: v3 };
+            }
+        }
+    }
+
     // A read that did not even parse has nothing to show on the confirm grid.
     if (!pick.parsed.ok) {
-        w.log(JSON.stringify({ ev: 'scorecard_scan', outcome: 'unreadable', retried, ms: Date.now() - started, tokens }));
+        w.log(JSON.stringify({ ev: 'scorecard_scan', outcome: 'unreadable', retried, focused, ms: Date.now() - started, tokens }));
         return unavailable('upstream_error');
     }
 
@@ -430,8 +457,11 @@ export async function handleScan(d) {
         const used = await bump(w.kv, freeKey(who.uid));   // no TTL: free scans are per account, for good
         freeScansLeft = Math.max(0, SCAN_FREE_LIMIT - used);
     }
+    // The app reads `result`: the swaps the validator took are written into it.
+    const result = V.applyRewrites(pick.parsed.value, pick.validation);
+    const swapped = pick.validation.rows.reduce((n, r) => n + Object.keys(r.cells).filter((h) => r.cells[h].swapped).length, 0);
     w.log(JSON.stringify({
-        ev: 'scorecard_scan', outcome: 'ok', model: pick.model, retried, paid,
+        ev: 'scorecard_scan', outcome: 'ok', model: pick.model, retried, focused, swapped, paid,
         ms: Date.now() - started, tokens,
         hard: pick.validation.hard.map((x) => x.code), suspect: pick.validation.suspectCount,
         players: pick.validation.rows.length
@@ -440,9 +470,10 @@ export async function handleScan(d) {
         status: 'ok',
         model: pick.model,
         retried,
+        focused,
         paid,
         freeScansLeft,
-        result: pick.parsed.value,
+        result,
         validation: pick.validation
     };
 }

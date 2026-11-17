@@ -36,6 +36,17 @@
 // (This file is not in the 106-file sweep list, which is how the branch's sweep missed it; measured on the merged
 // tree before the push: 7 pass / 5 fail of 12 before this re-pin, 13 / 0 after it.)
 //
+// RE-PINNED 2026-11-17 (Manny, typed in the tournaments tab: "On a branch, no deploy: improve crossed-out/rewritten
+// digit reading (both test cards must pass)"): (1) the prompt's two-digit sentence replaces the Nov 16 one (same
+// place; sansStruck strips the new text); (2) every result hole carries `other`, every cell `other` + `swapped`,
+// the answer `focused` (sansUnsure strips them when null / false; REWRITE FIELDS pins them); (3) the pen's mismatch
+// alone now spends a second FLASH read with a FOCUS block where dddb9565 spent Pro - two calls on both sides, so
+// the counters are identical again (THE PEN'S MISMATCH ALONE re-pinned); (4) a swap the pen decides is one call
+// on this branch and the digit the app sees changes (A SWAP THE PEN DECIDES). BASELINE: see the commit.
+// 15 tests. BASELINE against main 4cf836a4's _scan.js + scorecard-validate.js (the pre-build files): 6 pass / 9 fail;
+// 15 / 0 on preview-scan-rewrite. Controls (restored by sha): the swap never taken -> 1 red here; the focused read
+// never made -> 1; the swap not written into result -> 1; the FOCUS block never appended -> 1.
+//
 // RE-PINNED A THIRD TIME 2026-11-16 under Manny's typed "OK scanner speed fix A
 // (no Pro retry for sum mismatches; still retry low-confidence cells)". The
 // change is in scorecard-validate.js, which this test takes from dddb9565 for
@@ -156,12 +167,14 @@ function sansThinking(url, body) {
     if (!body || !/generativelanguage/.test(url)) return body || null;
     const o = JSON.parse(body);
     if (o.generationConfig) delete o.generationConfig.thinkingConfig;
+    // 2026-11-17: the schema's per-cell `other` is this branch's (pinned by REWRITE FIELDS); the rest must match.
+    try { delete o.generationConfig.responseSchema.properties.players.items.properties.holes.items.properties.other; } catch (e) {}
     return JSON.stringify(sansStruck(o));
 }
 // 2026-11-16 (the Desk scan, item 4 - Manny's typed OK "build scanner event list 1-4 ... crossed-out rule" and
 // "OK merge scanner Desk"): ONE prompt sentence is the other allowed difference in a Gemini body (pinned below).
 // It is removed from the prompt text before the byte comparison; any other change to the prompt is still red.
-const STRUCK_RULE = '- A digit that is crossed out, scribbled over or struck through is NOT the score. The score is the digit written beside, above or over it. If you cannot tell which digit stands, return score null with low confidence.';
+const STRUCK_RULE = '- A cell may hold TWO digits: an earlier one crossed out, scribbled over or written over, and the correction written beside, above or on top of it, often smaller or heavier. The correction is the score; put the crossed-out digit in other (null when the cell shows one digit). If you cannot tell which digit stands, return score null with low confidence and the digit you doubt in other.';
 function sansStruck(o) {
     (o.contents || []).forEach((c) => (c.parts || []).forEach((p) => {
         if (typeof p.text === 'string') p.text = p.text.split('\n' + STRUCK_RULE).join('');
@@ -171,7 +184,13 @@ function sansStruck(o) {
 // 2026-11-16 (speed fix A): validation.unsureCount is the one allowed difference in an answer (pinned below).
 function sansUnsure(out) {
     if (!out || !out.validation || !('unsureCount' in out.validation)) return out;
-    const o = JSON.parse(JSON.stringify(out)); delete o.validation.unsureCount; return o;
+    const o = JSON.parse(JSON.stringify(out)); delete o.validation.unsureCount;
+    // 2026-11-17 (rewritten digits, pinned below): `focused` on the answer, `other` on every result hole,
+    // `other` + `swapped` on every validation cell are this branch's; dddb9565 had none of them.
+    delete o.focused;
+    (o.result && o.result.players || []).forEach((p) => (p.holes || []).forEach((h) => { if (h.other === null) delete h.other; }));
+    (o.validation.rows || []).forEach((r) => Object.keys(r.cells || {}).forEach((h) => { if (r.cells[h].other === null) delete r.cells[h].other; if (r.cells[h].swapped === false) delete r.cells[h].swapped; }));
+    return o;
 }
 async function runBoth(name, scriptFn, opts) {
     const o = opts || {};
@@ -181,7 +200,7 @@ async function runBoth(name, scriptFn, opts) {
         const fetch = stubFetch(scriptFn());
         const kv = fakeKV(o.seed);
         const logs = [];
-        const out = await S.handleScan({ env: ENV, kv, fetch, clock, log: (l) => logs.push(l.replace(/"ms":\d+/g, '"ms":0')),
+        const out = await S.handleScan({ env: ENV, kv, fetch, clock, log: (l) => logs.push(l.replace(/"ms":\d+/g, '"ms":0').replace(/"focused":false,"swapped":0,/, '')),   // 2026-11-17: the two new log fields, at rest
             body: o.body || { image: IMAGE, round: ROUND }, authorization: o.auth === undefined ? 'Bearer ' + await idToken() : o.auth });
         res.push({ out: sansUnsure(out), kv: [...kv.m.entries()].sort(), logs, sent: fetch.calls.map((c) => [c.url, sansThinking(c.url, c.body)]) });
     }
@@ -232,9 +251,9 @@ t('THE THINKING CAP: dddb9565 sent the configured 3.8 Flash / 3.1 Pro no thinkin
     assert.equal(bodies[0].length, 2); assert.equal(bodies[1].length, 2);
     bodies[0].forEach((b) => assert.equal(b.generationConfig.thinkingConfig, undefined, 'dddb9565: no cap for a 3.x model'));
     bodies[1].forEach((b) => assert.deepEqual(b.generationConfig.thinkingConfig, { thinkingLevel: 'low' }, 'this branch: a level'));
-    bodies[1].forEach((b, i) => { const a = sansStruck(JSON.parse(JSON.stringify(b))); delete a.generationConfig.thinkingConfig; assert.deepEqual(a, bodies[0][i], 'the rest of the body (less the crossed-out sentence, pinned below) is identical'); });
+    bodies[1].forEach((b, i) => { const a = sansStruck(JSON.parse(JSON.stringify(b))); delete a.generationConfig.thinkingConfig; delete a.generationConfig.responseSchema.properties.players.items.properties.holes.items.properties.other; assert.deepEqual(a, bodies[0][i], 'the rest of the body (less the crossed-out sentence, pinned below) is identical'); });
 });
-t('THE CROSSED-OUT RULE: dddb9565\'s prompt has no struck-digit sentence; this branch\'s has exactly one, right after the Ignore-putts line, and the rest of the prompt is identical', async () => {
+t('THE CROSSED-OUT RULE (2026-11-17 wording): dddb9565\'s prompt has no two-digit sentence; this branch\'s has exactly one, right after the Ignore-putts line, and the rest of the prompt is identical', async () => {
     const texts = [];
     for (const S of [OLD, NEW]) {
         S.resetKeyCache();
@@ -245,7 +264,8 @@ t('THE CROSSED-OUT RULE: dddb9565\'s prompt has no struck-digit sentence; this b
     }
     assert.equal(texts[0].split(STRUCK_RULE).length - 1, 0, 'dddb9565: no such sentence');
     assert.equal(texts[1].split(STRUCK_RULE).length - 1, 1, 'this branch: exactly one');
-    assert.match(texts[1], /anything that is not the stroke count\.\n- A digit that is crossed out/, 'placed right after the Ignore-putts line');
+    assert.match(texts[1], /anything that is not the stroke count\.\n- A cell may hold TWO digits/, 'placed right after the Ignore-putts line');
+    assert.ok(!/A digit that is crossed out, scribbled over or struck through is NOT the score/.test(texts[1]), 'the Nov 16 sentence is replaced, not doubled');
     assert.equal(texts[1].split('\n' + STRUCK_RULE).join(''), texts[0], 'the rest of the prompt is identical');
 });
 t('THE TIMEOUT ANSWER: a Flash call hitting its abort was 504 network on dddb9565 and is 503 timeout here; a plain network failure is still network on both', async () => {
@@ -298,14 +318,16 @@ function penCard(doubt) {
     if (doubt) j.players[0].holes[2].confidence = 0.5;   // ...and the model doubted one digit in that nine
     return JSON.stringify(j);
 }
-async function both(script, label) {
+async function both(script, label, sent) {
     const res = [];
     for (const S of [OLD, NEW]) {
         S.resetKeyCache();
         const fetch = stubFetch(script());
         const kv = fakeKV();
         const out = await S.handleScan({ env: ENV, kv, fetch, clock, log: () => {}, body: { image: IMAGE, round: ROUND }, authorization: 'Bearer ' + await idToken() });
-        res.push({ out, gemini: fetch.calls.filter((c) => /generativelanguage/.test(c.url)).length, keys: [...kv.m.entries()].sort() });
+        const gcalls = fetch.calls.filter((c) => /generativelanguage/.test(c.url));
+        if (Array.isArray(sent)) sent.push(gcalls.map((c) => ({ url: c.url, body: c.body })));
+        res.push({ out, gemini: gcalls.length, keys: [...kv.m.entries()].sort() });
     }
     return res;
 }
@@ -315,10 +337,15 @@ t('UNSURE COUNT: this branch answers validation.unsureCount (a number); dddb9565
     assert.equal(neu.out.validation.unsureCount, 0);
     assert.deepEqual(sansUnsure(neu.out), old.out);
 });
-t("THE PEN'S MISMATCH ALONE: dddb9565 spent the Pro call, this branch does not; both tell the app the nine does not add up", async () => {
-    const [old, neu] = await both(() => ({ flash: [gem(penCard(false))], pro: [gem(penCard(false))] }));
-    assert.equal(old.gemini, 2); assert.equal(old.out.retried, true);
-    assert.equal(neu.gemini, 1); assert.equal(neu.out.retried, false);
+t("THE PEN'S MISMATCH ALONE: dddb9565 spent the Pro call; this branch spends a second FLASH read with a FOCUS block instead (2026-11-17); both tell the app the nine does not add up", async () => {
+    const sent = [];
+    const [old, neu] = await both(() => ({ flash: [gem(penCard(false)), gem(penCard(false))], pro: [gem(penCard(false))] }), null, sent);
+    assert.equal(old.gemini, 2); assert.equal(old.out.retried, true); assert.equal(old.out.focused, undefined);
+    assert.equal(neu.gemini, 2); assert.equal(neu.out.retried, false); assert.equal(neu.out.focused, true);
+    assert.match(sent[0][1].url, /pro/, 'dddb9565: the second call is Pro');
+    assert.match(sent[1][1].url, /flash/, 'this branch: the second call is Flash');
+    assert.ok(!/FOCUS - a second, careful read/.test(sent[1][0].body), 'the first read has no FOCUS block');
+    assert.match(JSON.parse(sent[1][1].body).contents[0].parts[0].text, /FOCUS - a second, careful read[\s\S]*Test Golfer A, holes 1-9: the written OUT is \d+ but the digits read add to \d+/, 'the second names the row, the nine and both figures');
     for (const r of [old, neu]) {
         assert.equal(r.out.status, 'ok');
         assert.ok(r.out.validation.hard.some((h) => h.code === 'sum_mismatch' && h.row === 0 && h.nine === 'out'), 'sum_mismatch reported');
@@ -327,11 +354,40 @@ t("THE PEN'S MISMATCH ALONE: dddb9565 spent the Pro call, this branch does not; 
     }
     assert.ok(old.out.validation.hard.some((h) => h.code === 'too_many_suspect'), 'dddb9565 counted the amber nine toward the retry');
     assert.ok(!neu.out.validation.hard.some((h) => h.code === 'too_many_suspect'), 'this branch does not');
-    assert.deepEqual(old.out.result, neu.out.result, 'the same read goes to the app');
-    // The only counter that moves is the global month total: dddb9565 bumped it for the Pro call it made; this branch did not.
-    const month = (r) => Number((r.keys.find((k) => /^scan:month:/.test(k[0])) || [0, 0])[1]);
-    assert.equal(month(old), month(neu) + 1, 'one model call fewer in the month total');
-    assert.deepEqual(neu.keys.filter((k) => !/^scan:month:/.test(k[0])), old.keys.filter((k) => !/^scan:month:/.test(k[0])), 'every other counter identical');
+    assert.deepEqual(sansUnsure(neu.out).result, old.out.result, 'the same read goes to the app (less the other: null this branch adds)');
+    // Two model calls on both sides, so every counter - the month total included - is identical.
+    assert.deepEqual(neu.keys, old.keys, 'every counter identical, the month total included');
+});
+t('REWRITE FIELDS (2026-11-17): this branch answers `focused` and `other` on every result hole, `other` + `swapped` on every cell; dddb9565 did not; a clean card differs in nothing else', async () => {
+    const [old, neu] = await both(() => ({ flash: [gem(cardJson())] }));
+    assert.equal(old.out.focused, undefined); assert.equal(neu.out.focused, false);
+    const oh = old.out.result.players[0].holes[0], nh = neu.out.result.players[0].holes[0];
+    assert.equal('other' in oh, false); assert.equal(nh.other, null);
+    const oc = old.out.validation.rows[0].cells[1], nc = neu.out.validation.rows[0].cells[1];
+    assert.equal('swapped' in oc, false); assert.equal(nc.swapped, false); assert.equal(nc.other, null);
+    assert.deepEqual(sansUnsure(neu.out), old.out);
+    const bodies = [];
+    for (const S of [OLD, NEW]) {
+        S.resetKeyCache();
+        const fetch = stubFetch({ flash: [gem(cardJson())] });
+        await S.handleScan({ env: ENV, kv: fakeKV(), fetch, clock, log: () => {}, body: { image: IMAGE, round: ROUND }, authorization: 'Bearer ' + await idToken() });
+        bodies.push(JSON.parse(fetch.calls.filter((c) => /generativelanguage/.test(c.url))[0].body));
+    }
+    const cellProps = (b) => b.generationConfig.responseSchema.properties.players.items.properties.holes.items.properties;
+    assert.equal('other' in cellProps(bodies[0]), false, 'dddb9565: no other in the schema');
+    assert.deepEqual(cellProps(bodies[1]).other, { type: 'INTEGER', nullable: true, description: 'a second digit visible in the same cell: the crossed-out, scribbled-over or overwritten one; null when the cell shows one digit' });
+});
+t('A SWAP THE PEN DECIDES (2026-11-17): one cell reads 4 with other 5 and the OUT needs the 5 - this branch swaps it in ONE call and the nine stands; dddb9565 spent the Pro call on the mismatch and still showed the 4', async () => {
+    const swapCard = () => { const j = JSON.parse(cardJson()); j.players[0].holes[5].other = 5; j.players[0].holes[5].score = 4; j.players[0].written_out = j.players[0].written_out - PAR[5] + 5; j.players[0].written_total = j.players[0].written_out + j.players[0].written_in; return JSON.stringify(j); };
+    const [old, neu] = await both(() => ({ flash: [gem(swapCard())], pro: [gem(swapCard())] }));
+    assert.equal(old.gemini, 2); assert.equal(old.out.retried, true); assert.equal(old.out.result.players[0].holes[5].score, 4);
+    assert.ok(old.out.validation.hard.some((h) => h.code === 'sum_mismatch'), 'dddb9565: the mismatch stands');
+    assert.equal(neu.gemini, 1); assert.equal(neu.out.retried, false); assert.equal(neu.out.focused, false);
+    assert.equal(neu.out.result.players[0].holes[5].score, 5); assert.equal(neu.out.result.players[0].holes[5].other, 4);
+    assert.deepEqual(neu.out.validation.hard, []);
+    assert.deepEqual(neu.out.validation.rows[0].cells[6].reasons, ['rewritten']);
+    assert.equal(neu.out.validation.rows[0].cells[6].swapped, true);
+    assert.equal(neu.out.validation.rows[0].nines.front, 'ok');
 });
 t('A DOUBTED DIGIT IN THE WRONG NINE: both sides still spend the one Pro call; this branch names it unsure_nine', async () => {
     const [old, neu] = await both(() => ({ flash: [gem(penCard(true))], pro: [gem(cardJson())] }));

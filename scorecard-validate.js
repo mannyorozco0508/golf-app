@@ -62,8 +62,28 @@
     // also holds a cell the model was unsure about ('unsure_nine') does, and
     // so does every other hard failure, exactly as before.
     var SUM_REASONS = ['check_this_nine', 'check_total'];
+    // REWRITTEN DIGITS (2026-11-17, Manny: "improve crossed-out/rewritten digit
+    // reading (both test cards must pass)"). The two synthetic rewrite cards
+    // (scan-test/synthetic s04, s11: a struck 4 with the correction written small
+    // beside it) read the struck digit at 0.85-0.95 confidence, so nothing but the
+    // pen's OUT total caught them, and after the Nov 16 prompt sentence one of the
+    // two still read 4 live. Three things now stand behind that sentence:
+    //   1. The schema carries `other` per cell: the second digit visible in the
+    //      cell (the struck one). A cell with an `other` is amber ('rewritten'),
+    //      so the golfer glances at it, but it is NOT an unsure cell: it never
+    //      earns the Pro retry by itself and never counts toward the threshold.
+    //   2. resolveRewrites: when a nine (or the TOT) does not add up to what the
+    //      pen wrote, and swapping one cell's score with its `other` (or two
+    //      cells') makes it add up exactly, the swap is taken, the cell marked
+    //      swapped, and the nine stands. The model's doubt plus the pen's
+    //      arithmetic settle the digit; a swap that does not add up is not taken.
+    //   3. focusFor + buildPrompt(ctx, focus): the server's second, FOCUSED Flash
+    //      read for a nine that still does not add up (the FOCUS block names the
+    //      row, the holes, the written figure and the sum the digits make, and
+    //      says to look for a second digit in each of those cells).
+    var REWRITE_REASON = 'rewritten';
     function isUnsure(cell) {
-        return cell.reasons.some(function (r) { return SUM_REASONS.indexOf(r) === -1; });
+        return cell.reasons.some(function (r) { return SUM_REASONS.indexOf(r) === -1 && r !== REWRITE_REASON; });
     }
 
     // ------------------------------------------------------------------------
@@ -89,7 +109,9 @@
                                     properties: {
                                         hole: { type: 'INTEGER' },
                                         score: { type: 'INTEGER', nullable: true },
-                                        confidence: { type: 'NUMBER', description: '0..1' }
+                                        confidence: { type: 'NUMBER', description: '0..1' },
+                                        // 2026-11-17: the second digit in a cell - the crossed-out, scribbled-over or overwritten one. null when the cell shows one digit.
+                                        other: { type: 'INTEGER', nullable: true, description: 'a second digit visible in the same cell: the crossed-out, scribbled-over or overwritten one; null when the cell shows one digit' }
                                     },
                                     required: ['hole', 'score', 'confidence']
                                 }
@@ -247,7 +269,8 @@
                 holes.push({
                     hole: c.hole,
                     score: c.score === undefined ? null : c.score,
-                    confidence: typeof c.confidence === 'number' && isFinite(c.confidence) ? c.confidence : 0
+                    confidence: typeof c.confidence === 'number' && isFinite(c.confidence) ? c.confidence : 0,
+                    other: isInt(c.other) ? c.other : null   // 2026-11-17: the struck digit, when the cell shows two
                 });
             }
             var num = function (v) { return isInt(v) ? v : null; };
@@ -280,6 +303,77 @@
     //   missingPlayers: [known names no row matched]
     // }
     // ------------------------------------------------------------------------
+    // A nine (or the whole card) against the pen's figure: swap one cell's score for
+    // its `other`, or two cells', when that - and only that - makes the sum exact.
+    // Returns true when a swap was taken. Cells without an `other`, a nine the pen
+    // did not total, or a nine with a blank are left alone.
+    function resolveRewrites(row, list, written) {
+        if (written === null || !list.length) return false;
+        var sum = 0, cands = [];
+        for (var i = 0; i < list.length; i++) {
+            var cell = row.cells[list[i]];
+            if (!cell || !isInt(cell.score)) return false;
+            sum += cell.score;
+            if (isInt(cell.other) && !cell.swapped) cands.push(cell);
+        }
+        if (sum === written || !cands.length) return false;
+        var swap = function (cell) { var s = cell.score; cell.score = cell.other; cell.other = s; cell.swapped = true; };
+        for (var a = 0; a < cands.length; a++) {
+            if (sum - cands[a].score + cands[a].other === written) { swap(cands[a]); return true; }
+        }
+        for (var x = 0; x < cands.length; x++) {
+            for (var y = x + 1; y < cands.length; y++) {
+                if (sum - cands[x].score + cands[x].other - cands[y].score + cands[y].other === written) { swap(cands[x]); swap(cands[y]); return true; }
+            }
+        }
+        return false;
+    }
+
+    // The scores the app should show: the model's read with every swap the
+    // validator took written into it (the app reads `result`, not the cells).
+    // Pure: a copy; the parsed value is left as it was.
+    function applyRewrites(value, validation) {
+        if (!value || !Array.isArray(value.players) || !validation || !Array.isArray(validation.rows)) return value;
+        var out = { players: [], notes: value.notes };
+        value.players.forEach(function (p, ri) {
+            var row = validation.rows[ri];
+            var q = {};
+            Object.keys(p).forEach(function (k) { q[k] = p[k]; });
+            q.holes = p.holes.map(function (c) {
+                var cell = row && row.cells && row.cells[c.hole];
+                if (!cell || !cell.swapped) return c;
+                var d = {};
+                Object.keys(c).forEach(function (k) { d[k] = c[k]; });
+                d.score = cell.score; d.other = cell.other;
+                return d;
+            });
+            out.players.push(q);
+        });
+        return out;
+    }
+
+    // The FOCUS of a second read: every row whose nine (or TOT) still does not add
+    // up after the swaps, with the pen's figure and the sum the digits make.
+    function focusFor(validation, ctx) {
+        var focus = [];
+        if (!validation || !Array.isArray(validation.rows)) return focus;
+        var holes = expectedHoles(ctx);
+        var front = holes.filter(function (h) { return h <= 9; }), back = holes.filter(function (h) { return h >= 10; });
+        validation.rows.forEach(function (row) {
+            var name = row.name || row.rowLabel || '';
+            var add = function (list, label, written) {
+                if (written === null || written === undefined) return;
+                var s = 0; list.forEach(function (h) { var v = row.cells[h] && row.cells[h].score; if (isInt(v)) s += v; });
+                focus.push({ name: name, nine: label, holes: list.slice(), written: written, sum: s });
+            };
+            if (row.nines.front === 'mismatch') add(front, 'out', row.written && row.written.out);
+            if (row.nines.back === 'mismatch') add(back, 'in', row.written && row.written['in']);
+            if (row.nines.front !== 'mismatch' && row.nines.back !== 'mismatch' && row.cells && row.written && row.written.total !== null
+                && row.written.total !== undefined && row.nines.front !== 'ok' && row.nines.back !== 'ok') add(holes, 'total', row.written.total);
+        });
+        return focus;
+    }
+
     function validateScan(parsed, ctx) {
         var c = ctx || {};
         var known = Array.isArray(c.players) ? c.players : [];
@@ -347,8 +441,19 @@
                 }
                 if (cell && conf < MIN_CONFIDENCE) reasons.push('low_confidence');
                 if (m.match === 'none' || m.match === 'duplicate') reasons.push('unmatched_name');
-                row.cells[h] = { score: isInt(score) ? score : null, confidence: conf, suspect: reasons.length > 0, reasons: reasons };
+                var other = cell && isInt(cell.other) ? cell.other : null;
+                if (other !== null) reasons.push(REWRITE_REASON);   // two digits in the cell: amber, not unsure
+                row.cells[h] = { score: isInt(score) ? score : null, confidence: conf, suspect: reasons.length > 0, reasons: reasons, other: other, swapped: false };
             });
+
+            // REWRITTEN DIGITS (header): before the sums are judged, a nine that does
+            // not add up but does once one cell (or two) trades its score for its
+            // `other` takes that trade. The pen's figure decides which digit stands.
+            var frontH = holes.filter(function (h) { return h <= 9; });
+            var backH = holes.filter(function (h) { return h >= 10; });
+            resolveRewrites(row, frontH, p.written_out);
+            resolveRewrites(row, backH, p.written_in);
+            if (p.written_out === null && p.written_in === null) resolveRewrites(row, holes, p.written_total);
 
             // SUMS AGAINST WHAT WAS WRITTEN. A nine is only checked when the card
             // shows a figure for it and the round plays it. A mismatch flags
@@ -448,9 +553,13 @@
     // only has to read digits. Names are sent because matching handwriting to
     // the round's golfers is the job; nothing else about them is.
     // ------------------------------------------------------------------------
-    function buildPrompt(ctx) {
+    // 2026-11-17: `focus` (focusFor) adds the FOCUS block for the server's second,
+    // careful read of a nine that did not add up. Without it the prompt is the one
+    // the first read sends.
+    function buildPrompt(ctx, focus) {
         var c = ctx || {};
         var holes = expectedHoles(c);
+        var f = Array.isArray(focus) ? focus : [];
         var known = (Array.isArray(c.players) ? c.players : []).map(function (p, i) {
             var extra = [].concat(p.initials ? [p.initials] : [], p.nicknames || []).filter(Boolean);
             return (i + 1) + '. ' + String(p.name || '') + (extra.length ? ' (also written as: ' + extra.join(', ') + ')' : '');
@@ -470,14 +579,25 @@
             // Manny's typed OK 2026-11-16 ("scanner event list" item 4): two synthetic cards with a crossed-out digit and a new one written
             // beside it read the STRUCK digit both times (scan-test/synthetic s04, s11, Nov 16); both were caught only because the written
             // total disagreed. The rule names the case; a scan that still cannot tell says null, which the validator flags, never a silent digit.
-            '- A digit that is crossed out, scribbled over or struck through is NOT the score. The score is the digit written beside, above or over it. If you cannot tell which digit stands, return score null with low confidence.',
+            // 2026-11-17 (Manny, "improve crossed-out/rewritten digit reading"): the Nov 16 sentence named the case; this one
+            // says what the cell looks like, names the `other` field and makes the choice explicit. One of the two synthetic
+            // rewrite cards (s11) still read the struck 4 at 0.9 live on Nov 16 with the shorter sentence.
+            '- A cell may hold TWO digits: an earlier one crossed out, scribbled over or written over, and the correction written beside, above or on top of it, often smaller or heavier. The correction is the score; put the crossed-out digit in other (null when the cell shows one digit). If you cannot tell which digit stands, return score null with low confidence and the digit you doubt in other.',
             '- Map each handwritten name or initials to one of the known players above and return that exact name. If a row cannot be matched, return name "UNKNOWN:" followed by what is written.',
             '- Put what the row label actually says in row_label_as_written.',
             '- If a cell is blank or you cannot read it, return score null with low confidence. Never guess or invent a score.',
             '- confidence is 0 to 1: how sure you are of that one digit.',
             '- Report the OUT, IN and TOTAL exactly as written on the card in written_out, written_in, written_total (null if not written). Do not calculate them.',
             '- Return one entry per hole listed above for every player, and nothing else.'
-        ].join('\n');
+        ].concat(f.length ? [
+            'FOCUS - a second, careful read. The first read of these cells did not add up to what the pen wrote:',
+            f.map(function (x) {
+                var span = x.holes.length ? 'holes ' + x.holes[0] + '-' + x.holes[x.holes.length - 1] : 'holes';
+                var word = x.nine === 'out' ? 'OUT' : (x.nine === 'in' ? 'IN' : 'TOTAL');
+                return '- ' + x.name + ', ' + span + ': the written ' + word + ' is ' + x.written + ' but the digits read add to ' + x.sum + '. Look at each of these cells for a second digit - a crossed-out, scribbled-over or overwritten one with the correction written beside, above or on top of it, often smaller. The correction is the score; the struck digit goes in other.';
+            }).join('\n'),
+            'Return the whole card again, every player and every hole, with these cells read again.'
+        ] : []).join('\n');
     }
 
     var api = {
@@ -491,6 +611,8 @@
         matchNames: matchNames,
         parseModelOutput: parseModelOutput,
         validateScan: validateScan,
+        applyRewrites: applyRewrites,
+        focusFor: focusFor,
         needsRetry: needsRetry,
         betterOf: betterOf,
         buildPrompt: buildPrompt

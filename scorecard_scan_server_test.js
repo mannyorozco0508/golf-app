@@ -25,6 +25,11 @@
 //   2 date check removed (any day gets it)                  -> 48/2, red: tests 2, 3
 //   3 EVENT_DAY_MAX cap removed                             -> 49/1, red: test 6
 //   4 day key never switched to the event key              -> 47/3, red: tests 1, 6, 7
+//   2026-11-17 (REWRITTEN DIGITS, Manny: "improve crossed-out/rewritten digit reading"): 62 tests (+ the seven
+//   REWRITE tests; the sum-mismatch-alone and four-live-reads tests re-pinned for the focused second Flash read).
+//   BASELINE against main 4cf836a4's _scan.js + scorecard-validate.js: 53 pass / 9 fail; 62 / 0 on the branch.
+//   Negative controls (restored by sha): the focused read never made -> 6 red here; the swap not written into result
+//   -> 1; an unparsed focused read allowed to replace the first -> 1; the swap never taken -> 1; 'rewritten' as unsure -> 2.
 // ============================================================================
 const { test, describe, before, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -619,12 +624,18 @@ describe('ONE Pro retry, only on a validation failure', () => {
         assert.equal(out.validation.suspectCount, 1);
         assert.equal(fetch.gemini().length, 1);
     });
-    test('a sum mismatch alone on Flash (every digit certain) -> NO Pro call; the mismatch still reaches the app (Manny OK 2026-11-16, speed fix A)', async () => {
+    test('a sum mismatch alone on Flash (every digit certain) -> NO Pro call, but ONE second FLASH read with a FOCUS block (2026-11-17); the mismatch still reaches the app when the second read agrees', async () => {
         need();
-        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true }))] });
-        assert.equal(fetch.gemini().length, 1, 'a second model call was made for the pen\'s arithmetic');
+        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true })), geminiOk(cardJson({ badOut: true }))] });
+        assert.equal(fetch.gemini().length, 2, 'the first read and the focused second read');
+        assert.match(fetch.gemini()[0].url, /gemini-2\.5-flash/); assert.match(fetch.gemini()[1].url, /gemini-2\.5-flash/, 'never Pro for the pen\'s arithmetic');
+        const p0 = JSON.parse(fetch.gemini()[0].init.body).contents[0].parts[0].text, p1 = JSON.parse(fetch.gemini()[1].init.body).contents[0].parts[0].text;
+        assert.ok(!/FOCUS - a second, careful read/.test(p0), 'the first read has no FOCUS block');
+        assert.match(p1, /FOCUS - a second, careful read[\s\S]*Test Golfer A, holes 1-9: the written OUT is 37 but the digits read add to 36[\s\S]*Test Golfer B, holes 1-9: the written OUT is 46 but the digits read add to 45/, 'the FOCUS names each mismatched row, its nine and both figures');
+        assert.equal(p1.indexOf(p0), 0, 'the focused prompt is the first prompt plus the FOCUS block, nothing else changed');
         assert.equal(out.status, 'ok');
         assert.equal(out.retried, false);
+        assert.equal(out.focused, true);
         assert.equal(out.model, 'gemini-2.5-flash');
         assert.ok(out.validation.hard.some((h) => h.code === 'sum_mismatch' && h.row === 0 && h.nine === 'out'));
         assert.equal(out.validation.rows[0].nines.front, 'mismatch');
@@ -632,15 +643,17 @@ describe('ONE Pro retry, only on a validation failure', () => {
         assert.equal(out.validation.unsureCount, 0);
         assert.equal(out.validation.ok, false);
     });
-    test('the four LIVE handwritten reads of Nov 16 2026, through the server: one model call each, the mismatches kept', async () => {
+    test('the four LIVE handwritten reads of Nov 16 2026, through the server: the Pro retry never fires, the mismatches kept (and since 2026-11-17 a focused Flash read follows each pen mismatch)', async () => {
         need();
         const fx = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'helpers/fixtures/scan-handwritten-reads.json'), 'utf8')).cases;
         for (const k of Object.keys(fx)) {
             const c = fx[k];
-            const { out, fetch } = await scan({ flash: [geminiOk(JSON.stringify(c.model))] }, { body: { image: IMAGE, round: c.round } });
+            const { out, fetch } = await scan({ flash: [geminiOk(JSON.stringify(c.model)), geminiOk(JSON.stringify(c.model))] }, { body: { image: IMAGE, round: c.round } });
             assert.equal(out.status, 'ok', k);
-            assert.equal(fetch.gemini().length, 1, k + ': the Pro retry fired');
+            assert.equal(fetch.gemini().length, 2, k + ': the first read and the focused Flash read (2026-11-17), never Pro');
+            assert.ok(fetch.gemini().every((g) => /gemini-2\.5-flash/.test(g.url)), k + ': both calls Flash');
             assert.equal(out.retried, false, k);
+            assert.equal(out.focused, true, k);
             assert.ok(out.validation.hard.some((h) => h.code === 'sum_mismatch'), k + ': the pen\'s mismatch must still be reported');
             assert.equal(out.validation.suspectCount, c.live.suspectCount, k);
             assert.equal(out.result.players.length, 4, k);
@@ -693,6 +706,80 @@ describe('ONE Pro retry, only on a validation failure', () => {
         assert.equal(out.status, 'ok');
         assert.equal(out.model, 'gemini-2.5-flash');
         assert.equal(out.retried, true);
+    });
+    // 2026-11-17 (Manny: "improve crossed-out/rewritten digit reading"): the per-cell `other`, the swap the pen decides,
+    // the focused second Flash read, its switch and its cap bookkeeping.
+    const rewriteCard = (o) => {
+        const j = JSON.parse(cardJson()); const h = j.players[0].holes[5];   // golfer A, hole 6, par 4
+        h.score = o.score; if (o.other !== undefined) h.other = o.other;
+        if (o.outNeeds !== undefined) { j.players[0].written_out = j.players[0].written_out - 4 + o.outNeeds; j.players[0].written_total = j.players[0].written_out + j.players[0].written_in; }
+        return JSON.stringify(j);
+    };
+    test('REWRITE: the model reads the struck 4 with other 5 and the OUT needs the 5 -> ONE call, the swap is taken, the app sees 5, the nine stands', async () => {
+        need();
+        const { out, fetch, logs } = await scan({ flash: [geminiOk(rewriteCard({ score: 4, other: 5, outNeeds: 5 }))] });
+        assert.equal(fetch.gemini().length, 1, 'no second call: the pen settled it');
+        assert.equal(out.focused, false); assert.equal(out.retried, false);
+        assert.deepEqual(out.validation.hard, []);
+        const cell = out.validation.rows[0].cells[6];
+        assert.equal(cell.score, 5); assert.equal(cell.other, 4); assert.equal(cell.swapped, true); assert.deepEqual(cell.reasons, ['rewritten']); assert.equal(cell.suspect, true, 'amber for a glance');
+        assert.equal(out.validation.unsureCount, 0, 'a rewrite is not a doubt');
+        assert.equal(out.result.players[0].holes[5].score, 5, 'the app reads result: the swap is written into it');
+        assert.equal(out.result.players[0].holes[5].other, 4);
+        assert.equal(out.result.players[0].holes[4].other, null, 'a plain cell carries other null');
+        assert.equal(JSON.parse(logs.find((l) => /"outcome":"ok"/.test(l))).swapped, 1);
+    });
+    test('REWRITE: a swap that does not add up is not taken; the nine stays a mismatch and the focused read follows', async () => {
+        need();
+        const { out, fetch } = await scan({ flash: [geminiOk(rewriteCard({ score: 4, other: 7, outNeeds: 5 })), geminiOk(rewriteCard({ score: 4, other: 7, outNeeds: 5 }))] });
+        assert.equal(fetch.gemini().length, 2);
+        assert.equal(out.focused, true);
+        assert.equal(out.validation.rows[0].cells[6].score, 4); assert.equal(out.validation.rows[0].cells[6].swapped, false);
+        assert.equal(out.validation.rows[0].nines.front, 'mismatch');
+        assert.ok(out.validation.hard.some((h) => h.code === 'sum_mismatch' && h.row === 0 && h.nine === 'out'));
+    });
+    test('REWRITE: the focused read fixes the nine -> it is the read shown (model stays Flash, retried false, focused true)', async () => {
+        need();
+        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true })), geminiOk(cardJson())] });
+        assert.equal(fetch.gemini().length, 2);
+        assert.equal(out.focused, true); assert.equal(out.retried, false); assert.equal(out.model, 'gemini-2.5-flash');
+        assert.equal(out.validation.ok, true, 'the second read added up');
+        assert.deepEqual(out.validation.hard, []);
+    });
+    test('REWRITE: the focused read is no better -> the first read is kept; a focused read that fails on the network keeps it too; never a third call', async () => {
+        need();
+        const same = await scan({ flash: [geminiOk(cardJson({ badOut: true })), geminiOk(cardJson({ badOut: true }))] });
+        assert.equal(same.fetch.gemini().length, 2); assert.equal(same.out.focused, true); assert.equal(same.out.validation.ok, false);
+        const worse = await scan({ flash: [geminiOk(cardJson({ badOut: true })), geminiOk('not json')] });
+        assert.equal(worse.fetch.gemini().length, 2); assert.equal(worse.out.status, 'ok'); assert.equal(worse.out.focused, true);
+        assert.ok(worse.out.validation.hard.some((h) => h.code === 'sum_mismatch'), 'the first read stands');
+        const net = await scan({ flash: [geminiOk(cardJson({ badOut: true })), { throws: true }] });
+        assert.equal(net.fetch.gemini().length, 2); assert.equal(net.out.status, 'ok'); assert.equal(net.out.focused, true);
+    });
+    test('REWRITE: a clean card never gets the focused read; a doubted nine takes the Pro retry and never the focused read', async () => {
+        need();
+        const clean = await scan({ flash: [geminiOk(cardJson())] });
+        assert.equal(clean.fetch.gemini().length, 1); assert.equal(clean.out.focused, false);
+        const doubted = await scan({ flash: [geminiOk(cardJson({ badOut: true, unsure: true }))], pro: [geminiOk(cardJson({ badOut: true, unsure: true }))] });
+        assert.equal(doubted.fetch.gemini().length, 2); assert.equal(doubted.out.retried, true); assert.equal(doubted.out.focused, false);
+        assert.match(doubted.fetch.gemini()[1].url, /gemini-2\.5-pro/);
+    });
+    test('REWRITE: SCAN_FOCUS_PASS=off is the switch - one call, the mismatch reaches the app as before', async () => {
+        need();
+        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true }))] }, { env: { SCAN_FOCUS_PASS: 'off' } });
+        assert.equal(fetch.gemini().length, 1); assert.equal(out.focused, false); assert.equal(out.retried, false);
+        assert.ok(out.validation.hard.some((h) => h.code === 'sum_mismatch'));
+    });
+    test('REWRITE: the focused read counts against the monthly cap like the retry; no room -> no focused read', async () => {
+        need();
+        const kv = fakeKV();
+        kv.m.set(S.monthKey(NOW), '4');
+        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true }))] }, { kv, env: { SCAN_MONTHLY_CAP: '5' } });
+        assert.equal(fetch.gemini().length, 1); assert.equal(out.focused, false);
+        const kv2 = fakeKV();
+        const r2 = await scan({ flash: [geminiOk(cardJson({ badOut: true })), geminiOk(cardJson())] }, { kv: kv2 });
+        assert.equal(r2.fetch.gemini().length, 2);
+        assert.equal(kv2.m.get(S.monthKey(NOW)), '2', 'two model calls in the month total');
     });
     test('no room under the monthly cap -> no retry spent', async () => {
         need();

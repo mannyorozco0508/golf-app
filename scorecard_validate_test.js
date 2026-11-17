@@ -18,6 +18,13 @@
 // THE CROSSED-OUT RULE (Manny's typed OK 2026-11-16, event list item 4): one prompt line, pinned by the last
 // test of "the prompt carries the round context". BASELINE against main fd15f9f6: 47 pass / 1 fail of 48;
 // 48 / 0 on preview-scan-desk. CONTROL K7 (the line deleted): 1 red, restored by sha.
+// REWRITTEN DIGITS (2026-11-17, Manny typed in the tournaments tab: "On a branch, no deploy: improve crossed-out/rewritten
+// digit reading (both test cards must pass)"): the per-cell `other`, the swap the pen decides (resolveRewrites), amber-
+// not-unsure, applyRewrites, focusFor and buildPrompt(ctx, focus); the prompt's two-digit sentence replaces the Nov 16 one.
+// 61 tests. BASELINE against main 4cf836a4's scorecard-validate.js (the pre-build file, measured after the last test was
+// written): 47 pass / 14 fail; 61 / 0 on preview-scan-rewrite. NEGATIVE CONTROLS (each restored by sha from a saved
+// copy; reds here + in scorecard_scan_server_test + in scan_score_path_identity_test): the swap never taken -> 6 + 1 + 1;
+// 'rewritten' counted as unsure -> 4 + 2 + 0; the FOCUS block never appended -> 1 + 1 + 1.
 // ============================================================================
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
@@ -412,13 +419,160 @@ describe('the prompt carries the round context (handoff section 5)', () => {
         assert.match(p, /Never guess or invent/);
         assert.match(p, /exactly as written/);
     });
-    test('the crossed-out rule (Manny OK 2026-11-16, event list item 4): a struck digit is not the score; the one beside it is; unsure = null', () => {
+    test('the crossed-out rule, 2026-11-17 wording: a cell may hold two digits; the correction is the score; the struck one goes in other; unsure = null + other', () => {
         const i = p.indexOf('crossed out');
         assert.ok(i > 0, 'the rule is in the prompt');
         const rule = p.slice(p.lastIndexOf('\n', i) + 1, p.indexOf('\n', i));
-        assert.match(rule, /^- A digit that is crossed out, scribbled over or struck through is NOT the score\./);
-        assert.match(rule, /the digit written beside, above or over it/);
-        assert.match(rule, /return score null with low confidence/);
+        assert.match(rule, /^- A cell may hold TWO digits: an earlier one crossed out, scribbled over or written over, and the correction written beside, above or on top of it, often smaller or heavier\./);
+        assert.match(rule, /The correction is the score; put the crossed-out digit in other \(null when the cell shows one digit\)/);
+        assert.match(rule, /return score null with low confidence and the digit you doubt in other/);
+        assert.ok(!/A digit that is crossed out, scribbled over or struck through is NOT the score/.test(p), 'the Nov 16 sentence is replaced, not kept beside the new one');
+        assert.equal((p.match(/crossed out/g) || []).length, 1, 'one rule, once');
         assert.ok(p.indexOf('Ignore putts') < i, 'it follows the ignore-the-marks rule, so "circles" cannot be read as "ignore the rewrite"');
+        assert.ok(!/FOCUS - a second/.test(p), 'the first read has no FOCUS block');
+    });
+    test('FOCUS (2026-11-17): buildPrompt(ctx, focus) appends the block naming each row, its holes and both figures; an empty focus changes nothing', () => {
+        const CTX = Object.assign({}, ROUND, { players: [{ name: 'Manny Orozco', initials: 'MO' }, { name: 'Dave Smith' }] });
+        assert.equal(V.buildPrompt(CTX, []), p);
+        assert.equal(V.buildPrompt(CTX, null), p);
+        const f = [{ name: 'Dave Smith', nine: 'out', holes: [1, 2, 3, 4, 5, 6, 7, 8, 9], written: 49, sum: 48 }, { name: 'Test Golfer', nine: 'in', holes: [10, 11, 12, 13, 14, 15, 16, 17, 18], written: 40, sum: 42 }];
+        const q = V.buildPrompt(CTX, f);
+        assert.equal(q.indexOf(p), 0, 'the first prompt, then the block');
+        const block = q.slice(p.length);
+        assert.match(block, /^\nFOCUS - a second, careful read\. The first read of these cells did not add up to what the pen wrote:\n/);
+        assert.match(block, /- Dave Smith, holes 1-9: the written OUT is 49 but the digits read add to 48\. Look at each of these cells for a second digit/);
+        assert.match(block, /- Test Golfer, holes 10-18: the written IN is 40 but the digits read add to 42\./);
+        assert.match(block, /The correction is the score; the struck digit goes in other\./);
+        assert.match(block, /Return the whole card again, every player and every hole, with these cells read again\.$/);
+        assert.match(V.buildPrompt(CTX, [{ name: 'X', nine: 'total', holes: [1, 2], written: 9, sum: 8 }]), /the written TOTAL is 9 but the digits read add to 8/);
+    });
+});
+
+// 2026-11-17 (Manny, typed in the tournaments tab: "On a branch, no deploy: improve crossed-out/rewritten digit reading
+// (both test cards must pass)"). The two synthetic rewrite cards (s04, s11) read the struck digit; see the header of
+// scorecard-validate.js. Held here: the schema's `other`, the parse, the swap the pen decides (one cell, two cells, not
+// taken when it does not add up, TOT-only cards), amber-not-unsure, applyRewrites for the app, focusFor.
+describe('REWRITTEN DIGITS: other, the swap the pen decides, focusFor', () => {
+    const R1 = Object.assign({}, ROUND, { players: [ROUND.players[0]] });   // one golfer, so player_count stays quiet
+    const rowWith = (name, offset, mut, written) => {
+        const r = cleanRow(name, offset);
+        mut(r.holes);
+        if (written) Object.assign(r, written);
+        return r;
+    };
+    const sumOf = (holes, from, to) => holes.slice(from, to).reduce((s, c) => s + c.score, 0);
+    test('the schema carries other per cell (INTEGER, nullable), not required', () => {
+        const cell = V.responseSchema().properties.players.items.properties.holes.items;
+        assert.deepEqual(cell.properties.other, { type: 'INTEGER', nullable: true, description: 'a second digit visible in the same cell: the crossed-out, scribbled-over or overwritten one; null when the cell shows one digit' });
+        assert.deepEqual(cell.required, ['hole', 'score', 'confidence']);
+    });
+    test('parse: other is carried when it is a whole number, null otherwise', () => {
+        const r = cleanRow('Manny Orozco', 0); r.holes[5].other = 5; r.holes[6].other = '7'; r.holes[7].other = 4.5;
+        const v = card([r]).value.players[0].holes;
+        assert.equal(v[5].other, 5); assert.equal(v[6].other, null); assert.equal(v[7].other, null); assert.equal(v[0].other, null);
+    });
+    test('THE SWAP: hole 6 reads 4 with other 5, the OUT needs the 5 -> score 5, other 4, swapped, reasons [rewritten], the nine ok, no hard, not unsure, no retry', () => {
+        const r = rowWith('Manny Orozco', 0, (h) => { h[5].score = 4; h[5].other = 5; });   // par 4 on 6: the truth is 5
+        r.written_out = sumOf(r.holes, 0, 9) + 1; r.written_total = r.written_out + r.written_in;
+        const v = V.validateScan(card([r]), R1);
+        const c = v.rows[0].cells[6];
+        assert.deepEqual([c.score, c.other, c.swapped, c.reasons, c.suspect], [5, 4, true, ['rewritten'], true]);
+        assert.deepEqual(v.rows[0].nines, { front: 'ok', back: 'ok' });
+        assert.deepEqual(v.hard, []);
+        assert.equal(v.suspectCount, 1); assert.equal(v.unsureCount, 0);
+        assert.equal(V.needsRetry(v), false);
+        assert.equal(v.rows[0].sums.out, r.written_out, 'the sums are the resolved sums');
+    });
+    test('the model read it right already (score 5, other 4) and the nine adds up: amber [rewritten], no swap, nothing hard', () => {
+        const r = rowWith('Manny Orozco', 0, (h) => { h[5].score = 5; h[5].other = 4; });
+        r.written_out = sumOf(r.holes, 0, 9); r.written_total = r.written_out + r.written_in;
+        const v = V.validateScan(card([r]), R1);
+        const c = v.rows[0].cells[6];
+        assert.deepEqual([c.score, c.other, c.swapped, c.reasons], [5, 4, false, ['rewritten']]);
+        assert.deepEqual(v.hard, []); assert.equal(v.unsureCount, 0);
+    });
+    test('NOT TAKEN: the other does not make the nine add up -> the score stands, the nine is a mismatch, every cell amber, still no Pro retry', () => {
+        const r = rowWith('Manny Orozco', 0, (h) => { h[5].score = 4; h[5].other = 7; });
+        r.written_out = sumOf(r.holes, 0, 9) + 1; r.written_total = r.written_out + r.written_in;
+        const v = V.validateScan(card([r]), R1);
+        const c = v.rows[0].cells[6];
+        assert.deepEqual([c.score, c.other, c.swapped], [4, 7, false]);
+        assert.deepEqual(c.reasons, ['rewritten', 'check_this_nine', 'check_total'], 'the OUT and the TOT both disagree');
+        assert.equal(v.rows[0].nines.front, 'mismatch');
+        assert.deepEqual(codes(v), ['sum_mismatch', 'sum_mismatch']);
+        assert.equal(V.needsRetry(v), false, 'a rewrite is not a doubt: no Pro');
+    });
+    test('TWO cells: neither alone adds up, both together do -> both swapped', () => {
+        const r = rowWith('Manny Orozco', 0, (h) => { h[1].score = 5; h[1].other = 6; h[5].score = 4; h[5].other = 5; });   // truths 6 and 5: +2
+        r.written_out = sumOf(r.holes, 0, 9) + 2; r.written_total = r.written_out + r.written_in;
+        const v = V.validateScan(card([r]), R1);
+        assert.equal(v.rows[0].cells[2].swapped, true); assert.equal(v.rows[0].cells[6].swapped, true);
+        assert.equal(v.rows[0].cells[2].score, 6); assert.equal(v.rows[0].cells[6].score, 5);
+        assert.equal(v.rows[0].nines.front, 'ok'); assert.deepEqual(v.hard, []);
+    });
+    test('ONE of two: when a single swap already adds up, only that one is taken (the other stays amber, unswapped)', () => {
+        const r = rowWith('Manny Orozco', 0, (h) => { h[1].score = 5; h[1].other = 6; h[5].score = 5; h[5].other = 4; });
+        r.written_out = sumOf(r.holes, 0, 9) + 1; r.written_total = r.written_out + r.written_in;
+        const v = V.validateScan(card([r]), R1);
+        assert.equal(v.rows[0].cells[2].swapped, true); assert.equal(v.rows[0].cells[6].swapped, false);
+        assert.equal(v.rows[0].nines.front, 'ok');
+    });
+    test('the back nine against the IN, and a TOT-only card (no OUT / IN written) against the TOTAL', () => {
+        const r = rowWith('Manny Orozco', 0, (h) => { h[12].score = 4; h[12].other = 6; });   // hole 13, par 5: truth 6
+        r.written_in = sumOf(r.holes, 9, 18) + 2; r.written_total = r.written_out + r.written_in;
+        const v = V.validateScan(card([r]), R1);
+        assert.equal(v.rows[0].cells[13].score, 6); assert.equal(v.rows[0].nines.back, 'ok'); assert.deepEqual(v.hard, []);
+        const t = rowWith('Manny Orozco', 0, (h) => { h[12].score = 4; h[12].other = 6; });
+        t.written_out = null; t.written_in = null; t.written_total = sumOf(t.holes, 0, 18) + 2;
+        const w = V.validateScan(card([t]), R1);
+        assert.equal(w.rows[0].cells[13].score, 6); assert.deepEqual(w.hard, []); assert.equal(w.rows[0].totalWrittenWrong, undefined);
+    });
+    test('a nine with a blank is left alone (no sum to judge); a nine the pen did not total is left alone', () => {
+        const r = rowWith('Manny Orozco', 0, (h) => { h[0].score = null; h[5].score = 4; h[5].other = 5; });
+        r.written_out = 40; r.written_total = null;
+        const v = V.validateScan(card([r]), R1);
+        assert.equal(v.rows[0].cells[6].swapped, false); assert.equal(v.rows[0].cells[6].score, 4);
+        const u = rowWith('Manny Orozco', 0, (h) => { h[5].score = 4; h[5].other = 5; });
+        u.written_out = null; u.written_in = null; u.written_total = null;
+        assert.equal(V.validateScan(card([u]), R1).rows[0].cells[6].swapped, false);
+    });
+    test('amber, never unsure: four rewrites on one card do not reach too_many_suspect and earn no retry; a low-confidence cell still does', () => {
+        const r = rowWith('Manny Orozco', 0, (h) => { [1, 3, 5, 7].forEach((i) => { h[i].other = h[i].score + 1; }); });
+        const v = V.validateScan(card([r]), R1);
+        assert.equal(v.suspectCount, 4); assert.equal(v.unsureCount, 0);
+        assert.ok(!codes(v).includes('too_many_suspect')); assert.equal(V.needsRetry(v), false);
+        const d = rowWith('Manny Orozco', 0, (h) => { h[5].other = 5; h[5].confidence = 0.4; });
+        const w = V.validateScan(card([d]), R1);
+        assert.deepEqual(reasonsAt(w, 0, 6), ['low_confidence', 'rewritten']);
+        assert.equal(w.unsureCount, 1);
+    });
+    test('applyRewrites: the result the app reads carries the swapped score and the struck digit; the parsed value is untouched; a pure copy', () => {
+        const r = rowWith('Manny Orozco', 0, (h) => { h[5].score = 4; h[5].other = 5; });
+        r.written_out = sumOf(r.holes, 0, 9) + 1; r.written_total = r.written_out + r.written_in;
+        const parsed = card([r]); const before = JSON.stringify(parsed.value);
+        const v = V.validateScan(parsed, R1);
+        const out = V.applyRewrites(parsed.value, v);
+        assert.deepEqual(out.players[0].holes[5], { hole: 6, score: 5, confidence: 0.99, other: 4 });
+        assert.deepEqual(out.players[0].holes[4], { hole: 5, score: 4, confidence: 0.99, other: null });
+        assert.equal(JSON.stringify(parsed.value), before, 'input untouched');
+        assert.notEqual(out, parsed.value); assert.equal(out.players[0].name, 'Manny Orozco'); assert.equal(out.players[0].written_out, r.written_out);
+        assert.equal(V.applyRewrites(null, v), null);
+    });
+    test('focusFor: every mismatched nine after the swaps, with the pen figure and the digits sum; a clean card and a swapped card give none; TOT-only cards give the total', () => {
+        const clean = V.validateScan(card([cleanRow('Manny Orozco', 0)]), R1);
+        assert.deepEqual(V.focusFor(clean, R1), []);
+        const r = rowWith('Manny Orozco', 0, (h) => { h[5].score = 4; h[5].other = 5; });
+        r.written_out = sumOf(r.holes, 0, 9) + 1; r.written_total = r.written_out + r.written_in;
+        assert.deepEqual(V.focusFor(V.validateScan(card([r]), R1), R1), [], 'the swap settled it');
+        const m = cleanRow('Manny Orozco', 0); m.written_out += 1; m.written_total += 1;
+        const d = cleanRow('Dave Smith', 1); d.written_in += 2; d.written_total += 2;
+        const f = V.focusFor(V.validateScan(card([m, d]), ROUND), ROUND);
+        assert.deepEqual(f, [
+            { name: 'Manny Orozco', nine: 'out', holes: [1, 2, 3, 4, 5, 6, 7, 8, 9], written: m.written_out, sum: m.written_out - 1 },
+            { name: 'Dave Smith', nine: 'in', holes: [10, 11, 12, 13, 14, 15, 16, 17, 18], written: d.written_in, sum: d.written_in - 2 }
+        ]);
+        const t = cleanRow('Manny Orozco', 0); t.written_out = null; t.written_in = null; t.written_total += 1;
+        assert.deepEqual(V.focusFor(V.validateScan(card([t]), R1), R1), [{ name: 'Manny Orozco', nine: 'total', holes: ROUND.par.map((_, i) => i + 1), written: t.written_total, sum: t.written_total - 1 }]);
+        assert.deepEqual(V.focusFor(null, ROUND), []);
     });
 });
