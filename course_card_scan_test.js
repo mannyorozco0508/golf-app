@@ -22,6 +22,19 @@
 // sha): RATING cap widened -> 1 red; the ladies pair unchecked -> 2; slopeOf
 // taking any number -> 1; the back photo dropped from the Gemini parts -> 2;
 // the rating dropped from the parse -> 10; the old privacy sentence -> 1.
+//
+// 2026-11-16 23:16 (Advisor, "rating range - use the app's numbers", asked by
+// the iOS lane): the server's rating range is the app's - 18-hole 55.0-80.0,
+// 9-hole 27.0-40.0, slope 55-155 on both - and an out-of-range rating / slope
+// comes back NULL in the response (C.withRatingsInRange, applied by _scan.js
+// to the picked read) for the golfer to type. Never clamped. The flag stays
+// soft. Baseline: this whole file (72 tests, measured after the last test was
+// written) against main fd15f9f6's course-card-validate.js + _scan.js (the
+// pre-build files): 54 pass / 18 fail; 72 / 0 on the branch. Negative controls
+// (each restored by sha from a saved copy): the range step clamping to the
+// edge instead of null -> 7 red; the 9-hole card using the 18-hole table -> 6;
+// the response built from the raw read (range step skipped) -> 3; the old 85
+// cap back -> 6; withRatingsInRange passing every value through -> 10.
 // ============================================================================
 const { test, describe, before, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
@@ -182,7 +195,11 @@ describe('course-card-validate: good card passes, every mutation fails (negative
         ['slope without its rating', (c) => { c.tees[1].slope = 115; }, ['rating_pair:White:men']],
         ['ladies slope 200', (c) => { c.tees[1].rating_ladies = 76.3; c.tees[1].slope_ladies = 200; }, ['slope_range:White:ladies']],
         ['ladies rating alone', (c) => { c.tees[1].rating_ladies = 76.3; }, ['rating_pair:White:ladies']],
-        ['two bad on one tee', (c) => { c.tees[0].rating = 20; c.tees[0].slope = 500; }, ['rating_range:Blue:men', 'slope_range:Blue:men']]
+        ['two bad on one tee', (c) => { c.tees[0].rating = 20; c.tees[0].slope = 500; }, ['rating_range:Blue:men', 'slope_range:Blue:men']],
+        // 2026-11-16 23:16 (Advisor: the app's numbers): the 18-hole cap is 80.0, not 85.0.
+        ['rating 80.1 (men) - just over the app\'s 18-hole cap', (c) => { c.tees[0].rating = 80.1; c.tees[0].slope = 128; }, ['rating_range:Blue:men']],
+        ['rating 84.9 (men) - inside the OLD 85 cap, outside the app\'s', (c) => { c.tees[0].rating = 84.9; c.tees[0].slope = 128; }, ['rating_range:Blue:men']],
+        ['ladies rating 81.0 (the same cap for the ladies\' pair)', (c) => { c.tees[1].rating_ladies = 81; c.tees[1].slope_ladies = 130; }, ['rating_range:White:ladies']]
     ];
     for (const [name, mut, want] of ratingCases) {
         test('RATINGS: ' + name + ' -> SOFT ' + want.join(' + ') + ', no hard, no retry', () => {
@@ -193,8 +210,91 @@ describe('course-card-validate: good card passes, every mutation fails (negative
             assert.equal(C.needsRetry(v), false, 'a rating never earns the Pro retry');
         });
     }
-    test('RATINGS: the boundaries 55.0 / 85.0 and 55 / 155 are inside the range', () => {
-        assert.deepEqual(check(card((c) => { c.tees[0].rating = 55; c.tees[0].slope = 55; c.tees[1].rating = 85; c.tees[1].slope = 155; })).soft, []);
+    test('RATINGS: the 18-hole boundaries 55.0 / 80.0 and 55 / 155 are inside the range', () => {
+        assert.deepEqual(check(card((c) => { c.tees[0].rating = 55; c.tees[0].slope = 55; c.tees[1].rating = 80; c.tees[1].slope = 155; })).soft, []);
+    });
+    // 2026-11-16 23:16: a 9-hole card has its own rating range, 27.0-40.0 (the app's); slope stays 55-155.
+    const nineCard = (rating, slope, ladies) => {
+        const t = { name: 'Blue', yards: BLUE.slice(0, 9), written: { out: 3284 }, rating, slope };
+        if (ladies) { t.rating_ladies = ladies[0]; t.slope_ladies = ladies[1]; }
+        return { holes: 9, par: PAR.slice(0, 9), par_written: { out: 36, in: null, total: null },
+            hcp_men: [9, 5, 3, 1, 8, 7, 2, 6, 4], hcp_ladies: [], tees: [t] };
+    };
+    test('RATINGS, 9 holes: 35.2 / 113 is clean, and the boundaries 27.0 / 40.0 are inside', () => {
+        assert.deepEqual(check(nineCard(35.2, 113), { holes: 9 }).soft, []);
+        assert.deepEqual(check(nineCard(27, 55), { holes: 9 }).soft, []);
+        assert.deepEqual(check(nineCard(40, 155, [40, 155]), { holes: 9 }).soft, []);
+    });
+    for (const [name, rating, slope, want] of [
+        ['26.9', 26.9, 113, ['rating_range:Blue:men']],
+        ['40.1', 40.1, 113, ['rating_range:Blue:men']],
+        ['72.1 - an 18-hole figure on a 9-hole card', 72.1, 113, ['rating_range:Blue:men']],
+        ['slope 156 - the slope range is the same for 9 holes', 35.2, 156, ['slope_range:Blue:men']]
+    ]) {
+        test('RATINGS, 9 holes: rating ' + name + ' -> SOFT ' + want.join(' + ') + ', no retry', () => {
+            const v = check(nineCard(rating, slope), { holes: 9 });
+            assert.deepEqual(soft(v), want);
+            assert.deepEqual(v.hard, []);
+            assert.equal(C.needsRetry(v), false);
+        });
+    }
+    test('RATINGS, 9 holes: the hole count comes from the caller first, then the card (holesOf)', () => {
+        // The body says 9: a 35.2 is fine. The body says nothing and the card says 9: still fine. The body says 18: 35.2 is out.
+        assert.deepEqual(check(nineCard(35.2, 113), { holes: 9 }).soft, []);
+        assert.deepEqual(check(nineCard(35.2, 113), {}).soft, []);
+        assert.deepEqual(soft(check(card((c) => { c.tees[0].rating = 35.2; c.tees[0].slope = 113; }), { holes: 18 })), ['rating_range:Blue:men']);
+    });
+    // 2026-11-16 23:16 (Advisor): out of range = NULL in the result (the golfer types it), NEVER clamped.
+    describe('withRatingsInRange: out of range comes back null, never clamped', () => {
+        const parsed = (c) => C.parseCourseOutput(JSON.stringify(c)).value;
+        const pair = (t) => [t.rating, t.slope, t.rating_ladies, t.slope_ladies];
+        test('95.0 / 128 -> rating null (not 80.0), the slope stands', () => {
+            const r = C.withRatingsInRange(parsed(card((c) => { c.tees[0].rating = 95; c.tees[0].slope = 128; })), { holes: 18 });
+            assert.deepEqual(pair(r.tees[0]), [null, 128, null, null]);
+            assert.notEqual(r.tees[0].rating, 80, 'never clamped to the cap');
+        });
+        test('54.9 / 128 -> rating null (not 55.0); 84.9 (inside the old 85 cap) -> null too', () => {
+            assert.deepEqual(pair(C.withRatingsInRange(parsed(card((c) => { c.tees[0].rating = 54.9; c.tees[0].slope = 128; })), { holes: 18 }).tees[0]), [null, 128, null, null]);
+            assert.deepEqual(pair(C.withRatingsInRange(parsed(card((c) => { c.tees[0].rating = 84.9; c.tees[0].slope = 128; })), { holes: 18 }).tees[0]), [null, 128, null, null]);
+        });
+        test('72.1 / 156 -> slope null (not 155), the rating stands; 72.1 / 54 -> slope null (not 55)', () => {
+            assert.deepEqual(pair(C.withRatingsInRange(parsed(card((c) => { c.tees[0].rating = 72.1; c.tees[0].slope = 156; })), { holes: 18 }).tees[0]), [72.1, null, null, null]);
+            assert.deepEqual(pair(C.withRatingsInRange(parsed(card((c) => { c.tees[0].rating = 72.1; c.tees[0].slope = 54; })), { holes: 18 }).tees[0]), [72.1, null, null, null]);
+        });
+        test('the ladies\' pair follows the same rule, on its own', () => {
+            const r = C.withRatingsInRange(parsed(card((c) => {
+                c.tees[1].rating = 67.4; c.tees[1].slope = 115; c.tees[1].rating_ladies = 81; c.tees[1].slope_ladies = 200;
+            })), { holes: 18 });
+            assert.deepEqual(pair(r.tees[1]), [67.4, 115, null, null]);
+        });
+        test('good pairs, the boundaries and a card with none are untouched, and every other field is carried over', () => {
+            const v = parsed(card((c) => { c.tees[0].rating = 55; c.tees[0].slope = 55; c.tees[1].rating = 80; c.tees[1].slope = 155; c.tees[1].rating_ladies = 72.5; c.tees[1].slope_ladies = 122; }));
+            assert.deepEqual(C.withRatingsInRange(v, { holes: 18 }), v);
+            const none = parsed(card());
+            assert.deepEqual(C.withRatingsInRange(none, { holes: 18 }), none);
+        });
+        test('pure: the parsed value is not changed, a new object comes back', () => {
+            const v = parsed(card((c) => { c.tees[0].rating = 95; c.tees[0].slope = 500; }));
+            const before = JSON.stringify(v);
+            const r = C.withRatingsInRange(v, { holes: 18 });
+            assert.equal(JSON.stringify(v), before, 'input untouched');
+            assert.notEqual(r, v);
+            assert.notEqual(r.tees, v.tees);
+            assert.deepEqual(pair(r.tees[0]), [null, null, null, null]);
+            assert.deepEqual(pair(v.tees[0]), [95, 500, null, null]);
+        });
+        test('9 holes: 35.2 / 113 stands, 72.1 is null; the same 35.2 on an 18-hole card is null', () => {
+            assert.deepEqual(pair(C.withRatingsInRange(parsed(nineCard(35.2, 113)), { holes: 9 }).tees[0]), [35.2, 113, null, null]);
+            assert.deepEqual(pair(C.withRatingsInRange(parsed(nineCard(72.1, 113)), { holes: 9 }).tees[0]), [null, 113, null, null]);
+            assert.deepEqual(pair(C.withRatingsInRange(parsed(nineCard(35.2, 113)), {}).tees[0]), [35.2, 113, null, null], 'the card\'s own holes:9 when the caller says nothing');
+            assert.deepEqual(pair(C.withRatingsInRange(parsed(card((c) => { c.tees[0].rating = 35.2; c.tees[0].slope = 113; })), { holes: 18 }).tees[0]), [null, 113, null, null]);
+        });
+        test('a flagged read and its nulled result agree: every rating_range / slope_range names a cell that came back null, and nothing else did', () => {
+            const c = card((m) => { m.tees[0].rating = 95; m.tees[0].slope = 128; m.tees[1].rating = 67.4; m.tees[1].slope = 300; m.tees[1].rating_ladies = 72.5; m.tees[1].slope_ladies = 122; });
+            const v = parsed(c), flags = C.validateCourse({ ok: true, value: v }, { holes: 18 }).soft, r = C.withRatingsInRange(v, { holes: 18 });
+            assert.deepEqual(flags.map((f) => f.code + ':' + f.row + ':' + f.who), ['rating_range:Blue:men', 'slope_range:White:men']);
+            assert.deepEqual(r.tees.map(pair), [[null, 128, null, null], [67.4, null, 72.5, 122]]);
+        });
     });
     test('not JSON / wrong shape -> parse_error', () => {
         assert.deepEqual(codes(C.validateCourse(C.parseCourseOutput('nope'))), ['parse_error']);
@@ -435,6 +535,39 @@ describe('course mode in the handler (fake Gemini: good / bad / retry)', () => {
         assert.equal(fetch.gemini().length, 1);
         assert.deepEqual(out.validation.hard, []);
         assert.deepEqual(out.validation.soft, [{ code: 'slope_range', row: 'Blue', who: 'men' }]);
+        // 2026-11-16 23:16: and the bad slope is NULL in the result - the golfer types it. The rating stands.
+        assert.deepEqual([out.result.tees[0].rating, out.result.tees[0].slope], [72.1, null]);
+    });
+    test('RATINGS: a rating over the app\'s cap comes back null in the response (not clamped), flagged, and the log counts the pair out', async () => {
+        const { out, fetch, logs } = await scan({ flash: [gem(card((c) => {
+            c.tees[0].rating = 84.9; c.tees[0].slope = 128;           // inside the old 85 cap
+            c.tees[1].rating = 67.4; c.tees[1].slope = 115;
+        }))] });
+        assert.equal(out.status, 'ok');
+        assert.equal(out.retried, false);
+        assert.equal(fetch.gemini().length, 1, 'no Pro call for a rating');
+        assert.deepEqual(out.validation.soft, [{ code: 'rating_range', row: 'Blue', who: 'men' }]);
+        assert.deepEqual(out.result.tees.map((t) => [t.name, t.rating, t.slope]), [['Blue', null, 128], ['White', 67.4, 115]]);
+        assert.notEqual(out.result.tees[0].rating, 80);
+        const line = JSON.parse(logs[0]);
+        assert.equal(line.ratings, 1, 'one pair stands');
+        assert.equal(line.soft, 1);
+        // The rest of the card is untouched by the range step.
+        assert.deepEqual(out.result.par, PAR);
+        assert.deepEqual(out.result.tees[0].yards, BLUE);
+    });
+    test('RATINGS, 9 holes: a 9-hole body keeps a 35.2 and nulls a 72.1 in the response', async () => {
+        const nine = (rating) => ({ holes: 9, par: PAR.slice(0, 9), par_written: { out: 36, in: null, total: null },
+            hcp_men: [9, 5, 3, 1, 8, 7, 2, 6, 4], hcp_ladies: [], tees: [{ name: 'Blue', yards: BLUE.slice(0, 9), written: { out: 3284 }, rating, slope: 113 }] });
+        const body9 = Object.assign({}, COURSE_BODY, { course: { holes: 9, name: 'Test Links' } });
+        const good = await scan({ flash: [gem(nine(35.2))] }, { body: body9 });
+        assert.equal(good.out.status, 'ok');
+        assert.deepEqual([good.out.result.tees[0].rating, good.out.result.tees[0].slope], [35.2, 113]);
+        assert.deepEqual(good.out.validation.soft, []);
+        const bad = await scan({ flash: [gem(nine(72.1))] }, { body: body9 });
+        assert.deepEqual([bad.out.result.tees[0].rating, bad.out.result.tees[0].slope], [null, 113]);
+        assert.deepEqual(bad.out.validation.soft, [{ code: 'rating_range', row: 'Blue', who: 'men' }]);
+        assert.equal(bad.fetch.gemini().length, 1);
     });
     test('no mode -> the score path (a course-only body is refused as a score body)', async () => {
         const fetch = stubFetch({});

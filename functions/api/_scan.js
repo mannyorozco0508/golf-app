@@ -549,13 +549,17 @@ async function handleCourseScan(w, d) {
         const used = await bump(w.kv, courseFreeKey(who.uid));   // no TTL, like the score scans
         courseScansLeft = Math.max(0, COURSE_SCAN_FREE_LIMIT - used);
     }
+    // THE RANGE (course-card-validate.js header, Nov 16): a rating / slope outside
+    // the app's range is flagged in `validation` AND null in `result` - the golfer
+    // types it. Never clamped.
+    const result = C.withRatingsInRange(pick.parsed.value, body.course);
     w.log(JSON.stringify({
         ev: 'course_scan', outcome: 'ok', model: pick.model, retried, paid,
         ms: Date.now() - started, tokens,
         hard: pick.validation.hard.map((x) => x.code), soft: pick.validation.suspectCount,
-        tees: pick.parsed.value.tees.length,
+        tees: result.tees.length,
         photos: body.images.length,   // 1, or 2 with the back of the card
-        ratings: pick.parsed.value.tees.filter((t) => t.rating !== null && t.slope !== null).length
+        ratings: result.tees.filter((t) => t.rating !== null && t.slope !== null).length   // pairs that stand
     }));
     return {
         status: 'ok',
@@ -564,7 +568,7 @@ async function handleCourseScan(w, d) {
         retried,
         paid,
         courseScansLeft,
-        result: pick.parsed.value,
+        result,
         validation: pick.validation
     };
 }

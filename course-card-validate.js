@@ -22,6 +22,16 @@
 // the app saves the card through its normal typed path after the golfer has
 // looked at it.
 //
+// THE RANGE (Nov 16 2026, 23:16, Advisor "rating range - use the app's numbers",
+// asked by the iOS lane: the app checked 55-80 while this file said 55-85): the
+// server's range is the APP's range - an 18-hole course rating 55.0-80.0, a
+// 9-hole rating 27.0-40.0, slope 55-155 on both. A value outside it is flagged
+// (rating_range / slope_range, soft, below) AND comes back NULL in the result
+// for the golfer to type - withRatingsInRange(), which the server applies to the
+// read it picks. It is NEVER clamped to the edge of the range: 95.0 becomes
+// null, not 80.0, because a rating that is wrong by a digit moves handicap
+// strokes, and a clamped one would look right.
+//
 // HARD CHECKS (any one earns the ONE Pro retry; Save stays off in the app):
 //   par_range       a par that is not a whole number 3-6 (or is missing)
 //   par_total       total par outside 60-75 (18 holes) / 27-38 (9 holes)
@@ -35,8 +45,11 @@
 //                   (tfweb-2, Manny Oct 26: AMBER for the golfer to fix, not
 //                   a block or a retry - a soft warning in the response)
 //   yards_range     a yardage outside 50-700
-//   rating_range    a tee's course rating outside 55.0-85.0 (who: men | ladies)
-//   slope_range     a tee's slope outside 55-155, the USGA range (who: men | ladies)
+//   rating_range    a tee's course rating outside the app's range: 55.0-80.0 on an
+//                   18-hole card, 27.0-40.0 on a 9-hole card (who: men | ladies);
+//                   the value comes back null (see THE RANGE above)
+//   slope_range     a tee's slope outside 55-155, the USGA range (who: men | ladies);
+//                   the value comes back null
 //   rating_pair     a rating without its slope, or a slope without its rating
 //   unsure          a cell the model itself said it was not sure of (hole 0 =
 //                   that tee's rating / slope cell)
@@ -50,8 +63,9 @@
 
     var PAR_TOTAL = { 18: [60, 75], 9: [27, 38] };
     var YARDS = [50, 700];
-    var RATING = [55, 85];      // course rating, one decimal
-    var SLOPE = [55, 155];      // the USGA slope range
+    // Course rating (one decimal) by hole count - the APP's numbers (THE RANGE, above).
+    var RATING = { 18: [55, 80], 9: [27, 40] };
+    var SLOPE = [55, 155];      // the USGA slope range, 9 or 18 holes
 
     function isInt(n) { return typeof n === 'number' && isFinite(n) && Math.floor(n) === n; }
     function isNum(n) { return typeof n === 'number' && isFinite(n); }
@@ -217,14 +231,40 @@
         }
         return bad;
     }
+    // The card's hole count: the caller's word first (the body's course.holes), then
+    // the model's, 18 unless it is 9. validateCourse and withRatingsInRange agree.
+    function holesOf(v, c) {
+        return c.holes === 9 ? 9 : (c.holes === 18 ? 18 : (v && v.holes === 9 ? 9 : 18));
+    }
+    function ratingInRange(rating, n) { var r = RATING[n]; return rating !== null && rating >= r[0] && rating <= r[1]; }
+    function slopeInRange(slope) { return slope !== null && slope >= SLOPE[0] && slope <= SLOPE[1]; }
     // A tee's rating / slope pair, SOFT only: both null is a card that does not print
-    // one; one of the two missing is rating_pair; a value outside the USGA range is
-    // rating_range / slope_range. who = 'men' | 'ladies'.
-    function ratingFlags(row, rating, slope, who, soft) {
+    // one; one of the two missing is rating_pair; a value outside the range for n
+    // holes is rating_range / slope_range. who = 'men' | 'ladies'.
+    function ratingFlags(row, rating, slope, who, n, soft) {
         if (rating === null && slope === null) return;
         if (rating === null || slope === null) soft.push({ code: 'rating_pair', row: row, who: who });
-        if (rating !== null && (rating < RATING[0] || rating > RATING[1])) soft.push({ code: 'rating_range', row: row, who: who });
-        if (slope !== null && (slope < SLOPE[0] || slope > SLOPE[1])) soft.push({ code: 'slope_range', row: row, who: who });
+        if (rating !== null && !ratingInRange(rating, n)) soft.push({ code: 'rating_range', row: row, who: who });
+        if (slope !== null && !slopeInRange(slope)) soft.push({ code: 'slope_range', row: row, who: who });
+    }
+    // THE RANGE (header): a copy of a parsed card's value with every rating / slope
+    // outside the range for its hole count set to NULL - the golfer types it. Never
+    // clamped. Pure: the input is left as it was; everything else is carried over.
+    function withRatingsInRange(value, ctx) {
+        if (!value || !Array.isArray(value.tees)) return value;
+        var n = holesOf(value, ctx || {});
+        var out = {};
+        Object.keys(value).forEach(function (k) { out[k] = value[k]; });
+        out.tees = value.tees.map(function (t) {
+            var u = {};
+            Object.keys(t).forEach(function (k) { u[k] = t[k]; });
+            u.rating = ratingInRange(t.rating, n) ? t.rating : null;
+            u.slope = slopeInRange(t.slope) ? t.slope : null;
+            u.rating_ladies = ratingInRange(t.rating_ladies, n) ? t.rating_ladies : null;
+            u.slope_ladies = slopeInRange(t.slope_ladies) ? t.slope_ladies : null;
+            return u;
+        });
+        return out;
     }
     // 1..n each exactly once.
     function isPermutation(row, n) {
@@ -245,7 +285,7 @@
             return { ok: false, hard: [{ code: 'parse_error' }], soft: [], suspectCount: 0, saveLadies: false, parTotal: null };
         }
         var v = parsed.value;
-        var n = c.holes === 9 ? 9 : (c.holes === 18 ? 18 : (v.holes === 9 ? 9 : 18));
+        var n = holesOf(v, c);
 
         // Par
         var par = v.par || [];
@@ -273,8 +313,8 @@
             t.yards.forEach(function (y, i) {
                 if (!isInt(y) || y < YARDS[0] || y > YARDS[1]) soft.push({ code: 'yards_range', row: t.name, hole: i + 1 });
             });
-            ratingFlags(t.name, t.rating, t.slope, 'men', soft);
-            ratingFlags(t.name, t.rating_ladies, t.slope_ladies, 'ladies', soft);
+            ratingFlags(t.name, t.rating, t.slope, 'men', n, soft);
+            ratingFlags(t.name, t.rating_ladies, t.slope_ladies, 'ladies', n, soft);
         });
 
         v.unsure.forEach(function (u) { soft.push({ code: 'unsure', row: u.row, hole: u.hole }); });
@@ -309,6 +349,7 @@
         buildCoursePrompt: buildCoursePrompt,
         parseCourseOutput: parseCourseOutput,
         validateCourse: validateCourse,
+        withRatingsInRange: withRatingsInRange,
         needsRetry: needsRetry,
         betterOf: betterOf
     };
