@@ -15,6 +15,9 @@
 // (restored by sha): needsRetry back to any hard failure -> 7 red here + 2 in the server
 // guard; the threshold counting the amber nine again -> 8 + 2; unsure_nine never pushed ->
 // 1 + 4; the total-branch unsure_nine removed -> 1 + 0.
+// THE CROSSED-OUT RULE (Manny's typed OK 2026-11-16, event list item 4): one prompt line, pinned by the last
+// test of "the prompt carries the round context". BASELINE against main fd15f9f6: 47 pass / 1 fail of 48;
+// 48 / 0 on preview-scan-desk. CONTROL K7 (the line deleted): 1 red, restored by sha.
 // ============================================================================
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
@@ -408,5 +411,14 @@ describe('the prompt carries the round context (handoff section 5)', () => {
         assert.match(p, /score null/);
         assert.match(p, /Never guess or invent/);
         assert.match(p, /exactly as written/);
+    });
+    test('the crossed-out rule (Manny OK 2026-11-16, event list item 4): a struck digit is not the score; the one beside it is; unsure = null', () => {
+        const i = p.indexOf('crossed out');
+        assert.ok(i > 0, 'the rule is in the prompt');
+        const rule = p.slice(p.lastIndexOf('\n', i) + 1, p.indexOf('\n', i));
+        assert.match(rule, /^- A digit that is crossed out, scribbled over or struck through is NOT the score\./);
+        assert.match(rule, /the digit written beside, above or over it/);
+        assert.match(rule, /return score null with low confidence/);
+        assert.ok(p.indexOf('Ignore putts') < i, 'it follows the ignore-the-marks rule, so "circles" cannot be read as "ignore the rewrite"');
     });
 });

@@ -252,6 +252,23 @@
     }
 
     function openIssues(check) { return issuesOf(check).filter(function (x) { return !x.choice; }); }
+
+    // THE WHOLE CARD (Manny's typed OK 2026-11-16, "scanner event list" item 2).
+    // The holes the card can fill WITHOUT a decision: the card has a digit and
+    // the app has nothing for that golfer on that hole ('missing' with no app
+    // score). A hole where the app already holds a different number (red) or the
+    // scanner was unsure (amber) is NOT in this list: those stay a per-hole
+    // choice. An untyped foursome is therefore 72 of these; a half-typed one, the
+    // other half. Returned in card order, open ones only.
+    function wholeCardIssues(check) {
+        return openIssues(check).filter(function (x) { return x.kind === 'missing' && x.app === null && x.canUseCard; });
+    }
+    // Several choices at once, each through choose(), on one copy.
+    function chooseMany(check, ids, choice) {
+        var c = check;
+        (Array.isArray(ids) ? ids : []).forEach(function (id) { c = choose(c, id, choice); });
+        return c;
+    }
     function isVerified(check) { return !!(check && check.rows) && openIssues(check).length === 0; }
 
     // The Desk's tiles. cards: [{ key, check: <stored check> | null }].
@@ -275,6 +292,8 @@
         compareCard: compareCard,
         issuesOf: issuesOf,
         openIssues: openIssues,
+        wholeCardIssues: wholeCardIssues,
+        chooseMany: chooseMany,
         verdictOf: verdictOf,
         choose: choose,
         isVerified: isVerified,

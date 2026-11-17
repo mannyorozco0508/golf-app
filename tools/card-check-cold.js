@@ -28,6 +28,10 @@
 //   recap    ?recap=1 with that record: the footer line, by innerText
 //   laptop   the Desk at 1100 px, mid-check: 8 cards, 2 verified, 3 with
 //            mismatches, 3 to scan
+//   whole    (Manny's typed OK 2026-11-16, event list item 2) Group 2 has no
+//            scores in the app: Scan card, the photo picked, the card screen
+//            offers "Use the whole card (72 holes)"; tapped: 72 score writes
+//            through the page, the card reads verified, no red or amber
 //
 // --tree points at another checkout (the "before" shots run the same steps
 // against preview-batch 5033e24b, where the scan check does not exist; there
@@ -218,6 +222,34 @@ async function main() {
     if (!r.ok) { console.log(JSON.stringify({ recap: r.reason })); process.exit(2); }
     results.recap = got(r, 'RECAP')[0];
     need(/^All 8 cards verified at \d{1,2}:\d{2}\s?(AM|PM)$/.test(String(results.recap || '')), 'recap: the footer line, by innerText');
+
+    // WHOLE CARD: Group 2 untyped, the card filled in one tap
+    const recU = record(); G[1][1].forEach((_, i) => { HOLES.forEach((h) => { delete recU.scores[pid(1, i) + '_h' + h]; }); });
+    const MEASURE_WHOLE = `(function(){
+      var b = document.getElementById('ck-use-whole');
+      return 'WHOLE:' + JSON.stringify({ button: b ? b.innerText : null, red: document.querySelectorAll('#ck-grid td.ck-x').length, amber: document.querySelectorAll('#ck-grid td.ck-u').length,
+        text: (document.getElementById('ck-whole') || {}).innerText || '', sentEvent: (window.__scanSent || []).map(function (x) { return x.event; }) });
+    })()`;
+    const MEASURE_AFTER = `(function(){
+      var w = (window.__coldWrites || []);
+      return 'AFTER:' + JSON.stringify({ scoreWrites: w.filter(function (x) { return /\\/scores\\//.test(x.path); }).length, checkWrites: w.filter(function (x) { return /cardChecks/.test(x.path); }).length,
+        button: !!document.getElementById('ck-use-whole'), text: (document.getElementById('cardcheck-wrap') || {}).innerText || '' });
+    })()`;
+    r = await run({ url: fileUrl('tournament.html', 'tourney=STK26'), db: db(recU), viewport: { width: 390, height: 844 },
+        preScript: tokenShim + scannerStub(1).replace('bytes: Math.round', 'event: body.event, bytes: Math.round'),
+        steps: [{ tap: '#tab-btn-desk' }, { sleep: 500 }, { tap: '#cardcheck-wrap .ck-scan[data-sk="g2"]' }, { sleep: 200 }, { expression: PICK }, { sleep: 2500 },
+            scrollTo('#cardcheck-wrap'), { sleep: 200 }, { expression: MEASURE_WHOLE }, ...shot('whole-untyped-phone'),
+            { tap: '#ck-use-whole' }, { sleep: 1200 }, scrollTo('#cardcheck-wrap'), { sleep: 200 }, { expression: MEASURE_AFTER }, ...shot('whole-done-phone')] });
+    if (!r.ok) { console.log(JSON.stringify({ whole: r.reason })); process.exit(2); }
+    const whole = JSON.parse(got(r, 'WHOLE')[0] || '{}');
+    const after = JSON.parse(got(r, 'AFTER')[0] || '{}');
+    results.whole = { button: whole.button, red: whole.red, amber: whole.amber, sentEvent: whole.sentEvent, scoreWrites: after.scoreWrites, checkWrites: after.checkWrites, after: String(after.text || '').slice(0, 200) };
+    need(whole.button === 'Use the whole card (72 holes)', 'whole: the button says 72 holes (saw ' + whole.button + ')');
+    need(whole.red === 0 && whole.amber === 0, 'whole: an untyped card has no red or amber cell');
+    need(whole.sentEvent && whole.sentEvent.length === 1 && whole.sentEvent[0] && whole.sentEvent[0].code === 'STK26', 'whole: the request carried event:{code:STK26} (item 3)');
+    need(after.scoreWrites === 72, 'whole: 72 score writes after the tap (saw ' + after.scoreWrites + ')');
+    need(after.checkWrites >= 1 && !after.button, 'whole: the check stored and the button gone');
+    need(/verified, 72 holes checked/.test(String(after.text || '')), 'whole: the card reads verified');
 
     // LAPTOP 1100, mid-check
     const rec2 = record(); rec2.cardChecks = stored([0, 1, 3, 4, 6]);

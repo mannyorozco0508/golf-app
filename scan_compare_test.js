@@ -223,3 +223,51 @@ test('M15 a 9-hole card on the back: the written OUT or IN stands for the total'
     assert.equal(c.rows.p07.writtenTotal, 36);
     assert.equal(c.verdict, 'match');
 });
+
+// ---- THE WHOLE CARD (Manny's typed OK 2026-11-16, "scanner event list" item 2) ----
+// BASELINE against 2c184122 (scan-compare.js before wholeCardIssues / chooseMany): 15 pass / 2 fail of 17 (M16, M17); 17 / 0 after.
+// CONTROL K4 (the app===null filter dropped from wholeCardIssues): M16 red, restored by sha.
+const WC_PLAYERS = [{ key: 'p05', name: 'Dana Ruiz' }, { key: 'p06', name: 'Lee Park' }, { key: 'p07', name: 'Kim Vo' }, { key: 'p08', name: 'Al Lopez' }];
+const WC_HOLES = Array.from({ length: 18 }, (_, i) => i + 1);
+const wcScan = (edit) => {
+    const players = WC_PLAYERS.map((p, pi) => ({ name: p.name, row_label_as_written: p.name, holes: WC_HOLES.map((h) => ({ hole: h, score: 4 + ((pi + h) % 3 === 0 ? 1 : 0), confidence: 0.97 })), written_out: null, written_in: null, written_total: null }));
+    if (edit) edit(players);
+    return { players, notes: '' };
+};
+const wcApp = (keys, holes) => { const app = {}; keys.forEach((k) => { app[k] = {}; const pi = WC_PLAYERS.findIndex((p) => p.key === k); holes.forEach((h) => { app[k][h] = 4 + ((pi + h) % 3 === 0 ? 1 : 0); }); }); return app; };
+
+test('M16 wholeCardIssues: an untyped foursome is 72 holes; a typed one is 0; half typed is the other half; red and amber are never in it', () => {
+    const none = SC.compareCard({ scan: wcScan(), players: WC_PLAYERS, holes: WC_HOLES, app: {} });
+    assert.equal(SC.wholeCardIssues(none).length, 72);
+    assert.deepEqual(SC.wholeCardIssues(none).slice(0, 2).map((x) => [x.key, x.hole, x.card, x.app, x.kind]), [['p05', 1, 4, null, 'missing'], ['p05', 2, 4, null, 'missing']]);
+    const full = SC.compareCard({ scan: wcScan(), players: WC_PLAYERS, holes: WC_HOLES, app: wcApp(['p05', 'p06', 'p07', 'p08'], WC_HOLES) });
+    assert.equal(SC.wholeCardIssues(full).length, 0);
+    assert.equal(SC.issuesOf(full).length, 0, 'positive: a typed card that matches has nothing at all');
+    // The front nine typed, the back not; plus one red (Dana's 7th differs) and one amber (Kim's 3rd read at 0.5 and differs).
+    const scan = wcScan((r) => { r[0].holes[6].score += 1; r[2].holes[2].score += 1; r[2].holes[2].confidence = 0.5; });
+    const half = SC.compareCard({ scan, players: WC_PLAYERS, holes: WC_HOLES, app: wcApp(['p05', 'p06', 'p07', 'p08'], WC_HOLES.slice(0, 9)) });
+    const whole = SC.wholeCardIssues(half);
+    assert.equal(whole.length, 36);
+    assert.ok(whole.every((x) => x.hole >= 10), 'only the untyped back nine');
+    const wholeIds = new Set(whole.map((x) => x.id));
+    const kinds = SC.openIssues(half).filter((x) => !wholeIds.has(x.id)).map((x) => x.kind).sort();
+    assert.deepEqual(kinds, ['mismatch', 'unsure'], 'the red and the amber stay out of the whole-card list');
+    // A blank on the card over an empty app cell is nothing to write.
+    const blank = SC.compareCard({ scan: wcScan((r) => { r[1].holes[4].score = null; }), players: WC_PLAYERS, holes: WC_HOLES, app: {} });
+    assert.equal(SC.wholeCardIssues(blank).length, 71);
+});
+
+test('M17 chooseMany records every usable choice on one copy; an id Use card cannot take is skipped, not an error', () => {
+    const none = SC.compareCard({ scan: wcScan(), players: WC_PLAYERS, holes: WC_HOLES, app: {} });
+    const ids = SC.wholeCardIssues(none).map((x) => x.id);
+    const next = SC.chooseMany(none, ids, 'card');
+    assert.notEqual(next, none);
+    assert.equal(SC.openIssues(next).length, 0);
+    assert.ok(SC.isVerified(next));
+    assert.equal(Object.keys(next.rows).reduce((n, k) => n + WC_HOLES.filter((h) => next.rows[k].h['h' + h].choice === 'card').length, 0), 72);
+    assert.equal(SC.openIssues(none).length, 72, 'the original is untouched');
+    const scan = wcScan((r) => { r[0].holes[6].score += 1; });
+    const typed = SC.compareCard({ scan, players: WC_PLAYERS, holes: WC_HOLES, app: wcApp(['p05', 'p06', 'p07', 'p08'], WC_HOLES) });
+    const same = SC.chooseMany(typed, ['p05|total', 'nope'], 'card');
+    assert.equal(same, typed, 'a total line and an unknown id change nothing');
+});

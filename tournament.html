@@ -953,6 +953,11 @@
         .ck-issue.ck-done { border: 1px solid var(--border-mid); }
         .ck-issue.ck-done > span { color: var(--text-main); font-weight: 400; }
         .ck-issue.ck-done small { color: var(--text-muted); }
+        .ck-grid td.ck-m span { display: inline-block; color: var(--text-main); border-bottom: 2px dotted var(--text-muted); min-width: 16px; }
+        .ck-whole { background: var(--nassau-box-bg); border: 1px solid var(--border-mid); border-radius: 10px; padding: 10px 12px; margin: 0 0 10px 0; }
+        .ck-whole p { margin: 0 0 8px 0; font-size: 0.92rem; }
+        .ck-whole button { width: auto; margin: 0; min-height: 44px; padding: 0 14px; }
+        .ck-whole small { display: block; margin-top: 6px; font-size: 0.78rem; color: var(--text-muted); }
         .ck-photo { margin: 6px 0 8px 0; }
         .ck-photo img { width: 100%; max-height: 420px; object-fit: contain; border: 1px solid var(--border-mid); border-radius: 8px; background: #fff; }
         .ck-photo small { display: block; font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; }
@@ -6915,6 +6920,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // NO PHOTO: the photo stays in this page's memory for the session (View
     // photo) and is gone on reload.
     const CARD_SCAN_PER_DAY = 30;   // functions/api/_scan.js PER_DAY, as the scanner enforces it
+    const CARD_SCAN_EVENT_MAX = 200; // functions/api/_scan.js EVENT_DAY_MAX
+    // EVENT DAY (Manny's typed OK 2026-11-16, "scanner event list" item 3). The
+    // scan carries event:{code}; the scanner (functions/api/_scan.js
+    // eventAllowance) then counts the owner's scans on the event's UTC day, or
+    // the day after, under the event with the field size as the cap (floor 30,
+    // ceiling 200) instead of this account's 30. This mirrors that rule for the
+    // footer only; the scanner decides. Anyone else, any other day: 30.
+    function cardCheckDailyCap() {
+        const d = currentData || {};
+        const date = String(d.eventDate || '');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return CARD_SCAN_PER_DAY;
+        const now = new Date();
+        const today = now.toISOString().slice(0, 10);
+        const yesterday = new Date(now.getTime() - 24 * 3600 * 1000).toISOString().slice(0, 10);
+        if (date !== today && date !== yesterday) return CARD_SCAN_PER_DAY;
+        const field = Object.keys((recordIsIndividual() ? d.players : d.teams) || {}).length;
+        return Math.max(CARD_SCAN_PER_DAY, Math.min(CARD_SCAN_EVENT_MAX, field));
+    }
     let cardCheckView = null;        // null (the Desk list) | { mode: 'card', sk } | { mode: 'review' }
     let cardCheckRoundId = null;     // multi-round: the round chip
     let cardCheckPending = null;     // the card a Scan card tap is photographing
@@ -7006,8 +7029,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!currentData || !currentCode || !canManage()) { mount.innerHTML = ''; return; }
         const all = cardCheckAllCards();
         const scored = all.some((c) => Object.keys(cardCheckAppScores(c.view, c.unit)).length > 0);
-        // A Desk before anyone has scored shows nothing new: there is no card to check.
-        if (!all.length || (!scored && !Object.keys(currentData.cardChecks || {}).length)) { mount.innerHTML = ''; return; }
+        // A Desk with no groups or teams yet shows nothing new: there is no card to check. Before anyone has
+        // SCORED it does show the Scan cards (Manny's typed OK 2026-11-16, item 2): an organizer running the
+        // event from paper scans each card instead of typing it, so the cards must be there before any score.
+        void scored;
+        if (!all.length) { mount.innerHTML = ''; return; }
         if (cardCheckView && cardCheckView.mode === 'card' && cardCheckFind(cardCheckView.sk)) { mount.innerHTML = cardCheckCardHtml(cardCheckFind(cardCheckView.sk)); return; }
         if (cardCheckView && cardCheckView.mode === 'review') { mount.innerHTML = cardCheckReviewHtml(all); return; }
         cardCheckView = null;
@@ -7048,14 +7074,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             else if (!c.check) { state = `<span class="ck-state">not scanned</span>`; act = `<button type="button" class="btn-primary ck-scan" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk)">Scan card</button>`; }
             else {
                 const open = ScanCompare.openIssues(c.check).length;
-                state = open ? `<span class="ck-state ck-open">${open} to resolve</span>` : `<span class="ck-state ck-ok">✓ verified · ${escapeHtml(cardCheckTime(c.check.at))}</span>`;
+                const fill = ScanCompare.wholeCardIssues(c.check).length;
+                state = open ? (fill === open ? `<span class="ck-state ck-open">${fill} to fill from the card</span>` : `<span class="ck-state ck-open">${open} to resolve</span>`) : `<span class="ck-state ck-ok">✓ verified · ${escapeHtml(cardCheckTime(c.check.at))}</span>`;
                 act = `<button type="button" class="btn-outline ck-look" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckOpenCard(this.dataset.sk)">${open ? 'Review' : 'Details'}</button>`
                     + `<button type="button" class="btn-outline ck-scan" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk)">Scan again</button>`;
             }
             return `<div class="ck-row" data-card="${escapeHtml(c.sk)}"><div class="ck-who"><strong>${escapeHtml(u.label)}${start}</strong><small>${escapeHtml(who)}</small>${state}</div><div class="ck-act">${act}</div></div>`;
         }).join('');
-        const left = Math.max(0, CARD_SCAN_PER_DAY - cardCheckUsedToday());
-        h += `<p class="ck-foot" id="ck-allowance">${left} of ${CARD_SCAN_PER_DAY} scans left today, counted on this phone. The scanner allows ${CARD_SCAN_PER_DAY} scans a day on this account and 3 a minute.</p></div>`;
+        const cap = cardCheckDailyCap();
+        const left = Math.max(0, cap - cardCheckUsedToday());
+        h += `<p class="ck-foot" id="ck-allowance">${left} of ${cap} scans left today, counted on this phone. ${cap > CARD_SCAN_PER_DAY ? `On event day the scanner allows one scan per ${recordIsIndividual() ? 'golfer' : 'team'} in the field (${cap}) and 3 a minute.` : `The scanner allows ${CARD_SCAN_PER_DAY} scans a day on this account and 3 a minute.`}</p></div>`;
         return h;
     }
     function cardCheckPickRound(rid) { cardCheckRoundId = rid || null; renderCardCheck(); }
@@ -7072,6 +7100,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (x.kind === 'missing') return x.card === null ? `Hole ${x.hole} · ${x.name}: blank on the card, app ${x.app}` : `Hole ${x.hole} · ${x.name}: card ${x.card}, no score in the app`;
         if (x.kind === 'total') return `${x.name}: the card's total says ${x.written}, the app adds to ${x.appTotal === null ? 'nothing' : x.appTotal}`;
         if (x.kind === 'absent') return `${x.name}: no row on the card`;
+        if (x.kind === 'fill') return `${x.count} ${x.count === 1 ? 'hole' : 'holes'} to fill from the card`;
         return `Card row ${x.row}: not matched${x.asWritten ? ' (“' + x.asWritten + '”)' : ''}`;
     }
     function cardCheckIssueHtml(c, x, withCard) {
@@ -7083,12 +7112,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return `<div class="ck-issue ck-done" data-issue="${escapeHtml(x.id)}"><span>${escapeHtml(head)}</span><small>${escapeHtml(said)}</small></div>`;
         }
         const keepLabel = (x.kind === 'mismatch' || x.kind === 'unsure' || x.kind === 'missing') && x.app !== null ? `Keep app (${x.app})` : 'Keep app';
+        if (x.kind === 'fill') return `<div class="ck-issue" data-issue="${escapeHtml(x.id)}"><span>${escapeHtml(head)}</span><div class="ck-btns"><button type="button" class="btn-primary ck-look" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckOpenCard(this.dataset.sk)">Open the card</button></div></div>`;
         return `<div class="${cls}" data-issue="${escapeHtml(x.id)}"><span>${escapeHtml(head)}</span><div class="ck-btns">`
             + (x.canUseCard ? `<button type="button" class="btn-primary ck-use" ${data} onclick="cardCheckChoose(this.dataset.sk, this.dataset.issue, 'card')">Use card (${x.card})</button>` : '')
             + `<button type="button" class="btn-outline ck-keep" ${data} onclick="cardCheckChoose(this.dataset.sk, this.dataset.issue, 'app')">${escapeHtml(keepLabel)}</button>`
             // The photo beside an amber line (the one that says "check the photo") and on every line of the field's list.
             + (cardCheckPhotos[c.sk] && (withCard || x.kind === 'unsure') ? `<button type="button" class="btn-outline ck-photo-btn" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckTogglePhoto(this.dataset.sk)">${withCard ? 'Photo' : 'View photo'}</button>` : '')
             + `</div></div>`;
+    }
+    // The card screen's lines in three parts: fill = open holes the whole card can fill (one button, not a line each);
+    // filled = those already filled from the card (one summary line); listed = everything else, one line each. A total
+    // line with nothing on the app side yet is held back while there are holes to fill: it is re-read once they are.
+    function cardCheckSplit(check) {
+        const issues = ScanCompare.issuesOf(check);
+        const isFill = (x) => x.kind === 'missing' && x.app === null && x.canUseCard;
+        const fill = issues.filter((x) => isFill(x) && !x.choice);
+        const filled = issues.filter((x) => isFill(x) && x.choice === 'card');
+        const listed = issues.filter((x) => !isFill(x) && !(fill.length && x.kind === 'total' && x.appTotal === null && !x.choice));
+        return { fill, filled, listed };
     }
     function cardCheckGridHtml(c) {
         const holes = cardCheckHoles(c.view);
@@ -7113,11 +7154,16 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                     any = true;
                     if (cell.status === 'unsure') return `<td class="ck-u"><span>${cell.card}?</span><small>app ${cell.app}</small></td>`;
                     if (cell.status === 'mismatch') return `<td class="ck-x"><span>${cell.card}</span><small>app ${cell.app}</small></td>`;
+                    // The card has a digit and the app has nothing yet (an untyped hole): the card's digit, in ink, marked "card".
+                    // Not red: there is nothing to disagree with. Use the whole card fills these in one tap.
+                    if (cell.card > 0 && cell.app === undefined) return `<td class="ck-m"><span>${cell.card}</span></td>`;
                     return `<td class="ck-x"><span>${cell.card || '–'}</span><small>app ${cell.app || '–'}</small></td>`;
                 }).join('');
                 const open = nine.some((h) => { const cell = (r.h || {})['h' + h.hole]; return cell && cell.status !== 'match' && cell.status !== 'empty' && !cell.choice; });
                 const unsureOnly = open && nine.every((h) => { const cell = (r.h || {})['h' + h.hole]; return !cell || cell.status === 'match' || cell.status === 'empty' || cell.choice || cell.status === 'unsure'; });
-                const mark = !r.row ? '' : (open ? (unsureOnly ? '<span class="ck-q">?</span>' : '<span class="ck-ne">≠</span>') : (all || any ? '✓' : ''));
+                // Open holes that are only "card digit, nothing in the app" are not a disagreement: no mark until they are filled.
+                const fillOnly = open && nine.every((h) => { const cell = (r.h || {})['h' + h.hole]; return !cell || cell.status === 'match' || cell.status === 'empty' || cell.choice || (cell.status === 'missing' && cell.card > 0 && cell.app === undefined); });
+                const mark = !r.row ? '' : (open ? (fillOnly ? '' : (unsureOnly ? '<span class="ck-q">?</span>' : '<span class="ck-ne">≠</span>')) : (all || any ? '✓' : ''));
                 const short = String(p.name).split(' ').filter(Boolean);
                 const nm = short.length > 1 ? `${short[0]} ${short[short.length - 1].charAt(0)}` : (short[0] || '');
                 t += `<tr><th class="ck-nm">${escapeHtml(nm)}</th>${cells}<td class="ck-sum">${sum || ''}</td><td class="ck-mk">${mark}</td></tr>`;
@@ -7137,12 +7183,22 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const issues = ScanCompare.issuesOf(c.check);
         const open = issues.filter((x) => !x.choice);
         const holesN = cardCheckHoles(c.view).length * u.players.length;
+        const parts = cardCheckSplit(c.check);
         let h = `<div class="ck-card" id="cardcheck-card">${head}<p class="ck-sub">${escapeHtml(currentData.name || '')} · read ${escapeHtml(cardCheckTime(c.check.at))} · ${u.players.length} ${u.scramble ? 'team row' : (u.players.length === 1 ? 'golfer' : 'golfers')}</p>`;
         if (cardCheckMsg) h += `<p class="ck-msg" id="ck-msg" role="alert">${escapeHtml(cardCheckMsg)}</p>`;
         if (cardCheckPhotoShown === c.sk && cardCheckPhotos[c.sk]) h += `<div class="ck-photo"><img id="ck-photo-img" src="${escapeHtml(cardCheckPhotos[c.sk])}" alt="The photo of this card"><small>This photo is kept on this screen only, until the page is closed.</small></div>`;
         h += `<div class="ck-grid-wrap" id="ck-grid">${cardCheckGridHtml(c)}</div>`;
         h += `<p class="ck-key">✓ = every hole in that nine matches. Red: the card and the app differ. Amber: the scanner was unsure.</p>`;
-        h += `<div id="ck-issues">` + issues.map((x) => cardCheckIssueHtml(c, x, false)).join('') + `</div>`;
+        // THE WHOLE CARD (item 2): the holes the app has nothing for, filled from the card in one tap; red and amber stay per hole.
+        const whole = parts.fill;
+        if (whole.length) {
+            const others = parts.listed.filter((x) => !x.choice).length;
+            h += `<div class="ck-whole" id="ck-whole"><p>${whole.length} ${whole.length === 1 ? 'hole has' : 'holes have'} a score on the card and none in the app.${others ? ` ${others} ${others === 1 ? 'other line stays' : 'other lines stay'} below for you to decide.` : ''}</p>`
+                + `<button type="button" class="btn-primary ck-use-whole" id="ck-use-whole" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckUseWhole(this.dataset.sk)">Use the whole card (${whole.length} ${whole.length === 1 ? 'hole' : 'holes'})</button>`
+                + `<small>Each one is written through the score corrector, as if typed there.</small></div>`;
+        }
+        h += `<div id="ck-issues">` + (parts.filled.length ? `<div class="ck-issue ck-done" id="ck-filled"><span>${parts.filled.length} ${parts.filled.length === 1 ? 'hole' : 'holes'} filled from the card</span><small>Used the card</small></div>` : '')
+            + parts.listed.map((x) => cardCheckIssueHtml(c, x, false)).join('') + `</div>`;
         h += open.length
             ? `<p class="ck-foot">Use card writes that hole through the score corrector, as if typed there. Keep app leaves the score as it is.</p>`
             : `<div class="ck-verified" id="ck-card-ok">✓ ${escapeHtml(u.label)}: verified, ${holesN} holes checked${issues.length ? ` · ${issues.length} resolved` : ''}</div>`;
@@ -7158,7 +7214,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const items = [];
         all.forEach((c) => {
             if (!c.check) return;
-            ScanCompare.openIssues(c.check).forEach((x) => { if (x.kind === 'unsure') unsure++; items.push([c, x]); });
+            const parts = cardCheckSplit(c.check);
+            if (parts.fill.length) items.push([c, { id: c.sk + '|fill', kind: 'fill', count: parts.fill.length, choice: null, canUseCard: false }]);
+            parts.listed.filter((x) => !x.choice).forEach((x) => { if (x.kind === 'unsure') unsure++; items.push([c, x]); });
         });
         let h = `<div class="ck-card" id="cardcheck-review"><div class="ck-top"><button type="button" class="pz-back" id="ck-back" onclick="cardCheckBack()">‹ Desk</button></div>`
             + `<div class="ck-title">Verify cards</div><p class="ck-sub" id="ck-review-sub">${read} of ${s.cards} read · ${s.matched} of ${s.cards} cards match</p>`
@@ -7286,7 +7344,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const user = authUser;   // the page's one seam: the signed-in organizer, never the anonymous session
         if (!user || typeof user.getIdToken !== 'function') return Promise.resolve({ ok: false, text: CARD_SCAN_SAYS.sign_in });
         if (typeof fetch !== 'function') return Promise.resolve({ ok: false, text: CARD_SCAN_SAYS.network });
-        const body = { image: { mimeType: 'image/jpeg', data: String(dataUrl).replace(/^data:[^,]*,/, '') }, round: cardCheckRound(c) };
+        // event:{code}: on the event's day the scanner counts this under the event's own allowance (cardCheckDailyCap above).
+        const body = { image: { mimeType: 'image/jpeg', data: String(dataUrl).replace(/^data:[^,]*,/, '') }, round: cardCheckRound(c), event: { code: String(currentCode) } };
         return Promise.resolve(user.getIdToken()).then((tok) => fetch('/api/scorecard-scan', {
             method: 'POST', credentials: 'omit',
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
@@ -7329,6 +7388,33 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             else correctTeamPlayerScore(u.num, (u.players.find((p) => p.key === x.key) || {}).idx, x.hole, x.card, rid);
         }
         const next = ScanCompare.choose(c.check, issueId, choice);
+        if (next === c.check) return;
+        cardCheckStore(sk, next);
+    }
+    // Use the whole card: every hole the card has a digit for and the app has
+    // nothing, written through the same corrector as a single Use card, then the
+    // choices recorded on the stored check in one write. Red and amber holes are
+    // not touched (ScanCompare.wholeCardIssues leaves them out).
+    function cardCheckUseWhole(sk) {
+        if (!currentCode || !canManage()) return;
+        const c = cardCheckFind(sk);
+        if (!c || !c.check) return;
+        const list = ScanCompare.wholeCardIssues(c.check);
+        if (!list.length) return;
+        cardCheckMsg = '';
+        if (c.rid && roundStatus((currentData.rounds || {})[c.rid]) !== 'open') {
+            cardCheckMsg = 'This round is not open. Open it in Setup to use the card’s scores.';
+            renderCardCheck();
+            return;
+        }
+        const u = c.unit;
+        const rid = c.rid || undefined;
+        list.forEach((x) => {
+            if (recordIsIndividual()) correctPlayerScore(u.gid, x.key, x.hole, x.card, rid);
+            else if (u.scramble) correctTeamScore(u.num, x.hole, x.card, rid);
+            else correctTeamPlayerScore(u.num, (u.players.find((p) => p.key === x.key) || {}).idx, x.hole, x.card, rid);
+        });
+        const next = ScanCompare.chooseMany(c.check, list.map((x) => x.id), 'card');
         if (next === c.check) return;
         cardCheckStore(sk, next);
     }

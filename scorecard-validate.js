@@ -467,6 +467,10 @@
             'Rules:',
             '- Read ONLY the gross strokes for each player on each hole.',
             '- Ignore putts, dots, handicap stroke dots, circles, squares, match marks, + and - signs, and anything that is not the stroke count.',
+            // Manny's typed OK 2026-11-16 ("scanner event list" item 4): two synthetic cards with a crossed-out digit and a new one written
+            // beside it read the STRUCK digit both times (scan-test/synthetic s04, s11, Nov 16); both were caught only because the written
+            // total disagreed. The rule names the case; a scan that still cannot tell says null, which the validator flags, never a silent digit.
+            '- A digit that is crossed out, scribbled over or struck through is NOT the score. The score is the digit written beside, above or over it. If you cannot tell which digit stands, return score null with low confidence.',
             '- Map each handwritten name or initials to one of the known players above and return that exact name. If a row cannot be matched, return name "UNKNOWN:" followed by what is written.',
             '- Put what the row label actually says in row_label_as_written.',
             '- If a cell is blank or you cannot read it, return score null with low confidence. Never guess or invent a score.',

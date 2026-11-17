@@ -55,6 +55,18 @@
 // Scan card) and R1 (the repo rules already let the owner write both keys and
 // refuse anyone else). After the build (tournament.html sha256 76bc5948
 // 3655190a...): 16 tests, 16 pass / 0 fail.
+//
+// 2026-11-16, Manny's typed OK "build scanner event list 1-4 on a branch" (preview-scan-desk, cherry-picked
+// from preview-sk a8c96970 onto main fd15f9f6): B1 + the F block. Item 2, Use the whole card: the holes the
+// card has a digit for and the app has nothing (ScanCompare.wholeCardIssues) are one button, written through
+// the same corrector, one stored write; red and amber stay per hole; such holes draw dotted, not red; the Desk
+// shows the Scan cards BEFORE anyone has scored (A1 re-pinned: scanning instead of typing). Item 3: the body
+// carries event:{code} and the footer mirrors the event-day allowance. BASELINE against 2c184122 (the
+// cherry-pick alone, before items 2-3): 15 pass / 6 fail of 21 (A1, B1, F1, F3, F4, F5); 21 / 0 after.
+// NEGATIVE CONTROLS (restored by sha): K4 wholeCardIssues takes every open hole -> F1 + F3 red (and M16 in
+// scan_compare_test); K5 Use the whole card records the choices but writes no score -> F1 + F3 red; K6 the
+// event code dropped from the body -> B1 red; K8 the Desk hides the Scan cards until someone has scored -> A1 + F1
+// red. tools/card-check-cold.js gained the "whole" scene (Chrome, cold): PASS 2026-11-16.
 // ============================================================================
 'use strict';
 const { test, describe } = require('node:test');
@@ -183,13 +195,19 @@ const scanBtn = (sk) => (t) => /ck-scan/.test(t) && new RegExp('data-sk="' + sk 
 
 // ---- A. THE DESK -------------------------------------------------------------
 describe('A. THE DESK, as the organizer arrives', () => {
-    test('A1 DEFAULT before anyone scores: the Desk shows nothing new and nothing is written', () => {
+    test('A1 DEFAULT before anyone scores: the Desk offers a Scan card per group (re-pinned 2026-11-16, Manny OK item 2: scanning INSTEAD of typing) and nothing is written', () => {
         const sb = arrive(individual({ scored: false }));
         deskTab(sb);
-        assert.equal(html(sb, 'cardcheck-wrap'), '', 'no card check before there is a score');
-        assert.ok(!/Scan card/.test(html(sb, 'manage-tab-desk')));
+        const w = html(sb, 'cardcheck-wrap');
+        assert.equal(tags(w).filter((t) => /ck-scan/.test(t)).length, 4, 'a Scan card on each of the four groups');
+        assert.match(w, /<b id="ck-tile-toscan">4<\/b>/);
         assert.equal(mine(sb).length, 0);
         assert.equal(sb.__fetches.length, 0);
+        // An event with no groups at all still shows nothing: there is no card to check.
+        const rec = individual({ scored: false }); rec.scoringGroups = {};
+        const sb2 = arrive(rec);
+        deskTab(sb2);
+        assert.equal(html(sb2, 'cardcheck-wrap'), '', 'no groups, no card check');
     });
 
     test('A2 DEFAULT after the round, nothing scanned yet: tiles 4 cards / 0 verified / 0 with mismatches / 4 to scan, a Scan card on every group row, the day\'s allowance, nothing written', () => {
@@ -242,6 +260,8 @@ describe('B. Scan card -> the photo -> the LIVE scanner -> the card\'s grid', ()
         assert.equal(body.round.strokeIndex['2'], 8);
         assert.deepEqual(body.round.players, [{ name: 'Dana Ruiz', handicap: 13 }, { name: 'Lee Park', handicap: 14 }, { name: 'Kim Vo', handicap: 15 }, { name: 'Al Lopez', handicap: 16 }]);
         assert.ok(!/u-org|org@example/.test(f.init.body), 'no account id or email in the body');
+        // Item 3 (Manny OK 2026-11-16): the event code rides along, so the scanner can count the owner's event-day scans under the event.
+        assert.deepEqual(body.event, { code: CODE });
     });
 
     test('B2 the result: Group 2\'s grid with the red "6 app 5" on Dana\'s 7th, the amber "6? app 5" on Kim\'s 13th, ink ticks elsewhere, the issues with Use card / Keep app (View photo beside the amber one), and the check stored with no photo and no uid', async () => {
@@ -404,6 +424,121 @@ describe('D. Use card goes through the corrector; Keep app writes no score', () 
         tap(sb, html(sb, 'cardcheck-wrap'), (t) => /ck-use/.test(t) && /data-issue="team\|h1"/.test(t));
         assert.deepEqual(calls, [['correctTeamScore', 3, 1, 3, undefined]]);
         assert.deepEqual(sb.__dbWrites.slice(n).filter((w) => /\/scores\//.test(w.path)).map((w) => [w.path, w.value]), [[`tournaments/${CODE}/scores/team3_h1`, 3]]);
+    });
+});
+
+// ---- F. USE THE WHOLE CARD + THE EVENT-DAY ALLOWANCE (Manny's typed OK 2026-11-16, "scanner event list" items 2 and 3) ----
+describe('F. Use the whole card (the holes the app has nothing for) and what the day allows', () => {
+    const wholeBtn = (t) => /\bid="ck-use-whole"/.test(t);
+    test('F1 an UNTYPED group: the Desk offers Scan card before anyone has typed; the card screen offers "Use the whole card (72 holes)"; one tap writes all 72 through the corrector and the card reads verified', async () => {
+        const sb = arrive(individual({ scored: false }), { answer: scanOf(GROUPS[1][2]) });
+        deskTab(sb);
+        const desk = html(sb, 'cardcheck-wrap');
+        assert.equal(tags(desk).filter((t) => /ck-scan/.test(t)).length, 4, 'a Scan card on every group, before any score');
+        assert.match(desk, /<b id="ck-tile-toscan">4<\/b>/);
+        assert.equal(mine(sb).length, 0, 'nothing written by showing it');
+        tap(sb, desk, scanBtn('g2'));
+        await takePhoto(sb);
+        const card = html(sb, 'cardcheck-wrap');
+        const btn = tags(card).find(wholeBtn);
+        assert.ok(btn, 'the whole-card button');
+        assert.match(card, /Use the whole card \(72 holes\)/);
+        assert.match(plain(card), /72 holes have a score on the card and none in the app\. Use the whole card \(72 holes\)/);
+        assert.ok(!/other lines? stays? below/.test(plain(card)), 'the four totals have nothing to compare with yet, so they are not lines');
+        assert.ok(!/td class="ck-x"|td class="ck-u"/.test(card), 'no red or amber cell: nothing to decide');
+        assert.equal((card.match(/td class="ck-m"/g) || []).length, 72, 'every hole shows the card\'s digit, dotted');
+        assert.ok(!/ck-ne|ck-q/.test(card), 'no ≠ or ? mark on a nine that is only waiting to be filled');
+        assert.equal((card.match(/class="ck-issue/g) || []).length, 0, 'no per-hole line under the one button');
+        const calls = spyCorrector(sb);
+        const n = sb.__dbWrites.length;
+        tap(sb, card, wholeBtn);
+        assert.equal(calls.length, 72, 'the corrector, 72 times');
+        assert.ok(calls.every((c) => c[0] === 'correctPlayerScore' && c[1] === 'g2' && c[5] === undefined), 'each through correctPlayerScore for Group 2');
+        assert.deepEqual(calls[0].slice(1, 5), ['g2', 'p05', 1, sc(0, 1)], 'Dana\'s 1st, the card\'s digit');
+        const ws = sb.__dbWrites.slice(n);
+        assert.equal(ws.filter((w) => /\/scores\//.test(w.path)).length, 72, '72 score writes');
+        const checks = ws.filter((w) => /cardChecks/.test(w.path));
+        assert.equal(checks.length, 1, 'the choices land on the stored check in ONE write');
+        const chosen = Object.keys(checks[0].value.rows).reduce((k, key) => k + Object.values(checks[0].value.rows[key].h).filter((c) => c.choice === 'card').length, 0);
+        assert.equal(chosen, 72);
+        const after = plain(html(sb, 'cardcheck-wrap'));
+        assert.match(after, /72 holes filled from the card Used the card/);
+        assert.match(after, /✓ Group 2: verified, 72 holes checked · 72 resolved/);
+        assert.ok(!/Use the whole card/.test(after), 'the button is gone once there is nothing left to fill');
+        assert.equal((html(sb, 'cardcheck-wrap').match(/class="ck-issue/g) || []).length, 1, 'one summary line, not 72');
+        // Back on the Desk: the card is verified; before the tap it said "72 to fill from the card".
+        tap(sb, html(sb, 'cardcheck-wrap'), (t) => /\bid="ck-back"/.test(t));
+        assert.match(html(sb, 'cardcheck-wrap'), /<b id="ck-tile-verified">1<\/b>/);
+    });
+    test('F2 a typed group with a red and an amber hole: no whole-card button, the per-hole choices stand', async () => {
+        const sb = arrive(individual(), { answer: G2_SCAN() });
+        deskTab(sb);
+        tap(sb, html(sb, 'cardcheck-wrap'), scanBtn('g2'));
+        await takePhoto(sb);
+        const card = html(sb, 'cardcheck-wrap');
+        assert.ok(!tags(card).some(wholeBtn), 'nothing the card can fill on its own');
+        assert.ok(/ck-use/.test(card) && /ck-keep/.test(card), 'positive: the per-hole buttons are there');
+    });
+    test('F3 a half-typed group (front nine in the app): the button says 35 holes and writes only those; the red 7th and the amber 13th stay open', async () => {
+        const rec = individual();
+        // The back nine untyped for all four, except Kim Vo's 13th (so the amber on it is still a disagreement, not a blank to fill).
+        GROUPS[1][2].forEach((_, ni) => { const pid = 'p' + String(5 + ni).padStart(2, '0'); for (let h = 10; h <= 18; h++) { if (pid === 'p07' && h === 13) continue; delete rec.scores[pid + '_h' + h]; } });
+        const sb = arrive(rec, { answer: G2_SCAN() });
+        deskTab(sb);
+        tap(sb, html(sb, 'cardcheck-wrap'), scanBtn('g2'));
+        await takePhoto(sb);
+        const card = html(sb, 'cardcheck-wrap');
+        assert.match(card, /Use the whole card \(35 holes\)/);
+        assert.match(plain(card), /35 holes have a score on the card and none in the app\. \d+ other lines stay below for you to decide\./);
+        assert.equal((card.match(/class="ck-issue/g) || []).length, plain(card).match(/(\d+) other lines stay/)[1] * 1, 'the lines below are exactly the "other" ones');
+        const calls = spyCorrector(sb);
+        tap(sb, card, wholeBtn);
+        assert.equal(calls.length, 35);
+        assert.ok(calls.every((c) => c[3] >= 10), 'only the back nine');
+        const after = html(sb, 'cardcheck-wrap');
+        assert.ok(tags(after).some((t) => /ck-use/.test(t) && /data-issue="p05\|h7"/.test(t)), 'the red 7th is still a choice');
+        assert.ok(tags(after).some((t) => /ck-keep/.test(t) && /data-issue="p07\|h13"/.test(t)), 'the amber 13th is still a choice');
+        assert.ok(!tags(after).some(wholeBtn));
+        // What is left open is exactly the red 7th, the amber 13th and Dana's total (her card total counts the 6): the other three totals
+        // agreed as soon as the card's back nine was on the app.
+        const openIds = tags(after).filter((t) => /ck-keep/.test(t)).map((t) => /data-issue="([^"]+)"/.exec(t)[1]).sort();
+        assert.deepEqual(openIds, ['p05|h7', 'p05|total', 'p07|h13']);
+    });
+    test('F4 a multi-round event whose round is closed: Use the whole card is refused with a sentence, nothing written', async () => {
+        const rec = individual();
+        rec.eventModel = 'round-v1';
+        const scores = Object.assign({}, rec.scores);
+        GROUPS[1][2].forEach((_, ni) => { const pid = 'p' + String(5 + ni).padStart(2, '0'); for (let h = 1; h <= 18; h++) delete scores[pid + '_h' + h]; });
+        rec.rounds = { r1: { name: 'Round 1', status: 'closed', createdAt: 1, courseData: CD, scoringGroups: rec.scoringGroups, scores } };
+        delete rec.scores; delete rec.courseData;
+        const sb = arrive(rec, { answer: scanOf(GROUPS[1][2]) });
+        deskTab(sb);
+        tap(sb, html(sb, 'cardcheck-wrap'), scanBtn('r1~g2'));
+        await takePhoto(sb);
+        const card = html(sb, 'cardcheck-wrap');
+        assert.ok(tags(card).some(wholeBtn), 'positive: the button is offered');
+        const calls = spyCorrector(sb);
+        const n = sb.__dbWrites.length;
+        tap(sb, card, wholeBtn);
+        assert.equal(calls.length, 0);
+        assert.equal(sb.__dbWrites.slice(n).filter((w) => /scores|cardChecks/.test(w.path)).length, 0);
+        assert.match(plain(html(sb, 'cardcheck-wrap')), /This round is not open\. Open it in Setup to use the card’s scores\./);
+    });
+    test('F5 the footer: any other day, 30 of 30; on event day with a 40-golfer field, 40 of 40 and the sentence says one scan per golfer', () => {
+        const sb = arrive(individual());
+        deskTab(sb);
+        assert.match(plain(html(sb, 'cardcheck-wrap')), /30 of 30 scans left today, counted on this phone\. The scanner allows 30 scans a day on this account and 3 a minute\./);
+        const rec = individual();
+        rec.eventDate = new Date().toISOString().slice(0, 10);
+        for (let i = 17; i <= 40; i++) { const pid = 'p' + i; rec.players[pid] = { id: pid, name: 'Golfer ' + i, addedAt: i }; }
+        const sb2 = arrive(rec);
+        deskTab(sb2);
+        assert.match(plain(html(sb2, 'cardcheck-wrap')), /40 of 40 scans left today, counted on this phone\. On event day the scanner allows one scan per golfer in the field \(40\) and 3 a minute\./);
+        const rec3 = individual();
+        rec3.eventDate = new Date().toISOString().slice(0, 10);   // event day, but a 16-golfer field: the floor of 30 holds
+        const sb3 = arrive(rec3);
+        deskTab(sb3);
+        assert.match(plain(html(sb3, 'cardcheck-wrap')), /30 of 30 scans left today/);
     });
 });
 
