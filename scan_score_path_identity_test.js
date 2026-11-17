@@ -29,6 +29,13 @@
 // from both sides and compares everything else as before; the two tests at the
 // bottom pin those two divergences exactly, so a third one turns this red.
 //
+// RE-PINNED AGAIN 2026-11-16 23:5x under Manny's "OK merge scanner Desk (preview-scan-desk) + deploy" (item 4 of
+// "OK build scanner event list 1-4 ... crossed-out rule"): one prompt sentence - a crossed-out digit is not the
+// score - is removed from the prompt text before the byte comparison (sansStruck), and a test below pins that it
+// is exactly one sentence, in one place, with the rest of the prompt identical. Any fourth divergence is red.
+// (This file is not in the 106-file sweep list, which is how the branch's sweep missed it; measured on the merged
+// tree before the push: 7 pass / 5 fail of 12 before this re-pin, 13 / 0 after it.)
+//
 // RE-PINNED A THIRD TIME 2026-11-16 under Manny's typed "OK scanner speed fix A
 // (no Pro retry for sum mismatches; still retry low-confidence cells)". The
 // change is in scorecard-validate.js, which this test takes from dddb9565 for
@@ -149,7 +156,17 @@ function sansThinking(url, body) {
     if (!body || !/generativelanguage/.test(url)) return body || null;
     const o = JSON.parse(body);
     if (o.generationConfig) delete o.generationConfig.thinkingConfig;
-    return JSON.stringify(o);
+    return JSON.stringify(sansStruck(o));
+}
+// 2026-11-16 (the Desk scan, item 4 - Manny's typed OK "build scanner event list 1-4 ... crossed-out rule" and
+// "OK merge scanner Desk"): ONE prompt sentence is the other allowed difference in a Gemini body (pinned below).
+// It is removed from the prompt text before the byte comparison; any other change to the prompt is still red.
+const STRUCK_RULE = '- A digit that is crossed out, scribbled over or struck through is NOT the score. The score is the digit written beside, above or over it. If you cannot tell which digit stands, return score null with low confidence.';
+function sansStruck(o) {
+    (o.contents || []).forEach((c) => (c.parts || []).forEach((p) => {
+        if (typeof p.text === 'string') p.text = p.text.split('\n' + STRUCK_RULE).join('');
+    }));
+    return o;
 }
 // 2026-11-16 (speed fix A): validation.unsureCount is the one allowed difference in an answer (pinned below).
 function sansUnsure(out) {
@@ -215,7 +232,21 @@ t('THE THINKING CAP: dddb9565 sent the configured 3.8 Flash / 3.1 Pro no thinkin
     assert.equal(bodies[0].length, 2); assert.equal(bodies[1].length, 2);
     bodies[0].forEach((b) => assert.equal(b.generationConfig.thinkingConfig, undefined, 'dddb9565: no cap for a 3.x model'));
     bodies[1].forEach((b) => assert.deepEqual(b.generationConfig.thinkingConfig, { thinkingLevel: 'low' }, 'this branch: a level'));
-    bodies[1].forEach((b, i) => { const a = JSON.parse(JSON.stringify(b)); delete a.generationConfig.thinkingConfig; assert.deepEqual(a, bodies[0][i], 'the rest of the body is identical'); });
+    bodies[1].forEach((b, i) => { const a = sansStruck(JSON.parse(JSON.stringify(b))); delete a.generationConfig.thinkingConfig; assert.deepEqual(a, bodies[0][i], 'the rest of the body (less the crossed-out sentence, pinned below) is identical'); });
+});
+t('THE CROSSED-OUT RULE: dddb9565\'s prompt has no struck-digit sentence; this branch\'s has exactly one, right after the Ignore-putts line, and the rest of the prompt is identical', async () => {
+    const texts = [];
+    for (const S of [OLD, NEW]) {
+        S.resetKeyCache();
+        const fetch = stubFetch({ flash: [gem(cardJson())] });
+        await S.handleScan({ env: ENV, kv: fakeKV(), fetch, clock, log: () => {}, body: { image: IMAGE, round: ROUND }, authorization: 'Bearer ' + await idToken() });
+        const b = JSON.parse(fetch.calls.filter((c) => /generativelanguage/.test(c.url))[0].body);
+        texts.push(b.contents[0].parts.filter((p) => typeof p.text === 'string').map((p) => p.text).join('\n'));
+    }
+    assert.equal(texts[0].split(STRUCK_RULE).length - 1, 0, 'dddb9565: no such sentence');
+    assert.equal(texts[1].split(STRUCK_RULE).length - 1, 1, 'this branch: exactly one');
+    assert.match(texts[1], /anything that is not the stroke count\.\n- A digit that is crossed out/, 'placed right after the Ignore-putts line');
+    assert.equal(texts[1].split('\n' + STRUCK_RULE).join(''), texts[0], 'the rest of the prompt is identical');
 });
 t('THE TIMEOUT ANSWER: a Flash call hitting its abort was 504 network on dddb9565 and is 503 timeout here; a plain network failure is still network on both', async () => {
     const outs = {};

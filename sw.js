@@ -4594,6 +4594,10 @@ const SHELL_FILES = [
     // launch showed the "No connection" page.
     './tournament.html',
     './tournament-scorecard.html',
+    // scan-compare.js (v421): the card-vs-app compare tournament.html loads for the
+    // Desk's Scan check. Called unguarded from the check; a cached shell without it
+    // would open a Scan card that cannot compare.
+    './scan-compare.js',
     './instructions.html',
     './shared.html',
     // Shared engines. index.html cannot render a scorecard without these.
