@@ -28,6 +28,22 @@
 // for a 504). The byte comparison below removes generationConfig.thinkingConfig
 // from both sides and compares everything else as before; the two tests at the
 // bottom pin those two divergences exactly, so a third one turns this red.
+//
+// RE-PINNED A THIRD TIME 2026-11-16 under Manny's typed "OK scanner speed fix A
+// (no Pro retry for sum mismatches; still retry low-confidence cells)". The
+// change is in scorecard-validate.js, which this test takes from dddb9565 for
+// the OLD side: a sum mismatch alone (the pen's arithmetic, every digit read
+// with confidence) no longer earns the Pro retry; a mismatched nine that holds
+// a doubted cell adds hard 'unsure_nine' and still does; the 4-cell threshold
+// counts the model's own doubts (validation.unsureCount, a new field), not the
+// amber a wrong written total paints. _scan.js itself did not change. So the
+// comparison below removes validation.unsureCount from the NEW answer, and the
+// three tests at the bottom pin the divergence exactly: a clean card and a
+// doubted card stay identical in calls and counters; the pen's mismatch alone
+// is two model calls on dddb9565 and one here, with the same sum_mismatch
+// reported to the app on both. BASELINE against main 832204f0 (the validator before
+// the fix): 10 pass / 2 fail of 12 (UNSURE COUNT and THE PEN'S MISMATCH ALONE red, as
+// they describe the change); 12 / 0 on the branch.
 // ============================================================================
 const { test, before } = require('node:test');
 const assert = require('node:assert/strict');
@@ -135,6 +151,11 @@ function sansThinking(url, body) {
     if (o.generationConfig) delete o.generationConfig.thinkingConfig;
     return JSON.stringify(o);
 }
+// 2026-11-16 (speed fix A): validation.unsureCount is the one allowed difference in an answer (pinned below).
+function sansUnsure(out) {
+    if (!out || !out.validation || !('unsureCount' in out.validation)) return out;
+    const o = JSON.parse(JSON.stringify(out)); delete o.validation.unsureCount; return o;
+}
 async function runBoth(name, scriptFn, opts) {
     const o = opts || {};
     const res = [];
@@ -145,7 +166,7 @@ async function runBoth(name, scriptFn, opts) {
         const logs = [];
         const out = await S.handleScan({ env: ENV, kv, fetch, clock, log: (l) => logs.push(l.replace(/"ms":\d+/g, '"ms":0')),
             body: o.body || { image: IMAGE, round: ROUND }, authorization: o.auth === undefined ? 'Bearer ' + await idToken() : o.auth });
-        res.push({ out, kv: [...kv.m.entries()].sort(), logs, sent: fetch.calls.map((c) => [c.url, sansThinking(c.url, c.body)]) });
+        res.push({ out: sansUnsure(out), kv: [...kv.m.entries()].sort(), logs, sent: fetch.calls.map((c) => [c.url, sansThinking(c.url, c.body)]) });
     }
     assert.deepEqual(res[1].out, res[0].out, name + ': the answer');
     assert.deepEqual(res[1].kv, res[0].kv, name + ': the KV counters');
@@ -236,5 +257,56 @@ t('WITH event:{code} the two diverge exactly as intended (dddb9565: ignored; thi
     assert.deepEqual(res[1].keys.filter((k) => /^scan:(day|event):/.test(k)), ['scan:event:STARK7:2026-10-26']);
     // Everything that is not the day counter is still identical.
     assert.deepEqual(res[1].keys.filter((k) => !/^scan:(day|event):/.test(k)), res[0].keys.filter((k) => !/^scan:(day|event):/.test(k)));
-    assert.deepEqual(res[1].out, res[0].out);
+    assert.deepEqual(sansUnsure(res[1].out), res[0].out);
+});
+
+// The divergence the 2026-11-16 speed fix A re-pin allows (Manny's typed OK), pinned exactly.
+function penCard(doubt) {
+    const j = JSON.parse(cardJson());
+    j.players[0].written_out += 1;                       // the pen added wrong on golfer A's front nine; every digit 0.99
+    if (doubt) j.players[0].holes[2].confidence = 0.5;   // ...and the model doubted one digit in that nine
+    return JSON.stringify(j);
+}
+async function both(script, label) {
+    const res = [];
+    for (const S of [OLD, NEW]) {
+        S.resetKeyCache();
+        const fetch = stubFetch(script());
+        const kv = fakeKV();
+        const out = await S.handleScan({ env: ENV, kv, fetch, clock, log: () => {}, body: { image: IMAGE, round: ROUND }, authorization: 'Bearer ' + await idToken() });
+        res.push({ out, gemini: fetch.calls.filter((c) => /generativelanguage/.test(c.url)).length, keys: [...kv.m.entries()].sort() });
+    }
+    return res;
+}
+t('UNSURE COUNT: this branch answers validation.unsureCount (a number); dddb9565 did not; a clean card differs in nothing else', async () => {
+    const [old, neu] = await both(() => ({ flash: [gem(cardJson())] }));
+    assert.equal(old.out.validation.unsureCount, undefined);
+    assert.equal(neu.out.validation.unsureCount, 0);
+    assert.deepEqual(sansUnsure(neu.out), old.out);
+});
+t("THE PEN'S MISMATCH ALONE: dddb9565 spent the Pro call, this branch does not; both tell the app the nine does not add up", async () => {
+    const [old, neu] = await both(() => ({ flash: [gem(penCard(false))], pro: [gem(penCard(false))] }));
+    assert.equal(old.gemini, 2); assert.equal(old.out.retried, true);
+    assert.equal(neu.gemini, 1); assert.equal(neu.out.retried, false);
+    for (const r of [old, neu]) {
+        assert.equal(r.out.status, 'ok');
+        assert.ok(r.out.validation.hard.some((h) => h.code === 'sum_mismatch' && h.row === 0 && h.nine === 'out'), 'sum_mismatch reported');
+        assert.equal(r.out.validation.rows[0].nines.front, 'mismatch');
+        for (let h = 1; h <= 9; h++) assert.equal(r.out.validation.rows[0].cells[h].suspect, true, 'amber ' + h);
+    }
+    assert.ok(old.out.validation.hard.some((h) => h.code === 'too_many_suspect'), 'dddb9565 counted the amber nine toward the retry');
+    assert.ok(!neu.out.validation.hard.some((h) => h.code === 'too_many_suspect'), 'this branch does not');
+    assert.deepEqual(old.out.result, neu.out.result, 'the same read goes to the app');
+    // The only counter that moves is the global month total: dddb9565 bumped it for the Pro call it made; this branch did not.
+    const month = (r) => Number((r.keys.find((k) => /^scan:month:/.test(k[0])) || [0, 0])[1]);
+    assert.equal(month(old), month(neu) + 1, 'one model call fewer in the month total');
+    assert.deepEqual(neu.keys.filter((k) => !/^scan:month:/.test(k[0])), old.keys.filter((k) => !/^scan:month:/.test(k[0])), 'every other counter identical');
+});
+t('A DOUBTED DIGIT IN THE WRONG NINE: both sides still spend the one Pro call; this branch names it unsure_nine', async () => {
+    const [old, neu] = await both(() => ({ flash: [gem(penCard(true))], pro: [gem(cardJson())] }));
+    assert.equal(old.gemini, 2); assert.equal(neu.gemini, 2);
+    assert.equal(old.out.retried, true); assert.equal(neu.out.retried, true);
+    assert.equal(old.out.model, neu.out.model, 'the better Pro read is kept on both');
+    assert.deepEqual(sansUnsure(neu.out), old.out, 'the kept Pro read is clean on both, so the answers match');
+    assert.deepEqual(neu.keys, old.keys);
 });

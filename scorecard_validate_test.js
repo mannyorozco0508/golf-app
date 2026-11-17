@@ -5,6 +5,16 @@
 // The server uses this to decide on the one Pro retry; the app uses it to paint
 // the confirm grid. If a rule here is wrong, both are wrong the same way -
 // which is the point of one file, and why every rule has a test.
+//
+// SPEED FIX A (Manny's typed OK 2026-11-16, 'no Pro retry for sum mismatches; still retry
+// low-confidence cells'): a sum mismatch alone earns no retry; a mismatched nine with a
+// doubted cell adds hard 'unsure_nine' and does; too_many_suspect counts unsureCount (the
+// model's own doubts), not the amber a wrong written total paints. BASELINE against main
+// 832204f0 (the validator before the fix): 38 pass / 9 fail of 47, measured with this file
+// copied there after the last test was written; 47 / 0 on the branch. NEGATIVE CONTROLS
+// (restored by sha): needsRetry back to any hard failure -> 7 red here + 2 in the server
+// guard; the threshold counting the amber nine again -> 8 + 2; unsure_nine never pushed ->
+// 1 + 4; the total-branch unsure_nine removed -> 1 + 0.
 // ============================================================================
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
@@ -152,7 +162,22 @@ describe('cell rules', () => {
         rows[0].holes[3].confidence = 0.5;
         const four = V.validateScan(card(rows), ROUND);
         assert.ok(codes(four).includes('too_many_suspect'));
+        assert.deepEqual(four.hard.find((h) => h.code === 'too_many_suspect'), { code: 'too_many_suspect', count: 4 });
         assert.equal(V.needsRetry(four), true);
+    });
+    test('the 4-cell threshold counts the model\'s own doubts, never the amber a wrong written total paints', () => {
+        const rows = base();
+        rows[0].written_out += 1;           // nine cells amber from the pen alone
+        const v = V.validateScan(card(rows), ROUND);
+        assert.equal(v.suspectCount, 9);    // the app still paints all nine
+        assert.equal(v.unsureCount, 0);
+        assert.ok(!codes(v).includes('too_many_suspect'));
+        rows[0].holes[9].confidence = 0.5; rows[0].holes[10].confidence = 0.5; rows[0].holes[11].confidence = 0.5;
+        assert.ok(!codes(V.validateScan(card(rows), ROUND)).includes('too_many_suspect'), '3 doubts + 9 amber: under the threshold');
+        rows[0].holes[12].confidence = 0.5;
+        const v4 = V.validateScan(card(rows), ROUND);
+        assert.deepEqual(v4.hard.find((h) => h.code === 'too_many_suspect'), { code: 'too_many_suspect', count: 4 });
+        assert.equal(V.needsRetry(v4), true);
     });
 });
 
@@ -169,9 +194,43 @@ describe('sums against what was written', () => {
         for (let h = 1; h <= 9; h++) assert.ok(reasonsAt(v, 0, h).includes('check_this_nine'), 'hole ' + h);
         for (let h = 10; h <= 18; h++) assert.ok(!v.rows[0].cells[h].suspect, 'hole ' + h);
         assert.equal(v.rows[0].nines.front, 'mismatch');
-        assert.equal(V.needsRetry(v), true);
+        // Every digit read at 0.99: the mismatch is the pen's, and it earns no retry (Manny's OK 2026-11-16, speed fix A).
+        assert.equal(V.needsRetry(v), false);
+        assert.equal(v.unsureCount, 0);
+        assert.ok(!codes(v).includes('unsure_nine'));
         // The wrong cell is among the flagged ones: no wrong cell left unflagged.
         assert.equal(v.rows[0].cells[5].suspect, true);
+    });
+    test('a mismatched nine that holds a cell the model doubted DOES earn the retry (unsure_nine)', () => {
+        const r = rows();
+        r[0].holes[4].score = 5;
+        r[0].holes[4].confidence = 0.6;
+        const v = V.validateScan(card(r), ROUND);
+        assert.deepEqual(codes(v).filter((c) => c !== 'sum_mismatch'), ['unsure_nine']);
+        assert.deepEqual(v.hard.find((h) => h.code === 'unsure_nine'), { code: 'unsure_nine', row: 0, nine: 'out' });
+        assert.equal(v.unsureCount, 1);
+        assert.equal(V.needsRetry(v), true);
+        // The doubt has to sit IN the mismatched nine: a doubted cell on the clean back nine is one amber cell, no retry.
+        const r2 = rows();
+        r2[0].holes[4].score = 5;
+        r2[0].holes[12].confidence = 0.6;
+        const v2 = V.validateScan(card(r2), ROUND);
+        assert.ok(!codes(v2).includes('unsure_nine'));
+        assert.equal(V.needsRetry(v2), false);
+    });
+    test('a wrong written TOTAL over an unchecked nine with a doubted cell earns the retry too', () => {
+        const r = rows();
+        r[0].written_out = null;            // no OUT written: the front nine is unchecked
+        r[0].written_total = 73;            // the total disagrees (holes add to 72)
+        r[0].holes[2].confidence = 0.5;     // and a front-nine digit was doubted
+        const v = V.validateScan(card(r), ROUND);
+        assert.ok(codes(v).includes('sum_mismatch'));
+        assert.deepEqual(v.hard.find((h) => h.code === 'unsure_nine'), { code: 'unsure_nine', row: 0, nine: 'total' });
+        assert.equal(V.needsRetry(v), true);
+        r[0].holes[2].confidence = 0.99;    // no doubt: the pen added wrong, no retry
+        const v2 = V.validateScan(card(r), ROUND);
+        assert.ok(codes(v2).includes('sum_mismatch'));
+        assert.equal(V.needsRetry(v2), false);
     });
     test('IN mismatch flags the back nine', () => {
         const r = rows();
@@ -272,6 +331,41 @@ describe('hole count', () => {
         assert.equal(v.ok, true, JSON.stringify(v.hard));
         assert.deepEqual(v.rows[0].nines, { front: null, back: 'ok' });
         assert.equal(v.rows[0].sums.out, null);
+    });
+});
+
+describe('the four LIVE handwritten reads of Nov 16 2026 (helpers/fixtures/scan-handwritten-reads.json)', () => {
+    // Two cards (Papago, The Legacy), two live Flash reads each, every hole right against the Advisor's answer keys and
+    // every cell at 0.99; the pens had added wrong (Manny OUT/TOT; James and Harry IN/TOT). Live, each cost a Pro retry
+    // that was never kept. The mismatches must still reach the golfer; the retry must not fire.
+    const fx = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'helpers/fixtures/scan-handwritten-reads.json'), 'utf8')).cases;
+    const WRONG = { 'papago-1': [[0, 'out']], 'papago-2': [[0, 'out']], 'legacy-1': [[0, 'in'], [1, 'in']], 'legacy-2': [[0, 'in'], [1, 'in']] };
+    Object.keys(fx).forEach((k) => {
+        test(k + ': the wrong nines stay red and amber, no retry', () => {
+            const c = fx[k];
+            assert.equal(c.live.retried, true, 'positive: the live scan did retry before the fix');
+            const v = V.validateScan(V.parseModelOutput(JSON.stringify(c.model)), c.round);
+            WRONG[k].forEach(([row, nine]) => {
+                assert.ok(v.hard.some((h) => h.code === 'sum_mismatch' && h.row === row && h.nine === nine), k + ' row ' + row + ' ' + nine);
+                assert.equal(v.rows[row].nines[nine === 'out' ? 'front' : 'back'], 'mismatch');
+                const holes = nine === 'out' ? [1, 2, 3, 4, 5, 6, 7, 8, 9] : [10, 11, 12, 13, 14, 15, 16, 17, 18];
+                holes.forEach((h) => assert.equal(v.rows[row].cells[h].suspect, true, 'amber ' + h));
+            });
+            assert.equal(v.suspectCount, c.live.suspectCount, 'the amber count the app paints is unchanged');
+            assert.equal(v.unsureCount, 0);
+            assert.ok(!codes(v).includes('too_many_suspect'));
+            assert.ok(!codes(v).includes('unsure_nine'));
+            assert.equal(V.needsRetry(v), false);
+            assert.equal(v.rows.filter((r) => r.match === 'exact').length, 4, 'all four cursive names matched');
+        });
+    });
+    test('control: the same Papago read with one doubted digit inside the wrong nine retries', () => {
+        const c = fx['papago-1'];
+        const m = JSON.parse(JSON.stringify(c.model));
+        m.players[0].holes[2].confidence = 0.5;
+        const v = V.validateScan(V.parseModelOutput(JSON.stringify(m)), c.round);
+        assert.ok(codes(v).includes('unsure_nine'));
+        assert.equal(V.needsRetry(v), true);
     });
 });
 

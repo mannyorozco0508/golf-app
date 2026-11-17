@@ -1,0 +1,1901 @@
+{
+"_note": "Four LIVE Flash reads of two handwritten cards (Papago, The Legacy), Nov 16 2026, every hole right against the Advisor answer keys and every cell at 0.99; the cards carry written totals that do not add up (Manny OUT/TOT; James and Harry IN/TOT). Each one cost a Pro retry that was never kept. Test data only: no event, no account.",
+"cases": {
+"papago-1": {
+"round": {
+"holes": 18,
+"par": [
+5,
+4,
+4,
+3,
+4,
+4,
+4,
+3,
+5,
+5,
+3,
+4,
+4,
+4,
+5,
+4,
+3,
+4
+],
+"strokeIndex": [
+15,
+17,
+3,
+13,
+11,
+1,
+7,
+9,
+5,
+18,
+12,
+16,
+10,
+8,
+14,
+4,
+6,
+2
+],
+"course": "Papago Golf Club",
+"tee": "White",
+"players": [
+{
+"name": "Manny"
+},
+{
+"name": "Josh"
+},
+{
+"name": "Phil"
+},
+{
+"name": "Tony"
+}
+]
+},
+"model": {
+"players": [
+{
+"name": "Manny",
+"row_label_as_written": "Manny",
+"holes": [
+{
+"hole": 1,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 2,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 4,
+"confidence": 0.99
+}
+],
+"written_out": 38,
+"written_in": 34,
+"written_total": 72
+},
+{
+"name": "Josh",
+"row_label_as_written": "Josh",
+"holes": [
+{
+"hole": 1,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 4,
+"confidence": 0.99
+}
+],
+"written_out": 38,
+"written_in": 39,
+"written_total": 77
+},
+{
+"name": "Phil",
+"row_label_as_written": "Phil",
+"holes": [
+{
+"hole": 1,
+"score": 7,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 7,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 2,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 4,
+"confidence": 0.99
+}
+],
+"written_out": 44,
+"written_in": 42,
+"written_total": 86
+},
+{
+"name": "Tony",
+"row_label_as_written": "Tony",
+"holes": [
+{
+"hole": 1,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 2,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 5,
+"confidence": 0.99
+}
+],
+"written_out": 37,
+"written_in": 37,
+"written_total": 74
+}
+],
+"notes": ""
+},
+"live": {
+"at": "2026-11-16",
+"model": "gemini-3.8-flash",
+"retried": true,
+"hard": [
+"sum_mismatch",
+"sum_mismatch",
+"too_many_suspect"
+],
+"suspectCount": 9
+}
+},
+"papago-2": {
+"round": {
+"holes": 18,
+"par": [
+5,
+4,
+4,
+3,
+4,
+4,
+4,
+3,
+5,
+5,
+3,
+4,
+4,
+4,
+5,
+4,
+3,
+4
+],
+"strokeIndex": [
+15,
+17,
+3,
+13,
+11,
+1,
+7,
+9,
+5,
+18,
+12,
+16,
+10,
+8,
+14,
+4,
+6,
+2
+],
+"course": "Papago Golf Club",
+"tee": "White",
+"players": [
+{
+"name": "Manny"
+},
+{
+"name": "Josh"
+},
+{
+"name": "Phil"
+},
+{
+"name": "Tony"
+}
+]
+},
+"model": {
+"players": [
+{
+"name": "Manny",
+"row_label_as_written": "Manny",
+"holes": [
+{
+"hole": 1,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 2,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 4,
+"confidence": 0.99
+}
+],
+"written_out": 38,
+"written_in": 34,
+"written_total": 72
+},
+{
+"name": "Josh",
+"row_label_as_written": "Josh",
+"holes": [
+{
+"hole": 1,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 4,
+"confidence": 0.99
+}
+],
+"written_out": 38,
+"written_in": 39,
+"written_total": 77
+},
+{
+"name": "Phil",
+"row_label_as_written": "Phil",
+"holes": [
+{
+"hole": 1,
+"score": 7,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 7,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 2,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 4,
+"confidence": 0.99
+}
+],
+"written_out": 44,
+"written_in": 42,
+"written_total": 86
+},
+{
+"name": "Tony",
+"row_label_as_written": "Tony",
+"holes": [
+{
+"hole": 1,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 2,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 5,
+"confidence": 0.99
+}
+],
+"written_out": 37,
+"written_in": 37,
+"written_total": 74
+}
+],
+"notes": ""
+},
+"live": {
+"at": "2026-11-16",
+"model": "gemini-3.8-flash",
+"retried": true,
+"hard": [
+"sum_mismatch",
+"sum_mismatch",
+"too_many_suspect"
+],
+"suspectCount": 9
+}
+},
+"legacy-1": {
+"round": {
+"holes": 18,
+"par": [
+4,
+4,
+4,
+3,
+4,
+5,
+3,
+5,
+4,
+4,
+3,
+4,
+4,
+5,
+3,
+4,
+3,
+5
+],
+"strokeIndex": [
+10,
+6,
+16,
+12,
+14,
+2,
+18,
+8,
+4,
+9,
+11,
+3,
+15,
+1,
+13,
+17,
+5,
+7
+],
+"course": "The Legacy Golf Club",
+"tee": "White",
+"players": [
+{
+"name": "James"
+},
+{
+"name": "Harry"
+},
+{
+"name": "Tom"
+},
+{
+"name": "Peter"
+}
+]
+},
+"model": {
+"players": [
+{
+"name": "James",
+"row_label_as_written": "James",
+"holes": [
+{
+"hole": 1,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 7,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 5,
+"confidence": 0.99
+}
+],
+"written_out": 43,
+"written_in": 39,
+"written_total": 82
+},
+{
+"name": "Harry",
+"row_label_as_written": "Harry",
+"holes": [
+{
+"hole": 1,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 7,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 6,
+"confidence": 0.99
+}
+],
+"written_out": 39,
+"written_in": 41,
+"written_total": 80
+},
+{
+"name": "Tom",
+"row_label_as_written": "Tom",
+"holes": [
+{
+"hole": 1,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 4,
+"confidence": 0.99
+}
+],
+"written_out": 37,
+"written_in": 38,
+"written_total": 75
+},
+{
+"name": "Peter",
+"row_label_as_written": "Peter",
+"holes": [
+{
+"hole": 1,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 7,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 6,
+"confidence": 0.99
+}
+],
+"written_out": 43,
+"written_in": 43,
+"written_total": 86
+}
+],
+"notes": ""
+},
+"live": {
+"at": "2026-11-16",
+"model": "gemini-3.8-flash",
+"retried": true,
+"hard": [
+"sum_mismatch",
+"sum_mismatch",
+"sum_mismatch",
+"sum_mismatch",
+"too_many_suspect"
+],
+"suspectCount": 18
+}
+},
+"legacy-2": {
+"round": {
+"holes": 18,
+"par": [
+4,
+4,
+4,
+3,
+4,
+5,
+3,
+5,
+4,
+4,
+3,
+4,
+4,
+5,
+3,
+4,
+3,
+5
+],
+"strokeIndex": [
+10,
+6,
+16,
+12,
+14,
+2,
+18,
+8,
+4,
+9,
+11,
+3,
+15,
+1,
+13,
+17,
+5,
+7
+],
+"course": "The Legacy Golf Club",
+"tee": "White",
+"players": [
+{
+"name": "James"
+},
+{
+"name": "Harry"
+},
+{
+"name": "Tom"
+},
+{
+"name": "Peter"
+}
+]
+},
+"model": {
+"players": [
+{
+"name": "James",
+"row_label_as_written": "James",
+"holes": [
+{
+"hole": 1,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 7,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 5,
+"confidence": 0.99
+}
+],
+"written_out": 43,
+"written_in": 39,
+"written_total": 82
+},
+{
+"name": "Harry",
+"row_label_as_written": "Harry",
+"holes": [
+{
+"hole": 1,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 7,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 6,
+"confidence": 0.99
+}
+],
+"written_out": 39,
+"written_in": 41,
+"written_total": 80
+},
+{
+"name": "Tom",
+"row_label_as_written": "Tom",
+"holes": [
+{
+"hole": 1,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 4,
+"confidence": 0.99
+}
+],
+"written_out": 37,
+"written_in": 38,
+"written_total": 75
+},
+{
+"name": "Peter",
+"row_label_as_written": "Peter",
+"holes": [
+{
+"hole": 1,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 2,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 3,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 4,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 5,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 6,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 7,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 8,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 9,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 10,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 11,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 12,
+"score": 3,
+"confidence": 0.99
+},
+{
+"hole": 13,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 14,
+"score": 6,
+"confidence": 0.99
+},
+{
+"hole": 15,
+"score": 5,
+"confidence": 0.99
+},
+{
+"hole": 16,
+"score": 7,
+"confidence": 0.99
+},
+{
+"hole": 17,
+"score": 4,
+"confidence": 0.99
+},
+{
+"hole": 18,
+"score": 6,
+"confidence": 0.99
+}
+],
+"written_out": 43,
+"written_in": 43,
+"written_total": 86
+}
+],
+"notes": ""
+},
+"live": {
+"at": "2026-11-16",
+"model": "gemini-3.8-flash",
+"retried": true,
+"hard": [
+"sum_mismatch",
+"sum_mismatch",
+"sum_mismatch",
+"sum_mismatch",
+"too_many_suspect"
+],
+"suspectCount": 18
+}
+}
+}
+}

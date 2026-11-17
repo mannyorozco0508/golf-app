@@ -42,9 +42,29 @@
     // Below this, the model is not sure enough for a golfer to skip the cell.
     var MIN_CONFIDENCE = 0.85;
 
-    // More than this many suspect cells on one card is a hard failure: the
+    // More than this many UNSURE cells on one card is a hard failure: the
     // Flash read was poor, and that is the only time Pro is worth its price.
+    // Unsure = suspect for a reason of its own (low confidence, blank, out of
+    // range, an unmatched name), NOT a cell that is amber only because the
+    // nine it sits in does not add up to what the pen wrote (see SUM_REASONS).
     var MAX_SUSPECT_BEFORE_RETRY = 3;
+
+    // THE RETRY AND THE PEN (Manny's OK 2026-11-16, "scanner speed fix A").
+    // A nine whose cells do not add up to the written OUT / IN / TOT is still
+    // flagged red, and every cell of it still goes amber, so the golfer looks
+    // at it before saving; that part has not changed. What changed is the Pro
+    // retry: four live handwritten cards on Nov 16 (helpers/fixtures/
+    // scan-handwritten-reads.json) came back with every digit right at 0.99,
+    // and every one still cost a second, slower model call (24.8 to 29.0 s a
+    // scan against 7.6 to 16.4 s without) because the PEN had added wrong and
+    // a sum mismatch counted as a reason to retry. Pro was kept 0 of 4 times.
+    // Now a sum mismatch alone never earns the retry. A mismatched nine that
+    // also holds a cell the model was unsure about ('unsure_nine') does, and
+    // so does every other hard failure, exactly as before.
+    var SUM_REASONS = ['check_this_nine', 'check_total'];
+    function isUnsure(cell) {
+        return cell.reasons.some(function (r) { return SUM_REASONS.indexOf(r) === -1; });
+    }
 
     // ------------------------------------------------------------------------
     // THE RESPONSE SCHEMA sent to Gemini as generationConfig.responseSchema
@@ -356,8 +376,12 @@
                 if (written === null) { row.nines[key] = 'unchecked'; return; }
                 if (written === sumOf(list).sum && sumOf(list).complete) { row.nines[key] = 'ok'; return; }
                 row.nines[key] = 'mismatch';
+                // Decided BEFORE the nine's own marks go on, so only a doubt
+                // the model itself had counts (low confidence, blank, out of range).
+                var unsure = list.some(function (h) { return isUnsure(row.cells[h]); });
                 flagNine(list, 'check_this_nine');
                 hard.push({ code: 'sum_mismatch', row: ri, nine: label });
+                if (unsure) hard.push({ code: 'unsure_nine', row: ri, nine: label });
             };
             checkNine(front, p.written_out, 'front', 'out');
             checkNine(back, p.written_in, 'back', 'in');
@@ -369,8 +393,10 @@
                 if (row.nines.front !== 'ok') unproven = unproven.concat(front);
                 if (row.nines.back !== 'ok') unproven = unproven.concat(back);
                 if (unproven.length) {
+                    var unsureTotal = unproven.some(function (h) { return isUnsure(row.cells[h]); });
                     flagNine(unproven, 'check_total');
                     hard.push({ code: 'sum_mismatch', row: ri, nine: 'total' });
+                    if (unsureTotal && !hard.some(function (h) { return h.code === 'unsure_nine' && h.row === ri; })) hard.push({ code: 'unsure_nine', row: ri, nine: 'total' });
                 } else {
                     row.totalWrittenWrong = true;
                 }
@@ -381,10 +407,14 @@
         if (holeCountWrong) hard.push({ code: 'hole_count' });
         if (value.players.length !== known.length) hard.push({ code: 'player_count', found: value.players.length, expected: known.length });
 
-        var suspect = 0;
-        result.rows.forEach(function (r) { Object.keys(r.cells).forEach(function (h) { if (r.cells[h].suspect) suspect++; }); });
-        result.suspectCount = suspect;
-        if (suspect > MAX_SUSPECT_BEFORE_RETRY) hard.push({ code: 'too_many_suspect', count: suspect });
+        var suspect = 0, unsure = 0;
+        result.rows.forEach(function (r) { Object.keys(r.cells).forEach(function (h) {
+            if (r.cells[h].suspect) suspect++;
+            if (isUnsure(r.cells[h])) unsure++;
+        }); });
+        result.suspectCount = suspect;       // what the app paints amber (unchanged)
+        result.unsureCount = unsure;         // what the retry decision counts
+        if (unsure > MAX_SUSPECT_BEFORE_RETRY) hard.push({ code: 'too_many_suspect', count: unsure });
 
         var claimed = {};
         result.rows.forEach(function (r) { if (r.index >= 0) claimed[r.index] = true; });
@@ -393,9 +423,13 @@
         return result;
     }
 
-    // ONE retry on Pro, and only for a hard failure (handoff section 7).
+    // ONE retry on Pro, and only for a hard failure (handoff section 7) that a
+    // second read could fix. A sum mismatch on its own is the pen's arithmetic,
+    // not the model's reading: it stays a hard failure for the golfer's screen
+    // and earns no retry (see THE RETRY AND THE PEN above).
     function needsRetry(validation) {
-        return !!(validation && Array.isArray(validation.hard) && validation.hard.length > 0);
+        if (!validation || !Array.isArray(validation.hard)) return false;
+        return validation.hard.some(function (h) { return h.code !== 'sum_mismatch'; });
     }
 
     // Which of two validated reads to show. Fewer hard failures wins, then

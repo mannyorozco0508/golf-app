@@ -33,6 +33,11 @@ const fs = require('fs');
 const { pathToFileURL } = require('url');
 const { webcrypto } = require('crypto');
 const { REPO_ROOT } = require('./helpers/load-script.js');
+// SPEED FIX A (Manny's typed OK 2026-11-16): a sum mismatch alone no longer earns the Pro call; the
+// retry triggers in this file carry a doubted digit (cardJson unsure) and two new tests pin the no-call
+// case and the four live handwritten reads (helpers/fixtures/scan-handwritten-reads.json) end to end
+// through handleScan. BASELINE against main 832204f0: 53 pass / 2 fail of 55 (the two new tests);
+// 55 / 0 on the branch.
 
 const API = path.join(REPO_ROOT, 'functions', 'api');
 let S = null, ROUTE = null, CATCH = null, loadError = null;
@@ -86,6 +91,7 @@ function cardJson(opts) {
     const o = opts || {};
     const row = (name, off) => {
         const holes = PAR.map((p, i) => ({ hole: i + 1, score: p + off, confidence: 0.99 }));
+        if (o.unsure && off === 0) holes[0].confidence = 0.5;   // one doubted digit on golfer A's front nine
         const out = holes.slice(0, 9).reduce((s, c) => s + c.score, 0);
         const inn = holes.slice(9).reduce((s, c) => s + c.score, 0);
         return { name, row_label_as_written: name, holes, written_out: out + (o.badOut ? 1 : 0), written_in: inn, written_total: out + inn };
@@ -551,7 +557,7 @@ describe('the Gemini request', () => {
     // Flash thought past the 25 s abort on every real card (scan-test/papago-RESULT.md).
     test('the configured Gemini 3 models get a thinking LEVEL (low), both calls', async () => {
         need();
-        const { fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true }))], pro: [geminiOk(cardJson())] },
+        const { fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true, unsure: true }))], pro: [geminiOk(cardJson())] },
             { env: { SCAN_MODEL: 'gemini-3.8-flash', SCAN_RETRY_MODEL: 'gemini-3.1-pro-preview' } });
         const sent = fetch.gemini().map((c) => JSON.parse(c.init.body).generationConfig.thinkingConfig);
         assert.deepEqual(sent, [{ thinkingLevel: 'low' }, { thinkingLevel: 'low' }]);
@@ -613,9 +619,36 @@ describe('ONE Pro retry, only on a validation failure', () => {
         assert.equal(out.validation.suspectCount, 1);
         assert.equal(fetch.gemini().length, 1);
     });
-    test('a sum mismatch on Flash -> one Pro call; the better Pro read is used', async () => {
+    test('a sum mismatch alone on Flash (every digit certain) -> NO Pro call; the mismatch still reaches the app (Manny OK 2026-11-16, speed fix A)', async () => {
         need();
-        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true }))], pro: [geminiOk(cardJson())] });
+        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true }))] });
+        assert.equal(fetch.gemini().length, 1, 'a second model call was made for the pen\'s arithmetic');
+        assert.equal(out.status, 'ok');
+        assert.equal(out.retried, false);
+        assert.equal(out.model, 'gemini-2.5-flash');
+        assert.ok(out.validation.hard.some((h) => h.code === 'sum_mismatch' && h.row === 0 && h.nine === 'out'));
+        assert.equal(out.validation.rows[0].nines.front, 'mismatch');
+        assert.equal(out.validation.suspectCount, 18, 'badOut puts a wrong OUT on both golfers: two amber nines');
+        assert.equal(out.validation.unsureCount, 0);
+        assert.equal(out.validation.ok, false);
+    });
+    test('the four LIVE handwritten reads of Nov 16 2026, through the server: one model call each, the mismatches kept', async () => {
+        need();
+        const fx = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'helpers/fixtures/scan-handwritten-reads.json'), 'utf8')).cases;
+        for (const k of Object.keys(fx)) {
+            const c = fx[k];
+            const { out, fetch } = await scan({ flash: [geminiOk(JSON.stringify(c.model))] }, { body: { image: IMAGE, round: c.round } });
+            assert.equal(out.status, 'ok', k);
+            assert.equal(fetch.gemini().length, 1, k + ': the Pro retry fired');
+            assert.equal(out.retried, false, k);
+            assert.ok(out.validation.hard.some((h) => h.code === 'sum_mismatch'), k + ': the pen\'s mismatch must still be reported');
+            assert.equal(out.validation.suspectCount, c.live.suspectCount, k);
+            assert.equal(out.result.players.length, 4, k);
+        }
+    });
+    test('a sum mismatch WITH a doubted digit in that nine -> one Pro call; the better Pro read is used', async () => {
+        need();
+        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true, unsure: true }))], pro: [geminiOk(cardJson())] });
         assert.equal(fetch.gemini().length, 2);
         assert.match(fetch.gemini()[1].url, /gemini-2\.5-pro/);
         assert.deepEqual(JSON.parse(fetch.gemini()[1].init.body).generationConfig.thinkingConfig, { thinkingBudget: 512 });
@@ -625,7 +658,7 @@ describe('ONE Pro retry, only on a validation failure', () => {
     });
     test('Pro is no better -> the Flash read is kept, and there is never a third call', async () => {
         need();
-        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true }))], pro: [geminiOk(cardJson({ badOut: true }))] });
+        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true, unsure: true }))], pro: [geminiOk(cardJson({ badOut: true, unsure: true }))] });
         assert.equal(fetch.gemini().length, 2);
         assert.equal(out.retried, true);
         assert.equal(out.model, 'gemini-2.5-flash');
@@ -655,7 +688,7 @@ describe('ONE Pro retry, only on a validation failure', () => {
     });
     test('Pro failing on the network keeps the Flash read', async () => {
         need();
-        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true }))], pro: [{ throws: true }] });
+        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true, unsure: true }))], pro: [{ throws: true }] });
         assert.equal(fetch.gemini().length, 2);
         assert.equal(out.status, 'ok');
         assert.equal(out.model, 'gemini-2.5-flash');
@@ -665,7 +698,7 @@ describe('ONE Pro retry, only on a validation failure', () => {
         need();
         const kv = fakeKV();
         kv.m.set(S.monthKey(NOW), '4');
-        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true }))] }, { kv, env: { SCAN_MONTHLY_CAP: '5' } });
+        const { out, fetch } = await scan({ flash: [geminiOk(cardJson({ badOut: true, unsure: true }))] }, { kv, env: { SCAN_MONTHLY_CAP: '5' } });
         assert.equal(fetch.gemini().length, 1);
         assert.equal(out.retried, false);
     });
