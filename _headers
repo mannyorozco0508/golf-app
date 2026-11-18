@@ -12,10 +12,15 @@
 #
 # The app-link association file must be served as application/json with no
 # redirect. apple-app-site-association has no extension, so Pages would
-# otherwise send it as application/octet-stream. assetlinks.json is held back
-# until the app ships the in-app card (2.0.6; Manny 2026-11-10). An hour's cache: a changed file reaches
+# otherwise send it as application/octet-stream. assetlinks.json (T4, Android
+# 2.0.8's hardpangolf.com link filter) is served since 2026-11-17: the Android
+# app that lists this host ships only after Google can read it. An hour's cache: a changed file reaches
 # Apple's and Google's verifiers the same day.
 /.well-known/apple-app-site-association
+  Content-Type: application/json
+  Cache-Control: public, max-age=3600
+
+/.well-known/assetlinks.json
   Content-Type: application/json
   Cache-Control: public, max-age=3600
 

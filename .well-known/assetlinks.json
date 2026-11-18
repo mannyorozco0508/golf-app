@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.rattlegolf.app",
+      "sha256_cert_fingerprints": [
+        "D7:6F:BB:1A:9A:6B:80:78:83:E0:7C:CC:C4:A2:74:86:D0:AF:07:40:02:88:7E:40:C5:2C:81:E5:95:83:26:74",
+        "CC:42:26:0D:1A:B3:76:D7:23:28:7A:CC:76:84:A5:56:E1:FC:AE:BC:54:01:C2:78:EB:45:9E:5A:30:83:96:8D"
+      ]
+    }
+  }
+]
