@@ -77,6 +77,16 @@
       "height": 844
     },
     {
+      "key": "scan-check",
+      "source": "the shipped tournament.html Desk scan check, rendered cold in headless Chrome at 390x844 by tools/card-check-cold.js (the stand-in event, Group 2's card with one red and one amber cell), 2026-11-17 for the Starkey pitch v5 (img-v5/scan-result-phone-issues.png), encoded to WebP in Chrome (canvas, quality .82) 2026-11-18: 780 for the viewer, 400 for the tile; nothing on the page called",
+      "files": [
+        "/media/home/scan-result-phone-400.webp",
+        "/media/home/scan-result-phone-800.webp"
+      ],
+      "width": 780,
+      "height": 1688
+    },
+    {
       "key": "board36",
       "source": "the shipped tournament.html?tourney=CODE (the watcher's board) rendered in Chrome at 390x844 with the two-round guard's stand-in event (helpers/two-round-fixture.js: Hope Foundation Classic, 8 golfers, Cascade closed + Olympic in play, two groups a round), 2026-11-16, tools/lib/cold-arrival.js; a real tap on the tab where one is named; nothing on the page called",
       "files": [

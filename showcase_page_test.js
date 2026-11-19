@@ -80,13 +80,14 @@ describe('the showcase page, /see-it', () => {
             assert.ok(!/\$\s?\d/.test(textOf(noSlots)), f + ': a dollar figure outside a price slot');
         }
     });
-    test('4 what is not live is tagged COMING: event-day GPS for the field, a group\'s own game inside the event (the step and the table), Turn in our card, Venmo at sign-up, the everyday paper card; what is live carries no tag', () => {
+    test('4 what is not live is tagged COMING: event-day GPS for the field, a group\'s own game inside the event (the step and the table), the everyday paper card; what is live (Turn in our card, Venmo) carries no tag', () => {
         const h = need(read(PAGE), PAGE);
-        assert.equal((h.match(/<span class="cmg"[^>]*>COMING<\/span>/g) || []).length, 6);
+        // 2026-11-19 (the COMING sweep): Turn in our card is live (d17014c0) and Venmo since 2026-11-16: four tags left, each waiting on the app (2.1.0).
+        assert.equal((h.match(/<span class="cmg"[^>]*>COMING<\/span>/g) || []).length, 4);
         assert.match(h, /COMING<\/span> HardPan GPS free for the whole field on event day\./);
-        assert.match(h, /COMING<\/span> Turn in our card:/);
+        assert.match(h, /<p>Turn in our card: a golfer in the group scans the card/, 'Turn in our card, untagged');
         assert.match(h, /On the way <span class="cmg"[^>]*>COMING<\/span>/);
-        assert.match(h, /Venmo or PayPal handle on the sign-up page; Pay beside each winner <span class="cmg"[^>]*>COMING<\/span>/);
+        assert.match(h, /<td class="hp">&#10003; Included\. Your Venmo or PayPal handle on the sign-up page; Pay on Venmo beside each winner<\/td>/);
         assert.match(h, /COMING<\/span><h3>Paper cards for the older crowd<\/h3>/);
         assert.match(h, /Paper cards read by a scanner at the scoring table<\/td><td class="typ">Not found<\/td><td class="hp">&#10003; Included\. The Desk scan, live/);
         assert.ok(!/Set up in minutes[\s\S]{0,400}COMING/.test(h), 'set-up carries no tag');
