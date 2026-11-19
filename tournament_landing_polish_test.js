@@ -76,7 +76,8 @@ const DELIBERATE = [
         from: '|🏆|Tournament|Multi-team events with a shared leaderboard — built for benefit tournaments, member-guests, and club events.|',
         // Re-pinned 2026-11-11: Manny picked rename option A (HardPan Tournaments), replacing the 09-23 "Tournaments are Rattle Golf" lock.
         // Re-pinned 2026-11-11 (Phase 2, P2-0): the app's own top bar follows the hero in the tree (shown in app mode only).
-        to: '|HardPan|Tournaments|' + HERO_LINE + '|\u2039|New tournament|HardPan Tournaments|'
+        // Re-pinned 2026-11-18 (showcase, Manny's typed OK "OK deploy showcase H1 + B"): the See-it button closes the hero band.
+        to: '|HardPan|Tournaments|' + HERO_LINE + '|See what your tournament will look like &rsaquo;|\u2039|New tournament|HardPan Tournaments|'
     },
     {
         // ADDED 2026-11-11 (Phase 2, S1 A): date, start time and shotgun on the create form, before Format.

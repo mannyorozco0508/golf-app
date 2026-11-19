@@ -59,6 +59,13 @@
     body { font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Inter, Arial, sans-serif; color:var(--ink); background:var(--cream); -webkit-font-smoothing:antialiased; }
     a { color:inherit; text-decoration:none; }
     .wrap { max-width:1180px; margin:0 auto; padding:0 28px; }
+    /* See how our tournaments work (2026-11-18): the band under the hero. */
+    .seeband { background:var(--g); color:#fff; padding:34px 0; margin-top:10px; }
+    .seeband .wrap { display:flex; align-items:center; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+    .seeband h2 { font-size:38px; font-weight:900; letter-spacing:-.02em; line-height:1.05; }
+    .seeband p { color:#d9e8e0; font-size:17px; margin-top:6px; max-width:52ch; }
+    .btn-see { display:inline-flex; align-items:center; justify-content:center; min-height:56px; padding:0 28px; border-radius:14px; background:var(--lime); color:var(--g); font-weight:900; font-size:19px; white-space:nowrap; }
+    @media (max-width:700px) { .seeband { padding:26px 0; } .seeband h2 { font-size:28px; } .seeband p { font-size:15px; } .btn-see { width:100%; } }
     nav.top { display:flex; align-items:center; justify-content:space-between; padding:18px 0; gap:16px; }
     .logo { display:flex; align-items:center; gap:10px; font-weight:800; font-size:20px; }
     .logo img { width:36px; height:36px; border-radius:9px; display:block; }
@@ -500,6 +507,12 @@
         <a class="pband" id="pband" href="#pricing"><span class="pb-l"><b data-price="pro-headline">$24.99/yr</b><span>HardPan Pro &middot; <span data-price="pro-label">Founding price</span> &middot; the first 1,000 golfers &middot; locked while you stay subscribed &middot; then <span data-price="pro-after">$49.99/yr</span></span></span><span class="pb-r"><em>up to <span data-price="compare-save">$75</span> a year less</em><br>Popular golf GPS apps charge up to <span data-price="compare-others">$99.99/yr</span></span></a>
     </div>
     <a class="webapp" id="open-web-app" href="/admin">Have a round code? Open the web app &rarr;</a>
+</section>
+
+<!-- SEE HOW OUR TOURNAMENTS WORK (Manny's typed OK 2026-11-18 "OK deploy showcase H1 + B"; ADVISOR-20261118-1637): the
+     band right under the hero, his heading, one button to the showcase at /see-it. Guard: showcase_page_test.js. -->
+<section class="seeband" id="see-it" aria-labelledby="see-it-h">
+    <div class="wrap"><div><h2 id="see-it-h">See how our tournaments work</h2><p>Running an event? Here&rsquo;s what your day looks like on HardPan: sign-ups, check-in, every golfer&rsquo;s phone, the live board on the clubhouse TV, paper cards welcome.</p></div><a class="btn-see" id="see-it-go" href="/see-it">See it &rsaquo;</a></div>
 </section>
 
 <!-- PRICE D (Manny's pick 2026-11-16 13:34 via the Advisor, ADVISOR-20261116-1335-OK-build-price-BD; mockups
