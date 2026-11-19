@@ -227,7 +227,7 @@ class Phone {
         this.logSeen = 0;
         ['DevToolsActivePort', 'SingletonLock', 'SingletonSocket', 'SingletonCookie'].forEach((f) => { try { fs.rmSync(path.join(this.profile, f), { force: true, recursive: true }); } catch (e) {} });
         const gpu = this.o.webgl ? ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : ['--disable-gpu'];
-        this.chrome = spawn(CHROME, ['--headless=new', ...gpu, '--no-first-run', '--remote-debugging-port=0', '--user-data-dir=' + this.profile, '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' });
+        this.chrome = spawn(CHROME, ['--headless=new', ...gpu, '--no-first-run', '--use-mock-keychain', '--password-store=basic', '--remote-debugging-port=0', '--user-data-dir=' + this.profile, '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' });
         this.tracked = registry.track(this.chrome, this.profile);
         const port = await readPort(this.profile);
         let targets = null;

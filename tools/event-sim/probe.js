@@ -1,0 +1,32 @@
+// Debug probe: the emulator, the site, the organizer and the check-in table only.
+'use strict';
+const path = require('path'), os = require('os');
+const { Emulator, EmuPhone, sleep } = require('../sim/lib/emu-phone.js');
+const F = require('./fixture.js'); const SITE = require('./server.js');
+const RULES = path.join(os.homedir(), 'Desktop', 'claude-mailbox-shared', 'tournaments', 'rules-publish-20261116-combined', 'readback.json');
+(async () => {
+    const fx = F.build(); const emu = new Emulator(9412, 'simprobe'); await emu.start(RULES);
+    const regs = {}; Object.keys(fx.record.players).forEach((pid, i) => { regs['r' + pid] = { fullName: fx.record.players[pid].name, email: pid + '@sim.example', createdAt: 1000 + i, approvedAt: 2000 + i, playerId: pid, paid: true }; });
+    await emu.write('tournaments/' + F.CODE, fx.record); await emu.write('registrations/' + F.CODE, regs);
+    const site = await SITE.start({ emu, scanAnswer: () => ({ players: [] }) });
+    const org = await EmuPhone.launch({ name: 'org', emu, auth: { uid: F.OWNER.uid, email: F.OWNER.email, isAnonymous: false, providerData: [{ providerId: 'password' }] }, viewport: { width: 1100, height: 900 }, url: site.base + '/tournament.html?tourney=' + F.CODE, settleMs: 3000 });
+    console.log('canManage/tabs:', await org.eval("[typeof canManage==='function'?'fn':'', (document.getElementById('tab-btn-desk')||{}).style && getComputedStyle(document.getElementById('tab-btn-desk')).display].join(' ')"));
+    console.log('regs readable:', await org.eval("typeof registrationData!=='undefined' ? Object.keys(registrationData||{}).length : 'n/a'"));
+    await org.tap('#tab-btn-desk', { settle: 3000 });
+    console.log('index after Desk:', Object.keys((await emu.read('tournaments/' + F.CODE + '/checkin')) || {}).length, 'CHECKIN_LIVE', await org.eval("typeof CHECKIN_LIVE!=='undefined'?CHECKIN_LIVE:'n/a'"), 'denied', JSON.stringify(await org.json('window.__dbDenied||[]')).slice(0, 300));
+    console.log('desk text:', ((await org.text('#manage-tab-desk')) || '').slice(0, 300));
+    await org.tap('#tab-btn-setup', { settle: 1500 });
+    const t1 = await org.type('#new-player-name', 'Lou Late', { settle: 200 });
+    const t2 = await org.type('#new-player-hcp', '20', { settle: 200 });
+    console.log('typed', t1, t2, 'values', await org.eval("document.getElementById('new-player-name').value + ' / ' + document.getElementById('new-player-hcp').value"));
+    const t3 = await org.tap('button[onclick="addPlayerToField()"]', { settle: 2000 });
+    console.log('tap add ->', t3, 'dialogs', JSON.stringify(org.dialogs), 'errs', JSON.stringify(org.errs.slice(-3)));
+    const ps = (await emu.read('tournaments/' + F.CODE + '/players')) || {};
+    console.log('players now', Object.keys(ps).length, 'late', Object.keys(ps).find((k) => ps[k].name === 'Lou Late'), 'denied', JSON.stringify(await org.json('window.__dbDenied||[]')).slice(0, 400));
+    const w = async (p, v) => org.eval("new Promise(function(res){ var t=setTimeout(function(){res('HANG')},6000); db.ref(" + JSON.stringify(p) + ").set(" + JSON.stringify(v) + ").then(function(){clearTimeout(t);res('ok')}, function(e){clearTimeout(t);res('ERR '+(e.code||e.message))}); })");
+    console.log('diag write players/pz:', await w('tournaments/' + F.CODE + '/players/pz', { id: 'pz', name: 'Z', handicap: '1', addedAt: 1 }));
+    console.log('diag write scores/p01_h1:', await w('tournaments/' + F.CODE + '/scores/p01_h1', 4));
+    console.log('diag write checkin/x:', await w('tournaments/' + F.CODE + '/checkin/rp01', { name: 'x', playerId: 'p01' }));
+    console.log('auth uid seen by page:', await org.eval("(firebase.auth().currentUser||{}).uid"), '| SDK log tail:', ((await org.json('window.__L')) || []).filter((l) => /auth|permission|denied|cancel|listen/i.test(l)).slice(-6).join(' || '));
+    await org.close(); site.close(); emu.stop();
+})().catch((e) => { console.error(e); process.exit(2); });

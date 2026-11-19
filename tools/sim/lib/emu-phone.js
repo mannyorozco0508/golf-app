@@ -64,7 +64,7 @@ function pre(o) {
     v.initializeApp = function (cfg, name) {
       { window.__L = []; v.database.enableLogging(function (m) { window.__L.push(Math.round(performance.now()) + ' ' + String(m).slice(0, 130)); }); }
       var app = init.call(v, Object.assign({}, cfg, { databaseURL: 'http://127.0.0.1:' + PORT + '?ns=' + NS, projectId: NS, apiKey: 'emu' }), name);
-      v.database(app).useEmulator('127.0.0.1', PORT, { mockUserToken: { sub: USER.uid, firebase: { sign_in_provider: ${JSON.stringify(provider)} } } });
+      v.database(app).useEmulator('127.0.0.1', PORT, { mockUserToken: Object.assign({ sub: USER.uid, firebase: { sign_in_provider: ${JSON.stringify(provider)} } }, USER.email ? { email: USER.email, email_verified: true } : {}) });
       return app;
     };
   }
