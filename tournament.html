@@ -8434,12 +8434,52 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!el) return;
         if (typeof TournamentPrizes === 'undefined' || typeof TournamentSkins === 'undefined') { el.innerHTML = '<p style="color:var(--text-muted); text-align:center; padding:16px;">Skins are not available on this page.</p>'; return; }
         const sk = TournamentPrizes.skinsSummary(currentData);
-        const perRound = sk.rounds.map((r) => `${r.name ? escapeHtml(r.name) + ' ' : ''}${r.result.totals.skins} skin${r.result.totals.skins === 1 ? '' : 's'}${r.result.totals.pending ? ' (holes still open)' : ''}`).join(' · ');
-        let h = `<div class="lb-skins-head" style="margin:4px 0 8px;"><b style="font-size:1rem;">${sk.skins} skin${sk.skins === 1 ? '' : 's'} so far</b>`
-            + `<div style="font-size:0.8rem; color:var(--text-muted);">${sk.ruled ? sk.games.map((g) => (g.name ? escapeHtml(g.name) + ' ' : '') + ({ gross: 'gross', net: 'net', both: 'gross and net' })[g.basis]).join(' · ') : 'Gross'} · carryover ${sk.carryover ? 'on' : 'off'} · ${perRound || 'no rounds yet'}</div>`
-            + `<div style="font-size:0.8rem; color:var(--text-muted);">${sk.ruled && sk.games.length > 1 ? sk.games.map((g) => `${escapeHtml(g.name || 'Skins')}: ${g.perSkin > 0 ? escapeHtml(TournamentPrizes.amountText(g.perSkin, currentData)) + ' a skin' : 'no amount a skin yet'}`).join(' · ') : (sk.perSkin > 0 ? `${escapeHtml(TournamentPrizes.amountText(sk.perSkin, currentData))} a skin, as the organizer set it` : 'The organizer has not set an amount a skin yet')}</div></div>`;
+        // ONE LINE FOR THE GOLFER (Manny 2026-11-19, ADVISOR-20261119-0905 item 2):
+        // "Skins · Gross · No carryover · 6 won", and " · $20 credit a skin" only when
+        // an amount is set. A golfer never reads that an amount is missing; the
+        // organizer gets a quiet link to the prize screen's Skins card instead.
+        const amount = skinsTabAmountWords(sk, currentData);
+        let h = `<div class="lb-skins-head" id="lb-skins-head" style="margin:4px 0 8px;"><b style="font-size:1rem;">${escapeHtml(['Skins', skinsTabBasisWord(sk), sk.carryover ? 'Carryover' : 'No carryover', `${sk.skins} won`].concat(amount ? [amount] : []).join(' · '))}</b></div>`;
+        if (!amount && canManage()) h += `<div style="font-size:0.8rem; margin:-4px 0 8px;"><a href="#prize-card-skins" class="rc-link" id="lb-skins-set-amount" onclick="openSkinsAmountFromTab(); return false;">Set an amount ›</a></div>`;
         h += prizeSkinsCardHtml(sk, currentData, { tab: true });
         el.innerHTML = h;
+    }
+    // The bases the event's skins play: one game of gross (no rules), or the union of
+    // the games' bases ("Gross", "Net", "Gross and net").
+    function skinsTabBasisWord(sk) {
+        const b = {};
+        if (sk.ruled) sk.games.forEach((g) => { if (g.basis === 'both') { b.gross = true; b.net = true; } else b[g.basis] = true; });
+        else b.gross = true;
+        return b.gross && b.net ? 'Gross and net' : (b.net ? 'Net' : 'Gross');
+    }
+    // "$20 credit a skin" in the event's prize word (shortText), or '' when no amount
+    // is set. Games with different amounts each name theirs.
+    function skinsTabAmountWords(sk, data) {
+        if (sk.perSkin > 0) return `${TournamentPrizes.shortText(sk.perSkin, data)} a skin`;
+        if (!sk.ruled) return '';
+        return sk.games.filter((g) => g.perSkin > 0).map((g) => `${g.name ? g.name + ' ' : ''}${TournamentPrizes.shortText(g.perSkin, data)} a skin`).join(' · ');
+    }
+    // The organizer's "Set an amount ›": the prize screen's Skins card (below the
+    // board on this same tab), opened, with its amount box in view.
+    function openSkinsAmountFromTab() {
+        if (!canManage()) return;
+        prizeSkinsOpen = true;
+        renderPrizeOwnerCards(true, typedPayoutSpots());
+        const box = document.getElementById('prize-skin-amount') || document.getElementById('prize-card-skins');
+        if (box && box.scrollIntoView) box.scrollIntoView({ block: 'center' });
+        if (box && box.focus) box.focus();
+    }
+    // Tied holes as a short list: "1–3, 5–8, 10, 17, 18" (a run of three or more is a range).
+    function skinsHoleList(holes) {
+        const out = [];
+        for (let i = 0; i < holes.length;) {
+            let j = i;
+            while (j + 1 < holes.length && holes[j + 1] === holes[j] + 1) j++;
+            if (j - i >= 2) out.push(`${holes[i]}–${holes[j]}`);
+            else for (let k = i; k <= j; k++) out.push(String(holes[k]));
+            i = j + 1;
+        }
+        return out.join(', ');
     }
 
     // PAIRINGS TAB: the printed sheet's rows (pairingsRows), per round on a
@@ -9181,18 +9221,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const perLine = ruled && sk.games.length > 1
             ? sk.games.map((g) => `${escapeHtml(g.name || 'Skins')}: ${g.perSkin > 0 ? escapeHtml(TournamentPrizes.amountText(g.perSkin, data)) + ' a skin' : 'no amount a skin yet'}`).join(' · ')
             : (sk.perSkin > 0 ? `${escapeHtml(TournamentPrizes.amountText(sk.perSkin, data))} a skin` : 'No amount a skin yet');
-        h += `<div class="pz-sub">${perLine}${share ? ' (each game\'s share over its skins, down to the dollar)' : ''} · per round · carryover ${sk.carryover ? 'on (a hole won after a tie takes the carried skin too)' : 'off'}</div>`;
+        // THE TAB SKIPS the sub line, the settings note and the per-round line: its one
+        // header says all three in plain words (ADVISOR-20261119-0905 item 2).
+        if (!tab) h += `<div class="pz-sub">${perLine}${share ? ' (each game\'s share over its skins, down to the dollar)' : ''} · per round · carryover ${sk.carryover ? 'on (a hole won after a tie takes the carried skin too)' : 'off'}</div>`;
         if (!tab && !share) h += `<div class="pz-ctl"><label for="prize-skin-amount">A skin $</label><input type="number" id="prize-skin-amount" min="0" step="1" placeholder="0" value="${sk.perSkin > 0 ? sk.perSkin : ''}" onchange="savePrizeSetting('perSkin', this.value)">`
             + `<div class="payout-basis-seg" role="group" aria-label="Carryover"><button type="button" class="${sk.carryover ? 'on' : ''}" aria-pressed="${sk.carryover}" onclick="savePrizeSetting('carryover', true)">Carryover on</button><button type="button" class="${sk.carryover ? '' : 'on'}" aria-pressed="${!sk.carryover}" onclick="savePrizeSetting('carryover', false)">Carryover off</button></div></div>`;
         if (!tab && share) h += `<div class="pz-ctl"><div class="payout-basis-seg" role="group" aria-label="Carryover"><button type="button" class="${sk.carryover ? 'on' : ''}" aria-pressed="${sk.carryover}" onclick="savePrizeSetting('carryover', true)">Carryover on</button><button type="button" class="${sk.carryover ? '' : 'on'}" aria-pressed="${!sk.carryover}" onclick="savePrizeSetting('carryover', false)">Carryover off</button></div></div>`;
-        h += ruled ? `<div class="pz-note">Games and gross or net are set in How prizes go above.</div>`
+        if (!tab) h += ruled ? `<div class="pz-note">Games and gross or net are set in How prizes go above.</div>`
             : `<div class="pz-note">Gross scores only. Net skins are set in How prizes go above.</div>`;
         const line = sk.rounds.map((r) => {
             const t = r.result.totals;
             return `${r.name ? escapeHtml(r.name) + ' ' : ''}${t.skins} skin${t.skins === 1 ? '' : 's'}${t.carried ? ` (${t.carried} carried)` : ''}`;
         }).join(' · ');
         const full = (v) => escapeHtml(TournamentPrizes.amountText(v, data));
-        h += `<div class="pz-note" id="prize-skins-line">${line}${sk.total > 0 ? ` → ${full(sk.total)}` : ''}</div>`;
+        if (!tab) h += `<div class="pz-note" id="prize-skins-line">${line}${sk.total > 0 ? ` → ${full(sk.total)}` : ''}</div>`;
         if (open) {
             sk.rounds.forEach((r, ri) => {
                 const res = r.result, rows = res.holes;
@@ -9217,14 +9259,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 const lastTie = last && last.status === 'tied';
                 const others = otherTies - (lastTie ? 1 : 0);
                 const lastRun = lastTie && last.carriedIn ? `Holes ${rows[rows.length - 1 - last.carriedIn].hole}–${last.hole} tied: ` : (lastTie ? `Hole ${last.hole} tied: ` : '');
-                if (otherTies) h += `<div class="pz-note">${others > 0 ? `${others} other hole${others === 1 ? '' : 's'} tied, no skin. ` : ''}${lastTie ? `${lastRun}nothing carries past the last hole.` : ''}</div>`;
+                // On the tab, a tied hole with carryover off reads "Tied · no skin" with the
+                // holes named; with carryover on, the last run reads the same way.
+                if (tab && !sk.carryover) {
+                    const tied = rows.filter((y) => y.status === 'tied').map((y) => y.hole);
+                    if (tied.length) h += `<div class="pz-note pz-tied">Tied · no skin: hole${tied.length === 1 ? '' : 's'} ${skinsHoleList(tied)}</div>`;
+                } else if (tab && otherTies) h += `<div class="pz-note pz-tied">${others > 0 ? `${others} other hole${others === 1 ? '' : 's'} tied · no skin. ` : ''}${lastTie ? `${lastRun.replace(/: $/, '')} · no skin, nothing carries past the last hole.` : ''}</div>`;
+                else if (otherTies) h += `<div class="pz-note">${others > 0 ? `${others} other hole${others === 1 ? '' : 's'} tied, no skin. ` : ''}${lastTie ? `${lastRun}nothing carries past the last hole.` : ''}</div>`;
                 if (res.totals.pending) {
                     const waiting = rows.filter((y) => y.status === 'pending').map((y) => y.hole);
                     h += `<div class="pz-note">${waiting.length === 1 ? `Hole ${waiting[0]} is` : `Holes ${waiting[0]}–${waiting[waiting.length - 1]} are`} waiting for every card's score.</div>`;
                 }
                 if (!res.totals.holesWon && !res.totals.pending && !otherTies) h += `<div class="pz-note">No scores yet.</div>`;
             });
-            h += `<div class="pz-total"><div class="pz-total-line"><span>Skins total<small>${sk.holesWon} hole${sk.holesWon === 1 ? '' : 's'} won · ${sk.carried} carried · ${sk.skins} skin${sk.skins === 1 ? '' : 's'}</small></span><span>${sk.total > 0 ? full(sk.total) : ''}</span></div></div>`;
+            h += `<div class="pz-total"><div class="pz-total-line"><span>Skins total<small>${sk.holesWon} hole${sk.holesWon === 1 ? '' : 's'} won · ${tab && !sk.carryover ? '' : `${sk.carried} carried · `}${sk.skins} skin${sk.skins === 1 ? '' : 's'}</small></span><span>${sk.total > 0 ? full(sk.total) : ''}</span></div></div>`;
         }
         return h;
     }
