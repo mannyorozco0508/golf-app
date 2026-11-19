@@ -1,0 +1,45 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prize rules C</title><style>
+:root{--bg-page:#f4f6f8;--bg-card:#fff;--text-main:#1a1a1a;--text-muted:#666;--brand-green:#0f4c3a;--brand-navy:#1d3557;--accent-teal:#2a9d8f;--border-mid:#d0e1db;--border-faint:#eee;--subtle-bg:#e0e8e4;--warn-bg:#fff4e5}
+@media (prefers-color-scheme:dark){:root{--bg-page:#101814;--bg-card:#17221d;--text-main:#eef3f0;--text-muted:#a7b4ad;--brand-green:#7fd1b2;--brand-navy:#a9c4ea;--border-mid:#2c3d35;--border-faint:#22302a;--subtle-bg:#22302a;--warn-bg:#3a2e1a}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg-page);color:var(--text-main);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:15px}
+.wrap{max-width:420px;margin:0 auto;padding:14px 16px 40px}
+.mk{font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-teal);font-weight:800;margin:0 0 4px}
+h1{font-size:1.25rem;margin:0 0 4px}h3{font-size:1.05rem;margin:14px 0 8px}
+.sub{color:var(--text-muted);font-size:.85rem;margin:0 0 12px}
+.card{border:1px solid var(--border-mid);border-radius:14px;padding:10px 14px;margin-bottom:12px;background:var(--bg-card)}
+.t{font-weight:800;font-size:1.02rem;display:flex;justify-content:space-between;align-items:center}
+.k{font-size:.78rem;color:var(--text-muted);margin:10px 0 4px;font-weight:700}
+.seg{display:flex;flex-wrap:wrap;gap:3px;padding:3px;border:1px solid var(--border-mid);border-radius:12px}
+.seg span{flex:1 1 auto;text-align:center;padding:7px 8px;border-radius:9px;font-size:.84rem;font-weight:700;color:var(--brand-navy)}
+.seg span.on{background:var(--brand-green);color:#fff}
+.row{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid var(--border-faint);font-size:.88rem}
+.row:first-of-type{border-top:0}.amt{font-variant-numeric:tabular-nums;font-weight:700}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{border:1px solid var(--border-mid);border-radius:999px;padding:5px 10px;font-size:.82rem;font-weight:700}
+.chip.on{background:var(--brand-green);color:#fff;border-color:var(--brand-green)}
+.note{font-size:.8rem;color:var(--text-muted);margin:6px 0 0}
+.btn{display:inline-block;border:1px solid var(--border-mid);border-radius:10px;padding:6px 9px;font-weight:700;font-size:.8rem;color:var(--brand-navy)}
+.edit{background:var(--warn-bg);border-radius:10px;padding:8px 10px;font-size:.84rem;margin-top:8px}
+.sent{font-size:.9rem;padding:7px 0;border-top:1px solid var(--border-faint);display:flex;justify-content:space-between;gap:10px}
+.sent:first-child{border-top:0}.sent a{color:var(--accent-teal);font-weight:700;text-decoration:none;white-space:nowrap}
+.amts{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}.amts div{border:1px solid var(--border-mid);border-radius:8px;padding:5px;text-align:center;font-size:.82rem;font-weight:700}
+</style></head><body><div class="wrap">
+<p class="mk">Mockup C · plan only, nothing built</p><h1>Prizes · rules inside each card</h1><p class="sub">No new card: Places, Skins and KPs each gain a ⚙ Rules row that opens their own settings, right above their results.</p><div class="card"><div class="t">Places <span class="btn">⚙ Rules · open</span></div>
+<div class="k">Places pay on</div><div class="seg"><span class="">Gross</span><span class="">Net</span><span class="on">Gross and net</span></div>
+<div class="k">Paid for</div><div class="seg"><span class="on">The 36 holes</span><span class="">Each round</span><span class="">Both</span></div>
+<div class="k">Places, by flight</div>
+<div class="row"><span>Flights 1, 2, 3 · gross and net</span><span class="btn">Edit</span></div><div class="amts"><div>1st<br>$250</div><div>2nd<br>$175</div><div>3rd<br>$100</div></div>
+<div class="row" style="margin-top:6px"><span>Ladies · net</span><span class="btn">Edit</span></div><div class="amts"><div>1st<br>$250</div><div>2nd<br>$200</div><div>3rd<br>$150</div><div>4th<br>$100</div></div>
+<div class="k">Ties</div><div class="seg"><span class="on">Split the tied places</span><span class="">Each gets the full prize</span></div>
+<div class="k">Round each share</div><div class="seg"><span class="on">To the cent</span><span class="">Down to the dollar</span></div>
+<div class="k">One prize per golfer</div><div class="seg"><span class="">Off</span><span class="on">Gross first</span><span class="">The larger prize</span></div>
+<p class="note">A golfer who places in both gross and net keeps the gross prize; the net places are paid again without them.</p></div>
+<div class="card"><div class="t">Flight 1 · gross</div><div class="row"><span>1 Ray Holt</span><span class="amt">$250</span></div><div class="row"><span>2 Sam Ortiz</span><span class="amt">$175</span></div><div class="row"><span>3 Lee Park</span><span class="amt">$100</span></div></div>
+<div class="card"><div class="t">Skins <span class="btn">⚙ Rules</span></div><p class="note">Men: gross + net, 17 skins · $276 each. Ladies: gross + net, 20 skins · $75 each.</p></div>
+<div class="card"><div class="t">Closest to the pin <span class="btn">⚙ Rules · open</span></div>
+<div class="k">Closest to the pin on every par 3</div><div class="seg"><span class="">One for the field</span><span class="on">One per flight</span></div>
+<div class="row"><span>Each KP</span><span class="amt">$50</span></div>
+<div class="k">Rounds</div><div class="seg"><span class="">Round 1</span><span class="">Round 2</span><span class="on">Both</span></div>
+<div class="k">Two golfers tie</div><div class="seg"><span class="">Earlier mark wins</span><span class="on">They share the prize</span></div>
+<div class="row" style="margin-top:8px"><span>Hole 3 · Flight 1 · Kim Lowe 4'1"</span><span class="amt">$50</span></div>
+<div class="row"><span>Hole 3 · Ladies · Ann Cole / Bea Ford, tied 6'2"</span><span class="amt">$25 each</span></div></div>
+<div class="card"><div class="edit"><b>Adjust before posting</b> · any amount, with a note.</div></div></div></body></html>
