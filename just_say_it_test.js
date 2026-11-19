@@ -1,7 +1,7 @@
 // ============================================================================
 // JUST SAY IT on the homepage, layout A (Manny's pick, OK 2026-11-19 03:01 relayed ADVISOR-20261119-0302; the
 // mockups ADVISOR-20261119-0241). "Just say it. We'll set it up." / "No menus. Type or say your game and HardPan
-// builds it." after the comparison block: a phone where the line types itself and the card appears, the next line, and
+// builds it." after the band See how our tournaments work (2026-11-19 homepage A, Manny's pick; it sat after the comparison block before): a phone where the line types itself and the card appears, the next line, and
 // four chips. Each card is jsi-cards.json, the app's own parser output (ask-hardpan.js askParse, sha 192bc1fde664) for
 // golfers Sam (you), Josh, Bob and Paul, four lines it sets up completely ("for fun": no amount). When the parser is on
 // this Mac (an app checkout), test 1 re-runs it and holds the cards to it.
@@ -40,11 +40,14 @@ test('1 the five cards are the parser\'s: complete, no amount, and - when the pa
         assert.deepEqual(A.linesOf(r.bet, r.missing, ctx, r).map((l) => [l.label, l.value]), c.lines, c.text);
     });
 });
-test('2 the homepage: the section after the comparison block and before How you\'ll use it, the heading and sub line, the looping phone, five chips, the cards as data', () => {
+test('2 the homepage: the section after the band See how our tournaments work and before How you\'ll use it (homepage A), the heading and sub line, the looping phone, five chips, the cards as data', () => {
     const h = read('hardpan-home.html');
     const s = sectionOf(h);
     assert.ok(s.length > 1000, 'the section');
-    assert.ok(h.indexOf('id="compare"') < h.indexOf('id="just-say-it"') && h.indexOf('id="just-say-it"') < h.indexOf('<section class="how" id="how"'), 'its place');
+    // Re-pinned 2026-11-19 homepage A (Manny's pick): the section moved, unchanged, from after the comparison block to right after
+    // the band "See how our tournaments work"; the comparison block now follows the feature rows (home_layout_a_test.js holds the whole order).
+    assert.ok(h.indexOf('<section class="seeband" id="see-it"') > 0 && h.indexOf('<section class="seeband" id="see-it"') < h.indexOf('id="just-say-it"') && h.indexOf('id="just-say-it"') < h.indexOf('<section class="how" id="how"'), 'its place');
+    assert.ok(h.indexOf('<section class="how" id="how"') < h.indexOf('<section class="wrap cmp" id="compare"'), 'the comparison block is below it now');
     assert.match(s, /<h2 id="jsi-h">Just say it\. We&rsquo;ll set it up\.<\/h2><p>No menus\. Type or say your game and HardPan builds it\.<\/p>/);
     assert.match(s, /<div class="jsi-say" id="jsi-say">/);
     assert.equal((s.match(/<button type="button" class="jsi-chip[ "]/g) || []).length, 5);

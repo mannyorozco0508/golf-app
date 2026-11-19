@@ -416,6 +416,17 @@
     .fv-img.wide { aspect-ratio:1400/844; width:100%; height:auto; max-height:100%; }
     @media (min-width:900px) { .sheet { align-items:center; } .sh-card { border-radius:22px; } }
     @media (max-width:980px) { .glance-tiles { grid-template-columns:repeat(3,1fr); } .scenes { grid-template-columns:1fr; } }
+    /* 2026-11-19 homepage A (Manny's pick): the at-a-glance grid shows its first 12 tiles; "See all N" reveals the rest in place
+       (the tiles above do not move; the button moves down under them). Every tile stays in the page and keeps its data-open-key. */
+    .glance[data-tiles="few"] .glance-tiles .gt:nth-child(n+13) { display:none; }
+    .glance-more { display:inline-flex; align-items:center; min-height:44px; margin-top:14px; padding:0 18px; border:1px solid var(--line); border-radius:999px; background:#fff; font:inherit; font-size:16px; font-weight:800; color:var(--g); cursor:pointer; }
+    .glance-more:focus-visible { outline:3px solid var(--lime); outline-offset:3px; }
+    .glance-more .gm-f, .glance[data-tiles="all"] .glance-more .gm-l { display:none; }
+    .glance[data-tiles="all"] .glance-more .gm-f { display:inline; }
+    .faq .qa { border-top:1px solid var(--line); padding:16px 0; max-width:760px; }
+    .faq .qa h3 { font-size:18px; font-weight:800; }
+    .faq .qa p { margin-top:6px; color:var(--mut); font-size:16px; line-height:1.5; }
+    @media (max-width:700px) { .faq .qa h3 { font-size:17px; } .faq .qa p { font-size:15px; } }
     @media (max-width:700px) {
         .fold { padding:0 16px; }
         .fan { margin-top:40px; width:358px; height:398px; }
@@ -473,6 +484,7 @@
         .shots { grid-template-columns:repeat(2,1fr); }
     }
 </style>
+<noscript><style>.glance[data-tiles="few"] .glance-tiles .gt:nth-child(n+13) { display:flex; } .glance-more { display:none; }</style></noscript>
 </head>
 <body>
 
@@ -542,32 +554,9 @@
     <div class="wrap"><div><h2 id="see-it-h">See how our tournaments work</h2><p>Running an event? Here&rsquo;s what your day looks like on HardPan: sign-ups, check-in, every golfer&rsquo;s phone, the live board on the clubhouse TV, paper cards welcome.</p></div><a class="btn-see" id="see-it-go" href="/see-it">See it &rsaquo;</a></div>
 </section>
 
-<!-- PRICE D (Manny's pick 2026-11-16 13:34 via the Advisor, ADVISOR-20261116-1335-OK-build-price-BD; mockups
-     tournaments/mockups-price/price-ABCD): HardPan next to a typical golf GPS app, the first section after the fold. Every
-     HardPan row is in the app today. Every "typical" cell is what the popular apps say on their own pages, read on the date
-     the compare-checked slot shows; site-compare-sources.md lists each with its URL. No competitor name on the page, no
-     negative word. Prices through site-pricing.js slots only. On a phone each row is the HardPan line plus one grey line. -->
-<section class="wrap cmp" id="compare" aria-labelledby="cmp-h">
-    <h2 id="cmp-h">Everything your group needs, in one app</h2>
-    <p class="cmp-sub">HardPan next to a typical golf GPS app. Checked against the popular apps' own pages on <span data-price="compare-checked">Nov 16, 2026</span>.</p>
-    <table>
-        <thead><tr><th>What you get</th><th class="us">HardPan</th><th>Typical golf GPS app</th></tr></thead>
-        <tbody>
-            <tr><td class="what">Every yard, every hole, and the number it plays (wind + elevation)</td><td class="us">Included</td><td class="them">GPS in all of them; the plays-like number is often a paid upgrade</td></tr>
-            <tr><td class="what">Green slope from lidar, with the safe side to miss</td><td class="us">Included</td><td class="them">Green maps are often a paid upgrade, not on every course</td></tr>
-            <tr><td class="what">Side games scored live: skins, Nassau, 2v2, match play, with the money</td><td class="us">Included</td><td class="them">Varies; often a paid upgrade, and the money is worked out by hand</td></tr>
-            <tr><td class="what">One live board for the whole group</td><td class="us">Included</td><td class="them">Most have one</td></tr>
-            <tr><td class="what">Settle up with Venmo from the recap</td><td class="us">Included</td><td class="them">Not found in the popular apps</td></tr>
-            <tr><td class="what">Tournaments: live 36-hole board, the board on a TV, check-in, entry fees by Venmo</td><td class="us">Included</td><td class="them">A live board, often through a partner site; TV board, check-in and entry fees not found</td></tr>
-            <tr><td class="what">Ask HardPan, in plain words</td><td class="us">Included</td><td class="them">AI labels vary; an ask-the-app chat was not found</td></tr>
-            <tr><td class="what">Works with no signal</td><td class="us">Included</td><td class="them">Most do, with limits (start the round with signal)</td></tr>
-            <tr><td class="what">One group of up to <span data-price="free-golfers">5</span> golfers, free</td><td class="us">Free forever</td><td class="them">Free tiers vary</td></tr>
-            <tr class="cmp-price"><td class="what">Price</td><td class="us"><b data-price="pro-headline">$24.99/yr</b><span class="fine"><span data-price="pro-label">Founding price</span>, the first 1,000 golfers, locked while you stay subscribed; then <span data-price="pro-after">$49.99/yr</span></span></td><td class="them"><b>up to <span data-price="compare-others">$99.99/yr</span></b><span class="fine">for the premium tier</span></td></tr>
-        </tbody>
-    </table>
-    <p class="cmp-foot">No names, no knocks: every row is what HardPan has in the app today, next to what the popular apps say on their own pages.</p>
-</section>
-
+<!-- 2026-11-19 homepage A (Manny's pick, mockup tournaments/site-sharpen/home-a): Just say it now sits right after the band
+     "See how our tournaments work" and before How you'll use it; the section below is byte for byte as before, only its place
+     moved (the two comments under this one describe the earlier place). Guards: just_say_it_test.js, home_layout_a_test.js. -->
 <!-- JUST SAY IT (ADVISOR-20261119-0241, Manny 2:40 AM: "Just type in the game and it'll be set up"), MOCKUP. Every card on this
      section is the app's own parser output (ask-hardpan.js askParse, sha 192bc1fde664, the 2.0.8 - 2.1.0 trees) for golfers Sam
      (you), Josh, Bob and Paul; the lines are the ones it sets up completely ("for fun": no amount). Lines it does not set up are not
@@ -621,13 +610,24 @@ if(!reduce){timer=setTimeout(function(){show(1,true);},3000);}})();</script>
     <ul class="shots"><li><button type="button" class="shot" data-open-key="gps-every-yard" data-shot="gps-every-yard" data-group="GPS"><img src="/media/home/gps-every-yard-400.webp" srcset="/media/home/gps-every-yard-400.webp 400w, /media/home/gps-every-yard-940.webp 940w" sizes="(max-width:700px) 45vw, 220px" width="940" height="2040" loading="lazy" decoding="async" alt="The GPS map on hole 2 at Papago from the tee: 380 to the middle with front 360 and back 398, 133 and 250 to the bunkers, Plays like 263 with the driver, and the Card, GPS, Games and Board tabs on top."><b>Every yard, from the tee</b></button></li><li><button type="button" class="shot" data-open-key="green-slope"><img src="/media/screens/green-slope-400.webp" loading="lazy" decoding="async" alt="Papago hole 10 near the green with Slope on: shading and contours on the green, arrows that run downhill, 55 to the middle, and the Slope switch under Ask."><b>Read the green.</b></button></li><li><button type="button" class="shot" data-open-key="plays-like"><img src="/media/screens/plays-like-400.webp" loading="lazy" decoding="async" alt="The GPS map on hole 2 at Dobson Ranch: 140 to the middle, Plays like 140 with a 9-iron and the aim tip 8 yards left, the green’s size line, and the Slope switch under Ask."><b>Hit the number it plays.</b></button></li><li><button type="button" class="shot" data-open-key="hazards"><img src="/media/screens/hazards-400.webp" loading="lazy" decoding="async" alt="The Hazards sheet on hole 1 at Talking Stick, over the GPS map: reach and carry yards for the bunker left and the water right, and lay-up distances with a club for each."><b>Know what you can carry.</b></button></li><li><button type="button" class="shot" data-open-key="offline"><img src="/media/screens/offline-400.webp" loading="lazy" decoding="async" alt="The course picker with a Download for offline button for Dobson Ranch Golf Course."><b>No signal? Still every yard.</b></button></li><li><button type="button" class="shot" data-open-key="my-bag"><img src="/media/screens/my-bag-400.webp" loading="lazy" decoding="async" alt="My bag for Sam: a carry yardage for each club, Driver 245, 3-wood 225, 5-wood 210, with a switch to keep each club in the bag and Type my carries."><b>Your real carries.</b></button></li><li><button type="button" class="shot" data-open-key="green-size"><img src="/media/screens/green-size-400.webp" loading="lazy" decoding="async" alt="Papago hole 14, 149 to the middle: the line Green 34 yds deep and 27 yds wide on the map, and Plays like 156 with an 8-iron."><b>How big is the green?</b></button></li><li><button type="button" class="shot" data-open-key="best-miss"><img src="/media/screens/best-miss-400.webp" loading="lazy" decoding="async" alt="The GPS map on Papago’s first green with Slope on: the green’s slope arrows and shading, 41 to the middle, carry bunker 43, and Best miss: right."><b>Miss on the right side.</b></button></li></ul></div>
 </div>
 
-<section class="glance" id="everything" aria-labelledby="glance-h">
+<section class="glance" id="everything" aria-labelledby="glance-h" data-tiles="few">
     <div class="wrap">
         <h2 id="glance-h">Everything in the app, at a glance</h2>
         <p class="hsub">Tap a tile for the picture. Every one is in the app
             today.</p>
         <div class="glance-tiles">
             <button type="button" class="gt" data-open-key="gps"><img src="/media/screens/gps-400.webp" loading="lazy" decoding="async" alt=""><span>Every yard GPS</span></button>
+            <button type="button" class="gt" data-open-key="event-board"><img src="/media/screens/event-board-400.webp" loading="lazy" decoding="async" alt=""><span>Event board</span></button>
+            <button type="button" class="gt" data-open-key="skins-tab"><img src="/media/home/skins-tab-400.webp" loading="lazy" decoding="async" alt=""><span>Skins &amp; pairings tabs</span></button>
+            <button type="button" class="gt" data-open-key="live-games"><img src="/media/screens/live-games-400.webp" loading="lazy" decoding="async" alt=""><span>Live games</span></button>
+            <button type="button" class="gt" data-open-key="chat"><img src="/media/screens/chat-400.webp" loading="lazy" decoding="async" alt=""><span>Round chat</span></button>
+            <button type="button" class="gt" data-open-key="scan-check"><img src="/media/home/scan-result-phone-400.webp" loading="lazy" decoding="async" alt=""><span>Scan check</span></button>
+            <button type="button" class="gt" data-open-key="strokes-gained"><img src="/media/screens/strokes-gained-400.webp" loading="lazy" decoding="async" alt=""><span>Strokes gained</span></button>
+            <button type="button" class="gt" data-open-key="weekly-code"><img src="/media/screens/weekly-code-400.webp" loading="lazy" decoding="async" alt=""><span>Weekly code</span></button>
+            <button type="button" class="gt" data-open-key="trip"><img src="/media/screens/trip-400.webp" loading="lazy" decoding="async" alt=""><span>Trip board</span></button>
+            <button type="button" class="gt" data-open-key="results"><img src="/media/screens/results-400.webp" loading="lazy" decoding="async" alt=""><span>Results &amp; recap</span></button>
+            <button type="button" class="gt" data-open-key="settle"><img src="/media/screens/settle-400.webp" loading="lazy" decoding="async" alt=""><span>Settle up</span></button>
+            <button type="button" class="gt" data-open-key="play-again"><img src="/media/screens/play-again-400.webp" loading="lazy" decoding="async" alt=""><span>Play again</span></button>
             <button type="button" class="gt" data-open-key="plays-like"><img src="/media/screens/plays-like-400.webp" loading="lazy" decoding="async" alt=""><span>Plays-like number</span></button>
             <button type="button" class="gt" data-open-key="green-slope"><img src="/media/screens/green-slope-400.webp" loading="lazy" decoding="async" alt=""><span>Green slope</span></button>
             <button type="button" class="gt" data-open-key="hazards"><img src="/media/screens/hazards-400.webp" loading="lazy" decoding="async" alt=""><span>Hazard carries</span></button>
@@ -637,23 +637,14 @@ if(!reduce){timer=setTimeout(function(){show(1,true);},3000);}})();</script>
             <button type="button" class="gt" data-open-key="best-miss"><img src="/media/screens/best-miss-400.webp" loading="lazy" decoding="async" alt=""><span>Best miss</span></button>
             <button type="button" class="gt" data-open-key="ask-caddie"><img src="/media/screens/ask-caddie-400.webp" loading="lazy" decoding="async" alt=""><span>Ask HardPan</span></button>
             <button type="button" class="gt" data-open-key="range"><img src="/media/screens/range-400.webp" loading="lazy" decoding="async" alt=""><span>Range practice</span></button>
-            <button type="button" class="gt" data-open-key="strokes-gained"><img src="/media/screens/strokes-gained-400.webp" loading="lazy" decoding="async" alt=""><span>Strokes gained</span></button>
             <button type="button" class="gt" data-open-key="round-tabs"><img src="/media/screens/round-tabs-400.webp" loading="lazy" decoding="async" alt=""><span>Round tabs</span></button>
             <button type="button" class="gt" data-open-key="set-up-card"><img src="/media/screens/set-up-card-400.webp" loading="lazy" decoding="async" alt=""><span>Just say it</span></button>
             <button type="button" class="gt" data-open-key="add-a-game"><img src="/media/screens/add-a-game-400.webp" loading="lazy" decoding="async" alt=""><span>Add a game</span></button>
-            <button type="button" class="gt" data-open-key="live-games"><img src="/media/screens/live-games-400.webp" loading="lazy" decoding="async" alt=""><span>Live games</span></button>
             <button type="button" class="gt" data-open-key="group-scoring"><img src="/media/screens/group-scoring-400.webp" loading="lazy" decoding="async" alt=""><span>Group scoring</span></button>
-            <button type="button" class="gt" data-open-key="results"><img src="/media/screens/results-400.webp" loading="lazy" decoding="async" alt=""><span>Results &amp; recap</span></button>
-            <button type="button" class="gt" data-open-key="settle"><img src="/media/screens/settle-400.webp" loading="lazy" decoding="async" alt=""><span>Settle up</span></button>
-            <button type="button" class="gt" data-open-key="weekly-code"><img src="/media/screens/weekly-code-400.webp" loading="lazy" decoding="async" alt=""><span>Weekly code</span></button>
-            <button type="button" class="gt" data-open-key="chat"><img src="/media/screens/chat-400.webp" loading="lazy" decoding="async" alt=""><span>Round chat</span></button>
-            <button type="button" class="gt" data-open-key="play-again"><img src="/media/screens/play-again-400.webp" loading="lazy" decoding="async" alt=""><span>Play again</span></button>
             <button type="button" class="gt" data-open-key="history"><img src="/media/screens/history-400.webp" loading="lazy" decoding="async" alt=""><span>History</span></button>
-            <button type="button" class="gt" data-open-key="trip"><img src="/media/screens/trip-400.webp" loading="lazy" decoding="async" alt=""><span>Trip board</span></button>
             <button type="button" class="gt" data-open-key="tournaments"><img src="/media/screens/tournaments-400.webp" loading="lazy" decoding="async" alt=""><span>Tournaments on Home</span></button>
             <button type="button" class="gt" data-open-key="create-event"><img src="/media/screens/create-event-400.webp" loading="lazy" decoding="async" alt=""><span>Create event</span></button>
             <button type="button" class="gt" data-open-key="join-event"><img src="/media/screens/join-event-400.webp" loading="lazy" decoding="async" alt=""><span>Join event</span></button>
-            <button type="button" class="gt" data-open-key="event-board"><img src="/media/screens/event-board-400.webp" loading="lazy" decoding="async" alt=""><span>Event board</span></button>
             <button type="button" class="gt" data-open-key="prizes"><img src="/media/screens/prizes-400.webp" loading="lazy" decoding="async" alt=""><span>Prizes by flight</span></button>
             <button type="button" class="gt" data-open-key="team-qr-links"><img src="/media/screens/team-qr-links-400.webp" loading="lazy" decoding="async" alt=""><span>Team QR links</span></button>
             <button type="button" class="gt" data-open-key="my-events"><img src="/media/screens/my-events-400.webp" loading="lazy" decoding="async" alt=""><span>My events</span></button>
@@ -665,10 +656,9 @@ if(!reduce){timer=setTimeout(function(){show(1,true);},3000);}})();</script>
             <button type="button" class="gt" data-open-key="registration-desk"><img src="/media/screens/registration-desk-400.webp" loading="lazy" decoding="async" alt=""><span>Sign-up desk</span></button>
             <button type="button" class="gt" data-open-key="live-tv"><img src="/media/home/live-tv-700.webp" loading="lazy" decoding="async" alt=""><span>TV board</span></button>
             <button type="button" class="gt" data-open-key="board36"><img src="/media/home/board36-400.webp" loading="lazy" decoding="async" alt=""><span>36-hole board</span></button>
-            <button type="button" class="gt" data-open-key="skins-tab"><img src="/media/home/skins-tab-400.webp" loading="lazy" decoding="async" alt=""><span>Skins &amp; pairings tabs</span></button>
             <button type="button" class="gt" data-open-key="checkin-table"><img src="/media/home/checkin-table-400.webp" loading="lazy" decoding="async" alt=""><span>Check-in</span></button>
-            <button type="button" class="gt" data-open-key="scan-check"><img src="/media/home/scan-result-phone-400.webp" loading="lazy" decoding="async" alt=""><span>Scan check</span></button>
         </div>
+        <button type="button" class="glance-more" id="glance-more" aria-expanded="false" aria-controls="everything"><span class="gm-l">See all <span id="glance-n">41</span> &rsaquo;</span><span class="gm-f">Show fewer &lsaquo;</span></button>
         <p class="strip"><a href="#pricing"><span data-price="pro-label">Founding price</span> <b data-price="pro-headline">$24.99/yr</b> &middot; the first 1,000 golfers &middot; locked for as long as you stay subscribed. Pricing &darr;</a></p>
     </div>
 </section>
@@ -765,6 +755,34 @@ if(!reduce){timer=setTimeout(function(){show(1,true);},3000);}})();</script>
 </div>
 <!-- /website-e features -->
 
+<!-- 2026-11-19 homepage A (Manny's pick): the comparison block below moved, unchanged, from under the fold to after the
+     five feature rows and before the golfer/organizer panels and Pricing. Guards: hardpan_home_price_test.js, home_layout_a_test.js. -->
+<!-- PRICE D (Manny's pick 2026-11-16 13:34 via the Advisor, ADVISOR-20261116-1335-OK-build-price-BD; mockups
+     tournaments/mockups-price/price-ABCD): HardPan next to a typical golf GPS app, the first section after the fold. Every
+     HardPan row is in the app today. Every "typical" cell is what the popular apps say on their own pages, read on the date
+     the compare-checked slot shows; site-compare-sources.md lists each with its URL. No competitor name on the page, no
+     negative word. Prices through site-pricing.js slots only. On a phone each row is the HardPan line plus one grey line. -->
+<section class="wrap cmp" id="compare" aria-labelledby="cmp-h">
+    <h2 id="cmp-h">Everything your group needs, in one app</h2>
+    <p class="cmp-sub">HardPan next to a typical golf GPS app. Checked against the popular apps' own pages on <span data-price="compare-checked">Nov 16, 2026</span>.</p>
+    <table>
+        <thead><tr><th>What you get</th><th class="us">HardPan</th><th>Typical golf GPS app</th></tr></thead>
+        <tbody>
+            <tr><td class="what">Every yard, every hole, and the number it plays (wind + elevation)</td><td class="us">Included</td><td class="them">GPS in all of them; the plays-like number is often a paid upgrade</td></tr>
+            <tr><td class="what">Green slope from lidar, with the safe side to miss</td><td class="us">Included</td><td class="them">Green maps are often a paid upgrade, not on every course</td></tr>
+            <tr><td class="what">Side games scored live: skins, Nassau, 2v2, match play, with the money</td><td class="us">Included</td><td class="them">Varies; often a paid upgrade, and the money is worked out by hand</td></tr>
+            <tr><td class="what">One live board for the whole group</td><td class="us">Included</td><td class="them">Most have one</td></tr>
+            <tr><td class="what">Settle up with Venmo from the recap</td><td class="us">Included</td><td class="them">Not found in the popular apps</td></tr>
+            <tr><td class="what">Tournaments: live 36-hole board, the board on a TV, check-in, entry fees by Venmo</td><td class="us">Included</td><td class="them">A live board, often through a partner site; TV board, check-in and entry fees not found</td></tr>
+            <tr><td class="what">Ask HardPan, in plain words</td><td class="us">Included</td><td class="them">AI labels vary; an ask-the-app chat was not found</td></tr>
+            <tr><td class="what">Works with no signal</td><td class="us">Included</td><td class="them">Most do, with limits (start the round with signal)</td></tr>
+            <tr><td class="what">One group of up to <span data-price="free-golfers">5</span> golfers, free</td><td class="us">Free forever</td><td class="them">Free tiers vary</td></tr>
+            <tr class="cmp-price"><td class="what">Price</td><td class="us"><b data-price="pro-headline">$24.99/yr</b><span class="fine"><span data-price="pro-label">Founding price</span>, the first 1,000 golfers, locked while you stay subscribed; then <span data-price="pro-after">$49.99/yr</span></span></td><td class="them"><b>up to <span data-price="compare-others">$99.99/yr</span></b><span class="fine">for the premium tier</span></td></tr>
+        </tbody>
+    </table>
+    <p class="cmp-foot">No names, no knocks: every row is what HardPan has in the app today, next to what the popular apps say on their own pages.</p>
+</section>
+
 <section class="wrap split">
     <div class="panel play" id="golfers">
         <div style="flex:1">
@@ -817,6 +835,21 @@ if(!reduce){timer=setTimeout(function(){show(1,true);},3000);}})();</script>
     </div>
 </section>
 
+<!-- 2026-11-19 homepage A (Manny's pick): "Good to know", six questions, after Pricing. Copy confirmed by Manny 2026-11-19. The
+     Pro answer names only what the Pricing card says Pro includes (full GPS map, coaching, hosting); its numbers are
+     site-pricing.js slots like every other price here. Guard: home_layout_a_test.js. -->
+<section class="sec faq" id="faq" aria-labelledby="faq-h">
+    <div class="wrap">
+        <h2 class="h2" id="faq-h">Good to know</h2>
+        <div class="qa"><h3>Is it free?</h3><p>Free for one group of up to <span data-price="free-golfers">5</span> golfers, for good. HardPan Pro adds the full GPS map, coaching and hosting for <b data-price="pro-headline">$24.99/yr</b>.</p></div>
+        <div class="qa"><h3>What if there&rsquo;s no signal?</h3><p>GPS and your card work with no signal; scores catch up when you&rsquo;re back in range.</p></div>
+        <div class="qa"><h3>Is it on Android?</h3><p>Yes: iPhone and Android.</p></div>
+        <div class="qa"><h3>How do round codes work?</h3><p>Your round has a code. Friends type it or scan the QR and land on the same card.</p></div>
+        <div class="qa"><h3>We keep paper cards. Okay?</h3><p>Yes. Snap the card and the scanner reads every score; you check it before it posts.</p></div>
+        <div class="qa"><h3>Does HardPan hold money?</h3><p>No. It never holds, sends or takes a cut of money.</p></div>
+    </div>
+</section>
+
 <section class="sec getapp" id="get-the-app">
     <div class="wrap">
         <div class="h2">Get the app</div>
@@ -851,6 +884,21 @@ if(!reduce){timer=setTimeout(function(){show(1,true);},3000);}})();</script>
     (function () {
         var P = window.HARDPAN_SITE_PRICING;
         if (P && P.compare && P.compare.othersUpTo && typeof window.HardPanSitePricingFill === 'function') window.HardPanSitePricingFill(document);
+    })();
+</script>
+<script>
+    // 2026-11-19 homepage A: "See all N" shows the rest of the at-a-glance tiles in place. N is counted from the tiles
+    // themselves. Collapsing keeps the button where it was on screen, so the page does not jump under the finger.
+    (function () {
+        var sec = document.getElementById('everything'), btn = document.getElementById('glance-more'), n = document.getElementById('glance-n');
+        if (!sec || !btn) return;
+        if (n) n.textContent = String(sec.querySelectorAll('.glance-tiles .gt').length);
+        btn.addEventListener('click', function () {
+            var open = sec.getAttribute('data-tiles') !== 'all', y = btn.getBoundingClientRect().top;
+            sec.setAttribute('data-tiles', open ? 'all' : 'few');
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (!open) window.scrollBy(0, btn.getBoundingClientRect().top - y);
+        });
     })();
 </script>
 </body>

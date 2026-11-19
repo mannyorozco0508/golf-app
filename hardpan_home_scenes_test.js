@@ -468,6 +468,9 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         await tab.metrics(390, 844);
         await tab.touchOn();
         await tab.go(base + '/');
+        // Re-pinned 2026-11-19 homepage A (Manny's pick): the grid shows 12 tiles; a visitor taps See all 41 first to reach the rest.
+        await tab.fingerTap('#glance-more');
+        assert.equal(await tab.eval(`document.getElementById('glance-more').getAttribute('aria-expanded')`), 'true', 'See all did not open the grid');
         const keys = await tab.eval(`[...document.querySelectorAll('.glance-tiles .gt[data-open-key]')].map((b) => b.getAttribute('data-open-key'))`);
         assert.equal(keys.length, 41);
         const bad = [];
@@ -487,7 +490,12 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         await tab.metrics(390, 844);
         await tab.touchOn();
         await tab.go(base + '/');
+        // Re-pinned 2026-11-19 homepage A (Manny's pick): the grid shows 12 tiles; a visitor taps See all 41 first to reach the rest.
+        await tab.fingerTap('#glance-more');
+        // back to the top, where this test always started: each swipe's "before" is read before the tile is centred
+        await tab.eval('window.scrollTo({ top: 0, behavior: "instant" })');
         const keys = await tab.eval(`[...document.querySelectorAll('.glance-tiles .gt[data-open-key]')].map((b) => b.getAttribute('data-open-key'))`);
+        assert.equal(keys.length, 41);
         const opened = [];
         for (const k of [keys[0], keys[Math.floor(keys.length / 2)], keys[keys.length - 1]]) {
             const sel = '.glance-tiles .gt[data-open-key="' + k + '"]';

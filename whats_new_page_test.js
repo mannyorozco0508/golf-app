@@ -287,6 +287,8 @@ describe('2. Chrome: the way a visitor arrives', { skip: CAN ? false : 'no Chrom
     test('2.3 on the homepage the round-tabs tile still opens the viewer on its picture (a viewer-only item)', async () => {
         await tab.metrics(390, 844);
         await tab.go(base + '/');
+        // Re-pinned 2026-11-19 homepage A (Manny's pick): round tabs is past the first 12 tiles now; a visitor taps See all first.
+        await tab.click('#glance-more');
         await tab.click('.glance-tiles .gt[data-open-key="round-tabs"]');
         const v = await waitImg(tab);
         assert.equal(v.open, true, 'the tile opened nothing');
