@@ -5453,6 +5453,54 @@ the live rules wave 57 already relied on. Whether the app's reader can read it
 follows the live read rule for `tournaments/<code>`, which this wave did not
 re-measure.
 
+## Card turn-in from a golfer's phone (C, ADVISOR-20261118-1533, Manny's pick 2026-11-18)
+
+Branch `preview-card-turnin` off main fc9680e7. PREVIEW; not merged, no deploy without "OK deploy".
+
+**What it is.** A group that kept score on paper turns its card in from a GOLFER's phone: the
+group's scoring link (`tournament-scorecard.html`) gains **Turn in our card** under the status bar,
+shown only while the organizer's switch is on; the photo goes through the same scanner the Desk
+uses (`POST /api/scorecard-scan`, with `event:{code}`), the same compare (`scan-compare.js`) and the
+same grid (`scan-grid.js`, new: the Desk's `cardCheckGridHtml` now delegates to it); **Send** puts the
+scanner's READ on the server; the Desk lists it under **Cards turned in** (above the Scan cards) and
+**Approve** writes the holes the app has nothing for through the score corrector (`cardCheckUseWhole`),
+stores the check at `cardChecks/<card>`, and tells the server; the golfer's card reads "On the
+leaderboard" (or "Please bring the card to the desk" on Decline). Nothing reaches the board or the
+side games without Approve: the function never writes a score (asserted on its source), the golfer's
+page writes none for a turn-in, and the Desk writes them only through the corrector.
+
+**Why a function and KV, not the record.** The live rules let a code-holder write one score key on an
+event and nothing else, so a golfer's phone has nowhere on `tournaments/<code>` to put a pending card.
+`functions/api/card-turn-in.js` (rules in `_turnin.js`) stores it in the scanner's own KV
+(`SCAN_KV`): key `turnin:<CODE>:<card>` with `{by, at, state, decidedAt, photo}` as the key's
+METADATA and `{uid, scan}` as the value, the JPEG beside it under `turninphoto:`, 21 days. The Desk's
+list is ONE `kv.list` call (metadata only), at most once a minute while the Desk is open plus Check
+now; the read is fetched per new card, the photo only on See photo. send: anyone signed in (an
+anonymous scoring-link session included) while `tournaments/<code>/cardTurnIn === true`, 3 a minute;
+status: anyone; list / read / photo / approve / decline: the owner (`ownerUid` read as the caller).
+Inert without KV (`not_configured`); no Gemini key needed; no rules change, no service account.
+
+**The switch.** `tournaments/<code>/cardTurnIn = true`, the owner's key, on the Desk's Scorecard
+check card. OFF by default: every event made before today shows no button on any golfer's card.
+
+**The scanner's allowance.** `_scan.js eventAllowance` now also answers for a NON-owner when the
+event's `cardTurnIn` is true (one more read, `cardTurnIn`, after `ownerUid`): the golfer's scan on the
+event's day counts under the event key and spends none of the account's three free reads. The minute
+brake still runs before any event read. `scorecard_scan_server_test.js` gained the describe
+"the turn-in allowance for a golfer" (5 tests) and re-pinned the non-owner read (stops at the switch).
+
+**Known limits, said plainly.** A low-confidence digit on an untyped hole is not an amber cell
+(ScanCompare has no app digit to be unsure against); both screens COUNT them from the read
+("1 number the scanner was not sure about") and the organizer has See photo before Approve. The
+Desk's queue is fetched, not a snapshot (a minute's lag at most; Check now is immediate). The golfer's
+"Waiting" state asks the function every 45 s and is remembered on the phone (localStorage) across a
+reload. Multi-round: the card id is `<round>~<group>`, as the Desk's.
+
+**Guards.** `card_turn_in_server_test.js` (18; 0/18 on fc9680e7), `tournament_card_turn_in_test.js`
+(16; 1/15 on fc9680e7; controls K1-K4 in its header), `tools/card-turn-in-cold.js` (Chrome, cold, both
+pages, PASS 2026-11-18; shots in claude-mailbox-shared/tournaments/build-card-turn-in/).
+`sw.js` moved to v422-2.0 (both pages are shell files; `scan-grid.js` joins TOURNAMENT_SHELL).
+
 ## Checks that live outside `npm test`
 
 **DEVICE CHECKS MUST ARRIVE COLD.** Navigate to the URL a user lands on, replace

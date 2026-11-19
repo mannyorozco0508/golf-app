@@ -27,6 +27,7 @@ import * as courseDetail from './course/[id].js';
 import * as pushSend from './push-send.js';
 import * as scorecardScan from './scorecard-scan.js';
 import * as scanErase from './scan-erase.js';
+import * as cardTurnIn from './card-turn-in.js';
 
 // onRequestGet -> 'GET', onRequestPost -> 'POST', ...
 const methodsOf = (mod) => Object.keys(mod)
@@ -52,7 +53,10 @@ export const ROUTES = [
       methods: methodsOf(scorecardScan) },
     // 088: POST only, like scorecard-scan.
     { file: 'scan-erase.js', matches: (seg) => seg.length === 1 && seg[0] === 'scan-erase',
-      methods: methodsOf(scanErase) }
+      methods: methodsOf(scanErase) },
+    // C (2026-11-18): GET and POST; a golfer's card turn-in and the organizer's queue.
+    { file: 'card-turn-in.js', matches: (seg) => seg.length === 1 && seg[0] === 'card-turn-in',
+      methods: methodsOf(cardTurnIn) }
 ];
 
 export async function onRequest(context) {

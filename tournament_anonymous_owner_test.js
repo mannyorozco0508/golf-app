@@ -211,7 +211,8 @@ describe('THE SEAM (tournament.html, comments stripped)', () => {
         assert.equal((code.match(/firebase\.auth\(\)/g) || []).length, 3, 'signInWithEmailAndPassword, signOut (the button), onAuthStateChanged');
         // Re-pinned 2026-11-12 (My events by account): + loadAccountEvents (1), rememberOwnedEvent (1), renderMyEvents (1) - the organizer's own pointer, still read through the one seam.
         // Re-pinned 2026-11-16 (preview-scan-desk: + cardCheckSend (1), the organizer's ID token for /api/scorecard-scan, read through the seam; the SK scan check cherry-picked from a8c96970). Re-pinned 2026-11-15 (Hide from Home + Archive, Manny go via Advisor): + the My-events flag writes (hidden / archivedAt pointer, uid read twice) and the auto-archive owner check + the archive write's ownerUid (4) - the organizer's own pointer and record, still through the one seam.
-        assert.equal((code.match(/\bauthUser\b/g) || []).length, 21, 'the declaration, the seam, the Save gate, the ownerUid write, canManage (2), renderSignedInAs (3 + 1), renderSignInPanels, loadAccountEvents, rememberOwnedEvent, renderMyEvents');
+        // Re-pinned 2026-11-18 (preview-card-turnin, C): + turnInToken (1), the organizer's ID token for /api/card-turn-in (the queue, approve, decline, the photo), read through the seam like cardCheckSend's.
+        assert.equal((code.match(/\bauthUser\b/g) || []).length, 22, 'the declaration, the seam, the Save gate, the ownerUid write, canManage (2), renderSignedInAs (3 + 1), renderSignInPanels, loadAccountEvents, rememberOwnedEvent, renderMyEvents, cardCheckSend, turnInToken');
         assert.match(code, /if \(!authUser\) \{\s*alert\('Sign in to create a tournament/);
         assert.match(code, /ownerUid: authUser\.uid/);
         assert.match(code, /return !!\(authUser && authUser\.uid === owner\);/);

@@ -75,6 +75,7 @@
     <script src="tournament-prizes.js"></script>
     <!-- SK (2026-11-14): the scorecard scan check - the scanner's read against the app's scores. -->
     <script src="scan-compare.js"></script>
+    <script src="scan-grid.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -964,6 +965,22 @@
         .ck-photo { margin: 6px 0 8px 0; }
         .ck-photo img { width: 100%; max-height: 420px; object-fit: contain; border: 1px solid var(--border-mid); border-radius: 8px; background: #fff; }
         .ck-photo small { display: block; font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; }
+        /* CARDS TURNED IN (C, 2026-11-18): the switch and the queue above the Scan cards. */
+        .ti-switch { border: 1px solid var(--border-mid); border-radius: 10px; padding: 8px 10px; margin: 6px 0 8px 0; background: var(--nassau-box-bg); }
+        .ti-sw-row { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+        .ti-sw-row input { width: 22px; height: 22px; margin: 2px 0 0 0; flex: none; accent-color: var(--brand-green); }
+        .ti-sw-row b { display: block; font-size: 0.9rem; }
+        .ti-sw-row small { display: block; font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; }
+        .ti-queue { border: 1px solid var(--border-mid); border-radius: 10px; padding: 8px 10px; margin: 0 0 10px 0; }
+        .ti-row { border-top: 1px solid var(--border-faint); }
+        .ti-row:first-of-type { border-top: 0; }
+        .ti-row .ck-row { border-top: 0; }
+        /* Tap targets (bug-hunt #14 rule): every button in the queue is at least 44 px tall. */
+        .ti-row .ck-btns .btn-primary, .ti-row .ck-btns .btn-outline, .ti-row .ck-act .btn-outline { min-height: 44px; }
+        .ti-pill { display: inline-block; font-size: 0.72rem; font-weight: 800; border-radius: 999px; padding: 3px 9px; text-align: center; }
+        .ti-pill.ti-new { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+        .ti-pill.ti-ok { background: var(--nassau-box-bg); color: var(--text-main); border: 1px solid var(--border-mid); }
+        .ti-pill.ti-no { background: #fff; color: var(--text-muted); border: 1px solid var(--border-mid); }
         .rc-verified { text-align: center; font-size: 0.85rem; color: var(--text-main); border-top: 1px solid var(--border-faint); padding: 10px 0 0 0; margin: 10px 0; }
     </style>
 </head>
@@ -1665,6 +1682,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              slash-star comments) and hid every line after it. -->
         <div id="cardcheck-wrap"></div>
         <input type="file" id="cardcheck-file" accept="image/&#42;" capture="environment" style="display:none;" onchange="cardCheckPicked(this)">
+        <!-- Saved photos (ADVISOR-20261118-1704): no capture attribute, so the phone offers its photo library; one or two. -->
+        <input type="file" id="cardcheck-pick" accept="image/&#42;" multiple style="display:none;" onchange="cardCheckPicked(this)">
         <div id="registration-chips"></div>
         <input type="search" id="registration-search" placeholder="Search a name or email" autocomplete="off" autocapitalize="off" spellcheck="false">
         <!-- THE EDITOR (2026-10-06). STATIC MARKUP, for the same reason the search
@@ -7023,11 +7042,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function cardCheckCountScan() {
         try { localStorage.setItem('hp-card-scans', JSON.stringify({ d: cardCheckToday(), n: cardCheckUsedToday() + 1 })); } catch (e) { /* no storage */ }
     }
-    function cardCheckMark(score, par) {
-        const d = Number(score) - Number(par);
-        if (!(score > 0) || !(par > 0)) return '';
-        return d <= -2 ? ' eagle' : d === -1 ? ' birdie' : d === 1 ? ' bogey' : d >= 2 ? ' double' : '';
-    }
+    function cardCheckMark(score, par) { return ScanGrid.mark(score, par); }   // the ring class lives in scan-grid.js (C, 2026-11-18)
     function cardCheckCardName(c) { return c.unit.label; }
 
     function renderCardCheck() {
@@ -7041,6 +7056,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // event from paper scans each card instead of typing it, so the cards must be there before any score.
         void scored;
         if (!all.length) { mount.innerHTML = ''; return; }
+        turnInSync();   // C: the Cards turned in queue, at most once a minute
         if (cardCheckView && cardCheckView.mode === 'card' && cardCheckFind(cardCheckView.sk)) { mount.innerHTML = cardCheckCardHtml(cardCheckFind(cardCheckView.sk)); return; }
         if (cardCheckView && cardCheckView.mode === 'review') { mount.innerHTML = cardCheckReviewHtml(all); return; }
         cardCheckView = null;
@@ -7061,6 +7077,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         let h = `<div class="ck-card" id="cardcheck-desk"><div class="ck-head"><div class="ck-title">Scorecard check</div>`
             + (fieldAll.open ? `<button type="button" class="btn-outline ck-review-btn" id="ck-review-open" onclick="cardCheckOpenReview()">Verify cards · ${fieldAll.open}</button>` : '') + `</div>`
             + `<p class="ck-note">Photograph each paper card after the round. The scanner reads it and checks every hole against the app.</p>`;
+        h += turnInSwitchHtml() + turnInQueueHtml();   // C (2026-11-18): the organizer's switch and the Cards turned in queue
         if (multi) {
             h += `<div class="ck-chips">` + rids.map((rid) => `<button type="button" class="reg-chip${rid === cardCheckRoundId ? ' active' : ''}" data-rid="${escapeHtml(rid)}" onclick="cardCheckPickRound(this.dataset.rid)">${escapeHtml((currentData.rounds[rid] || {}).name || rid)}</button>`).join('') + `</div>`;
         }
@@ -7078,7 +7095,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const start = u.start ? ` · H${escapeHtml(u.start)}` : '';
             let state, act;
             if (cardCheckBusy && cardCheckBusy.sk === c.sk) { state = `<span class="ck-state">${escapeHtml(cardCheckBusy.text)}</span>`; act = ''; }
-            else if (!c.check) { state = `<span class="ck-state">not scanned</span>`; act = `<button type="button" class="btn-primary ck-scan" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk)">Scan card</button>`; }
+            else if (!c.check) { state = `<span class="ck-state">not scanned</span>`; act = `<button type="button" class="btn-primary ck-scan" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk)">Scan card</button>`
+                + `<button type="button" class="btn-outline ck-pick" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk, 'photos')">From Photos</button>`; }
             else {
                 const open = ScanCompare.openIssues(c.check).length;
                 const fill = ScanCompare.wholeCardIssues(c.check).length;
@@ -7138,45 +7156,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const listed = issues.filter((x) => !isFill(x) && !(fill.length && x.kind === 'total' && x.appTotal === null && !x.choice));
         return { fill, filled, listed };
     }
+    // THE GRID lives in scan-grid.js since C (2026-11-18): the golfer's "Turn in our card" check
+    // screen on tournament-scorecard.html draws the same rows, so one builder. The markup is what
+    // this function drew inline before (tournament_card_check_test.js B2 and F1 hold the cells).
     function cardCheckGridHtml(c) {
-        const holes = cardCheckHoles(c.view);
-        const rows = (c.check && c.check.rows) || {};
-        const nines = [holes.filter((h) => h.hole <= 9), holes.filter((h) => h.hole >= 10)].filter((n) => n.length);
-        return nines.map((nine) => {
-            const tag = nine[0].hole >= 10 ? 'IN' : 'OUT';
-            let t = `<table class="ck-grid"><tr class="ck-hr"><th>Hole</th>${nine.map((h) => `<th>${h.hole}</th>`).join('')}<th>${tag}</th><th></th></tr>`
-                + `<tr class="ck-par"><th>Par</th>${nine.map((h) => `<td>${h.par || ''}</td>`).join('')}<td>${nine.reduce((s, h) => s + (h.par || 0), 0)}</td><td></td></tr>`;
-            c.unit.players.forEach((p) => {
-                const r = rows[p.key] || { h: {} };
-                let sum = 0, all = true, any = false;
-                const cells = nine.map((h) => {
-                    const cell = (r.h || {})['h' + h.hole] || { status: 'empty' };
-                    const shown = cell.choice === 'card' ? cell.card : (cell.app !== undefined ? cell.app : cell.card);
-                    if (shown > 0) sum += shown; else all = false;
-                    if (cell.status === 'match' || cell.choice) {
-                        if (cell.status !== 'match') any = true;
-                        return `<td><span class="ck-d${cardCheckMark(shown, h.par)}">${shown || ''}</span></td>`;
-                    }
-                    if (cell.status === 'empty') { all = false; return `<td></td>`; }
-                    any = true;
-                    if (cell.status === 'unsure') return `<td class="ck-u"><span>${cell.card}?</span><small>app ${cell.app}</small></td>`;
-                    if (cell.status === 'mismatch') return `<td class="ck-x"><span>${cell.card}</span><small>app ${cell.app}</small></td>`;
-                    // The card has a digit and the app has nothing yet (an untyped hole): the card's digit, in ink, marked "card".
-                    // Not red: there is nothing to disagree with. Use the whole card fills these in one tap.
-                    if (cell.card > 0 && cell.app === undefined) return `<td class="ck-m"><span>${cell.card}</span></td>`;
-                    return `<td class="ck-x"><span>${cell.card || '–'}</span><small>app ${cell.app || '–'}</small></td>`;
-                }).join('');
-                const open = nine.some((h) => { const cell = (r.h || {})['h' + h.hole]; return cell && cell.status !== 'match' && cell.status !== 'empty' && !cell.choice; });
-                const unsureOnly = open && nine.every((h) => { const cell = (r.h || {})['h' + h.hole]; return !cell || cell.status === 'match' || cell.status === 'empty' || cell.choice || cell.status === 'unsure'; });
-                // Open holes that are only "card digit, nothing in the app" are not a disagreement: no mark until they are filled.
-                const fillOnly = open && nine.every((h) => { const cell = (r.h || {})['h' + h.hole]; return !cell || cell.status === 'match' || cell.status === 'empty' || cell.choice || (cell.status === 'missing' && cell.card > 0 && cell.app === undefined); });
-                const mark = !r.row ? '' : (open ? (fillOnly ? '' : (unsureOnly ? '<span class="ck-q">?</span>' : '<span class="ck-ne">≠</span>')) : (all || any ? '✓' : ''));
-                const short = String(p.name).split(' ').filter(Boolean);
-                const nm = short.length > 1 ? `${short[0]} ${short[short.length - 1].charAt(0)}` : (short[0] || '');
-                t += `<tr><th class="ck-nm">${escapeHtml(nm)}</th>${cells}<td class="ck-sum">${sum || ''}</td><td class="ck-mk">${mark}</td></tr>`;
-            });
-            return t + `</table>`;
-        }).join('');
+        return ScanGrid.gridHtml({ holes: cardCheckHoles(c.view), players: c.unit.players, rows: (c.check && c.check.rows) || {}, esc: escapeHtml });
     }
     function cardCheckCardHtml(c) {
         const u = c.unit;
@@ -7244,20 +7228,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     // ---- THE SCAN ----
-    function cardCheckScan(sk) {
+    // which: absent = the camera; 'photos' = saved photos, one or two (ADVISOR-20261118-1704).
+    function cardCheckScan(sk, which) {
         if (!canManage() || cardCheckBusy) return;
         const c = cardCheckFind(sk);
         if (!c) return;
         cardCheckPending = sk;
         cardCheckMsg = '';
-        const input = document.getElementById('cardcheck-file');
+        const input = document.getElementById(which === 'photos' ? 'cardcheck-pick' : 'cardcheck-file');
         if (input && typeof input.click === 'function') input.click();
     }
     function cardCheckPicked(input) {
-        const file = input && input.files && input.files[0];
+        const file = input && input.files ? Array.prototype.slice.call(input.files, 0, 2) : [];
         const sk = cardCheckPending;
         cardCheckPending = null;
-        if (!file || !sk || !canManage()) return;
+        if (!file.length || !sk || !canManage()) return;
         const c = cardCheckFind(sk);
         if (!c) return;
         const holes = cardCheckHoles(c.view);
@@ -7282,36 +7267,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
         try { input.value = ''; } catch (e) { /* a picked file stays picked */ }
     }
-    // The phone's photo, shrunk to a JPEG of at most about 600 KB (the size
-    // the scanner expects: 300-600 KB; it refuses anything over about 2.2 MB).
-    function cardCheckJpeg(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onerror = () => reject(new Error('read'));
-            reader.onload = () => {
-                const img = new Image();
-                img.onerror = () => reject(new Error('image'));
-                img.onload = () => {
-                    const w = img.naturalWidth || img.width, ht = img.naturalHeight || img.height;
-                    if (!(w > 0) || !(ht > 0)) { reject(new Error('image')); return; }
-                    let max = 1600, q = 0.8, out = '';
-                    for (let i = 0; i < 5; i++) {
-                        const k = Math.min(1, max / Math.max(w, ht));
-                        const cv = document.createElement('canvas');
-                        cv.width = Math.max(1, Math.round(w * k)); cv.height = Math.max(1, Math.round(ht * k));
-                        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-                        out = cv.toDataURL('image/jpeg', q);
-                        if (out.length * 0.75 <= 600 * 1024) break;
-                        max = Math.round(max * 0.8); q = Math.max(0.6, q - 0.08);
-                    }
-                    if (!/^data:image\/jpeg;base64,/.test(out)) { reject(new Error('encode')); return; }
-                    resolve(out);
-                };
-                img.src = String(reader.result);
-            };
-            reader.readAsDataURL(file);
-        });
-    }
+    // The photo or photos (the camera's shot, or one or two saved photos), as one JPEG of at most about
+    // 600 KB (the scanner expects 300-600 KB and refuses anything over about 2.2 MB): scan-grid.js photosToJpeg.
+    function cardCheckJpeg(files) { return ScanGrid.photosToJpeg(files && files.length !== undefined ? files : [files]); }
     // The scanner's own answers, as a sentence each (functions/api/_scan.js).
     const CARD_SCAN_SAYS = {
         not_configured: 'The card scanner is not switched on yet.',
@@ -7441,6 +7399,245 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             delete currentData.cardsVerified;
             ref.remove().catch(() => { /* the next snapshot shows what is there */ });
         }
+    }
+
+    // ---- CARDS TURNED IN (C, ADVISOR-20261118-1533, Manny's pick 2026-11-18) ----
+    //
+    // A group that kept score on paper turns its card in from a GOLFER's phone:
+    // the group's scoring link (tournament-scorecard.html) scans the card with
+    // the same scanner, compares it the same way, and sends the scanner's read
+    // to /api/card-turn-in, where it waits in the scanner's KV. This Desk lists
+    // those cards here, above the Scan cards, and the organizer APPROVES one:
+    //   1. the read is compared against the app's scores NOW (ScanCompare, as a
+    //      Desk scan of that card would be) and stored as the card's check;
+    //   2. the holes the app has nothing for are written through the score
+    //      corrector - cardCheckUseWhole, the same one tap as Use the whole card;
+    //      red and amber holes stay per hole, on the card screen, with the photo;
+    //   3. the card's state goes back to the server, so the golfer's phone reads
+    //      "On the leaderboard" (or "Declined").
+    // NOTHING REACHES THE LEADERBOARD OR THE SIDE GAMES WITHOUT APPROVE: the
+    // function never writes a score (card_turn_in_server_test.js holds that), the
+    // golfer's page writes none for a turn-in, and this page writes them only
+    // here, through the corrector, as every Desk scan does.
+    //
+    // THE SWITCH. tournaments/<code>/cardTurnIn = true, the owner's key (the
+    // rules give the owner every child; no new rule). Off by default: an event
+    // made before today shows no button on any golfer's card. The function
+    // refuses a send while it is off, and the scanner counts a golfer's turn-in
+    // scan under the event's day allowance only while it is on.
+    //
+    // WHY THE QUEUE IS FETCHED, NOT A SNAPSHOT. A golfer's phone cannot write to
+    // the event record (the live rules let a code-holder write one score key and
+    // nothing else), so the turn-ins are not in it. The Desk asks the function
+    // (one list call, the keys' metadata only) when it draws, on Check now, and
+    // once a minute while the Desk is open; a card's read is fetched when it is
+    // new, the photo only when See photo is tapped. The photo lives in this
+    // page's memory like a Desk scan's (cardCheckPhotos); nothing stores it.
+    const TURN_IN_POLL_MS = 60000;
+    let turnIns = null;          // null: not asked yet; [] asked, none; items { sk, by, at, state, decidedAt, photo, scan? }
+    let turnInAskedAt = 0;
+    let turnInFetching = false;
+    let turnInBusy = false;
+    let turnInMsg = '';
+    let turnInOpenSk = null;
+    let turnInTimer = null;
+    function turnInOn() { return !!(currentData && currentData.cardTurnIn === true); }
+    function turnInToken() {
+        const user = authUser;   // the signed-in organizer, the same seam as the Desk scan
+        return (user && typeof user.getIdToken === 'function') ? Promise.resolve(user.getIdToken()) : Promise.reject(new Error('sign_in'));
+    }
+    // One call to the function. GET carries its question in the query; POST its action in the body.
+    function turnInApi(method, query, body) {
+        if (typeof fetch !== 'function') return Promise.reject(new Error('network'));
+        const qs = query ? '?' + Object.keys(query).map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(query[k])).join('&') : '';
+        return turnInToken().then((tok) => fetch('/api/card-turn-in' + qs, {
+            method, credentials: 'omit',
+            headers: Object.assign({ Authorization: 'Bearer ' + tok }, body ? { 'Content-Type': 'application/json' } : {}),
+            body: body ? JSON.stringify(body) : undefined
+        })).then((r) => Promise.resolve(r.json()).catch(() => null));
+    }
+    function turnInSetSwitch(on) {
+        if (!currentCode || !canManage()) return;
+        const v = on ? true : null;
+        currentData.cardTurnIn = v === true ? true : undefined;
+        db.ref(`tournaments/${currentCode}/cardTurnIn`).set(v).catch((err) => { turnInMsg = `That did not save: ${err.message}`; renderCardCheck(); });
+        turnInMsg = '';
+        renderCardCheck();
+        if (on) turnInSync(true);
+    }
+    // The list, at most once a minute unless forced (Check now, the switch, an approve).
+    function turnInSync(force) {
+        if (!currentCode || !canManage() || typeof fetch !== 'function') return;
+        if (!turnInOn() && !(turnIns && turnIns.length)) return;
+        const now = Date.now();
+        if (turnInFetching || (!force && now - turnInAskedAt < TURN_IN_POLL_MS)) return;
+        turnInFetching = true;
+        turnInAskedAt = now;
+        turnInApi('GET', { code: String(currentCode) }).then((j) => {
+            if (!j || j.status !== 'ok' || !Array.isArray(j.cards)) { turnInMsg = j && j.status === 'not_configured' ? 'Card turn-in is not switched on at the server yet.' : ''; return; }
+            const had = {};
+            (turnIns || []).forEach((it) => { had[it.sk] = it; });
+            turnIns = j.cards.map((c) => {
+                const old = had[c.sk];
+                // A re-send (a newer at) drops the read fetched for the earlier one.
+                return Object.assign({}, c, old && old.at === c.at && old.scan ? { scan: old.scan } : {});
+            });
+            turnIns.filter((it) => it.state === 'sent' && !it.scan).forEach(turnInFetchRead);
+        }).catch(() => { /* the next check says what is there */ }).then(() => {
+            turnInFetching = false;
+            renderCardCheck();
+            turnInArm();
+        });
+    }
+    function turnInArm() {
+        if (turnInTimer) clearTimeout(turnInTimer);
+        turnInTimer = setTimeout(() => {
+            turnInTimer = null;
+            const panel = document.getElementById('manage-tab-desk');
+            const showing = panel && panel.style && panel.style.display !== 'none' && !(typeof document.hidden === 'boolean' && document.hidden);
+            if (showing) turnInSync(true); else turnInArm();
+        }, TURN_IN_POLL_MS);
+        if (turnInTimer && typeof turnInTimer.unref === 'function') turnInTimer.unref();
+    }
+    function turnInFetchRead(it) {
+        return turnInApi('GET', { code: String(currentCode), sk: it.sk, read: '1' }).then((j) => {
+            if (j && j.status === 'ok' && j.card && j.card.scan) { it.scan = j.card.scan; renderCardCheck(); }
+        }).catch(() => { /* Open fetches it again */ });
+    }
+    // The card as the Desk sees it NOW: the turned-in read against the app's scores at this moment.
+    function turnInCompare(it) {
+        const c = cardCheckFind(it.sk);
+        if (!c || !it.scan) return null;
+        const holes = cardCheckHoles(c.view);
+        return { c, check: ScanCompare.compareCard({ scan: it.scan, players: c.unit.players, holes: holes.map((h) => h.hole), app: cardCheckAppScores(c.view, c.unit), at: it.at }) };
+    }
+    // Digits read below the confidence cut, counted on the read itself (an untyped hole has no
+    // app digit to be "unsure" against): the number to check against the photo before Approve.
+    function turnInLowConfidence(scan) {
+        let n = 0;
+        ((scan && scan.players) || []).forEach((p) => (p.holes || []).forEach((c) => { if (c && c.score > 0 && typeof c.confidence === 'number' && c.confidence < ScanCompare.CONFIDENCE_CUT) n++; }));
+        return n;
+    }
+    function turnInTotalsText(check) {
+        const rows = Object.keys(check.rows || {}).map((k) => check.rows[k]).filter((r) => r.row);
+        const written = rows.filter((r) => Number.isInteger(r.writtenTotal));
+        if (!written.length) return 'No totals written on the card.';
+        const off = written.filter((r) => {
+            let s = 0, any = false;
+            Object.keys(r.h || {}).forEach((k) => { const cell = r.h[k]; if (cell && cell.card > 0) { s += cell.card; any = true; } });
+            return any && s !== r.writtenTotal;
+        });
+        return off.length ? `${off.map((r) => String(r.name).split(' ')[0]).join(', ')}: the card’s written total does not match its holes.` : 'Totals match the card.';
+    }
+    function turnInSwitchHtml() {
+        const on = turnInOn();
+        return `<div class="ti-switch" id="ti-switch"><label class="ti-sw-row"><input type="checkbox" id="ti-switch-box"${on ? ' checked' : ''} onchange="turnInSetSwitch(this.checked)"><span><b>Card turn-in from a golfer’s phone</b><small>${on
+            ? 'On. Any golfer on a group’s scoring link can photograph the paper card after the last hole and send it here. Nothing reaches the leaderboard until you approve it.'
+            : 'Off. Turn it on and any golfer on a group’s scoring link can photograph the paper card after the last hole and send it to this Desk for your OK.'}</small></span></label></div>`;
+    }
+    function turnInQueueHtml() {
+        if (!turnInOn() && !(turnIns && turnIns.length)) return '';
+        const items = turnIns || [];
+        const waiting = items.filter((it) => it.state === 'sent').length;
+        let h = `<div class="ti-queue" id="ti-queue"><div class="ck-head"><div class="ck-title" style="font-size:0.92rem;">Cards turned in${items.length ? ` · ${waiting} waiting` : ''}</div>`
+            + `<button type="button" class="btn-outline ck-review-btn" id="ti-refresh" onclick="turnInSync(true)"${turnInFetching ? ' disabled' : ''}>${turnInFetching ? 'Checking…' : 'Check now'}</button></div>`;
+        if (turnInMsg) h += `<p class="ck-msg" id="ti-msg" role="alert">${escapeHtml(turnInMsg)}</p>`;
+        if (!items.length) h += `<p class="ck-note" id="ti-none">${turnIns === null ? 'Checking for cards…' : `No card has been turned in yet. Checked ${escapeHtml(cardCheckTime(turnInAskedAt))}; this Desk checks again every minute while it is open.`}</p>`;
+        h += items.map(turnInRowHtml).join('');
+        return h + `</div>`;
+    }
+    function turnInRowHtml(it) {
+        const c = cardCheckFind(it.sk);
+        const label = c ? c.unit.label : `Card ${it.sk}`;
+        const pill = it.state === 'approved' ? '<span class="ti-pill ti-ok">On the leaderboard</span>'
+            : it.state === 'declined' ? '<span class="ti-pill ti-no">Declined</span>' : '<span class="ti-pill ti-new">New</span>';
+        const who = it.by ? `sent by ${escapeHtml(it.by)}` : 'sent from the group’s link';
+        const sk = escapeHtml(it.sk);
+        let h = `<div class="ti-row" data-ti="${sk}"><div class="ck-row"><div class="ck-who"><strong>${escapeHtml(label)}</strong><small>${who} · ${escapeHtml(cardCheckTime(it.at))}</small></div>`
+            + `<div class="ck-act">${pill}${it.state === 'sent' ? `<button type="button" class="btn-outline ti-open" data-sk="${sk}" onclick="turnInOpen(this.dataset.sk)">${turnInOpenSk === it.sk ? 'Close' : 'Open'}</button>` : ''}</div></div>`;
+        if (turnInOpenSk === it.sk && it.state === 'sent') {
+            const cmp = turnInCompare(it);
+            if (!c) h += `<p class="ck-msg">This card’s group is not in the event any more.</p>`;
+            else if (!cmp) h += `<p class="ck-note" id="ti-reading">Fetching the read…</p>`;
+            else {
+                const issues = ScanCompare.issuesOf(cmp.check);
+                const fills = ScanCompare.wholeCardIssues(cmp.check).length;
+                const red = issues.filter((x) => x.kind === 'mismatch').length;
+                const amber = issues.filter((x) => x.kind === 'unsure').length;
+                const low = turnInLowConfidence(it.scan);
+                const rowsOff = (cmp.check.unmatched || []).length;
+                h += `<div class="ck-grid-wrap" id="ti-grid">${cardCheckGridHtml(Object.assign({}, c, { check: cmp.check }))}</div>`;
+                h += `<p class="ck-key" id="ti-sum">${fills} ${fills === 1 ? 'hole' : 'holes'} to fill from the card${red ? ` · ${red} red` : ''}${amber ? ` · ${amber} amber` : ''}${low ? ` · ${low} read with low confidence (see the photo)` : ''}${rowsOff ? ` · ${rowsOff} ${rowsOff === 1 ? 'row' : 'rows'} not matched` : ''}. ${escapeHtml(turnInTotalsText(cmp.check))}</p>`;
+                if (cardCheckPhotoShown === it.sk && cardCheckPhotos[it.sk]) h += `<div class="ck-photo" id="ti-photo"><img src="${escapeHtml(cardCheckPhotos[it.sk])}" alt="The photo of this card"><small>Kept on this screen only, until the page is closed.</small></div>`;
+                h += `<div class="ck-btns"><button type="button" class="btn-primary ti-approve" data-sk="${sk}" onclick="turnInApprove(this.dataset.sk)"${turnInBusy ? ' disabled' : ''}>Approve · ${fills} ${fills === 1 ? 'hole' : 'holes'} to the board</button>`
+                    + (it.photo ? `<button type="button" class="btn-outline ti-photo-btn" data-sk="${sk}" onclick="turnInPhoto(this.dataset.sk)">${cardCheckPhotoShown === it.sk ? 'Hide photo' : 'See photo'}</button>` : '')
+                    + `<button type="button" class="btn-outline ti-decline" data-sk="${sk}" onclick="turnInDecline(this.dataset.sk)"${turnInBusy ? ' disabled' : ''}>Decline</button></div>`;
+                h += `<p class="ck-foot">Approve writes the holes the app has nothing for through the score corrector, as if typed, and stores the check on this Desk. Red and amber holes stay for you to decide on the card screen, with the photo.</p>`;
+            }
+        }
+        return h + `</div>`;
+    }
+    function turnInOpen(sk) {
+        turnInOpenSk = turnInOpenSk === sk ? null : sk;
+        turnInMsg = '';
+        renderCardCheck();
+        const it = (turnIns || []).find((x) => x.sk === sk);
+        if (it && !it.scan) turnInFetchRead(it);
+    }
+    function turnInPhoto(sk) {
+        if (cardCheckPhotos[sk]) { cardCheckTogglePhoto(sk); return; }
+        turnInApi('GET', { code: String(currentCode), sk, photo: '1' }).then((j) => {
+            if (j && j.status === 'ok' && j.photo) { cardCheckPhotos[sk] = 'data:image/jpeg;base64,' + j.photo; cardCheckPhotoShown = sk; }
+            else turnInMsg = 'The photo could not be fetched. Check now in a moment.';
+            renderCardCheck();
+        }).catch(() => { turnInMsg = 'The photo could not be fetched. Check now in a moment.'; renderCardCheck(); });
+    }
+    function turnInApprove(sk) {
+        if (!currentCode || !canManage() || turnInBusy) return;
+        const it = (turnIns || []).find((x) => x.sk === sk);
+        const cmp = it && it.state === 'sent' ? turnInCompare(it) : null;
+        if (!cmp) return;
+        if (cmp.c.rid && roundStatus((currentData.rounds || {})[cmp.c.rid]) !== 'open') {
+            turnInMsg = 'This round is not open. Open it in Setup to approve the card.';
+            renderCardCheck();
+            return;
+        }
+        turnInBusy = true;
+        turnInMsg = '';
+        renderCardCheck();
+        // 1. the check on the Desk, as a scan of this card would be stored; 2. the fills through
+        // the corrector (the same tap as Use the whole card); 3. the state back to the golfer.
+        cardCheckStore(sk, cmp.check);
+        cardCheckUseWhole(sk);
+        const label = cmp.c.unit.label;
+        turnInApi('POST', null, { action: 'approve', code: String(currentCode), sk }).then((j) => {
+            if (j && j.status === 'ok' && j.card) { it.state = 'approved'; it.decidedAt = j.card.decidedAt; }
+            else turnInMsg = `${label}’s card is on the Desk, but the golfer’s phone could not be told. Check now in a minute.`;
+        }).catch(() => { turnInMsg = `${label}’s card is on the Desk, but the golfer’s phone could not be told. Check now in a minute.`; }).then(() => {
+            turnInBusy = false;
+            turnInOpenSk = null;
+            const stored = (currentData.cardChecks || {})[sk] || cmp.check;
+            const open = ScanCompare.openIssues(stored).length;
+            cardCheckMsg = open ? `${label}: the card’s holes are on the board. ${open} ${open === 1 ? 'line stays' : 'lines stay'} to resolve on the card screen (Review).`
+                : `${label}: the card is on the board and verified.`;
+            renderCardCheck();
+        });
+    }
+    function turnInDecline(sk) {
+        if (!currentCode || !canManage() || turnInBusy) return;
+        const it = (turnIns || []).find((x) => x.sk === sk);
+        if (!it) return;
+        turnInBusy = true;
+        turnInMsg = '';
+        renderCardCheck();
+        turnInApi('POST', null, { action: 'decline', code: String(currentCode), sk }).then((j) => {
+            if (j && j.status === 'ok' && j.card) { it.state = 'declined'; it.decidedAt = j.card.decidedAt; }
+            else turnInMsg = 'That did not reach the server. Try again.';
+        }).catch(() => { turnInMsg = 'That did not reach the server. Try again.'; }).then(() => {
+            turnInBusy = false;
+            turnInOpenSk = null;
+            renderCardCheck();
+        });
     }
 
     // ---- THE REGISTRATION DESK (waves 1, 2a, 2b, 2c) --------------------------

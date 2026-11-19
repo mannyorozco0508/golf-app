@@ -51,6 +51,10 @@
          server confirms them, so closing the tab cannot lose them. The shared
          queue, unmodified; the page files it under its own storage key. -->
     <script src="offline-queue.js"></script>
+    <!-- C (2026-11-18): Turn in our card. The Desk's compare and its grid, so the golfer's check
+         screen and the organizer's Cards turned in queue are the same rows (one builder). -->
+    <script src="scan-compare.js"></script>
+    <script src="scan-grid.js"></script>
     <style>
         :root {
             --bg-page: #f4f6f8;
@@ -199,6 +203,53 @@
         .org-alert-text { font-size: 1rem; line-height: 1.4; overflow-wrap: anywhere; }
         .org-alert-ok { display: block; width: 100%; margin-top: 14px; background: #0f4c3a; color: #ffffff; border: 0; border-radius: 12px; padding: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; font-family: inherit; }
         /* EC4 C: the after-the-round photo block on the card. */
+        /* TURN IN OUR CARD (C, 2026-11-18): the card under the status bar, the check grid (the
+           Desk's .ck-grid classes, drawn by scan-grid.js), the waiting / approved states. */
+        :root { --warn-bg: #fff4e5; --warn-border: #e08a00; --warn-text: #7a4a00; }
+        .ti-card { border: 2px solid var(--brand-navy); border-radius: 14px; padding: 12px 14px; margin: 0 0 14px 0; background: var(--bg-card); }
+        .ti-h { font-weight: 800; font-size: 1.05rem; margin-bottom: 4px; }
+        .ti-p { font-size: 0.85rem; color: var(--text-muted); margin: 0 0 10px 0; }
+        .ti-btn { width: 100%; background: var(--brand-green); color: #fff; border: 0; border-radius: 12px; padding: 14px; font-size: 1.05rem; font-weight: 800; cursor: pointer; font-family: inherit; min-height: 48px; margin-top: 8px; }
+        .ti-btn.ti-ghost { background: #fff; color: var(--brand-green); border: 1.5px solid var(--brand-green); }
+        .ti-msg { font-size: 0.85rem; color: #b00020; font-weight: 700; margin: 6px 0; }
+        .ti-busy { text-align: center; font-size: 0.9rem; color: var(--text-muted); margin: 10px 0; }
+        .ti-lines { list-style: none; padding: 0; margin: 6px 0 4px 0; font-size: 0.85rem; }
+        .ti-lines li { padding: 4px 0; }
+        .ti-lines li.ok { color: var(--brand-green); font-weight: 700; }
+        .ti-lines li.warn { color: var(--warn-text); background: var(--warn-bg); border: 1px solid var(--warn-border); border-radius: 8px; padding: 6px 8px; margin: 4px 0; }
+        .ti-by { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 2px 0; font-size: 0.82rem; color: var(--text-muted); }
+        .ti-chip { background: #fff; border: 1.5px solid var(--border-mid); border-radius: 999px; padding: 6px 12px; min-height: 36px; font: inherit; font-size: 0.82rem; font-weight: 700; color: var(--text-main); cursor: pointer; }
+        .ti-chip.on { background: var(--brand-green); color: #fff; border-color: var(--brand-green); }
+        .ti-foot { font-size: 0.78rem; color: var(--text-muted); margin: 8px 0 0 0; }
+        .ti-dark { background: var(--brand-green); color: #fff; border-radius: 12px; padding: 12px 14px; }
+        .ti-dark.ti-no { background: var(--brand-navy); }
+        .ti-k { font-size: 0.68rem; letter-spacing: 0.12em; font-weight: 700; color: #d4f28a; }
+        .ti-big { font-size: 1.3rem; font-weight: 900; margin: 2px 0; }
+        .ti-s { font-size: 0.82rem; color: #d9e8e0; }
+        .ti-wait { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.88rem; padding: 10px 0 2px 0; }
+        .ti-pill { display: inline-block; font-size: 0.72rem; font-weight: 800; border-radius: 999px; padding: 3px 9px; background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+        .ck-grid-wrap { overflow-x: auto; margin: 6px 0; }
+        .ck-grid { border-collapse: collapse; width: 100%; font-size: 0.8rem; margin: 0 0 8px 0; table-layout: fixed; }
+        .ck-grid th, .ck-grid td { text-align: center; padding: 3px 0; font-weight: 700; color: var(--text-main); }
+        .ck-grid tr.ck-hr th, .ck-grid tr.ck-par th, .ck-grid tr.ck-par td { font-size: 0.66rem; color: var(--text-muted); font-weight: 600; }
+        .ck-grid th.ck-nm { text-align: left; width: 52px; font-size: 0.74rem; white-space: nowrap; overflow: hidden; }
+        .ck-grid tr.ck-hr th:first-child, .ck-grid tr.ck-par th:first-child { text-align: left; width: 52px; }
+        .ck-grid .ck-sum { color: var(--text-muted); }
+        .ck-grid .ck-mk { width: 16px; }
+        .ck-d { display: inline-flex; align-items: center; justify-content: center; width: 21px; height: 21px; }
+        .ck-d.birdie { box-shadow: inset 0 0 0 1.5px #c1121f; border-radius: 50%; }
+        .ck-d.eagle { box-shadow: inset 0 0 0 1.5px #c1121f, inset 0 0 0 3px var(--bg-card), inset 0 0 0 4.5px #c1121f; border-radius: 50%; }
+        .ck-d.bogey { box-shadow: inset 0 0 0 1.5px var(--text-main); border-radius: 2px; }
+        .ck-d.double { box-shadow: inset 0 0 0 1.5px var(--text-main), inset 0 0 0 3px var(--bg-card), inset 0 0 0 4.5px var(--text-main); border-radius: 2px; }
+        .ck-grid td.ck-x, .ck-grid td.ck-u { line-height: 1; }
+        .ck-grid td.ck-x span { display: inline-block; color: #b00020; border: 1.5px solid #b00020; border-radius: 3px; min-width: 16px; }
+        .ck-grid td.ck-u span { display: inline-block; color: var(--warn-text); background: var(--warn-bg); border: 1.5px dashed var(--warn-border); border-radius: 3px; min-width: 16px; }
+        .ck-grid td.ck-x small, .ck-grid td.ck-u small { display: block; font-size: 0.5rem; letter-spacing: -0.02em; font-weight: 600; white-space: nowrap; margin-top: 1px; }
+        .ck-grid td.ck-x small { color: #b00020; }
+        .ck-grid td.ck-u small { color: var(--warn-text); }
+        .ck-grid td.ck-m span { display: inline-block; color: var(--text-main); border-bottom: 2px dotted var(--text-muted); min-width: 16px; }
+        .ck-ne { color: #b00020; }
+        .ck-q { color: var(--warn-text); }
         .ph-done { border: 1px solid var(--border-mid); border-radius: 14px; padding: 12px 14px; margin: 0 0 14px 0; background: var(--bg-card); }
         /* GET HARDPAN, A + B (Manny 2026-11-12). Browser only: app mode hides both. */
         .getapp-bar { display: none; background: #13261d; color: #fff; border-radius: 12px; padding: 9px 11px; margin: 0 0 12px 0; font-size: 0.82rem; line-height: 1.3; }
@@ -401,6 +452,15 @@
             <div class="status-main" id="status-main">Thru 0</div>
             <div class="status-sub" id="status-sub"></div>
         </div>
+        <!-- TURN IN OUR CARD (C, ADVISOR-20261118-1533, 2026-11-18): the group kept score on paper;
+             one golfer photographs the card here, it waits for the organizer's Approve on the Desk.
+             Drawn by renderTurnIn on each snapshot; shown only while the organizer's switch is on.
+             The file input is STATIC MARKUP, like the Desk's (a camera open on a phone must not
+             lose its input to a re-render); accept is written image/&#42; for the same reason. -->
+        <div class="ti-card" id="turnin-card" style="display:none;"></div>
+        <input type="file" id="turnin-file" accept="image/&#42;" capture="environment" style="display:none;" onchange="turnInPicked(this)">
+        <!-- Saved photos (ADVISOR-20261118-1704): no capture attribute, so the phone offers its photo library; one or two. -->
+        <input type="file" id="turnin-pick" accept="image/&#42;" multiple style="display:none;" onchange="turnInPicked(this)">
         <!-- E2a / E2b: the contest-hole prompt, on the hole this card is playing
              (or has just played) when the organizer made it a contest hole. -->
         <div class="contest-prompt" id="contest-prompt" style="display:none;"></div>
@@ -732,6 +792,7 @@
             roundScope = view;   // for a single-round record this IS currentData
             roundLocked = (status !== 'open');
             renderLinkTruth(status);   // bug hunt #6
+            renderTurnIn();   // C: Turn in our card (shown only while the organizer's switch is on); before the card, which it does not depend on
             // THE ROUND IS KNOWN, AND WHETHER IT IS OPEN: anything this phone
             // queued for this card goes now. Before the render, so a render that
             // throws cannot also strand the scores.
@@ -755,6 +816,268 @@
             contestEntries = (snap && snap.val()) || {};
             renderContestArea();
         });
+    }
+
+    // ---- TURN IN OUR CARD (C, ADVISOR-20261118-1533, Manny's pick 2026-11-18) ----
+    //
+    // The group kept score on paper. After the last hole one golfer on this
+    // link photographs the card; the same scanner the Desk uses reads it
+    // (POST /api/scorecard-scan, with this group's names, par and stroke index,
+    // and event:{code} so the scan counts under the event's allowance while the
+    // organizer's switch is on); the same compare (scan-compare.js) lays it out
+    // on the same grid (scan-grid.js); Send puts the scanner's READ on the
+    // server (POST /api/card-turn-in), where it waits for the organizer.
+    //
+    // THIS PAGE WRITES NO SCORE FOR A TURN-IN. The organizer's Approve on the
+    // Desk writes them, through the score corrector, as a Desk scan does. The
+    // card here reads "Waiting for the organizer" and asks the server for the
+    // card's state until it is approved or declined. The photo goes with the
+    // read (the JPEG the page already shrinks for the scanner, at most ~600 KB)
+    // so the organizer can see it beside an amber digit; nothing on this phone
+    // keeps it.
+    //
+    // SHOWN only while the organizer has card turn-in on
+    // (tournaments/<code>/cardTurnIn === true, read from the record this page
+    // already listens to), never on the watch link, never on a round that is
+    // not open. Off: the card does not exist on the page.
+    const TURN_IN_POLL_MS = 45000;
+    const TURN_IN_SAYS = {   // the scanner's own answers, as a sentence each (functions/api/_scan.js); the Desk's list
+        not_configured: 'The card scanner is not switched on yet. Hand the card in at the desk.',
+        sign_in: 'The scanner could not tell who is asking. Reload the link and try again.',
+        needs_pass: 'This phone has used its free scans. Ask another golfer in the group to scan the card, or hand it in at the desk.',
+        rate_limited: 'The scanner takes 3 cards a minute. Wait a minute, then scan again.',
+        daily_limit: 'The scanner has reached today’s limit for this event. Hand the card in at the desk.',
+        monthly_cap: 'The scanner has reached its monthly limit. Hand the card in at the desk.',
+        bad_request: 'The scanner could not use this round. Hand the card in at the desk.',
+        bad_image: 'That photo could not be read. Take it again, flat and in good light.',
+        busy: 'The scanner is busy. Try again in a minute.',
+        upstream_error: 'The scanner could not read this card. Take the photo again.',
+        network: 'The scanner did not answer. Check the signal and try again.',
+        turnin_off: 'The organizer has switched card turn-in off. Hand the card in at the desk.',
+        no_event: 'This event could not be found. Hand the card in at the desk.',
+        too_big: 'That photo is too big to send. Take it again.'
+    };
+    let turnIn = { step: 'idle', scan: null, check: null, photo: null, by: '', msg: '', state: null, at: 0 };
+    let turnInTimer = null;
+    function turnInSk() { return (myRoundId ? myRoundId + '~' : '') + (myTeamNum ? 'team' + myTeamNum : String(myGroupId || '')); }
+    function turnInStoreKey() { return 'hp-turnin:' + currentCode + ':' + turnInSk(); }
+    function turnInOn() {
+        return !!(currentData && currentData.cardTurnIn === true && !WATCH_MODE && !roundLocked && (myTeamNum || myGroupId) && roundScope);
+    }
+    // This card's golfers, the way the Desk's scan check names them (cardCheckUnits): a
+    // scramble is one team row with the golfers as aliases; otherwise one row per golfer.
+    function turnInUnit() {
+        const view = roundScope || currentData || {};
+        if (myTeamNum) {
+            const t = ((view.teams || {})['team' + myTeamNum]) || {};
+            const names = (t.players || []).map((n) => String(n || '').trim()).filter(Boolean);
+            const label = t.name || ('Team ' + myTeamNum);
+            const scramble = (view.format || 'scramble') === 'scramble';
+            return { label, scramble, players: scramble ? [{ key: 'team', name: String(label), aliases: names }] : names.map((n, i) => ({ key: 'p' + i, idx: i, name: n })) };
+        }
+        const g = ((view.scoringGroups || {})[myGroupId]) || {};
+        const players = view.players || {};
+        return { label: g.name || 'Group', scramble: false,
+            players: (g.playerIds || []).filter((pid) => players[pid]).map((pid) => ({ key: pid, name: String(players[pid].name || pid), handicap: players[pid].handicap })) };
+    }
+    function turnInHoles() {
+        const view = roundScope || currentData || {};
+        return (view.courseData || []).map((h) => ({ hole: Number(h.hole), par: Number(h.par), si: Number(h.hcpIndex) || null }))
+            .filter((h) => h.hole >= 1 && h.hole <= 18).sort((a, b) => a.hole - b.hole);
+    }
+    // The app's scores for this card, read the way the board reads them.
+    function turnInAppScores(unit) {
+        const scores = (roundScope || currentData || {}).scores || {};
+        const out = {};
+        turnInHoles().forEach((h) => {
+            unit.players.forEach((p) => {
+                const k = myTeamNum ? (unit.scramble ? teamHoleKey(myTeamNum, h.hole) : teamPlayerHoleKey(myTeamNum, p.idx, h.hole)) : playerHoleKey(p.key, h.hole);
+                const v = parseInt(scores[k], 10);
+                if (v > 0) (out[p.key] = out[p.key] || {})[h.hole] = v;
+            });
+        });
+        return out;
+    }
+    function turnInRound(unit) {
+        const holes = turnInHoles();
+        const par = {}, si = {};
+        holes.forEach((h) => { if (h.par > 0) par[h.hole] = h.par; if (h.si > 0) si[h.hole] = h.si; });
+        const hcp = (v) => { const t = String(v === undefined || v === null ? '' : v).trim(); return /^\d{1,2}$/.test(t) ? parseInt(t, 10) : undefined; };
+        return {
+            holes: holes.length === 9 ? 9 : 18,
+            startHole: holes.length === 9 && holes[0].hole === 10 ? 10 : 1,
+            expectedHoles: holes.map((h) => h.hole),
+            par, strokeIndex: si,
+            course: String((roundScope || currentData || {}).courseName || (currentData || {}).courseName || ''),
+            tee: '',
+            players: unit.players.slice(0, 8).map((p) => {
+                const o = { name: String(p.name).slice(0, 60) };
+                if (p.aliases && p.aliases.length) o.nicknames = p.aliases.slice(0, 4);
+                const hv = hcp(p.handicap);
+                if (hv !== undefined) o.handicap = hv;
+                return o;
+            })
+        };
+    }
+    // The photo or photos (camera, or one or two saved photos), as one JPEG of at most about 600 KB: scan-grid.js.
+    function turnInJpeg(files) { return ScanGrid.photosToJpeg(files); }
+    // The golfer's own session: the one the scoring links already run as (auth-boot's anonymous
+    // sign-in on the consumer pages; here the same path the photo post takes).
+    function turnInToken() { return photoIdToken(); }   // the one place this card gets a token: photoIdToken, lazily (service_worker_shell_test pins it)
+    function turnInFetch(url, body, tok) {
+        return fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify(body) })
+            .then((r) => Promise.resolve(r.json()).catch(() => null));
+    }
+    // which: 'camera' (the phone's camera) or 'photos' (saved photos, one or two: ADVISOR-20261118-1704).
+    function turnInStart(which) {
+        if (!turnInOn() || turnIn.step === 'reading' || turnIn.step === 'sending') return;
+        turnIn.msg = '';
+        const input = document.getElementById(which === 'photos' ? 'turnin-pick' : 'turnin-file');
+        if (input && typeof input.click === 'function') input.click();
+    }
+    function turnInPicked(input) {
+        const files = input && input.files ? Array.prototype.slice.call(input.files, 0, 2) : [];
+        if (!files.length || !turnInOn()) return;
+        const unit = turnInUnit();
+        const holes = turnInHoles();
+        if (!unit.players.length || (holes.length !== 9 && holes.length !== 18)) { turnIn.msg = 'The scanner reads 9- or 18-hole cards only.'; renderTurnIn(); return; }
+        turnIn = Object.assign(turnIn, { step: 'reading', scan: null, check: null, photo: null, msg: '' });
+        renderTurnIn();
+        turnInJpeg(files).then((dataUrl) => {
+            turnIn.photo = dataUrl;
+            if (typeof fetch !== 'function') throw Object.assign(new Error('network'), { say: 'network' });
+            return turnInToken().catch(() => { throw Object.assign(new Error('sign_in'), { say: 'sign_in' }); }).then((tok) =>
+                turnInFetch('/api/scorecard-scan', { image: { mimeType: 'image/jpeg', data: dataUrl.replace(/^data:[^,]*,/, '') }, round: turnInRound(unit), event: { code: String(currentCode) } }, tok));
+        }).then((j) => {
+            if (!(j && j.status === 'ok' && j.result && Array.isArray(j.result.players))) {
+                const why = j && (j.status === 'not_configured' ? 'not_configured' : j.reason);
+                turnIn.step = 'idle'; turnIn.photo = null; turnIn.msg = TURN_IN_SAYS[why] || TURN_IN_SAYS.network; renderTurnIn(); return;
+            }
+            turnIn.scan = j.result;
+            turnIn.check = ScanCompare.compareCard({ scan: j.result, players: unit.players, holes: holes.map((h) => h.hole), app: turnInAppScores(unit), at: Date.now() });
+            turnIn.step = 'check';
+            renderTurnIn();
+        }).catch((e) => {
+            turnIn.step = 'idle'; turnIn.photo = null;
+            turnIn.msg = TURN_IN_SAYS[e && e.say] || 'That photo could not be used. Take it again, flat and in good light.';
+            renderTurnIn();
+        });
+        try { input.value = ''; } catch (e) { /* a picked file stays picked */ }
+    }
+    function turnInBy(name) { turnIn.by = String(name || ''); renderTurnIn(); }
+    function turnInSend() {
+        if (!turnInOn() || turnIn.step !== 'check' || !turnIn.scan) return;
+        turnIn.step = 'sending'; turnIn.msg = '';
+        renderTurnIn();
+        const body = { action: 'send', code: String(currentCode), sk: turnInSk(), scan: turnIn.scan, by: turnIn.by || '', photo: turnIn.photo ? turnIn.photo.replace(/^data:[^,]*,/, '') : null };
+        turnInToken().catch(() => { throw Object.assign(new Error('sign_in'), { say: 'sign_in' }); })
+            .then((tok) => turnInFetch('/api/card-turn-in', body, tok))
+            .then((j) => {
+                if (j && j.status === 'ok' && j.card) {
+                    turnIn.step = 'sent'; turnIn.state = 'sent'; turnIn.at = j.card.at || Date.now(); turnIn.photo = null;
+                    turnInRemember();
+                    turnInPoll(true);
+                } else {
+                    const why = j && (j.status === 'not_configured' ? 'not_configured' : j.reason);
+                    turnIn.step = 'check'; turnIn.msg = TURN_IN_SAYS[why] || TURN_IN_SAYS.network;
+                }
+                renderTurnIn();
+            }).catch((e) => { turnIn.step = 'check'; turnIn.msg = TURN_IN_SAYS[e && e.say] || TURN_IN_SAYS.network; renderTurnIn(); });
+    }
+    function turnInAgain() { turnIn = { step: 'idle', scan: null, check: null, photo: null, by: turnIn.by, msg: '', state: null, at: 0 }; turnInForget(); renderTurnIn(); }
+    function turnInRemember() { try { localStorage.setItem(turnInStoreKey(), JSON.stringify({ at: turnIn.at, state: turnIn.state, by: turnIn.by })); } catch (e) { /* no storage */ } }
+    // Forgotten by writing an empty value, not by removing the key: tournament_darkmode_gone_test holds this page to "nothing removes browser storage".
+    function turnInForget() { try { localStorage.setItem(turnInStoreKey(), ''); } catch (e) { /* no storage */ } }
+    function turnInRecall() {
+        try {
+            const s = JSON.parse(localStorage.getItem(turnInStoreKey()) || 'null');
+            if (s && s.at && s.state) { turnIn.step = 'sent'; turnIn.state = s.state; turnIn.at = Number(s.at) || 0; turnIn.by = String(s.by || ''); if (s.state === 'sent') turnInPoll(true); }
+        } catch (e) { /* no storage */ }
+    }
+    // The card's state from the server, every 45 s while it is waiting.
+    function turnInPoll(now) {
+        if (turnInTimer) { clearTimeout(turnInTimer); turnInTimer = null; }
+        if (turnIn.step !== 'sent' || turnIn.state !== 'sent' || !currentCode || typeof fetch !== 'function') return;
+        const ask = () => turnInToken().then((tok) => fetch('/api/card-turn-in?code=' + encodeURIComponent(String(currentCode)) + '&sk=' + encodeURIComponent(turnInSk()), { credentials: 'omit', headers: { Authorization: 'Bearer ' + tok } }))
+            .then((r) => Promise.resolve(r.json()).catch(() => null))
+            .then((j) => {
+                if (j && j.status === 'ok' && j.card && j.card.state) { turnIn.state = j.card.state; turnInRemember(); renderTurnIn(); }
+                else if (j && j.status === 'refused' && j.reason === 'no_card') { turnInAgain(); return; }   // the server no longer has it (21 days)
+                if (turnIn.state === 'sent') arm();
+            }).catch(() => arm());
+        const arm = () => { turnInTimer = setTimeout(ask, TURN_IN_POLL_MS); if (turnInTimer && typeof turnInTimer.unref === 'function') turnInTimer.unref(); };
+        if (now) ask(); else arm();
+    }
+    // Digits the scanner read below its confidence cut, counted on the READ itself: on a paper
+    // card the app has nothing to compare against, so ScanCompare has no "unsure" cell to show;
+    // the count and the photo are how the organizer knows which digits to look at.
+    function turnInLowConfidence(scan) {
+        let n = 0;
+        ((scan && scan.players) || []).forEach((p) => (p.holes || []).forEach((c) => { if (c && c.score > 0 && typeof c.confidence === 'number' && c.confidence < ScanCompare.CONFIDENCE_CUT) n++; }));
+        return n;
+    }
+    function turnInTotalsLine(check) {
+        const rows = Object.keys(check.rows || {}).map((k) => check.rows[k]).filter((r) => r.row);
+        const written = rows.filter((r) => Number.isInteger(r.writtenTotal));
+        if (!written.length) return { ok: true, text: 'No totals written on the card; the organizer adds them up.' };
+        const off = written.filter((r) => { let s = 0, any = false; Object.keys(r.h || {}).forEach((k) => { const c = r.h[k]; if (c && c.card > 0) { s += c.card; any = true; } }); return any && s !== r.writtenTotal; });
+        return off.length ? { ok: false, text: `${off.map((r) => String(r.name).split(' ')[0]).join(', ')}: the total written on the card does not match the holes. The organizer decides.` } : { ok: true, text: 'Totals match the card' };
+    }
+    let turnInRecalled = false;
+    function renderTurnIn() {
+        const el = document.getElementById('turnin-card');
+        if (!el) return;
+        if (!turnInOn()) { el.style.display = 'none'; el.innerHTML = ''; return; }
+        if (!turnInRecalled) { turnInRecalled = true; turnInRecall(); }
+        const unit = turnInUnit();
+        const label = unit.label;
+        el.style.display = 'block';
+        let h = '';
+        if (turnIn.step === 'idle' || turnIn.step === 'reading') {
+            h = `<div class="ti-h">📷 Turn in our card</div><p class="ti-p">Kept score on paper? After your last hole, photograph the card here. The organizer checks it before it goes on the leaderboard.</p>`
+                + (turnIn.msg ? `<p class="ti-msg" id="turnin-msg" role="alert">${escapeHtml(turnIn.msg)}</p>` : '')
+                + (turnIn.step === 'reading' ? `<p class="ti-busy" id="turnin-busy">Reading ${escapeHtml(label)}’s card…</p>`
+                    : `<button type="button" class="ti-btn" id="turnin-start" onclick="turnInStart('camera')">📷 Take a photo</button><button type="button" class="ti-btn ti-ghost" id="turnin-photos" onclick="turnInStart('photos')">Choose from Photos</button><p class="ti-foot">One photo of the whole card, or two (front nine, back nine).</p>`);
+        } else if (turnIn.step === 'check' || turnIn.step === 'sending') {
+            const check = turnIn.check;
+            const issues = ScanCompare.issuesOf(check);
+            const amber = Math.max(issues.filter((x) => x.kind === 'unsure').length, turnInLowConfidence(turnIn.scan));
+            const red = issues.filter((x) => x.kind === 'mismatch').length;
+            const rowsOff = (check.unmatched || []).length;
+            const matched = unit.players.filter((p) => check.rows[p.key] && check.rows[p.key].row).length;
+            const totals = turnInTotalsLine(check);
+            h = `<div class="ti-h">${escapeHtml(label)} · check the card</div>`
+                + `<div class="ck-grid-wrap" id="turnin-grid">${ScanGrid.gridHtml({ holes: turnInHoles(), players: unit.players, rows: check.rows, esc: escapeHtml })}</div>`
+                + `<ul class="ti-lines" id="turnin-lines">`
+                + `<li class="${matched === unit.players.length && !rowsOff ? 'ok' : 'warn'}">${matched === unit.players.length && !rowsOff ? '✓ Names matched to ' + escapeHtml(label) : `${matched} of ${unit.players.length} names matched to ${escapeHtml(label)}${rowsOff ? ` · ${rowsOff} ${rowsOff === 1 ? 'row' : 'rows'} on the card not matched` : ''}. The organizer sorts out the rest.`}</li>`
+                + `<li class="${totals.ok ? 'ok' : 'warn'}">${totals.ok ? '✓ ' : ''}${escapeHtml(totals.text)}</li>`
+                + (amber ? `<li class="warn">${amber} ${amber === 1 ? 'number' : 'numbers'} the scanner was not sure about. The organizer checks ${amber === 1 ? 'it' : 'them'} against the photo.</li>` : '')
+                + (red ? `<li class="warn">${red} ${red === 1 ? 'hole differs' : 'holes differ'} from a score already in the app (red). The organizer decides which stands.</li>` : '')
+                + `</ul>`;
+            const names = unit.scramble ? (unit.players[0].aliases || []) : unit.players.map((p) => p.name);
+            if (names.length) {
+                h += `<div class="ti-by" id="turnin-by"><span>Sent by</span>${names.map((n) => `<button type="button" class="ti-chip${turnIn.by === n ? ' on' : ''}" data-name="${escapeHtml(n)}" onclick="turnInBy(this.dataset.name)">${escapeHtml(String(n).split(' ')[0])}</button>`).join('')}</div>`;
+            }
+            if (turnIn.msg) h += `<p class="ti-msg" id="turnin-msg" role="alert">${escapeHtml(turnIn.msg)}</p>`;
+            h += turnIn.step === 'sending' ? `<p class="ti-busy" id="turnin-busy">Sending…</p>`
+                : `<button type="button" class="ti-btn" id="turnin-send" onclick="turnInSend()">Send to the organizer</button><button type="button" class="ti-btn ti-ghost" id="turnin-again" onclick="turnInAgain()">Scan again</button>`;
+            h += `<p class="ti-foot">Nothing goes on the leaderboard until the organizer approves it. Keep the paper card.</p>`;
+        } else {
+            const st = turnIn.state;
+            const when = turnIn.at ? new Date(turnIn.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+            if (st === 'approved') {
+                h = `<div class="ti-dark ti-ok" id="turnin-state"><div class="ti-k">CARD APPROVED</div><div class="ti-big">On the leaderboard</div><div class="ti-s">The organizer approved ${escapeHtml(label)}’s card.</div></div>`
+                    + `<button type="button" class="ti-btn ti-ghost" id="turnin-board" onclick="showTab('leaderboard')">Leaderboard</button>`;
+            } else if (st === 'declined') {
+                h = `<div class="ti-dark ti-no" id="turnin-state"><div class="ti-k">CARD NOT USED</div><div class="ti-big">Please bring the card to the desk</div><div class="ti-s">The organizer could not use the photo of ${escapeHtml(label)}’s card.</div></div>`
+                    + `<button type="button" class="ti-btn ti-ghost" id="turnin-again" onclick="turnInAgain()">Scan it again</button>`;
+            } else {
+                h = `<div class="ti-dark" id="turnin-state"><div class="ti-k">CARD SENT${when ? ' · ' + escapeHtml(when) : ''}</div><div class="ti-big">Waiting for the organizer</div><div class="ti-s">Usually a few minutes. This card updates when it is on the leaderboard.</div></div>`
+                    + `<div class="ti-wait" id="turnin-wait"><span>${escapeHtml(label)} card${turnIn.by ? ' · sent by ' + escapeHtml(String(turnIn.by).split(' ')[0]) : ''}</span><span class="ti-pill">Waiting for OK</span></div>`
+                    + `<p class="ti-foot">Keep the paper card until you see it on the leaderboard.</p>`;
+            }
+        }
+        el.innerHTML = h;
     }
 
     // ---- E1a: THE ORGANIZER'S NOTES (mockup approved 2026-11-09) -----------
