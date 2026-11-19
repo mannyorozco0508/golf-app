@@ -8436,8 +8436,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const sk = TournamentPrizes.skinsSummary(currentData);
         const perRound = sk.rounds.map((r) => `${r.name ? escapeHtml(r.name) + ' ' : ''}${r.result.totals.skins} skin${r.result.totals.skins === 1 ? '' : 's'}${r.result.totals.pending ? ' (holes still open)' : ''}`).join(' · ');
         let h = `<div class="lb-skins-head" style="margin:4px 0 8px;"><b style="font-size:1rem;">${sk.skins} skin${sk.skins === 1 ? '' : 's'} so far</b>`
-            + `<div style="font-size:0.8rem; color:var(--text-muted);">Gross · carryover ${sk.carryover ? 'on' : 'off'} · ${perRound || 'no rounds yet'}</div>`
-            + `<div style="font-size:0.8rem; color:var(--text-muted);">${sk.perSkin > 0 ? `${escapeHtml(TournamentPrizes.amountText(sk.perSkin, currentData))} a skin, as the organizer set it` : 'The organizer has not set an amount a skin yet'}</div></div>`;
+            + `<div style="font-size:0.8rem; color:var(--text-muted);">${sk.ruled ? sk.games.map((g) => (g.name ? escapeHtml(g.name) + ' ' : '') + ({ gross: 'gross', net: 'net', both: 'gross and net' })[g.basis]).join(' · ') : 'Gross'} · carryover ${sk.carryover ? 'on' : 'off'} · ${perRound || 'no rounds yet'}</div>`
+            + `<div style="font-size:0.8rem; color:var(--text-muted);">${sk.ruled && sk.games.length > 1 ? sk.games.map((g) => `${escapeHtml(g.name || 'Skins')}: ${g.perSkin > 0 ? escapeHtml(TournamentPrizes.amountText(g.perSkin, currentData)) + ' a skin' : 'no amount a skin yet'}`).join(' · ') : (sk.perSkin > 0 ? `${escapeHtml(TournamentPrizes.amountText(sk.perSkin, currentData))} a skin, as the organizer set it` : 'The organizer has not set an amount a skin yet')}</div></div>`;
         h += prizeSkinsCardHtml(sk, currentData, { tab: true });
         el.innerHTML = h;
     }
@@ -8999,6 +8999,79 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return `<div class="payout-basis-seg" role="group" aria-label="${escapeHtml(label)}">` + choices.map(([v, t]) =>
             `<button type="button" class="${current === v ? 'on' : ''}" aria-pressed="${current === v}" data-v="${v}" onclick="${fn || 'setPlaceRule'}('${field}', this.dataset.v)">${escapeHtml(t)}</button>`).join('') + `</div>`;
     }
+    // SKINS SENTENCES (Starkey settings 8-11): the skins rules tournament-prizes.js
+    // applies (skinRulesOf), read as sentences in the same card. Owner writes to
+    // tournaments/<code>/prizeSettings/skins/...
+    function skinRuleWrite(path, v) {
+        if (!currentCode || !canManage()) return;
+        const ref = db.ref(`tournaments/${currentCode}/prizeSettings/skins${path ? '/' + path : ''}`);
+        return (v === null ? ref.remove() : ref.set(v)).catch(err => alert(`Error: ${err.message}`));
+    }
+    function setSkinRule(field, v) {
+        if (field === 'value' && (v === 'each' || v === 'share')) return skinRuleWrite('value', v);
+        if (field === 'allowance' && ['1', '0.75', '0.5'].indexOf(String(v)) !== -1) return skinRuleWrite('allowance', Number(v));
+        if (field === 'onePerHole' && (v === 'yes' || v === 'no')) return skinRuleWrite('onePerHole', v === 'yes');
+    }
+    function addSkinGame() {
+        if (!currentCode || !canManage()) return;
+        const id = 'g' + Date.now().toString(36);
+        return skinRuleWrite(`games/${id}`, { name: '', basis: 'gross', createdAt: firebase.database.ServerValue.TIMESTAMP });
+    }
+    function removeSkinGame(id) { if (/^[\w-]+$/.test(String(id))) return skinRuleWrite(`games/${id}`, null); }
+    function setSkinGame(id, field, v) {
+        if (!/^[\w-]+$/.test(String(id))) return;
+        if (field === 'name') return skinRuleWrite(`games/${id}/name`, String(v || '').trim().slice(0, 40));
+        if (field === 'basis' && ['gross', 'net', 'both'].indexOf(v) !== -1) return skinRuleWrite(`games/${id}/basis`, v);
+        if (field === 'share') { const x = TournamentPrizes.amountOf(parseFloat(String(v).replace(/[$,]/g, ''))); return skinRuleWrite(id === 'all' ? 'share' : `games/${id}/share`, x); }
+    }
+    function toggleSkinGameFlight(id, fid) {
+        if (!/^[\w-]+$/.test(String(id)) || !(currentData.flights || {})[fid]) return;
+        const K = TournamentPrizes.skinRulesOf(currentData || {});
+        const gm = K && K.games.find((x) => x.id === id);
+        const on = !!gm && gm.flights.indexOf(fid) !== -1;
+        return skinRuleWrite(`games/${id}/flights/${fid}`, on ? null : true);
+    }
+    function skinSentencesHtml(data, sent) {
+        const K = TournamentPrizes.skinRulesOf(data);
+        const fids = eventFlightIds(data);
+        const fname = (fid) => escapeHtml(((data.flights || {})[fid] || {}).name || 'Flight');
+        const bw = { gross: 'gross', net: 'net', both: 'gross and net' };
+        const games = (K && K.games) || [];
+        let h = `<div class="pz-k" id="skin-rules-head">Skins</div>`;
+        const gText = games.length
+            ? games.map((g) => `<b>${escapeHtml(g.name || 'Skins')}</b>${g.flights.length ? ' (' + g.flights.map(fname).join(', ') + ')' : ' (the whole field)'}, ${bw[g.basis]}`).join(' · ')
+            : 'one game for <b>the whole field</b>, <b>gross</b>';
+        let ed = games.map((g) => `<div class="pz-game" data-g="${escapeHtml(g.id)}"><input type="text" class="pz-spots" maxlength="40" placeholder="Game name, e.g. Men" value="${escapeHtml(g.name)}" data-g="${escapeHtml(g.id)}" onchange="setSkinGame(this.dataset.g, 'name', this.value)">`
+            + (fids.length ? `<div class="pz-chips">${fids.map((fid) => `<button type="button" class="pz-chip${g.flights.indexOf(fid) !== -1 ? ' on' : ''}" aria-pressed="${g.flights.indexOf(fid) !== -1}" data-g="${escapeHtml(g.id)}" data-f="${escapeHtml(fid)}" onclick="toggleSkinGameFlight(this.dataset.g, this.dataset.f)">${fname(fid)}</button>`).join('')}</div>` : '')
+            + `<div class="payout-basis-seg" role="group" aria-label="Skins on">${[['gross', 'Gross'], ['net', 'Net'], ['both', 'Gross and net']].map(([v, t]) => `<button type="button" class="${g.basis === v ? 'on' : ''}" aria-pressed="${g.basis === v}" data-g="${escapeHtml(g.id)}" data-v="${v}" onclick="setSkinGame(this.dataset.g, 'basis', this.dataset.v)">${t}</button>`).join('')}</div>`
+            + `<button type="button" class="pz-change" data-g="${escapeHtml(g.id)}" onclick="removeSkinGame(this.dataset.g)">Remove this game</button></div>`).join('');
+        ed += `<button type="button" class="ct-btn" id="skin-add-game" onclick="addSkinGame()">+ Add a game</button>`
+            + (fids.length ? `<div class="pz-note">Tap the flights a game takes in. No flight tapped = the whole field.</div>` : '');
+        h += sent('skins', `Skins: ${gText}.`, ed);
+        const value = (K && K.value) || 'each';
+        const per = TournamentPrizes.settingsOf(data).perSkin;
+        const shareOf = (g) => (g.id === 'all' ? TournamentPrizes.amountOf(((data.prizeSettings || {}).skins || {}).share) : g.share);
+        const shareGames = games.length ? games : [{ id: 'all', name: '' }];
+        const vText = value === 'share'
+            ? `Each game <b>shares an amount</b> over the skins it gives out: ${shareGames.map((g) => `${g.name ? escapeHtml(g.name) + ' ' : ''}<b>${prizeMoney(shareOf(g))}</b>`).join(' · ')}, each skin rounded down to the dollar.`
+            : (per > 0 ? `Each skin is <b>${prizeMoney(per)}</b> (set in Skins below).` : 'Each skin is the amount set in Skins below.');
+        const vEd = `<div class="payout-basis-seg" role="group" aria-label="A skin is worth">${[['each', 'A set amount a skin'], ['share', 'Each game shares an amount']].map(([v, t]) => `<button type="button" class="${value === v ? 'on' : ''}" aria-pressed="${value === v}" data-v="${v}" onclick="setSkinRule('value', this.dataset.v)">${t}</button>`).join('')}</div>`
+            + (value === 'share' ? shareGames.map((g) => `<label class="pz-k">${escapeHtml(g.name || 'Skins')} shares $</label><input type="text" class="pz-spots" inputmode="decimal" value="${shareOf(g) || ''}" data-g="${escapeHtml(g.id)}" onchange="setSkinGame(this.dataset.g, 'share', this.value)">`).join('') : '');
+        h += sent('skinvalue', vText, vEd);
+        const anyNet = games.some((g) => g.basis !== 'gross');
+        if (anyNet) {
+            const al = (K && K.allowance) || 1;
+            const aText = { 1: 'full handicap', 0.75: '¾ of each handicap', 0.5: '½ of each handicap' }[al];
+            h += sent('allowance', `Net skins use <b>${aText}</b>.`, `<div class="payout-basis-seg" role="group" aria-label="Net skins use">${[['1', 'Full handicap'], ['0.75', '¾'], ['0.5', '½']].map(([v, t]) => `<button type="button" class="${String(al) === v ? 'on' : ''}" aria-pressed="${String(al) === v}" data-v="${v}" onclick="setSkinRule('allowance', this.dataset.v)">${t}</button>`).join('')}</div>`);
+        }
+        if (games.some((g) => g.basis === 'both')) {
+            const one = !!(K && K.onePerHole);
+            h += sent('oneperhole', one ? '<b>One skin per golfer per hole</b>: a hole\'s gross winner sits out its net skin, which goes to the low net among the rest.' : 'A golfer can take <b>both</b> the gross and the net skin on a hole.',
+                `<div class="payout-basis-seg" role="group" aria-label="Same hole">${[['no', 'A golfer can take both'], ['yes', 'One skin per golfer per hole']].map(([v, t]) => `<button type="button" class="${(one ? 'yes' : 'no') === v ? 'on' : ''}" aria-pressed="${(one ? 'yes' : 'no') === v}" data-v="${v}" onclick="setSkinRule('onePerHole', this.dataset.v)">${t}</button>`).join('')}</div>`);
+        }
+        return h;
+    }
+
     function prizeRulesCardHtml(data, spots) {
         const R = TournamentPrizes.placeRulesOf(data);
         const multi = isMultiRound(data);
@@ -9006,7 +9079,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const amountsText = (list) => list.map((v, i) => `${ordinal(i + 1)} ${prizeMoney(v)}`).join(' · ');
         const preset = !R ? 'simple' : (R.on === 'both' && R.onePrize === 'gross' && R.ties === 'split' && R.rounding === 'cents'
             ? (R.scope === 'round' && R.within === 'round' ? 'rounds' : (R.scope === 'event' || !multi) && R.within === 'event' ? 'both' : '') : '');
-        let h = `<div class="pz-head"><span class="pz-title">How places go</span></div>`;
+        let h = `<div class="pz-head"><span class="pz-title">How prizes go</span></div><div class="pz-k">Places</div>`;
         h += `<div class="pz-k">Start from</div><div class="pz-chips" id="place-presets">`
             + [['simple', 'Places only'], ['both', 'Gross and net']].concat(multi ? [['rounds', 'Each round, gross and net']] : [])
                 .map(([k, t]) => `<button type="button" class="pz-chip${preset === k ? ' on' : ''}" aria-pressed="${preset === k}" data-p="${k}" onclick="setPlacePreset(this.dataset.p)">${escapeHtml(t)}</button>`).join('')
@@ -9046,6 +9119,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         h += sent('one', opText, placeSeg('One prize per golfer', 'onePrize', [['off', 'Off'], ['gross', 'Gross first'], ['larger', 'The larger prize']], op)
             + (multi ? placeSeg('Within', 'within', [['event', 'The event'], ['round', 'Each round']], wi) : ''));
         h += `<div class="pz-note" id="place-adjust-note">${R ? 'Tap Adjust beside any amount below to change it before posting.' : 'Choose a rule to turn on Adjust beside each amount.'}</div>`;
+        h += skinSentencesHtml(data, sent);
         return h;
     }
 
@@ -9080,23 +9154,31 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function prizeSkinsCardHtml(sk, data, opts) {
         const tab = !!(opts && opts.tab);
         const open = tab || prizeSkinsOpen;
-        const amt = (v) => (sk.perSkin > 0 ? escapeHtml(TournamentPrizes.shortText(v, data)) : '');
+        const amt = (v) => (v > 0 ? escapeHtml(TournamentPrizes.shortText(v, data)) : '');
+        const perOf = (r) => (typeof r.perSkin === 'number' ? r.perSkin : sk.perSkin);
+        const ruled = !!sk.ruled, share = ruled && sk.rules.value === 'share';
         let h = '';
-        if (!tab) h += `<div class="pz-head"><span class="pz-title">Skins · gross</span><button type="button" class="ct-btn" id="prize-skins-open" onclick="togglePrizeSkins()">${prizeSkinsOpen ? 'Close' : 'Open'}</button></div>`;
-        h += `<div class="pz-sub">${sk.perSkin > 0 ? `${escapeHtml(TournamentPrizes.amountText(sk.perSkin, data))} a skin` : 'No amount a skin yet'} · per round · carryover ${sk.carryover ? 'on (a hole won after a tie takes the carried skin too)' : 'off'}</div>`;
-        if (!tab) h += `<div class="pz-ctl"><label for="prize-skin-amount">A skin $</label><input type="number" id="prize-skin-amount" min="0" step="1" placeholder="0" value="${sk.perSkin > 0 ? sk.perSkin : ''}" onchange="savePrizeSetting('perSkin', this.value)">`
+        if (!tab) h += `<div class="pz-head"><span class="pz-title">${ruled ? 'Skins' : 'Skins · gross'}</span><button type="button" class="ct-btn" id="prize-skins-open" onclick="togglePrizeSkins()">${prizeSkinsOpen ? 'Close' : 'Open'}</button></div>`;
+        const perLine = ruled && sk.games.length > 1
+            ? sk.games.map((g) => `${escapeHtml(g.name || 'Skins')}: ${g.perSkin > 0 ? escapeHtml(TournamentPrizes.amountText(g.perSkin, data)) + ' a skin' : 'no amount a skin yet'}`).join(' · ')
+            : (sk.perSkin > 0 ? `${escapeHtml(TournamentPrizes.amountText(sk.perSkin, data))} a skin` : 'No amount a skin yet');
+        h += `<div class="pz-sub">${perLine}${share ? ' (each game\'s share over its skins, down to the dollar)' : ''} · per round · carryover ${sk.carryover ? 'on (a hole won after a tie takes the carried skin too)' : 'off'}</div>`;
+        if (!tab && !share) h += `<div class="pz-ctl"><label for="prize-skin-amount">A skin $</label><input type="number" id="prize-skin-amount" min="0" step="1" placeholder="0" value="${sk.perSkin > 0 ? sk.perSkin : ''}" onchange="savePrizeSetting('perSkin', this.value)">`
             + `<div class="payout-basis-seg" role="group" aria-label="Carryover"><button type="button" class="${sk.carryover ? 'on' : ''}" aria-pressed="${sk.carryover}" onclick="savePrizeSetting('carryover', true)">Carryover on</button><button type="button" class="${sk.carryover ? '' : 'on'}" aria-pressed="${!sk.carryover}" onclick="savePrizeSetting('carryover', false)">Carryover off</button></div></div>`;
-        h += `<div class="pz-note">Gross scores only. Net skins need each golfer's handicap strokes on every hole, so they are not built yet.</div>`;
+        if (!tab && share) h += `<div class="pz-ctl"><div class="payout-basis-seg" role="group" aria-label="Carryover"><button type="button" class="${sk.carryover ? 'on' : ''}" aria-pressed="${sk.carryover}" onclick="savePrizeSetting('carryover', true)">Carryover on</button><button type="button" class="${sk.carryover ? '' : 'on'}" aria-pressed="${!sk.carryover}" onclick="savePrizeSetting('carryover', false)">Carryover off</button></div></div>`;
+        h += ruled ? `<div class="pz-note">Games and gross or net are set in How prizes go above.</div>`
+            : `<div class="pz-note">Gross scores only. Net skins are set in How prizes go above.</div>`;
         const line = sk.rounds.map((r) => {
             const t = r.result.totals;
             return `${r.name ? escapeHtml(r.name) + ' ' : ''}${t.skins} skin${t.skins === 1 ? '' : 's'}${t.carried ? ` (${t.carried} carried)` : ''}`;
         }).join(' · ');
         const full = (v) => escapeHtml(TournamentPrizes.amountText(v, data));
-        h += `<div class="pz-note" id="prize-skins-line">${line}${sk.perSkin > 0 ? ` → ${full(sk.total)}` : ''}</div>`;
+        h += `<div class="pz-note" id="prize-skins-line">${line}${sk.total > 0 ? ` → ${full(sk.total)}` : ''}</div>`;
         if (open) {
             sk.rounds.forEach((r, ri) => {
                 const res = r.result, rows = res.holes;
-                if (r.name || sk.rounds.length > 1) h += `<div class="pz-k">Round ${ri + 1}${r.name ? ' · ' + escapeHtml(r.name) : ''}</div>`;
+                if (ruled) { if (r.name) h += `<div class="pz-k">${escapeHtml(r.name)}</div>`; if (r.result.available === false) { h += `<div class="pz-note">${escapeHtml(r.result.reason || '')}</div>`; return; } }
+                else if (r.name || sk.rounds.length > 1) h += `<div class="pz-k">Round ${ri + 1}${r.name ? ' · ' + escapeHtml(r.name) : ''}</div>`;
                 let otherTies = 0;
                 // A run of tied holes is one line, just above the hole that took it.
                 const runLine = (run, to) => (run.length === 1
@@ -9107,7 +9189,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                         const run = x.carriedIn ? rows.slice(i - x.carriedIn, i) : [];
                         const from = run.map((y) => y.hole);
                         if (run.length) h += `<div class="pz-row pz-carry" data-hole="${from.join(',')}"><span class="pz-n">${run.length === 1 ? from[0] : ''}</span><span class="pz-who pz-note">${runLine(run, x.hole)}</span></div>`;
-                        h += `<div class="pz-row" data-hole="${x.hole}"><span class="pz-n">${x.hole}</span>${prizeRing(x.score, x.par)}<span class="pz-who">${escapeHtml(x.name)} <small>par ${x.par || '-'}${from.length ? ` · <span class="pz-tag">carried from ${from.length > 1 ? from[0] + '–' + from[from.length - 1] : from[0]}</span>` : ''}</small></span><span class="pz-amt">${amt(x.skins * sk.perSkin)}</span></div>`;
+                        h += `<div class="pz-row" data-hole="${x.hole}"><span class="pz-n">${x.hole}</span>${prizeRing(x.score, x.par)}<span class="pz-who">${escapeHtml(x.name)} <small>par ${x.par || '-'}${from.length ? ` · <span class="pz-tag">carried from ${from.length > 1 ? from[0] + '–' + from[from.length - 1] : from[0]}</span>` : ''}</small></span><span class="pz-amt">${amt(x.skins * perOf(r))}</span></div>`;
                     } else if (x.status === 'tied' && !x.carriesTo) {
                         otherTies++;
                     }
@@ -9123,7 +9205,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 }
                 if (!res.totals.holesWon && !res.totals.pending && !otherTies) h += `<div class="pz-note">No scores yet.</div>`;
             });
-            h += `<div class="pz-total"><div class="pz-total-line"><span>Skins total<small>${sk.holesWon} hole${sk.holesWon === 1 ? '' : 's'} won · ${sk.carried} carried · ${sk.skins} skin${sk.skins === 1 ? '' : 's'}</small></span><span>${sk.perSkin > 0 ? full(sk.total) : ''}</span></div></div>`;
+            h += `<div class="pz-total"><div class="pz-total-line"><span>Skins total<small>${sk.holesWon} hole${sk.holesWon === 1 ? '' : 's'} won · ${sk.carried} carried · ${sk.skins} skin${sk.skins === 1 ? '' : 's'}</small></span><span>${sk.total > 0 ? full(sk.total) : ''}</span></div></div>`;
         }
         return h;
     }

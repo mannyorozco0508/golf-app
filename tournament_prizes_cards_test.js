@@ -196,9 +196,14 @@ describe('4. THE SKINS CARD', () => {
         const off = arrive('STK', F.starkey({ prizeSettings: { perSkin: 20, carryover: false } }), F.OWNER);
         assert.match(text(html(off, 'prize-card-skins')), /Cascade 3 skins · Olympic 3 skins → \$120 pro shop credit/);
     });
-    test('net is not offered as a number: the card says why skins are gross', () => {
+    // RE-PINNED 2026-11-19 (Starkey settings 8-11, Manny: "then skins 8-11"): net
+    // skins are built now (tournament_skin_rules_test.js), so "not built yet" became
+    // a false sentence. With no skins rule saved the card is still gross, and says
+    // where net is set.
+    test('net is not offered as a number: with no skins rule the card says skins are gross and where net is set', () => {
         const sb = arrive('STK', F.starkey(), F.OWNER);
-        assert.match(text(html(sb, 'prize-card-skins')), /Gross scores only\. Net skins need each golfer's handicap strokes on every hole/);
+        assert.match(text(html(sb, 'prize-card-skins')), /Gross scores only\. Net skins are set in How prizes go above\./);
+        assert.match(text(html(sb, 'prize-card-skins')), /^Skins · gross /, 'positive: the default card is the gross one');
     });
 });
 

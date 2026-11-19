@@ -271,8 +271,112 @@
 
     // SKINS, per round. A single-round record is its own round; a multi-round
     // event counts every round that is open or closed, in play order.
+    // ========================================================================
+    // SKINS RULES (Starkey settings 8-11; Manny 2026-11-19: "then skins 8-11",
+    // "Net skins full handicap (editable)"). Saved on the event, owner-written:
+    //   tournaments/<code>/prizeSettings/skins = {
+    //     games:     { <gameId>: { name, flights?: { <flightId>: true }, basis: 'gross'|'net'|'both', share? } }
+    //                absent = one game, the whole field, gross (today)
+    //     value:     'each' | 'share'   each = prizeSettings.perSkin a skin (today); share = each game's
+    //                share divided by every skin it gives out (gross and net, every round), down to the dollar
+    //     allowance: 1 | 0.75 | 0.5     the share of a golfer's handicap net skins use; absent = 1 (full)
+    //     onePerHole: true | false      true = a golfer who wins a hole's gross skin sits out its net skin,
+    //                                   which goes to whoever is low among the rest (Starkey 2025)
+    //   }
+    // Net strokes are the engine's: getStrokes(stroke index, handicap x allowance),
+    // the handicap the round's own view carries. skins.js still holds no handicap.
+    // ========================================================================
+    function skinRulesOf(data) {
+        var s = data && data.prizeSettings && data.prizeSettings.skins;
+        if (!s || typeof s !== 'object') return null;
+        var games = [];
+        Object.keys(s.games || {}).forEach(function (id) {
+            var x = s.games[id]; if (!x || typeof x !== 'object') return;
+            var fl = x.flights && typeof x.flights === 'object' ? Object.keys(x.flights).filter(function (k) { return x.flights[k]; }) : [];
+            games.push({ id: id, name: String(x.name || '').slice(0, 40), flights: fl, basis: pick(x.basis, ['gross', 'net', 'both'], 'gross'),
+                share: amountOf(x.share), createdAt: Number(x.createdAt) || 0 });
+        });
+        games.sort(function (a, b) { return (a.createdAt - b.createdAt) || a.id.localeCompare(b.id); });
+        var al = Number(s.allowance);
+        return { games: games, shareAll: amountOf(s.share), value: pick(s.value, ['each', 'share'], 'each'), allowance: (al === 0.75 || al === 0.5) ? al : 1, onePerHole: s.onePerHole === true };
+    }
+    var NET_SKINS_NO_SI = 'Net skins need a real scorecard (a stroke index) for this course.';
+    var NET_SKINS_TEAMS = 'Net skins are for events scored golfer by golfer.';
+
+    function ruledSkins(data, st, K) {
+        var multi = g('isMultiRound') && g('isMultiRound')(data);
+        var rv = g('roundView');
+        var rounds = multi
+            ? g('countableRoundIds')(data).map(function (rid) { return { id: rid, name: ((data.rounds || {})[rid] || {}).name || 'Round', view: rv(data, rid) }; }).filter(function (r) { return r.view; })
+            : [{ id: null, name: '', view: data || {} }];
+        var nameOf = g('competitorDisplayName') || function (p) { return (p && p.name) || ''; };
+        var S = root.TournamentSkins;
+        var games = K.games.length ? K.games : [{ id: 'all', name: '', flights: [], basis: 'gross', share: K.shareAll }];
+        var named = games.length > 1 || games.some(function (x) { return x.name; });
+        var getStrokes = g('getStrokes'), parseHcp = g('parseHcp'), netOk = g('netIsInPlay');
+        var panels = [], gameOut = [];
+        games.forEach(function (gm) {
+            var bases = gm.basis === 'both' ? ['gross', 'net'] : [gm.basis];
+            var mine = [];
+            rounds.forEach(function (r) {
+                var view = r.view;
+                var players = view.players || {};
+                var ent = S.entrantsFromRecord(view, nameOf).filter(function (e) {
+                    if (!gm.flights.length) return true;
+                    var p = players[e.id]; return !!p && gm.flights.indexOf(p.flightId) !== -1;
+                });
+                var isGolfers = !!(view.scoringModel === 'player-v1' || Object.keys(players).length);
+                var netEnt = null, netReason = '';
+                if (bases.indexOf('net') !== -1) {
+                    if (!isGolfers || !getStrokes || !parseHcp) netReason = NET_SKINS_TEAMS;
+                    else if (netOk && !netOk(Object.assign({}, view, { scoringMode: 'net' }))) netReason = NET_SKINS_NO_SI;
+                    else netEnt = ent.map(function (e) {
+                        var h = parseHcp((players[e.id] || {}).handicap);
+                        h = isFinite(h) ? Math.round(h * K.allowance) : 0;
+                        var strokes = {};
+                        (view.courseData || []).forEach(function (x) { strokes[x.hole] = getStrokes(x.hcpIndex, h) || 0; });
+                        return Object.assign({}, e, { strokes: strokes });
+                    });
+                }
+                var opts = { carryover: st.carryover };
+                var gross = bases.indexOf('gross') !== -1 ? S.computeSkins({ holes: view.courseData || [], entrants: ent }, Object.assign({ scoringBasis: 'gross' }, opts)) : null;
+                var net = null;
+                if (netEnt) {
+                    var ex = {};
+                    for (var pass = 0; pass < 20; pass++) {
+                        net = S.computeSkins({ holes: view.courseData || [], entrants: netEnt }, Object.assign({ scoringBasis: 'net', excludeOnHole: ex }, opts));
+                        if (!(K.onePerHole && gross)) break;
+                        var grossWin = {}; gross.holes.forEach(function (x) { if (x.status === 'won') grossWin[x.hole] = x.winner; });
+                        var more = false;
+                        net.holes.forEach(function (x) { if (x.status === 'won' && grossWin[x.hole] === x.winner) { ex[x.hole] = (ex[x.hole] || []).concat([x.winner]); more = true; } });
+                        if (!more) break;
+                    }
+                } else if (bases.indexOf('net') !== -1) {
+                    net = { available: false, reason: netReason, carryover: st.carryover, holes: [], tally: {}, totals: { holesWon: 0, skins: 0, carried: 0, notWon: 0, pending: 0 } };
+                }
+                [['gross', gross], ['net', net]].forEach(function (p) {
+                    if (!p[1]) return;
+                    var title = [named ? (gm.name || 'Skins') : '', p[0] === 'net' || gm.basis === 'both' ? BASIS_WORD[p[0]] : '', r.name].filter(Boolean).join(' · ');
+                    mine.push({ id: (r.id || 'r') + '|' + gm.id + '|' + p[0], name: title, game: gm.id, basis: p[0], result: p[1] });
+                });
+            });
+            var n = mine.reduce(function (a, p) { return a + p.result.totals.skins; }, 0);
+            var per = K.value === 'share' ? (n ? Math.floor(gm.share / n + 1e-9) : 0) : st.perSkin;
+            mine.forEach(function (p) { p.perSkin = per; panels.push(p); });
+            gameOut.push({ id: gm.id, name: gm.name, flights: gm.flights, basis: gm.basis, share: gm.share, skins: n, perSkin: per, total: round2(n * per) });
+        });
+        var skins = panels.reduce(function (a, p) { return a + p.result.totals.skins; }, 0);
+        var pers = gameOut.map(function (x) { return x.perSkin; });
+        return { perSkin: pers.every(function (v) { return v === pers[0]; }) ? pers[0] : 0, carryover: st.carryover, multi: !!multi, rounds: panels, skins: skins,
+            carried: panels.reduce(function (a, p) { return a + p.result.totals.carried; }, 0),
+            holesWon: panels.reduce(function (a, p) { return a + p.result.totals.holesWon; }, 0),
+            total: round2(gameOut.reduce(function (a, x) { return a + x.total; }, 0)), games: gameOut, ruled: true, rules: K };
+    }
+
     function skinsSummary(data, settings) {
         var st = settings || settingsOf(data);
+        var K = skinRulesOf(data);
+        if (K) return ruledSkins(data || {}, st, K);   // the organizer chose skins rules
         var multi = g('isMultiRound') && g('isMultiRound')(data);
         var rounds;
         if (multi) {
@@ -368,7 +472,7 @@
                     return { name: r.name || '', notWon: r.result.totals.notWon, pending: r.result.totals.pending,
                         won: r.result.holes.filter(function (h) { return h.status === 'won'; }).map(function (h) {
                             return { hole: h.hole, par: h.par || 0, key: owner[h.winner] || h.winner, name: h.name, score: h.score,
-                                skins: h.skins, carriedIn: h.carriedIn, amount: round2(h.skins * sk.perSkin) };
+                                skins: h.skins, carriedIn: h.carriedIn, amount: round2(h.skins * (typeof r.perSkin === 'number' ? r.perSkin : sk.perSkin)) };
                         }) };
                 }) },
             contests: { perContest: sum.contests.perContest, multi: sum.contests.multi, total: sum.contests.total,
@@ -446,7 +550,7 @@
 
     var api = {
         PRIZE_WORD: PRIZE_WORD, typeOf: typeOf, wordOf: wordOf, wordCap: wordCap, amountOf: amountOf, money: money,
-        amountText: amountText, shortWord: shortWord, shortText: shortText, settingsOf: settingsOf, flightIds: flightIds, placeGroups: placeGroups, placeRulesOf: placeRulesOf, placeTables: placeTables,
+        amountText: amountText, shortWord: shortWord, shortText: shortText, settingsOf: settingsOf, flightIds: flightIds, placeGroups: placeGroups, placeRulesOf: placeRulesOf, placeTables: placeTables, skinRulesOf: skinRulesOf,
         skinsSummary: skinsSummary, contestOwnerKey: contestOwnerKey, contestsSummary: contestsSummary,
         summary: summary, hostOf: hostOf, recordFor: recordFor, posted: posted, myResults: myResults
     };

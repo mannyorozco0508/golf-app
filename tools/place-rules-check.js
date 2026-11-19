@@ -56,6 +56,21 @@ const shotsAt = (() => { const i = process.argv.indexOf('--shots'); return i > -
     const g = JSON.parse(golfer.value[2]);
     check('a golfer sees the same tables', /A Flight · Net · Cascade 1st — Mia Chen \$100 pro shop credit A Flight · Gross · Olympic/i.test(g['payout-results'].text), g['payout-results'].text);
     check('a golfer sees no card and no Adjust', (!g['prize-rules-card'] || g['prize-rules-card'].text === '') && golfer.value[3] === 0, JSON.stringify(g['prize-rules-card']) + ' adjust ' + golfer.value[3]);
+    // SKINS (settings 8-11): two games over flights, sharing an amount, the card opened by a real tap on Open.
+    const sk = rec();
+    sk.prizeSettings = { perSkin: 20, carryover: false, skins: { value: 'share', onePerHole: true,
+        games: { m: { name: 'Men', flights: { fA: true }, basis: 'both', share: 1000, createdAt: 1 }, l: { name: 'Ladies', flights: { fB: true }, basis: 'gross', share: 200, createdAt: 2 } } } };
+    delete sk.prizeSettings.places;
+    const s3 = await arriveCold({ url: fileUrl('tournament.html', 'tourney=STK'), db: dbOf(sk), auth: F.OWNER, settleMs: 2500, viewport: { width: 390, height: 844 },
+        steps: [{ tap: '#tab-btn-leaderboard' }, { sleep: 500 }, { tap: '#prize-skins-open' }, { sleep: 300 }, READ(['prize-card-skins', 'prize-rules-card'])]
+            .concat(shotsAt ? [{ expression: `document.getElementById('skin-rules-head').scrollIntoView(); 1` }, { shot: path.join(shotsAt, 'skins-B-owner-sentences.png'), viewportOnly: true },
+                { expression: `document.getElementById('prize-card-skins').scrollIntoView(); 1` }, { shot: path.join(shotsAt, 'skins-B-owner-card.png'), viewportOnly: true }] : []) });
+    if (!s3.ok) { console.log('NO BROWSER RUN: ' + s3.reason); process.exit(2); }
+    const k = JSON.parse(s3.value[4]);
+    check('the skins sentences say two games, their flights and gross / net', /Skins: Men \(A Flight\), gross and net · Ladies \(B Flight\), gross\./.test(k['prize-rules-card'].text) && /One skin per golfer per hole/.test(k['prize-rules-card'].text), k['prize-rules-card'].text.slice(-700));
+    // one skin per golfer per hole is on here: Men give out 15 skins (1 + 6 + 3 + 5), $1,000 / 15 = $66.67, down to $66
+    check('the Skins card prices each game from its share: Men $66 (15 skins), Ladies $100 a skin', /Men: \$66 pro shop credit a skin · Ladies: \$100 pro shop credit a skin/.test(k['prize-card-skins'].text) && k['prize-card-skins'].h > 100, k['prize-card-skins'].text.slice(0, 400));
+    check('the card shows a Ladies win at the Ladies value', /Ladies · Cascade[\s\S]*Ray Diaz[\s\S]*\$100 credit/i.test(k['prize-card-skins'].text), k['prize-card-skins'].text.slice(0, 900));
     const fails = results.filter((x) => !x).length;
     console.log('\n' + (results.length - fails) + ' / ' + results.length + ' PASS');
     process.exit(fails ? 1 : 0);
