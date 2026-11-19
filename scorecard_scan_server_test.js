@@ -219,7 +219,11 @@ describe('the request is checked for free, before anyone is verified', () => {
             [{ image: { mimeType: 'image/jpeg', data: 'not base64!!' }, round: ROUND }, 'bad_image'],
             [{ image: { mimeType: 'image/jpeg', data: 'A'.repeat(S.MAX_IMAGE_CHARS + 4) }, round: ROUND }, 'bad_image'],
             [{ image: IMAGE, round: Object.assign({}, ROUND, { holes: 12 }) }, 'bad_request'],
-            [{ image: IMAGE, round: Object.assign({}, ROUND, { players: [] }) }, 'bad_request'],
+            // Re-pinned 2026-11-19 (SCAN A, Manny: "read the golfer names off the card when no names are sent"): players []
+            // is no longer a bad body, it asks the scanner to read the names (scan_read_names_test.js). A player with an
+            // empty name, or players that is not a list, still are.
+            [{ image: IMAGE, round: Object.assign({}, ROUND, { players: [{ name: ' ' }] }) }, 'bad_request'],
+            [{ image: IMAGE, round: Object.assign({}, ROUND, { players: 'Test Golfer A' }) }, 'bad_request'],
             [{ image: IMAGE, round: Object.assign({}, ROUND, { par: undefined }) }, 'bad_request']
         ];
         for (const [body, reason] of cases) {
