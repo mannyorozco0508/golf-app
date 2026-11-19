@@ -113,8 +113,12 @@ export function readBody(body) {
     if (!data || data.length > MAX_IMAGE_CHARS || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) return { error: 'bad_image' };
     const r = b.round && typeof b.round === 'object' ? b.round : null;
     if (!r || (r.holes !== 9 && r.holes !== 18)) return { error: 'bad_request' };
-    if (!Array.isArray(r.players) || r.players.length < 1 || r.players.length > 8) return { error: 'bad_request' };
-    if (!r.players.every((p) => p && typeof p.name === 'string' && p.name.trim() && p.name.length <= 60)) return { error: 'bad_request' };
+    // SCAN A (2026-11-19, Manny: "read the golfer names off the card when no names are sent"; the app's Scan our card
+    // knows nobody yet). players absent or [] = read the names off the card (readNames). Any non-empty list is the
+    // named scan exactly as before: the Desk and the card turn-in always send their golfers, so their path is unchanged.
+    const readNames = r.players === undefined || r.players === null || (Array.isArray(r.players) && r.players.length === 0);
+    if (!readNames && (!Array.isArray(r.players) || r.players.length < 1 || r.players.length > 8)) return { error: 'bad_request' };
+    if (!readNames && !r.players.every((p) => p && typeof p.name === 'string' && p.name.trim() && p.name.length <= 60)) return { error: 'bad_request' };
     if (!Array.isArray(r.par) && !(r.par && typeof r.par === 'object')) return { error: 'bad_request' };
     // Only the fields the prompt and the validator read go any further - an
     // app that sends more cannot leak more to the model.
@@ -126,13 +130,14 @@ export function readBody(body) {
         strokeIndex: r.strokeIndex,
         course: typeof r.course === 'string' ? r.course.slice(0, 120) : '',
         tee: typeof r.tee === 'string' ? r.tee.slice(0, 40) : '',
-        players: r.players.map((p) => ({
+        players: readNames ? [] : r.players.map((p) => ({
             name: p.name.trim(),
             initials: typeof p.initials === 'string' ? p.initials.slice(0, 6) : undefined,
             nicknames: Array.isArray(p.nicknames) ? p.nicknames.filter((x) => typeof x === 'string').slice(0, 4) : undefined,
             handicap: Number.isInteger(p.handicap) ? p.handicap : undefined
         }))
     };
+    if (readNames) round.readNames = true;
     // Scan allowance on event day (Manny OK 2026-11-15): the event code, when the
     // Desk sends one. Anything else-shaped is dropped and the 30 a day applies.
     const event = b.event && typeof b.event === 'object' && /^[A-Z0-9]{4,8}$/.test(String(b.event.code || ''))
@@ -310,7 +315,7 @@ export function geminiRequest(model, image, round) {
     const generationConfig = {
         temperature: 0,
         responseMimeType: 'application/json',
-        responseSchema: V.responseSchema()
+        responseSchema: V.responseSchema(round && round.readNames)
     };
     const thinking = thinkingFor(model);
     if (thinking) generationConfig.thinkingConfig = thinking;

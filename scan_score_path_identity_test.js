@@ -213,7 +213,9 @@ t('used-up COURSE scans never block a score scan (score path ignores scan:course
 });
 t('no sign-in / bad body, identical', async () => {
     await runBoth('no auth', () => ({}), { auth: '' });
-    await runBoth('bad body', () => ({}), { body: { image: IMAGE, round: Object.assign({}, ROUND, { players: [] }) } });
+    // Re-pinned 2026-11-19 (SCAN A): players [] now reads the names off the card on the new code, so the bad body both
+    // versions refuse is a player with an empty name.
+    await runBoth('bad body', () => ({}), { body: { image: IMAGE, round: Object.assign({}, ROUND, { players: [{ name: '' }] }) } });
     await runBoth('mode score', () => ({ flash: [gem(cardJson())] }), { body: { mode: 'score', image: IMAGE, round: ROUND } });
 });
 t('NEGATIVE CONTROL: a different answer is caught by the comparison', async () => {

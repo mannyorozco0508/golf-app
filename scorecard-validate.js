@@ -71,7 +71,9 @@
     // (handoff section 6). Gemini's schema is an OpenAPI subset, written here
     // with the upper-case type names its REST reference uses.
     // ------------------------------------------------------------------------
-    function responseSchema() {
+    // readNames (SCAN A, 2026-11-19): no names were sent; the model returns each row's name as written. Only the
+    // name's description differs; a named scan gets this schema byte for byte as before.
+    function responseSchema(readNames) {
         return {
             type: 'OBJECT',
             properties: {
@@ -80,7 +82,7 @@
                     items: {
                         type: 'OBJECT',
                         properties: {
-                            name: { type: 'STRING', description: "must be one of the known names, or 'UNKNOWN:<as written>'" },
+                            name: { type: 'STRING', description: readNames ? 'the name or initials exactly as written on the card' : "must be one of the known names, or 'UNKNOWN:<as written>'" },
                             row_label_as_written: { type: 'STRING' },
                             holes: {
                                 type: 'ARRAY',
@@ -295,7 +297,20 @@
             return result;
         }
 
-        var matches = matchNames(value.players, known);
+        // SCAN A: with no names sent, every row the model returned is a golfer, named as written: nothing to match,
+        // so no unmatched / duplicate / player-count failure. A read with no rows at all is a hard failure.
+        var readNames = c.readNames === true;
+        var matches = readNames
+            ? value.players.map(function (p, ri) { return { index: ri, match: 'read' }; })
+            : matchNames(value.players, known);
+        if (readNames) {
+            known = value.players.map(function (p) {
+                var w = String((p && p.name) || '').replace(/^UNKNOWN:\s*/i, '').trim() || String((p && p.row_label_as_written) || '').trim();
+                return { name: w.slice(0, 60) || 'Player' };
+            });
+            if (!value.players.length) hard.push({ code: 'no_players' });
+            if (value.players.length > 8) hard.push({ code: 'player_count', found: value.players.length, expected: 8 });
+        }
         var holeCountWrong = false;
 
         value.players.forEach(function (p, ri) {
@@ -405,7 +420,7 @@
         });
 
         if (holeCountWrong) hard.push({ code: 'hole_count' });
-        if (value.players.length !== known.length) hard.push({ code: 'player_count', found: value.players.length, expected: known.length });
+        if (!readNames && value.players.length !== known.length) hard.push({ code: 'player_count', found: value.players.length, expected: known.length });
 
         var suspect = 0, unsure = 0;
         result.rows.forEach(function (r) { Object.keys(r.cells).forEach(function (h) {
@@ -450,6 +465,7 @@
     // ------------------------------------------------------------------------
     function buildPrompt(ctx) {
         var c = ctx || {};
+        if (c.readNames === true) return buildReadNamesPrompt(c);
         var holes = expectedHoles(c);
         var known = (Array.isArray(c.players) ? c.players : []).map(function (p, i) {
             var extra = [].concat(p.initials ? [p.initials] : [], p.nicknames || []).filter(Boolean);
@@ -473,6 +489,33 @@
             '- A digit that is crossed out, scribbled over or struck through is NOT the score. The score is the digit written beside, above or over it. If you cannot tell which digit stands, return score null with low confidence.',
             '- Map each handwritten name or initials to one of the known players above and return that exact name. If a row cannot be matched, return name "UNKNOWN:" followed by what is written.',
             '- Put what the row label actually says in row_label_as_written.',
+            '- If a cell is blank or you cannot read it, return score null with low confidence. Never guess or invent a score.',
+            '- confidence is 0 to 1: how sure you are of that one digit.',
+            '- Report the OUT, IN and TOTAL exactly as written on the card in written_out, written_in, written_total (null if not written). Do not calculate them.',
+            '- Return one entry per hole listed above for every player, and nothing else.'
+        ].join('\n');
+    }
+
+    // SCAN A (2026-11-19): the prompt when no names were sent. The same card facts and the same digit rules as the
+    // named prompt; the players are read off the card instead of matched to a list. Kept a separate function so the
+    // named prompt (the Desk, the card turn-in) is the same text it always was.
+    function buildReadNamesPrompt(c) {
+        var holes = expectedHoles(c);
+        var line = function (label, fn) { return label + ': ' + holes.map(function (h) { var v = fn(c, h); return h + '=' + (v === null ? '?' : v); }).join(', '); };
+        return [
+            'You are reading a photo of a handwritten golf scorecard.',
+            'Course: ' + String(c.course || 'unknown') + (c.tee ? ' (' + c.tee + ' tees)' : '') + '.',
+            'This round plays ' + holes.length + ' holes: ' + holes.join(', ') + '. Front nine = holes 1-9 (OUT), back nine = holes 10-18 (IN).',
+            line('Par per hole', parFor),
+            line('Stroke index per hole', siFor),
+            'The players are NOT known in advance. Read them off the card.',
+            'Rules:',
+            '- Return one entry for every row on the card where a golfer wrote scores, top to bottom, at most 8.',
+            '- Do NOT return the printed rows: hole numbers, yardages or tee rows (colour names such as Black, White, Blue), Par, Handicap / HCP / stroke index, or a blank row.',
+            '- For each player row put the name or initials exactly as written in name, and the same text in row_label_as_written. Never invent a name; if the name is unreadable, write what you can see.',
+            '- Read ONLY the gross strokes for each player on each hole.',
+            '- Ignore putts, dots, handicap stroke dots, circles, squares, match marks, + and - signs, and anything that is not the stroke count. A circle or square drawn around a digit is a birdie or bogey mark: the digit inside is the score.',
+            '- A digit that is crossed out, scribbled over or struck through is NOT the score. The score is the digit written beside, above or over it. If you cannot tell which digit stands, return score null with low confidence.',
             '- If a cell is blank or you cannot read it, return score null with low confidence. Never guess or invent a score.',
             '- confidence is 0 to 1: how sure you are of that one digit.',
             '- Report the OUT, IN and TOTAL exactly as written on the card in written_out, written_in, written_total (null if not written). Do not calculate them.',
