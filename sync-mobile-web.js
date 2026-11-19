@@ -256,6 +256,10 @@ const TOURNAMENT_SHELL = [
     // compare tournament.html loads for the Scan check and Use the whole card. Without
     // it build-shell refuses the tournament output.
     'scan-compare.js',
+    // Card turn-in (C, 2026-11-18): the card-vs-app grid both tournament pages draw
+    // (the Desk Scan check and its queue, the golfer Turn in our card check screen).
+    // No apostrophe in this comment: declaredList reads every quoted string in the array.
+    'scan-grid.js',
     // qrcode.min.js (qrcodejs 1.0.0, MIT): the QR library tournament.html draws
     // the share modal, the inline codes and the tee sheet with. Vendored
     // 2026-09-18 - it was a runtime CDN script, and without the CDN the share

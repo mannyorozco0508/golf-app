@@ -4559,7 +4559,8 @@ const APP_SHELL_ALIASES = ['./', './app'];
 // Moved to v419-2.0 (price B + D, Manny OK 2026-11-16 14:16 via the Advisor: hardpan-home.html gains the price band under the badges and the comparison block after the fold, site-pricing.js the comparison figure and the computed saving; a device on v418 keeps the page without them)
 // Moved to v420-2.0 (Moved to v420-2.0 (the price dashes, ADVISOR-20261116-1547, Manny 'fix this asap': hardpan-home.html carries every price as text and loads site-pricing.js by a versioned URL; site-pricing.js never writes a dash into a slot; a device on v419 keeps a site-pricing.js whose fill dashed any slot it did not know))
 // Moved to v421-2.0 (the Desk scan: Scan cards, Use the whole card, the event-day scan allowance in tournament.html, scan-compare.js and the tournament shell; an installed device would keep the pre-scan Desk)
-const CACHE_VERSION = 'golfapp-v421-2.0';
+// Moved to v422-2.0 (card turn-in C, ADVISOR-20261118-1533, Manny's pick 2026-11-18: tournament.html's Desk gains the Card turn-in switch and the Cards turned in queue (Approve / See photo / Decline) and draws its scan grid from the new scan-grid.js; tournament-scorecard.html gains Turn in our card (scan, check, Send, Waiting for the organizer) and loads scan-compare.js + scan-grid.js; an installed device would keep the Desk without the queue and a card without the button, and a cached scorecard would load the new page without its two scripts)
+const CACHE_VERSION = 'golfapp-v422-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
@@ -4598,6 +4599,9 @@ const SHELL_FILES = [
     // Desk's Scan check. Called unguarded from the check; a cached shell without it
     // would open a Scan card that cannot compare.
     './scan-compare.js',
+    // scan-grid.js (v422): the card-vs-app grid both tournament pages draw (the Desk
+    // Scan check and Cards turned in queue, the golfer Turn in our card check screen).
+    './scan-grid.js',
     './instructions.html',
     './shared.html',
     // Shared engines. index.html cannot render a scorecard without these.

@@ -229,6 +229,14 @@ export async function hasLivePass(w, uid, idToken) {
 // caller and eventDate is the UTC date of now or the day before (an Arizona
 // evening is already the next UTC day). Any failure to read is null, which
 // means "the 30 applies", never "unlimited".
+//
+// THE TURN-IN (C, ADVISOR-20261118-1533, 2026-11-18): when the event's owner
+// has switched card turn-in on (tournaments/<code>/cardTurnIn === true), a
+// GOLFER scanning that event's card on its day gets the same allowance - counted
+// under the same event key, the free scans untouched, so a group's own scan does
+// not spend the three free reads its sender's account has for life. Everything
+// else about the allowance (the day, the field, the ceiling) is the owner's
+// rule, unchanged; turnIn: true marks it so handleScan can skip the free gate.
 // ---------------------------------------------------------------------------
 export async function eventAllowance(w, code, uid, idToken) {
     const read = async (child, shallow) => {
@@ -241,7 +249,13 @@ export async function eventAllowance(w, code, uid, idToken) {
         try { return { value: await res.json() }; } catch (e) { return { fail: true }; }
     };
     const owner = await read('ownerUid');
-    if (owner.fail || typeof owner.value !== 'string' || owner.value !== uid) return null;
+    if (owner.fail || typeof owner.value !== 'string') return null;
+    let turnIn = false;
+    if (owner.value !== uid) {
+        const sw = await read('cardTurnIn');
+        if (sw.fail || sw.value !== true) return null;
+        turnIn = true;
+    }
     const date = await read('eventDate');
     const today = w.now.toISOString().slice(0, 10);
     const yesterday = new Date(w.now.getTime() - 24 * 3600 * 1000).toISOString().slice(0, 10);
@@ -251,7 +265,7 @@ export async function eventAllowance(w, code, uid, idToken) {
     const entries = await read(model.value === 'player-v1' ? 'players' : 'teams', true);
     if (entries.fail || !entries.value || typeof entries.value !== 'object') return null;
     const field = Object.keys(entries.value).length;
-    return field > 0 ? { owner: owner.value, date: date.value, field } : null;
+    return field > 0 ? { owner: owner.value, date: date.value, field, turnIn } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -379,14 +393,17 @@ export async function handleScan(d) {
     if (who.error) return refused('sign_in');
 
     const paid = await hasLivePass(w, who.uid, m[1].trim());
+    // The minute brake first (it refuses before any event read), then the
+    // allowance, then the free gate: a golfer's turn-in scan on an event whose
+    // switch is on (ev.turnIn) does not spend their free reads (C, 2026-11-18).
+    if (await readCount(w.kv, minuteKey(who.uid, w.now)) >= PER_MINUTE) return refused('rate_limited');
+    const ev = body.event ? await eventAllowance(w, body.event.code, who.uid, m[1].trim()) : null;
     let freeUsed = 0;
-    if (!paid) {
+    if (!paid && !(ev && ev.turnIn)) {
         freeUsed = await readCount(w.kv, freeKey(who.uid));
         if (freeUsed >= SCAN_FREE_LIMIT) return refused('needs_pass');
     }
 
-    if (await readCount(w.kv, minuteKey(who.uid, w.now)) >= PER_MINUTE) return refused('rate_limited');
-    const ev = body.event ? await eventAllowance(w, body.event.code, who.uid, m[1].trim()) : null;
     const dk = ev ? eventDayKey(body.event.code, w.now) : dayKey(who.uid, w.now);
     const cap = ev ? Math.min(EVENT_DAY_MAX, Math.max(PER_DAY, ev.field)) : PER_DAY;
     if (await readCount(w.kv, dk) >= cap) return refused('daily_limit');
@@ -426,7 +443,7 @@ export async function handleScan(d) {
     }
 
     let freeScansLeft = null;
-    if (!paid) {
+    if (!paid && !(ev && ev.turnIn)) {   // a turn-in scan under the event's allowance spends no free read
         const used = await bump(w.kv, freeKey(who.uid));   // no TTL: free scans are per account, for good
         freeScansLeft = Math.max(0, SCAN_FREE_LIMIT - used);
     }

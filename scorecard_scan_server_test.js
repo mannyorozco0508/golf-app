@@ -441,14 +441,17 @@ describe('the event-day allowance for the event owner', () => {
         assert.deepEqual(refused.out, refusedDaily);
     });
 
-    test('another account sending the owner\'s code: the 30 applies, and the read stops at ownerUid', async () => {
+    // Re-pinned 2026-11-18 (C, card turn-in): a non-owner's read now goes one child further, to the
+    // owner's cardTurnIn switch, and stops there when it is off. Before C it stopped at ownerUid.
+    test('another account sending the owner\'s code (turn-in off): the 30 applies, and the read stops at cardTurnIn', async () => {
         need();
         const { out, fetch } = await scan({ pass: PASS, tourney: tourney() },
             { kv: dayUsedUp('test-uid-2'), body: WITH_EVENT, claims: { sub: 'test-uid-2' } });
         assert.deepEqual(out, refusedDaily);
         assert.equal(fetch.gemini().length, 0);
-        assert.equal(fetch.tourney().length, 1, 'only ownerUid is read for a non-owner');
+        assert.equal(fetch.tourney().length, 2, 'ownerUid, then the switch, for a non-owner');
         assert.match(fetch.tourney()[0].url, /\/tournaments\/STARK7\/ownerUid\.json\?auth=/);
+        assert.match(fetch.tourney()[1].url, /\/tournaments\/STARK7\/cardTurnIn\.json\?auth=/);
     });
 
     test('the event read failing (HTTP error, network): the 30 applies, never unlimited', async () => {
@@ -524,6 +527,66 @@ describe('the event-day allowance for the event owner', () => {
             assert.equal(S.readBody(Object.assign({}, BODY, { event: bad })).event, undefined, JSON.stringify(bad));
         }
         assert.equal(S.readBody(BODY).event, undefined);
+    });
+});
+
+// ============================================================================
+// THE TURN-IN ALLOWANCE (C, ADVISOR-20261118-1533, 2026-11-18). A GOLFER - any
+// signed-in account, an anonymous scoring-link session included - scanning the
+// card of an event whose owner switched card turn-in ON
+// (tournaments/<code>/cardTurnIn === true), on the event's day, is counted under
+// the event's key like the owner, and the account's free reads are not spent.
+// Switch off, or another day: everything exactly as before.
+// ============================================================================
+describe('the turn-in allowance for a golfer', () => {
+    const CODE = 'STARK7';
+    const TODAY = '2026-10-24', TOMORROW = '2026-10-25';
+    const entries = (n, prefix) => Object.fromEntries(Array.from({ length: n }, (_, i) => [prefix + (i + 1), { name: 'Entry ' + (i + 1) }]));
+    const onEvent = (over) => Object.assign({ ownerUid: 'u-owner', cardTurnIn: true, eventDate: TODAY, scoringModel: 'player-v1', players: entries(40, 'p') }, over);
+    const WITH_EVENT = Object.assign({}, BODY, { event: { code: CODE } });
+    const GOLFER = { sub: 'anon-golfer-9', firebase: { sign_in_provider: 'anonymous' } };
+    const freeGone = () => { const kv = fakeKV(); kv.m.set(S.freeKey('anon-golfer-9'), String(S.SCAN_FREE_LIMIT)); return kv; };
+
+    test('free reads used up, the switch on, event day: the scan answers ok, counts under the event key, and the free key is untouched', async () => {
+        need();
+        const kv = freeGone();
+        const { out, fetch } = await scan({ tourney: onEvent(), flash: [geminiOk(cardJson())] }, { kv, body: WITH_EVENT, claims: GOLFER });
+        assert.equal(out.status, 'ok', JSON.stringify(out));
+        assert.equal(out.paid, false);
+        assert.equal(out.freeScansLeft, null, 'no free read was spent, so none is counted');
+        assert.equal(kv.m.get(S.eventDayKey(CODE, NOW)), '1', 'counted under the event');
+        assert.equal(kv.m.get(S.freeKey('anon-golfer-9')), String(S.SCAN_FREE_LIMIT), 'the free key exactly as seeded');
+        assert.equal(kv.m.has(S.dayKey('anon-golfer-9', NOW)), false, 'the account day key untouched');
+        assert.deepEqual(fetch.tourney().map((c) => /\/([A-Za-z]+)\.json/.exec(c.url)[1]), ['ownerUid', 'cardTurnIn', 'eventDate', 'scoringModel', 'players']);
+        assert.ok(fetch.tourney().every((c) => c.init.method === undefined), 'GETs only');
+    });
+    test('free reads left, the switch on: a turn-in scan spends none of them (scan:free: stays absent)', async () => {
+        need();
+        const kv = fakeKV();
+        const { out } = await scan({ tourney: onEvent(), flash: [geminiOk(cardJson())] }, { kv, body: WITH_EVENT, claims: GOLFER });
+        assert.equal(out.status, 'ok');
+        assert.equal(kv.m.has(S.freeKey('anon-golfer-9')), false);
+        assert.equal(kv.m.get(S.eventDayKey(CODE, NOW)), '1');
+    });
+    test('the switch off: needs_pass exactly as before, no model call, the read stopped at the switch', async () => {
+        need();
+        const { out, fetch } = await scan({ tourney: onEvent({ cardTurnIn: false }) }, { kv: freeGone(), body: WITH_EVENT, claims: GOLFER });
+        assert.deepEqual(out, { status: 'refused', reason: 'needs_pass' });
+        assert.equal(fetch.gemini().length, 0);
+        assert.deepEqual(fetch.tourney().map((c) => /\/([A-Za-z]+)\.json/.exec(c.url)[1]), ['ownerUid', 'cardTurnIn']);
+    });
+    test('the switch on but the event is tomorrow: the free gate applies (needs_pass)', async () => {
+        need();
+        const { out, fetch } = await scan({ tourney: onEvent({ eventDate: TOMORROW }) }, { kv: freeGone(), body: WITH_EVENT, claims: GOLFER });
+        assert.deepEqual(out, { status: 'refused', reason: 'needs_pass' });
+        assert.equal(fetch.gemini().length, 0);
+    });
+    test('the owner on the same event: the allowance as before, turn-in or not (the free gate never applied to a paid host)', async () => {
+        need();
+        const kv = fakeKV();
+        const { out } = await scan({ pass: { kind: 'season', expiresAt: NOW.getTime() + 86400000 }, tourney: onEvent({ ownerUid: 'test-uid-1' }), flash: [geminiOk(cardJson())] }, { kv, body: WITH_EVENT });
+        assert.equal(out.status, 'ok');
+        assert.equal(kv.m.get(S.eventDayKey(CODE, NOW)), '1');
     });
 });
 
