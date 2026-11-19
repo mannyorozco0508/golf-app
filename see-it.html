@@ -9,8 +9,10 @@
 <!--
   THE SHOWCASE, layout B: two parts (Tournaments & events / Everyday side games at your course, ADVISOR-1641b), the
   tournament part as "Before / During / After", a big hero phone and three tabs (ADVISOR-20261118-1630 + 1633,
-  Manny 2026-11-18). The same sample event, pictures, COMING tags and rules as layout A (see-it-a.html); the day is
-  grouped into three tabs instead of one long scroll, and each tab is a link (#before, #during, #after). Tap any
+  Manny 2026-11-18). A sample event, the site's own real pictures, COMING on what is not live; the day is
+  grouped into three tabs, and each view is a link (?tab=before | during | after | everyday; a query, not a hash:
+  web_d_homepage_root_test holds every page on the site to never reading the hash). Manny's pick 2026-11-18 ("OK deploy
+  showcase H1 + B"); layout A, the scroll story, was the other mockup. Tap any
   phone to see it big. No real client, course or golfer is named (showcase_page_test.js). Prices from site-pricing.js.
   Not in sw.js's shell list and not in the native bundle.
 -->
@@ -256,7 +258,7 @@
 <script>
     if (typeof window.HardPanSitePricingFill === 'function') window.HardPanSitePricingFill(document);
     (function () {
-        // The three tabs. Each is a link (#before, #during, #after) so a tab can be sent; the Next button walks them.
+        // The views. Each is a link (?tab=during ...) so one can be sent; the Next button walks the three tabs.
         var names = ['before', 'during', 'after', 'everyday'];
         function show(name, scroll) {
             if (names.indexOf(name) === -1) name = 'before';
@@ -269,13 +271,14 @@
             document.getElementById('tabs').style.display = name === 'everyday' ? 'none' : '';
             document.getElementById('part-events').classList.toggle('on', name !== 'everyday');
             document.getElementById('part-everyday').classList.toggle('on', name === 'everyday');
-            if (history.replaceState) history.replaceState(null, '', '#' + name);
+            if (history.replaceState) history.replaceState(null, '', name === 'before' ? location.pathname : location.pathname + '?tab=' + name);
             if (scroll) { var p = document.getElementById('panels'); if (p && p.scrollIntoView) p.scrollIntoView({ block: 'start' }); }
         }
         Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-tab'), false); }); });
         Array.prototype.forEach.call(document.querySelectorAll('[data-go]'), function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-go'), true); }); });
         Array.prototype.forEach.call(document.querySelectorAll('[data-part]'), function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-part') === 'everyday' ? 'everyday' : 'before', false); }); });
-        show((location.hash || '#before').slice(1), false);
+        var asked = 'before'; try { asked = new URLSearchParams(location.search).get('tab') || 'before'; } catch (e) { asked = 'before'; }
+        show(asked, false);
         // Tap a phone: the big capture in a plain overlay.
         var zoom = document.getElementById('zoom'), img = document.getElementById('zoom-img');
         function open(btn) { var small = btn.querySelector('img'); img.src = btn.getAttribute('data-big') || small.src; img.alt = small.alt; zoom.classList.add('on'); }

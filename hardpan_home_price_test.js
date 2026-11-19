@@ -167,7 +167,10 @@ describe('2. where they sit', () => {
         const cmp = at('<section class="wrap cmp" id="compare" aria-labelledby="cmp-h">');
         const how = at('<section class="how" id="how"');
         assert.ok(topEnd < cmp && cmp < how, 'order: fold ' + topEnd + ', compare ' + cmp + ', how ' + how);
-        const between = html.slice(topEnd, cmp);
+        // Re-pinned 2026-11-18 (Manny's typed OK "OK deploy showcase H1 + B"): the band "See how our tournaments work"
+        // now sits right under the hero, by his pick; the comparison block is the first section after THAT, and nothing else is between.
+        const between = html.slice(topEnd, cmp).replace(/<section class="seeband" id="see-it"[\s\S]*?<\/section>/, '');
+        assert.equal((html.slice(topEnd, cmp).match(/<section/g) || []).length, 1, 'exactly the one band between the fold and the block');
         assert.doesNotMatch(between, /<section/, 'another section sits between the fold and the block');
         assert.match(html, /<h2 id="cmp-h">Everything your group needs, in one app<\/h2>/);
     });
