@@ -223,10 +223,14 @@ describe('5. THE KPs CARD', () => {
         assert.match(t, /Hole 13 \(closest to the pin\): no winner confirmed yet\./);
         assert.doesNotMatch(t, /Dana Ruiz/);
     });
-    test('multi-round event: the one-round limit is said on screen, and nothing is paid', () => {
-        const t = text(html(arrive('STK', F.starkey({ prizeSettings: { perContest: 25 } }), F.OWNER), 'prize-card-kps'));
-        assert.match(t, /Contest holes are for one-round events, so this event has none\./);
-        assert.doesNotMatch(t, /\$25/);
+    // RE-PINNED 2026-11-19 (Starkey settings 12, KPs per round): a two-round event
+    // now has contest holes on each round (tournament_kp_rounds_test.js), so "one-round
+    // events only" became a false sentence. With none marked, the card says so and pays nothing.
+    test('multi-round event with no contest holes marked: the card says so, and nothing is paid', () => {
+        const h = html(arrive('STK', F.starkey({ prizeSettings: { perContest: 25 } }), F.OWNER), 'prize-card-kps');
+        assert.match(text(h), /No contest holes yet\. Mark them on the Contests tab\./);
+        assert.match(text(h), /\$25 pro shop credit each/, 'positive: the amount setting is offered on a two-round event now');
+        assert.doesNotMatch(h, /class="pz-row"/, 'no winner row: nothing is paid');
     });
 });
 

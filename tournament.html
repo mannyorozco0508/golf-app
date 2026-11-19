@@ -9231,14 +9231,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 
     function prizeKpsCardHtml(ct, data) {
         let h = `<div class="pz-head"><span class="pz-title">KPs · contest holes</span><button type="button" class="ct-btn" id="prize-kps-edit" onclick="showTab('contests')">Edit</button></div>`;
-        if (ct.multi) {
-            return h + `<div class="pz-note" id="prize-kps-multi">Contest holes are for one-round events, so this event has none. KP and long drive credit stays off here.</div>`;
-        }
         h += `<div class="pz-sub">Winners from the Contests tab · ${ct.perContest > 0 ? `${escapeHtml(TournamentPrizes.amountText(ct.perContest, data))} each` : 'no amount each yet'}</div>`;
         h += `<div class="pz-ctl"><label for="prize-kp-amount">Each contest $</label><input type="number" id="prize-kp-amount" min="0" step="1" placeholder="0" value="${ct.perContest > 0 ? ct.perContest : ''}" onchange="savePrizeSetting('perContest', this.value)"></div>`;
         if (!ct.rows.length && !ct.open.length) return h + `<div class="pz-note">No contest holes yet. Mark them on the Contests tab.</div>`;
-        h += ct.rows.map((c) => `<div class="pz-row" data-hole="${c.hole}"><span class="pz-n">${c.hole}</span><span class="pz-who">${escapeHtml(c.name)} <small>${c.flight ? escapeHtml(c.flight) + ' · ' : ''}${c.kind === 'kp' ? 'closest' : 'long drive'} · ${escapeHtml(c.value)}${c.shared ? ' · shared' : ''}</small></span><span class="pz-amt">${c.amount > 0 ? escapeHtml(TournamentPrizes.shortText(c.amount, data)) : ''}</span></div>`).join('');
-        h += ct.open.map((c) => `<div class="pz-note">Hole ${c.hole} (${c.kind === 'kp' ? 'closest to the pin' : 'long drive'}): no winner confirmed yet.</div>`).join('');
+        h += ct.rows.map((c) => `<div class="pz-row" data-hole="${c.hole}"><span class="pz-n">${c.hole}</span><span class="pz-who">${escapeHtml(c.name)} <small>${c.round ? escapeHtml(c.round) + ' · ' : ''}${c.flight ? escapeHtml(c.flight) + ' · ' : ''}${c.kind === 'kp' ? 'closest' : 'long drive'} · ${escapeHtml(c.value)}${c.shared ? ' · shared' : ''}</small></span><span class="pz-amt">${c.amount > 0 ? escapeHtml(TournamentPrizes.shortText(c.amount, data)) : ''}</span></div>`).join('');
+        h += ct.open.map((c) => `<div class="pz-note">${c.round ? escapeHtml(c.round) + ' · ' : ''}Hole ${c.hole} (${c.kind === 'kp' ? 'closest to the pin' : 'long drive'}): no winner confirmed yet.</div>`).join('');
         return h;
     }
 
@@ -10580,24 +10577,36 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
     }
     function contestGpsOn() {
-        const list = TournamentContests.contestList(currentData || {});
+        const list = TournamentContests.contestList(cView());
         return list.length ? list.every((c) => c.allowGps) : contestGpsDefault;
     }
     let contestGpsDefault = true;   // "allow GPS marks", default on (plan section 2)
+    // KPs PER ROUND (Starkey settings 12): on a two-round event the tab works on one round at a time.
+    let contestRound = null;
+    function contestRoundNow() {
+        if (!isMultiRound(currentData || {})) return null;
+        const ids = orderedRoundIds(currentData);
+        if (!contestRound || ids.indexOf(contestRound) === -1) contestRound = ids[0] || null;
+        return contestRound;
+    }
+    const cView = () => TournamentContests.contestView(currentData || {}, contestRoundNow());
+    const cEntries = () => TournamentContests.entriesFor(contestEntriesAll, contestRoundNow());
+    const cPath = () => TournamentContests.paths(currentCode, contestRoundNow());
+    function setContestRound(rid) { if ((currentData.rounds || {})[rid]) { contestRound = rid; contestSelected = null; contestAdding = false; renderContestsTab(); } }
     function renderContestsTab() {
         const box = document.getElementById('contest-holes-list');
         if (!box || !currentData) return;
-        const list = TournamentContests.contestList(currentData);
+        const view = cView();
+        const list = TournamentContests.contestList(view);
         const multi = isMultiRound(currentData);
-        const course = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        const course = (view.courseData || []).slice().sort((a, b) => a.hole - b.hole);
         if (!list.some((c) => c.key === contestSelected)) contestSelected = list.length ? list[0].key : null;
-        let html = list.map((c) => {
+        let html = multi ? `<div class="payout-basis-seg" id="contest-rounds" role="group" aria-label="Round">${orderedRoundIds(currentData).map((rid) => `<button type="button" class="${rid === contestRoundNow() ? 'on' : ''}" aria-pressed="${rid === contestRoundNow()}" data-r="${escapeHtml(rid)}" onclick="setContestRound(this.dataset.r)">${escapeHtml((currentData.rounds[rid] || {}).name || 'Round')}</button>`).join('')}</div>` : '';
+        html += list.map((c) => {
             const pill = c.kind === 'kp' ? 'Closest to the pin' : ('Long drive' + (c.fairwayOnly ? ' · fairway only' : ''));
             return `<div class="ct-row"><button type="button" class="ct-hole${c.key === contestSelected ? ' on' : ''}" data-hole="${c.key}" onclick="openContestHole(this.dataset.hole)"><strong>Hole ${c.hole}</strong>${c.par ? ` par ${c.par}` : ''}</button><span class="ct-pill ${c.kind}">${pill}</span></div>`;
         }).join('');
-        if (multi) {
-            html += `<div class="ct-row"><span style="color:var(--text-muted); font-size:0.9rem;">Contest holes are for one-round events.</span></div>`;
-        } else if (contestAdding) {
+        if (contestAdding) {
             const used = list.map((c) => c.hole);
             const opts = course.filter((h) => used.indexOf(Number(h.hole)) === -1)
                 .map((h) => `<option value="${h.hole}">Hole ${h.hole} · par ${h.par}</option>`).join('');
@@ -10624,7 +10633,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             }
         }
         box.innerHTML = html;
-        if (contestAdding && !multi) contestHoleChosen();
+        if (contestAdding) contestHoleChosen();
         renderContestEntries(list);
         const gps = document.getElementById('contest-gps-toggle');
         if (gps) gps.textContent = contestGpsOn() ? 'on' : 'off';
@@ -10634,7 +10643,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!box) return;
         const c = list.find((x) => x.key === contestSelected);
         if (!c) { box.style.display = 'none'; box.innerHTML = ''; return; }
-        const groups = TournamentContests.rankedGroups(contestEntriesAll[c.key] || {}, c.kind, currentData || {});
+        const groups = TournamentContests.rankedGroups(cEntries()[c.key] || {}, c.kind, cView());
         const rows = [].concat.apply([], groups.map((g) => g.rows));
         let html = `<div class="ct-head">Hole ${c.hole} entries</div>`;
         const rowHtml = (r, g) => {
@@ -10651,7 +10660,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         box.innerHTML = html;
         box.style.display = 'block';
     }
-    function contestsRef(key) { return db.ref(`tournaments/${currentCode}/contests/${key}`); }
+    function contestsRef(key) { return db.ref(`${cPath().contests}/${key}`); }
     function openContestHole(key) { contestSelected = key; renderContestsTab(); }
     function startContestHole() { contestAdding = true; renderContestsTab(); }
     function cancelContestHole() { contestAdding = false; renderContestsTab(); }
@@ -10662,7 +10671,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const kindSel = document.getElementById('contest-add-kind');
         if (!holeSel || !kindSel) return;
         if (!kindTouched) {
-            const h = (currentData.courseData || []).find((x) => String(x.hole) === String(holeSel.value));
+            const h = (cView().courseData || []).find((x) => String(x.hole) === String(holeSel.value));
             kindSel.value = h && Number(h.par) === 3 ? 'kp' : (h ? 'ld' : 'kp');
         }
         const fw = document.getElementById('contest-add-fw-row');
@@ -10680,12 +10689,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return out.sort((a, b) => a.hole - b.hole);
     }
     function useSuggestedContests() {
-        if (!canManage() || isMultiRound(currentData)) return;
-        const course = (currentData.courseData || []).slice().sort((a, b) => a.hole - b.hole);
+        if (!canManage()) return;
+        const course = (cView().courseData || []).slice().sort((a, b) => a.hole - b.hole);
         const sug = suggestedContests(course);
         if (!sug.length) return;
         const updates = {};
-        sug.forEach((c) => { updates[`tournaments/${currentCode}/contests/${TournamentContests.holeKey(c.hole)}`] = { kind: c.kind, allowGps: contestGpsOn() }; });
+        sug.forEach((c) => { updates[`${cPath().contests}/${TournamentContests.holeKey(c.hole)}`] = { kind: c.kind, allowGps: contestGpsOn() }; });
         contestSelected = TournamentContests.holeKey(sug[0].hole);
         return db.ref().update(updates).catch((err) => alert(`Error: ${err.message}`));
     }
@@ -10702,39 +10711,39 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     function removeContestHole(key) {
         if (!canManage()) return;
-        if (Object.keys(contestEntriesAll[key] || {}).length) return;
+        if (Object.keys(cEntries()[key] || {}).length) return;
         if (!confirm('Remove this contest hole?')) return;
         return contestsRef(key).remove().catch((err) => alert(`Error: ${err.message}`));
     }
     function makeContestWinner(key, entryKey) {
         if (!canManage()) return;
-        const c = TournamentContests.contestList(currentData || {}).find((x) => x.key === key);
+        const c = TournamentContests.contestList(cView()).find((x) => x.key === key);
         if (!c) return;
         // One winner for the field: { winner, lockedAt } as always. A flight's winner or a shared tie: winners + locks.
-        return contestsRef(key).update(TournamentContests.winnerUpdate(currentData, c, contestEntriesAll[key] || {}, entryKey, firebase.database.ServerValue.TIMESTAMP))
+        return contestsRef(key).update(TournamentContests.winnerUpdate(cView(), c, cEntries()[key] || {}, entryKey, firebase.database.ServerValue.TIMESTAMP))
             .catch((err) => alert(`Error: ${err.message}`));
     }
     function clearContestWinner(key, group) {
         if (!canManage()) return;
-        const c = TournamentContests.contestList(currentData || {}).find((x) => x.key === key);
+        const c = TournamentContests.contestList(cView()).find((x) => x.key === key);
         if (!c) return;
         const legacy = !!c.winner && !Object.keys(c.locks || {}).length;
         if (!confirm(legacy || !group || group === 'all' ? 'Unlock this hole? Golfers can enter again and you can pick another winner.' : 'Unlock this flight on this hole? Its golfers can enter again and you can pick another winner.')) return;
-        return contestsRef(key).update(legacy ? { winner: null, lockedAt: null } : TournamentContests.clearWinnerUpdate(currentData, c, group || 'all')).catch((err) => alert(`Error: ${err.message}`));
+        return contestsRef(key).update(legacy ? { winner: null, lockedAt: null } : TournamentContests.clearWinnerUpdate(cView(), c, group || 'all')).catch((err) => alert(`Error: ${err.message}`));
     }
     function removeContestEntry(key, entryKey) {
         if (!canManage()) return;
         if (!confirm('Remove this entry?')) return;
-        return db.ref(`contestEntries/${currentCode}/${key}/${entryKey}`).remove().catch((err) => alert(`Error: ${err.message}`));
+        return db.ref(`${cPath().entries}/${key}/${entryKey}`).remove().catch((err) => alert(`Error: ${err.message}`));
     }
     function toggleContestGps() {
         if (!canManage()) return;
         const next = !contestGpsOn();
         contestGpsDefault = next;
-        const list = TournamentContests.contestList(currentData || {});
+        const list = TournamentContests.contestList(cView());
         if (!list.length) { renderContestsTab(); return; }
         const changes = {};
-        list.forEach((c) => { changes[`tournaments/${currentCode}/contests/${c.key}/allowGps`] = next; });
+        list.forEach((c) => { changes[`${cPath().contests}/${c.key}/allowGps`] = next; });
         return db.ref().update(changes).catch((err) => alert(`Error: ${err.message}`));
     }
 

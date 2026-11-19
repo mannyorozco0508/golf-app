@@ -101,6 +101,29 @@
         return Object.keys(teams).some(function (k) { var t = teams[k]; return t && String(t.num) === m[1] && t.status === 'withdrawn'; });
     }
 
+    // ---- CONTESTS PER ROUND (Starkey settings 12, "Round 1 / Round 2 / Both"; Manny 2026-11-19) ----------
+    // A two-round event plays each hole twice, so its contest holes live on the ROUND:
+    //   tournaments/<code>/rounds/<rid>/contests/h<N>      the same shape as tournaments/<code>/contests/h<N>
+    //   contestEntries/<code>/r/<rid>/h<N>/<entryKey>       contestProofs/<code>/r/<rid>/h<N>/<entryKey>
+    // A one-round event (rid null) keeps every path it has always had. The round paths need the round blocks of
+    // the proposed rules change (not yet published).
+    function paths(code, rid) {
+        return rid
+            ? { contests: 'tournaments/' + code + '/rounds/' + rid + '/contests', entries: 'contestEntries/' + code + '/r/' + rid, proofs: 'contestProofs/' + code + '/r/' + rid }
+            : { contests: 'tournaments/' + code + '/contests', entries: 'contestEntries/' + code, proofs: 'contestProofs/' + code };
+    }
+    // What contestList / rankedGroups / winnerUpdate read for one round: the round's course and handicaps (the
+    // engine's roundView), its contest holes, and the event's players, flights and prize settings.
+    function contestView(data, rid) {
+        var multi = typeof root.isMultiRound === 'function' && root.isMultiRound(data || {});
+        if (!rid || !multi) return data || {};
+        var rv = (typeof root.roundView === 'function' && root.roundView(data, rid)) || {};
+        var r = ((data && data.rounds) || {})[rid] || {};
+        return Object.assign({}, rv, { contests: r.contests || {}, prizeSettings: data.prizeSettings, roundId: rid, roundName: r.name || '' });
+    }
+    // The entries of one round (or of the event) out of the contestEntries/<code> snapshot.
+    function entriesFor(all, rid) { return rid ? (((all || {}).r || {})[rid] || {}) : (all || {}); }
+
     // ---- KP SETTINGS 12-13 (Starkey settings, Manny 2026-11-19 "then KPs 12-13 (rules publish later, my OK)") ----
     // prizeSettings/kps = { perFlight: true|false, ties: 'earlier'|'share' }. Absent = today: one winner for the
     // field, a tie keeps the earlier mark.
@@ -231,9 +254,10 @@
     }
     function entryUpdate(o, timestamp) {
         var hk = holeKey(o.hole);
+        var p = paths(o.code, o.round || null);
         var out = {};
-        out['contestEntries/' + o.code + '/' + hk + '/' + o.entryKey] = entryRecord(o, timestamp);
-        if (o.k) out['contestProofs/' + o.code + '/' + hk + '/' + o.entryKey] = { who: o.who, k: o.k, t: timestamp };
+        out[p.entries + '/' + hk + '/' + o.entryKey] = entryRecord(o, timestamp);
+        if (o.k) out[p.proofs + '/' + hk + '/' + o.entryKey] = { who: o.who, k: o.k, t: timestamp };
         return out;
     }
 
@@ -241,10 +265,15 @@
     // Only a hole the organizer confirmed ("Make winner") has a winner here.
     function confirmedWinners(data, entriesByHole) {
         var out = [];
-        contestList(data).forEach(function (c) {
-            c.winners.forEach(function (k) {
-                var e = ((entriesByHole || {})[c.key] || {})[k];
-                if (e) out.push({ hole: c.hole, kind: c.kind, name: e.name, value: valueText(e) });
+        var multi = typeof root.isMultiRound === 'function' && root.isMultiRound(data || {});
+        var rids = multi ? Object.keys((data && data.rounds) || {}).sort(function (a, b) { return ((data.rounds[a] || {}).createdAt || 0) - ((data.rounds[b] || {}).createdAt || 0); }) : [null];
+        rids.forEach(function (rid) {
+            var view = contestView(data, rid), ent = entriesFor(entriesByHole, rid);
+            contestList(view).forEach(function (c) {
+                c.winners.forEach(function (k) {
+                    var e = (ent[c.key] || {})[k];
+                    if (e) out.push({ hole: c.hole, kind: c.kind, name: e.name, value: valueText(e), round: rid ? (view.roundName || 'Round') : '' });
+                });
             });
         });
         return out;
@@ -257,7 +286,7 @@
         feetInchesText: feetInchesText, yardsText: yardsText, valueText: valueText,
         kpInches: kpInches, ldYards: ldYards, ranked: ranked, withdrawnKey: withdrawnKey, throughCount: throughCount,
         teamLabel: teamLabel, entryRecord: entryRecord, entryUpdate: entryUpdate,
-        confirmedWinners: confirmedWinners, kpRulesOf: kpRulesOf, winnersOf: winnersOf, flightOfKey: flightOfKey,
+        confirmedWinners: confirmedWinners, paths: paths, contestView: contestView, entriesFor: entriesFor, kpRulesOf: kpRulesOf, winnersOf: winnersOf, flightOfKey: flightOfKey,
         groupOfKey: groupOfKey, lockedFor: lockedFor, rankedGroups: rankedGroups, winnerUpdate: winnerUpdate, clearWinnerUpdate: clearWinnerUpdate
     };
     root.TournamentContests = api;

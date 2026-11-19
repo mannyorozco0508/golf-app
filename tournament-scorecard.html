@@ -813,7 +813,9 @@
         // E2: the event's contest entries (public, like the board). The prompt
         // reads it to know who on this card has entered; the board ranks it.
         db.ref(`contestEntries/${currentCode}`).on('value', (snap) => {
-            contestEntries = (snap && snap.val()) || {};
+            contestEntriesRaw = (snap && snap.val()) || {};
+            // KPs per round (settings 12): a round link reads its round's entries.
+            contestEntries = TournamentContests.entriesFor(contestEntriesRaw, contestRoundId());
             renderContestArea();
         });
     }
@@ -2299,10 +2301,15 @@
     var contestShape = '';
     const CONTEST_REFUSED = "⚠️ Not saved — this link can't enter for this card. Ask the organizer for your team's link.";
 
+    // KPs PER ROUND (Starkey settings 12): a two-round event's contest holes are on the round this link scores.
+    let contestEntriesRaw = {};
+    function contestRoundId() { return isMultiRound(currentData || {}) ? (myRoundId || null) : null; }
+    function contestViewNow() { return TournamentContests.contestView(currentData || {}, contestRoundId()); }
     function contestsOn() {
         const data = currentData || {};
         if (WATCH_MODE) return false;   // the watch card enters nothing
-        return !isMultiRound(data) && TournamentContests.contestList(data).length > 0;
+        if (isMultiRound(data) && !contestRoundId()) return false;   // an event-level link scores no round
+        return TournamentContests.contestList(contestViewNow()).length > 0;
     }
     function contestSkipKey(hole) {
         return `rattle_contest_skip_${currentCode}_${hole}_${myGroupId || myTeamNum}`;
@@ -2314,7 +2321,8 @@
     // The contest this card is on now: the next hole, else the hole just played.
     function contestHoleNow() {
         if (!contestCtx || !contestsOn()) return null;
-        const data = currentData || {};
+        contestEntries = TournamentContests.entriesFor(contestEntriesRaw, contestRoundId());
+        const data = contestViewNow();
         const order = contestCtx.order || [];
         const cands = [];
         if (contestCtx.next) {
@@ -2359,7 +2367,7 @@
         const c = contestHoleNow();
         if (!c) { box.style.display = 'none'; box.innerHTML = ''; contestShape = ''; return; }
         const got = contestEntries[c.key] || {};
-        const golfers = contestCtx.golfers.filter(g => !TournamentContests.lockedFor(c, TournamentContests.groupOfKey(currentData || {}, g.entryKey)));
+        const golfers = contestCtx.golfers.filter(g => !TournamentContests.lockedFor(c, TournamentContests.groupOfKey(contestViewNow(), g.entryKey)));
         const open = golfers.filter(g => !got[g.entryKey]);
         if (golfers.length === 1) contestPick[c.hole] = golfers[0].entryKey;
         const pick = contestPick[c.hole] || null;
@@ -2404,14 +2412,14 @@
     }
     var contestSkippedNow = {};
     function saveContestEntry(hole) {
-        const data = currentData || {};
+        const data = contestViewNow();
         const c = TournamentContests.contestFor(data, hole);
         if (!c || !contestCtx) return;
         const g = contestCtx.golfers.find(x => x.entryKey === contestPick[hole]);
         const say = (cls, text) => { contestMsg[hole] = { cls, text }; contestShape = ''; renderContestPrompt(); };
         if (!g) { say('err', 'Tap whose ball it is first.'); return; }
         const val = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
-        const o = { code: currentCode, hole: c.hole, kind: c.kind, entryKey: g.entryKey, who: g.who, team: g.team, name: g.name, k: myScoreKey };
+        const o = { code: currentCode, round: contestRoundId(), hole: c.hole, kind: c.kind, entryKey: g.entryKey, who: g.who, team: g.team, name: g.name, k: myScoreKey };
         if (c.kind === 'kp') {
             o.inches = TournamentContests.kpInches(val('cp-ft'), val('cp-in'));
             if (o.inches === null) { say('err', 'Enter feet and inches (up to 100 ft).'); return; }

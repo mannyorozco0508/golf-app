@@ -13,7 +13,13 @@
 //      of THEIR flight exists (players/<entryKey>/flightId). The old lockedAt check stays.
 //      Limitation, said plainly: a team entry (team<N>_p<i>) has no players/<key> to read its flight from, so on a
 //      team event a FLIGHT lock is the app's (the prompt stops asking) and not the rules'; locks/all still binds.
-//   3. Nothing for rounds yet (KPs on a two-round event come with their own proposal).
+//   3. ROUNDS (KPs on a two-round event): the same three blocks one level down, nothing else -
+//        tournaments/$code/rounds/$roundId/contests/$hole   the event-level contest block, its entry paths on the round
+//        contestEntries/$code/r/$rid/$hole/$entryKey       the event-level entry rule, read against the round's hole
+//        contestProofs/$code/r/$rid/$hole/$entryKey        the event-level proof rule, also accepting the ROUND's key
+//                                                          (tournamentKeys/$code/r/$rid/<who>, as round scores do)
+//      Today a round's contests are not validated at all (the round has no $other), and an entry on a round path
+//      is refused (the hole pattern reads 'r').
 //
 //   node tools/kp-rules-emulator-check.js [--write-proposal <file>]    exit 0 = every expectation met
 // ============================================================================
@@ -40,6 +46,20 @@ function proposal(live) {
     e['.write'] = e['.write'].replace(OLD, OLD
         + ` && !root.child('tournaments/' + $code + '/contests/' + $hole + '/locks/all').exists()`
         + ` && !root.child('tournaments/' + $code + '/contests/' + $hole + '/locks/' + root.child('tournaments/' + $code + '/players/' + $entryKey + '/flightId').val()).exists()`);
+    // 3. rounds
+    const SEP = (x, a, b) => { if (x.split(a).length < 2) throw new Error('live text moved: ' + a); return x.split(a).join(b); };
+    const rc = JSON.parse(SEP(JSON.stringify(hole), "'contestEntries/' + $tourneyCode + '/' + $hole", "'contestEntries/' + $tourneyCode + '/r/' + $roundId + '/' + $hole"));
+    root.tournaments[tKey].rounds['$roundId'].contests = { '$hole': rc };
+    const er = JSON.parse(JSON.stringify(e));
+    ['.write', '.validate'].forEach((k) => {
+        er[k] = SEP(er[k], "'/contests/' + $hole", "'/rounds/' + $rid + '/contests/' + $hole");
+    });
+    er['.write'] = SEP(er['.write'], "newData.parent().parent().parent().parent().child('contestProofs/' + $code + '/' + $hole", "newData.parent().parent().parent().parent().parent().parent().child('contestProofs/' + $code + '/r/' + $rid + '/' + $hole");
+    root.contestEntries['$code'].r = { '$rid': { '$hole': { '$entryKey': er } } };
+    const pr = JSON.parse(JSON.stringify(root.contestProofs['$code']['$hole']['$entryKey']));
+    const KP = "newData.child('k').val() === root.child('tournamentKeys/' + $code + '/p/' + newData.child('who').val()).val()";
+    pr['.write'] = SEP(pr['.write'], KP, KP + " || newData.child('k').val() === root.child('tournamentKeys/' + $code + '/r/' + $rid + '/' + newData.child('who').val()).val()");
+    root.contestProofs['$code'].r = { '$rid': { '$hole': { '$entryKey': pr } } };
     return R;
 }
 
@@ -90,6 +110,19 @@ async function run(rulesFile, label) {
     out['golfer enters after locks/all'] = await golfer(`contestEntries/${CODE}/h7/pc`, 'PUT', entry('Cy'));
     out['a golfer cannot write winners'] = await golfer(`tournaments/${CODE}/contests/h7/winners/pc`, 'PUT', true);
     out['owner clears (nulls)'] = await owner(`tournaments/${CODE}/contests/h7`, 'PATCH', { 'winners/pa': null, 'winners/pb': null, 'locks/all': null, 'locks/fB': null });
+    // ROUNDS: a two-round event, scoring keys on, the round's key for group g1 (who = pa on a golfer card)
+    const KEY = 'k'.repeat(24), WRONG = 'w'.repeat(24);
+    const multi = Object.assign(seed(), { eventModel: 'round-v1', rounds: { r1: { name: 'Cascade', status: 'open', format: 'individual', courseData: seed().courseData, createdAt: 1 } } });
+    delete multi.contests;
+    await emu.admin('tournaments/' + CODE, 'PUT', multi); await emu.admin('contestEntries/' + CODE, 'DELETE');
+    await emu.admin('tournamentKeys/' + CODE, 'PUT', { on: true, r: { r1: { pa: KEY, pb: KEY } } });
+    const roundEntry = (pid, k) => ({ ['contestEntries/' + CODE + '/r/r1/h7/' + pid]: entry(pid), ['contestProofs/' + CODE + '/r/r1/h7/' + pid]: { who: pid, k, t: { '.sv': 'timestamp' } } });
+    out['round: owner marks hole 7 on Cascade'] = await owner(`tournaments/${CODE}/rounds/r1/contests/h7`, 'PUT', { kind: 'kp', allowGps: true });
+    out['round: golfer enters with the round key'] = await golfer('', 'PATCH', roundEntry('pa', KEY));
+    out['round: golfer enters with a wrong key'] = await golfer('', 'PATCH', roundEntry('pb', WRONG));
+    out['round: owner names a winner with no entry'] = await owner(`tournaments/${CODE}/rounds/r1/contests/h7`, 'PATCH', { winner: 'pzz', lockedAt: 1 });
+    out['round: owner confirms Ana'] = await owner(`tournaments/${CODE}/rounds/r1/contests/h7`, 'PATCH', { winner: 'pa', lockedAt: { '.sv': 'timestamp' } });
+    out['round: golfer enters after the round hole is locked'] = await golfer('', 'PATCH', roundEntry('pb', KEY));
     await emu.stop();
     console.log('\n' + label); Object.keys(out).forEach((k) => console.log('  ' + out[k].padEnd(7) + k));
     return out;
@@ -119,6 +152,12 @@ async function run(rulesFile, label) {
         'golfer enters after locks/all': ['ok', 'DENIED'],
         'a golfer cannot write winners': ['DENIED', 'DENIED'],
         'owner clears (nulls)': ['ok', 'ok'],
+        'round: owner marks hole 7 on Cascade': ['ok', 'ok'],
+        'round: golfer enters with the round key': ['DENIED', 'ok'],
+        'round: golfer enters with a wrong key': ['DENIED', 'DENIED'],
+        'round: owner names a winner with no entry': ['ok', 'DENIED'],
+        'round: owner confirms Ana': ['ok', 'ok'],
+        'round: golfer enters after the round hole is locked': ['DENIED', 'DENIED'],
     };
     let bad = 0;
     console.log('\nEXPECTED (live / proposal):');
