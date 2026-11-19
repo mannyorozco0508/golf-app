@@ -18,9 +18,13 @@ const read = (f) => { const p = path.join(REPO_ROOT, f); assert.ok(fs.existsSync
 const sectionOf = (h) => (String(h).match(/<section class="jsi" id="just-say-it"[\s\S]*?<\/section>\s*<script data-jsi>window\.JSI_CARDS = [\s\S]*?<\/script>\s*<script data-jsi>[\s\S]*?<\/script>/) || [''])[0];
 const textOf = (h) => String(h).replace(/<!--[\s\S]*?-->/g, ' ').replace(/<script[\s\S]*?<\/script>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/&rsquo;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ');
 
-test('1 the four cards are the parser\'s: complete, no amount, and - when the parser is on this Mac - what it builds today', () => {
+// RE-PINNED 2026-11-19 (Manny 8:58 AM via ADVISOR-20261119-0905: skins default to no carryover): five cards. Plain
+// skins first, carryover Off (the parser's own default); one card keeps "with carryovers" to show it can be on.
+test('1 the five cards are the parser\'s: complete, no amount, and - when the parser is on this Mac - what it builds today', () => {
     const J = JSON.parse(read('jsi-cards.json'));
-    assert.equal(J.cards.length, 4);
+    assert.equal(J.cards.length, 5);
+    assert.deepEqual(J.cards[0].lines.find((l) => l[0] === 'Carry over'), ['Carry over', 'Off'], 'plain skins: no carryover');
+    assert.deepEqual(J.cards[4].lines.find((l) => l[0] === 'Carry over'), ['Carry over', 'On'], 'the carryovers example');
     J.cards.forEach((c) => {
         assert.ok(c.lines.some((l) => l[0] === 'Amount' && l[1] === 'No amount'), c.text);
         assert.ok(!c.lines.some((l) => /Tap to choose/.test(l[1])), c.text);
@@ -36,14 +40,15 @@ test('1 the four cards are the parser\'s: complete, no amount, and - when the pa
         assert.deepEqual(A.linesOf(r.bet, r.missing, ctx, r).map((l) => [l.label, l.value]), c.lines, c.text);
     });
 });
-test('2 the homepage: the section after the comparison block and before How you\'ll use it, the heading and sub line, the looping phone, four chips, the cards as data', () => {
+test('2 the homepage: the section after the comparison block and before How you\'ll use it, the heading and sub line, the looping phone, five chips, the cards as data', () => {
     const h = read('hardpan-home.html');
     const s = sectionOf(h);
     assert.ok(s.length > 1000, 'the section');
     assert.ok(h.indexOf('id="compare"') < h.indexOf('id="just-say-it"') && h.indexOf('id="just-say-it"') < h.indexOf('<section class="how" id="how"'), 'its place');
     assert.match(s, /<h2 id="jsi-h">Just say it\. We&rsquo;ll set it up\.<\/h2><p>No menus\. Type or say your game and HardPan builds it\.<\/p>/);
     assert.match(s, /<div class="jsi-say" id="jsi-say">/);
-    assert.equal((s.match(/<button type="button" class="jsi-chip[ "]/g) || []).length, 4);
+    assert.equal((s.match(/<button type="button" class="jsi-chip[ "]/g) || []).length, 5);
+    assert.match(s, /<b>Off<\/b>/, 'the first card, drawn before the script runs, says no carryover');
     assert.deepEqual(JSON.parse(/window\.JSI_CARDS = (\[[\s\S]*?\]);<\/script>/.exec(s)[1]), JSON.parse(read('jsi-cards.json')).cards);
     assert.match(s, /prefers-reduced-motion: reduce/, 'the loop stops for reduced motion');
 });

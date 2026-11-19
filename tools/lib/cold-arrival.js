@@ -366,7 +366,7 @@ async function arriveCold({ url, rounds, db, expression, steps, viewport, settle
     if (!fs.existsSync(CHROME)) {
         return { ok: false, reason: 'Chrome not found at ' + CHROME + ' (set CHROME_PATH)' };
     }
-    const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run',
+    const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--no-first-run', '--use-mock-keychain', '--password-store=basic',
         '--remote-debugging-port=0', '--user-data-dir=' + profile,
         '--allow-file-access-from-files', 'about:blank'], { stdio: 'ignore' });
     // TRACKED BEFORE ANYTHING THAT CAN THROW OR BAIL. A caller that gives up

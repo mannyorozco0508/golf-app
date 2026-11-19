@@ -3,7 +3,7 @@
  "golfers": "Sam (you), Josh, Bob, Paul",
  "cards": [
   {
-   "text": "Skins for everyone, carry over, for fun",
+   "text": "Skins for everyone, for fun",
    "title": "Skins",
    "lines": [
     [
@@ -24,10 +24,9 @@
     ],
     [
      "Carry over",
-     "On"
+     "Off"
     ]
-   ],
-   "start": "Add game"
+   ]
   },
   {
    "text": "Best ball, me and Josh vs Bob and Paul, for fun",
@@ -109,6 +108,32 @@
     ]
    ],
    "start": "Add game"
+  },
+  {
+   "text": "Skins for everyone, with carryovers, for fun",
+   "title": "Skins",
+   "lines": [
+    [
+     "Who’s in",
+     "Everyone (4)"
+    ],
+    [
+     "Amount",
+     "No amount"
+    ],
+    [
+     "Scoring",
+     "Net"
+    ],
+    [
+     "Counts from",
+     "Now"
+    ],
+    [
+     "Carry over",
+     "On"
+    ]
+   ]
   }
  ]
 }

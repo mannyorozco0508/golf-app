@@ -50,9 +50,16 @@
     function shortText(v, data) { return amountOf(v) > 0 ? money(v) + ' ' + shortWord(data) : 'Trophy'; }
     function round2(x) { return Math.round(x * 100) / 100; }
 
+    // CARRYOVER DEFAULTS TO OFF (Manny 2026-11-19 8:58 AM: "skins are RARELY carried over. Let's always default it
+    // to no carry over", ADVISOR-20261119-0905). An event created from 2026-11-19 16:00 UTC (09:00 AZ) on, with no
+    // carryover saved, plays without it. An event made before then with nothing saved keeps what it has always shown
+    // (carryover on), so a running event's skins never change under it; a saved choice always wins.
+    var CARRY_OFF_FROM = Date.UTC(2026, 10, 19, 16, 0, 0);
+    function carryDefault(data) { return !(Number(data && data.createdAt) >= CARRY_OFF_FROM); }
     function settingsOf(data) {
         var s = (data && data.prizeSettings) || {};
-        return { perSkin: amountOf(s.perSkin), carryover: s.carryover !== false, perContest: amountOf(s.perContest) };
+        var carry = s.carryover === true ? true : (s.carryover === false ? false : carryDefault(data));
+        return { perSkin: amountOf(s.perSkin), carryover: carry, perContest: amountOf(s.perContest) };
     }
 
     // Flights in the order the board's flight filter shows them.
@@ -280,7 +287,7 @@
         PRIZE_WORD: PRIZE_WORD, typeOf: typeOf, wordOf: wordOf, wordCap: wordCap, amountOf: amountOf, money: money,
         amountText: amountText, shortWord: shortWord, shortText: shortText, settingsOf: settingsOf, flightIds: flightIds, placeGroups: placeGroups,
         skinsSummary: skinsSummary, contestOwnerKey: contestOwnerKey, contestsSummary: contestsSummary,
-        summary: summary, hostOf: hostOf, recordFor: recordFor, posted: posted, myResults: myResults
+        summary: summary, hostOf: hostOf, CARRY_OFF_FROM: CARRY_OFF_FROM, recordFor: recordFor, posted: posted, myResults: myResults
     };
     root.TournamentPrizes = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

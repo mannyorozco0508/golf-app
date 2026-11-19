@@ -4562,7 +4562,8 @@ const APP_SHELL_ALIASES = ['./', './app'];
 // Moved to v422-2.0 (the showcase, Manny's typed OK 2026-11-18 "OK deploy showcase H1 + B": tournament.html's hero band gains the See what your tournament will look like button to /see-it; an installed device would keep the Tournaments front page without it)
 // Moved to v423-2.0 (card turn-in C, Manny typed OK 2026-11-19 "OK deploy card turn-in"; built as v422 on its branch while the showcase took v422 on main, ADVISOR-20261118-1533, Manny's pick 2026-11-18: tournament.html's Desk gains the Card turn-in switch and the Cards turned in queue (Approve / See photo / Decline) and draws its scan grid from the new scan-grid.js; tournament-scorecard.html gains Turn in our card (scan, check, Send, Waiting for the organizer) and loads scan-compare.js + scan-grid.js; an installed device would keep the Desk without the queue and a card without the button, and a cached scorecard would load the new page without its two scripts)
 // Moved to v424-2.0 (a withdrawn golfer's contest mark never leads, Manny typed OK 2026-11-19 "OK fix the withdrawn-golfer KP defect on a preview": tournament-contests.js ranks without withdrawn golfers and tournament.html passes it the record; an installed device would otherwise keep offering the withdrawn golfer's mark for Make winner).
-const CACHE_VERSION = 'golfapp-v424-2.0';
+// Moved to v426-2.0 (skins carryover defaults to off, Manny 2026-11-19 8:58 AM "Let's always default it to no carry over", ADVISOR-20261119-0905: tournament-prizes.js settingsOf; v425 is taken by the Starkey settings preview, reconciled at whichever merge comes second; an installed device would otherwise keep defaulting new events to carryover on).
+const CACHE_VERSION = 'golfapp-v426-2.0';
 
 // Every file the shell actually needs. The old list predated the shared engine files
 // and the pages added since, so those were only ever cached opportunistically at
