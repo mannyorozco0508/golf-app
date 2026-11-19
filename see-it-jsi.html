@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="See what your tournament looks like on HardPan: before, during and after the event, on your golfers' phones, your Desk and the clubhouse TV.">
+<link rel="icon" href="/hardpan-icon.svg" type="image/svg+xml">
+<title>See your tournament on HardPan</title>
+<!--
+  THE SHOWCASE, layout B: two parts (Tournaments & events / Everyday side games at your course, ADVISOR-1641b), the
+  tournament part as "Before / During / After", a big hero phone and three tabs (ADVISOR-20261118-1630 + 1633,
+  Manny 2026-11-18). A sample event, the site's own real pictures, COMING on what is not live; the day is
+  grouped into three tabs, and each view is a link (?tab=before | during | after | everyday; a query, not a hash:
+  web_d_homepage_root_test holds every page on the site to never reading the hash). Manny's pick 2026-11-18 ("OK deploy
+  showcase H1 + B"); layout A, the scroll story, was the other mockup. Tap any
+  phone to see it big. No real client, course or golfer is named (showcase_page_test.js). Prices from site-pricing.js.
+  Not in sw.js's shell list and not in the native bundle.
+-->
+<style>
+    :root { --g:#0f4a36; --lime:#d9f07a; --cream:#f4f1e8; --ink:#14201b; --mut:#5d6b64; --line:#e3e0d6; --navy:#1d3557; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Inter, Arial, sans-serif; color:var(--ink); background:var(--cream); -webkit-font-smoothing:antialiased; font-size:15px; line-height:1.45; }
+    a { color:inherit; text-decoration:none; }
+    .wrap { max-width:1120px; margin:0 auto; padding:0 28px; }
+    .top { display:flex; align-items:center; justify-content:space-between; height:64px; gap:16px; }
+    .top .logo img { height:44px; width:auto; display:block; }
+    .btn { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 18px; border-radius:12px; font-weight:800; font-size:15px; white-space:nowrap; }
+    .lime { background:var(--lime); color:var(--g); }
+    .ghost { border:2px solid var(--g); color:var(--g); }
+    .k { font-size:13px; font-weight:800; letter-spacing:.14em; color:var(--g); text-transform:uppercase; }
+    .cmg { display:inline-block; vertical-align:middle; font-size:11.5px; font-weight:800; letter-spacing:.06em; color:#8a4b00; background:#fff8ec; border:1px solid #f0b060; border-radius:6px; padding:2px 7px; margin-left:6px; }
+    /* the hero: words and the tabs left, the big phone right */
+    .hero { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr); gap:36px; align-items:center; padding:26px 0 10px; }
+    h1 { font-size:48px; font-weight:900; letter-spacing:-.02em; line-height:1.04; margin-top:8px; }
+    .sub { color:var(--mut); font-size:18px; max-width:560px; margin-top:14px; }
+    .sample { display:inline-block; margin-top:14px; background:#fff; border:1px solid var(--line); border-radius:999px; padding:6px 14px; font-size:13px; color:var(--mut); }
+    .sample b { color:var(--ink); }
+    .bigphone { justify-self:center; width:320px; max-width:100%; background:#0b0f0d; border-radius:40px; padding:11px; box-shadow:0 30px 70px rgba(20,32,27,.28); border:0; cursor:zoom-in; display:block; }
+    .bigphone img { display:block; width:100%; height:auto; border-radius:30px; }
+    .bigcap { text-align:center; color:var(--mut); font-size:13px; margin-top:8px; }
+    /* the tabs */
+
+    /* part two: everyday side games */
+    .parts { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
+    .part { display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-height:64px; padding:12px 16px; border-radius:16px; border:2px solid var(--g); background:#fff; color:var(--ink); text-align:left; font:inherit; cursor:pointer; }
+    .part b { font-size:17px; font-weight:900; }
+    .part span { font-size:13px; color:var(--mut); }
+    .part.on { background:var(--g); color:#fff; } .part.on span { color:#d9e8e0; }
+    .ph2 { font-size:32px; font-weight:900; letter-spacing:-.02em; line-height:1.08; margin-top:8px; }
+    .plede { color:var(--mut); font-size:17px; max-width:62ch; margin-top:10px; }
+    .egrid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:22px; }
+    .ecard { background:#fff; border:1px solid var(--line); border-radius:20px; padding:16px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; }
+    .ecard .phone { width:170px; }
+    .ecard h3 { font-size:19px; font-weight:900; letter-spacing:-.01em; line-height:1.15; }
+    .ecard p { color:var(--mut); font-size:15px; }
+    .ecard.noshot { justify-content:center; background:#fff8ec; border-color:#f0b060; }
+    @media (max-width:860px) { .parts { grid-template-columns:1fr; } .ph2 { font-size:26px; } .egrid { grid-template-columns:1fr; } .ecard .phone { width:160px; } }
+    .parts { margin-top:18px; }
+    .tabs { display:flex; gap:8px; margin-top:12px; background:#e7e9e3; border-radius:16px; padding:5px; }
+    .tab { flex:1; min-height:48px; border:0; border-radius:12px; background:transparent; font:inherit; font-weight:800; font-size:16px; color:var(--mut); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.1; }
+    .tab small { font-size:11.5px; font-weight:600; letter-spacing:.04em; margin-top:2px; }
+    .tab.on { background:#fff; color:var(--g); box-shadow:0 2px 10px rgba(20,32,27,.12); }
+    .panel { display:none; padding-top:10px; }
+    .panel.on { display:block; }
+    .step { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:28px; align-items:center; padding:26px 0; border-top:1px solid var(--line); }
+    .step:first-child { border-top:0; }
+    .n { display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:11px; background:var(--lime); color:var(--g); font-weight:900; font-size:17px; margin-bottom:10px; }
+    .step h2 { font-size:27px; font-weight:900; letter-spacing:-.015em; line-height:1.12; }
+    .step p { color:var(--mut); font-size:16px; margin-top:8px; max-width:46ch; }
+    .step ul { margin:10px 0 0 18px; color:var(--mut); font-size:15px; }
+    .shots { display:flex; gap:14px; justify-content:center; align-items:flex-start; flex-wrap:wrap; }
+    .phone { width:210px; max-width:100%; background:#0b0f0d; border-radius:30px; padding:8px; box-shadow:0 20px 50px rgba(20,32,27,.22); cursor:zoom-in; border:0; display:block; }
+    .phone img { display:block; width:100%; height:auto; border-radius:23px; }
+    .tv { width:100%; max-width:440px; background:#0b0f0d; border-radius:14px; padding:8px; box-shadow:0 20px 50px rgba(20,32,27,.22); cursor:zoom-in; border:0; display:block; }
+    .tv img { display:block; width:100%; height:auto; border-radius:8px; }
+    .cap { width:100%; text-align:center; color:var(--mut); font-size:13px; margin-top:-2px; }
+    .nextrow { display:flex; justify-content:flex-end; padding:6px 0 18px; }
+    .cmp { margin-top:10px; background:#fff; border:1px solid var(--line); border-radius:20px; padding:22px; }
+    .cmp h2 { font-size:27px; font-weight:900; letter-spacing:-.015em; }
+    .cmp p.lede { color:var(--mut); margin:8px 0 14px; font-size:15px; }
+    table { width:100%; border-collapse:collapse; font-size:15px; }
+    th, td { text-align:left; padding:12px 10px; vertical-align:top; border-top:1px solid var(--line); }
+    th { font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--mut); border-top:0; }
+    td.hp { font-weight:700; color:var(--g); }
+    td.typ { color:var(--mut); }
+    .cta { margin-top:26px; background:var(--g); color:#fff; border-radius:22px; padding:30px 24px; text-align:center; }
+    .cta h2 { font-size:32px; font-weight:900; letter-spacing:-.02em; }
+    .cta p { color:#d9e8e0; margin-top:8px; font-size:16px; }
+    .cta .row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:18px; }
+    .cta .btn.ghost { border-color:#fff; color:#fff; }
+    .cta .addr { margin-top:14px; font-size:15px; color:#fff; }
+    .price { margin:22px auto 0; max-width:720px; background:#e8f5ee; border:1px solid #b9dcc8; border-radius:14px; padding:14px 16px; font-size:15px; color:var(--g); font-weight:700; text-align:center; }
+    .note { color:var(--mut); font-size:14px; text-align:center; max-width:720px; margin:12px auto 40px; }
+    footer { background:var(--ink); color:#c9d1cc; padding:30px 0; font-size:14px; line-height:1.6; }
+    footer .wrap { display:flex; flex-direction:column; gap:8px; }
+    footer a { color:#fff; text-decoration:underline; text-underline-offset:3px; margin-right:14px; display:inline-flex; align-items:center; min-height:44px; }
+    .zoom { position:fixed; inset:0; background:rgba(5,10,8,.9); display:none; align-items:center; justify-content:center; padding:16px; z-index:50; }
+    .zoom.on { display:flex; }
+    .zoom img { max-width:100%; max-height:100%; border-radius:12px; }
+    .zoom button { position:absolute; top:14px; right:16px; min-height:44px; padding:0 16px; border:0; border-radius:999px; background:#fff; color:var(--ink); font-weight:800; font-size:15px; cursor:pointer; }
+    @media (max-width:860px) {
+        .wrap { padding:0 16px; }
+        .top { height:56px; } .top .logo img { height:32px; }
+        .hero { grid-template-columns:1fr; gap:18px; padding-top:18px; }
+        h1 { font-size:32px; } .sub { font-size:15px; margin-top:10px; }
+        .bigphone { width:230px; }
+        .tabs { position:sticky; top:8px; z-index:5; }
+        .tab { font-size:14px; min-height:46px; } .tab small { display:none; }
+        .step { grid-template-columns:1fr; gap:16px; padding:22px 0; }
+        .step h2 { font-size:22px; }
+        .phone { width:170px; }
+        .cmp { padding:16px; } table { font-size:14px; } th, td { padding:10px 6px; }
+        .cta h2 { font-size:26px; }
+    }
+</style>
+</head>
+<body>
+
+<nav class="wrap top" aria-label="Main">
+    <a class="logo" href="/"><img src="/media/home/hardpan-golf-lockup.png" alt="HardPan Golf" width="1278" height="222"></a>
+    <a class="btn lime" id="top-run-an-event" href="/tournaments">Run an event</a>
+</nav>
+
+<section class="wrap hero" id="top">
+    <div>
+        <div class="k">HardPan Tournaments &nbsp;&middot;&nbsp; See it in action</div>
+        <h1>This is your tournament on HardPan</h1>
+        <p class="sub">Before, during and after the day: what your golfers hold, what your Desk shows, what the clubhouse TV plays. Tap any phone to see it big.</p>
+        <div class="sample" id="sample-line">Sample event: <b>Your Club Invitational</b> &middot; a 72-player shotgun at your course &middot; the names on the screens are examples</div>
+        <div class="parts" id="parts"><button type="button" class="part on" id="part-events" data-part="events"><b>Tournaments &amp; events</b><span>Your day step by step</span></button><button type="button" class="part" id="part-everyday" data-part="everyday"><b>Everyday side games</b><span>The weekly game at your course</span></button></div>
+        <div class="tabs" role="tablist" id="tabs">
+            <button type="button" class="tab on" role="tab" id="tab-before" data-tab="before" aria-selected="true">Before<small>SET UP · CHECK-IN</small></button>
+            <button type="button" class="tab" role="tab" id="tab-during" data-tab="during" aria-selected="false">During<small>PHONES · BOARD · CARDS</small></button>
+            <button type="button" class="tab" role="tab" id="tab-after" data-tab="after" aria-selected="false">After<small>RESULTS · RECAP</small></button>
+        </div>
+    </div>
+    <div>
+        <button type="button" class="bigphone" id="hero-phone" data-big="/media/screens/event-board-940.webp"><img src="/media/screens/event-board-940.webp" decoding="async" width="940" height="2036" alt="The event leaderboard on a golfer's phone: Net and Gross, flights, the field by position with to par and thru."></button>
+        <div class="bigcap">The live board, on every phone in the field</div>
+    </div>
+</section>
+
+<section class="wrap" id="panels">
+
+    <div class="panel on" id="panel-before" role="tabpanel">
+        <div class="step" id="step-setup">
+            <div><span class="n">1</span><h2>Set up in minutes</h2>
+                <p>Course, date, format, how many. Flights by handicap, a Ladies net flight if you want one, tee times or shotgun groups, a scorecard link and QR for every group.</p>
+                <ul><li>9 or 18 holes, one round or two</li><li>Scramble, best ball, shamble, individual</li><li>Flights, gross or net, set once</li></ul></div>
+            <div class="shots"><button type="button" class="phone" data-big="/media/screens/create-event-786.webp"><img src="/media/screens/create-event-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="Create a tournament, step 4 of 4: the format and how many golfers."></button>
+                <button type="button" class="phone" data-big="/media/screens/team-qr-links-780.webp"><img src="/media/screens/team-qr-links-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="A group's scorecard link with its QR, Copy link and Send all scorecard links."></button></div>
+        </div>
+        <div class="step" id="step-checkin">
+            <div><span class="n">2</span><h2>Check-in and join with one code</h2>
+                <p>A QR at the registration table: golfers tap their own name and they are in. Your Desk and the clubhouse TV show who has arrived and who is still to come. The event code joins them in the HardPan app.</p></div>
+            <div class="shots"><button type="button" class="phone" data-big="/media/home/checkin-table-940.webp"><img src="/media/home/checkin-table-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="The check-in page from the table QR: the name list, tap your own name."></button>
+                <button type="button" class="tv" data-big="/media/home/checkin-tv-1400.webp"><img src="/media/home/checkin-tv-700.webp" loading="lazy" decoding="async" width="700" height="394" alt="The check-in board on the clubhouse TV: the QR, who has arrived, who is still to come."></button><div class="cap">The check-in board on the clubhouse TV</div></div>
+        </div>
+        <div class="nextrow"><button type="button" class="btn ghost" data-go="during">Next: during the round &rarr;</button></div>
+    </div>
+
+    <div class="panel" id="panel-during" role="tabpanel">
+        <div class="step" id="step-phones">
+            <div><span class="n">3</span><h2>Every golfer&rsquo;s phone: GPS and scoring</h2>
+                <p>Yardages to the green and the hazards on a satellite map, the green&rsquo;s slope, and the group&rsquo;s card, all in the app they joined with. No account needed to post a score from the group link.</p>
+                <p><span class="cmg" style="margin-left:0">COMING</span> HardPan GPS free for the whole field on event day.</p></div>
+            <div class="shots"><button type="button" class="phone" data-big="/media/screens/gps-886.webp"><img src="/media/screens/gps-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="The GPS screen: the hole on a satellite map with front, middle and back yardages."></button>
+                <button type="button" class="phone" data-big="/media/screens/group-scoring-886.webp"><img src="/media/screens/group-scoring-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="The group's scorecard: each golfer's score for the hole, saved as typed."></button></div>
+        </div>
+        <div class="step" id="step-board">
+            <div><span class="n">4</span><h2>The live board, on every phone and the clubhouse TV</h2>
+                <p>Flights, gross and net, who is leading and by how much, updating as the groups post. One link on the TV rotates by flight with a QR golfers scan to follow along. Two rounds on one board for a 36-hole event.</p></div>
+            <div class="shots"><button type="button" class="tv" data-big="/media/home/live-tv-1400.webp"><img src="/media/home/live-tv-700.webp" loading="lazy" decoding="async" width="700" height="394" alt="The event board on a clubhouse TV, LIVE, with the follow QR in the corner."></button><div class="cap">The clubhouse TV</div>
+                <button type="button" class="tv" data-big="/media/home/board36-tv-1400.webp"><img src="/media/home/board36-tv-700.webp" loading="lazy" decoding="async" width="700" height="394" alt="The 36-hole event board on the clubhouse TV: R1, R2, total and to par by flight."></button><div class="cap">A 36-hole event: two rounds on one board</div></div>
+        </div>
+        <div class="step" id="step-games">
+            <div><span class="n">5</span><h2>Skins and KPs, by flight</h2>
+                <p>Skins carry and settle from the scores on the board; closest-to-the-pin holes take entries on the card and you confirm the winners. The results post to the board when you say so.</p>
+                <p><span class="cmg" style="margin-left:0">COMING</span> A foursome&rsquo;s own game inside the event, seen only by them; the event board stays the event board.</p></div>
+            <div class="shots"><button type="button" class="phone" data-big="/media/home/skins-tab-940.webp"><img src="/media/home/skins-tab-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="The Skins tab: holes won outright, carries, the skins count by golfer."></button>
+                <button type="button" class="phone" data-big="/media/screens/contests-780.webp"><img src="/media/screens/contests-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="A contest hole on the card: closest to the pin, enter your distance."></button></div>
+        </div>
+        <div class="step" id="step-paper">
+            <div><span class="n">6</span><h2>Paper cards welcome</h2>
+                <p>Some groups keep score on paper. Your scoring table photographs each card; the scanner reads it and checks every hole against the app. Red where they differ, amber where the scanner was unsure, one tap to use the whole card for a group that typed nothing.</p>
+                <p>Turn in our card: a golfer in the group scans the card from their own phone at the 18th green, or picks the photo from their saved photos; it waits for your OK, then goes on the board. You switch it on per event.</p></div>
+            <div class="shots"><button type="button" class="phone" data-big="/media/home/scan-result-phone-800.webp"><img src="/media/home/scan-result-phone-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="The Desk's card check: the paper card's digits against the app's, red where they differ, amber where the scanner was unsure."></button>
+                <button type="button" class="phone" data-big="/media/home/turnin-check-phone-800.webp"><img src="/media/home/turnin-check-phone-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="Turn in our card on a golfer's phone: the card's 72 digits, names matched, totals match, Send to the organizer."></button></div>
+        </div>
+        <div class="nextrow"><button type="button" class="btn ghost" data-go="after">Next: after the round &rarr;</button></div>
+    </div>
+
+    <div class="panel" id="panel-after" role="tabpanel">
+        <div class="step" id="step-results">
+            <div><span class="n">7</span><h2>Final results and the recap</h2>
+                <p>Places by flight, the skins and the KPs, posted to the board when you confirm them. Every golfer gets the recap that evening: their finish, their card, the photos you approved.</p></div>
+            <div class="shots"><button type="button" class="phone" data-big="/media/screens/prizes-780.webp"><img src="/media/screens/prizes-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="Results by flight: 1st, 3 under through 4, leading by 2, the teams around you."></button>
+                <button type="button" class="phone" data-big="/media/home/round-recap-940.webp"><img src="/media/home/round-recap-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="The recap: the day's results and photos, shared with everyone who played."></button></div>
+        </div>
+        <div class="cmp" id="compare">
+            <span class="n">8</span>
+            <h2>Next to a typical tournament app</h2>
+            <p class="lede">Every HardPan row is live today unless it says COMING. The other column is what the popular tournament platforms say on their own pages; no one is named.</p>
+            <table>
+                <tr><th>What your golfers get</th><th>Typical tournament app</th><th>HardPan Tournaments</th></tr>
+                <tr><td>Real GPS yardages and green slope, in the app they join the event with</td><td class="typ">Varies: some have GPS in the scoring app, some send golfers to a separate GPS app, some have none</td><td class="hp">&#10003; Included. Join by code in the HardPan app; the GPS and the slope are the same app</td></tr>
+                <tr><td>A foursome&rsquo;s own game inside the event that only they see</td><td class="typ">Skins are event-wide, run by the organizer and shown to everyone</td><td class="hp">On the way <span class="cmg">COMING</span></td></tr>
+                <tr><td>One board across 36 holes, two rounds, two courses if you like</td><td class="typ">Varies: one does two courses in a round, one multi-round only, one up to four rounds on one course</td><td class="hp">&#10003; Included. R1, R2 and the event total on one board</td></tr>
+                <tr><td>The board on the clubhouse TV, and a check-in board with the QR</td><td class="typ">TV board: most; a check-in board: few</td><td class="hp">&#10003; Included. Both live</td></tr>
+                <tr><td>Watch the live board with no app download</td><td class="typ">Most; one joins through its own app only</td><td class="hp">&#10003; Included. The link or the QR</td></tr>
+                <tr><td>Paper cards read by a scanner at the scoring table</td><td class="typ">Not found</td><td class="hp">&#10003; Included. The Desk scan, live</td></tr>
+                <tr><td>Entry fees paid to you at sign-up; winners paid out from the results</td><td class="typ">Card collection is common, often a paid tier or a processing fee</td><td class="hp">&#10003; Included. Your Venmo or PayPal handle on the sign-up page; Pay on Venmo beside each winner</td></tr>
+            </table>
+        </div>
+        <p class="price"><span data-price="pro-label"></span> <span data-price="pro-headline"></span> &middot; the first 1,000 golfers &middot; locked for as long as you stay subscribed. <a href="/#pricing" style="text-decoration:underline">All prices</a></p>
+        <p class="note">Joining an event and scoring are always free for golfers. HardPan keeps score; it never holds or moves money.</p>
+        <div class="cta" id="cta">
+            <span class="n">9</span>
+            <h2>Run your next event on HardPan</h2>
+            <p>Set it up yourself in a minute, or write to us and we will walk your first event through with you.</p>
+            <div class="row"><a class="btn lime" id="run-an-event" href="/tournaments">Run an event &rarr;</a><a class="btn ghost" id="back-organizers" href="/organizers">What organizers get</a></div>
+            <p class="addr">Write to <b id="contact-address">support@rattlegolf.com</b> &middot; <a href="mailto:support@rattlegolf.com?subject=Our%20tournament%20on%20HardPan" style="text-decoration:underline">open in Mail</a></p>
+        </div>
+        <p class="note" style="margin-top:18px">HardPan Tournaments is a product of Rattle Golf LLC. The event, course and golfers on these screens are examples.</p>
+    </div>
+
+    <div class="panel" id="panel-everyday" role="tabpanel">
+    <div class="everyday" id="everyday">
+        <div class="k">Part two &nbsp;&middot;&nbsp; For the public course</div>
+        <h2 class="ph2">Everyday side games at your course</h2>
+        <p class="plede">Your regulars already play for something on Tuesday night. HardPan keeps their game on one live board, on the phones they already carry, with no account for the friends they bring. Club night is a tournament page: the first part of this page.</p>
+        <!-- JUST SAY IT (mockup 2026-11-19, ADVISOR-20261119-0241): the parser's own card for this line (jsi-cards.json). -->
+        <div class="egrid"><div class="ecard jsi-e" style="grid-column:1/-1;flex-direction:row;flex-wrap:wrap;justify-content:center;gap:18px;text-align:left"><div style="max-width:340px"><span class="k" style="display:block;font-size:12px;font-weight:800;letter-spacing:.14em;color:var(--g)">&#10024; JUST SAY IT</span><h3 style="font-size:24px;margin-top:4px">Just say it. We&rsquo;ll set it up.</h3><p style="margin-top:6px">No menus. Type or say the game the way you would to the group, and HardPan builds it: the sides, the format, net or gross, where it counts from.</p><p style="margin-top:10px;background:var(--g);color:#fff;border-radius:14px 14px 4px 14px;padding:10px 12px;font-weight:600">Best ball, me and Josh vs Bob and Paul, for fun</p></div><div style="width:300px;max-width:100%;background:#f1f3ee;border-radius:18px;padding:12px;font-size:14px"><div style="font-size:11px;font-weight:800;letter-spacing:.12em;color:var(--mut)">HERE&rsquo;S WHAT I&rsquo;LL SET UP</div><div style="font-size:20px;font-weight:900;color:var(--g);margin:2px 0 6px">2 v 2 Best Ball</div><div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #e3e6df"><span style="color:var(--mut)">Sides</span><b>Sam + Josh vs Bob + Paul</b></div><div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #e3e6df"><span style="color:var(--mut)">Amount</span><b>No amount</b></div><div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #e3e6df"><span style="color:var(--mut)">Presses</span><b>Off</b></div><div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #e3e6df"><span style="color:var(--mut)">Scoring</span><b>Net</b></div><div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #e3e6df"><span style="color:var(--mut)">Counts from</span><b>Now</b></div></div></div>
+            <div class="ecard"><button type="button" class="phone" data-big="/media/screens/add-a-game-886.webp"><img src="/media/screens/add-a-game-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="Add a game to the round: Skins, Nassau, closest to the pin, best ball, points."></button><h3>A side game set up in seconds</h3><p>Skins, Nassau, closest to the pin, best ball, points. Pick the game, tap Start; the scoring and the board do the rest.</p></div>
+            <div class="ecard"><button type="button" class="phone" data-big="/media/screens/weekly-code-1170.webp"><img src="/media/screens/weekly-code-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="The weekly game: one code the regulars use every week."></button><h3>Join with a code, friends join free</h3><p>The regulars keep one code for the weekly game; a guest types it and is in. One group of up to <span data-price="free-golfers">5</span> golfers scores free, forever.</p></div>
+            <div class="ecard"><button type="button" class="phone" data-big="/media/screens/live-games-886.webp"><img src="/media/screens/live-games-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="The live games board for the group: skins and the match, hole by hole."></button><h3>The board, live for the group</h3><p>Who has the skin, where the match stands, hole by hole, on every phone in the group. The results are ready when the last putt drops; the golfers settle up themselves.</p></div>
+            <div class="ecard"><button type="button" class="phone" data-big="/media/screens/plays-like-940.webp"><img src="/media/screens/plays-like-400.webp" loading="lazy" decoding="async" width="400" height="866" alt="The GPS screen: 140 to the middle, wind, plays like 141 yards, 9 iron, on a satellite map."></button><h3>GPS on the tee, for every golfer</h3><p>Yardages to the green and the hazards on a satellite map, wind and elevation in one plays-like number, the green&rsquo;s slope.</p></div>
+            <div class="ecard noshot"><span class="cmg" style="margin-left:0">COMING</span><h3>Paper cards for the older crowd</h3><p>One photo of the group&rsquo;s paper card fills the whole round: scores, games, the board. The same scanner the tournament Desk uses today.</p></div>
+        </div>
+        <p class="note" style="margin:16px auto 0">HardPan keeps the score. It never holds or moves money.</p>
+    </div>
+
+        <div class="cta" id="cta-everyday" style="margin-top:26px"><h2>Bring HardPan to your course</h2><p>Write to us and we will set your weekly game up with you.</p><p class="addr">Write to <b>support@rattlegolf.com</b> &middot; <a href="mailto:support@rattlegolf.com?subject=Side%20games%20at%20our%20course" style="text-decoration:underline">open in Mail</a></p></div>
+    </div>
+
+</section>
+
+<footer>
+    <div class="wrap">
+        <div><b style="color:#fff">HardPan: Golf GPS &amp; Games</b> &middot; HardPan is a product of Rattle Golf LLC &middot; Scottsdale, AZ</div>
+        <div><a href="/help">Help</a><a href="/support">Support</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></div>
+        <div>HardPan keeps score for your group. It never holds or moves money.</div>
+    </div>
+</footer>
+
+<div class="zoom" id="zoom" role="dialog" aria-modal="true" aria-label="A screen, enlarged"><button type="button" id="zoom-close">Close &#10005;</button><img id="zoom-img" src="" alt=""></div>
+
+<script src="/site-pricing.js?v=22ed522b"></script>
+<script>
+    if (typeof window.HardPanSitePricingFill === 'function') window.HardPanSitePricingFill(document);
+    (function () {
+        // The views. Each is a link (?tab=during ...) so one can be sent; the Next button walks the three tabs.
+        var names = ['before', 'during', 'after', 'everyday'];
+        function show(name, scroll) {
+            if (names.indexOf(name) === -1) name = 'before';
+            names.forEach(function (n) {
+                var tab = document.getElementById('tab-' + n);
+                if (tab) { tab.classList.toggle('on', n === name); tab.setAttribute('aria-selected', n === name ? 'true' : 'false'); }
+                document.getElementById('panel-' + n).classList.toggle('on', n === name);
+            });
+            // The two parts: the tabs belong to Tournaments & events; Everyday is one panel.
+            document.getElementById('tabs').style.display = name === 'everyday' ? 'none' : '';
+            document.getElementById('part-events').classList.toggle('on', name !== 'everyday');
+            document.getElementById('part-everyday').classList.toggle('on', name === 'everyday');
+            if (history.replaceState) history.replaceState(null, '', name === 'before' ? location.pathname : location.pathname + '?tab=' + name);
+            if (scroll) { var p = document.getElementById('panels'); if (p && p.scrollIntoView) p.scrollIntoView({ block: 'start' }); }
+        }
+        Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-tab'), false); }); });
+        Array.prototype.forEach.call(document.querySelectorAll('[data-go]'), function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-go'), true); }); });
+        Array.prototype.forEach.call(document.querySelectorAll('[data-part]'), function (b) { b.addEventListener('click', function () { show(b.getAttribute('data-part') === 'everyday' ? 'everyday' : 'before', false); }); });
+        var asked = 'before'; try { asked = new URLSearchParams(location.search).get('tab') || 'before'; } catch (e) { asked = 'before'; }
+        show(asked, false);
+        // Tap a phone: the big capture in a plain overlay.
+        var zoom = document.getElementById('zoom'), img = document.getElementById('zoom-img');
+        function open(btn) { var small = btn.querySelector('img'); img.src = btn.getAttribute('data-big') || small.src; img.alt = small.alt; zoom.classList.add('on'); }
+        function close() { zoom.classList.remove('on'); img.src = ''; }
+        Array.prototype.forEach.call(document.querySelectorAll('.phone, .tv, .bigphone'), function (b) { b.addEventListener('click', function () { open(b); }); });
+        document.getElementById('zoom-close').addEventListener('click', close);
+        zoom.addEventListener('click', function (e) { if (e.target === zoom) close(); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    })();
+</script>
+</body>
+</html>
