@@ -2432,7 +2432,7 @@
         const list = contestsOn() ? TournamentContests.contestList(data) : [];
         let gpsLegend = false;
         el.innerHTML = list.map((c) => {
-            const rows = TournamentContests.ranked(contestEntries[c.key] || {}, c.kind).slice(0, 3);
+            const rows = TournamentContests.ranked(contestEntries[c.key] || {}, c.kind, data).slice(0, 3);
             const thru = TournamentContests.throughCount(data, c.hole);
             const anyGps = rows.some(r => r.by === 'gps');
             const legend = anyGps && !gpsLegend ? (gpsLegend = true, '<span>GPS 📍 = marked</span>') : '';

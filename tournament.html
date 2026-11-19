@@ -10354,7 +10354,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!box) return;
         const c = list.find((x) => x.key === contestSelected);
         if (!c) { box.style.display = 'none'; box.innerHTML = ''; return; }
-        const rows = TournamentContests.ranked(contestEntriesAll[c.key] || {}, c.kind);
+        const rows = TournamentContests.ranked(contestEntriesAll[c.key] || {}, c.kind, currentData || {});
         let html = `<div class="ct-head">Hole ${c.hole} entries</div>`;
         html += rows.length ? rows.map((r) => {
             const who = `${escapeHtml(r.name || '')} ${escapeHtml(TournamentContests.valueText(r))}${r.by === 'gps' ? ' 📍' : ''}`;

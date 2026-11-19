@@ -83,13 +83,31 @@
         return (n >= LD_MIN_YD && n <= LD_MAX_YD) ? n : null;
     }
 
+    // ---- withdrawn ----------------------------------------------------------------
+    // The same marker the engine reads (tournament-engine.js isWithdrawn): a golfer
+    // the organizer withdrew carries players/<pid>/status = 'withdrawn'. Their
+    // contest mark stays stored (un-withdraw brings it back) but is never ranked,
+    // so it can neither lead the board nor be offered for "Make winner".
+    // Found by the full-event simulation, 2026-11-19: a withdrawn golfer's KP led
+    // hole 3 and was the one confirmed.
+    function withdrawnKey(data, key) {
+        var players = (data && data.players) || {};
+        var p = players[key];
+        if (p) return p.status === 'withdrawn';
+        var m = /^team(\d+)_/.exec(String(key || ''));
+        if (!m) return false;
+        var teams = (data && data.teams) || {};
+        return Object.keys(teams).some(function (k) { var t = teams[k]; return t && String(t.num) === m[1] && t.status === 'withdrawn'; });
+    }
+
     // ---- the ranking ------------------------------------------------------------
     // KP: shortest first. Long drive: longest first. A tie keeps the earlier entry.
-    function ranked(entries, kind) {
+    // data (the event record) is how a withdrawn golfer is left out; both pages pass it.
+    function ranked(entries, kind, data) {
         var list = Object.keys(entries || {}).map(function (k) {
             return Object.assign({ key: k }, entries[k]);
         }).filter(function (e) {
-            return e.kind === kind && (kind === 'ld' ? isFinite(Number(e.yards)) : isFinite(Number(e.inches)));
+            return e.kind === kind && !withdrawnKey(data, e.key) && (kind === 'ld' ? isFinite(Number(e.yards)) : isFinite(Number(e.inches)));
         });
         list.sort(function (a, b) {
             var d = kind === 'ld' ? Number(b.yards) - Number(a.yards) : Number(a.inches) - Number(b.inches);
@@ -111,7 +129,7 @@
         if (tk.length) {
             return { done: tk.filter(function (k) { return scored('team' + teams[k].num); }).length, total: tk.length, noun: 'teams' };
         }
-        var pk = Object.keys(players).filter(function (k) { return players[k] && !players[k].withdrawn; });
+        var pk = Object.keys(players).filter(function (k) { return players[k] && !withdrawnKey(data, k); });
         return { done: pk.filter(function (k) { return Number(s[k + '_h' + n]) > 0; }).length, total: pk.length, noun: 'golfers' };
     }
 
@@ -154,7 +172,7 @@
         KP_MAX_IN: KP_MAX_IN, LD_MIN_YD: LD_MIN_YD, LD_MAX_YD: LD_MAX_YD,
         holeKey: holeKey, holeNum: holeNum, contestList: contestList, contestFor: contestFor,
         feetInchesText: feetInchesText, yardsText: yardsText, valueText: valueText,
-        kpInches: kpInches, ldYards: ldYards, ranked: ranked, throughCount: throughCount,
+        kpInches: kpInches, ldYards: ldYards, ranked: ranked, withdrawnKey: withdrawnKey, throughCount: throughCount,
         teamLabel: teamLabel, entryRecord: entryRecord, entryUpdate: entryUpdate,
         confirmedWinners: confirmedWinners
     };
