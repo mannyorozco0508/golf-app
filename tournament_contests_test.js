@@ -301,6 +301,8 @@ describe('D. THE ORGANIZER (E2d): Contests tab on tournament.html', () => {
         tap(sb, ORG_HTML, byId('tab-btn-contests'));
         return sb;
     }
+    // RE-PINNED 2026-11-19 (Starkey settings 12): with one winner per flight, Make winner
+    // locks that flight only (tournament_kp_rules_test.js C2), so the note now says so.
     test('D1 the owner taps Contests: the holes with their pills, the first hole\'s entries with Make winner / Remove, the GPS line', () => {
         const sb = arriveOwner(teamEvent({ contests: CONTESTS }), ENTRIES);
         assert.equal(shown(sb, 'manage-tab-contests'), true);
@@ -308,7 +310,7 @@ describe('D. THE ORGANIZER (E2d): Contests tab on tournament.html', () => {
         assert.match(list, /Hole 7 par 3 Closest to the pin Hole 12 par 5 Long drive · fairway only Hole 16 par 3 Closest to the pin \+ Add a contest hole/);
         const e = plain(html(sb, 'contest-entries'));
         assert.match(e, /Hole 7 entries Dee Nguyen 3 ft 1 in Make winner Remove Al Lopez 8 ft 4 in Make winner Remove Jo Kim 41 ft 0 in/);
-        assert.match(plain(ORG_HTML.slice(ORG_HTML.indexOf('id="contest-note"'), ORG_HTML.indexOf('</p>', ORG_HTML.indexOf('id="contest-note"')))), /Override: "Make winner" locks the hole; a later entry cannot replace it\. Allow GPS marks:/);
+        assert.match(plain(ORG_HTML.slice(ORG_HTML.indexOf('id="contest-note"'), ORG_HTML.indexOf('</p>', ORG_HTML.indexOf('id="contest-note"')))), /Override: "Make winner" locks the hole \(with one winner per flight, that flight\); a later entry cannot replace it\. Allow GPS marks:/);
         assert.equal(el(sb, 'contest-gps-toggle').textContent, 'on');
     });
     test('D2 Make winner writes winner + lockedAt (server time) in one update; the row then reads Winner ✓; Remove deletes one entry', async () => {

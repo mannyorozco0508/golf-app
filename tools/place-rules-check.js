@@ -71,6 +71,22 @@ const shotsAt = (() => { const i = process.argv.indexOf('--shots'); return i > -
     // one skin per golfer per hole is on here: Men give out 15 skins (1 + 6 + 3 + 5), $1,000 / 15 = $66.67, down to $66
     check('the Skins card prices each game from its share: Men $66 (15 skins), Ladies $100 a skin', /Men: \$66 pro shop credit a skin · Ladies: \$100 pro shop credit a skin/.test(k['prize-card-skins'].text) && k['prize-card-skins'].h > 100, k['prize-card-skins'].text.slice(0, 400));
     check('the card shows a Ladies win at the Ladies value', /Ladies · Cascade[\s\S]*Ray Diaz[\s\S]*\$100 credit/i.test(k['prize-card-skins'].text), k['prize-card-skins'].text.slice(0, 900));
+    // KPs (settings 12-13): a two-round event, one winner per flight, the Contests tab opened by a real tap.
+    const kp = rec();
+    delete kp.prizeSettings;
+    kp.prizeSettings = { perContest: 50, kps: { perFlight: true, ties: 'share' } };
+    kp.rounds.r1.contests = { h5: { kind: 'kp', allowGps: true, winners: { pA: true }, locks: { fA: 5 } }, h7: { kind: 'kp', allowGps: true } };
+    kp.rounds.r2.contests = { h13: { kind: 'kp', allowGps: true } };
+    const kdb = dbOf(kp);
+    kdb.contestEntries = { STK: { r: { r1: { h5: { pA: { name: 'Ana Diaz', team: 'g1', kind: 'kp', inches: 30, by: 'typed', at: 1 }, pS: { name: 'Sam Ortiz', team: 'g1', kind: 'kp', inches: 44, by: 'typed', at: 2 },
+        pD: { name: 'Dana Ruiz', team: 'g2', kind: 'kp', inches: 61, by: 'typed', at: 3 }, pK: { name: 'Kim Vo', team: 'g2', kind: 'kp', inches: 61, by: 'typed', at: 4 } } } } } };
+    const s4 = await arriveCold({ url: fileUrl('tournament.html', 'tourney=STK'), db: kdb, auth: F.OWNER, settleMs: 2500, viewport: { width: 390, height: 844 },
+        steps: [{ tap: '#tab-btn-contests' }, { sleep: 500 }, READ(['contest-holes-list', 'contest-entries'])]
+            .concat(shotsAt ? [{ shot: path.join(shotsAt, 'kps-rounds-flights-contests-tab.png'), viewportOnly: true }] : []) });
+    if (!s4.ok) { console.log('NO BROWSER RUN: ' + s4.reason); process.exit(2); }
+    const c4 = JSON.parse(s4.value[2]);
+    check('the Contests tab shows a chip per round and Cascade\'s holes', /Cascade Olympic/.test(c4['contest-holes-list'].text) && /Hole 5 par 3/.test(c4['contest-holes-list'].text) && c4['contest-holes-list'].h > 50, c4['contest-holes-list'].text);
+    check('hole 5 is listed per flight, A Flight decided, B Flight still open', /A FLIGHT Ana Diaz 2 ft 6 in Winner ✓ Sam Ortiz 3 ft 8 in Make winner Remove B FLIGHT Dana Ruiz 5 ft 1 in Make winner Remove Kim Vo 5 ft 1 in Make winner Remove/i.test(c4['contest-entries'].text), c4['contest-entries'].text);
     const fails = results.filter((x) => !x).length;
     console.log('\n' + (results.length - fails) + ' / ' + results.length + ' PASS');
     process.exit(fails ? 1 : 0);
