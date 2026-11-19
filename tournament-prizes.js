@@ -63,12 +63,179 @@
         });
     }
 
+    // ========================================================================
+    // PLACE RULES (Starkey settings, places 1-7; Manny 2026-11-19: layout B,
+    // "places 1-7 ... Preview only"). Saved on the event, owner-written:
+    //   tournaments/<code>/prizeSettings/places = {
+    //     on:       'gross' | 'net' | 'both'          absent = as the event is scored
+    //     scope:    'event' | 'round' | 'both'        multi-round only; absent = payoutBasis, as before
+    //     ties:     'split' | 'full'                  absent = split (allocatePlacePayouts, today's rule)
+    //     rounding: 'cents' | 'dollar'                absent = cents; dollar = each share rounded DOWN
+    //     onePrize: 'off' | 'gross' | 'larger'        absent = off; larger = the bigger prize, gross on an equal one
+    //     within:   'event' | 'round'                 where one prize per golfer applies (multi-round)
+    //     flights:  { <flightId>: { on?, spots? } }   a flight's own basis and place amounts
+    //     edits:    { <tableKey>: { <entryKey>: { amount, note } } }   the organizer's adjust before posting
+    //   }
+    // NO places node = the old path, byte for byte: placeGroups below never
+    // reaches this code (tournament_place_rules_test.js proves the two agree
+    // when the node exists with nothing chosen). The split is still
+    // allocatePlacePayouts (payouts.js, PROTECTED, shared with Trip Mode): this
+    // wraps it, it never edits it. Ranking is the engine's own rows, on the
+    // basis asked for (computeTournamentLeaderboard / roundViewOnBasis /
+    // resolveLeaderboardView with { basis }).
+    // ========================================================================
+    var PLACE_ON = ['gross', 'net', 'both'], PLACE_SCOPE = ['event', 'round', 'both'];
+    function pick(v, ok, d) { return ok.indexOf(v) !== -1 ? v : d; }
+    function spotsList(raw) {
+        var list = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.keys(raw).sort(function (a, b) { return a - b; }).map(function (k) { return raw[k]; }) : null);
+        return list ? list.slice(0, 20).map(amountOf) : null;
+    }
+    function placeRulesOf(data) {
+        var p = data && data.prizeSettings && data.prizeSettings.places;
+        if (!p || typeof p !== 'object') return null;
+        var flights = {};
+        Object.keys(p.flights || {}).forEach(function (fid) {
+            var f = p.flights[fid] || {};
+            flights[fid] = { on: pick(f.on, PLACE_ON, null), spots: spotsList(f.spots) };
+        });
+        return { on: pick(p.on, PLACE_ON, null), scope: pick(p.scope, PLACE_SCOPE, null),
+            ties: pick(p.ties, ['split', 'full'], 'split'), rounding: pick(p.rounding, ['cents', 'dollar'], 'cents'),
+            onePrize: pick(p.onePrize, ['off', 'gross', 'larger'], 'off'), within: pick(p.within, ['event', 'round'], 'event'),
+            flights: flights, edits: (p.edits && typeof p.edits === 'object') ? p.edits : {} };
+    }
+    var BASIS_WORD = { gross: 'Gross', net: 'Net' };
+
+    // One ranking for one table, on the basis asked for. 'as' = as the event is scored.
+    function tableRows(data, scopeId, basis, fid) {
+        var ctl = g('computeTournamentLeaderboard');
+        var refusedNet = function (v) { var f = g('netWasRefused'); return basis === 'net' && f ? f(v) : false; };
+        var NO_NET = 'Net places need a real scorecard (a stroke index) for this course.';
+        if (scopeId === 'single') {
+            var d = basis === 'as' ? data : Object.assign({}, data, { scoringMode: basis });
+            if (refusedNet(d)) return { available: false, reason: NO_NET, rows: [] };
+            return { available: true, rows: ctl(d, fid) };
+        }
+        if (scopeId === 'event') {
+            var v = g('resolveLeaderboardView')(data, 'event', fid, basis === 'as' ? undefined : { basis: basis });
+            return { available: !!v.available, reason: v.reason || '', rows: v.rows || [] };
+        }
+        var rv = basis === 'as' ? g('roundView')(data, scopeId) : g('roundViewOnBasis')(data, scopeId, basis);
+        if (!rv) return { available: false, reason: 'That round is no longer part of this event.', rows: [] };
+        if (refusedNet(rv)) return { available: false, reason: NO_NET, rows: [] };
+        return { available: true, rows: ctl(rv, fid) };
+    }
+
+    // Competition ranks again after a golfer is taken out (one prize per golfer):
+    // the engine's tie groups are kept, the numbers close up.
+    function rerank(rows) {
+        var out = [], prevOld = null, prevNew = 0;
+        rows.forEach(function (r, i) {
+            var nr = (i > 0 && r.rank === prevOld) ? prevNew : i + 1;
+            prevOld = r.rank; prevNew = nr;
+            out.push(Object.assign({}, r, { rank: nr }));
+        });
+        return out;
+    }
+
+    function allocateTable(rows, amounts, R) {
+        var placesSet = amounts.some(function (v) { return v > 0; });
+        if (!placesSet) return [];
+        var scored = rerank(rows.filter(function (r) { return r.hasScores; }));
+        var tieCount = {}; scored.forEach(function (r) { tieCount[r.rank] = (tieCount[r.rank] || 0) + 1; });
+        var paid;
+        if (R.ties === 'full') {
+            paid = scored.filter(function (r) { return r.rank <= amounts.length; }).map(function (r) { return { rank: r.rank, entry: r, amount: amounts[r.rank - 1] || 0 }; });
+        } else {
+            paid = g('allocatePlacePayouts')(scored, amounts).filter(function (p) { return p.amount > 0 || p.rank <= amounts.length; });
+        }
+        return paid.map(function (p) {
+            var amt = R.rounding === 'dollar' ? Math.floor(p.amount + 1e-9) : round2(p.amount);
+            return { rank: p.rank, tied: tieCount[p.rank] > 1, key: String(p.entry.entryKey || ''), name: String(p.entry.teamName || p.entry.name || ''),
+                toPar: typeof p.entry.toPar === 'number' ? p.entry.toPar : null, amount: amt };
+        });
+    }
+
+    // Every table this event awards: flight x basis x scope, in that order.
+    function placeTables(data, prize, spots) {
+        var R = placeRulesOf(data);
+        var out = { available: true, reason: '', title: '', byFlight: true, groups: [], unflighted: 0, ruled: true, rules: R };
+        var multi = !!(g('isMultiRound') && g('isMultiRound')(data));
+        var scopes;
+        if (!multi) scopes = [{ id: 'single', title: '' }];
+        else if (R.scope) {
+            var rounds = data.rounds || {};
+            var rs = (g('countableRoundIds') ? g('countableRoundIds')(data) : Object.keys(rounds)).map(function (rid) { return { id: rid, title: (rounds[rid] && rounds[rid].name) || 'Round' }; });
+            var ev = [{ id: 'event', title: 'Event total' }];
+            scopes = R.scope === 'event' ? ev : R.scope === 'round' ? rs : ev.concat(rs);
+        } else if (prize && prize.available) scopes = [{ id: prize.basis, title: '' }];   // named by Prizes go by, as today
+        else { out.available = false; out.reason = (prize && prize.reason) || ''; return out; }
+        var fids = flightIds(data);
+        var flights = fids.length ? fids : [null];
+        if (!fids.length) out.byFlight = false;
+        var base = (spots || []).map(amountOf);
+        var tables = [];
+        flights.forEach(function (fid) {
+            var fo = (fid && R.flights[fid]) || {};
+            var on = fo.on || R.on;
+            var bases = on === 'both' ? ['gross', 'net'] : on ? [on] : ['as'];
+            var amounts = fo.spots && fo.spots.some(function (v) { return v > 0; }) ? fo.spots : base;
+            scopes.forEach(function (sc) {
+                bases.forEach(function (b) {
+                    var t = tableRows(data, sc.id, b, fid);
+                    var title = [fid ? (data.flights[fid].name || 'Flight') : '', b === 'as' ? '' : BASIS_WORD[b], sc.title].filter(Boolean).join(' · ');
+                    tables.push({ key: (fid || 'all') + '|' + b + '|' + sc.id, flightId: fid, basis: b, scope: sc.id, title: title,
+                        available: t.available, reason: t.reason || '', rows: t.available ? t.rows : [], amounts: amounts });
+                });
+            });
+        });
+        // ONE PRIZE PER GOLFER: a golfer placing in more than one table of the same
+        // flight (and, within 'round', the same round) keeps one prize; the others
+        // are worked out again without them, until nothing changes.
+        var excluded = {}; tables.forEach(function (t) { excluded[t.key] = {}; });
+        var award = {};
+        for (var pass = 0; pass < 25; pass++) {
+            tables.forEach(function (t) {
+                award[t.key] = allocateTable(t.rows.filter(function (r) { return !excluded[t.key][String(r.entryKey || '')]; }), t.amounts, R);
+            });
+            if (R.onePrize === 'off') break;
+            var changed = false, buckets = {};
+            tables.forEach(function (t) {
+                var b = (t.flightId || 'all') + (R.within === 'round' ? '|' + t.scope : '');
+                (buckets[b] = buckets[b] || []).push(t);
+            });
+            Object.keys(buckets).forEach(function (b) {
+                var wins = {};
+                buckets[b].forEach(function (t, ti) { award[t.key].forEach(function (r) { if (r.key) (wins[r.key] = wins[r.key] || []).push({ t: t, ti: ti, amount: r.amount }); }); });
+                Object.keys(wins).forEach(function (k) {
+                    var w = wins[k]; if (w.length < 2) return;
+                    var keep = R.onePrize === 'gross'
+                        ? (w.filter(function (x) { return x.t.basis === 'gross'; })[0] || w[0])
+                        : w.slice().sort(function (a, c) { return (c.amount - a.amount) || ((a.t.basis === 'gross' ? 0 : 1) - (c.t.basis === 'gross' ? 0 : 1)) || (a.ti - c.ti); })[0];
+                    w.forEach(function (x) { if (x !== keep) { excluded[x.t.key][k] = true; changed = true; } });
+                });
+            });
+            if (!changed) break;
+        }
+        out.groups = tables.map(function (t) {
+            var ed = R.edits[t.key] || {};
+            var rows = award[t.key].map(function (r) {
+                var e = ed[r.key];
+                if (e && isFinite(Number(e.amount))) return Object.assign({}, r, { amount: amountOf(e.amount), edited: true, note: String(e.note || '').slice(0, 120) });
+                return r;
+            });
+            return { flightId: t.flightId, name: t.title, key: t.key, basis: t.basis, scope: t.scope, available: t.available, reason: t.reason, rows: rows,
+                field: t.rows.filter(function (r) { return r.hasScores; }).length };
+        });
+        return out;
+    }
+
     // PLACES. prize = resolvePrizeView(data): the saved basis, never a tab. With
     // flights, one ranking per flight from the engine on that same basis; the
     // amounts are the calculator's, and allocatePlacePayouts splits ties exactly
     // as it does for the overall list. A place inside the count with no amount is
     // a Trophy row; ranks past the count are not rows (the calculator's filter).
     function placeGroups(data, prize, spots) {
+        if (placeRulesOf(data)) return placeTables(data, prize, spots);   // the organizer chose place rules
         var out = { available: !!(prize && prize.available), reason: (prize && prize.reason) || '',
             title: (prize && prize.title) || '', byFlight: false, groups: [], unflighted: 0 };
         if (!out.available) return out;
@@ -190,6 +357,7 @@
                 return { flight: gr.name || '', rows: gr.rows.map(function (r) {
                     var o = { rank: r.rank, key: r.key, name: r.name, amount: r.amount };
                     if (typeof r.toPar === 'number') o.toPar = r.toPar;
+                    if (r.edited) { o.set = true; if (r.note) o.note = r.note; }   // the organizer's Adjust
                     return o;
                 }) };
             }),
@@ -278,7 +446,7 @@
 
     var api = {
         PRIZE_WORD: PRIZE_WORD, typeOf: typeOf, wordOf: wordOf, wordCap: wordCap, amountOf: amountOf, money: money,
-        amountText: amountText, shortWord: shortWord, shortText: shortText, settingsOf: settingsOf, flightIds: flightIds, placeGroups: placeGroups,
+        amountText: amountText, shortWord: shortWord, shortText: shortText, settingsOf: settingsOf, flightIds: flightIds, placeGroups: placeGroups, placeRulesOf: placeRulesOf, placeTables: placeTables,
         skinsSummary: skinsSummary, contestOwnerKey: contestOwnerKey, contestsSummary: contestsSummary,
         summary: summary, hostOf: hostOf, recordFor: recordFor, posted: posted, myResults: myResults
     };

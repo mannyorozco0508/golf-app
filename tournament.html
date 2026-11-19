@@ -589,6 +589,20 @@
            .mark-birdie / .mark-eagle: a 2px inset ring, never a colour fill. */
         .pz-type-note { font-size:0.78rem; color:var(--text-muted); margin:-6px 0 12px; }
         .pz-card { border:1px solid var(--border-mid); border-radius:14px; padding:10px 14px; margin-bottom:12px; background:var(--bg-card); }
+        .pz-chips { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px; }
+        .pz-chip { border:1px solid var(--border-mid); border-radius:999px; padding:6px 11px; font-weight:700; font-size:0.82rem; background:var(--bg-card); color:var(--brand-navy); cursor:pointer; font-family:inherit; }
+        .pz-chip.on { background:var(--brand-green); border-color:var(--brand-green); color:#fff; }
+        .pz-sent { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding:8px 0; border-top:1px solid var(--border-faint); font-size:0.9rem; }
+        .pz-change { border:0; background:none; color:var(--accent-teal); font-weight:800; font-size:0.85rem; cursor:pointer; padding:0; font-family:inherit; white-space:nowrap; }
+        .pz-sent-edit { padding:0 0 8px; }
+        .pz-sent-edit .payout-basis-seg { margin-bottom:6px; }
+        .pz-spots { width:100%; box-sizing:border-box; border:1px solid var(--border-mid); border-radius:10px; padding:8px; font-size:0.9rem; margin-bottom:6px; background:var(--bg-card); color:var(--text-main); }
+        .pz-set { color:var(--text-muted); font-size:0.78rem; }
+        .pz-adjust { border:0; background:none; padding:2px 0 0; font-size:0.75rem; font-weight:800; color:var(--accent-teal); display:block; margin-left:auto; cursor:pointer; font-family:inherit; }
+        .pz-edit { flex-wrap:wrap; gap:6px; margin:4px 0 8px; }
+        .pz-edit input { border:1px solid var(--border-mid); border-radius:8px; padding:6px; font-size:0.88rem; background:var(--bg-card); color:var(--text-main); }
+        .pz-edit input[type=number] { width:90px; }
+        .pz-edit input[type=text] { flex:1 1 160px; }
         .pz-card h3 { margin:4px 0 8px; }
         .pz-head { display:flex; align-items:center; justify-content:space-between; gap:8px; }
         .pz-title { font-size:1.02rem; font-weight:800; color:var(--text-main); }
@@ -1813,6 +1827,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <div class="payout-basis-seg" id="prize-type-control" role="group" aria-label="Prize type"></div>
             <p class="pz-type-note" id="prize-type-note"></p>
         </div>
+        <!-- HOW THIS EVENT GOES (Starkey settings, layout B, Manny 2026-11-19): the place
+             rules as sentences, each with Change; owner only, filled by renderPrizeOwnerCards. -->
+        <div class="pz-card" id="prize-rules-card" style="display:none;"></div>
         <div class="pz-card" id="prize-card-places">
         <!-- THE CALCULATOR IS THE ORGANIZER'S (Wave 1, A3/A4). Hidden for everyone
              else, never removed (the f0fa56f rule: hide in the tree). The amounts it
@@ -8720,7 +8737,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const note = document.getElementById('payout-basis-note');
         if (!ctl || !label || !note) return;
         const ids = recordIsMultiRound() ? orderedRoundIds(currentData) : [];
-        if (ids.length === 0) {
+        // Places are for a chosen scope (How places go): this single choice no longer decides anything.
+        const ruledScope = (TournamentPrizes.placeRulesOf(currentData || {}) || {}).scope;
+        if (ids.length === 0 || ruledScope) {
             [ctl, label, note].forEach((e) => { e.style.display = 'none'; e.innerHTML = ''; });
             return;
         }
@@ -8767,7 +8786,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const pub = document.getElementById('payout-public-amounts');
         if (pub) {
             pub.innerHTML = owner ? '' : (payoutsAreSet(spotAmounts)
-                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${eventFlightIds(currentData).length ? 'Each flight: ' : ''}${spotAmounts.map((v, i) => `${ordinal(i + 1)} ${prizeLabel(v)}`).join(' \u00b7 ')}</div>`
+                ? `<div class="payout-spot-readonly" style="text-align:center; font-size:0.85rem;">${publicPlacesLine(spotAmounts, (v) => prizeLabel(v))}</div>`
                 : `<div class="payout-spot-readonly" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">Results not set yet.</div>`);
         }
         // ONE BASIS FOR EVERY PHONE (audit #1, A1). The data decides - the
@@ -8775,7 +8794,14 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // work one out - and never the board tab or flight this viewer has open.
         const prize = resolvePrizeView(currentData || {});
         renderPayoutBasis(prize, owner);
-        if (!owner && !payoutsAreSet(spotAmounts)) { resultsContainer.innerHTML = ''; return; }
+        if (!owner && !payoutsAreSet(spotAmounts) && !placeRulesSpotsSet(currentData)) { resultsContainer.innerHTML = ''; return; }
+        // PLACE RULES CHOSEN (layout B): every table the rules make, from the record.
+        if (TournamentPrizes.placeRulesOf(currentData || {})) {
+            const fp = prizePlaceGroups(currentData || {}, prize, spotAmounts);
+            resultsContainer.innerHTML = fp.available ? prizeFlightRowsHtml(fp, owner)
+                : `<div class="payout-basis-reason" style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.82rem;">${escapeHtml(owner ? (fp.reason || '') : 'Prize results coming soon')}</div>`;
+            return;
+        }
 
         // NEVER A MADE-UP LIST. No basis the engine can pay on: its sentence,
         // and no rows at all.
@@ -8863,15 +8889,163 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     function eventFlightIds(data) { return TournamentPrizes.flightIds(data); }
     function prizePlaceGroups(data, prize, spots) { return TournamentPrizes.placeGroups(data, prize, spots); }
 
-    function prizeFlightRowsHtml(fp) {
+    function prizeFlightRowsHtml(fp, owner) {
         let h = '';
         fp.groups.forEach((gr) => {
-            h += `<div class="pz-k">${escapeHtml(gr.name)}</div>`;
+            if (gr.name) h += `<div class="pz-k">${escapeHtml(gr.name)}</div>`;
+            if (fp.ruled && gr.available === false) { h += `<div class="pz-note">${escapeHtml(gr.reason || '')}</div>`; return; }
             h += gr.rows.length
-                ? gr.rows.map((p) => `<div class="ledger-row"><span>${ordinal(p.rank)} — ${escapeHtml(p.name)}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">${prizeLabel(p.amount)}</span></div>`).join('')
-                : `<div class="pz-note">No scores in this flight yet.</div>`;
+                ? gr.rows.map((p) => placeRowHtml(fp, gr, p, owner)).join('')
+                : `<div class="pz-note">${fp.ruled ? (gr.field > 0 ? 'Every golfer here already holds a prize.' : 'No scores here yet.') : 'No scores in this flight yet.'}</div>`;
         });
         if (fp.unflighted) h += `<div class="pz-note">${fp.unflighted} scored ${fp.unflighted === 1 ? 'entry is' : 'entries are'} in no flight, so in no flight's places.</div>`;
+        return h;
+    }
+
+    // ========================================================================
+    // HOW THIS EVENT GOES (Starkey settings, places 1-7, layout B; Manny
+    // 2026-11-19 "Starkey settings: layout B ... places 1-7 ... Preview only").
+    // The rules tournament-prizes.js applies (placeRulesOf), read as sentences,
+    // each with Change. Owner only. Every write is the owner's own write to
+    // tournaments/<code>/prizeSettings/places/..., the way savePrizeSetting
+    // writes prizeSettings/perSkin. Nothing here computes a place or an amount.
+    // ========================================================================
+    let placeRuleOpen = '';            // which sentence is open for Change
+    let placeEditOpen = '';            // '<tableKey>#<entryKey>' being adjusted
+    const PLACE_PRESETS = {
+        simple: null,
+        both: { on: 'both', scope: 'event', ties: 'split', rounding: 'cents', onePrize: 'gross', within: 'event' },
+        rounds: { on: 'both', scope: 'round', ties: 'split', rounding: 'cents', onePrize: 'gross', within: 'round' }
+    };
+    // The golfer's line under Prizes: the amounts every flight uses, and any flight's own (How places go).
+    function publicPlacesLine(spotAmounts, label) {
+        const list = (a) => a.map((v, i) => `${ordinal(i + 1)} ${label(v)}`).join(' \u00b7 ');
+        const fids = eventFlightIds(currentData);
+        const R = TournamentPrizes.placeRulesOf(currentData || {});
+        const own = R ? fids.filter((fid) => R.flights[fid] && (R.flights[fid].spots || []).some((v) => v > 0)) : [];
+        if (!own.length) return `${fids.length ? 'Each flight: ' : ''}${list(spotAmounts)}`;
+        const rest = fids.length > own.length ? `${own.length ? 'Other flights' : 'Each flight'}: ${list(spotAmounts)}` : '';
+        return own.map((fid) => `${escapeHtml(currentData.flights[fid].name || 'Flight')}: ${list(R.flights[fid].spots)}`).concat(rest ? [rest] : []).join('<br>');
+    }
+    function placeRulesSpotsSet(data) {
+        const R = TournamentPrizes.placeRulesOf(data || {});
+        return !!R && Object.keys(R.flights).some((fid) => (R.flights[fid].spots || []).some((v) => v > 0));
+    }
+    function placeRuleWrite(path, v) {
+        if (!currentCode || !canManage()) return;
+        const ref = db.ref(`tournaments/${currentCode}/prizeSettings/places${path ? '/' + path : ''}`);
+        return (v === null ? ref.remove() : ref.set(v)).catch(err => alert(`Error: ${err.message}`));
+    }
+    function setPlaceRule(field, v) {
+        const ok = { on: ['gross', 'net', 'both', ''], scope: ['event', 'round', 'both', ''], ties: ['split', 'full'], rounding: ['cents', 'dollar'],
+            onePrize: ['off', 'gross', 'larger'], within: ['event', 'round'] };
+        if (!ok[field] || ok[field].indexOf(v) === -1) return;
+        return placeRuleWrite(field, v === '' ? null : v);
+    }
+    function setPlacePreset(name) {
+        if (!(name in PLACE_PRESETS) || !currentCode || !canManage()) return;
+        const p = PLACE_PRESETS[name];
+        if (!p) return placeRuleWrite('', null);    // Places only: today's screen, no rules at all
+        const upd = {};
+        Object.keys(p).forEach((k) => { upd[k] = p[k]; });
+        return db.ref(`tournaments/${currentCode}/prizeSettings/places`).update(upd).catch(err => alert(`Error: ${err.message}`));
+    }
+    function setFlightPlaceOn(fid, v) {
+        if (!(currentData.flights || {})[fid] || ['gross', 'net', 'both', ''].indexOf(v) === -1) return;
+        return placeRuleWrite(`flights/${fid}/on`, v === '' ? null : v);
+    }
+    function setFlightPlaceSpots(fid, raw) {
+        if (!(currentData.flights || {})[fid]) return;
+        const list = String(raw || '').split(/[\s,\/]+/).filter(Boolean).slice(0, MAX_PAYOUT_SPOTS)
+            .map((x) => { const n = Number(x.replace(/[$]/g, '')); return isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : 0; });
+        return placeRuleWrite(`flights/${fid}/spots`, list.length ? list : null);
+    }
+    function togglePlaceRule(which) {
+        placeRuleOpen = placeRuleOpen === which ? '' : which;
+        renderPrizeOwnerCards(canManage(), typedPayoutSpots());
+    }
+    function openPlaceEdit(tableKey, key) {
+        placeEditOpen = placeEditOpen === tableKey + '#' + key ? '' : tableKey + '#' + key;
+        renderPayoutResults();
+    }
+    function savePlaceEdit(tableKey, key) {
+        const amt = document.getElementById('place-edit-amount'), note = document.getElementById('place-edit-note');
+        const x = amt ? parseFloat(amt.value) : NaN;
+        if (!(isFinite(x) && x >= 0)) return;
+        placeEditOpen = '';
+        return placeRuleWrite(`edits/${tableKey}/${key}`, { amount: Math.round(x * 100) / 100, note: String((note && note.value) || '').slice(0, 120) });
+    }
+    function clearPlaceEdit(tableKey, key) {
+        placeEditOpen = '';
+        return placeRuleWrite(`edits/${tableKey}/${key}`, null);
+    }
+    function placeRowHtml(fp, gr, p, owner) {
+        const tie = fp.ruled && p.tied ? 'T' : '';
+        const set = p.edited ? ` <span class="pz-set">· set by the organizer${p.note ? ': ' + escapeHtml(p.note) : ''}</span>` : '';
+        let h = `<div class="ledger-row"><span>${tie}${ordinal(p.rank)} — ${escapeHtml(p.name)}${set}</span><span class="${p.amount > 0 ? 'val-pos' : 'val-even'}">${prizeLabel(p.amount)}`;
+        const can = owner && fp.ruled && p.key && gr.key;
+        if (can) h += ` <button type="button" class="pz-adjust" data-table="${escapeHtml(gr.key)}" data-key="${escapeHtml(p.key)}" onclick="openPlaceEdit(this.dataset.table, this.dataset.key)">Adjust</button>`;
+        h += `</span></div>`;
+        if (can && placeEditOpen === gr.key + '#' + p.key) {
+            h += `<div class="pz-ctl pz-edit" id="place-edit"><label for="place-edit-amount">${escapeHtml(prizeWordCap(currentData))} $</label><input type="number" id="place-edit-amount" min="0" step="1" value="${p.amount}">`
+                + `<input type="text" id="place-edit-note" maxlength="120" placeholder="Why (shown beside it)" value="${escapeHtml(p.note || '')}">`
+                + `<button type="button" class="ct-btn" id="place-edit-save" data-table="${escapeHtml(gr.key)}" data-key="${escapeHtml(p.key)}" onclick="savePlaceEdit(this.dataset.table, this.dataset.key)">Save</button>`
+                + (p.edited ? `<button type="button" class="ct-btn" id="place-edit-clear" data-table="${escapeHtml(gr.key)}" data-key="${escapeHtml(p.key)}" onclick="clearPlaceEdit(this.dataset.table, this.dataset.key)">Back to the rule</button>` : '')
+                + `</div>`;
+        }
+        return h;
+    }
+    function placeSeg(label, field, choices, current, fn) {
+        return `<div class="payout-basis-seg" role="group" aria-label="${escapeHtml(label)}">` + choices.map(([v, t]) =>
+            `<button type="button" class="${current === v ? 'on' : ''}" aria-pressed="${current === v}" data-v="${v}" onclick="${fn || 'setPlaceRule'}('${field}', this.dataset.v)">${escapeHtml(t)}</button>`).join('') + `</div>`;
+    }
+    function prizeRulesCardHtml(data, spots) {
+        const R = TournamentPrizes.placeRulesOf(data);
+        const multi = isMultiRound(data);
+        const fids = eventFlightIds(data);
+        const amountsText = (list) => list.map((v, i) => `${ordinal(i + 1)} ${prizeMoney(v)}`).join(' · ');
+        const preset = !R ? 'simple' : (R.on === 'both' && R.onePrize === 'gross' && R.ties === 'split' && R.rounding === 'cents'
+            ? (R.scope === 'round' && R.within === 'round' ? 'rounds' : (R.scope === 'event' || !multi) && R.within === 'event' ? 'both' : '') : '');
+        let h = `<div class="pz-head"><span class="pz-title">How places go</span></div>`;
+        h += `<div class="pz-k">Start from</div><div class="pz-chips" id="place-presets">`
+            + [['simple', 'Places only'], ['both', 'Gross and net']].concat(multi ? [['rounds', 'Each round, gross and net']] : [])
+                .map(([k, t]) => `<button type="button" class="pz-chip${preset === k ? ' on' : ''}" aria-pressed="${preset === k}" data-p="${k}" onclick="setPlacePreset(this.dataset.p)">${escapeHtml(t)}</button>`).join('')
+            + `</div>`;
+        const asScored = netIsInPlay(data) ? 'net' : 'gross';
+        const on = (R && R.on) || '';
+        const onText = on === 'both' ? '<b>gross and net</b>' : on ? `<b>${on}</b>` : `<b>${asScored}</b>, as the event is scored`;
+        const sent = (id, html, editor) => `<div class="pz-sent" id="place-rule-${id}"><span>${html}</span><button type="button" class="pz-change" onclick="togglePlaceRule('${id}')">${placeRuleOpen === id ? 'Done' : 'Change'}</button></div>`
+            + (placeRuleOpen === id ? `<div class="pz-sent-edit">${editor}</div>` : '');
+        h += sent('on', `Places go by ${onText}.`, placeSeg('Places go by', 'on', [['', 'As scored'], ['gross', 'Gross'], ['net', 'Net'], ['both', 'Gross and net']], on));
+        if (multi) {
+            const sc = (R && R.scope) || '';
+            const scText = sc === 'round' ? '<b>each round</b>' : sc === 'both' ? '<b>the event total and each round</b>' : sc === 'event' ? '<b>the event total</b>' : 'what <b>Prizes go by</b> says below';
+            h += sent('scope', `Places are for ${scText}.`, placeSeg('Places are for', 'scope', [['', 'Prizes go by'], ['event', 'Event total'], ['round', 'Each round'], ['both', 'Both']], sc));
+        }
+        const base = (spots || []).filter((v, i) => i < spots.length);
+        let amt = base.some((v) => v > 0) ? `${fids.length ? 'Each flight: ' : ''}${amountsText(base)}.` : 'Place amounts are set in Places below.';
+        let ed = `<div class="pz-note">The amounts in Places below are every flight's, unless a flight has its own here.</div>`;
+        fids.forEach((fid) => {
+            const fo = (R && R.flights[fid]) || {};
+            const own = (fo.spots || []).some((v) => v > 0);
+            if (own || fo.on) amt += ` ${escapeHtml(data.flights[fid].name || 'Flight')}: ${fo.on ? (fo.on === 'both' ? 'gross and net' : fo.on) + ', ' : ''}${own ? amountsText(fo.spots) : 'the same amounts'}.`;
+            ed += `<div class="pz-k">${escapeHtml(data.flights[fid].name || 'Flight')}</div>`
+                + placeSeg('Goes by', fid, [['', 'Same as above'], ['gross', 'Gross'], ['net', 'Net'], ['both', 'Gross and net']], fo.on || '', 'setFlightPlaceOn')
+                + `<input type="text" class="pz-spots" id="place-spots-${escapeHtml(fid)}" placeholder="Its own amounts, e.g. 250, 200, 150" value="${own ? fo.spots.join(', ') : ''}" data-f="${escapeHtml(fid)}" onchange="setFlightPlaceSpots(this.dataset.f, this.value)">`;
+        });
+        h += fids.length ? sent('amounts', amt, ed) : `<div class="pz-sent"><span>${amt}</span></div>`;
+        const ties = (R && R.ties) || 'split';
+        h += sent('ties', ties === 'full' ? 'Each tied golfer gets <b>the full prize</b> of the place they tie for.' : 'Ties <b>split</b> the places they fill.',
+            placeSeg('Ties', 'ties', [['split', 'Split the tied places'], ['full', 'Each gets the full prize']], ties));
+        const rd = (R && R.rounding) || 'cents';
+        h += sent('rounding', rd === 'dollar' ? 'Shares are rounded <b>down to the dollar</b>.' : 'Shares go <b>to the cent</b>.',
+            placeSeg('Round each share', 'rounding', [['cents', 'To the cent'], ['dollar', 'Down to the dollar']], rd));
+        const op = (R && R.onePrize) || 'off', wi = (R && R.within) || 'event';
+        const opText = op === 'off' ? 'A golfer can win <b>more than one</b> place.'
+            : `<b>One prize per golfer</b>: ${op === 'gross' ? 'gross first' : 'the larger prize (gross if they are equal)'}${multi ? (wi === 'round' ? ', in each round' : ', in the event') : ''}.`;
+        h += sent('one', opText, placeSeg('One prize per golfer', 'onePrize', [['off', 'Off'], ['gross', 'Gross first'], ['larger', 'The larger prize']], op)
+            + (multi ? placeSeg('Within', 'within', [['event', 'The event'], ['round', 'Each round']], wi) : ''));
+        h += `<div class="pz-note" id="place-adjust-note">${R ? 'Tap Adjust beside any amount below to change it before posting.' : 'Choose a rule to turn on Adjust beside each amount.'}</div>`;
         return h;
     }
 
@@ -8968,6 +9142,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     function renderPrizeOwnerCards(owner, spots) {
+        const rulesCard = document.getElementById('prize-rules-card');
+        if (rulesCard) {
+            rulesCard.style.display = owner && currentData ? 'block' : 'none';
+            rulesCard.innerHTML = owner && currentData ? prizeRulesCardHtml(currentData, spots) : '';
+        }
         const els = ['prize-owner-head', 'prize-card-skins', 'prize-card-kps', 'prize-post'].map((id) => document.getElementById(id));
         if (els.some((e) => !e)) return;
         if (!owner || !currentData) {
