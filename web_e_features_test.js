@@ -49,7 +49,16 @@ const exists = (f) => fs.existsSync(path.join(ROOT, f));
 const stripComments = (h) => h.replace(/<!--[\s\S]*?-->/g, '');
 const html = stripComments(read('hardpan-home.html'));
 const JS = read('site-features.js');
-const feat = (/<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(html) || [])[1] || '';
+// WHAT'S NEW RE-PIN (2026-11-19, ADVISOR-20261119-0906 item 1): the three release rows (New in 2.0.9, 2.0.8, 2.0.7) moved
+// byte for byte off the homepage onto whats-new.html (/whats-new); the homepage keeps a "What's new" link where they were.
+// "The rows" this file holds are now the site's: whats-new.html's three, then the homepage's five - the same eight rows,
+// the same 40 cards, in the same order as before (and as media/screens/manifest.json lists them). Where a check was about
+// "the page", it now reads both pages (`both`). whats_new_page_test.js holds the move itself.
+const wnHtml = stripComments(read('whats-new.html'));
+const featHome = (/<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(html) || [])[1] || '';
+const featNew = (/<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(wnHtml) || [])[1] || '';
+const feat = featNew + '\n' + featHome;
+const both = html + '\n' + wnHtml;
 // 2.0.8 site (Nov 15): the "Coming in 2.0.8" row was a section of its own just above #features while 2.0.8 was in review.
 // 2.0.8 release re-pin: flip-to-released.sh moved it INTO #features as "New in 2.0.8" (#g-update), the first row, tags gone.
 // 2.0.9 release re-pin (Nov 17): the New in 2.0.9 row is now #g-update (first); the 2.0.8 row moved to #g-update208.
@@ -61,7 +70,7 @@ const update209 = (/<div class="grp" id="g-update">[\s\S]*?<\/div>(?=\n    <div 
 // #features, tagged. 2.0.9 RELEASE RE-PIN (Nov 17, iOS 2.0.9 (1) Ready for Distribution 3:08 PM AZ, Manny's typed
 // "OK web flip 2.0.9"): the row moved INTO #features as "New in 2.0.9" (#g-update), first, tags and their CSS gone,
 // manifest.coming gone (its two screens lead screens[]).
-const rawHome = read('hardpan-home.html');
+const rawHome = read('hardpan-home.html') + '\n' + read('whats-new.html');   // what's new re-pin: both pages, raw
 // The 2.0.9 features: named ONLY in the New in 2.0.9 row, never anywhere else on the page. (The 2.0.8
 // row's own "Under par in red on the GPS screen." is 2.0.8's and is taken out with that row before this is matched.)
 // The All-in / GPS v2 plans ladder is in the 2.0.9 code but behind a live switch that is off: never on the page.
@@ -237,6 +246,9 @@ describe('1. the 25 cards', () => {
         cards.forEach((c) => assert.match(c.body, new RegExp('<button type="button" class="ph" data-open="' + c.key + '" aria-label="See [^"]+ full screen">'), c.h));
         assert.match(html, /<div class="fv" id="fv" role="dialog" aria-modal="true" aria-labelledby="fv-title" hidden>/);
         assert.match(html, /<script src="\/site-features\.js" defer><\/script>/);
+        // what's new re-pin: the release cards open the same viewer on their own page
+        assert.match(wnHtml, /<div class="fv" id="fv" role="dialog" aria-modal="true" aria-labelledby="fv-title" hidden>/);
+        assert.match(wnHtml, /<script src="\/site-features\.js" defer><\/script>/);
     });
 });
 
@@ -279,7 +291,7 @@ describe('2. words', () => {
     test('2.0.8 release: the 2.0.8 features are named only in the New in 2.0.8 row, the first row of EVERYTHING IN THE APP', () => {
         assert.ok(update208.length > 500, 'positive: the New in 2.0.8 row is there');
         // 2.0.9 release re-pin: the New in 2.0.9 row (its UNDER PAR IN RED eyebrow) is taken out too; it is held by the 2.0.9 tests.
-        const t = textOf(html.replace(update208, '').replace(update209, ''));
+        const t = textOf(both.replace(update208, '').replace(update209, ''));   // what's new re-pin: both pages
         assert.ok(update209.length > 1200, 'positive: the New in 2.0.9 row is there');
         assert.match(t, /New in 2\.0\.7/, 'positive: the 2.0.7 row is there');
         assert.match(t, /EVERYTHING IN THE APP/, 'positive: the slice still has the rest of the page');
@@ -287,7 +299,10 @@ describe('2. words', () => {
         // the row sits inside EVERYTHING IN THE APP, first, right above New in 2.0.7; the old section is gone
         // 2.0.9 release re-pin: New in 2.0.9 leads (#g-update), the 2.0.8 row is second (#g-update208), then New in 2.0.7.
         assert.equal(groups[0].id, 'update'); assert.equal(groups[0].name, 'New in 2.0.9'); assert.equal(groups[1].name, 'New in 2.0.8'); assert.equal(groups[2].name, 'New in 2.0.7');
-        assert.ok(feat.indexOf('id="g-update208"') > feat.indexOf('EVERYTHING IN THE APP') && feat.indexOf('id="g-update208"') < feat.indexOf('id="g-new"'));
+        // what's new re-pin (2026-11-19): the release rows are on whats-new.html, 2.0.8 between 2.0.9 and 2.0.7; none on the homepage
+        assert.ok(featNew.indexOf('id="g-update208"') > featNew.indexOf('id="g-update"') && featNew.indexOf('id="g-update208"') < featNew.indexOf('id="g-new"'));
+        assert.match(featHome, /EVERYTHING IN THE APP/, 'positive: the homepage rows were found');
+        assert.doesNotMatch(featHome, /id="g-update|id="g-new"|New in 2\.0\./);
         assert.doesNotMatch(html, /id="coming208"|id="coming209"|class="feat coming"|id="g-coming"|coming208-tag|coming209-tag/, 'a Coming section is still on the page');
     });
 
@@ -301,7 +316,7 @@ describe('2. words', () => {
         // 2.0.9 release re-pin: the Coming in 2.0.9 block and its CSS are gone too; nothing on the page says coming any more.
         assert.doesNotMatch(rawHome, /gsoon|fsoon|soon208|coming in 2\.0\.[89]|in review|Not in the app yet/i, 'coming wording left on the page (markup, CSS or comments)');
         // (the at-a-glance tiles may say COMING about Check-in / Scan check: that is not a release row's wording)
-        assert.doesNotMatch(textOf(html), /coming in 2\.0\.[89]|coming in the next update|in review|not in the app yet/i);
+        assert.doesNotMatch(textOf(both), /coming in 2\.0\.[89]|coming in the next update|in review|not in the app yet/i);
         const cs = [...update208.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
         assert.equal(cs.length, 2);
         cs.forEach((m) => assert.match(m[3], /^<div class="cap"><span class="eb">/, m[1] + ': the caption does not start with its eyebrow (a tag is still there)'));
@@ -334,7 +349,7 @@ describe('2. words', () => {
         assert.match(update209, /<span class="gn">2 &middot; swipe &rarr;<\/span>/);
         assert.equal((update209.match(/<div class="dots"[^>]*>(<i[^>]*><\/i>)+<\/div>/) || [''])[0].match(/<i/g).length, 2);
         assert.equal(groups[0].name, 'New in 2.0.9'); assert.equal(groups[1].name, 'New in 2.0.8');
-        assert.equal(html.indexOf('id="coming209"'), -1); assert.equal(html.indexOf('id="coming208"'), -1);
+        assert.equal(both.indexOf('id="coming209"'), -1); assert.equal(both.indexOf('id="coming208"'), -1);
         const cs = [...update209.matchAll(/<li class="fc" id="([^"]+)" data-key="([^"]+)">([\s\S]*?)<\/li>/g)];
         assert.deepEqual(cs.map((m) => [m[1], m[2]]), [['f-red-under', 'red-under'], ['f-ask-red', 'ask-red']]);
         cs.forEach((m) => assert.match(m[3], /^<div class="cap"><span class="eb">/, m[1] + ': the caption does not start with its eyebrow (a tag is still there)'));
@@ -394,11 +409,11 @@ describe('2. words', () => {
         assert.doesNotMatch(t, /\b(settle|owes?|pool|payout|wager)\b|\$/i);
         // the 2.0.9 features are named only inside the New in 2.0.9 row (the 2.0.8 row's own "Under par in red on the GPS
         // screen." shipped in 2.0.8 and is taken out with that row)
-        const rest = textOf(html.replace(update209, '').replace(update208, ''));
+        const rest = textOf(both.replace(update209, '').replace(update208, ''));   // what's new re-pin: both pages
         assert.match(rest, /EVERYTHING IN THE APP/, 'positive: the slice still has the rest of the page');
         assert.doesNotMatch(rest, UNSHIPPED_209);
         // the All-in / GPS v2 plans ladder is in the 2.0.9 code behind a live switch that is off: not a feature, never named
-        assert.doesNotMatch(textOf(html), PLANS_209);
+        assert.doesNotMatch(textOf(both), PLANS_209);
         assert.doesNotMatch(rawHome, PLANS_209);
     });
 
@@ -564,7 +579,7 @@ describe('6. served, static, not the app', () => {
         const sw = read('sw.js');
         const shell = sw.slice(sw.indexOf('const SHELL_FILES = ['), sw.indexOf('];', sw.indexOf('const SHELL_FILES = [')));
         assert.ok(shell.length > 200, 'positive: the shell list was found');
-        assert.doesNotMatch(shell, /site-features|media\/|hardpan-home/);
+        assert.doesNotMatch(shell, /site-features|media\/|hardpan-home|whats-new/);   // what's new re-pin: + whats-new
         assert.doesNotMatch(read('sync-mobile-web.js'), /site-features|media\/screens/);
         // Re-pinned 2026-11-11: v397-2.0, icon B moved it.
         assert.match(sw, /const CACHE_VERSION = 'golfapp-v426-2\.0';/);

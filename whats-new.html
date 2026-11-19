@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="What changed in each HardPan Golf update: the new features of 2.0.9, 2.0.8 and 2.0.7, with real screens.">
+<link rel="icon" href="/hardpan-icon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>What&rsquo;s new in HardPan</title>
+<!--
+  WHAT'S NEW (2026-11-19, ADVISOR-20261119-0906 item 1, the part common to all three homepage mockups: the homepage is too long).
+  Served at /whats-new as a Pretty URL (Cloudflare Pages serves whats-new.html there; no _redirects row, no Function), the
+  same way see-it.html is /see-it. The homepage keeps one plain link, "What's new", where these rows were.
+  The three release rows are the ones hardpan-home.html had at d1a5e83a, moved here byte for byte (newest first: 2.0.9,
+  2.0.8, 2.0.7, each with its cards and, for 2.0.8 and 2.0.7, its Also new list), with the homepage's CSS for them copied
+  unchanged. site-features.js runs the rows (dots, arrows) and the full-screen viewer (#fv, copied unchanged) here exactly
+  as on the homepage; the homepage-only parts of that script (the sticky bar, Try the GPS, Try Just say it) find nothing
+  here and do nothing. A release is added here only once it is in the stores.
+  Not the app: not in sw.js's shell list, not in the native bundle. Guards: whats_new_page_test.js, web_e_features_test.js.
+-->
+<style>
+    :root { --g:#0f4a36; --g2:#163f31; --lime:#d9f07a; --cream:#f4f1e8; --navy:#1d3357; --ink:#14201b; --mut:#5d6b64; --card:#fff; --line:#e3e0d6; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    html { scroll-behavior:smooth; }
+    body { font-family:-apple-system, BlinkMacSystemFont, "Helvetica Neue", Inter, Arial, sans-serif; color:var(--ink); background:var(--cream); -webkit-font-smoothing:antialiased; }
+    a { color:inherit; text-decoration:none; }
+    .wrap { max-width:1180px; margin:0 auto; padding:0 28px; }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:13px 20px; border-radius:12px; font-weight:700; font-size:15px; white-space:nowrap; }
+    .lime { background:var(--lime); color:var(--g); }
+    footer { background:var(--ink); color:#c9d1cc; padding:40px 0; font-size:14px; line-height:1.6; }
+    footer .wrap { display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+    footer .flinks a { margin-right:16px; color:#fff; text-decoration:underline; text-underline-offset:3px; }
+    .feat { padding:4px 0 46px; }
+    .fsub { text-align:center; color:var(--mut); font-size:15px; margin:-8px 16px 4px; }
+    .grp { max-width:1180px; margin:0 auto; padding:24px 28px 4px; }
+    .ghd { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .ghd h2 { font-size:30px; font-weight:900; letter-spacing:-.02em; }
+    .gn { display:none; font-size:13px; color:var(--g); font-weight:700; white-space:nowrap; }
+    .arrows { display:flex; gap:8px; }
+    .ga { width:38px; height:38px; border-radius:50%; background:#fff; border:1px solid var(--line); color:var(--ink); font-size:24px; font-weight:800; line-height:1; cursor:pointer; }
+    .ga:hover { border-color:var(--g); }
+    .gln { color:var(--mut); font-size:15px; line-height:1.4; margin:4px 0 14px; }
+    .row { list-style:none; display:flex; gap:12px; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none; padding:2px 0 2px; }
+    .row::-webkit-scrollbar { display:none; }
+    .fc { flex:0 0 272px; scroll-snap-align:start; height:520px; overflow:hidden; border-radius:24px; background:linear-gradient(180deg,var(--g),var(--g2)); color:#fff; padding:18px 16px 0; text-align:center; display:flex; flex-direction:column; align-items:center; cursor:pointer; }
+    .fc .cap { width:100%; }
+    .eb { display:inline-block; font-size:11.5px; font-weight:800; letter-spacing:.14em; color:var(--lime); border:1.5px solid rgba(217,240,122,.5); border-radius:999px; padding:3px 10px; }
+    .clipchip { display:inline-block; font-size:11.5px; font-weight:800; color:var(--g); background:var(--lime); border-radius:999px; padding:4px 9px; margin-left:4px; vertical-align:top; }
+    .fc h3 { font-size:22px; font-weight:900; line-height:1.12; letter-spacing:-.02em; margin:9px 0 5px; }
+    .fc p { font-size:13px; color:#cfe0d6; line-height:1.38; }
+    .ph { display:block; flex:0 0 auto; width:206px; margin-top:14px; padding:7px; border:0; border-radius:34px; background:#0b0f0d; box-shadow:0 18px 40px rgba(0,0,0,.35); cursor:pointer; }
+    .ph:focus-visible, .ga:focus-visible, .chipb:focus-visible, .go:focus-visible { outline:3px solid var(--lime); outline-offset:3px; }
+    .ph .s { display:block; position:relative; width:100%; aspect-ratio:886/1920; border-radius:27px; overflow:hidden; background:#dfe8e4; }
+    .ph img, .ph video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
+    .ph .s.fit img { object-fit:contain; object-position:top; }
+    .ph img { z-index:1; transition:opacity .25s; }
+    .ph .s.has-clip img { opacity:0; }
+    .ph .cb { display:none; position:absolute; z-index:2; left:8px; bottom:8px; background:rgba(16,35,28,.86); color:#fff; font-size:12px; font-weight:700; border-radius:8px; padding:3px 8px; }
+    .ph .s.has-clip .cb { display:block; }
+    /* 2.0.7 site update (web-207-site): the New in 2.0.7 row and the Also new list. */
+    .new207 { list-style:none; display:flex; flex-wrap:wrap; gap:8px 10px; margin:16px 0 6px; padding:0; }
+    .new207 li { font-size:14px; line-height:1.35; color:var(--ink); background:#fff; border:1px solid #e3dfd2; border-radius:12px; padding:8px 12px; }
+    @media (max-width:700px) { .new207 { padding:0 16px; } }
+    .dots { display:flex; gap:5px; justify-content:center; padding:12px 0 0; }
+    .dots i { width:6px; height:6px; border-radius:50%; background:#c9c4b4; }
+    .dots i.on { width:18px; border-radius:3px; background:var(--g); }
+
+    .fv { position:fixed; inset:0; z-index:50; background:#0b0f0d; color:#fff; display:flex; flex-direction:column; }
+    .fv[hidden] { display:none; }
+    html.fv-open, html.fv-open body { overflow:hidden; }
+    .fv-top { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; font-size:14px; font-weight:700; }
+    .fv-x { width:40px; height:40px; border-radius:50%; border:0; background:#26302b; color:#fff; font-size:17px; cursor:pointer; }
+    .fv-sp { width:40px; }
+    .fv-stage { position:relative; flex:1; min-height:0; }
+    .fv-track { list-style:none; display:flex; height:100%; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; }
+    .fv-track::-webkit-scrollbar { display:none; }
+    .fv-s { flex:0 0 100%; height:100%; scroll-snap-align:center; display:flex; align-items:center; justify-content:center; padding:4px 16px; }
+    .fv-img { position:relative; height:100%; max-width:100%; aspect-ratio:886/1920; border-radius:22px; overflow:hidden; background:#1b2320; touch-action:pan-x pan-y pinch-zoom; cursor:zoom-in; }
+    .fv-img img, .fv-img video { width:100%; height:100%; object-fit:contain; display:block; }
+    .fv-img.fit img { object-position:top; }
+    .fv-img.zoom { overflow:auto; cursor:zoom-out; }
+    .fv-img.zoom img { width:200%; height:auto; max-width:none; }
+    .fv-ar { position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:50%; border:0; background:rgba(255,255,255,.2); color:#fff; font-size:28px; line-height:1; cursor:pointer; }
+    .fv-prev { left:10px; } .fv-next { right:10px; }
+    .fv-ar:disabled { opacity:.25; cursor:default; }
+    .fv button:focus-visible { outline:3px solid var(--lime); outline-offset:2px; }
+    .fv-cap { text-align:center; padding:10px 16px 20px; }
+    .fv-cap b { display:block; font-size:18px; }
+    .fv-cap small { color:#aab7b0; font-size:12.5px; }
+    /* this page's own: the top row (the lockup to the homepage and the back link), the title */
+    .top { display:flex; align-items:center; justify-content:space-between; gap:16px; height:72px; }
+    .top .logo img { height:44px; width:auto; display:block; }
+    .back { display:inline-flex; align-items:center; min-height:44px; font-size:15px; font-weight:700; color:var(--g); }
+    .wnhd { max-width:1180px; margin:0 auto; padding:14px 28px 0; }
+    .wnhd h1 { font-size:40px; font-weight:900; letter-spacing:-.02em; line-height:1.05; }
+    .wnhd p { color:var(--mut); font-size:16px; line-height:1.45; margin-top:8px; }
+    .wnback { max-width:1180px; margin:0 auto; padding:26px 28px 0; }
+    @media (max-width:700px) {
+        .wrap { padding:0 16px; }
+        .top { height:56px; } .top .logo img { height:32px; }
+        .wnhd { padding:8px 16px 0; } .wnhd h1 { font-size:30px; } .wnhd p { font-size:15px; }
+        .wnback { padding:20px 16px 0; }
+        footer .wrap { flex-direction:column; }
+    }
+    @media (max-width:700px) {
+        .grp { padding:18px 0 4px; }
+        .ghd, .gln { padding:0 16px; }
+        .ghd h2 { font-size:24px; }
+        .gn { display:inline; }
+        .arrows { display:none; }
+        .gln { font-size:13.5px; margin:2px 0 10px; }
+        .hero .start-row { padding:0; }
+        .try { padding:16px; margin-top:22px; }
+        .fv-ar { width:36px; height:36px; font-size:22px; }
+        .fv-prev { left:4px; } .fv-next { right:4px; }
+    }
+</style>
+</head>
+<body>
+
+<nav class="wrap top" aria-label="Main">
+    <a class="logo" href="/"><img src="/media/home/hardpan-golf-lockup.png" alt="HardPan Golf" width="1278" height="222"></a>
+    <a class="back" id="back-home" href="/">&lsaquo; Back to HardPan</a>
+</nav>
+
+<header class="wnhd">
+    <h1>What&rsquo;s new</h1>
+    <p>What changed in each update, newest first. Swipe each row. Tap a card to see it full screen.</p>
+</header>
+
+<section class="feat" id="features">
+    <div class="grp" id="g-update">
+        <div class="ghd"><h2>New in 2.0.9</h2><span class="gn">2 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="New in 2.0.9: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="New in 2.0.9: more cards">&rsaquo;</button></span></div>
+        <p class="gln">What changed in this update.</p>
+        <ul class="row" aria-label="New in 2.0.9 features"><li class="fc" id="f-red-under" data-key="red-under"><div class="cap"><span class="eb">UNDER PAR IN RED</span><h3>Red means under.</h3><p>Every under-par number on the Receipt, the boards and the leaderboard shows in red. Even and over par stay plain. Birdies are still circles, bogeys squares.</p></div><button type="button" class="ph" data-open="red-under" aria-label="See Red means under full screen"><span class="s"><img src="/media/screens/red-under-400.webp" srcset="/media/screens/red-under-400.webp 400w, /media/screens/red-under-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="1910" loading="lazy" decoding="async" alt="The live leaderboard at Papago thru 9, ranked by net: Leading the Field: Alex P. −6 thru 9, and the To Par column −6, −4, −3, −3 in red for the four stand-in golfers."></span></button></li><li class="fc" id="f-ask-red" data-key="ask-red"><div class="cap"><span class="eb">ASK HARDPAN</span><h3>HardPan&rsquo;s replies read the same way.</h3><p>Ask who&rsquo;s winning - the under-par number inside the answer is red too. Same on the live chip and the tournament card.</p></div><button type="button" class="ph" data-open="ask-red" aria-label="See HardPan&rsquo;s replies read the same way full screen"><span class="s"><img src="/media/screens/ask-red-400.webp" srcset="/media/screens/ask-red-400.webp 400w, /media/screens/ask-red-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="1910" loading="lazy" decoding="async" alt="Ask HardPan in a round at Papago: Who’s winning? Alex leads at −6 net (thru 9). Sam −4 · Casey −3 · Jordan −3, with only the under-par numbers in red inside the sentence."></span></button></li></ul>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i></div>
+    </div>
+    <div class="grp" id="g-update208">
+        <div class="ghd"><h2>New in 2.0.8</h2><span class="gn">2 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="New in 2.0.8: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="New in 2.0.8: more cards">&rsaquo;</button></span></div>
+        <p class="gln">What changed in this update.</p>
+        <ul class="row" aria-label="New in 2.0.8 features"><li class="fc" id="f-smooth-slope" data-key="smooth-slope"><div class="cap"><span class="eb">GREEN SLOPE</span><h3>Read the green.</h3><p>Slope from 1 m lidar, drawn smooth on the map: shading, contours and downhill arrows, with the putt read at the pin. On by default.</p></div><button type="button" class="ph" data-open="smooth-slope" aria-label="See Read the green full screen"><span class="s"><img src="/media/screens/smooth-slope-400.webp" srcset="/media/screens/smooth-slope-400.webp 400w, /media/screens/smooth-slope-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="1896" loading="lazy" decoding="async" alt="Papago hole 10 from 55 yards with Slope on: smooth shading, contour lines and downhill arrows over the whole green, no target ring over it, only the dot at the middle, the lidar year and the slope key."></span></button></li><li class="fc" id="f-ring-aside" data-key="ring-aside"><div class="cap"><span class="eb">RING STEPS ASIDE</span><h3>Nothing covers the arrows.</h3><p>While the slope is drawn, the target ring steps aside. The dot stays.</p></div><button type="button" class="ph" data-open="ring-aside" aria-label="See Nothing covers the arrows full screen"><span class="s"><img src="/media/screens/ring-aside-400.webp" srcset="/media/screens/ring-aside-400.webp 400w, /media/screens/ring-aside-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="1938" loading="lazy" decoding="async" alt="The Home Course hole 6 with Slope on: no target ring over the green, only the white dot at the middle, so every downhill arrow shows; 40 to the middle, B 57, F 22."></span></button></li></ul>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i></div>
+        <ul class="new207" aria-label="Also new in 2.0.8"><li><b>The Home Course</b> (DuPont, WA) is added, with its green slope.</li><li>The <b>whole course&rsquo;s slope saves</b> to your phone when a round opens.</li><li>A <b>round recap card</b> for Messages or an Instagram story. Money stays off the card unless you switch it on.</li><li><b>Lock Screen and Dynamic Island</b> yardages on iPhone, with a tee-to-green bar. They turn grey and say &ldquo;GPS paused&rdquo; when the fix drops. Free golfers get the center number too.</li><li>A <b>sponsor tee card</b> in tournaments: who presents the hole, for a few seconds, then out of the way.</li><li><b>Easier course search</b>: it forgives spelling and typos, and shows nearby courses first.</li><li><b>Under par in red</b> on the GPS screen.</li></ul>
+    </div>
+    <div class="grp" id="g-new">
+        <div class="ghd"><h2>New in 2.0.7</h2><span class="gn">4 &middot; swipe &rarr;</span><span class="arrows"><button type="button" class="ga" data-dir="-1" aria-label="New in 2.0.7: earlier cards">&lsaquo;</button><button type="button" class="ga" data-dir="1" aria-label="New in 2.0.7: more cards">&rsaquo;</button></span></div>
+        <p class="gln">What changed in this update.</p>
+        <ul class="row" aria-label="New in 2.0.7 features"><li class="fc" id="f-round-tabs" data-key="round-tabs"><div class="cap"><span class="eb">ROUND TABS</span><h3>Card, GPS, Games, Board.</h3><p>Four tabs on top of every round. The map opens on the whole hole.</p></div><button type="button" class="ph" data-open="round-tabs" aria-label="See Card, GPS, Games, Board full screen"><span class="s"><img src="/media/screens/round-tabs-400.webp" srcset="/media/screens/round-tabs-400.webp 400w, /media/screens/round-tabs-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="The GPS map on hole 2 at Papago, opened on the whole hole with the tee and the green both on screen: 380 to the middle, and the Card, GPS, Games and Board tabs on top."></span></button></li><li class="fc" id="f-green-slope" data-key="green-slope"><div class="cap"><span class="eb">GREEN SLOPE</span><h3>Slope on the green.</h3><p>Shading, contours and downhill arrows on the map, with the Slope switch under Ask.</p></div><button type="button" class="ph" data-open="green-slope" aria-label="See Slope on the green full screen"><span class="s"><img src="/media/screens/green-slope-400.webp" srcset="/media/screens/green-slope-400.webp 400w, /media/screens/green-slope-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="Papago hole 10, 55 to the middle, with Slope on: smooth shading, contour lines and downhill arrows over the green, the target ring hidden, the lidar 2020–21 tag and the slope key under the Slope switch, and Thru 9 · 38 (+2) · Net 35 (−1) with the under-par number in red."></span></button></li><li class="fc" id="f-green-size" data-key="green-size"><div class="cap"><span class="eb">GREEN SIZE</span><h3>How big is the green?</h3><p>Deep and wide along your line of play, the same from the tee or the fairway.</p></div><button type="button" class="ph" data-open="green-size" aria-label="See How big is the green? full screen"><span class="s"><img src="/media/screens/green-size-400.webp" srcset="/media/screens/green-size-400.webp 400w, /media/screens/green-size-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="Papago hole 14, 149 to the middle: the line Green 34 yds deep and 27 yds wide on the map, Plays like 153 with an 8-iron, the club chips, Slope on, and Net 51 (−1) in red."></span></button></li><li class="fc" id="f-team-card" data-key="team-card"><div class="cap"><span class="eb">TEAM CARD</span><h3>Your team card, in the app.</h3><p>Card, Board and GPS on one card. Scan your team’s QR right in HardPan.</p></div><button type="button" class="ph" data-open="team-card" aria-label="See Your team card, in the app full screen"><span class="s"><img src="/media/screens/team-card-400.webp" srcset="/media/screens/team-card-400.webp 400w, /media/screens/team-card-940.webp 940w" sizes="(max-width:700px) 200px, 206px" width="940" height="2040" loading="lazy" decoding="async" alt="The Desert Classic team card for Team 4 in the app: the Card, Board and GPS switch, Hole 8 · Par 5 next to play, the team score with minus and plus, and Save · Next hole."></span></button></li></ul>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
+        <ul class="new207" aria-label="Also new in 2.0.7"><li><b>Why?</b> on the suggested fair game: the strokes, the handicaps and the game it is built on.</li><li><b>Undo</b> on the scorecard, right after each score.</li><li>A <b>Season board</b> for your weekly group, on Home.</li><li><b>Play in this event</b> on the card of an event you run.</li><li>The Home card names the course and the next hole.</li></ul>
+    </div>
+</section>
+
+<div class="fv" id="fv" role="dialog" aria-modal="true" aria-labelledby="fv-title" hidden>
+    <div class="fv-top"><button type="button" class="fv-x" id="fv-x" aria-label="Close">&#10005;</button><span class="fv-n" id="fv-n"></span><span class="fv-sp"></span></div>
+    <div class="fv-stage"><ul class="fv-track" id="fv-track"></ul>
+        <button type="button" class="fv-ar fv-prev" id="fv-prev" aria-label="Previous feature">&lsaquo;</button>
+        <button type="button" class="fv-ar fv-next" id="fv-next" aria-label="Next feature">&rsaquo;</button></div>
+    <div class="fv-cap"><b id="fv-title"></b><small>Pinch or tap to zoom &middot; swipe for the next feature</small></div>
+</div>
+
+<p class="wnback"><a class="back" href="/">&lsaquo; Back to HardPan</a></p>
+
+<footer>
+    <div class="wrap">
+        <div><b style="color:#fff">HardPan: Golf GPS &amp; Games</b> &middot; HardPan is a product of Rattle Golf LLC &middot; Scottsdale, AZ</div>
+        <div class="flinks">
+            <a href="/help">Help</a><a href="/support">Support</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a>
+        </div>
+        <div>HardPan keeps score for your group's side games. It never holds or moves money.</div>
+    </div>
+</footer>
+
+<script src="/site-features.js" defer></script>
+</body>
+</html>

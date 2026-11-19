@@ -24,6 +24,9 @@
 //    scene; the TV picture gets the wide slide; a tile opens the viewer on the SAME item the row has
 //    (Play · 1 / 6), not a copy; the Golfers door lands on #how; the map's tile layer still sits at 0.
 // WHAT IT CANNOT PROVE: Safari, a real Cloudflare edge, pinch zoom.
+// WHAT'S NEW RE-PIN (2026-11-19, ADVISOR-20261119-0906 item 1): the three release rows moved to whats-new.html; the homepage
+// keeps a What's new link first inside #features, 32 row cards, and the four 2.0.7 cards its tiles open as viewer-only items
+// (<div class="vx" hidden>); the viewer holds 32 + 12 + 4 slides. whats_new_page_test.js holds the move.
 // BASELINE against pre-build main 55077321 (hardpan-home.html without the fold), measured with
 // this exact file copied there: the file cannot load (the fold section is not on the page, so the module-level
 // slice assertion throws: 1 fail, 0 of the 18 tests run); here: 24 pass / 0 fail (13 source + 11 Chrome).
@@ -59,6 +62,11 @@ const sheets = body.slice(body.indexOf('<div class="sheet" id="sheet-weekly"'), 
 const newParts = fold + how + sheets + glance;
 const attrs = (tag) => Object.fromEntries([...tag.matchAll(/([a-z-]+)="([^"]*)"/g)].map((m) => [m[1], m[2]]));
 const cardKeys = [...body.matchAll(/<li class="fc" id="[^"]+" data-key="([^"]+)">/g)].map((m) => m[1]);
+// WHAT'S NEW RE-PIN (2026-11-19, ADVISOR-20261119-0906 item 1): the three release rows moved to whats-new.html. Four of
+// their cards (the 2.0.7 row) are still opened from this page by a tile and a sheet picture, so the homepage carries them
+// as viewer-only items: <div class="vx" hidden> with a [data-shot] per card (site-features.js reads every [data-shot]).
+const vxBlock = (/<div class="vx" hidden>([\s\S]*?)<\/div>/.exec(body) || ['', ''])[1];
+const vxKeys = [...vxBlock.matchAll(/<span data-shot="([^"]+)" data-group="At a glance"><img [^>]*><b>[^<]+<\/b><\/span>/g)].map((m) => m[1]);
 const shots = [...body.matchAll(/<button type="button" class="shot" data-open-key="([^"]+)" data-shot="([^"]+)" data-group="([^"]+)"( data-wide)?>([\s\S]*?)<\/button>/g)]
     .map((m) => ({ key: m[1], shot: m[2], group: m[3], wide: !!m[4], img: attrs(/<img\b[^>]*>/.exec(m[5])[0]), title: (/<b>([^<]*)<\/b>/.exec(m[5]) || [])[1] }));
 const MONEY = /\$|\b(bet|bets|betting|wager\w*|gambl\w*|pot|pots|buy-?ins?|stake|stakes|dollars?|bucks|cash|venmo|paypal)\b/i;
@@ -114,10 +122,14 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
     test('every data-open-key on the page is a card the rows have or one of the five new pictures', () => {
         const keys = [...body.matchAll(/data-open-key="([^"]+)"/g)].map((m) => m[1]);
         assert.ok(keys.length >= 70, keys.length);
-        const known = new Set(cardKeys.concat(shots.map((s) => s.shot)));
+        const known = new Set(cardKeys.concat(shots.map((s) => s.shot), vxKeys));
+        // what's new re-pin: exactly the four 2.0.7 cards a tile or sheet still opens, none of them also a row card here
+        assert.deepEqual(vxKeys, ['round-tabs', 'green-slope', 'green-size', 'team-card']);
+        vxKeys.forEach((k) => { assert.ok(!cardKeys.includes(k), k + ' is a row card too'); assert.ok(keys.includes(k), 'positive: something opens ' + k); });
         keys.forEach((k) => assert.ok(known.has(k), 'nothing opens for ' + k));
         // 2.0.9 site (web-209-coming, Nov 16): + the two cards of the Coming in 2.0.9 row = 40; 2.0.9 release (Nov 17): the same two, now the New in 2.0.9 row inside #features.
-        assert.equal(cardKeys.length, 40, 'the rows still hold the 38 cards main had, + the 2 of New in 2.0.9');
+        // what's new re-pin (2026-11-19): the 8 release cards (2.0.9: 2, 2.0.8: 2, 2.0.7: 4) moved to whats-new.html; 40 - 8 = 32.
+        assert.equal(cardKeys.length, 32, 'the homepage rows hold the 32 cards of Play, Games, Your group, Organize and Get better');
     });
     test('the twelve pictures of media/home (+ scan-check 2026-11-19): each once, its group, a real alt, files on disk at the manifest\'s sizes, the three TV ones wide; no weekly-results (it shows amounts)', () => {
         assert.deepEqual(shots.map((s) => s.shot), ['round-recap', 'live-tv', 'live-board-phone', 'multi-group-board', 'board36', 'board36-tv', 'skins-tab', 'pairings-tab', 'checkin-table', 'checkin-tv', 'scan-check', 'gps-every-yard']);
@@ -157,15 +169,20 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
     });
     // 2.0.8 release re-pin: the Coming in 2.0.8 section (#coming208, between the tiles and #features) moved INTO #features as
     // its first row, "New in 2.0.8" (#g-update); the order is now tiles, #features (starting with #g-update), the viewer.
-    test('the rows, the New in 2.0.8 row (first inside #features) and the viewer are still there, after the new sections; the header is unchanged', () => {
-        const iGlance = body.indexOf('id="everything"'), iFeat = body.indexOf('<section class="feat" id="features">'), i208 = body.indexOf('<div class="grp" id="g-update">'), iNew = body.indexOf('<div class="grp" id="g-new">'), iFv = body.indexOf('<div class="fv" id="fv"');
-        assert.ok(iGlance > 0 && iFeat > iGlance && i208 > iFeat && iNew > i208 && iFv > iNew, [iGlance, iFeat, i208, iNew, iFv].join(' '));
+    // WHAT'S NEW RE-PIN (2026-11-19): the release rows left for whats-new.html; in their place, first inside #features, the What's new link.
+    test('the rows, the What\'s new link (first inside #features) and the viewer are still there, after the new sections; the header is unchanged', () => {
+        const iGlance = body.indexOf('id="everything"'), iFeat = body.indexOf('<section class="feat" id="features">'), iLink = body.indexOf('<p class="wnlink"><a id="whats-new-link" href="/whats-new">'), iPlay = body.indexOf('<div class="grp" id="g-play">'), iFv = body.indexOf('<div class="fv" id="fv"');
+        assert.ok(iGlance > 0 && iFeat > iGlance && iLink > iFeat && iPlay > iLink && iFv > iPlay, [iGlance, iFeat, iLink, iPlay, iFv].join(' '));
+        assert.doesNotMatch(body, /id="g-update|id="g-new"|<h2>New in 2\.0\./, 'a release row is still on the homepage');
+        const wn = stripComments(read('whats-new.html'));
+        const w9 = wn.indexOf('<div class="grp" id="g-update">'), w8 = wn.indexOf('<div class="grp" id="g-update208">'), w7 = wn.indexOf('<div class="grp" id="g-new">');
+        assert.ok(w9 > 0 && w8 > w9 && w7 > w8, 'whats-new.html: 2.0.9, 2.0.8, 2.0.7 in that order: ' + [w9, w8, w7].join(' '));
         assert.equal(body.indexOf('id="coming208"'), -1, 'the Coming in 2.0.8 section is still on the page');
         // 2.0.9 release re-pin (Nov 17): the Coming in 2.0.9 section moved INTO #features as "New in 2.0.9" (#g-update, first);
         // the 2.0.8 row is #g-update208 right under it, then New in 2.0.7 (#g-new).
         assert.equal(body.indexOf('id="coming209"'), -1, 'the Coming in 2.0.9 section is still on the page');
         const i208b = body.indexOf('<div class="grp" id="g-update208">');
-        assert.ok(i208b > i208 && i208b < iNew, 'New in 2.0.8 is not between New in 2.0.9 and New in 2.0.7: ' + [i208, i208b, iNew].join(' '));
+        assert.equal(i208b, -1, 'what\'s new re-pin: the 2.0.8 row is on whats-new.html, not here');
         assert.equal((body.match(/<div class="fv" id="fv"/g) || []).length, 1);
         assert.match(body, /<nav class="wrap toplinks" aria-label="Main">\s*<div class="links">/);
         assert.match(body, /<div class="stick" id="stick" aria-label="HardPan Golf">\s*<div class="wrap stick-in">\s*<a class="logo" href="\/"><img src="\/media\/home\/hardpan-golf-lockup\.png" alt="HardPan Golf" width="1278" height="222"><\/a>/);
@@ -419,7 +436,8 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         assert.equal(s.sheet, null);
         const slides = await tab.eval(`document.querySelectorAll('#fv-track .fv-s').length`);
         // 2.0.9 site (web-209-coming, Nov 16): + the two 2.0.9 cards (the viewer walks every .fc on the page); 2.0.9 release (Nov 17): the same two, now inside #features first.
-        assert.equal(slides, 40 + 12, 'the viewer holds the 40 cards (38 + 2 New in 2.0.9) and the 12 media/home pictures (six added 2026-11-16, scan-check 2026-11-19), each once');
+        // what's new re-pin (2026-11-19): the 8 release cards left for whats-new.html; the 4 of them a tile still opens stay as viewer-only items: 32 + 12 + 4.
+        assert.equal(slides, 32 + 12 + 4, 'the viewer holds the 32 row cards, the 12 media/home pictures (six added 2026-11-16, scan-check 2026-11-19) and the 4 viewer-only 2.0.7 cards, each once');
         // a phone of the fan is a door into its sheet too
         await tab.tapEl('.fp.c');
         s = await tab.eval(STATE);
