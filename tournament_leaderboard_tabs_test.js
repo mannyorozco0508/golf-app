@@ -44,6 +44,11 @@
 // B3 reads "$20 credit a skin" (shortText, the event's prize word). The behaviour
 // itself is guarded by tournament_skins_tab_words_test.js. Against 4b7da2de this
 // file is 15 pass / 3 fail (B1, B2, B3: the old sentences); after: 18 / 0.
+// RE-PIN 2026-11-19, LAYOUT B (Manny's pick "Skins tab B"; the layout moved the
+// rows, no sentence changed): B1's "a row per hole won" now taps "Hole by hole ›"
+// and each round chip through the onclick the page rendered and counts the hole
+// rows round by round. Against the layout-B page before this re-pin: 17 pass / 1
+// fail (B1); after: 18 / 0. Layout B itself: tournament_skins_tab_b_test.js.
 // ============================================================================
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
@@ -140,7 +145,16 @@ describe('B. the Skins tab', () => {
         const sk = vm.runInContext('TournamentPrizes.skinsSummary(currentData)', sb);
         assert.match(t, new RegExp('^Skins · Gross · Carryover · ' + sk.skins + ' won'), 'the count is skinsSummary\'s');
         assert.ok(sk.skins > 0, 'positive: the fixture has skins');
-        assert.ok((el(sb, 'lb-skins-panel').innerHTML.match(/class="pz-row/g) || []).length >= sk.holesWon, 'a row per hole won');
+        // LAYOUT B (re-pin 2026-11-19): the hole rows sit behind "Hole by hole ›", one
+        // round at a time; tap it open, then each round chip, and count the hole rows.
+        const skinsTap = (pick) => tap(sb, el(sb, 'lb-skins-panel').innerHTML, pick);
+        skinsTap((t) => /id="lb-skins-holes"/.test(t));
+        let rows = 0;
+        sk.rounds.forEach((r, i) => {
+            skinsTap((t) => new RegExp('id="lb-skins-round-' + i + '"').test(t));
+            rows += (el(sb, 'lb-skins-panel').innerHTML.match(/class="pz-row" data-hole=/g) || []).length;
+        });
+        assert.ok(rows >= sk.holesWon, 'a row per hole won');
     });
     test('B2 the tab is read-only: no amount input, no carryover buttons, no Open toggle; a watcher sees the same', () => {
         const sb = arrive(record());

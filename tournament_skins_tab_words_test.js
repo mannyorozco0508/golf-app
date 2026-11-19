@@ -36,6 +36,14 @@
 //   4. games' bases ignored (always "Gross") -> B1, B2 red (12 / 2)
 //   5. the organizer's sub line ("per round · carryover ...") back on the tab -> C1 red (13 / 1)
 //   6. the link no longer opens the prize screen's card -> D1 red (13 / 1)
+// RE-PIN 2026-11-19, LAYOUT B (Manny's pick "Skins tab B"; the layout moved the
+// text, the words did not change): the hole rows now sit behind "Hole by hole ›"
+// and show one round at a time, so skinsTab() taps "Hole by hole ›" through the
+// onclick the page rendered (first round, the default), and E1 taps the Olympic
+// chip before reading Olympic's tie line. No sentence was re-worded. The file as it
+// stood (971f1168) against the layout-B page: 10 PASS / 4 FAIL (C1, E1, E2, E3: the
+// hole rows collapsed). 10 + 4 = 14. After the re-pin: 14 / 0. Layout B itself:
+// tournament_skins_tab_b_test.js.
 // ============================================================================
 'use strict';
 const { test, describe } = require('node:test');
@@ -63,9 +71,17 @@ function skinsTab(rec, user) {
     const m = /id="lb-sub-skins"[^>]*onclick="([^"]+)"/.exec(SRC);
     assert.ok(m, 'positive: the Skins sub-tab exists in the markup');
     vm.runInContext(m[1], sb);
+    // LAYOUT B (2026-11-19): the hole rows sit behind "Hole by hole ›", tapped here
+    // through the onclick the page rendered, for the first round (the default filter).
+    tapRendered(sb, 'lb-skins-holes');
     const html = String(sb.document.getElementById('lb-skins-panel').innerHTML);
-    assert.ok(/class="pz-row/.test(html), 'positive: the panel rendered won holes');
+    assert.ok(/id="lb-skins-holes-list"[\s\S]*class="pz-row/.test(html), 'positive: the panel rendered won holes');
     return { sb, html, t: text(html) };
+}
+function tapRendered(sb, id) {
+    const tag = (String(sb.document.getElementById('lb-skins-panel').innerHTML).match(/<button\b[^>]*>/g) || []).find((t) => t.indexOf(`id="${id}"`) !== -1);
+    assert.ok(tag, 'nothing rendered with id ' + id);
+    vm.runInContext(/\bonclick="([^"]*)"/.exec(tag)[1], sb);
 }
 // The header: the panel's first block, up to its first closing div.
 function head(html) {
@@ -135,9 +151,10 @@ describe('D. the organizer\'s quiet link', () => {
 
 describe('E. tied holes', () => {
     test('E1 carryover off: "Tied · no skin" with the holes, nothing "carried", nothing "carries past"', () => {
-        const { t } = skinsTab(ev());
+        const { sb, t } = skinsTab(ev());
         assert.match(t, /Tied · no skin: holes 1–3, 5–8, 10–14, 16–18/, 'Cascade');
-        assert.match(t, /Tied · no skin: holes 1, 2, 4–10, 12–15, 17, 18/, 'Olympic');
+        tapRendered(sb, 'lb-skins-round-1');   // layout B: one round at a time
+        assert.match(String(sb.document.getElementById('lb-skins-panel').innerHTML).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '), /Tied · no skin: holes 1, 2, 4–10, 12–15, 17, 18/, 'Olympic');
         assert.doesNotMatch(t, /carried to|carries past|other holes? tied/);
     });
     test('E2 carryover on: the last run reads "tied · no skin" too', () => {

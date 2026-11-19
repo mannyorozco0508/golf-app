@@ -508,6 +508,16 @@
         .lb-pair-row .gl { margin-top: 6px; }
         .lb-pair-row .gl a { font-size: 0.78rem; }
         .lb-skins .pz-row, .lb-skins .pz-note, .lb-skins .pz-k, .lb-skins .pz-total { font-size: 0.86rem; }
+        /* SKINS TAB, LAYOUT B (Manny 2026-11-19): filters, Most skins first, hole by hole one tap away. */
+        .lb-skins .sk-filters .pz-chips { margin: 0 0 6px; }
+        .lb-skins .sk-most { padding: 8px 12px; margin: 6px 0 10px; }
+        .lb-skins .sk-most .pz-row { padding: 7px 0; }
+        .lb-skins .sk-most .sk-n { flex: none; width: 28px; text-align: right; font-weight: 800; color: var(--brand-green); }
+        .lb-skins .sk-holes-btn { display: block; width: 100%; box-sizing: border-box; text-align: left; border: 1px solid var(--border-mid); border-radius: 14px; padding: 10px 12px; background: var(--bg-card); color: var(--text-main); font-family: inherit; font-size: 0.92rem; cursor: pointer; }
+        .lb-skins .sk-holes-btn small { color: var(--text-muted); font-size: 0.78rem; margin-left: 4px; }
+        .lb-skins .sk-holes-btn .sk-chev { display: inline-block; transition: transform .15s; }
+        .lb-skins .sk-holes-btn[aria-expanded="true"] .sk-chev { transform: rotate(90deg); }
+        .lb-skins .sk-holes { margin-top: 6px; }
         .rounds-card { border: 1px solid var(--border-faint); border-radius: 10px; padding: 10px 12px; margin: 8px 0 10px; font-size: 0.8rem; }
         .rounds-card .rc-head { font-weight: bold; margin-bottom: 6px; }
         .rounds-card .rc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; margin-bottom: 8px; }
@@ -8441,8 +8451,107 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const amount = skinsTabAmountWords(sk, currentData);
         let h = `<div class="lb-skins-head" id="lb-skins-head" style="margin:4px 0 8px;"><b style="font-size:1rem;">${escapeHtml(['Skins', skinsTabBasisWord(sk), sk.carryover ? 'Carryover' : 'No carryover', `${sk.skins} won`].concat(amount ? [amount] : []).join(' · '))}</b></div>`;
         if (!amount && canManage()) h += `<div style="font-size:0.8rem; margin:-4px 0 8px;"><a href="#prize-card-skins" class="rc-link" id="lb-skins-set-amount" onclick="openSkinsAmountFromTab(); return false;">Set an amount ›</a></div>`;
-        h += prizeSkinsCardHtml(sk, currentData, { tab: true });
+        h += skinsTabLayoutB(sk, currentData);
         el.innerHTML = h;
+    }
+    // LAYOUT B (Manny's pick 2026-11-19, "Skins tab B"): Round / Gross-Net / Flight
+    // filters, a "Most skins" table for the filter, and the hole-by-hole list one tap
+    // away. Everything is read from skinsSummary's results (the round panels, their
+    // tallies and hole rows); nothing here decides who won. The filter and the open
+    // list are this viewer's only, in memory: nothing is written anywhere.
+    // FLIGHT FILTER MEANING: it narrows WHOSE skins are shown, never re-decides a hole.
+    // A skin in an all-field game was won against the whole field, so "A Flight" lists
+    // the A golfers' wins from that same game, and says so under the chips.
+    let skinsTabPick = { round: 0, basis: 0, flight: -1 };
+    let skinsTabHolesOpen = false;
+    function setSkinsTabPick(kind, i) {
+        if (!Object.prototype.hasOwnProperty.call(skinsTabPick, kind)) return;
+        skinsTabPick[kind] = Number(i) || 0;
+        if (kind === 'flight' && Number(i) < 0) skinsTabPick.flight = -1;
+        renderSkinsTab();
+    }
+    function toggleSkinsTabHoles() { skinsTabHolesOpen = !skinsTabHolesOpen; renderSkinsTab(); }
+    // The round a panel belongs to: an unruled panel's own id; a ruled panel's id is
+    // "<round>|<game>|<basis>", so the round is what precedes its game and basis.
+    function skinsPanelRound(p) {
+        if (!p.game) return String(p.id === null || p.id === undefined ? '' : p.id);
+        const tail = '|' + p.game + '|' + p.basis;
+        return p.id.slice(-tail.length) === tail ? p.id.slice(0, -tail.length) : p.id;
+    }
+    function skinsEntrantFlight(data, owner) {
+        const x = ((data.players || {})[owner]) || ((data.teams || {})[owner]) || {};
+        return x.flightId || null;
+    }
+    function skinsTabView(sk, data) {
+        const rounds = [], bases = [];
+        sk.rounds.forEach((p) => {
+            const k = skinsPanelRound(p);
+            if (!rounds.some((r) => r.key === k)) rounds.push({ key: k, name: p.game ? (((data.rounds || {})[k] || {}).name || p.name || '') : (p.name || '') });
+            const b = p.basis || 'gross';
+            if (bases.indexOf(b) === -1) bases.push(b);
+        });
+        bases.sort((a, b) => (a === 'gross' ? -1 : 1) - (b === 'gross' ? -1 : 1));
+        const fids = TournamentPrizes.flightIds(data);
+        const flights = fids.map((id) => ({ id, name: ((data.flights || {})[id] || {}).name || 'Flight' }));
+        const ri = Math.min(Math.max(skinsTabPick.round, 0), Math.max(rounds.length - 1, 0));
+        const bi = Math.min(Math.max(skinsTabPick.basis, 0), Math.max(bases.length - 1, 0));
+        const fi = skinsTabPick.flight >= 0 && skinsTabPick.flight < flights.length ? skinsTabPick.flight : -1;
+        const round = rounds[ri], basis = bases[bi] || 'gross', flight = fi >= 0 ? flights[fi] : null;
+        // A game played by other flights only has nothing to show for this flight.
+        const gameFlights = (p) => { const g = p.game ? (sk.games || []).find((x) => x.id === p.game) : null; return (g && g.flights) || []; };
+        const panels = sk.rounds.filter((p) => (!round || skinsPanelRound(p) === round.key) && (p.basis || 'gross') === basis
+            && !(flight && gameFlights(p).length && gameFlights(p).indexOf(flight.id) === -1));
+        const only = (id, res) => {
+            if (!flight) return true;
+            const t = ((res && res.tally) || {})[id] || {};
+            return skinsEntrantFlight(data, t.owner || id) === flight.id;
+        };
+        return { rounds, bases, flights, ri, bi, fi, round, basis, flight, panels, only, gameFlights };
+    }
+    function skinsTabLayoutB(sk, data) {
+        const v = skinsTabView(sk, data);
+        const chip = (kind, i, on, label, id) => `<button type="button" class="pz-chip${on ? ' on' : ''}" id="${id}" aria-pressed="${on}" onclick="setSkinsTabPick('${kind}', ${i})">${escapeHtml(label)}</button>`;
+        let h = '<div class="sk-filters" id="lb-skins-filters">';
+        if (v.rounds.length > 1) h += `<div class="pz-chips" role="group" aria-label="Round">${v.rounds.map((r, i) => chip('round', i, i === v.ri, r.name || `Round ${i + 1}`, 'lb-skins-round-' + i)).join('')}</div>`;
+        if (v.bases.length > 1) h += `<div class="pz-chips" role="group" aria-label="Gross or net">${v.bases.map((b, i) => chip('basis', i, i === v.bi, b === 'net' ? 'Net' : 'Gross', 'lb-skins-basis-' + b)).join('')}</div>`;
+        if (v.flights.length) h += `<div class="pz-chips" role="group" aria-label="Flight">${chip('flight', -1, v.fi < 0, 'All flights', 'lb-skins-flight-all')}${v.flights.map((f, i) => chip('flight', i, i === v.fi, f.name, 'lb-skins-flight-' + i)).join('')}</div>`;
+        h += '</div>';
+        if (v.flight) {
+            const field = v.panels.some((p) => !v.gameFlights(p).length);
+            h += `<div class="pz-note" id="lb-skins-flight-note">${escapeHtml(v.flight.name)} golfers' skins.${field ? ' Each hole was decided across the whole field.' : ''}</div>`;
+        }
+        const per = (p) => (typeof p.perSkin === 'number' ? p.perSkin : sk.perSkin);
+        const off = v.panels.filter((p) => p.result && p.result.available === false);
+        const by = {}, order = [];
+        let won = 0, tied = 0, skins = 0, carried = 0, total = 0;
+        v.panels.forEach((p) => {
+            const res = p.result;
+            if (!res || res.available === false) return;
+            (res.holes || []).forEach((x) => {
+                if (x.status === 'tied') tied++;
+                if (x.status !== 'won' || !v.only(x.winner, res)) return;
+                won++; skins += x.skins; carried += x.carriedIn || 0; total += x.skins * per(p);
+                if (!by[x.winner]) { by[x.winner] = { name: ((res.tally || {})[x.winner] || {}).name || x.name || '', skins: 0, amount: 0 }; order.push(x.winner); }
+                by[x.winner].skins += x.skins; by[x.winner].amount += x.skins * per(p);
+            });
+        });
+        const rows = order.map((id) => by[id]).sort((a, b) => (b.skins - a.skins) || a.name.localeCompare(b.name));
+        const withAmt = rows.some((r) => r.amount > 0);
+        h += '<div class="pz-card sk-most" id="lb-skins-most"><div class="pz-k">Most skins</div>';
+        if (off.length && off.length === v.panels.length) h += off.map((p) => `<div class="pz-note">${escapeHtml(p.result.reason || '')}</div>`).join('');
+        else if (!rows.length) h += '<div class="pz-note">No skins won yet.</div>';
+        rows.forEach((r) => {
+            const rank = 1 + rows.filter((o) => o.skins > r.skins).length;
+            const tiedRank = rows.filter((o) => o.skins === r.skins).length > 1;
+            h += `<div class="pz-row sk-most-row"><span class="pz-n">${tiedRank ? 'T' : ''}${rank}</span><span class="pz-who">${escapeHtml(r.name)}</span><span class="sk-n">${r.skins}</span>${withAmt ? `<span class="pz-amt">${r.amount > 0 ? escapeHtml(TournamentPrizes.shortText(Math.round(r.amount * 100) / 100, data)) : ''}</span>` : ''}</div>`;
+        });
+        h += '</div>';
+        h += `<button type="button" class="sk-holes-btn" id="lb-skins-holes" aria-expanded="${skinsTabHolesOpen}" onclick="toggleSkinsTabHoles()"><b>Hole by hole <span class="sk-chev">›</span></b><small>${won} won · ${tied} tied</small></button>`;
+        if (skinsTabHolesOpen) {
+            const sub = Object.assign({}, sk, { rounds: v.panels, holesWon: won, skins, carried, total: Math.round(total * 100) / 100 });
+            h += `<div class="sk-holes" id="lb-skins-holes-list">${prizeSkinsCardHtml(sub, data, { tab: true, only: v.only })}</div>`;
+        }
+        return h;
     }
     // The bases the event's skins play: one game of gross (no rules), or the union of
     // the games' bases ("Gross", "Net", "Gross and net").
@@ -9212,6 +9321,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // open, without the organizer's amount and carryover controls.
     function prizeSkinsCardHtml(sk, data, opts) {
         const tab = !!(opts && opts.tab);
+        // opts.only (layout B's flight filter): whose wins the tab lists; ties are the field's.
+        const only = (opts && typeof opts.only === 'function') ? opts.only : () => true;
         const open = tab || prizeSkinsOpen;
         const amt = (v) => (v > 0 ? escapeHtml(TournamentPrizes.shortText(v, data)) : '');
         const perOf = (r) => (typeof r.perSkin === 'number' ? r.perSkin : sk.perSkin);
@@ -9238,7 +9349,10 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (open) {
             sk.rounds.forEach((r, ri) => {
                 const res = r.result, rows = res.holes;
-                if (ruled) { if (r.name) h += `<div class="pz-k">${escapeHtml(r.name)}</div>`; if (r.result.available === false) { h += `<div class="pz-note">${escapeHtml(r.result.reason || '')}</div>`; return; } }
+                // On the tab the filter chips name the round and basis; a heading only
+                // tells two games apart.
+                if (tab) { if (ruled && sk.rounds.length > 1 && r.name) h += `<div class="pz-k">${escapeHtml(r.name)}</div>`; if (r.result.available === false) { h += `<div class="pz-note">${escapeHtml(r.result.reason || '')}</div>`; return; } }
+                else if (ruled) { if (r.name) h += `<div class="pz-k">${escapeHtml(r.name)}</div>`; if (r.result.available === false) { h += `<div class="pz-note">${escapeHtml(r.result.reason || '')}</div>`; return; } }
                 else if (r.name || sk.rounds.length > 1) h += `<div class="pz-k">Round ${ri + 1}${r.name ? ' · ' + escapeHtml(r.name) : ''}</div>`;
                 let otherTies = 0;
                 // A run of tied holes is one line, just above the hole that took it.
@@ -9246,6 +9360,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                     ? `Tied at ${run[0].score} (${escapeHtml(prizeNames(run[0].tiedIds, res.tally))}) · no skin, carried to ${to}`
                     : `Holes ${run[0].hole}–${run[run.length - 1].hole} tied · no skin, carried to ${to}`);
                 rows.forEach((x, i) => {
+                    if (x.status === 'won' && !only(x.winner, res)) return;
                     if (x.status === 'won') {
                         const run = x.carriedIn ? rows.slice(i - x.carriedIn, i) : [];
                         const from = run.map((y) => y.hole);
