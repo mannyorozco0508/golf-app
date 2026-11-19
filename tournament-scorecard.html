@@ -459,6 +459,8 @@
              lose its input to a re-render); accept is written image/&#42; for the same reason. -->
         <div class="ti-card" id="turnin-card" style="display:none;"></div>
         <input type="file" id="turnin-file" accept="image/&#42;" capture="environment" style="display:none;" onchange="turnInPicked(this)">
+        <!-- Saved photos (ADVISOR-20261118-1704): no capture attribute, so the phone offers its photo library; one or two. -->
+        <input type="file" id="turnin-pick" accept="image/&#42;" multiple style="display:none;" onchange="turnInPicked(this)">
         <!-- E2a / E2b: the contest-hole prompt, on the hole this card is playing
              (or has just played) when the organizer made it a contest hole. -->
         <div class="contest-prompt" id="contest-prompt" style="display:none;"></div>
@@ -917,35 +919,8 @@
             })
         };
     }
-    // The phone's photo, shrunk to a JPEG of at most about 600 KB (what the scanner expects).
-    function turnInJpeg(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onerror = () => reject(new Error('read'));
-            reader.onload = () => {
-                const img = new Image();
-                img.onerror = () => reject(new Error('image'));
-                img.onload = () => {
-                    const w = img.naturalWidth || img.width, ht = img.naturalHeight || img.height;
-                    if (!(w > 0) || !(ht > 0)) { reject(new Error('image')); return; }
-                    let max = 1600, q = 0.8, out = '';
-                    for (let i = 0; i < 5; i++) {
-                        const k = Math.min(1, max / Math.max(w, ht));
-                        const cv = document.createElement('canvas');
-                        cv.width = Math.max(1, Math.round(w * k)); cv.height = Math.max(1, Math.round(ht * k));
-                        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-                        out = cv.toDataURL('image/jpeg', q);
-                        if (out.length * 0.75 <= 600 * 1024) break;
-                        max = Math.round(max * 0.8); q = Math.max(0.6, q - 0.08);
-                    }
-                    if (!/^data:image\/jpeg;base64,/.test(out)) { reject(new Error('encode')); return; }
-                    resolve(out);
-                };
-                img.src = String(reader.result);
-            };
-            reader.readAsDataURL(file);
-        });
-    }
+    // The photo or photos (camera, or one or two saved photos), as one JPEG of at most about 600 KB: scan-grid.js.
+    function turnInJpeg(files) { return ScanGrid.photosToJpeg(files); }
     // The golfer's own session: the one the scoring links already run as (auth-boot's anonymous
     // sign-in on the consumer pages; here the same path the photo post takes).
     function turnInToken() { return photoIdToken(); }   // the one place this card gets a token: photoIdToken, lazily (service_worker_shell_test pins it)
@@ -953,21 +928,22 @@
         return fetch(url, { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify(body) })
             .then((r) => Promise.resolve(r.json()).catch(() => null));
     }
-    function turnInStart() {
+    // which: 'camera' (the phone's camera) or 'photos' (saved photos, one or two: ADVISOR-20261118-1704).
+    function turnInStart(which) {
         if (!turnInOn() || turnIn.step === 'reading' || turnIn.step === 'sending') return;
         turnIn.msg = '';
-        const input = document.getElementById('turnin-file');
+        const input = document.getElementById(which === 'photos' ? 'turnin-pick' : 'turnin-file');
         if (input && typeof input.click === 'function') input.click();
     }
     function turnInPicked(input) {
-        const file = input && input.files && input.files[0];
-        if (!file || !turnInOn()) return;
+        const files = input && input.files ? Array.prototype.slice.call(input.files, 0, 2) : [];
+        if (!files.length || !turnInOn()) return;
         const unit = turnInUnit();
         const holes = turnInHoles();
         if (!unit.players.length || (holes.length !== 9 && holes.length !== 18)) { turnIn.msg = 'The scanner reads 9- or 18-hole cards only.'; renderTurnIn(); return; }
         turnIn = Object.assign(turnIn, { step: 'reading', scan: null, check: null, photo: null, msg: '' });
         renderTurnIn();
-        turnInJpeg(file).then((dataUrl) => {
+        turnInJpeg(files).then((dataUrl) => {
             turnIn.photo = dataUrl;
             if (typeof fetch !== 'function') throw Object.assign(new Error('network'), { say: 'network' });
             return turnInToken().catch(() => { throw Object.assign(new Error('sign_in'), { say: 'sign_in' }); }).then((tok) =>
@@ -1061,7 +1037,7 @@
             h = `<div class="ti-h">📷 Turn in our card</div><p class="ti-p">Kept score on paper? After your last hole, photograph the card here. The organizer checks it before it goes on the leaderboard.</p>`
                 + (turnIn.msg ? `<p class="ti-msg" id="turnin-msg" role="alert">${escapeHtml(turnIn.msg)}</p>` : '')
                 + (turnIn.step === 'reading' ? `<p class="ti-busy" id="turnin-busy">Reading ${escapeHtml(label)}’s card…</p>`
-                    : `<button type="button" class="ti-btn" id="turnin-start" onclick="turnInStart()">📷 Turn in our card</button>`);
+                    : `<button type="button" class="ti-btn" id="turnin-start" onclick="turnInStart('camera')">📷 Take a photo</button><button type="button" class="ti-btn ti-ghost" id="turnin-photos" onclick="turnInStart('photos')">Choose from Photos</button><p class="ti-foot">One photo of the whole card, or two (front nine, back nine).</p>`);
         } else if (turnIn.step === 'check' || turnIn.step === 'sending') {
             const check = turnIn.check;
             const issues = ScanCompare.issuesOf(check);

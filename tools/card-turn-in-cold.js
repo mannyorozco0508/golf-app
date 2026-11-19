@@ -164,7 +164,7 @@ async function main() {
     if (!r.ok) { console.log(JSON.stringify({ golfer: r.reason })); process.exit(2); }
     const btn = JSON.parse(got(r, 'BTN')[0] || '{}'), chk = JSON.parse(got(r, 'CHECK')[0] || '{}'), sent = JSON.parse(got(r, 'SENT')[0] || '{}');
     results.golfer = { picked: (r.value || []).find((x) => /^picked|^no #/.test(String(x))), button: btn.button, buttonText: (btn.text || '').slice(0, 160), check: { tables: chk.tables, dotted: chk.dotted, red: chk.red, amber: chk.amber, gridRight: chk.gridRight, viewport: chk.viewport, text: (chk.text || '').slice(0, 260), scan: (chk.sent || [])[0] }, sent: { text: (sent.text || '').slice(0, 200), send: (sent.sent || []).filter((s) => s.body && s.body.action === 'send')[0], polls: (sent.sent || []).filter((s) => s.method === 'GET').length, writes: sent.writes } };
-    need(btn.shown && btn.button && /Turn in our card/.test(btn.button.text) && btn.button.h >= 44, 'golfer: the Turn in our card button, at least 44 px tall');
+    need(btn.shown && /Turn in our card/.test(btn.text || '') && btn.button && /Take a photo/.test(btn.button.text) && btn.button.h >= 44 && /Choose from Photos/.test(btn.text || ''), 'golfer: Take a photo (at least 44 px tall) and Choose from Photos');
     need(btn.overflowX <= 0, 'golfer: no sideways scroll at 390');
     need(chk.tables === 2 && chk.dotted === 72 && chk.red === 0 && chk.amber === 0, 'golfer: the check grid - two nines, 72 dotted digits, nothing red or amber');
     need(chk.gridRight > 0 && chk.gridRight <= chk.viewport, 'golfer: the grid fits the screen (' + chk.gridRight + ' of ' + chk.viewport + ')');

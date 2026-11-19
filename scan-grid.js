@@ -11,8 +11,8 @@
 // (tournament_card_check_test.js B2 and F1 hold the cells).
 //
 // Plain ES5 in the scan-compare.js wrapper: a browser sees window.ScanGrid,
-// Node sees module.exports. No DOM, no database, no fetch: strings in, a
-// string out.
+// Node sees module.exports. gridHtml and mark: no DOM, no database, no fetch,
+// strings in, a string out. photosToJpeg (below) is the one browser piece.
 //
 //   gridHtml({ holes, players, rows, esc })
 //     holes    [{ hole, par }] for the round, in hole order (cardCheckHoles)
@@ -84,7 +84,52 @@
         }).join('');
     }
 
-    var api = { gridHtml: gridHtml, mark: mark };
+    // THE PHOTO (ADVISOR-20261118-1704, Manny: "submit in a picture from our saved photos"). One or two picked
+    // files (the camera's shot, or saved photos: the front nine and the back nine as two pictures) become ONE
+    // JPEG of at most about 600 KB, the size the scanner expects: two photos are stacked, the first on top, at
+    // a common width. The only part of this file that touches the browser (FileReader, Image, a canvas); both
+    // pages call it, so the Desk's scan and the golfer's Turn in our card shrink a photo the same way.
+    function photosToJpeg(files) {
+        var list = Array.prototype.slice.call(files || [], 0, 2);
+        if (!list.length) return Promise.reject(new Error('read'));
+        function load(file) {
+            return new Promise(function (resolve, reject) {
+                var reader = new FileReader();
+                reader.onerror = function () { reject(new Error('read')); };
+                reader.onload = function () {
+                    var img = new Image();
+                    img.onerror = function () { reject(new Error('image')); };
+                    img.onload = function () {
+                        var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+                        if (!(w > 0) || !(h > 0)) { reject(new Error('image')); return; }
+                        resolve({ img: img, w: w, h: h });
+                    };
+                    img.src = String(reader.result);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        return Promise.all(list.map(load)).then(function (ims) {
+            var W = Math.max.apply(null, ims.map(function (m) { return m.w; }));
+            var parts = ims.map(function (m) { return { img: m.img, w: W, h: Math.round(m.h * W / m.w) }; });
+            var H = parts.reduce(function (s, p) { return s + p.h; }, 0);
+            var max = 1600, q = 0.8, out = '';
+            for (var i = 0; i < 5; i++) {
+                var k = Math.min(1, max / Math.max(W, H));
+                var cv = document.createElement('canvas');
+                cv.width = Math.max(1, Math.round(W * k)); cv.height = Math.max(1, Math.round(H * k));
+                var ctx = cv.getContext('2d'), y = 0;
+                parts.forEach(function (p) { var ph = Math.round(p.h * k); ctx.drawImage(p.img, 0, y, cv.width, ph); y += ph; });
+                out = cv.toDataURL('image/jpeg', q);
+                if (out.length * 0.75 <= 600 * 1024) break;
+                max = Math.round(max * 0.8); q = Math.max(0.6, q - 0.08);
+            }
+            if (!/^data:image\/jpeg;base64,/.test(out)) throw new Error('encode');
+            return out;
+        });
+    }
+
+    var api = { gridHtml: gridHtml, mark: mark, photosToJpeg: photosToJpeg };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (typeof window !== 'undefined') window.ScanGrid = api;
 })();

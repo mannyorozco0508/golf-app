@@ -1675,6 +1675,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              slash-star comments) and hid every line after it. -->
         <div id="cardcheck-wrap"></div>
         <input type="file" id="cardcheck-file" accept="image/&#42;" capture="environment" style="display:none;" onchange="cardCheckPicked(this)">
+        <!-- Saved photos (ADVISOR-20261118-1704): no capture attribute, so the phone offers its photo library; one or two. -->
+        <input type="file" id="cardcheck-pick" accept="image/&#42;" multiple style="display:none;" onchange="cardCheckPicked(this)">
         <div id="registration-chips"></div>
         <input type="search" id="registration-search" placeholder="Search a name or email" autocomplete="off" autocapitalize="off" spellcheck="false">
         <!-- THE EDITOR (2026-10-06). STATIC MARKUP, for the same reason the search
@@ -7086,7 +7088,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const start = u.start ? ` · H${escapeHtml(u.start)}` : '';
             let state, act;
             if (cardCheckBusy && cardCheckBusy.sk === c.sk) { state = `<span class="ck-state">${escapeHtml(cardCheckBusy.text)}</span>`; act = ''; }
-            else if (!c.check) { state = `<span class="ck-state">not scanned</span>`; act = `<button type="button" class="btn-primary ck-scan" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk)">Scan card</button>`; }
+            else if (!c.check) { state = `<span class="ck-state">not scanned</span>`; act = `<button type="button" class="btn-primary ck-scan" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk)">Scan card</button>`
+                + `<button type="button" class="btn-outline ck-pick" data-sk="${escapeHtml(c.sk)}" onclick="cardCheckScan(this.dataset.sk, 'photos')">From Photos</button>`; }
             else {
                 const open = ScanCompare.openIssues(c.check).length;
                 const fill = ScanCompare.wholeCardIssues(c.check).length;
@@ -7218,20 +7221,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
 
     // ---- THE SCAN ----
-    function cardCheckScan(sk) {
+    // which: absent = the camera; 'photos' = saved photos, one or two (ADVISOR-20261118-1704).
+    function cardCheckScan(sk, which) {
         if (!canManage() || cardCheckBusy) return;
         const c = cardCheckFind(sk);
         if (!c) return;
         cardCheckPending = sk;
         cardCheckMsg = '';
-        const input = document.getElementById('cardcheck-file');
+        const input = document.getElementById(which === 'photos' ? 'cardcheck-pick' : 'cardcheck-file');
         if (input && typeof input.click === 'function') input.click();
     }
     function cardCheckPicked(input) {
-        const file = input && input.files && input.files[0];
+        const file = input && input.files ? Array.prototype.slice.call(input.files, 0, 2) : [];
         const sk = cardCheckPending;
         cardCheckPending = null;
-        if (!file || !sk || !canManage()) return;
+        if (!file.length || !sk || !canManage()) return;
         const c = cardCheckFind(sk);
         if (!c) return;
         const holes = cardCheckHoles(c.view);
@@ -7256,36 +7260,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         });
         try { input.value = ''; } catch (e) { /* a picked file stays picked */ }
     }
-    // The phone's photo, shrunk to a JPEG of at most about 600 KB (the size
-    // the scanner expects: 300-600 KB; it refuses anything over about 2.2 MB).
-    function cardCheckJpeg(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onerror = () => reject(new Error('read'));
-            reader.onload = () => {
-                const img = new Image();
-                img.onerror = () => reject(new Error('image'));
-                img.onload = () => {
-                    const w = img.naturalWidth || img.width, ht = img.naturalHeight || img.height;
-                    if (!(w > 0) || !(ht > 0)) { reject(new Error('image')); return; }
-                    let max = 1600, q = 0.8, out = '';
-                    for (let i = 0; i < 5; i++) {
-                        const k = Math.min(1, max / Math.max(w, ht));
-                        const cv = document.createElement('canvas');
-                        cv.width = Math.max(1, Math.round(w * k)); cv.height = Math.max(1, Math.round(ht * k));
-                        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-                        out = cv.toDataURL('image/jpeg', q);
-                        if (out.length * 0.75 <= 600 * 1024) break;
-                        max = Math.round(max * 0.8); q = Math.max(0.6, q - 0.08);
-                    }
-                    if (!/^data:image\/jpeg;base64,/.test(out)) { reject(new Error('encode')); return; }
-                    resolve(out);
-                };
-                img.src = String(reader.result);
-            };
-            reader.readAsDataURL(file);
-        });
-    }
+    // The photo or photos (the camera's shot, or one or two saved photos), as one JPEG of at most about
+    // 600 KB (the scanner expects 300-600 KB and refuses anything over about 2.2 MB): scan-grid.js photosToJpeg.
+    function cardCheckJpeg(files) { return ScanGrid.photosToJpeg(files && files.length !== undefined ? files : [files]); }
     // The scanner's own answers, as a sentence each (functions/api/_scan.js).
     const CARD_SCAN_SAYS = {
         not_configured: 'The card scanner is not switched on yet.',

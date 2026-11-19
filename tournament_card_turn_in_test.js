@@ -29,10 +29,11 @@
 //
 // BASELINE against pre-build main fc9680e7 (the two pages as they stand there, no
 // scan-grid.js), this file copied there and run, the FINAL file:
-//   16 tests, 1 pass / 15 fail / 0 cancelled. The 1 is O5 (a visitor never asks
+//   16 tests, 1 pass / 15 fail / 0 cancelled (2026-11-18 17:1x, + G7 and P1 for saved photos, ADVISOR-1704:
+//   18 tests, re-measured on fc9680e7 with the final file: 1 pass / 17 fail). The 1 is O5 (a visitor never asks
 //   the function), true of a page with no turn-in at all. G1 and G5 are red there
 //   too: they read #turnin-card, which the old page does not have.
-//   On preview-card-turnin: 16 / 0.
+//   On preview-card-turnin: 18 / 0.
 // NEGATIVE CONTROLS, run 2026-11-18 on the FINAL pages (each copied to the scratchpad first,
 // restored by cp from that copy, sha re-checked: RESTORED-OK d6837e043017ffd6 / 08843526906f7a81):
 //   K1 Approve writes db.ref(tournaments/<code>/scores/..).set itself, not the corrector -> 15/1, O3 red
@@ -192,7 +193,8 @@ describe('G. the golfer: Turn in our card on the group\'s scoring link', () => {
         let w = html(sb, 'turnin-card');
         assert.match(plain(w), /Turn in our card/);
         assert.match(plain(w), /Kept score on paper\? After your last hole, photograph the card here\. The organizer checks it before it goes on the leaderboard\./);
-        assert.ok(/id="turnin-start"[^>]*onclick="turnInStart\(\)"/.test(w), 'the button is the page\'s own start');
+        assert.ok(/id="turnin-start"[^>]*onclick="turnInStart\('camera'\)"[^>]*>📷 Take a photo</.test(w), 'Take a photo');
+        assert.ok(/id="turnin-photos"[^>]*onclick="turnInStart\('photos'\)"[^>]*>Choose from Photos</.test(w), 'Choose from Photos (ADVISOR-20261118-1704)');
         tap(sb, w, (t) => /id="turnin-start"/.test(t));
         await camera(sb, 'turnin-file', CARD_HTML);
         const scans = scanCalls(sb);
@@ -279,6 +281,20 @@ describe('G. the golfer: Turn in our card on the group\'s scoring link', () => {
         assert.match(w, /The scanner has reached today's limit for this event\. Hand the card in at the desk\./);
         assert.match(w, /Turn in our card/, 'back to the button');
         assert.equal(turnInCalls(sb).length, 0);
+        assert.equal(scoreWrites(sb).length, 0);
+    });
+    test('G7 saved photos (ADVISOR-20261118-1704): the second input has no capture attribute and takes two; two picked photos become ONE scan request with one JPEG; the same check screen follows', async () => {
+        assert.match(CARD_HTML, /<input type="file" id="turnin-pick" accept="image\/&#42;" multiple style="display:none;" onchange="turnInPicked\(this\)">/);
+        assert.ok(!/id="turnin-pick"[^>]*capture/.test(CARD_HTML), 'no capture: the phone offers its photo library');
+        const sb = golfer(record());
+        tap(sb, html(sb, 'turnin-card'), (t) => /id="turnin-photos"/.test(t));
+        const on = /\bonchange="([^"]*)"/.exec((CARD_HTML.match(/<input\b[^>]*\bid="turnin-pick"[^>]*>/) || [])[0])[1];
+        sb.__fileEl = { files: [{ name: 'front.jpg', type: 'image/jpeg', b64: 'RlJPTlQ=' }, { name: 'back.jpg', type: 'image/jpeg', b64: 'QkFDSw==' }, { name: 'third.jpg', type: 'image/jpeg', b64: 'WA==' }], value: '' };
+        vm.runInContext('(function () { ' + unq(on) + ' }).call(__fileEl)', sb);
+        await settle(20);
+        assert.equal(scanCalls(sb).length, 1, 'one scan for the two photos');
+        assert.equal(scanCalls(sb)[0].body.image.mimeType, 'image/jpeg');
+        assert.match(plain(html(sb, 'turnin-card')), /Group 2 · check the card/);
         assert.equal(scoreWrites(sb).length, 0);
     });
     test('G6 a doubtful card: a row the scanner could not name and a low-confidence digit are said in plain words; the golfer can still send and the organizer decides', async () => {
@@ -452,6 +468,26 @@ describe('O. the organizer: the switch and the Cards turned in queue on the Desk
         assert.equal(checkWrites(sb).length, 0);
         assert.equal(turnInCalls(sb).filter((f) => f.method === 'POST').length, 0);
         assert.match(plain(html(sb, 'cardcheck-wrap')), /This round is not open\. Open it in Setup to approve the card\./);
+    });
+});
+
+describe('P. the organizer scans from saved photos too', () => {
+    test('P1 every not-scanned row offers Scan card and From Photos; From Photos opens the input with no capture attribute; a picked photo is read by the same scanner and stored as that card\'s check', async () => {
+        assert.match(ORG_HTML, /<input type="file" id="cardcheck-pick" accept="image\/&#42;" multiple style="display:none;" onchange="cardCheckPicked\(this\)">/);
+        assert.ok(!/id="cardcheck-pick"[^>]*capture/.test(ORG_HTML));
+        const sb = organizer(record({ turnIn: false }), { script: { scan: scanAnswer(scanOf(GROUPS[1][2])) } });
+        wireCamera(sb);
+        deskTab(sb);
+        await settle();
+        const w = html(sb, 'cardcheck-wrap');
+        assert.equal((w.match(/class="btn-outline ck-pick"/g) || []).length, 4, 'one per group');
+        assert.ok(/ck-pick" data-sk="g2" onclick="cardCheckScan\(this\.dataset\.sk, 'photos'\)">From Photos</.test(w));
+        tap(sb, w, (t) => /ck-pick/.test(t) && /data-sk="g2"/.test(t));
+        await camera(sb, 'cardcheck-pick', ORG_HTML);
+        assert.equal(scanCalls(sb).length, 1);
+        assert.equal(checkWrites(sb).length, 1);
+        assert.equal(checkWrites(sb)[0].path, 'tournaments/STK26/cardChecks/g2');
+        assert.equal(scoreWrites(sb).length, 0, 'a scan writes no score until Use the whole card');
     });
 });
 
