@@ -1,0 +1,114 @@
+{
+ "parser": "ask-hardpan.js sha 192bc1fde664 (golf-app-210-hr, the 2.0.8-2.1.0 trees)",
+ "golfers": "Sam (you), Josh, Bob, Paul",
+ "cards": [
+  {
+   "text": "Skins for everyone, carry over, for fun",
+   "title": "Skins",
+   "lines": [
+    [
+     "Who’s in",
+     "Everyone (4)"
+    ],
+    [
+     "Amount",
+     "No amount"
+    ],
+    [
+     "Scoring",
+     "Net"
+    ],
+    [
+     "Counts from",
+     "Now"
+    ],
+    [
+     "Carry over",
+     "On"
+    ]
+   ],
+   "start": "Add game"
+  },
+  {
+   "text": "Best ball, me and Josh vs Bob and Paul, for fun",
+   "title": "2 v 2 Best Ball",
+   "lines": [
+    [
+     "Sides",
+     "Sam + Josh vs Bob + Paul"
+    ],
+    [
+     "Amount",
+     "No amount"
+    ],
+    [
+     "Presses",
+     "Off"
+    ],
+    [
+     "Scoring",
+     "Net"
+    ],
+    [
+     "Counts from",
+     "Now"
+    ]
+   ],
+   "start": "Add game"
+  },
+  {
+   "text": "Nassau, me vs Josh, for fun",
+   "title": "1 v 1 Nassau",
+   "lines": [
+    [
+     "Sides",
+     "Sam vs Josh"
+    ],
+    [
+     "Amount",
+     "No amount"
+    ],
+    [
+     "Presses",
+     "Off"
+    ],
+    [
+     "Scoring",
+     "Net"
+    ],
+    [
+     "Counts from",
+     "Now"
+    ]
+   ],
+   "start": "Add game"
+  },
+  {
+   "text": "Me vs Bob, match play, gross, from hole 1, for fun",
+   "title": "1 v 1 Match Play",
+   "lines": [
+    [
+     "Sides",
+     "Sam vs Bob"
+    ],
+    [
+     "Amount",
+     "No amount"
+    ],
+    [
+     "Presses",
+     "Off"
+    ],
+    [
+     "Scoring",
+     "Gross"
+    ],
+    [
+     "Counts from",
+     "Hole 1"
+    ]
+   ],
+   "start": "Add game"
+  }
+ ]
+}
