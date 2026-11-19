@@ -9031,6 +9031,24 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const on = !!gm && gm.flights.indexOf(fid) !== -1;
         return skinRuleWrite(`games/${id}/flights/${fid}`, on ? null : true);
     }
+    // KP SENTENCES (Starkey settings 12-13): prizeSettings/kps = { perFlight, ties }.
+    function setKpRule(field, v) {
+        if (!currentCode || !canManage()) return;
+        if (field === 'perFlight' && (v === 'yes' || v === 'no')) return db.ref(`tournaments/${currentCode}/prizeSettings/kps/perFlight`).set(v === 'yes').catch(err => alert(`Error: ${err.message}`));
+        if (field === 'ties' && (v === 'earlier' || v === 'share')) return db.ref(`tournaments/${currentCode}/prizeSettings/kps/ties`).set(v).catch(err => alert(`Error: ${err.message}`));
+    }
+    function kpSentencesHtml(data, sent) {
+        const K = TournamentContests.kpRulesOf(data);
+        const fids = eventFlightIds(data);
+        let h = `<div class="pz-k" id="kp-rules-head">Closest to the pin and long drive</div>`;
+        if (fids.length) {
+            h += sent('kpflight', K.perFlight ? 'One winner a hole <b>in each flight</b>.' : 'One winner a hole <b>for the field</b>.',
+                `<div class="payout-basis-seg" role="group" aria-label="Winners">${[['no', 'One for the field'], ['yes', 'One per flight']].map(([v, t]) => `<button type="button" class="${(K.perFlight ? 'yes' : 'no') === v ? 'on' : ''}" aria-pressed="${(K.perFlight ? 'yes' : 'no') === v}" data-v="${v}" onclick="setKpRule('perFlight', this.dataset.v)">${t}</button>`).join('')}</div>`);
+        }
+        h += sent('kpties', K.ties === 'share' ? 'Two marks the same: they <b>share</b> the prize.' : 'Two marks the same: the <b>earlier</b> mark wins.',
+            `<div class="payout-basis-seg" role="group" aria-label="A tie">${[['earlier', 'Earlier mark wins'], ['share', 'They share the prize']].map(([v, t]) => `<button type="button" class="${K.ties === v ? 'on' : ''}" aria-pressed="${K.ties === v}" data-v="${v}" onclick="setKpRule('ties', this.dataset.v)">${t}</button>`).join('')}</div>`);
+        return h;
+    }
     function skinSentencesHtml(data, sent) {
         const K = TournamentPrizes.skinRulesOf(data);
         const fids = eventFlightIds(data);
@@ -9120,6 +9138,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             + (multi ? placeSeg('Within', 'within', [['event', 'The event'], ['round', 'Each round']], wi) : ''));
         h += `<div class="pz-note" id="place-adjust-note">${R ? 'Tap Adjust beside any amount below to change it before posting.' : 'Choose a rule to turn on Adjust beside each amount.'}</div>`;
         h += skinSentencesHtml(data, sent);
+        h += kpSentencesHtml(data, sent);
         return h;
     }
 
@@ -9218,7 +9237,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         h += `<div class="pz-sub">Winners from the Contests tab · ${ct.perContest > 0 ? `${escapeHtml(TournamentPrizes.amountText(ct.perContest, data))} each` : 'no amount each yet'}</div>`;
         h += `<div class="pz-ctl"><label for="prize-kp-amount">Each contest $</label><input type="number" id="prize-kp-amount" min="0" step="1" placeholder="0" value="${ct.perContest > 0 ? ct.perContest : ''}" onchange="savePrizeSetting('perContest', this.value)"></div>`;
         if (!ct.rows.length && !ct.open.length) return h + `<div class="pz-note">No contest holes yet. Mark them on the Contests tab.</div>`;
-        h += ct.rows.map((c) => `<div class="pz-row" data-hole="${c.hole}"><span class="pz-n">${c.hole}</span><span class="pz-who">${escapeHtml(c.name)} <small>${c.kind === 'kp' ? 'closest' : 'long drive'} · ${escapeHtml(c.value)}</small></span><span class="pz-amt">${c.amount > 0 ? escapeHtml(TournamentPrizes.shortText(c.amount, data)) : ''}</span></div>`).join('');
+        h += ct.rows.map((c) => `<div class="pz-row" data-hole="${c.hole}"><span class="pz-n">${c.hole}</span><span class="pz-who">${escapeHtml(c.name)} <small>${c.flight ? escapeHtml(c.flight) + ' · ' : ''}${c.kind === 'kp' ? 'closest' : 'long drive'} · ${escapeHtml(c.value)}${c.shared ? ' · shared' : ''}</small></span><span class="pz-amt">${c.amount > 0 ? escapeHtml(TournamentPrizes.shortText(c.amount, data)) : ''}</span></div>`).join('');
         h += ct.open.map((c) => `<div class="pz-note">Hole ${c.hole} (${c.kind === 'kp' ? 'closest to the pin' : 'long drive'}): no winner confirmed yet.</div>`).join('');
         return h;
     }
@@ -10615,15 +10634,20 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!box) return;
         const c = list.find((x) => x.key === contestSelected);
         if (!c) { box.style.display = 'none'; box.innerHTML = ''; return; }
-        const rows = TournamentContests.ranked(contestEntriesAll[c.key] || {}, c.kind, currentData || {});
+        const groups = TournamentContests.rankedGroups(contestEntriesAll[c.key] || {}, c.kind, currentData || {});
+        const rows = [].concat.apply([], groups.map((g) => g.rows));
         let html = `<div class="ct-head">Hole ${c.hole} entries</div>`;
-        html += rows.length ? rows.map((r) => {
+        const rowHtml = (r, g) => {
             const who = `${escapeHtml(r.name || '')} ${escapeHtml(TournamentContests.valueText(r))}${r.by === 'gps' ? ' 📍' : ''}`;
-            const btns = c.winner === r.key
-                ? `<button type="button" class="ct-btn" data-hole="${c.key}" onclick="clearContestWinner(this.dataset.hole)">Winner ✓</button>`
+            const shared = g.rows.filter((x) => c.winners.indexOf(x.key) !== -1).length > 1;
+            const btns = c.winners.indexOf(r.key) !== -1
+                ? `<button type="button" class="ct-btn" data-hole="${c.key}" data-group="${escapeHtml(g.id)}" onclick="clearContestWinner(this.dataset.hole, this.dataset.group)">${shared ? 'Winner ✓ · shared' : 'Winner ✓'}</button>`
                 : `<button type="button" class="ct-btn" data-hole="${c.key}" data-entry="${escapeHtml(r.key)}" onclick="makeContestWinner(this.dataset.hole, this.dataset.entry)">Make winner</button><button type="button" class="ct-btn rm" data-hole="${c.key}" data-entry="${escapeHtml(r.key)}" onclick="removeContestEntry(this.dataset.hole, this.dataset.entry)">Remove</button>`;
             return `<div class="ct-row"><span>${who}</span><span class="ct-btns">${btns}</span></div>`;
-        }).join('') : `<div class="ct-row"><span style="color:var(--text-muted);">No entries yet.</span><button type="button" class="ct-btn rm" data-hole="${c.key}" onclick="removeContestHole(this.dataset.hole)">Remove hole</button></div>`;
+        };
+        html += rows.length ? groups.map((g) => (g.name ? `<div class="ct-head ct-flight">${escapeHtml(g.name)}</div>` : '')
+            + (g.rows.length ? g.rows.map((r) => rowHtml(r, g)).join('') : `<div class="ct-row"><span style="color:var(--text-muted);">No entries in this flight yet.</span></div>`)).join('')
+            : `<div class="ct-row"><span style="color:var(--text-muted);">No entries yet.</span><button type="button" class="ct-btn rm" data-hole="${c.key}" onclick="removeContestHole(this.dataset.hole)">Remove hole</button></div>`;
         box.innerHTML = html;
         box.style.display = 'block';
     }
@@ -10684,13 +10708,19 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     }
     function makeContestWinner(key, entryKey) {
         if (!canManage()) return;
-        return contestsRef(key).update({ winner: entryKey, lockedAt: firebase.database.ServerValue.TIMESTAMP })
+        const c = TournamentContests.contestList(currentData || {}).find((x) => x.key === key);
+        if (!c) return;
+        // One winner for the field: { winner, lockedAt } as always. A flight's winner or a shared tie: winners + locks.
+        return contestsRef(key).update(TournamentContests.winnerUpdate(currentData, c, contestEntriesAll[key] || {}, entryKey, firebase.database.ServerValue.TIMESTAMP))
             .catch((err) => alert(`Error: ${err.message}`));
     }
-    function clearContestWinner(key) {
+    function clearContestWinner(key, group) {
         if (!canManage()) return;
-        if (!confirm('Unlock this hole? Golfers can enter again and you can pick another winner.')) return;
-        return contestsRef(key).update({ winner: null, lockedAt: null }).catch((err) => alert(`Error: ${err.message}`));
+        const c = TournamentContests.contestList(currentData || {}).find((x) => x.key === key);
+        if (!c) return;
+        const legacy = !!c.winner && !Object.keys(c.locks || {}).length;
+        if (!confirm(legacy || !group || group === 'all' ? 'Unlock this hole? Golfers can enter again and you can pick another winner.' : 'Unlock this flight on this hole? Its golfers can enter again and you can pick another winner.')) return;
+        return contestsRef(key).update(legacy ? { winner: null, lockedAt: null } : TournamentContests.clearWinnerUpdate(currentData, c, group || 'all')).catch((err) => alert(`Error: ${err.message}`));
     }
     function removeContestEntry(key, entryKey) {
         if (!canManage()) return;

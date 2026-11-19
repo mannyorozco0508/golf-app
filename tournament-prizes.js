@@ -417,13 +417,27 @@
         var out = { multi: multi, perContest: st.perContest, rows: [], open: [], total: 0 };
         if (multi) return out;
         var C = root.TournamentContests;
+        // KP settings 12-13: one winner a hole (as always), or one a flight; a shared tie splits the amount
+        // between the winners of that flight (or of the field).
+        var perFlight = C.kpRulesOf ? C.kpRulesOf(data).perFlight : false;
+        var fl = (data && data.flights) || {};
         C.contestList(data || {}).forEach(function (c) {
-            var e = c.winner ? (((entries || {})[c.key] || {})[c.winner] || null) : null;
-            if (!e) { out.open.push({ hole: c.hole, kind: c.kind }); return; }
-            out.rows.push({ hole: c.hole, kind: c.kind, key: contestOwnerKey(data, c.winner), name: String(e.name || ''),
-                value: C.valueText(e), amount: st.perContest });
+            var ws = (c.winners || (c.winner ? [c.winner] : [])).filter(function (k) { return ((entries || {})[c.key] || {})[k]; });
+            if (!ws.length) { out.open.push({ hole: c.hole, kind: c.kind }); return; }
+            var byGroup = {};
+            ws.forEach(function (k) { var gid = perFlight ? (C.flightOfKey(data, k) || 'none') : 'all'; (byGroup[gid] = byGroup[gid] || []).push(k); });
+            Object.keys(byGroup).forEach(function (gid) {
+                var n = byGroup[gid].length;
+                byGroup[gid].forEach(function (k) {
+                    var e = entries[c.key][k];
+                    var row = { hole: c.hole, kind: c.kind, key: contestOwnerKey(data, k), name: String(e.name || ''), value: C.valueText(e), amount: round2(st.perContest / n) };
+                    if (perFlight) row.flight = gid === 'none' ? 'No flight' : ((fl[gid] && fl[gid].name) || 'Flight');
+                    if (n > 1) row.shared = n;
+                    out.rows.push(row);
+                });
+            });
         });
-        out.total = round2(out.rows.length * st.perContest);
+        out.total = round2(out.rows.reduce(function (a, r) { return a + r.amount; }, 0));
         return out;
     }
 
@@ -476,7 +490,7 @@
                         }) };
                 }) },
             contests: { perContest: sum.contests.perContest, multi: sum.contests.multi, total: sum.contests.total,
-                rows: sum.contests.rows.map(function (c) { return { hole: c.hole, kind: c.kind, key: c.key, name: c.name, value: c.value, amount: c.amount }; }) },
+                rows: sum.contests.rows.map(function (c) { var o = { hole: c.hole, kind: c.kind, key: c.key, name: c.name, value: c.value, amount: c.amount }; if (c.flight) o.flight = c.flight; if (c.shared) o.shared = c.shared; return o; }) },
             placeTotal: sum.placeTotal, trophies: sum.trophies, total: sum.total,
             golfers: g('competitorCount') ? g('competitorCount')(data || {}) : 0
         };

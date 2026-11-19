@@ -45,7 +45,8 @@
             var n = holeNum(k), h = course.filter(function (x) { return Number(x.hole) === n; })[0] || {};
             return { key: k, hole: n, kind: c[k].kind, fairwayOnly: c[k].fairwayOnly === true,
                 allowGps: c[k].allowGps !== false, winner: c[k].winner || null,
-                lockedAt: c[k].lockedAt || null, par: h.par || null, yards: h.yards || null };
+                lockedAt: c[k].lockedAt || null, par: h.par || null, yards: h.yards || null,
+                winners: winnersOf(c[k]), locks: (c[k].locks && typeof c[k].locks === 'object') ? c[k].locks : {} };
         }).sort(function (a, b) { return a.hole - b.hole; });
     }
     function contestFor(data, hole) {
@@ -98,6 +99,84 @@
         if (!m) return false;
         var teams = (data && data.teams) || {};
         return Object.keys(teams).some(function (k) { var t = teams[k]; return t && String(t.num) === m[1] && t.status === 'withdrawn'; });
+    }
+
+    // ---- KP SETTINGS 12-13 (Starkey settings, Manny 2026-11-19 "then KPs 12-13 (rules publish later, my OK)") ----
+    // prizeSettings/kps = { perFlight: true|false, ties: 'earlier'|'share' }. Absent = today: one winner for the
+    // field, a tie keeps the earlier mark.
+    // A contest hole may then carry  winners: { <entryKey>: true }  and  locks: { <flightId>|'all': time }  beside
+    // the single winner / lockedAt it has always had. ONE winner for the field with no share still writes
+    // winner + lockedAt, exactly as before, which the live rules accept; winners / locks need the rules change
+    // proposed in outbox (TOURN-...-kp-rules-PROPOSAL), not yet published.
+    function kpRulesOf(data) {
+        var k = (data && data.prizeSettings && data.prizeSettings.kps) || {};
+        return { perFlight: k.perFlight === true, ties: k.ties === 'share' ? 'share' : 'earlier' };
+    }
+    function winnersOf(raw) {
+        var w = raw && raw.winners && typeof raw.winners === 'object' ? Object.keys(raw.winners).filter(function (k) { return raw.winners[k] === true; }) : [];
+        if (!w.length && raw && raw.winner) w = [raw.winner];
+        return w;
+    }
+    // The flight an entry counts in: its golfer's (a player id), or its team's (team<N>_p<i>).
+    function flightOfKey(data, key) {
+        var p = ((data && data.players) || {})[key];
+        if (p) return p.flightId || null;
+        var m = /^team(\d+)_/.exec(String(key || ''));
+        if (!m) return null;
+        var teams = (data && data.teams) || {};
+        var t = Object.keys(teams).map(function (k) { return teams[k]; }).filter(function (x) { return x && String(x.num) === m[1]; })[0];
+        return (t && t.flightId) || null;
+    }
+    // 'all' when the event has one winner a hole; the flight (or 'none') when it has one a flight.
+    function groupOfKey(data, key) { return kpRulesOf(data).perFlight ? (flightOfKey(data, key) || 'none') : 'all'; }
+    function lockedFor(c, groupId) { return !!(c && (c.lockedAt || ((c.locks || {})[groupId || 'all']))); }
+    // The ranked entries of one hole, in groups: one group, or one per flight in the board's flight order.
+    function rankedGroups(entries, kind, data) {
+        var all = ranked(entries, kind, data);
+        if (!kpRulesOf(data).perFlight) return [{ id: 'all', name: '', rows: all }];
+        var f = (data && data.flights) || {};
+        var ids = Object.keys(f).filter(function (k) { return f[k]; }).sort(function (a, b) { return ((f[a].createdAt || 0) - (f[b].createdAt || 0)) || String(f[a].name || '').localeCompare(String(f[b].name || '')); });
+        var out = ids.map(function (id) { return { id: id, name: f[id].name || 'Flight', rows: all.filter(function (r) { return flightOfKey(data, r.key) === id; }) }; });
+        var none = all.filter(function (r) { return ids.indexOf(flightOfKey(data, r.key)) === -1; });
+        if (none.length) out.push({ id: 'none', name: 'No flight', rows: none });
+        return out;
+    }
+    var sameMark = function (a, b) { return a.kind === b.kind && (a.kind === 'ld' ? Number(a.yards) === Number(b.yards) : Number(a.inches) === Number(b.inches)); };
+    // MAKE WINNER, as one update relative to tournaments/<code>/contests/<hole>. The legacy write when it can be
+    // (one winner for the field, no share): { winner, lockedAt }. Otherwise winners/<key> for the pick (and, when
+    // ties share, every entry in the same group with the same mark) and locks/<group>.
+    function winnerUpdate(data, c, entries, entryKey, timestamp) {
+        var R = kpRulesOf(data);
+        var gid = groupOfKey(data, entryKey);
+        var grp = rankedGroups(entries, c.kind, data).filter(function (x) { return x.id === gid; })[0] || { rows: [] };
+        var me = grp.rows.filter(function (r) { return r.key === entryKey; })[0];
+        var picks = R.ties === 'share' && me ? grp.rows.filter(function (r) { return sameMark(r, me); }).map(function (r) { return r.key; }) : [entryKey];
+        if (!R.perFlight && picks.length === 1) {
+            var legacy = { winner: entryKey, lockedAt: timestamp };
+            (c.winners || []).forEach(function (k) { if (k !== c.winner) legacy['winners/' + k] = null; });
+            Object.keys(c.locks || {}).forEach(function (k) { legacy['locks/' + k] = null; });
+            if (Object.keys(c.locks || {}).length) legacy['winners/' + entryKey] = null;
+            return legacy;
+        }
+        var u = {};
+        var grpOf = function (k) { return R.perFlight ? (flightOfKey(data, k) || 'none') : 'all'; };
+        // A hole won the old way (winner + lockedAt) is carried into the new shape first: its winner becomes
+        // winners/<key> with its group's lock, so another flight's pick never un-wins it.
+        if (c.winner) {
+            u.winner = null; u.lockedAt = null;
+            if (grpOf(c.winner) !== gid) { u['winners/' + c.winner] = true; u['locks/' + grpOf(c.winner)] = c.lockedAt || timestamp; }
+        }
+        (c.winners || []).forEach(function (k) { if (picks.indexOf(k) === -1 && grpOf(k) === gid) u['winners/' + k] = null; });
+        picks.forEach(function (k) { u['winners/' + k] = true; });
+        u['locks/' + gid] = timestamp;
+        return u;
+    }
+    // CLEAR: the legacy pair, or the group's winners and its lock.
+    function clearWinnerUpdate(data, c, groupId) {
+        var u = { winner: null, lockedAt: null };
+        (c.winners || []).forEach(function (k) { if ((kpRulesOf(data).perFlight ? (flightOfKey(data, k) || 'none') : 'all') === groupId) u['winners/' + k] = null; });
+        u['locks/' + (groupId || 'all')] = null;
+        return u;
     }
 
     // ---- the ranking ------------------------------------------------------------
@@ -161,10 +240,14 @@
     // ---- the recap's winners -------------------------------------------------------
     // Only a hole the organizer confirmed ("Make winner") has a winner here.
     function confirmedWinners(data, entriesByHole) {
-        return contestList(data).filter(function (c) { return c.winner; }).map(function (c) {
-            var e = ((entriesByHole || {})[c.key] || {})[c.winner];
-            return e ? { hole: c.hole, kind: c.kind, name: e.name, value: valueText(e) } : null;
-        }).filter(Boolean);
+        var out = [];
+        contestList(data).forEach(function (c) {
+            c.winners.forEach(function (k) {
+                var e = ((entriesByHole || {})[c.key] || {})[k];
+                if (e) out.push({ hole: c.hole, kind: c.kind, name: e.name, value: valueText(e) });
+            });
+        });
+        return out;
     }
 
     var api = {
@@ -174,7 +257,8 @@
         feetInchesText: feetInchesText, yardsText: yardsText, valueText: valueText,
         kpInches: kpInches, ldYards: ldYards, ranked: ranked, withdrawnKey: withdrawnKey, throughCount: throughCount,
         teamLabel: teamLabel, entryRecord: entryRecord, entryUpdate: entryUpdate,
-        confirmedWinners: confirmedWinners
+        confirmedWinners: confirmedWinners, kpRulesOf: kpRulesOf, winnersOf: winnersOf, flightOfKey: flightOfKey,
+        groupOfKey: groupOfKey, lockedFor: lockedFor, rankedGroups: rankedGroups, winnerUpdate: winnerUpdate, clearWinnerUpdate: clearWinnerUpdate
     };
     root.TournamentContests = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;

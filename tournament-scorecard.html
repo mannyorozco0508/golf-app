@@ -2326,7 +2326,9 @@
             const c = TournamentContests.contestFor(data, hole);
             if (!c || c.lockedAt || contestSkipped(hole)) continue;
             const got = contestEntries[c.key] || {};
-            if (contestCtx.golfers.length && contestCtx.golfers.every(g => got[g.entryKey])) continue;
+            // KP setting 12: a flight whose winner is confirmed is done on this hole; its golfers are not asked.
+            const asked = contestCtx.golfers.filter(g => !TournamentContests.lockedFor(c, TournamentContests.groupOfKey(data, g.entryKey)));
+            if (!asked.length || asked.every(g => got[g.entryKey])) continue;
             return c;
         }
         return null;
@@ -2357,7 +2359,7 @@
         const c = contestHoleNow();
         if (!c) { box.style.display = 'none'; box.innerHTML = ''; contestShape = ''; return; }
         const got = contestEntries[c.key] || {};
-        const golfers = contestCtx.golfers;
+        const golfers = contestCtx.golfers.filter(g => !TournamentContests.lockedFor(c, TournamentContests.groupOfKey(currentData || {}, g.entryKey)));
         const open = golfers.filter(g => !got[g.entryKey]);
         if (golfers.length === 1) contestPick[c.hole] = golfers[0].entryKey;
         const pick = contestPick[c.hole] || null;
