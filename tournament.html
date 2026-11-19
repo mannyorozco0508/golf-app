@@ -244,6 +244,9 @@
         .tourney-wordmark .wm-rattle { grid-column: 1; grid-row: 2; justify-self: center; white-space: nowrap; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; color: rgba(244,247,245,0.78); }
         .tourney-wordmark .wm-product { grid-column: 2; grid-row: 1; font-size: 2.1rem; font-weight: 800; letter-spacing: -0.01em; color: #ffffff; }
         .tourney-hero-line { margin: 12px 0 0 0; font-size: 0.95rem; line-height: 1.45; color: rgba(244,247,245,0.92); max-width: 34em; }
+        /* See it in action (2026-11-18): the showcase button, lime on the dark band, a 52 px target. */
+        .tourney-hero-cta { display: inline-flex; align-items: center; justify-content: center; min-height: 52px; padding: 0 22px; margin-top: 16px; border-radius: 14px; background: #d9f07a; color: #0f4a36; font-weight: 800; font-size: 1.05rem; text-decoration: none; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+        .tourney-hero-cta:active { transform: translateY(1px); }
         @media (min-width: 560px) {
             .tourney-hero { min-height: 240px; }
             .tourney-hero-body { padding: 80px 28px 30px 28px; }
@@ -987,6 +990,10 @@
         <div class="tourney-hero-body">
             <div class="tourney-wordmark" aria-label="HardPan Tournaments"><span class="wm-disc"><svg class="wm-mark" viewBox="4 24 92 46" width="56" height="28" aria-hidden="true" focusable="false"><g fill="#f5f2ea"><rect x="6" y="28" width="8.5" height="30" rx="1"/><rect x="26" y="28" width="8.5" height="30" rx="1"/><rect x="12" y="40.5" width="16" height="7"/><rect x="40" y="28" width="8.5" height="30" rx="1"/><path d="M46 28 H54 A11 11 0 0 1 54 50 H46 Z"/></g><path d="M48.5 34.5 H53.5 A4.5 4.5 0 0 1 53.5 43.5 H48.5 Z" fill="#0B0F0C"/><path d="M79 64.5 C75.15 55.7 68 50.75 68 42.5 A11 11 0 1 1 90 42.5 C90 50.75 82.85 55.7 79 64.5Z" fill="#2e7d4f"/><circle cx="79" cy="42.5" r="7.92" fill="#f5f2ea" stroke="#2e7d4f" stroke-width="1"/></svg></span><span class="wm-rattle">HardPan</span><span class="wm-product">Tournaments</span></div>
             <p class="tourney-hero-line">Live scoring + registration for charity, member-guest, and club events.</p>
+            <!-- SEE IT IN ACTION (ADVISOR-20261118-1633, Manny: "when someone clicks the tournaments tab, it should lead to
+                 something like 'see what it'll look like'"): the showcase for a course GM, its own page at /see-it (a Pretty URL,
+                 no rewrite row; /tournaments/see-it is the other address on offer, two _redirects rows away). Markup only; nothing on this page reads it. -->
+            <a class="tourney-hero-cta" id="see-it-btn" href="/see-it">See what your tournament will look like &rsaquo;</a>
         </div>
     </header>
     <!-- PHASE 2, P2-0: the app's own top bar and "My events". Shown only in app
