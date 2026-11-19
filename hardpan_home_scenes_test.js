@@ -98,12 +98,13 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
         assert.ok(sc[1][1] && sc[1][3], 'the club day scene is the wide TV picture');
         assert.equal(sc.filter((m) => m[1]).length, 1);
     });
-    test('the sheets: five dialogs, hidden on arrival, labelled, X button, 36 pictures + 2 notes', () => {
+    test('the sheets: five dialogs, hidden on arrival, labelled, X button, 37 pictures + 2 notes', () => {
         const ds = [...sheets.matchAll(/<div class="sheet" id="sheet-([a-z]+)" role="dialog" aria-modal="true" aria-labelledby="sheet-\1-h" hidden>/g)].map((m) => m[1]);
         assert.deepEqual(ds, ['weekly', 'club', 'trip', 'tournaments', 'gps']);
         ds.forEach((d) => assert.ok(sheets.includes('<h3 id="sheet-' + d + '-h">'), d));
         assert.equal((sheets.match(/<button type="button" class="sh-x" aria-label="Close">/g) || []).length, 5);
-        assert.equal((sheets.match(/class="shot"/g) || []).length, 42);   // 2026-11-16: + check-in (2), the 36-hole board (2), skins, pairings (ADVISOR-20261116-0104)
+        // 2026-11-19 (the COMING sweep, ADVISOR-20261119-0134): + the Desk scan check (live since 2026-11-16, v421) in the Tournaments sheet.
+        assert.equal((sheets.match(/class="shot"/g) || []).length, 43);   // 2026-11-16: + check-in (2), the 36-hole board (2), skins, pairings (ADVISOR-20261116-0104)
         assert.equal((sheets.match(/<li class="note">/g) || []).length, 0, 'every note became a picture');
         assert.match(sheets, /data-shot="board36" data-group="Tournaments"[\s\S]*data-shot="board36-tv" data-group="Tournaments" data-wide[\s\S]*data-shot="skins-tab"[\s\S]*data-shot="pairings-tab"/);
         // check-in is live (rules 2026-11-16 00:30, CHECKIN_LIVE 00:43): its COMING note became two real pictures of the shipped pages
@@ -118,8 +119,8 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
         // 2.0.9 site (web-209-coming, Nov 16): + the two cards of the Coming in 2.0.9 row = 40; 2.0.9 release (Nov 17): the same two, now the New in 2.0.9 row inside #features.
         assert.equal(cardKeys.length, 40, 'the rows still hold the 38 cards main had, + the 2 of New in 2.0.9');
     });
-    test('the eleven pictures of media/home: each once, its group, a real alt, files on disk at the manifest\'s sizes, the three TV ones wide; no weekly-results (it shows amounts)', () => {
-        assert.deepEqual(shots.map((s) => s.shot), ['round-recap', 'live-tv', 'live-board-phone', 'multi-group-board', 'board36', 'board36-tv', 'skins-tab', 'pairings-tab', 'checkin-table', 'checkin-tv', 'gps-every-yard']);
+    test('the twelve pictures of media/home (+ scan-check 2026-11-19): each once, its group, a real alt, files on disk at the manifest\'s sizes, the three TV ones wide; no weekly-results (it shows amounts)', () => {
+        assert.deepEqual(shots.map((s) => s.shot), ['round-recap', 'live-tv', 'live-board-phone', 'multi-group-board', 'board36', 'board36-tv', 'skins-tab', 'pairings-tab', 'checkin-table', 'checkin-tv', 'scan-check', 'gps-every-yard']);
         const man = JSON.parse(read('media/home/manifest.json'));
         assert.deepEqual(man.shots.map((s) => s.key).sort(), shots.map((s) => s.shot).sort());
         shots.forEach((s) => {
@@ -132,17 +133,18 @@ describe('1. source: the fold, the scenes, the sheets, the tiles', () => {
             assert.deepEqual(set, m.files, s.shot + ' srcset is the manifest\'s two files');
             assert.equal(s.wide, ['live-tv', 'checkin-tv', 'board36-tv'].includes(s.shot));
         });
-        assert.deepEqual(shots.map((s) => s.group), ['Weekly game', 'Club day', 'Club day', 'Tournaments', 'Tournaments', 'Tournaments', 'Tournaments', 'Tournaments', 'Tournaments', 'Tournaments', 'GPS']);
+        assert.deepEqual(shots.map((s) => s.group), ['Weekly game', 'Club day', 'Club day', 'Tournaments', 'Tournaments', 'Tournaments', 'Tournaments', 'Tournaments', 'Tournaments', 'Tournaments', 'Tournaments', 'GPS']);
         assert.ok(!exists('media/home/weekly-results-400.webp') && !exists('media/home/weekly-results-940.webp'));
         assert.match(man._about, /weekly-results[\s\S]*NOT used/);
     });
-    test('the tiles: 40 with a picture into the viewer, none without one, 1 COMING (Scan check; Check-in, the 36-hole board and Skins & pairings got their pictures 2026-11-16); the Founding line comes from site-pricing.js', () => {
+    test('the tiles: 41 with a picture into the viewer, none without one, none COMING (2026-11-19: Scan check is live and pictured; Check-in, the 36-hole board and Skins & pairings got their pictures 2026-11-16); the Founding line comes from site-pricing.js', () => {
         const pic = [...glance.matchAll(/<button type="button" class="gt" data-open-key="([^"]+)"><img src="([^"]+)" loading="lazy" decoding="async" alt=""><span>([^<]*)<\/span><\/button>/g)];
-        assert.equal(pic.length, 40);
+        assert.equal(pic.length, 41);
         pic.forEach((m) => assert.ok(exists(m[2].slice(1)), m[2]));
         assert.deepEqual([...glance.matchAll(/<span class="gt plain"><span class="ic">[^<]*<\/span><span>([^<]*)<small>picture coming<\/small><\/span><\/span>/g)].map((m) => m[1]), []);
         assert.ok(glance.includes('data-open-key="board36"><img src="/media/home/board36-400.webp"') && glance.includes('data-open-key="skins-tab"><img src="/media/home/skins-tab-400.webp"'), 'the two former picture-coming tiles carry their pictures');
-        assert.deepEqual([...glance.matchAll(/<span class="gt soon"><span class="ic">[^<]*<\/span><span><small>COMING<\/small>([^<]*)<\/span><\/span>/g)].map((m) => m[1]), ['Scan check']);
+        assert.deepEqual([...glance.matchAll(/<span class="gt soon"><span class="ic">[^<]*<\/span><span><small>COMING<\/small>([^<]*)<\/span><\/span>/g)].map((m) => m[1]), []);
+        assert.ok(glance.includes('data-open-key="scan-check"><img src="/media/home/scan-result-phone-400.webp"'), 'positive: the Scan check tile carries its picture');
         assert.equal((glance.match(/class="gt/g) || []).length, 41);
         assert.match(glance, /<p class="strip"><a href="#pricing"><span data-price="pro-label">[^<]+<\/span> <b data-price="pro-headline">\$[0-9.]+\/yr<\/b> &middot; the first 1,000 golfers &middot; locked for as long as you stay subscribed\. Pricing &darr;<\/a><\/p>/);
         assert.doesNotMatch(glance, /class="soon"/, 'marketing_home_test.js reads class="soon" as the old Android tile');
@@ -217,7 +219,9 @@ describe('1b. organizers.html, the organizer landing (ADVISOR-20261115-2017): on
         const cards = [...org.matchAll(/<div class="card( plain)?">([\s\S]*?)<\/div><\/div>/g)];
         assert.equal(cards.length, 12);
         const coming = cards.filter((c) => /class="cmg">COMING</.test(c[2])).map((c) => /<h2>([^<]*)<\/h2>/.exec(c[2])[1]);
-        assert.deepEqual(coming, ['Entry fees by Venmo or PayPal', 'Pay-outs from the results']);   // 2026-11-16: check-in is live and pictured
+        // 2026-11-19 (the COMING sweep): Venmo A has been live since its merge 167c65ec (2026-11-16); both cards lose the tag.
+        assert.deepEqual(coming, []);   // 2026-11-16: check-in is live and pictured
+        assert.ok(cards.some((c) => /<h2>Entry fees by Venmo or PayPal<\/h2>/.test(c[2])) && cards.some((c) => /<h2>Pay-outs from the results<\/h2>/.test(c[2])), 'positive: the two cards are still there');
         assert.match(org, /<div class="card"><div class="pic ci"><img src="\/media\/home\/board36-tv-700\.webp"[^>]*><\/div><div class="tx"><h2>36-hole events<\/h2>/);
     });
 });
@@ -415,7 +419,7 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         assert.equal(s.sheet, null);
         const slides = await tab.eval(`document.querySelectorAll('#fv-track .fv-s').length`);
         // 2.0.9 site (web-209-coming, Nov 16): + the two 2.0.9 cards (the viewer walks every .fc on the page); 2.0.9 release (Nov 17): the same two, now inside #features first.
-        assert.equal(slides, 40 + 11, 'the viewer holds the 40 cards (38 + 2 New in 2.0.9) and the 11 media/home pictures (six added 2026-11-16), each once');
+        assert.equal(slides, 40 + 12, 'the viewer holds the 40 cards (38 + 2 New in 2.0.9) and the 12 media/home pictures (six added 2026-11-16, scan-check 2026-11-19), each once');
         // a phone of the fan is a door into its sheet too
         await tab.tapEl('.fp.c');
         s = await tab.eval(STATE);
@@ -447,7 +451,7 @@ describe('2. in Chrome: the fold, then a visitor\'s taps', { skip: CAN ? false :
         await tab.touchOn();
         await tab.go(base + '/');
         const keys = await tab.eval(`[...document.querySelectorAll('.glance-tiles .gt[data-open-key]')].map((b) => b.getAttribute('data-open-key'))`);
-        assert.equal(keys.length, 40);
+        assert.equal(keys.length, 41);
         const bad = [];
         for (const k of keys) {
             await tab.fingerTap('.glance-tiles .gt[data-open-key="' + k + '"]');
