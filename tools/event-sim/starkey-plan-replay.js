@@ -212,4 +212,5 @@ function main() {
     say('all', 'HOLDS', 'KPs: a prize per par 3, per round; split between golfers who tie', '2023: 8 at $50\n2024: 8 at $50, one shared $25 / $25\n2025: 8 at $100\n2026: per flight on the Cascade par 3s, $50 each (23 paid), one shared by two golfers');
     fs.writeFileSync(path.join(H, 'replay-plan.json'), JSON.stringify(out, null, 1));
 }
-main();
+if (require.main === module) main();
+module.exports = { H, gg, placeTables, keyOf, idIn, sheets };
