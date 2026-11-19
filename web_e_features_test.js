@@ -57,7 +57,10 @@ const JS = read('site-features.js');
 const wnHtml = stripComments(read('whats-new.html'));
 const featHome = (/<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(html) || [])[1] || '';
 const featNew = (/<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(wnHtml) || [])[1] || '';
-const feat = featNew + '\n' + featHome;
+// RE-PINNED 2026-11-19 homepage A (Manny's pick): the Try Just say it box moved out of #features to position 3 of the
+// page (the looping demo it duplicated is gone), so the words checks read it where it now stands.
+const trySay = (/<div class="wrap trywrap"><section class="try" id="try-say"[\s\S]*?<\/section><\/div>/.exec(html) || [])[0] || '';
+const feat = featNew + '\n' + featHome + '\n' + trySay;
 const both = html + '\n' + wnHtml;
 // 2.0.8 site (Nov 15): the "Coming in 2.0.8" row was a section of its own just above #features while 2.0.8 was in review.
 // 2.0.8 release re-pin: flip-to-released.sh moved it INTO #features as "New in 2.0.8" (#g-update), the first row, tags gone.

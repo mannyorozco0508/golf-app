@@ -41,7 +41,10 @@ const words = (h) => decodeEscapes(h.replace(/<[^>]+>/g, '')
     .replace(/&rsquo;/g, '’').replace(/&lsquo;/g, '‘').replace(/&rsaquo;/g, '›').replace(/&lsaquo;/g, '‹')
     .replace(/&amp;/g, '&').replace(/&middot;/g, '·').replace(/&nbsp;/g, ' ')).replace(/\s+/g, ' ').trim();
 
-const ORDER = ['top', 'see-it', 'just-say-it', 'how', 'everything', 'features', 'compare', 'pricing', 'faq', 'get-the-app'];
+// RE-PINNED 2026-11-19 (homepage A, Manny's pick: "one box, no looping demo beside it"): the third block is the typed
+// Try box (#try-say), moved from under the Games row; the looping demo (#just-say-it) is gone.
+const TRY_SHA = '0eefac006153';   // the Try box as it stood under Games at 1dfe04be (2,589 bytes)
+const ORDER = ['top', 'see-it', 'try-say', 'how', 'everything', 'features', 'compare', 'pricing', 'faq', 'get-the-app'];
 const TWELVE = ['gps', 'event-board', 'skins-tab', 'live-games', 'chat', 'scan-check', 'strokes-gained', 'weekly-code', 'trip', 'results', 'settle', 'play-again'];
 const FAQ = [
     ['Is it free?', 'Free for one group of up to 5 golfers, for good. HardPan Pro adds the full GPS map, coaching and hosting for $24.99/yr.'],
@@ -69,14 +72,14 @@ describe('1. source', () => {
         assert.deepEqual(grps, ['g-play', 'g-games', 'g-group', 'g-organize', 'g-better']);
     });
 
-    test('1.2 Just say it is the same section, byte for byte, with its two scripts right behind it', () => {
-        const jsi = section('<section class="jsi" id="just-say-it"');
-        assert.match(jsi, /<h2 id="jsi-h">Just say it\. We&rsquo;ll set it up\.<\/h2>/);
-        assert.equal((jsi.match(/<button type="button" class="jsi-chip( on)?"/g) || []).length, 5);
-        assert.equal(require('crypto').createHash('sha256').update(jsi).digest('hex').slice(0, 12), '87e292e98b2e');
-        const after = body.slice(body.indexOf(jsi) + jsi.length, body.indexOf('<section class="how" id="how"'));
-        assert.equal((after.match(/<script data-jsi>/g) || []).length, 2);
-        assert.doesNotMatch(body, /class="jsi-try"|<form[^>]*jsi/, 'no typed Try box was built');
+    test('1.2 Just say it is ONE block: the Try box, moved whole from under Games with one added chip; the looping demo is gone', () => {
+        const box = (body.match(/<div class="wrap trywrap"><section class="try" id="try-say"[\s\S]*?<\/section><\/div>/) || [''])[0];
+        assert.match(box, /<h3 id="try-say-h">Try Just say it<\/h3>/, 'positive: the Try box');
+        const CHIP = '<button type="button" class="chipb" data-say="Skins for everyone, with carryovers, for fun">Skins for everyone, with carryovers, for fun</button>';
+        assert.equal(box.split(CHIP).length, 2, 'the one added chip');
+        assert.equal(require('crypto').createHash('sha256').update(box.replace(CHIP, '')).digest('hex').slice(0, 12), TRY_SHA, 'otherwise byte for byte the Try box that stood under Games');
+        assert.doesNotMatch(body, /id="just-say-it"|<script data-jsi>/, 'the looping demo is gone');
+        assert.equal((body.match(/id="try-say"/g) || []).length, 1, 'one Try box');
     });
 
     test('1.3 the tiles: the 12 first in the mockup order, all 41 still there, the rest hidden by the section state, one real button with the count', () => {
