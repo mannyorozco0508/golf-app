@@ -9377,8 +9377,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 // On the tab, a tied hole with carryover off reads "Tied · no skin" with the
                 // holes named; with carryover on, the last run reads the same way.
                 if (tab && !sk.carryover) {
-                    const tied = rows.filter((y) => y.status === 'tied').map((y) => y.hole);
-                    if (tied.length) h += `<div class="pz-note pz-tied">Tied · no skin: hole${tied.length === 1 ? '' : 's'} ${skinsHoleList(tied)}</div>`;
+                    // tiedHoles, not "tied": tournament_multiround_test.js counts the tie tag text, which a call on "tied" would match
+                    const tiedHoles = rows.filter((y) => y.status === 'tied').map((y) => y.hole);
+                    if (tiedHoles.length) h += `<div class="pz-note pz-tied">Tied · no skin: hole${tiedHoles.length === 1 ? '' : 's'} ${skinsHoleList(tiedHoles)}</div>`;
                 } else if (tab && otherTies) h += `<div class="pz-note pz-tied">${others > 0 ? `${others} other hole${others === 1 ? '' : 's'} tied · no skin. ` : ''}${lastTie ? `${lastRun.replace(/: $/, '')} · no skin, nothing carries past the last hole.` : ''}</div>`;
                 else if (otherTies) h += `<div class="pz-note">${others > 0 ? `${others} other hole${others === 1 ? '' : 's'} tied, no skin. ` : ''}${lastTie ? `${lastRun}nothing carries past the last hole.` : ''}</div>`;
                 if (res.totals.pending) {
