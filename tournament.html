@@ -826,6 +826,21 @@
         .scd-b .btn-outline, .scd-b .btn-primary { width: auto; margin: 0; padding: 6px 10px; font-size: 0.78rem; }
         .scd-pick { background: var(--nassau-box-bg); border-radius: 10px; padding: 8px 10px; margin-top: 6px; font-size: 0.8rem; }
         .scd-pick .btn-outline { width: auto; margin: 4px 6px 0 0; padding: 6px 10px; font-size: 0.78rem; }
+        /* GOLFER CODES, A: the Desk's Golfer codes card and the My results offer. */
+        .gc-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+        .gc-top .btn-outline { width: auto; margin: 0; padding: 6px 10px; font-size: 0.78rem; }
+        .gc-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+        .gc-code { font-family: ui-monospace, Menlo, monospace; font-weight: 800; font-size: 0.95rem; letter-spacing: .08em; }
+        .gc-chip { display: inline-block; font-size: 0.74rem; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--border-mid); color: var(--text-muted); }
+        .gc-chip.gc-open { color: var(--brand-green); border-color: var(--brand-green); }
+        .gc-link { font-family: ui-monospace, Menlo, monospace; font-size: 0.72rem; color: var(--text-muted); word-break: break-all; -webkit-user-select: all; user-select: all; margin-top: 4px; }
+        .scd-b a.btn-outline { text-decoration: none; display: inline-block; }
+        .mr-offer { border: 1px solid var(--border-mid); border-radius: 12px; padding: 12px 14px; margin: 12px 0; }
+        .mr-offer-h { font-weight: bold; font-size: 1rem; }
+        .mr-offer-p { font-size: 1.5rem; font-weight: 800; margin: 4px 0 0 0; }
+        .mr-offer-p small { font-size: 0.85rem; font-weight: normal; }
+        .mr-offer-r, .mr-offer-t { font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 0 0; }
+        .mr-offer .btn-primary { display: block; box-sizing: border-box; width: 100%; text-align: center; text-decoration: none; margin: 10px 0 0 0; }
         #ci-search { width: 100%; box-sizing: border-box; margin: 0 0 6px 0; -webkit-appearance: none; appearance: none; }
         .ci-count { font-size: 0.8rem; color: var(--text-muted); margin: 6px 0 8px 0; }
         .ci-flight { font-size: 0.76rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--brand-green); margin: 16px 0 0 0; }
@@ -1361,6 +1376,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     <h1 class="rc-title" id="my-results-title">🏆 My results</h1>
     <p class="rc-sub" id="my-results-sub"></p>
     <div class="rc-card" id="my-results-card"></div>
+    <!-- GOLFER CODES, A: the first-year offer, after the golfer's own results, on
+         the personal link only (drawn by renderMyResults; empty otherwise). -->
+    <div id="my-results-offer"></div>
     <button type="button" class="btn-primary" id="my-results-full" onclick="closeMyResults()">See the full results</button>
     <p class="rc-msg" id="my-results-posted"></p>
 </div>
@@ -1695,6 +1713,12 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              who scores, how many have joined on the watch link, Switch scorer
              and the Watch QR. Drawn by renderScorerDesk on each Desk render. -->
         <div class="scd-card" id="scorer-desk" style="display:none;"></div>
+        <!-- GOLFER CODES, A "Codes on the Desk" (Manny's pick 2026-11-19/20): per
+             golfer on an individual event, their code, Opened / Not used yet,
+             Text it, Reissue and the personal link; Print code sheet for the
+             field. Drawn by renderGolferCodes on each Desk render and when the
+             owner-only tournamentKeys node arrives (the codes live there). -->
+        <div class="scd-card gc-card" id="golfer-codes" style="display:none;"></div>
         <!-- SK (ADVISOR-20261114-1527): the scorecard scan check - a Scan card
              button per team or group, the card's grid, Verify cards. Filled by
              renderCardCheck on each Desk render; empty until the round has a
@@ -6634,17 +6658,18 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // (gps_meta/config/foundingOpen, else site-pricing.js), one renewal price.
     // The redemption limit and count live in App Store Connect; this page
     // cannot read them and says so. The optional line is text only.
-    const OFFER_FIRST_YEAR = '$19.99';
+    // The first-year figure is site-pricing.js's eventOffer slot (golfer codes, A): this page types no price.
+    function offerFirstYear() { return String((window.HARDPAN_SITE_PRICING || {}).eventOffer || '').trim(); }
     let foundingOpenLive = null, offerFlagAsked = false;
     function offerPro() { return ((window.HARDPAN_SITE_PRICING || {}).pro) || {}; }
     function offerFoundingOpen() { if (typeof foundingOpenLive === 'boolean') return foundingOpenLive; const p = offerPro(); return typeof p.foundingOpen === 'boolean' ? p.foundingOpen : true; }
     function offerPreviewLine() {
         const p = offerPro(); const open = offerFoundingOpen();
         // Manny 2026-11-12: the Apple offer starts with a 7-day free trial; one renewal price, no "(regular price)".
-        return 'Tournament players: 7 days free, then ' + OFFER_FIRST_YEAR + ' your first year, then ' + (open ? (p.founding || '$24.99') : (p.yearly || '$49.99')) + '/yr. Renews until you cancel. New subscribers.';
+        return 'Tournament players: 7 days free, then ' + (offerFirstYear() || 'the tournament price') + ' your first year, then ' + (open ? (p.founding || '$24.99') : (p.yearly || '$49.99')) + '/yr. Renews until you cancel. New subscribers.';
     }
     function loadOfferFoundingFlag() {
-        try { db.ref('gps_meta/config/foundingOpen').once('value').then((snap) => { const v = snap && snap.val(); if (typeof v === 'boolean') { foundingOpenLive = v; renderOfferSetup(); } }).catch(() => {}); } catch (e) { /* no database */ }
+        try { db.ref('gps_meta/config/foundingOpen').once('value').then((snap) => { const v = snap && snap.val(); if (typeof v === 'boolean') { foundingOpenLive = v; renderOfferSetup(); if (myResultsCode) renderRecap(); } }).catch(() => {}); } catch (e) { /* no database */ }
     }
     function renderOfferSetup() {
         const box = document.getElementById('offer-setup');
@@ -6757,6 +6782,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderTeamCards();
             renderLockPanel();
             renderScorerDesk();   // Switch scorer re-keys from what is held here
+            renderGolferCodes();  // GOLFER CODES, A: the codes live under tournamentKeys/<code>/c
         };
         db.ref('tournamentKeys/' + code).on('value', keysCb);
         keysBoundCode = code;
@@ -7848,6 +7874,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         showExport(false);
         const photosOnDesk = registrationFilter === 'photos';
         renderScorerDesk();   // ONE SCORER PER GROUP, A: drawn with or without signups
+        renderGolferCodes();  // GOLFER CODES, A: individual events, owner only
         renderDeskPhotos(photosOnDesk);
         renderCheckinCard();
         syncCheckinIndex();
@@ -11271,6 +11298,181 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         renderScorerDesk();
     }
 
+    // ===== GOLFER CODES, A "Codes on the Desk" (Manny's pick 2026-11-19/20) =====
+    //
+    // INDIVIDUAL EVENTS ONLY (scoringModel player-v1); a team event draws nothing.
+    // Each golfer in the field gets a 6-character code (A-Z and 2-9 without
+    // 0/O/1/I, unique within the event) and a PERSONAL LINK: the group's watch
+    // card (watchGroupUrl, no &k=) with &me=<pid>&c=<CODE>. The card greets the
+    // golfer, records the open as a join (joins/<entry>/<pid>, the watch card's
+    // own write) and, once results are posted, links to My results.
+    //
+    // WHERE THE CODES LIVE: tournamentKeys/<code>/c/<pid> = { code, issuedAt }
+    // (+ reissued: true after a Reissue). tournaments/<code> is public to read,
+    // so a code there would be anybody's; tournamentKeys/<code> is owner-only
+    // to read and write and only its "on" child is validated, so the owner may
+    // write here with no rules change. Codes are made on first need: the Desk,
+    // open on an individual event once the keys node has arrived, writes every
+    // missing one in ONE update.
+    //
+    // WHAT IS NOT ENFORCED, AND IS NOT CLAIMED. A golfer's phone cannot read
+    // tournamentKeys, so it cannot check a code, and nothing binds a code to
+    // the first phone that opens it. Under today's rules a reissued code does
+    // not stop the old link opening the card. One use per golfer needs a rules
+    // change (outbox TOURN-20261120-golfer-codes-rules-NOTE.md); nothing on this
+    // card says a code is checked, locked or switched off.
+    const GOLFER_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // 32 characters: a byte % 32 is unbiased
+    function newGolferCode(taken) {
+        const c = (typeof crypto !== 'undefined' && crypto && crypto.getRandomValues) ? crypto : null;
+        if (!c) return null;   // no secure random source: no code rather than a guessable one
+        for (let tries = 0; tries < 50; tries++) {
+            const a = new Uint8Array(6);
+            c.getRandomValues(a);
+            const code = Array.from(a, (b) => GOLFER_CODE_CHARS[b % 32]).join('');
+            if (!taken.has(code)) return code;
+        }
+        return null;
+    }
+    function golferCodesHeld() {
+        const c = scoringKeys && scoringKeys.c;
+        return (c && typeof c === 'object') ? c : {};
+    }
+    function golferCodesOn() {
+        return !!(currentCode && currentData && currentData.ownerUid && canManage() && recordIsIndividual() && scoringKeys !== null);
+    }
+    function golferCodeTime(ms) {
+        const n = Number(ms);
+        return n > 0 ? new Date(n).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+    }
+    // One row per golfer, in group order (the pairings sheet's order), then
+    // the golfers in no group yet. On a multi-round event the day's round.
+    function golferCodeRows() {
+        const data = currentData || {};
+        const rid = isMultiRound(data) ? dayRoundId() : null;
+        const groups = rid ? (((data.rounds || {})[rid] || {}).scoringGroups || {}) : (data.scoringGroups || {});
+        const players = data.players || {};
+        const flights = data.flights || {};
+        const held = golferCodesHeld();
+        const joins = data.joins || {};
+        const seen = {};
+        const rows = [];
+        const add = (pid, gid) => {
+            if (seen[pid] || !players[pid]) return;
+            seen[pid] = true;
+            const p = players[pid];
+            const rec = held[pid] && typeof held[pid] === 'object' ? held[pid] : null;
+            const code = rec && /^[A-Z2-9]{6}$/.test(String(rec.code || '')) ? String(rec.code) : null;
+            const entry = gid ? (rid ? rid + '_' + gid : gid) : null;
+            const join = entry ? ((joins[entry] || {})[pid] || null) : null;
+            rows.push({ pid, name: String(p.name || '').trim(), flight: (p.flightId && flights[p.flightId] && flights[p.flightId].name) || '',
+                gid, rid, groupName: gid ? (groups[gid].name || 'Group') : '', code, rec, join: (join && typeof join === 'object') ? join : null,
+                url: (code && gid) ? `${watchGroupUrl(gid, rid)}&me=${encodeURIComponent(pid)}&c=${code}` : null });
+        };
+        Object.keys(groups).sort((a, b) => (groups[a].createdAt || 0) - (groups[b].createdAt || 0))
+            .forEach((gid) => (groups[gid].playerIds || []).forEach((pid) => add(pid, gid)));
+        Object.keys(players).sort((a, b) => String(players[a].name || '').localeCompare(String(players[b].name || ''))).forEach((pid) => add(pid, null));
+        return rows.filter((r) => r.name);
+    }
+    // The state chip. "Opened" is the join record the card writes when the
+    // golfer's link (or That's me on the group's watch link) opens it; after a
+    // Reissue it reads "Reissued <time>" until an open newer than the reissue.
+    function golferCodeChip(r) {
+        const at = r.join && Number(r.join.at) > 0 ? Number(r.join.at) : 0;
+        const issued = r.rec ? Number(r.rec.issuedAt) || 0 : 0;
+        if (r.rec && r.rec.reissued === true && !(at > issued)) return { open: false, text: `Reissued ${golferCodeTime(issued)}`.trim() };
+        if (at) return { open: true, text: `Opened ${golferCodeTime(at)}` };
+        return { open: false, text: 'Not used yet' };
+    }
+    function golferPhoneOf(pid) {
+        const entries = registrationData || {};
+        const id = Object.keys(entries).find((k) => entries[k] && String(entries[k].playerId || '') === pid);
+        const ph = id ? String(entries[id].phone || '').replace(/[^0-9+]/g, '') : '';
+        return ph.length >= 7 ? ph : '';
+    }
+    function golferSmsHref(r) {
+        const body = `${r.name.split(/\s+/)[0]}, your card for ${(currentData && currentData.name) || 'the tournament'}: ${r.url}`;
+        return `sms:${golferPhoneOf(r.pid)}?&body=${encodeURIComponent(body)}`;
+    }
+    let golferCodesSent = null;   // the update sent and not yet back (one write per missing set)
+    function ensureGolferCodes(rows) {
+        const desk = document.getElementById('manage-tab-desk');
+        if (!desk || desk.style.display !== 'block' || !keysWritable()) return;
+        const missing = rows.filter((r) => !r.code);
+        if (!missing.length) { golferCodesSent = null; return; }
+        const sig = currentCode + ' ' + missing.map((r) => r.pid).join(',');
+        if (golferCodesSent === sig) return;
+        const taken = new Set(rows.filter((r) => r.code).map((r) => r.code));
+        const changes = {};
+        for (const r of missing) {
+            const code = newGolferCode(taken);
+            if (!code) return;
+            taken.add(code);
+            changes[`${keysBase()}/c/${r.pid}`] = { code: code, issuedAt: firebase.database.ServerValue.TIMESTAMP };
+        }
+        golferCodesSent = sig;
+        db.ref().update(changes).catch(() => { golferCodesSent = null; });
+    }
+    function renderGolferCodes() {
+        const box = document.getElementById('golfer-codes');
+        if (!box) return;
+        if (!golferCodesOn()) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        const rows = golferCodeRows();
+        if (!rows.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        ensureGolferCodes(rows);
+        box.style.display = 'block';
+        const coded = rows.filter((r) => r.code);
+        const opened = coded.filter((r) => golferCodeChip(r).open).length;
+        box.innerHTML = `<div class="gc-top"><div class="scd-h">Golfer codes</div>`
+            + `<button type="button" class="btn-outline" id="gc-print" onclick="printGolferCodes()">Print code sheet</button></div>`
+            + `<div class="scd-s" id="gc-count">${rows.length} golfer${rows.length === 1 ? '' : 's'} · ${opened} opened · ${coded.length - opened} not yet</div>`
+            + `<div class="scd-s">Each code rides on the golfer's own link: their group's live card, the board and the HardPan GPS link. The group's scorer still enters the scores. Anyone with the link can open it, so send it to that golfer only.</div>`
+            + rows.map((r) => {
+                const chip = r.code ? golferCodeChip(r) : null;
+                const acts = r.code
+                    ? `<div class="scd-b">${r.url ? `<a class="btn-outline gc-text" href="${escapeHtml(golferSmsHref(r))}">Text it</a>` : ''}`
+                        + `<button type="button" class="btn-outline gc-reissue" data-pid="${escapeHtml(r.pid)}" onclick="reissueGolferCode(this.dataset.pid)">Reissue</button></div>`
+                        + (r.url ? `<div class="gc-link">${escapeHtml(r.url)}</div>` : `<div class="scd-sub">No group yet: the link comes with the group.</div>`)
+                    : '';
+                return `<div class="scd-row gc-row" data-pid="${escapeHtml(r.pid)}"><div class="gc-line"><span class="scd-name">${escapeHtml(r.name)}</span>`
+                    + (r.code ? `<span class="gc-code">${r.code}</span>` : '')
+                    + (chip ? `<span class="gc-chip${chip.open ? ' gc-open' : ''}">${escapeHtml(chip.text)}</span>` : '') + `</div>`
+                    + `<div class="scd-sub">${escapeHtml([r.flight, r.groupName].filter(Boolean).join(' · '))}</div>`
+                    + acts + `</div>`;
+            }).join('');
+    }
+    // REISSUE: a new code for one golfer, one write. The new link goes out by
+    // Text it; the old link keeps opening the card (nothing can check a code
+    // under today's rules), and the question says so.
+    function reissueGolferCode(pid) {
+        if (!golferCodesOn() || !keysWritable()) return;
+        const rows = golferCodeRows();
+        const r = rows.find((x) => x.pid === pid);
+        if (!r || !r.code) return;
+        const code = newGolferCode(new Set(rows.filter((x) => x.code).map((x) => x.code)));
+        if (!code) { alert('Could not make a new code on this device.'); return; }
+        if (!confirm(`Give ${r.name} a new code? Text them the new link. The old link still opens the card.`)) return;
+        db.ref(`${keysBase()}/c/${pid}`).set({ code: code, issuedAt: firebase.database.ServerValue.TIMESTAMP, reissued: true })
+            .catch((err) => alert(`Error: ${err.message}`));
+    }
+    function printGolferCodes() { if (canManage()) printSheet(buildGolferCodesPrintView); }
+    // One sheet for the whole field: name, flight, group, code, personal link.
+    function buildGolferCodesPrintView() {
+        const container = document.getElementById('tournament-print-view');
+        const rows = golferCodesOn() ? golferCodeRows().filter((r) => r.code) : [];
+        if (!rows.length) { alert('No golfer codes yet. Open the Desk once the field is in.'); return false; }
+        const data = currentData || {};
+        const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const td = 'padding:6px 4px; vertical-align:top;';
+        container.innerHTML = `<h1 style="margin:0 0 2px 0; color:#0f4c3a;">${esc(data.name || 'Tournament')}</h1>`
+            + `<p style="margin:0 0 10px 0; color:#555;">Golfer codes · ${rows.length} golfer${rows.length === 1 ? '' : 's'} · each link opens that golfer's group card</p>`
+            + `<table id="gc-print-table" style="width:100%; border-collapse:collapse; font-size:0.9rem;"><thead style="display:table-header-group;"><tr style="border-bottom:2px solid #ccc; text-align:left; color:#666; font-size:0.8rem;">`
+            + `<th style="${td}">Name</th><th style="${td}">Flight</th><th style="${td}">Group</th><th style="${td}">Code</th><th style="${td}">Personal link</th></tr></thead><tbody>`
+            + rows.map((r) => `<tr class="gc-print-row" style="border-bottom:1px solid #ddd; page-break-inside:avoid;"><td style="${td} font-weight:bold;">${esc(r.name)}</td><td style="${td}">${esc(r.flight)}</td><td style="${td}">${esc(r.groupName)}</td>`
+                + `<td style="${td} font-family:ui-monospace, Menlo, monospace; font-weight:bold; letter-spacing:1px;">${esc(r.code)}</td><td style="${td} font-family:ui-monospace, Menlo, monospace; font-size:0.7rem; word-break:break-all;">${esc(r.url || 'No group yet')}</td></tr>`).join('')
+            + `</tbody></table><p style="margin-top:14px; color:#888; font-size:0.8rem;">Printed ${new Date().toLocaleString()}</p>`;
+        return true;
+    }
+
     function renderCheckinCard() {
         const card = document.getElementById('checkin-card');
         if (!card) return;
@@ -11586,6 +11788,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // golfer's My results. ?tourney=CODE&recap=1&me=<key> (or &me= alone) opens
     // My results straight from a link. Before posting the recap is unchanged.
     let myResultsKey = null;
+    let myResultsCode = null;   // GOLFER CODES, A: { key, code } when My results was opened by a golfer's personal link
     function recapToParHtml(v) {
         if (typeof v !== 'number') return '';
         const t = v === 0 ? 'E' : (v > 0 ? `+${v}` : String(v));
@@ -11634,6 +11837,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         return { name, flight: fid && flights[fid] ? (flights[fid].name || '') : '' };
     }
     function renderMyResults(data) {
+        const offerBox = document.getElementById('my-results-offer');
+        if (offerBox) offerBox.innerHTML = '';   // GOLFER CODES, A: drawn again below only with posted results
         const post = TournamentPrizes.posted(data);
         const who = myResultsWho(data, myResultsKey);
         const mine = TournamentPrizes.myResults(post, myResultsKey);
@@ -11672,6 +11877,50 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         }
         card.innerHTML = h;
         postedLine.textContent = post.postedAt ? `Posted ${prizePostedWhen(post.postedAt)} by the organizer` : '';
+        renderMyResultsOffer(data, post);
+    }
+    // ---- GOLFER CODES, A: THE OFFER AFTER THE EVENT -------------------------
+    // Shown under the golfer's own results once the organizer has posted them,
+    // on an individual event, when My results was opened by that golfer's
+    // personal link (&c=). The price is the 58A tournament offer's (the App
+    // Store offer code the organizer switched on, tournaments/<code>/offer),
+    // so the card exists only while that offer is on, has its code word and
+    // has not ended: without it a golfer has no way to get the first-year
+    // price, and a card naming one would be false. Prices come only from
+    // site-pricing.js (eventOffer beside pro.yearly); a stale copy without the
+    // slot shows no card. This is the app's own price, not a prize.
+    function liveTournamentOffer(data) {
+        const o = data && data.offer;
+        if (!o || !o.on) return null;
+        const code = String(o.code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (!code) return null;
+        if (o.endsAt && /^\d{4}-\d{2}-\d{2}$/.test(o.endsAt)) {
+            const t = new Date();
+            const ymd = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+            if (ymd > o.endsAt) return null;
+        }
+        return { code };
+    }
+    function renderMyResultsOffer(data, post) {
+        const box = document.getElementById('my-results-offer');
+        if (!box) return;
+        const first = offerFirstYear();
+        const regular = String(offerPro().yearly || '').trim();
+        const o = liveTournamentOffer(data);
+        const mine = !!(myResultsCode && myResultsCode.key === myResultsKey && (data.players || {})[myResultsKey]);
+        if (!post || !isPlayerModel(data) || !mine || !o || !first || !regular) { box.innerHTML = ''; return; }
+        if (foundingOpenLive === null && !offerFlagAsked) { offerFlagAsked = true; loadOfferFoundingFlag(); }
+        const android = /Android/.test(String(navigator.userAgent || ''));
+        const p = offerPro();
+        const renewal = offerFoundingOpen() ? (p.founding || '') : (p.yearly || '');
+        box.innerHTML = `<div class="mr-offer" id="mr-offer"><div class="mr-offer-h">Keep HardPan</div>`
+            + `<div class="mr-offer-p"><span id="mr-offer-price">${escapeHtml(first)}</span> <small>your first year</small></div>`
+            + `<div class="mr-offer-r" id="mr-offer-regular">Regular price ${escapeHtml(regular)}/yr</div>`
+            + `<div class="mr-offer-t" id="mr-offer-terms">${escapeHtml(offerPreviewLine())}</div>`
+            + (android
+                ? `<div class="mr-offer-t" id="mr-offer-android">Android: ${offerFoundingOpen() ? 'founding price ' : ''}${escapeHtml(renewal)}/yr in HardPan. The tournament price arrives with the next app update.</div>`
+                : `<a class="btn-primary" id="mr-offer-redeem" href="https://apps.apple.com/redeem?ctx=offercodes&amp;id=6808220335&amp;code=${encodeURIComponent(o.code)}" rel="noopener">Redeem in the App Store</a>`)
+            + `</div>`;
     }
     function shareRecap() {
         const url = recapUrl();
@@ -11790,6 +12039,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             renderSponsorsSetup();   // 57
             renderTvLink();          // 57
             renderOfferSetup();   // 58A
+            renderGolferCodes();  // GOLFER CODES, A: a join or a new golfer redraws the chips
             renderEventHome();
             // Last, so it can remove what the renders above filled in. Runs on
             // every snapshot: the record may gain an owner while the page is open.
@@ -11808,6 +12058,11 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         // E4c: the read-only recap. Never the console, whoever opens it.
         // PO: &me=<key> opens that golfer's My results on the same page.
         myResultsKey = urlParams.get('me') || null;
+        // GOLFER CODES, A: the personal link's code, carried (never checked: this
+        // page cannot read tournamentKeys). It only says this is the golfer's
+        // own arrival, which is when My results ends with the offer.
+        const carried = String(urlParams.get('c') || '').toUpperCase();
+        myResultsCode = (myResultsKey && /^[A-Z2-9]{6}$/.test(carried)) ? { key: myResultsKey, code: carried } : null;
         openRecap(tourneyParam.toUpperCase());
     } else if (tourneyParam && CHECKIN_LIVE && urlParams.get('checkin') === '1') {
         // CI-FINAL: the table QR's name list. Never the console, whoever opens it.

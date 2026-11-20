@@ -39,6 +39,10 @@ window.HARDPAN_SITE_PRICING = {
         name: 'Host Pro',
         yearly: '$29.99'      // gps-config.js iapHostFallbackPrices.host
     },
+    // GOLFER CODES, A (Manny's pick 2026-11-19/20): the first-year price a golfer sees on My results once the
+    // organizer posts results, shown beside pro.yearly (the regular yearly price). The same first-year figure as the
+    // 58A tournament offer (App Store Connect offer code); tournament.html reads it from here and types no price.
+    eventOffer: '$19.99',
     tripPass: {
         name: 'Trip Pass',
         price: '$14.99',      // gps-config.js iapHostFallbackPrices.trip

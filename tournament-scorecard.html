@@ -367,6 +367,11 @@
         .sc-gps { display: none; border: 1px solid var(--border-mid); border-radius: 14px; padding: 12px 14px; margin: 14px 0 0 0; background: var(--bg-card); font-size: 0.85rem; }
         .sc-gps-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
         .sc-gps-open { background: var(--brand-green); color: #fff; border-radius: 10px; padding: 9px 14px; font-weight: bold; text-decoration: none; white-space: nowrap; }
+        /* GOLFER CODES, A: the personal link's greeting and the results door. */
+        .sc-me { border: 1px solid var(--border-mid); border-radius: 14px; padding: 12px 14px; margin: 0 0 14px 0; background: var(--bg-card); }
+        .sc-me-h { font-weight: 800; font-size: 1.25rem; }
+        .sc-me-s { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
+        .sc-me-res { display: block; text-align: center; background: var(--brand-green); color: #fff; border-radius: 10px; padding: 11px 14px; font-weight: bold; text-decoration: none; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -441,6 +446,9 @@
              (&watch=1, no &k=) the golfer taps their own name here first; the
              card below then shows the live scores read-only. Hidden on every
              other link. -->
+        <!-- GOLFER CODES, A: on a golfer's personal link (&watch=1&me=<pid>&c=),
+             "Hi <first name>" and, once results are posted, See my results. -->
+        <div class="sc-me" id="sc-me" style="display:none;"></div>
         <div class="sc-join" id="sc-join" style="display:none;"></div>
         <div class="scoring-for-label" id="scoring-for"></div>
         <!-- WHAT THIS LINK IS (Option A, 2026-09-16). The team number is a URL
@@ -1443,6 +1451,44 @@
         renderScorerViews();
     }
     function joinPickAgain() { joinPicking = true; renderScorerViews(); }
+
+    // ===== GOLFER CODES, A (Manny's pick 2026-11-19/20): THE PERSONAL LINK =====
+    // The organizer's Desk sends each golfer of an individual event their own
+    // link: this group's WATCH link plus &me=<player id>&c=<6-character code>.
+    // It opens as that golfer's viewer card - the That's me tap made for them,
+    // through joinAs, so the join record (joins/<entry>/<pid> = { name, at })
+    // is the watch card's own write, once per phone (the phone remembers it,
+    // as That's me does) - with "Hi <first name>" on top and, once the
+    // organizer has posted results, a door to My results.
+    // THE CODE IS CARRIED, NOT VERIFIED. It lives in tournamentKeys/<code>/c,
+    // which only the organizer can read, so this page cannot compare it and
+    // nothing binds it to one phone; it rides along to My results, where it
+    // marks the golfer's own arrival. Nothing on screen says it was checked.
+    const ME_PID = WATCH_MODE ? (urlParams.get('me') || null) : null;
+    const ME_CODE = (function () { const c = String(urlParams.get('c') || '').toUpperCase(); return /^[A-Z2-9]{6}$/.test(c) ? c : null; })();
+    let meJoinAsked = false;
+    function meRow() {
+        if (!ME_PID) return null;
+        return joinRoster().find((r) => r.slot === ME_PID && r.name.trim()) || null;
+    }
+    function meResultsUrl() {
+        return 'tournament.html?tourney=' + encodeURIComponent(currentCode) + '&recap=1&me=' + encodeURIComponent(ME_PID) + (ME_CODE ? '&c=' + ME_CODE : '');
+    }
+    function renderMeView(on) {
+        const box = document.getElementById('sc-me');
+        if (!box) return;
+        const r = on ? meRow() : null;
+        if (!r) { box.style.display = 'none'; box.innerHTML = ''; return; }
+        const data = currentData || {};
+        const p = (data.players || {})[ME_PID] || {};
+        const flights = data.flights || {};
+        const flight = (p.flightId && flights[p.flightId] && flights[p.flightId].name) || '';
+        const posted = !!(data.prizeResults && typeof data.prizeResults === 'object' && data.prizeResults.postedAt);
+        box.style.display = 'block';
+        box.innerHTML = `<div class="sc-me-h" id="sc-me-hi">Hi ${escapeHtml(scFirst(r.name))}</div>`
+            + `<div class="sc-me-s">You\u2019re in ${escapeHtml(data.name || 'the tournament')}${flight ? ' \u00b7 ' + escapeHtml(flight) : ''} \u00b7 ${escapeHtml(cardLabel())}</div>`
+            + (posted ? `<div class="sc-me-s" id="sc-me-posted">Results are posted.</div><a class="sc-me-res" id="sc-me-results" href="${escapeHtml(meResultsUrl())}">See my results</a>` : '');
+    }
     function scorerSentence() {
         const s = scorerNameHere();
         return s ? `${s} is scoring for your group.` : 'One phone in your group is scoring; this card shows its scores live.';
@@ -1489,6 +1535,7 @@
             // THE SCORER'S CARD: unchanged, plus who is watching once anyone is.
             if (joinBox) { joinBox.style.display = 'none'; joinBox.innerHTML = ''; }
             renderGpsDoor(false);
+            renderMeView(false);
             const scorer = scorerNameHere();
             const joins = joinsHere();
             const watching = joinRoster().filter((r) => joins[r.slot] && r.name.trim() && r.name.trim() !== scorer).map((r) => scFirst(r.name));
@@ -1497,8 +1544,15 @@
             }
             return;
         }
+        // GOLFER CODES, A: the personal link taps That's me for its golfer, once.
+        if (ME_PID && !meJoinAsked && meRow()) {
+            meJoinAsked = true;
+            const was = readJoinMine();
+            if (!was || was.slot !== ME_PID) { joinAs(ME_PID); return; }   // joinAs draws the viewer card
+        }
         const me = readJoinMine();
         const picking = !me || joinPicking;
+        renderMeView(!!(me && me.slot === ME_PID));
         const hide = (id, off) => { const el = document.getElementById(id); if (el) el.style.display = off ? 'none' : ''; };
         ['scoring-for', 'link-truth', 'team-roster', 'status-bar', 'holes-list'].forEach((id) => hide(id, picking));
         // The play-order note keeps its own display (applyPlayState): held while
