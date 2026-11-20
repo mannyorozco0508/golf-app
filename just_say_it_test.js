@@ -1,64 +1,66 @@
 // ============================================================================
-// JUST SAY IT on the homepage, layout A (Manny's pick, OK 2026-11-19 03:01 relayed ADVISOR-20261119-0302; the
-// mockups ADVISOR-20261119-0241). "Just say it. We'll set it up." / "No menus. Type or say your game and HardPan
-// builds it." after the comparison block: a phone where the line types itself and the card appears, the next line, and
-// four chips. Each card is jsi-cards.json, the app's own parser output (ask-hardpan.js askParse, sha 192bc1fde664) for
-// golfers Sam (you), Josh, Bob and Paul, four lines it sets up completely ("for fun": no amount). When the parser is on
-// this Mac (an app checkout), test 1 re-runs it and holds the cards to it.
-// BASELINE against main c8a3c3e7: 0 / 4 (no section, no jsi-cards.json).
+// JUST SAY IT on the homepage: ONE block, the typed Try box (2026-11-19 homepage A, Manny's pick; the mockup reads
+// "Just say it (try it) - one box, no looping demo beside it", and ADVISOR-20261119-0906 "ONE Just say it block:
+// keep the interactive Try box; drop the duplicate").
+//
+// RE-WRITTEN 2026-11-19. This file used to hold the looping demo (#just-say-it, two <script data-jsi> blocks and
+// jsi-cards.json; Manny's pick A of 03:01). That demo is gone; the Try box (#try-say, site-features.js) moved from
+// under the Games row to the demo's place, after the band See how our tournaments work and before How you'll use it.
+// Its cards are the app parser's own output (web_e_features_test.js section 5 holds every card to dev-204's
+// ask-hardpan.js). Carryover defaults to off (ADVISOR-20261119-0905): plain skins shows Carry over Off, and one card
+// keeps "with carryovers" to show it can be on.
+//
+// BASELINE (final file, 4 tests) against 1dfe04be (the looping demo on the page, the Try box under Games; hardpan-home.html,
+// site-features.js and jsi-cards.json swapped in, restored by sha): 1 PASS / 3 FAIL. Test 4 passes there (the Try box
+// already had no money word). 1 + 3 = 4. After: 4 / 0.
+// CONTROLS (restored by sha, e7a94aaaf4a9 5dc1cf4cca72 RESTORED-OK): the carryovers card set to Off -> test 3 fails (3 / 1); the Try
+// box left under the Games row -> test 2 fails (3 / 1).
 // ============================================================================
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const os = require('os');
 const { REPO_ROOT } = require('./helpers/load-script.js');
-const read = (f) => { const p = path.join(REPO_ROOT, f); assert.ok(fs.existsSync(p), f + ' exists'); return fs.readFileSync(p, 'utf8'); };
-const sectionOf = (h) => (String(h).match(/<section class="jsi" id="just-say-it"[\s\S]*?<\/section>\s*<script data-jsi>window\.JSI_CARDS = [\s\S]*?<\/script>\s*<script data-jsi>[\s\S]*?<\/script>/) || [''])[0];
+const read = (f) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
+const home = read('hardpan-home.html');
+const tryBox = (home.match(/<div class="wrap trywrap"><section class="try" id="try-say"[\s\S]*?<\/section><\/div>/) || [''])[0];
 const textOf = (h) => String(h).replace(/<!--[\s\S]*?-->/g, ' ').replace(/<script[\s\S]*?<\/script>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/&rsquo;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ');
+// The Try box's table in site-features.js: one JSON object per line.
+function table() {
+    return read('site-features.js').split('\n').filter((l) => /^\s*\{"text":/.test(l)).map((l) => JSON.parse(l.trim().replace(/,$/, '')));
+}
 
-// RE-PINNED 2026-11-19 (Manny 8:58 AM via ADVISOR-20261119-0905: skins default to no carryover): five cards. Plain
-// skins first, carryover Off (the parser's own default); one card keeps "with carryovers" to show it can be on.
-test('1 the five cards are the parser\'s: complete, no amount, and - when the parser is on this Mac - what it builds today', () => {
-    const J = JSON.parse(read('jsi-cards.json'));
-    assert.equal(J.cards.length, 5);
-    assert.deepEqual(J.cards[0].lines.find((l) => l[0] === 'Carry over'), ['Carry over', 'Off'], 'plain skins: no carryover');
-    assert.deepEqual(J.cards[4].lines.find((l) => l[0] === 'Carry over'), ['Carry over', 'On'], 'the carryovers example');
-    J.cards.forEach((c) => {
-        assert.ok(c.lines.some((l) => l[0] === 'Amount' && l[1] === 'No amount'), c.text);
-        assert.ok(!c.lines.some((l) => /Tap to choose/.test(l[1])), c.text);
-    });
-    const parser = path.join(os.homedir(), 'golf-app-210-hr', 'ask-hardpan.js');
-    if (!fs.existsSync(parser)) return;
-    const A = require(parser);
-    const ctx = { players: [{ id: '101', name: 'Sam' }, { id: '102', name: 'Josh' }, { id: '103', name: 'Bob' }, { id: '104', name: 'Paul' }], meId: '101', holes: Array.from({ length: 18 }, (_, i) => i + 1) };
-    J.cards.forEach((c) => {
-        const r = A.askParse(c.text, ctx);
-        assert.equal(r.kind, 'game'); assert.deepEqual(r.missing, []);
-        assert.equal(A.titleOf(r.bet), c.title);
-        assert.deepEqual(A.linesOf(r.bet, r.missing, ctx, r).map((l) => [l.label, l.value]), c.lines, c.text);
-    });
+test('1 the looping demo is gone: no #just-say-it section, no <script data-jsi>, no jsi-cards.json', () => {
+    assert.ok(tryBox.length > 500, 'positive: the Try box is on the page');
+    assert.doesNotMatch(home, /id="just-say-it"/);
+    assert.doesNotMatch(home, /<script data-jsi>/);
+    assert.ok(!fs.existsSync(path.join(REPO_ROOT, 'jsi-cards.json')), 'jsi-cards.json is gone');
+    assert.equal((home.match(/<form id="ts-form"/g) || []).length, 1, 'one typed box');
 });
-test('2 the homepage: the section after the comparison block and before How you\'ll use it, the heading and sub line, the looping phone, five chips, the cards as data', () => {
-    const h = read('hardpan-home.html');
-    const s = sectionOf(h);
-    assert.ok(s.length > 1000, 'the section');
-    assert.ok(h.indexOf('id="compare"') < h.indexOf('id="just-say-it"') && h.indexOf('id="just-say-it"') < h.indexOf('<section class="how" id="how"'), 'its place');
-    assert.match(s, /<h2 id="jsi-h">Just say it\. We&rsquo;ll set it up\.<\/h2><p>No menus\. Type or say your game and HardPan builds it\.<\/p>/);
-    assert.match(s, /<div class="jsi-say" id="jsi-say">/);
-    assert.equal((s.match(/<button type="button" class="jsi-chip[ "]/g) || []).length, 5);
-    assert.match(s, /<b>Off<\/b>/, 'the first card, drawn before the script runs, says no carryover');
-    assert.deepEqual(JSON.parse(/window\.JSI_CARDS = (\[[\s\S]*?\]);<\/script>/.exec(s)[1]), JSON.parse(read('jsi-cards.json')).cards);
-    assert.match(s, /prefers-reduced-motion: reduce/, 'the loop stops for reduced motion');
+
+test('2 the Try box stands third: after the band See how our tournaments work, before How you\'ll use it', () => {
+    const at = home.indexOf('<section class="try" id="try-say"');
+    assert.ok(at > 0, 'positive');
+    assert.ok(home.indexOf('id="see-it"') < at && at < home.indexOf('<section class="how" id="how"'), 'its place');
+    assert.match(tryBox, /<h3 id="try-say-h">Try Just say it<\/h3>/);
 });
-test('3 no money figure, no betting or cash word, no competitor, no "Coming soon" in the section', () => {
-    const t = textOf(sectionOf(read('hardpan-home.html')));
-    assert.ok(t.length > 100);
+
+test('3 plain skins shows no carryover; one card and chip say "with carryovers" and show it on', () => {
+    const T = table();
+    assert.ok(T.length >= 6, 'positive: the table is read');
+    const plain = T.find((r) => r.text === 'Skins for everyone, for fun');
+    const carry = T.find((r) => r.text === 'Skins for everyone, with carryovers, for fun');
+    assert.ok(plain && carry, 'both skins cards');
+    assert.deepEqual(plain.lines.find((l) => l[0] === 'Carry over'), ['Carry over', 'Off']);
+    assert.deepEqual(carry.lines.find((l) => l[0] === 'Carry over'), ['Carry over', 'On']);
+    assert.ok(tryBox.includes('data-say="Skins for everyone, with carryovers, for fun"'), 'its chip');
+});
+
+test('4 no money figure, no betting or cash word, no competitor, no "Coming soon" in the Try box', () => {
+    const t = textOf(tryBox);
+    assert.ok(t.length > 100, 'positive');
     assert.ok(!/\$\s?\d|\b(bet|bets|wager\w*|gambl\w*|pool|pot|cash|venmo|paypal|stake)\b/i.test(t));
-    assert.ok(!/18birdies|golfshot|hole19|thegrint|swingu/i.test(sectionOf(read('hardpan-home.html'))));
+    assert.ok(!/18birdies|golfshot|hole19|thegrint|swingu/i.test(tryBox));
     assert.ok(!/coming soon/i.test(t));
-});
-test('4 the mockup files did not ship', () => {
-    ['home-jsi-a.html', 'home-jsi-b.html', 'home-jsi-c.html', 'see-it-jsi.html'].forEach((f) => assert.ok(!fs.existsSync(path.join(REPO_ROOT, f)), f));
 });

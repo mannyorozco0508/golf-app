@@ -226,9 +226,16 @@ describe('1. THE PAGE: links, placeholders, no prices of its own', () => {
         const home = read('hardpan-home.html');
         assert.equal((home.match(/<div class="fsoon">/g) || []).length, 0, 'a Coming soon tag on a shipped card');
         assert.doesNotMatch(home, /fsoon|gsoon|coming208|coming209|Coming in 2\.0\.[89]|in review/i, 'coming wording left on the home page');
-        assert.match(home, /<h2>New in 2\.0\.9<\/h2>/, 'positive: the New in 2.0.9 row is there');
-        assert.match(home, /<h2>New in 2\.0\.8<\/h2>/, 'positive: the New in 2.0.8 row is there');
-        assert.ok(home.indexOf('<h2>New in 2.0.9</h2>') > home.indexOf('EVERYTHING IN THE APP') && home.indexOf('<h2>New in 2.0.9</h2>') < home.indexOf('<h2>New in 2.0.8</h2>') && home.indexOf('<h2>New in 2.0.8</h2>') < home.indexOf('<h2>New in 2.0.7</h2>'), 'New in 2.0.9 is not the first row of EVERYTHING IN THE APP, then 2.0.8, then 2.0.7');
+        // WHAT'S NEW RE-PIN (2026-11-19, ADVISOR-20261119-0906 item 1): the three release rows moved to whats-new.html (/whats-new),
+        // newest first; the homepage has none and links there. The release rule above holds on the new page too.
+        const wn = read('whats-new.html');
+        assert.equal((wn.match(/<div class="fsoon">/g) || []).length, 0, 'a Coming soon tag on a shipped card (whats-new)');
+        assert.doesNotMatch(wn, /fsoon|gsoon|coming208|coming209|Coming in 2\.0\.[89]|in review/i, 'coming wording on whats-new');
+        assert.doesNotMatch(home, /<h2>New in 2\.0\.\d<\/h2>/, 'a release row is still on the homepage');
+        assert.match(home, /<a id="whats-new-link" href="\/whats-new">What&rsquo;s new &rsaquo;<\/a>/, 'positive: the homepage links to What\'s new');
+        assert.match(wn, /<h2>New in 2\.0\.9<\/h2>/, 'positive: the New in 2.0.9 row is there');
+        assert.match(wn, /<h2>New in 2\.0\.8<\/h2>/, 'positive: the New in 2.0.8 row is there');
+        assert.ok(wn.indexOf('<h2>New in 2.0.9</h2>') > 0 && wn.indexOf('<h2>New in 2.0.9</h2>') < wn.indexOf('<h2>New in 2.0.8</h2>') && wn.indexOf('<h2>New in 2.0.8</h2>') < wn.indexOf('<h2>New in 2.0.7</h2>'), 'New in 2.0.9 is not the first row of EVERYTHING IN THE APP, then 2.0.8, then 2.0.7');
         assert.match(read('hardpan-home.html'), /<li class="fc" id="f-offline" data-key="offline"><div class="cap"><span class="eb">OFFLINE MAPS<\/span>/, 'positive: the Offline maps card is there, untagged');
     });
 
@@ -583,8 +590,13 @@ describe('5. WEBSITE-C: feature grid, Help pages, clip slots, side-games wording
         assert.match(home, /EVERYTHING IN THE APP/);
         const sec = /<section class="feat" id="features">([\s\S]*?)<\/section>\s*<div class="fv"/.exec(home)[1];
         assert.deepEqual((sec.match(/<div class="grp" id="g-[a-z0-9]+">\s*<div class="ghd"><h2>([^<]*)<\/h2>/g) || []).map((t) => />([^<]*)<\/h2>/.exec(t)[1]),
-            ['New in 2.0.9', 'New in 2.0.8', 'New in 2.0.7', 'Play', 'Games', 'Your group', 'Organize', 'Get better']);   // 2.0.7 re-pin (2026-11-14): the New in 2.0.7 row leads; 2.0.8 release re-pin: New in 2.0.8 leads; 2.0.9 release (Nov 17): New in 2.0.9 leads
-        assert.equal((sec.match(/<li class="fc"/g) || []).length, 40);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin: + 4; 2.0.8 release: + 2; 2.0.9 release: + 2
+            ['Play', 'Games', 'Your group', 'Organize', 'Get better']);   // 2.0.7 re-pin (2026-11-14): the New in 2.0.7 row leads; 2.0.8 release re-pin: New in 2.0.8 leads; 2.0.9 release (Nov 17): New in 2.0.9 leads; what's new re-pin (2026-11-19): the three release rows left for whats-new.html
+        // WHAT'S NEW RE-PIN (2026-11-19): the three release rows (8 cards) moved to whats-new.html; the homepage keeps the five, 32 cards.
+        assert.equal((sec.match(/<li class="fc"/g) || []).length, 32);
+        const wsec = /<section class="feat" id="features">([\s\S]*?)<\/section>/.exec(read('whats-new.html'))[1];
+        assert.deepEqual((wsec.match(/<div class="grp" id="g-[a-z0-9]+">\s*<div class="ghd"><h2>([^<]*)<\/h2>/g) || []).map((t) => />([^<]*)<\/h2>/.exec(t)[1]), ['New in 2.0.9', 'New in 2.0.8', 'New in 2.0.7']);
+        assert.equal((wsec.match(/<li class="fc"/g) || []).length, 8);
+        assert.equal(videos(wsec).length, 0, 'no clip in the release rows');   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin: + 4; 2.0.8 release: + 2; 2.0.9 release: + 2
         assert.equal(videos(sec).length, 6, 'the six features with a clip');
     });
 

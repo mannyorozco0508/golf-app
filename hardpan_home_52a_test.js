@@ -107,7 +107,10 @@ test('3 the 25 cards main had keep their headlines and order', async () => {
     const wasH3 = [...baseHtml().matchAll(/<li class="fc"[^>]*>[\s\S]*?<h3>([^<]*)<\/h3>/g)].map((m) => m[1].replace(/&amp;/g, '&'));
     assert.equal(wasH3.length, 25, 'positive: main had 25');
     const mineOld = a.allH3.filter((h, i) => !NEW.includes(a.allIds[i]) && !NEW_207.includes(a.allIds[i]) && !NEW_208.includes(a.allIds[i]) && !NEW_209.includes(a.allIds[i]));
-    assert.equal(a.allIds.length, 25 + NEW.length + NEW_207.length + NEW_208.length + NEW_209.length, 'positive: the 2.0.8 and 2.0.9 cards are inside #features');
+    // WHAT'S NEW RE-PIN (2026-11-19, ADVISOR-20261119-0906 item 1): the three release rows (NEW_207, NEW_208, NEW_209) moved to
+    // whats-new.html; the homepage's #features holds the 25 cards main had + the 7 Organize cards, and none of the release cards.
+    assert.equal(a.allIds.length, 25 + NEW.length, 'positive: the homepage rows are all there');
+    assert.deepEqual(a.allIds.filter((id) => NEW_207.includes(id) || NEW_208.includes(id) || NEW_209.includes(id)), [], 'a release card is still on the homepage');
     assert.deepEqual(mineOld, wasH3);
 });
 

@@ -175,7 +175,9 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         if (srv) { srv.closeAllConnections(); srv.close(); }
     });
 
-    test('40 cards render in eight rows, each with its headline and a described screen', async () => {
+    // WHAT'S NEW RE-PIN (2026-11-19, ADVISOR-20261119-0906 item 1): the three release rows (8 cards) moved to whats-new.html;
+    // the homepage renders the other five rows (32 cards) and a What's new link; whats-new.html renders the three.
+    test('32 cards render in five rows on the homepage and 8 in three on whats-new.html, each with its headline and a described screen', async () => {
         await tab.go(base + '/');
         const r = await tab.eval(`(() => { const cs = [...document.querySelectorAll('#features .fc')];
             return { n: cs.length, rows: [...document.querySelectorAll('#features .row')].map((r) => r.children.length),
@@ -183,12 +185,20 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
               sideways: document.documentElement.scrollWidth > window.innerWidth,
               text: document.body.innerText, c209: (document.getElementById('coming209') || {}).innerText || '',
               c209n: document.querySelectorAll('#coming209 .fc').length, c209before: !!document.getElementById('coming209') && !!(document.getElementById('coming209').compareDocumentPosition(document.getElementById('features')) & 4) }; })()`);
-        assert.equal(r.n, 40);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin (2026-11-14): + New in 2.0.7 (4); 2.0.8 release: + New in 2.0.8 (2), first; 2.0.9 release (Nov 17): + New in 2.0.9 (2), first
-        assert.deepEqual(r.rows, [2, 2, 4, 6, 6, 5, 12, 3]);
+        assert.equal(r.n, 32);   // 52A batch 1 re-pin (2026-11-12): Organize 5 -> 12; 2.0.7 re-pin (2026-11-14): + New in 2.0.7 (4); 2.0.8 release: + New in 2.0.8 (2), first; 2.0.9 release (Nov 17): + New in 2.0.9 (2), first; what's new re-pin (2026-11-19): - the 8 release cards
+        assert.deepEqual(r.rows, [6, 6, 5, 12, 3]);
+        assert.doesNotMatch(r.text, /New in 2\.0\.\d/, 'a release row is still on the homepage');
+        assert.match(r.text, /What’s new ›/, 'positive: the homepage shows the What\'s new link');
         // 2.0.9 release re-pin (Nov 17, Manny's typed "OK web flip 2.0.9"): the Coming in 2.0.9 row is gone; its two cards are
         // the New in 2.0.9 row, first inside #features; nothing on the page says coming / in review any more.
         assert.equal(r.c209n, 0); assert.equal(r.c209, ''); assert.equal(r.c209before, false, 'a #coming209 section is still on the page');
-        assert.match(r.text, /New in 2\.0\.9/); assert.match(r.text, /Red means under\./);
+        const w = await (async () => { await tab.go(base + '/whats-new.html'); return tab.eval(`(() => ({ n: document.querySelectorAll('#features .fc').length, rows: [...document.querySelectorAll('#features .row')].map((r) => r.children.length),
+            bad: [...document.querySelectorAll('#features .fc')].filter((c) => !c.querySelector('h3').textContent.trim() || !c.querySelector('p').textContent.trim() || !(c.querySelector('.ph img').alt || '').trim()).map((c) => c.id),
+            sideways: document.documentElement.scrollWidth > window.innerWidth, text: document.body.innerText }))()`); })();
+        assert.equal(w.n, 8); assert.deepEqual(w.rows, [2, 2, 4]); assert.deepEqual(w.bad, []); assert.equal(w.sideways, false, 'whats-new.html scrolls sideways at 390');
+        assert.match(w.text, /New in 2\.0\.9/); assert.match(w.text, /Red means under\./);
+        assert.doesNotMatch(w.text, /coming in 2\.0\.[89]|coming in the next update|in review|not in the app yet/i);
+        await tab.go(base + '/');
         assert.doesNotMatch(r.text, /coming in 2\.0\.[89]|coming in the next update|in review|not in the app yet/i, '2.0.9 release: nothing on the page says 2.0.8 or 2.0.9 is coming any more');
         assert.deepEqual(r.bad, []);
         assert.equal(r.sideways, false, 'the page scrolls sideways at 390');
@@ -215,14 +225,15 @@ describe('website-e homepage in real Chrome', { skip: !CAN && 'Chrome is not ins
         // 2.0.9 site (web-209-coming, Nov 16): the two Coming in 2.0.9 slides (#coming209, above #features) come first now:
         // Play 2 is data-i 9 (was 7), Games 1 is slide 15 = scrollTo 14 widths (was 12).
         // 2.0.9 release re-pin (Nov 17): the two slides moved into #features but stay first, so the indexes do not move.
-        const big = await tab.eval(`(() => { const li = document.querySelector('#fv-track .fv-s[data-i="9"] img'); return li ? { src: li.currentSrc, w: li.getBoundingClientRect().width } : null; })()`);
+        // what's new re-pin (2026-11-19): the 8 release slides left the homepage, so Play 2 is data-i 1 (was 9), Games 1 is 6 widths (was 14).
+        const big = await tab.eval(`(() => { const li = document.querySelector('#fv-track .fv-s[data-i="1"] img'); return li ? { src: li.currentSrc, w: li.getBoundingClientRect().width } : null; })()`);
         assert.ok(big && /plays-like-940\.webp$/.test(big.src) && big.w > 250, 'the viewer does not show the sharp screen: ' + JSON.stringify(big));
         // a swipe: the track is scrolled the way a finger scrolls it, to the 11th slide (Games 1).
         // 2.0.7 re-pin (2026-11-14): the four New in 2.0.7 slides come first, so Play 2 is slide 6 (data-i 5) and Games 1 is slide 11 (was 7).
         // 2.0.8 site (Nov 15): the two Coming in 2.0.8 slides (#coming208, above #features) come before those: Play 2 is data-i 7, Games 1 slide 13.
         // 2.0.8 release re-pin: the viewer walks every .fc on the page in order; the two 2.0.8 slides moved from #coming208 into
         // #features but stay first, so the indexes do not move (Play 2 data-i 7, Games 1 slide 13 = scrollTo 12 widths).
-        await tab.eval(`(() => { const t = document.getElementById('fv-track'); t.scrollTo({ left: t.clientWidth * 14 }); return true; })()`);
+        await tab.eval(`(() => { const t = document.getElementById('fv-track'); t.scrollTo({ left: t.clientWidth * 6 }); return true; })()`);
         await sleep(700);
         v = await tab.eval(VIEWER);
         assert.equal(v.n, 'Games · 1 / 6', 'a swipe did not move to the next feature');

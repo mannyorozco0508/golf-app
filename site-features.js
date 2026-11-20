@@ -155,6 +155,7 @@
         if (fv.hidden) return;
         each(track.querySelectorAll('video'), function (v) { v.pause(); });
         each(track.querySelectorAll('.fv-img.zoom'), function (b) { b.classList.remove('zoom'); });
+        hint(false);
         fv.hidden = true; fv.style.display = '';
         document.documentElement.classList.remove('fv-open');
         if (!fromPop && ourState) { ignorePop = true; try { history.back(); } catch (e) { ignorePop = false; } }
@@ -199,6 +200,8 @@
         settle = setTimeout(function () {
             var i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
             if (i !== cur && i >= 0 && i < items.length) {
+                each(track.querySelectorAll('.fv-img.zoom'), function (b) { b.classList.remove('zoom'); });
+                hint(false);
                 cur = i; [i - 1, i, i + 1].forEach(fill);
                 var it = items[i];
                 $('fv-n').textContent = it.group + ' · ' + it.n + ' / ' + it.of;
@@ -208,9 +211,24 @@
             }
         }, 120);
     }, { passive: true });
-    track.addEventListener('click', function (ev) {   // tap the picture: zoom in / out
+    // TAP THE PICTURE: zoom in / out (ADVISOR-20261119-1045: Manny tapped the Skins picture on his iPhone and saw it
+    // cut off on the right, "Hope Foundation Clas…", "Pairi…". The zoom doubled the picture from its top-left corner,
+    // so the right half sat off screen with nothing saying it could be dragged into view.) The zoom now keeps the
+    // tapped spot under the finger, and the caption says how to look around and how to get back.
+    var ZOOM_HINT = 'Drag to look around \u00b7 tap again to fit';
+    var FIT_HINT = 'Pinch or tap to zoom \u00b7 swipe for the next feature';
+    function hint(on) { var c = fv.querySelector('.fv-cap small'); if (c) c.textContent = on ? ZOOM_HINT : FIT_HINT; }
+    track.addEventListener('click', function (ev) {
         var box = ev.target.closest && ev.target.closest('.fv-img');
-        if (box) box.classList.toggle('zoom');
+        if (!box) return;
+        var r = box.getBoundingClientRect();
+        var fx = (ev.clientX - r.left) / Math.max(1, r.width), fy = (ev.clientY - r.top) / Math.max(1, r.height);
+        var on = box.classList.toggle('zoom');
+        hint(on);
+        if (on) {
+            box.scrollLeft = Math.max(0, fx * box.scrollWidth - r.width / 2);
+            box.scrollTop = Math.max(0, fy * box.scrollHeight - r.height / 2);
+        }
     });
     fv.addEventListener('keydown', function (ev) {
         if (ev.key === 'Escape') { ev.preventDefault(); close(false); }
@@ -318,6 +336,7 @@
         {"text":"Me & Josh vs Bob & Paul, best ball for fun","says":["me and josh vs bob and paul best ball for fun","sam and josh vs bob and paul best ball for fun"],"title":"2 v 2 Best Ball","lines":[["Sides","Sam + Josh vs Bob + Paul"],["Amount","No amount"],["Presses","Off"],["Scoring","Net"],["Counts from","Hole 4 (now)"]],"start":"Start game"},
         {"text":"Me vs Josh, Nassau, for fun","says":["me vs josh nassau for fun","nassau me vs josh for fun","sam vs josh nassau for fun"],"title":"1 v 1 Nassau","lines":[["Sides","Sam vs Josh"],["Amount","No amount"],["Presses","Off"],["Scoring","Net"],["Counts from","Hole 4 (now)"]],"start":"Start game"},
         {"text":"Skins for everyone, for fun","says":["skins for everyone for fun","skins everyone for fun","everyone skins for fun"],"title":"Skins","lines":[["Who’s in","Everyone (4)"],["Amount","No amount"],["Scoring","Net"],["Counts from","Hole 4 (now)"],["Carry over","Off"]],"start":"Start game"},
+        {"text":"Skins for everyone, with carryovers, for fun","says":["skins for everyone with carryovers for fun","skins for everyone with carryover for fun","skins with carryovers for everyone for fun","everyone skins with carryovers for fun"],"title":"Skins","lines":[["Who’s in","Everyone (4)"],["Amount","No amount"],["Scoring","Net"],["Counts from","Hole 4 (now)"],["Carry over","On"]]},
         {"text":"Me vs Bob, match play, gross, from hole 1, for fun","says":["me vs bob match play gross from hole 1 for fun","match play me vs bob gross from hole 1 for fun","sam vs bob match play gross from hole 1 for fun"],"title":"1 v 1 Match Play","lines":[["Sides","Sam vs Bob"],["Amount","No amount"],["Presses","Off"],["Scoring","Gross"],["Counts from","Hole 1"]],"start":"Start game"},
         {"text":"Me & Josh vs Bob & Paul, Hi-Lo for fun","says":["me and josh vs bob and paul hi lo for fun","hi lo me and josh vs bob and paul for fun"],"title":"2 v 2 Hi-Lo","lines":[["Sides","Sam + Josh vs Bob + Paul"],["Amount","No amount"],["Scoring","Net"],["Counts from","Hole 4 (now)"]],"start":"Start game"}
     ];
