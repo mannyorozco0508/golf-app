@@ -37,6 +37,18 @@
 // 25d00b9a501adea9...): 18 tests - 17 pass / 1 fail (C3). With the build: 18 / 0.
 // CONTROL (q2 in tournament_event_board_test.js: the mix treated as no board) ->
 // C3 red; tournament.html restored by sha (c0953d7a50209181).
+// RE-PIN 2026-11-19 (Manny via ADVISOR-20261119-0905 item 2, the public Skins tab in
+// plain words; copy is behaviour, so the pinned sentences moved with it): B1 reads
+// the one header line "Skins · Gross · Carryover · N won" and no "not set" line; B2
+// lets the organizer's quiet "Set an amount ›" be the one difference from a watcher;
+// B3 reads "$20 credit a skin" (shortText, the event's prize word). The behaviour
+// itself is guarded by tournament_skins_tab_words_test.js. Against 4b7da2de this
+// file is 15 pass / 3 fail (B1, B2, B3: the old sentences); after: 18 / 0.
+// RE-PIN 2026-11-19, LAYOUT B (Manny's pick "Skins tab B"; the layout moved the
+// rows, no sentence changed): B1's "a row per hole won" now taps "Hole by hole ›"
+// and each round chip through the onclick the page rendered and counts the hole
+// rows round by round. Against the layout-B page before this re-pin: 17 pass / 1
+// fail (B1); after: 18 / 0. Layout B itself: tournament_skins_tab_b_test.js.
 // ============================================================================
 const { test, describe } = require('node:test');
 const assert = require('node:assert/strict');
@@ -128,12 +140,21 @@ describe('B. the Skins tab', () => {
         const sb = arrive(record());
         tap(sb, subtabs(sb), (t) => /id="lb-sub-skins"/.test(t));
         const t = text(el(sb, 'lb-skins-panel').innerHTML);
-        assert.match(t, /^\d+ skins? so far Gross · carryover on · Cascade \d+ skins? · Olympic \d+ skins? \(holes still open\)/);
-        assert.match(t, /The organizer has not set an amount a skin yet/);
+        assert.match(t, /^Skins · Gross · Carryover · \d+ won /);
+        assert.doesNotMatch(t, /not set|amount a skin yet/, 'a missing amount is never a golfer\'s line (re-pin 2026-11-19)');
         const sk = vm.runInContext('TournamentPrizes.skinsSummary(currentData)', sb);
-        assert.match(t, new RegExp('^' + sk.skins + ' skins? so far'), 'the count is skinsSummary\'s');
+        assert.match(t, new RegExp('^Skins · Gross · Carryover · ' + sk.skins + ' won'), 'the count is skinsSummary\'s');
         assert.ok(sk.skins > 0, 'positive: the fixture has skins');
-        assert.ok((el(sb, 'lb-skins-panel').innerHTML.match(/class="pz-row/g) || []).length >= sk.holesWon, 'a row per hole won');
+        // LAYOUT B (re-pin 2026-11-19): the hole rows sit behind "Hole by hole ›", one
+        // round at a time; tap it open, then each round chip, and count the hole rows.
+        const skinsTap = (pick) => tap(sb, el(sb, 'lb-skins-panel').innerHTML, pick);
+        skinsTap((t) => /id="lb-skins-holes"/.test(t));
+        let rows = 0;
+        sk.rounds.forEach((r, i) => {
+            skinsTap((t) => new RegExp('id="lb-skins-round-' + i + '"').test(t));
+            rows += (el(sb, 'lb-skins-panel').innerHTML.match(/class="pz-row" data-hole=/g) || []).length;
+        });
+        assert.ok(rows >= sk.holesWon, 'a row per hole won');
     });
     test('B2 the tab is read-only: no amount input, no carryover buttons, no Open toggle; a watcher sees the same', () => {
         const sb = arrive(record());
@@ -142,13 +163,15 @@ describe('B. the Skins tab', () => {
         assert.ok(!/prize-skin-amount|savePrizeSetting|togglePrizeSkins|id="prize-skins-open"/.test(h), 'no organizer controls on the tab');
         const w = arrive(record(), null);
         tap(w, subtabs(w), (t) => /id="lb-sub-skins"/.test(t));
-        assert.equal(text(el(w, 'lb-skins-panel').innerHTML), text(h), 'watcher and organizer read the same tab');
+        // The organizer's one extra: the quiet "Set an amount ›" while none is set (re-pin 2026-11-19).
+        assert.match(text(h), /Set an amount ›/);
+        assert.equal(text(el(w, 'lb-skins-panel').innerHTML), text(h).replace(' Set an amount ›', ''), 'watcher and organizer read the same tab otherwise');
     });
     test('B3 when the organizer has set an amount, the tab names it and never calls it cash', () => {
         const sb = arrive(record({ prizeSettings: { perSkin: 20, carryover: true } }));
         tap(sb, subtabs(sb), (t) => /id="lb-sub-skins"/.test(t));
         const t = text(el(sb, 'lb-skins-panel').innerHTML);
-        assert.match(t, /\$20 pro shop credit a skin, as the organizer set it/);
+        assert.match(t, /^Skins · Gross · Carryover · \d+ won · \$20 credit a skin /);
         assert.ok(!/cash/i.test(t));
     });
 });

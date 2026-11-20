@@ -19,6 +19,8 @@
 // should: they describe what does NOT change. 3 + 2 = 5. After: 5 / 0.
 // NEGATIVE CONTROL: the default put back to "on for everyone" -> A1, A3 fail;
 // restored by copying the saved file back (sha printed beside RESTORED-OK).
+// RE-PIN 2026-11-19: A3 reads the Skins tab's new header ("No carryover"); against
+// 4b7da2de it is 4 / 1 (A3, the old words), after 5 / 0.
 // ============================================================================
 'use strict';
 const { test, describe } = require('node:test');
@@ -64,7 +66,9 @@ describe('A. NOTHING SAVED: the event\'s age decides', () => {
         const m = /id="lb-sub-skins"[^>]*onclick="([^"]+)"/.exec(SRC);
         assert.ok(m, 'positive: the Skins sub-tab exists');
         vm.runInContext(m[1], sb);
-        assert.match(text(sb.document.getElementById('lb-skins-panel').innerHTML), /carryover off/);
+        // RE-PIN 2026-11-19 (ADVISOR-20261119-0905 item 2; copy is behaviour): the tab's one
+        // header line says "No carryover"; the prize screen's card keeps "carryover off".
+        assert.match(text(sb.document.getElementById('lb-skins-panel').innerHTML), /^Skins · Gross · No carryover · /);
     });
 });
 

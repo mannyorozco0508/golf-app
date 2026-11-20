@@ -196,9 +196,14 @@ describe('4. THE SKINS CARD', () => {
         const off = arrive('STK', F.starkey({ prizeSettings: { perSkin: 20, carryover: false } }), F.OWNER);
         assert.match(text(html(off, 'prize-card-skins')), /Cascade 3 skins · Olympic 3 skins → \$120 pro shop credit/);
     });
-    test('net is not offered as a number: the card says why skins are gross', () => {
+    // RE-PINNED 2026-11-19 (Starkey settings 8-11, Manny: "then skins 8-11"): net
+    // skins are built now (tournament_skin_rules_test.js), so "not built yet" became
+    // a false sentence. With no skins rule saved the card is still gross, and says
+    // where net is set.
+    test('net is not offered as a number: with no skins rule the card says skins are gross and where net is set', () => {
         const sb = arrive('STK', F.starkey(), F.OWNER);
-        assert.match(text(html(sb, 'prize-card-skins')), /Gross scores only\. Net skins need each golfer's handicap strokes on every hole/);
+        assert.match(text(html(sb, 'prize-card-skins')), /Gross scores only\. Net skins are set in How prizes go above\./);
+        assert.match(text(html(sb, 'prize-card-skins')), /^Skins · gross /, 'positive: the default card is the gross one');
     });
 });
 
@@ -218,10 +223,14 @@ describe('5. THE KPs CARD', () => {
         assert.match(t, /Hole 13 \(closest to the pin\): no winner confirmed yet\./);
         assert.doesNotMatch(t, /Dana Ruiz/);
     });
-    test('multi-round event: the one-round limit is said on screen, and nothing is paid', () => {
-        const t = text(html(arrive('STK', F.starkey({ prizeSettings: { perContest: 25 } }), F.OWNER), 'prize-card-kps'));
-        assert.match(t, /Contest holes are for one-round events, so this event has none\./);
-        assert.doesNotMatch(t, /\$25/);
+    // RE-PINNED 2026-11-19 (Starkey settings 12, KPs per round): a two-round event
+    // now has contest holes on each round (tournament_kp_rounds_test.js), so "one-round
+    // events only" became a false sentence. With none marked, the card says so and pays nothing.
+    test('multi-round event with no contest holes marked: the card says so, and nothing is paid', () => {
+        const h = html(arrive('STK', F.starkey({ prizeSettings: { perContest: 25 } }), F.OWNER), 'prize-card-kps');
+        assert.match(text(h), /No contest holes yet\. Mark them on the Contests tab\./);
+        assert.match(text(h), /\$25 pro shop credit each/, 'positive: the amount setting is offered on a two-round event now');
+        assert.doesNotMatch(h, /class="pz-row"/, 'no winner row: nothing is paid');
     });
 });
 

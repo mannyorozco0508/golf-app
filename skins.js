@@ -30,9 +30,15 @@
 //   6. A hole somebody has not posted is PENDING. Carryover OFF: only that hole
 //      waits. Carryover ON: that hole and every hole after it wait, because a
 //      carry could still change hands there; nothing past it is guessed.
-//   7. Gross only. Net skins need each golfer's handicap strokes per hole, which
-//      live in the scoring engine; scoringBasis 'net' is refused with a reason
-//      rather than computed on gross scores.
+//   7. Net (Starkey settings 8-11, Manny 2026-11-19): scoringBasis 'net' is
+//      computed ONLY when every entrant carries strokes: { <hole>: n }, worked
+//      out by the caller from the engine's own getStrokes (this file still knows
+//      no handicap). A hole's net score is gross minus that hole's strokes.
+//      Without strokes, 'net' is refused with a reason, as before, rather than
+//      computed on gross scores.
+//   8. options.excludeOnHole { <hole>: [ids] }: those entrants still had to post
+//      the hole, but are left out of who wins it (one skin per golfer per hole:
+//      the gross winner sits out that hole's net skin).
 //
 // OUTPUT
 //   { available, reason, carryover, holes: [row], tally: { <id>: { id, name, owner, skins, holes: [n] } },
@@ -76,7 +82,7 @@
         var carryover = opt.carryover !== false;
         var empty = { available: false, reason: null, carryover: carryover, holes: [], tally: {},
             totals: { holesWon: 0, skins: 0, carried: 0, notWon: 0, pending: 0 } };
-        if (basis !== 'gross') { empty.reason = NET_REASON; return empty; }
+        if (basis !== 'gross' && basis !== 'net') { empty.reason = NET_REASON; return empty; }
 
         var holes = holeList(round && round.holes);
         var entrants = ((round && round.entrants) || []).filter(function (e) {
@@ -84,6 +90,16 @@
             var s = e.scores || {};
             return Object.keys(s).some(function (k) { return postedScore(s[k]) !== null; });
         });
+        if (basis === 'net' && (!entrants.length || entrants.some(function (e) { return !e.strokes || typeof e.strokes !== 'object'; }))) {
+            empty.reason = NET_REASON; return empty;
+        }
+        var exclude = opt.excludeOnHole || {};
+        var scoreOf = function (e, hole) {
+            var g = postedScore((e.scores || {})[hole]);
+            if (g === null || basis !== 'net') return g;
+            var k = Number((e.strokes || {})[hole]);
+            return g - (isFinite(k) ? k : 0);
+        };
         var tally = {};
         entrants.forEach(function (e) {
             tally[e.id] = { id: e.id, name: e.name || '', owner: e.owner || e.id, skins: 0, holes: [] };
@@ -98,15 +114,17 @@
             var last = i === holes.length - 1;
             var row = { hole: h.hole, par: h.par, status: 'pending', winner: null, name: '', score: null,
                 skins: 0, carriedIn: carryover ? carry : 0, tiedIds: [], carriesTo: null, notWon: 0 };
-            var posted = entrants.map(function (e) { return { id: e.id, s: postedScore((e.scores || {})[h.hole]) }; });
+            var posted = entrants.map(function (e) { return { id: e.id, s: scoreOf(e, h.hole) }; });
             if (blocked || !entrants.length || posted.some(function (p) { return p.s === null; })) {
                 if (carryover && entrants.length) blocked = true;
                 totals.pending++;
                 rows.push(row);
                 return;
             }
-            var low = Math.min.apply(null, posted.map(function (p) { return p.s; }));
-            var atLow = posted.filter(function (p) { return p.s === low; });
+            var out = exclude[h.hole] || [];
+            var inPlay = posted.filter(function (p) { return out.indexOf(p.id) === -1; });
+            var low = Math.min.apply(null, inPlay.map(function (p) { return p.s; }));
+            var atLow = inPlay.filter(function (p) { return p.s === low; });
             row.score = low;
             if (atLow.length === 1) {
                 var id = atLow[0].id;
