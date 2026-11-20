@@ -162,6 +162,8 @@ describe('B. THE GOLFER: the prompt on the contest hole the card is playing', ()
     });
     test('B2 pick Al, type 8 ft 4 in, Save: ONE update - the entry (distance + time only) and its keyed proof', async () => {
         const sb = arriveCard(teamEvent({ contests: CONTESTS }), undefined, {});
+        // 2026-11-20 (KP save read-back): "Saved" needs the mark to read back; seeded (re-pinned deliberately).
+        sb.__dbReads = { 'contestEntries/CT1/h7/team4_p0': { inches: 100 } };
         const ph = html(sb, 'contest-prompt');
         tap(sb, ph, (t) => /data-entry="team4_p0"/.test(t));
         el(sb, 'cp-ft').value = '8'; el(sb, 'cp-in').value = '4';

@@ -161,6 +161,7 @@
         .cp-msg { min-height: 16px; text-align: center; font-size: 0.8rem; font-weight: bold; margin-top: 8px; }
         .cp-msg.ok { color: var(--brand-green); }
         .cp-msg.err { color: var(--accent-red); }
+        .cp-retry { display: block; width: 100%; background: none; border: 1.5px solid var(--accent-red); color: var(--accent-red); border-radius: 10px; padding: 10px; font-size: 0.95rem; font-weight: 800; cursor: pointer; font-family: inherit; }
         .cp-skip { display: block; margin: 6px auto 0 auto; background: none; border: 0; color: var(--text-muted); text-decoration: underline; font-size: 0.85rem; cursor: pointer; font-family: inherit; }
         .cb-card { border: 1px solid var(--border-mid); border-radius: 14px; padding: 10px 14px; margin-bottom: 12px; background: var(--bg-card); }
         .cb-head { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #444; padding: 4px 0 8px 0; border-bottom: 1px solid var(--border-faint); }
@@ -2120,7 +2121,7 @@
             document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
         }
         // E2: who on this card can enter a contest - each golfer by player id.
-        contestCtx = { order: order, isPlayed: isPlayed, next: roundLocked ? null : next,
+        contestCtx = { order: order, isPlayed: isPlayed, next: roundLocked ? null : next, open: !roundLocked,
             golfers: ids.map(pid => ({ entryKey: pid, who: pid, team: pid, name: competitorDisplayName(players[pid]) || 'Golfer' })) };
         renderContestArea();
         if (currentData.roundName) {
@@ -2271,7 +2272,7 @@
             document.querySelectorAll('#holes-list input').forEach(i => { i.disabled = true; });
         }
         // E2: who on this card can enter a contest - each golfer by index.
-        contestCtx = { order: order, isPlayed: isPlayed, next: roundLocked ? null : next,
+        contestCtx = { order: order, isPlayed: isPlayed, next: roundLocked ? null : next, open: !roundLocked,
             golfers: (team.players || []).map((name, i) => ({ entryKey: `team${myTeamNum}_p${i}`, who: `team${myTeamNum}`, team: `team${myTeamNum}`, name: String(name || '') || `Golfer ${i + 1}` })) };
         renderContestArea();
     }
@@ -2318,21 +2319,34 @@
         if (contestSkippedNow[hole]) return true;
         try { return localStorage.getItem(contestSkipKey(hole)) === '1'; } catch (e) { return false; }
     }
-    // The contest this card is on now: the next hole, else the hole just played.
+    // The contest this card is on now: a mark still not confirmed stored first,
+    // then the next hole, else the hole just played.
+    //
+    // THE LAST HOLE (Home Course sim 2026-11-20). A group's last hole has no next
+    // hole: a shotgun group that starts on 7 finishes on 6. When that hole is a
+    // contest hole the prompt used to vanish the moment the last score went in, so
+    // nobody on the card could enter a mark. With every hole played (and the round
+    // still open) the last hole in this card's play order stays the candidate, so
+    // its prompt stays until the golfers enter or tap "Not on the green".
     function contestHoleNow() {
         if (!contestCtx || !contestsOn()) return null;
         contestEntries = TournamentContests.entriesFor(contestEntriesRaw, contestRoundId());
         const data = contestViewNow();
         const order = contestCtx.order || [];
-        const cands = [];
+        const cands = Object.keys(contestPending).map(Number);
         if (contestCtx.next) {
             cands.push(Number(contestCtx.next.hole));
             const at = order.findIndex(h => Number(h.hole) === Number(contestCtx.next.hole));
             if (at > 0 && contestCtx.isPlayed(Number(order[at - 1].hole))) cands.push(Number(order[at - 1].hole));
+        } else if (contestCtx.open && order.length) {
+            const last = Number(order[order.length - 1].hole);
+            if (contestCtx.isPlayed(last)) cands.push(last);
         }
         for (const hole of cands) {
             const c = TournamentContests.contestFor(data, hole);
-            if (!c || c.lockedAt || contestSkipped(hole)) continue;
+            if (!c || c.lockedAt) continue;
+            if (contestPending[hole]) return c;
+            if (contestSkipped(hole)) continue;
             const got = contestEntries[c.key] || {};
             // KP setting 12: a flight whose winner is confirmed is done on this hole; its golfers are not asked.
             const asked = contestCtx.golfers.filter(g => !TournamentContests.lockedFor(c, TournamentContests.groupOfKey(data, g.entryKey)));
@@ -2386,8 +2400,9 @@
             html += `<div class="cp-who" role="group" aria-label="Whose ball?">` + golfers.map(g => {
                 const e = got[g.entryKey];
                 const first = escapeHtml(String(g.name).split(' ')[0]);
+                const unsure = contestPending[c.hole] && contestPending[c.hole].entryKey === g.entryKey;
                 return e
-                    ? `<span class="cp-chip" aria-disabled="true">${first} ✓ ${escapeHtml(TournamentContests.valueText(e))}</span>`
+                    ? `<span class="cp-chip" aria-disabled="true">${first} ${unsure ? '· ' : '✓ '}${escapeHtml(TournamentContests.valueText(e))}${unsure ? ' · not saved yet' : ''}</span>`
                     : `<button type="button" class="cp-chip${pick === g.entryKey ? ' on' : ''}" data-entry="${escapeHtml(g.entryKey)}" onclick="pickContestGolfer(${c.hole}, this.dataset.entry)">${first}</button>`;
             }).join('') + `</div>`;
         }
@@ -2395,10 +2410,12 @@
             ? `<div class="cp-inputs"><label class="cp-box"><input id="cp-ft" type="number" inputmode="numeric" min="0" max="100" aria-label="Feet"><span>ft</span></label><label class="cp-box"><input id="cp-in" type="number" inputmode="numeric" min="0" max="11" aria-label="Inches"><span>in</span></label></div>`
             : `<div class="cp-inputs"><label class="cp-box"><input id="cp-yds" type="number" inputmode="numeric" min="${TournamentContests.LD_MIN_YD}" max="${TournamentContests.LD_MAX_YD}" aria-label="Yards"><span>yds</span></label></div>`;
         html += `<button type="button" class="cp-save" id="cp-save" onclick="saveContestEntry(${c.hole})">${kp ? 'Save my KP' : 'Save my drive'}</button>`;
-        html += `<div class="cp-msg${msg ? ' ' + msg.cls : ''}" id="cp-msg" aria-live="polite">${msg ? escapeHtml(msg.text) : ''}</div>`;
+        html += `<div class="cp-msg${msg ? ' ' + msg.cls : ''}" id="cp-msg" aria-live="polite">${msg ? (msg.retry
+            ? `<button type="button" class="cp-retry" id="cp-retry" onclick="retryContestEntry(${c.hole})">${escapeHtml(msg.text)}</button>`
+            : escapeHtml(msg.text)) : ''}</div>`;
         if (kp) html += `<button type="button" class="cp-skip" id="cp-skip" onclick="skipContestHole(${c.hole})">Not on the green</button>`;
         box.innerHTML = html;
-        if (open.length === 0) box.style.display = 'none';
+        if (open.length === 0 && !contestPending[c.hole]) box.style.display = 'none';
     }
     function pickContestGolfer(hole, entryKey) {
         contestPick[hole] = entryKey;
@@ -2427,11 +2444,66 @@
             o.yards = TournamentContests.ldYards(val('cp-yds'));
             if (o.yards === null) { say('err', `Enter yards from ${TournamentContests.LD_MIN_YD} to ${TournamentContests.LD_MAX_YD}.`); return; }
         }
-        const update = TournamentContests.entryUpdate(o, firebase.database.ServerValue.TIMESTAMP);
-        contestMsg[hole] = { cls: '', text: 'Saving…' };
-        return db.ref().update(update)
-            .then(() => { contestMsg[hole] = { cls: 'ok', text: `✓ Saved: ${String(g.name).split(' ')[0]} ${TournamentContests.valueText(o)}` }; contestPick[hole] = null; contestShape = ''; renderContestPrompt(); })
-            .catch((err) => say('err', (err && err.code === 'PERMISSION_DENIED') ? CONTEST_REFUSED : '⚠️ Could not save — check your signal and try again.'));
+        return sendContestEntry(hole, o, 0);
+    }
+    // A MARK NEVER DROPS SILENTLY (Home Course sim 2026-11-20: one KP mark was not
+    // stored and nothing on the card said so). The entry is kept in contestPending
+    // until a read of its own path returns it, and the prompt stays on that hole
+    // (contestHoleNow puts it first) until then:
+    //   - the write is acknowledged -> read contestEntries/<code>/<hole>/<entry>
+    //     back; the value there must be this mark. If it is not, send once more,
+    //     then show "Not saved yet - tap to retry".
+    //   - no answer within CONTEST_SLOW_MS (no signal) -> the same retry button.
+    //     The write is still queued; if it lands later, the prompt says Saved.
+    //   - refused by the rules -> the refusal sentence; nothing is retried.
+    // What the read can prove: with the card's own listener open, the database
+    // client may answer it from the copy it holds, which already reflects an
+    // acknowledged write. It catches a mark that is missing or different after
+    // the acknowledgement, not a server that lied about acknowledging.
+    var contestPending = {};       // hole -> the entry being saved, until it reads back
+    const CONTEST_NOT_SAVED = 'Not saved yet - tap to retry';
+    const CONTEST_SLOW_MS = 8000;
+    function contestStored(o) {
+        const p = `contestEntries/${o.code}/${TournamentContests.holeKey(o.hole)}/${o.entryKey}`;
+        return db.ref(p).once('value').then((snap) => {
+            const v = snap && snap.val();
+            if (!v) return false;
+            return o.kind === 'kp' ? Number(v.inches) === o.inches : Number(v.yards) === o.yards;
+        });
+    }
+    function contestSay(hole, msg) { contestMsg[hole] = msg; contestShape = ''; renderContestPrompt(); }
+    function sendContestEntry(hole, o, tries) {
+        contestPending[hole] = o;
+        contestSay(hole, { cls: '', text: 'Saving…' });
+        let settled = false;
+        const slow = setTimeout(() => { if (!settled) contestSay(hole, { cls: 'err', text: CONTEST_NOT_SAVED, retry: true }); }, CONTEST_SLOW_MS);
+        const done = () => { settled = true; clearTimeout(slow); };
+        return db.ref().update(TournamentContests.entryUpdate(o, firebase.database.ServerValue.TIMESTAMP))
+            .then(() => contestStored(o))
+            .then((ok) => {
+                done();
+                if (contestPending[hole] !== o) return ok;   // a newer save of this hole owns the prompt
+                if (ok) {
+                    delete contestPending[hole];
+                    contestPick[hole] = null;
+                    contestSay(hole, { cls: 'ok', text: `✓ Saved: ${String(o.name).split(' ')[0]} ${TournamentContests.valueText(o)}` });
+                    return true;
+                }
+                if (tries < 1) return sendContestEntry(hole, o, tries + 1);
+                contestSay(hole, { cls: 'err', text: CONTEST_NOT_SAVED, retry: true });
+                return false;
+            })
+            .catch((err) => {
+                done();
+                if (contestPending[hole] !== o) return false;
+                if (err && err.code === 'PERMISSION_DENIED') { delete contestPending[hole]; contestSay(hole, { cls: 'err', text: CONTEST_REFUSED }); return false; }
+                contestSay(hole, { cls: 'err', text: CONTEST_NOT_SAVED, retry: true });
+                return false;
+            });
+    }
+    function retryContestEntry(hole) {
+        const o = contestPending[hole];
+        return o ? sendContestEntry(hole, Object.assign({}, o), 0) : null;
     }
 
     // E2c: THE BOARD. Every contest hole, its leaders, and who has played it.

@@ -99,6 +99,9 @@ test('1. every contest write the web makes holds a distance and a time - never a
         contests: { h7: { kind: 'kp', allowGps: true }, h8: { kind: 'ld', fairwayOnly: true, allowGps: true } } };
     let sb = load('tournament-scorecard.html', `?tourney=CT1&team=4&k=${K}`);
     fire(sb, /^tournaments\/CT1$/, team); fire(sb, /^contestEntries\/CT1$/, {});
+    // 2026-11-20 (KP save read-back): the card reads each saved mark back and resends a missing one, so the
+    // stored marks are seeded here; without them every save is sent twice (re-pinned deliberately).
+    sb.__dbReads = { 'contestEntries/CT1/h7/team4_p0': { inches: 118 }, 'contestEntries/CT1/h8/team4_p1': { yards: 301 } };
     tap(sb, html(sb, 'contest-prompt'), (t) => /data-entry="team4_p0"/.test(t));
     sb.document.getElementById('cp-ft').value = '9'; sb.document.getElementById('cp-in').value = '10';
     tap(sb, html(sb, 'contest-prompt'), (t) => /id="cp-save"/.test(t));
@@ -116,6 +119,7 @@ test('1. every contest write the web makes holds a distance and a time - never a
         scores: { pat_h1: 4, pat_h2: 4, pat_h3: 3, pat_h4: 5, pat_h5: 4, pat_h6: 4 }, contests: { h7: { kind: 'kp', allowGps: true } } };
     sb = load('tournament-scorecard.html', `?tourney=CT2&group=g1&k=${K}`);
     fire(sb, /^tournaments\/CT2$/, ind); fire(sb, /^contestEntries\/CT2$/, {});
+    sb.__dbReads = { 'contestEntries/CT2/h7/pat': { inches: 7 } };
     sb.document.getElementById('cp-ft').value = '0'; sb.document.getElementById('cp-in').value = '7';
     tap(sb, html(sb, 'contest-prompt'), (t) => /id="cp-save"/.test(t));
     await settle();
