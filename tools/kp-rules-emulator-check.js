@@ -22,6 +22,11 @@
 //      is refused (the hole pattern reads 'r').
 //
 //   node tools/kp-rules-emulator-check.js [--write-proposal <file>]    exit 0 = every expectation met
+//   node tools/kp-rules-emulator-check.js --published <rules.json>
+//       AFTER A PUBLISH (2.1.0, 2026-11-20): the same writes against the given rules file (a read-back of the
+//       live rules), each expected to answer as the PROPOSAL did; then THE APP'S OWN WRITERS
+//       (TournamentContests.winnerUpdate / clearWinnerUpdate, the payloads the Contests tab sends) on an event
+//       with prizeSettings/kps per flight, and one with shared ties. Emulator only; nothing is written live.
 // ============================================================================
 'use strict';
 const fs = require('fs');
@@ -128,7 +133,97 @@ async function run(rulesFile, label) {
     return out;
 }
 
+// THE APP'S WRITERS against a rules file. The payloads come from tournament-contests.js, not from this file.
+async function runApp(rulesFile) {
+    const TC = require('../tournament-contests.js');
+    const emu = new Emulator(9000 + Math.floor(Math.random() * 400), NS);
+    await emu.start(rulesFile);
+    const as = (who) => async (p, method, body) => {
+        const r = await fetch(emu.base + '/' + p + '.json?ns=' + NS + '&auth=' + token(who.uid, who.email), { method, body: body === undefined ? undefined : JSON.stringify(body) });
+        return r.status === 200 ? 'ok' : 'DENIED';
+    };
+    const owner = as(OWNER), golfer = as({ uid: 'anon-1' });
+    const getJson = async (p) => (await fetch(emu.base + '/' + p + '.json?ns=' + NS + '&auth=' + token(OWNER.uid, OWNER.email))).json();
+    const mark = (name, inches) => ({ name, team: 'g1', kind: 'kp', inches, by: 'typed', at: { '.sv': 'timestamp' } });
+    const TS = { '.sv': 'timestamp' };
+    const out = {};
+    const pick = async (key) => {
+        const data = await getJson('tournaments/' + CODE);
+        const entries = (await getJson('contestEntries/' + CODE + '/h7')) || {};
+        return TC.winnerUpdate(data, TC.contestFor(data, 7), entries, key, TS);
+    };
+    // PER FLIGHT: Ana (A) 30 in, Ben (B) 20 in, Cy (B) 60 in. Make winner Ben: B Flight is locked, A is not.
+    await emu.admin('tournaments/' + CODE, 'PUT', Object.assign(seed(), { prizeSettings: { kps: { perFlight: true } } }));
+    await emu.admin('contestEntries/' + CODE, 'DELETE');
+    await golfer(`contestEntries/${CODE}/h7/pa`, 'PUT', mark('Ana', 30));
+    await golfer(`contestEntries/${CODE}/h7/pb`, 'PUT', mark('Ben', 20));
+    const uB = await pick('pb');
+    out['app per flight: payload is winners/pb + locks/fB'] = (uB['winners/pb'] === true && 'locks/fB' in uB && !('winner' in uB && uB.winner)) ? 'ok' : 'WRONG ' + JSON.stringify(uB);
+    out['app per flight: owner sends Make winner Ben (B Flight)'] = await owner(`tournaments/${CODE}/contests/h7`, 'PATCH', uB);
+    out['app per flight: a B Flight golfer enters after B is won'] = await golfer(`contestEntries/${CODE}/h7/pc`, 'PUT', mark('Cy', 10));
+    out['app per flight: an A Flight golfer still enters'] = await golfer(`contestEntries/${CODE}/h7/pa`, 'PUT', mark('Ana', 25));
+    const uA = await pick('pa');
+    out['app per flight: owner sends Make winner Ana (A Flight), B stays won'] = await owner(`tournaments/${CODE}/contests/h7`, 'PATCH', uA);
+    const h7 = (await getJson('tournaments/' + CODE + '/contests/h7')) || {};
+    out['app per flight: two winners stored, one per flight'] = (h7.winners && h7.winners.pa === true && h7.winners.pb === true && h7.locks && h7.locks.fA && h7.locks.fB) ? 'ok' : 'WRONG ' + JSON.stringify(h7);
+    const dataNow = await getJson('tournaments/' + CODE);
+    out['app per flight: owner clears B Flight'] = await owner(`tournaments/${CODE}/contests/h7`, 'PATCH', TC.clearWinnerUpdate(dataNow, TC.contestFor(dataNow, 7), 'fB'));
+    out['app per flight: a B Flight golfer enters again after the clear'] = await golfer(`contestEntries/${CODE}/h7/pc`, 'PUT', mark('Cy', 10));
+    // SHARED TIES: Ana and Ben both 40 in, one field. Make winner Ana shares with Ben, locks/all.
+    await emu.admin('tournaments/' + CODE, 'PUT', Object.assign(seed(), { prizeSettings: { kps: { ties: 'share' } } }));
+    await emu.admin('contestEntries/' + CODE, 'DELETE');
+    await golfer(`contestEntries/${CODE}/h7/pa`, 'PUT', mark('Ana', 40));
+    await golfer(`contestEntries/${CODE}/h7/pb`, 'PUT', mark('Ben', 40));
+    const uT = await pick('pa');
+    out['app shared tie: payload is winners pa + pb + locks/all'] = (uT['winners/pa'] === true && uT['winners/pb'] === true && 'locks/all' in uT) ? 'ok' : 'WRONG ' + JSON.stringify(uT);
+    out['app shared tie: owner sends Make winner (tie shared)'] = await owner(`tournaments/${CODE}/contests/h7`, 'PATCH', uT);
+    out['app shared tie: a golfer enters after the tie is won'] = await golfer(`contestEntries/${CODE}/h7/pc`, 'PUT', mark('Cy', 5));
+    // THE OLD WAY still works: no settings, one winner + lockedAt.
+    await emu.admin('tournaments/' + CODE, 'PUT', seed());
+    await emu.admin('contestEntries/' + CODE, 'DELETE');
+    await golfer(`contestEntries/${CODE}/h7/pa`, 'PUT', mark('Ana', 30));
+    const uL = await pick('pa');
+    out['app default: payload is winner + lockedAt'] = (uL.winner === 'pa' && 'lockedAt' in uL) ? 'ok' : 'WRONG ' + JSON.stringify(uL);
+    out['app default: owner sends Make winner'] = await owner(`tournaments/${CODE}/contests/h7`, 'PATCH', uL);
+    out['app default: a golfer enters after it is won'] = await golfer(`contestEntries/${CODE}/h7/pb`, 'PUT', mark('Ben', 5));
+    await emu.stop();
+    return out;
+}
+
 (async () => {
+    const pi = process.argv.indexOf('--published');
+    if (pi > -1) {
+        const file = process.argv[pi + 1];
+        const a = await run(file, 'PUBLISHED RULES (' + file.split('/').slice(-2).join('/') + ')');
+        const want = {
+            'golfer enters (nothing locked)': 'ok', 'owner: old winner + lockedAt': 'ok', 'golfer enters after lockedAt': 'DENIED',
+            'owner: B Flight winner (winners/pb + locks/fB)': 'ok', 'B Flight golfer enters after B is locked': 'DENIED',
+            'A Flight golfer edits after B is locked': 'ok', 'owner: a winner with no entry': 'DENIED',
+            'owner: a lock for a flight that does not exist': 'DENIED', 'owner: shared tie (winners pa + pb, locks/all)': 'ok',
+            'golfer enters after locks/all': 'DENIED', 'a golfer cannot write winners': 'DENIED', 'owner clears (nulls)': 'ok',
+            'round: owner marks hole 7 on Cascade': 'ok', 'round: golfer enters with the round key': 'ok',
+            'round: golfer enters with a wrong key': 'DENIED', 'round: owner names a winner with no entry': 'DENIED',
+            'round: owner confirms Ana': 'ok', 'round: golfer enters after the round hole is locked': 'DENIED',
+        };
+        const b = await runApp(file);
+        const wantApp = {
+            'app per flight: payload is winners/pb + locks/fB': 'ok', 'app per flight: owner sends Make winner Ben (B Flight)': 'ok',
+            'app per flight: a B Flight golfer enters after B is won': 'DENIED', 'app per flight: an A Flight golfer still enters': 'ok',
+            'app per flight: owner sends Make winner Ana (A Flight), B stays won': 'ok', 'app per flight: two winners stored, one per flight': 'ok',
+            'app per flight: owner clears B Flight': 'ok', 'app per flight: a B Flight golfer enters again after the clear': 'ok',
+            'app shared tie: payload is winners pa + pb + locks/all': 'ok', 'app shared tie: owner sends Make winner (tie shared)': 'ok',
+            'app shared tie: a golfer enters after the tie is won': 'DENIED',
+            'app default: payload is winner + lockedAt': 'ok', 'app default: owner sends Make winner': 'ok', 'app default: a golfer enters after it is won': 'DENIED',
+        };
+        let bad = 0;
+        console.log('\nEXPECTED (as the proposal answered):');
+        Object.keys(want).forEach((k) => { const ok = a[k] === want[k]; if (!ok) bad++; console.log('  ' + (ok ? 'PASS ' : 'FAIL ') + k + '  got ' + a[k] + ' (want ' + want[k] + ')'); });
+        console.log('\nTHE APP\'S OWN WRITERS:');
+        Object.keys(wantApp).forEach((k) => { const ok = b[k] === wantApp[k]; if (!ok) bad++; console.log('  ' + (ok ? 'PASS ' : 'FAIL ') + k + '  got ' + b[k] + ' (want ' + wantApp[k] + ')'); });
+        const n = Object.keys(want).length + Object.keys(wantApp).length;
+        console.log('\n' + (n - bad) + ' / ' + n + ' as expected');
+        process.exit(bad ? 1 : 0);
+    }
     const live = JSON.parse(fs.readFileSync(LIVE, 'utf8'));
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kp-rules-'));
     const liveFile = path.join(tmp, 'live.json'), propFile = path.join(tmp, 'proposal.json');
