@@ -161,17 +161,19 @@ describe('2. where they sit', () => {
         assert.match(fold, /up to <span data-price="compare-save">\$[0-9.]+<\/span> a year less/);
         assert.match(fold, /Popular golf GPS apps charge up to <span data-price="compare-others">\$[0-9.]+\/yr<\/span>/);
     });
-    test('the block is the first section after the fold and before How you\'ll use it', () => {
+    // Re-pinned 2026-11-19 homepage A (Manny's pick, mockup tournaments/site-sharpen/home-a): the comparison block moved, unchanged,
+    // from the first section after the fold (and the band) to after the five feature rows, before the golfer/organizer panels and
+    // Pricing. The price band in the fold is untouched (the test above). home_layout_a_test.js holds the whole page order.
+    test('the block follows the feature rows and comes before the panels and Pricing; no other section between', () => {
         const top = at('<section class="wrap hero fold" id="top">');
-        const topEnd = html.indexOf('</section>', top);
+        const feat = at('<section class="feat" id="features">');
         const cmp = at('<section class="wrap cmp" id="compare" aria-labelledby="cmp-h">');
-        const how = at('<section class="how" id="how"');
-        assert.ok(topEnd < cmp && cmp < how, 'order: fold ' + topEnd + ', compare ' + cmp + ', how ' + how);
-        // Re-pinned 2026-11-18 (Manny's typed OK "OK deploy showcase H1 + B"): the band "See how our tournaments work"
-        // now sits right under the hero, by his pick; the comparison block is the first section after THAT, and nothing else is between.
-        const between = html.slice(topEnd, cmp).replace(/<section class="seeband" id="see-it"[\s\S]*?<\/section>/, '');
-        assert.equal((html.slice(topEnd, cmp).match(/<section/g) || []).length, 1, 'exactly the one band between the fold and the block');
-        assert.doesNotMatch(between, /<section/, 'another section sits between the fold and the block');
+        const split = at('<section class="wrap split">');
+        const pricing = at('<section class="sec" id="pricing">');
+        assert.ok(top < feat && feat < cmp && cmp < split && split < pricing, 'order: fold ' + top + ', features ' + feat + ', compare ' + cmp + ', panels ' + split + ', pricing ' + pricing);
+        const between = html.slice(html.indexOf('<div class="fv" id="fv"'), cmp);
+        assert.ok(between.includes('<div class="vx" hidden>'), 'positive: the viewer and its viewer-only items sit between');
+        assert.doesNotMatch(between, /<section/, 'another section sits between the feature rows and the block');
         assert.match(html, /<h2 id="cmp-h">Everything your group needs, in one app<\/h2>/);
     });
     test('nine feature rows + the price row; HardPan says Included or Free forever on every one', () => {

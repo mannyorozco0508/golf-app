@@ -506,7 +506,7 @@ describe('S. the pieces every arrival relies on', () => {
         assert.match(sync, /'scan-grid\.js'/, 'scan-grid.js is in the tournament shell');
         const sw = fs.readFileSync(path.join(REPO_ROOT, 'sw.js'), 'utf8');
         assert.match(sw, /'\.\/scan-grid\.js'/, 'and precached');
-        assert.match(sw, /const CACHE_VERSION = 'golfapp-v425-2\.0';/, 'the cache moved: both pages are shell files');
+        assert.match(sw, /const CACHE_VERSION = 'golfapp-v427-2\.0';/, 'the cache moved: both pages are shell files');
     });
     test('S2 no money, no cash, no competitor words on either side of the turn-in; under par red only (the ring classes come from one place)', () => {
         const SG = require(path.join(REPO_ROOT, 'scan-grid.js'));
