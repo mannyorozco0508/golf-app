@@ -147,6 +147,27 @@
         .lobby-logo { font-size: 3rem; text-align: center; margin-bottom: 4px; }
         .lobby-title { font-size: 1.7rem; color: var(--brand-navy); text-align: center; margin-bottom: 10px; font-weight: bold; }
         .lobby-sub { color: var(--text-muted); font-size: 0.9rem; text-align: center; margin-bottom: 20px; line-height: 1.4; }
+        /* SIGN-UP C: the event page (brand line, facts, spots, the "You're in" panel) and the Desk's tiles. */
+        .ev-brand { font-size: 0.72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); font-weight: bold; text-align: center; margin: 0 0 4px 0; }
+        .ev-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 0.9rem; margin: 0 0 14px 0; }
+        .ev-facts dt { color: var(--text-muted); }
+        .ev-facts dd { margin: 0; font-weight: 600; color: var(--text-main); min-width: 0; overflow-wrap: anywhere; }
+        .ev-spots { margin: 0 0 14px 0; }
+        .ev-spots-t { font-size: 0.88rem; color: var(--text-main); margin: 0 0 4px 0; }
+        .ev-bar { height: 8px; border-radius: 99px; background: var(--nav-bg); overflow: hidden; }
+        .ev-bar i { display: block; height: 100%; width: 0; background: var(--brand-green); }
+        .ev-done { margin: 0 0 14px 0; }
+        .ev-hello { background: var(--brand-green); color: #ffffff; border-radius: 14px; padding: 14px; margin: 0 0 10px 0; font-size: 0.9rem; }
+        .ev-hello b { display: block; font-size: 1.4rem; line-height: 1.15; margin-bottom: 2px; }
+        .ev-done-s { font-size: 0.9rem; color: var(--text-main); margin: 0 0 10px 0; }
+        .ev-done .btn-outline { display: block; text-align: center; text-decoration: none; box-sizing: border-box; }
+        .sd-head { font-size: 0.9rem; font-weight: bold; margin: 0 0 6px 0; }
+        .sd-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0 0 8px 0; text-align: center; font-size: 0.74rem; color: var(--text-muted); }
+        .sd-tiles div { border: 1px solid var(--border-light); border-radius: 10px; padding: 6px 2px; }
+        .sd-tiles b { display: block; font-size: 1.3rem; color: var(--text-main); line-height: 1.1; }
+        .reg-state-online { background: #eef6d4; color: #3d4f00; border: 1px solid #b9d36a; }
+        .reg-state-wait { background: #fff8e1; color: #7a5200; border: 1px solid #e6c200; }
+        .reg-grp { font-size: 0.72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); font-weight: bold; margin: 12px 0 2px 0; }
         /* The signup status line (Wave 2b): green for a confirmation, red and
            PERSISTENT for a failure the golfer did not cause - a sentence they can
            read twice and act on, never a modal that vanishes on one tap. */
@@ -1251,10 +1272,22 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
 </div>
 
 <div class="container" id="register-screen" style="display:none;">
-    <div class="lobby-logo">📋</div>
+    <!-- SIGN-UP C, "Event page with sign-up" (Manny's pick 2026-11-21): the
+         ?register=CODE page is the event's own page. The facts come from the
+         PUBLIC tournaments/<code> record and nothing else (no host name: the
+         record has none). The spots line is drawn only when the page could
+         COUNT - signupSeats/<code> readable AND a field size on the event; under
+         rules that refuse that read it stays hidden and nothing claims a spot.
+         #reg-done replaces the form after an individual sign-up. -->
+    <p class="ev-brand">HardPan Tournaments</p>
     <div class="lobby-title" id="reg-event-name">Sign up</div>
-    <p class="lobby-sub" id="reg-event-sub"></p>
+    <dl class="ev-facts" id="reg-event-sub"></dl>
+    <div class="ev-spots" id="reg-spots" style="display:none;">
+        <p class="ev-spots-t" id="reg-spots-text"></p>
+        <div class="ev-bar"><i id="reg-spots-bar"></i></div>
+    </div>
     <div id="reg-closed" style="display:none; background:var(--nassau-box-bg); border:1px solid var(--border-mid); border-radius:10px; padding:14px; font-size:0.9rem;"></div>
+    <div id="reg-done" class="ev-done" style="display:none;"></div>
     <div id="reg-form">
         <!-- WAVE 2a (2026-09-16): the field schema. fullName, email and phone are
              REQUIRED - by this form and by database.rules.json (registrations/
@@ -1523,6 +1556,22 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             <hr class="section-divider">
             <h3>📋 Registration</h3>
             <div id="registration-link-row"></div>
+            <!-- SIGN-UP C: the sign-up switch and the field size, owner keys under
+                 tournaments/<code>/signup = { open, cap } (the record's owner write;
+                 no rules change). STATIC MARKUP, like the search box: the link row
+                 above is rebuilt on every snapshot and would eat a half-typed size.
+                 renderSignupSettings() fills them and skips the one with focus. -->
+            <div id="signup-settings" style="margin:4px 0 0 0;">
+                <div class="toggle-row" style="justify-content:flex-start;">
+                    <label class="toggle-switch"><input type="checkbox" id="signup-open-switch" onchange="setSignupOpen(this.checked)"><span class="toggle-slider"></span></label>
+                    <label for="signup-open-switch" style="text-transform:none; letter-spacing:normal; margin:0;">Taking sign-ups</label>
+                </div>
+                <div class="form-group" id="signup-cap-wrap" style="margin:10px 0 4px 0;">
+                    <label for="signup-cap">Field size (golfers)</label>
+                    <input type="number" id="signup-cap" min="1" max="999" step="1" inputmode="numeric" placeholder="No limit" onchange="setSignupCap(this.value)">
+                </div>
+                <p class="course-note" id="signup-cap-note" style="margin:0 0 8px 0;">Leave it empty for no limit. When the field is full, golfers can still sign up: they go on a waiting list in sign-up order.</p>
+            </div>
         </div>
 
         <hr class="section-divider">
@@ -1694,6 +1743,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
              the counts line (which is pinned as it is); empty until a golfer is
              in the field. -->
         <div id="checkin-tiles"></div>
+        <!-- SIGN-UP C: golfers in the field, the field size tiles and Close sign-up now. -->
+        <div id="signup-desk-bar"></div>
         <div id="registration-counts"></div>
         <!-- CHECK-IN (CI-FINAL): the table QR. Shown with the Desk's list;
              drawn by renderCheckinCard on each Desk render. -->
@@ -4435,6 +4486,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         syncRegistrationListener();
         syncKeysListener();
         renderLockPanel();
+        syncSignupField();   // SIGN-UP C: a new field size or a golfer removed on Setup can open a spot
         renderRegistrationList();
         renderEntryFeesCard();
         renderEventTools();
@@ -4743,25 +4795,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // the organizer to find out. formatEventDate is the page's own
             // formatter, so the date here and the date in the header are one
             // definition; a fee of 0 or absent prints nothing rather than "$0".
-            if (sub) {
-                const fee = Number(data.entryFee) || 0;
-                sub.textContent = [
-                    formatEventDate(data.eventDate),
-                    data.courseName,
-                    formatLabelFor(data.format),
-                    fee > 0 ? ('$' + (Math.round(fee * 100) % 100 === 0 ? fee.toFixed(0) : fee.toFixed(2)) + ' entry per ' + feePer(data)) : ''
-                ].filter(Boolean).join(' \u2022 ');
-            }
+            // SIGN-UP C: the same facts as a list (When, Where, Format, Entry
+            // fee, Prizes, Benefiting), from eventPageFacts - the record's own keys.
+            if (sub) sub.innerHTML = eventPageFacts(data).map(([k, v]) => `<dt>${escReg(k)}</dt><dd>${escReg(v)}</dd>`).join('');
             // DE-C: an archived event takes no more signups (the public form
             // only; the owner's Desk, refunds included, is not gated here).
+            // SIGN-UP C: and an organizer who switched sign-up off (signup/open false).
             const archived = Number(data.archivedAt) > 0;
-            const taking = !!data.ownerUid && !archived;
+            const switchedOff = !signupOpenOf(data);
+            const taking = !!data.ownerUid && !archived && !switchedOff;
             form.style.display = taking ? 'block' : 'none';
             closed.style.display = taking ? 'none' : 'block';
             if (!taking) {
                 closed.textContent = archived
                     ? 'Signups for this event are closed. The event is over; its results are on the board.'
-                    : 'This event is not taking signups. Signups need an organizer account, and this event does not have one.';
+                    : (data.ownerUid && switchedOff
+                        ? 'Sign-up for this event is closed. The organizer closed it; text them if you hoped to play.'
+                        : 'This event is not taking signups. Signups need an organizer account, and this event does not have one.');
                 return;
             }
             // THE ORGANIZER'S SWITCHES (Wave 2b) decide which optional boxes are
@@ -4774,6 +4824,8 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // the form. Back from Checkout: the result panel replaces it.
             applyRegistrationFees(data);
             applyPayLinks(data);   // VENMO A
+            // SIGN-UP C: count the seats, when there is a field size to count against.
+            readSignupSeats();
             const back = new URLSearchParams(window.location.search);
             const checkout = back.get('checkout');
             const entry = back.get('entry');
@@ -4787,6 +4839,202 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 closed.textContent = 'This event is not taking signups.';
             }
         });
+    }
+
+    // ===== SIGN-UP C, "Event page with sign-up" (Manny's pick 2026-11-21) =====
+    //
+    // ONE LIST, NO APPROVE (individual events). A golfer's sign-up lands on the
+    // organizer's Desk and the organizer's OWN page adds it to the field - the
+    // write Approve made, made by itself (syncSignupField), once per entry.
+    // Team events are unchanged: a sign-up still needs a team, chosen at Approve.
+    //
+    // THE FIELD SIZE AND THE WAITING LIST. tournaments/<code>/signup = { open,
+    // cap }, owner keys (absent = open, no limit). The Desk orders sign-ups by
+    // createdAt, then id: the first (cap - golfers already in the field) go in,
+    // the rest are "Waiting list" in that order. NOTHING IN THE RULES ENFORCES
+    // THE CAP: rules cannot count. A sign-up past the cap is written like any
+    // other; the Desk's ordering is what keeps it out of the field, and the
+    // organizer's "Move into the field" is the only way past it.
+    //
+    // THE PUBLIC COUNT. signupSeats/<code>/<entryId> = the server time of the
+    // sign-up, no name, no email, written in the SAME update as the
+    // registration (rules PROPOSAL, outbox signup-c-rules-PROPOSAL; not on the
+    // live database yet). Until it is published the seat read is refused: the
+    // page then shows no spots line, writes the registration alone, and never
+    // tells a golfer which spot they hold.
+    const SIGNUP_CAP_MAX = 999;
+    function signupCapOf(data) {
+        if (!eventIsIndividual(data)) return 0;   // team events: no field size here (unchanged)
+        const c = Number(data && data.signup && data.signup.cap);
+        return Number.isInteger(c) && c >= 1 && c <= SIGNUP_CAP_MAX ? c : 0;
+    }
+    function signupOpenOf(data) { return !(data && data.signup && data.signup.open === false); }
+    // The public facts, as [label, value] rows. Only keys the record holds.
+    function eventPageFacts(data) {
+        const rows = [];
+        const when = [formatEventDate(data.eventDate), teeTimeText(data)].filter(Boolean).join(' · ');
+        if (when) rows.push(['When', when]);
+        const where = String(data.venue || '').trim() || String(data.courseName || '').trim();
+        if (where) rows.push(['Where', where]);
+        const flights = Object.keys(data.flights || {}).length;
+        const fmt = [formatLabelFor(data.format),
+            eventIsIndividual(data) ? (data.scoringMode === 'net' ? 'Net' : 'Gross') : '',
+            flights > 1 ? flights + ' flights' : ''].filter(Boolean).join(' · ');
+        if (data.format) rows.push(['Format', fmt]);
+        const fee = Number(data.entryFee) || 0;
+        if (fee > 0) rows.push(['Entry fee', '$' + (Math.round(fee * 100) % 100 === 0 ? fee.toFixed(0) : fee.toFixed(2)) + ' per ' + feePer(data)]);
+        // PRIZES: trophies and pro shop credit only (Manny 2026-11-10). Shown only
+        // once the organizer has set places, and only on the credit switch; the
+        // other switch position draws no prize row on this page at all.
+        const places = (function () { const raw = data.payoutSpots; return Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []); })();
+        if (places.length && TournamentPrizes.typeOf(data) === 'credit') {
+            rows.push(['Prizes', places.some((v) => Number(v) > 0) ? 'Pro shop credit' : 'Trophies']);
+        }
+        const beneficiary = String(data.beneficiary || '').trim();
+        if (beneficiary) rows.push(['Benefiting', beneficiary]);
+        return rows;
+    }
+    // The seat list as this page last read it: null = not read yet / refused.
+    let regSeatsLive = null;     // true once a read came back; false when the rules refused it
+    let regSeats = {};
+    function readSignupSeats() {
+        regSeatsLive = null; regSeats = {};
+        renderRegisterSpots();
+        if (!registerCode || !signupCapOf(registerEvent)) return Promise.resolve();
+        const code = registerCode;
+        return db.ref('signupSeats/' + code).once('value').then((snap) => {
+            if (registerCode !== code) return;
+            const v = snap && snap.val ? snap.val() : null;
+            regSeats = (v && typeof v === 'object') ? v : {};
+            regSeatsLive = true;
+            renderRegisterSpots();
+        }, () => {
+            if (registerCode !== code) return;
+            regSeatsLive = false; regSeats = {};
+            renderRegisterSpots();
+        });
+    }
+    // THE PUBLIC ARITHMETIC, the Desk's own order seen from outside: every
+    // golfer in the field holds a spot; a seat whose entry is not yet in the
+    // field (its id is no player's signupId) holds the next one, in (time, id)
+    // order. A signed-up golfer in the field is counted once, as a player.
+    function seatQueue(event, seats) {
+        const players = (event && event.players) || {};
+        const linked = new Set(Object.keys(players).map((pid) => String((players[pid] || {}).signupId || '')).filter(Boolean));
+        const queue = Object.keys(seats || {}).filter((id) => !linked.has(id) && Number(seats[id]) > 0)
+            .sort((a, b) => (Number(seats[a]) - Number(seats[b])) || (a < b ? -1 : (a > b ? 1 : 0)));
+        return { field: Object.keys(players).length, queue: queue };
+    }
+    function signupCount(event, seats) {
+        const cap = signupCapOf(event);
+        const q = seatQueue(event, seats);
+        const taken = q.field + q.queue.length;
+        return { cap: cap, taken: taken, full: cap > 0 && taken >= cap, waiting: Math.max(0, taken - Math.max(cap, q.field)) };
+    }
+    // Only a counted field is full; an uncounted one is "Sign up", never a claim.
+    function registerFieldFull() {
+        return regSeatsLive === true && signupCount(registerEvent, regSeats).full;
+    }
+    function renderRegisterSpots() {
+        const box = document.getElementById('reg-spots');
+        const text = document.getElementById('reg-spots-text');
+        const bar = document.getElementById('reg-spots-bar');
+        const cap = signupCapOf(registerEvent);
+        const counted = regSeatsLive === true && cap > 0;
+        if (box) box.style.display = counted ? 'block' : 'none';
+        const c = counted ? signupCount(registerEvent, regSeats) : null;
+        if (counted && text) {
+            const shown = Math.min(c.taken, cap);
+            text.textContent = c.full
+                ? `${shown} of ${cap} spots taken. The field is full: you can join the waiting list.`
+                : `${shown} of ${cap} spots taken`;
+        }
+        if (bar) bar.style.width = counted ? Math.round(100 * Math.min(c.taken, cap) / cap) + '%' : '0';
+        // THE BUTTON. A full field (counted) is the same sign-up under another name,
+        // and no card payment is asked of a golfer who is not in the field.
+        const full = !!(c && c.full);
+        const submit = document.getElementById('reg-submit');
+        if (submit) submit.textContent = full ? 'Join the waiting list' : 'Sign up';
+        if (full) {
+            ['reg-pay', 'reg-fee-box', 'reg-cash-line'].forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+            if (submit) submit.style.display = '';
+        } else if (registerEvent) {
+            applyRegistrationFees(registerEvent);
+        }
+    }
+    // THE CONFIRMATION (individual events). `place` is a measured spot - the
+    // seat read back after the write - or null when the page could not count.
+    function signupDoneHtml(first, place) {
+        const data = registerEvent || {};
+        const cap = signupCapOf(data);
+        const line = [escReg(data.name || ''), escReg(formatEventDate(data.eventDate))].filter(Boolean).join(' · ');
+        let head, body;
+        if (place && cap && place > cap) {
+            head = `You're on the waiting list, ${escReg(first)}`;
+            body = `You're number ${place - cap} on the waiting list. If a spot opens, the organizer's Desk moves golfers in from the waiting list in sign-up order.`;
+        } else if (place && cap) {
+            head = `You're in, ${escReg(first)}`;
+            body = `You're spot ${place} of ${cap}. Your group and your own link come before the day.`;
+        } else if (cap) {
+            // A field size, and no count this page could make: no spot is claimed.
+            head = `You're signed up, ${escReg(first)}`;
+            body = `You're on the organizer's Desk. It puts you in the field, or on the waiting list if the field is already full; the organizer can tell you which.`;
+        } else {
+            head = `You're in, ${escReg(first)}`;
+            body = `You're on the organizer's list. Your group and your own link come before the day.`;
+        }
+        const tee = teeTimeText(data);
+        const ics = signupIcsHref(data);
+        // GOLFER CODES HOOK: once golfer codes ship (the rules NOTE, outbox
+        // TOURN-20261120-golfer-codes-rules-NOTE.md) the golfer's own code is shown
+        // here. Not today: the code lives in tournamentKeys/<code>/c/<pid>, which
+        // only the owner can read, and the field write that makes the pid happens
+        // on the organizer's page, not this one.
+        return `<div class="ev-hello" id="reg-done-hello"><b>${head}</b>${line}</div>`
+            + `<p class="ev-done-s" id="reg-done-line">${body}</p>`
+            + (tee ? `<dl class="ev-facts"><dt>Start</dt><dd>${escReg(tee)}</dd></dl>` : '')
+            + (ics ? `<a class="btn-outline" id="reg-done-ics" href="${escReg(ics)}" download="${escReg(String(data.name || 'event').replace(/[^A-Za-z0-9 _-]/g, '').trim() || 'event')}.ics">Add to my calendar</a>` : '')
+            + `<button type="button" class="btn-outline" id="reg-done-again" onclick="signupAnother()">Sign up another golfer</button>`;
+    }
+    // ADD TO MY CALENDAR: an .ics as a data: link, built from eventDate (and the
+    // start time when set, as floating local time; 5 hours long). No date, no button.
+    function signupIcsHref(data) {
+        if (!EVENT_DETAIL_KEYS.eventDate.test((data && data.eventDate) || '')) return '';
+        const d = String(data.eventDate).replace(/-/g, '');
+        const esc = (v) => String(v || '').replace(/\\/g, '\\\\').replace(/([,;])/g, '\\$1').replace(/\r?\n/g, ' ');
+        let start, end;
+        if (EVENT_DETAIL_KEYS.startTime.test(data.startTime || '')) {
+            const [h, m] = data.startTime.split(':').map(Number);
+            const pad = (n) => String(n).padStart(2, '0');
+            start = 'DTSTART:' + d + 'T' + pad(h) + pad(m) + '00';
+            end = 'DTEND:' + d + 'T' + pad(Math.min(23, h + 5)) + pad(m) + '00';
+        } else {
+            const y = Number(d.slice(0, 4)), mo = Number(d.slice(4, 6)), da = Number(d.slice(6, 8));
+            const next = new Date(y, mo - 1, da + 1);
+            start = 'DTSTART;VALUE=DATE:' + d;
+            end = 'DTEND;VALUE=DATE:' + next.getFullYear() + String(next.getMonth() + 1).padStart(2, '0') + String(next.getDate()).padStart(2, '0');
+        }
+        const where = String(data.venue || '').trim() || String(data.courseName || '').trim();
+        const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//HardPan Tournaments//EN', 'BEGIN:VEVENT',
+            'UID:' + esc(registerCode || 'event') + '-' + d + '@hardpan', start, end, 'SUMMARY:' + esc(data.name || 'Tournament')]
+            .concat(where ? ['LOCATION:' + esc(where)] : []).concat(['END:VEVENT', 'END:VCALENDAR']);
+        return 'data:text/calendar;charset=utf-8,' + encodeURIComponent(lines.join('\r\n'));
+    }
+    function showSignupDone(first, place) {
+        const done = document.getElementById('reg-done');
+        const form = document.getElementById('reg-form');
+        if (done) { done.innerHTML = signupDoneHtml(first, place); done.style.display = 'block'; }
+        if (form) form.style.display = 'none';
+        setRegistrationStatus('ok', '');
+    }
+    // The same phone, the next golfer (a desk at the club): the form again,
+    // and the count read afresh so the button says what is true now.
+    function signupAnother() {
+        const done = document.getElementById('reg-done');
+        const form = document.getElementById('reg-form');
+        if (done) { done.style.display = 'none'; done.innerHTML = ''; }
+        if (form) form.style.display = 'block';
+        readSignupSeats();
     }
 
     // THE SIGNUP PAYLOAD (Wave 2a). Exactly the keys database.rules.json permits
@@ -4952,7 +5200,25 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (button) button.disabled = false;
             setRegistrationStatus('pending', REG_STILL_SENDING);
         }, REG_SEND_TIMEOUT_MS);
-        db.ref(`registrations/${registerCode}/${entryId}`).set(payload).then(() => {
+        // SIGN-UP C: THE SEAT RIDES WITH THE REGISTRATION, in ONE update, when
+        // the page has a field size to count and the seat list answered a read
+        // (regSeatsLive) - then both carry the SERVER time, so the order the Desk
+        // keeps cannot be bought with a phone's clock. If that update is refused
+        // (rules without signupSeats), the registration goes ALONE, same id,
+        // with the page's own time, and the spots line comes down: a golfer is
+        // never told a place this page could not count. With no field size, or
+        // a seat list the rules refused, it is today's single write.
+        const regPath = `registrations/${registerCode}/${entryId}`;
+        const code = registerCode;
+        const first = String(payload.fullName || '').trim().split(/\s+/)[0] || '';
+        const withSeat = regSeatsLive === true && signupCapOf(registerEvent) > 0;
+        const alone = () => db.ref(`registrations/${registerCode}/${entryId}`).set(payload).then(() => 'alone');
+        const send = withSeat
+            ? db.ref().update({ [regPath]: Object.assign({}, payload, { createdAt: firebase.database.ServerValue.TIMESTAMP }),
+                                [`signupSeats/${code}/${entryId}`]: firebase.database.ServerValue.TIMESTAMP })
+                .then(() => 'seat', () => { regSeatsLive = false; regSeats = {}; renderRegisterSpots(); return alone(); })
+            : alone();
+        send.then((how) => {
             settled = true; clearTimeout(timer);
             if (attempt !== regAttempt && regPendingId !== entryId) return;   // an older tap for an entry already confirmed
             regPendingId = null;
@@ -4964,7 +5230,23 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             const shirt = document.getElementById('reg-shirt'); if (shirt) shirt.value = '';
             const box = document.getElementById('reg-sponsor'); if (box) box.checked = false;
             if (button) button.disabled = false;
-            setRegistrationStatus('ok', 'Thanks \u2014 you are signed up. The organizer will see this and add you to the field.');
+            // A TEAM EVENT IS UNCHANGED: the organizer still places the golfer on a team.
+            if (!eventIsIndividual(registerEvent)) {
+                setRegistrationStatus('ok', 'Thanks \u2014 you are signed up. The organizer will see this and add you to the field.');
+                return;
+            }
+            if (how !== 'seat') { showSignupDone(first, null); return; }
+            // THE PLACE IS MEASURED: the seat list read back after the write, this
+            // entry's position in the Desk's order. Not found, or refused: no place.
+            return db.ref('signupSeats/' + code).once('value').then((snap) => {
+                const v = snap && snap.val ? snap.val() : null;
+                regSeats = (v && typeof v === 'object') ? v : {};
+                regSeatsLive = true;
+                const q = seatQueue(registerEvent, regSeats);
+                const at = q.queue.indexOf(entryId);
+                renderRegisterSpots();
+                showSignupDone(first, at === -1 ? null : q.field + at + 1);
+            }, () => showSignupDone(first, null));
         }).catch((err) => {
             settled = true; clearTimeout(timer);
             if (button) button.disabled = false;
@@ -4990,6 +5272,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             if (currentCode !== code) return;
             registrationData = snap.val() || {};
             registrationLoadedFor = code;   // CHECK-IN: the index syncs only from a list that has arrived
+            syncSignupField();               // SIGN-UP C: the field follows the list (individual events)
             renderRegistrationList();
             renderEventHome();
             renderPrizePayoutCard(canManage());   // VENMO A: the winners' handles come from this list
@@ -7708,6 +7991,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     // until a real event says which are needed (HANDOFF, "Wave 2c").
     function renderRegistrationList() {
         renderRegistrationSetupRow();
+        renderSignupSettings();
         renderRegistrationDesk();
         renderEventDayPanel();
     }
@@ -7727,7 +8011,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (linkBox) {
             const eventName = escReg((currentData && currentData.name) || 'Event');
             linkBox.innerHTML =
-                `<p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">Golfers open this link to sign up. The Desk tab is where you tick Paid and approve them into the field.</p>`
+                `<p style="font-size:0.8rem; color:var(--text-muted); margin-top:-8px;">${recordIsIndividual()
+                    ? 'Golfers open this link to sign up. They go straight onto the Desk and into the field; the Desk tab is where you tick Paid.'
+                    : 'Golfers open this link to sign up. The Desk tab is where you tick Paid and approve them into the field.'}</p>`
                 + registrationFieldsHtml()
                 + `<div class="link-text-box" id="registration-link-text">${escReg(url)}</div>`
                 + `<button class="btn-outline" data-share-name="${eventName}" data-share-kind="register" onclick="openShareModal(registrationSignupUrl(), this.dataset.shareName, this.dataset.shareKind)">📤 Share signup link</button>`;
@@ -7878,6 +8164,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         renderDeskPhotos(photosOnDesk);
         renderCheckinCard();
         syncCheckinIndex();
+        renderSignupDeskBar();   // SIGN-UP C
         // The tiles are drawn below only when someone is in the field.
         const tilesEl = document.getElementById('checkin-tiles');
         if (tilesEl) tilesEl.innerHTML = '';
@@ -7894,16 +8181,41 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             return;
         }
         const feesOn = deskFeesOn();
-        if (note) note.textContent = (feesOn
-            ? 'Card payments mark themselves Paid. Mark cash paid when you have the cash, then approve golfers into the field.'
-            : (payMethodsOn(currentData) ? 'Tap Venmo, PayPal or Cash beside a golfer when the money lands, then approve golfers into the field.' : 'Tick Paid when you have the cash, then approve golfers into the field.'))
+        const individual = recordIsIndividual();
+        // SIGN-UP C: on an individual event nobody is approved - a sign-up is in
+        // the field (or on the waiting list) by itself - so the note drops that clause.
+        if (note) note.textContent = (individual
+            ? (feesOn
+                ? 'Card payments mark themselves Paid. Mark cash paid when you have the cash.'
+                : (payMethodsOn(currentData) ? 'Tap Venmo, PayPal or Cash beside a golfer when the money lands.' : 'Tick Paid when you have the cash.'))
+              + (signupCapOf(currentData) ? ` Golfers who sign up go straight into the field, up to ${signupCapOf(currentData)}; the rest wait in sign-up order.` : ' Golfers who sign up go straight into the field.')
+            : (feesOn
+                ? 'Card payments mark themselves Paid. Mark cash paid when you have the cash, then approve golfers into the field.'
+                : (payMethodsOn(currentData) ? 'Tap Venmo, PayPal or Cash beside a golfer when the money lands, then approve golfers into the field.' : 'Tick Paid when you have the cash, then approve golfers into the field.')))
             + (payMethodsOn(currentData) ? ' HardPan never holds or moves money; these buttons open Venmo or PayPal.' : '');
-        const all = Object.keys(registrationData || {}).map((id) => [id, registrationData[id] || {}])
+        const all = Object.keys(registrationData || {}).filter((id) => !signupRemoved[id]).map((id) => [id, registrationData[id] || {}])
             .sort((a, b) => (a[1].createdAt || 0) - (b[1].createdAt || 0));
+        // SIGN-UP C, ONE LIST: on an individual event the Desk also lists the
+        // golfers in the field who did not sign up online (added on Setup), after
+        // the sign-ups, under the All chip - the field, not only the sign-ups.
+        const linkedPids = new Set(all.map(([id, e]) => String(e.playerId || signupAdded[id] || '')).filter(Boolean));
+        const fieldOnlyRows = (q) => {
+            if (!individual) return '';
+            const players = currentData.players || {};
+            const flights = currentData.flights || {};
+            return Object.keys(players).filter((pid) => !linkedPids.has(pid) && String((players[pid] || {}).name || '').trim())
+                .filter((pid) => !q || String(players[pid].name).toLowerCase().indexOf(q) !== -1)
+                .sort((a, b) => (players[a].addedAt || 0) - (players[b].addedAt || 0))
+                .map((pid) => {
+                    const p = players[pid];
+                    const meta = [p.handicap !== undefined && !handicapIsPending(p) ? 'Hcp ' + p.handicap : '', (flights[p.flightId] && flights[p.flightId].name) || '', 'Added on Setup'].filter(Boolean).map(escReg).join(' · ');
+                    return `<div class="reg-row reg-row-field" data-player-id="${escReg(pid)}"><span class="reg-name">${escReg(p.name)}</span><span class="reg-state reg-state-field">In the field</span><span class="reg-meta">${meta}</span></div>`;
+                }).join('');
+        };
         if (all.length === 0) {
             if (countsEl) countsEl.innerHTML = '';
             if (chipsEl) chipsEl.innerHTML = photosChipHtml();
-            list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No signups yet.</p>`;
+            list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No signups yet.</p>` + fieldOnlyRows('');
             return;
         }
         showExport(true);
@@ -7911,7 +8223,13 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         const anyInField = entriesOnly.some(regInField);
         if (tilesEl) tilesEl.innerHTML = (CHECKIN_LIVE && anyInField) ? checkinTilesHtml(entriesOnly) : '';
         if (countsEl) countsEl.innerHTML = (feesOn ? payTilesHtml(entriesOnly) : (payMethodsOn(currentData) ? payInTileHtml(entriesOnly) : '')) + registrationCountsHtml(registrationCounts(entriesOnly));
-        const filters = deskFilters();
+        // SIGN-UP C: an individual event's two state chips name what is true there.
+        const plan = individual ? signupPlan() : { wait: [], add: [] };
+        const waitSet = new Set(plan.wait);
+        const filters = deskFilters().map((f) => !individual ? f
+            : (f.key === 'approved' ? Object.assign({}, f, { label: 'In the field', test: (e) => signupInField(e.__id, e) })
+            : (f.key === 'pending' ? Object.assign({}, f, { label: 'Waiting list', test: (e) => waitSet.has(e.__id) }) : f)));
+        all.forEach(([id, e]) => { Object.defineProperty(e, '__id', { value: id, enumerable: false, configurable: true }); });
         if (!photosOnDesk && !filters.some((f) => f.key === registrationFilter)) registrationFilter = 'all';
         if (chipsEl) chipsEl.innerHTML = filters.filter((f) => (!f.teamOnly || !recordIsIndividual()) && (!f.fieldOnly || (CHECKIN_LIVE && anyInField))).map((f) => {
             const n = entriesOnly.filter(f.test).length;
@@ -7925,14 +8243,21 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             || String(e.email || '').toLowerCase().indexOf(q) !== -1));
         // The Arrived chip lists the latest arrival first (who just walked in).
         if (filter.key === 'arrived') shown.sort((a, b) => regArrivedAt(b[1]) - regArrivedAt(a[1]));
-        if (shown.length === 0) {
+        // SIGN-UP C: the waiting list last, in its own order, under its own heading.
+        if (individual && plan.wait.length) {
+            const rest = shown.filter(([id]) => !waitSet.has(id));
+            const wl = plan.wait.map((id) => shown.find(([x]) => x === id)).filter(Boolean);
+            shown.length = 0; rest.concat(wl).forEach((x) => shown.push(x));
+        }
+        const extraRows = filter.key === 'all' ? fieldOnlyRows(q) : '';
+        if (shown.length === 0 && !extraRows) {
             list.innerHTML = `<p style="font-size:0.78rem; color:var(--text-muted);">No one matches.</p>`;
             return;
         }
         const dup = registrationDuplicates(all);
         const teams = currentData.teams || {};
         const teamOpts = Object.keys(teams).sort((a, b) => (teams[a].num || 0) - (teams[b].num || 0));
-        const individual = recordIsIndividual();
+        let waitHeadDone = false;
         list.innerHTML = shown.map(([id, e]) => {
             const inField = regInField(e);
             const pref = String(e.teamPreference || '').trim();
@@ -7970,16 +8295,29 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
             // VENMO A: with a handle on the event the tick names the method (Venmo / PayPal / Cash) instead of the checkbox.
             const payControl = (moneyRow || payMethodsOn(currentData)) ? payControlHtml(id, e)
                 : `<label><input type="checkbox" onchange="setRegistrationPaid('${escReg(id)}', this.checked)"${paid}> Paid</label>`;
-            const approve = inField
+            // SIGN-UP C: an individual event has no Approve. A sign-up reads
+            // "Signed up online" and then In the field, Adding to the field (the
+            // write in flight), or its place on the waiting list with Move into
+            // the field; a refused add offers the same tap.
+            const waitAt = individual ? plan.wait.indexOf(id) : -1;
+            const online = `<span class="reg-state reg-state-online">Signed up online</span>`;
+            const moveBtn = (label) => `<button class="btn-outline reg-move" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="moveSignupIntoField('${escReg(id)}')">${label}</button>`;
+            const approve = individual
+                ? (online + (signupInField(id, e) && !signupAddFailed[id]
+                    ? (inField ? `<span class="reg-state reg-state-field">In the field</span>` : `<span class="reg-state reg-state-field">Adding to the field</span>`)
+                    : (waitAt !== -1 ? `<span class="reg-state reg-state-wait">Waiting list · ${waitAt + 1}</span>` + moveBtn('Move into the field')
+                        : (signupAddFailed[id] ? `<span class="reg-state reg-state-needs">Not added yet</span>` + moveBtn('Add to the field') : `<span class="reg-state reg-state-field">Adding to the field</span>`))))
+                : (inField
                 ? `<span class="reg-state reg-state-field">In the field</span>${regTeam(e) ? `<span class="reg-state reg-state-team">${escReg(regTeam(e).name || ('Team ' + regTeam(e).num))}</span>` : ''}${regNeedsTeam(e) ? `<span class="reg-state reg-state-needs">Needs a team</span>` : ''}`
-                : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`;
+                : `<button class="btn-outline" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="approveRegistration('${escReg(id)}')">Approve into field</button>`);
+            const waitHead = (waitAt !== -1 && !waitHeadDone) ? (waitHeadDone = true, `<p class="reg-grp" id="desk-wait-head">Waiting list · ${plan.wait.length}</p>`) : '';
             // CORRECT AND REMOVE (2026-10-06). Small and last, after the
             // controls that run the event: an organizer taps Paid and Approve
             // all day and the destructive one must not sit under the thumb that
             // is doing it. Remove asks by name before it writes.
             const fix = `<button class="btn-outline reg-fix" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="editRegistration('${escReg(id)}')">Correct</button>`
                 + `<button class="btn-outline reg-remove" style="width:auto; padding:6px 10px; font-size:0.78rem; margin:0;" onclick="removeRegistration('${escReg(id)}')">Remove</button>`;
-            return `<div class="reg-row" data-entry-id="${escReg(id)}">`
+            return (waitHead ? extraRows + waitHead : '') + `<div class="reg-row" data-entry-id="${escReg(id)}">`
                 + `<span class="reg-name">${escReg(e.fullName || e.name || '')}</span>`
                 + payBadge
                 + payControl
@@ -7989,7 +8327,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 + fix
                 + (meta || dupMark ? `<span class="reg-meta">${meta}${meta && dupMark ? ' · ' : ''}${dupMark}</span>` : '')
                 + `</div>`;
-        }).join('');
+        }).join('') + (waitHeadDone ? '' : extraRows);
     }
 
     // ===== REMOVE, CORRECT, EXPORT (2026-10-06) ==============================
@@ -8011,6 +8349,9 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
         if (!currentCode || !canManage()) return;
         const entry = (registrationData || {})[entryId];
         if (!entry) return;
+        // SIGN-UP C: on an individual event the Desk IS the field, so Remove takes
+        // the golfer out of it too. Team events keep the question below.
+        if (recordIsIndividual()) { removeSignupFromField(entryId); return; }
         const who = String(entry.fullName || entry.name || 'this golfer').trim();
         const inField = regInField(entry);
         // WHAT IS LOST, IN THE QUESTION. An approved golfer is already in the
@@ -8174,6 +8515,168 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
     const approvesInFlight = {};
     const reservedTeamNums = {};
 
+    // ===== SIGN-UP C ON THE DESK: straight into the field (individual events) =====
+    // The write is Approve's (player record + approvedAt + playerId, one update),
+    // made by the organizer's page itself for every sign-up the order puts in
+    // the field. NEVER TWICE: an entry is added at most once per page load
+    // (signupAdded, kept after success, so a snapshot that has not caught up
+    // cannot add it again), never once it carries approvedAt/playerId, never
+    // after a refusal until the organizer taps (signupAddFailed), never for a
+    // removed entry (signupRemoved, so a stale snapshot cannot bring it back),
+    // never for a waitlisted one. The player id is derived from the entry id
+    // ("pe" + its tail) when that is a plain id nobody holds, so two of the
+    // owner's devices open at once write the SAME golfer, not two.
+    const signupAdded = {};      // entryId -> pid this page wrote
+    const signupAddFailed = {};  // entryId -> true after a refused add
+    const signupRemoved = {};    // entryId -> true once the organizer removed it
+    function signupHandicapOf(entry) {
+        // A GHIN number is not a handicap; only a number that reads as one is carried.
+        const raw = String((entry && (entry.ghinOrHandicap || entry.handicap)) || '').trim();
+        return /^\+?\d{1,2}(\.\d+)?$/.test(raw) ? raw : '0';
+    }
+    function signupPlayerId(entryId) {
+        const m = /^e([a-z0-9]{6,40})$/.exec(String(entryId || ''));
+        const players = (currentData && currentData.players) || {};
+        if (m) {
+            const pid = 'pe' + m[1];
+            if (!players[pid] || String(players[pid].signupId || '') === entryId) return pid;
+        }
+        return newPlayerId();
+    }
+    function signupInField(id, e) { return regInField(e) || !!signupAdded[id]; }
+    // THE ORDER (the comment at signupCapOf): every live entry by (createdAt, id).
+    // add = in the field by the order and not there yet; wait = the waiting list.
+    function signupPlan() {
+        const data = currentData || {};
+        const cap = signupCapOf(data);
+        const field = new Set(Object.keys(data.players || {}));
+        Object.keys(signupAdded).forEach((id) => { if (!signupRemoved[id]) field.add(signupAdded[id]); });
+        let slots = cap ? Math.max(0, cap - field.size) : Infinity;
+        const add = [], wait = [];
+        Object.keys(registrationData || {}).map((id) => [id, registrationData[id] || {}])
+            .sort((a, b) => ((Number(a[1].createdAt) || 0) - (Number(b[1].createdAt) || 0)) || (a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0)))
+            .forEach(([id, e]) => {
+                if (signupRemoved[id] || signupInField(id, e)) return;
+                if (slots > 0) { add.push(id); slots--; } else wait.push(id);
+            });
+        return { cap: cap, field: field.size, add: add, wait: wait };
+    }
+    function signupAutoOn() {
+        return !!(registrationAllowed() && recordIsIndividual() && registrationLoadedFor === currentCode);
+    }
+    function syncSignupField() {
+        if (!signupAutoOn()) return;
+        signupPlan().add.forEach((id) => { if (!signupAddFailed[id]) addSignupToField(id); });
+    }
+    function addSignupToField(entryId) {
+        if (!currentCode || !canManage() || !recordIsIndividual()) return;
+        const entry = (registrationData || {})[entryId];
+        if (!entry || signupRemoved[entryId] || signupInField(entryId, entry)) return;
+        const name = String(entry.fullName || entry.name || '').trim();
+        if (!name) return;
+        const pid = signupPlayerId(entryId);
+        signupAdded[entryId] = pid;
+        delete signupAddFailed[entryId];
+        const regBase = `registrations/${currentCode}/${entryId}`;
+        db.ref().update({
+            [`tournaments/${currentCode}/players/${pid}`]: { id: pid, name: name, handicap: signupHandicapOf(entry), addedAt: Date.now(), signupId: entryId },
+            [`${regBase}/approvedAt`]: Date.now(),
+            [`${regBase}/playerId`]: pid
+        }).catch(() => {
+            delete signupAdded[entryId];
+            signupAddFailed[entryId] = true;
+            renderRegistrationDesk();
+        });
+    }
+    // The organizer's tap on a waiting-list row (or on a refused add): the same
+    // write, past the field size if that is what they chose.
+    function moveSignupIntoField(entryId) {
+        if (!currentCode || !canManage()) return;
+        delete signupAddFailed[entryId];
+        addSignupToField(entryId);
+        renderRegistrationDesk();
+    }
+    // REMOVE ON AN INDIVIDUAL EVENT TAKES THE GOLFER OUT: the sign-up and the
+    // player record in ONE update. Not a golfer in a scoring group (Setup's own
+    // rule: out of the group first) and not one with scores (Withdraw keeps the
+    // record) - the question names why, and nothing is written. The public seat
+    // goes after, by itself; under rules with no signupSeats that delete is
+    // refused and there was no seat to delete.
+    function removeSignupFromField(entryId) {
+        const entry = (registrationData || {})[entryId];
+        if (!entry) return;
+        const who = String(entry.fullName || entry.name || 'this golfer').trim();
+        const pid = String(entry.playerId || signupAdded[entryId] || '');
+        const players = (currentData && currentData.players) || {};
+        const inField = !!(pid && players[pid]);
+        if (inField) {
+            const groups = recordIsMultiRound() ? allRoundGroups() : (currentData.scoringGroups || {});
+            const gid = Object.keys(groups).find((g) => (groups[g].playerIds || []).indexOf(pid) !== -1);
+            if (gid) { alert(`⚠️ ${who} is in ${groups[gid].name || 'a scoring group'}. Take them out of the group on Setup first.`); return; }
+            if (competitorScoreCount(currentData, pid) > 0) { alert(`⚠️ ${who} has scores. Withdraw them on Setup instead; their scores are kept.`); return; }
+        }
+        if (!confirm('Remove ' + who + '?\n\nThey come off the Desk' + (inField ? ' and out of the field' : '') + '.\n\nThis cannot be undone. They would have to sign up again.')) return;
+        if (registrationEditingId === entryId) closeRegistrationEdit();
+        signupRemoved[entryId] = true;
+        const changes = { [`registrations/${currentCode}/${entryId}`]: null };
+        if (inField) changes[`tournaments/${currentCode}/players/${pid}`] = null;
+        const code = currentCode;
+        db.ref().update(changes).then(() => {
+            db.ref(`signupSeats/${code}/${entryId}`).remove().catch(() => { /* no seat rules: nothing to delete */ });
+        }, (err) => { delete signupRemoved[entryId]; renderRegistrationDesk(); alert(`Error: ${err.message}`); });
+        renderRegistrationDesk();
+    }
+    // THE SWITCH AND THE SIZE (Setup > Registration, and the Desk's Close button).
+    function setSignupOpen(on) {
+        if (!currentCode || !canManage()) return;
+        db.ref(`tournaments/${currentCode}/signup/open`).set(!!on).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function setSignupCap(value) {
+        if (!currentCode || !canManage()) return;
+        const raw = String(value == null ? '' : value).trim();
+        const ref = db.ref(`tournaments/${currentCode}/signup/cap`);
+        if (raw === '') { ref.remove().catch((err) => alert(`Error: ${err.message}`)); return; }
+        const n = Number(raw);
+        if (!Number.isInteger(n) || n < 1 || n > SIGNUP_CAP_MAX) {
+            alert('Field size: a whole number from 1 to ' + SIGNUP_CAP_MAX + ', or empty for no limit.');
+            renderSignupSettings();
+            return;
+        }
+        ref.set(n).catch((err) => alert(`Error: ${err.message}`));
+    }
+    function renderSignupSettings() {
+        const box = document.getElementById('signup-settings');
+        if (!box) return;
+        const sw = document.getElementById('signup-open-switch');
+        if (sw) sw.checked = signupOpenOf(currentData);
+        const wrap = document.getElementById('signup-cap-wrap');
+        const note = document.getElementById('signup-cap-note');
+        const ind = recordIsIndividual();
+        if (wrap) wrap.style.display = ind ? 'block' : 'none';
+        if (note) note.style.display = ind ? 'block' : 'none';
+        const cap = document.getElementById('signup-cap');
+        if (cap && document.activeElement !== cap) { const c = signupCapOf(currentData); cap.value = c ? String(c) : ''; }
+    }
+    // THE DESK'S HEAD: golfers in the field, and with a field size the three tiles.
+    function renderSignupDeskBar() {
+        const bar = document.getElementById('signup-desk-bar');
+        if (!bar) return;
+        if (!registrationAllowed()) { bar.innerHTML = ''; return; }
+        const open = signupOpenOf(currentData);
+        const toggle = `<button type="button" class="btn-outline" id="desk-signup-toggle" style="width:auto; margin:0 0 8px 0;" onclick="setSignupOpen(${open ? 'false' : 'true'})">${open ? 'Close sign-up now' : 'Open sign-up again'}</button>`;
+        if (!recordIsIndividual()) { bar.innerHTML = toggle; return; }
+        const plan = signupPlan();
+        const n = plan.field + plan.add.length;
+        const online = Object.keys(registrationData || {}).filter((id) => !signupRemoved[id] && signupInField(id, registrationData[id] || {})).length + plan.add.length;
+        let h = `<div class="sd-head" id="desk-field-count">${n} golfer${n === 1 ? '' : 's'} in the field${open ? '' : ' · sign-up closed'}</div>`;
+        if (plan.cap) {
+            h += `<div class="sd-tiles" id="desk-signup-tiles"><div><b>${n}</b>of ${plan.cap}</div><div><b>${Math.max(0, plan.cap - n)}</b>spots left</div><div><b>${plan.wait.length}</b>waiting</div></div>`;
+        }
+        h += `<div class="reg-count-line" id="desk-online-count">${online} signed up online</div>`;
+        bar.innerHTML = h + toggle;
+    }
+
+
     function approveRegistration(entryId) {
         if (!currentCode || !canManage()) return;
         if (approvesInFlight[entryId]) return;
@@ -8199,7 +8702,7 @@ Tom Wilson, +2" oninput="previewPasteTeams()" style="width:100%; box-sizing:bord
                 id: pid,
                 name: name,
                 // A GHIN number is not a handicap; only a number that reads as one is carried.
-                handicap: (function () { const raw = String(entry.ghinOrHandicap || entry.handicap || '').trim(); return /^\+?\d{1,2}(\.\d+)?$/.test(raw) ? raw : '0'; })(),
+                handicap: signupHandicapOf(entry),
                 addedAt: Date.now()
             };
             commit({

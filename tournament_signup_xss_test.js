@@ -77,8 +77,17 @@ function approvedIntoField(rec, entry) {
     sb.__auth.setUser(ORGANIZER);
     fire(sb, new RegExp('registrations/' + CODE + '$'), { e1: entry });
     const desk = String(sb.document.getElementById('registration-list').innerHTML || '');
-    assert.match(desk, /approveRegistration\('e1'\)/, 'the desk offered no Approve for the signup');
-    vm.runInContext("approveRegistration('e1')", sb);
+    if (rec.scoringModel === 'player-v1') {
+        // RE-PINNED 2026-11-21 (SIGN-UP C, Manny's pick): an individual event has no
+        // Approve - the owner's page wrote the signup into the field when the list
+        // arrived (the same player record Approve wrote). The premise is unchanged:
+        // the typed name reaches the field.
+        assert.doesNotMatch(desk, /approveRegistration\('e1'\)/, 'an individual event offers no Approve');
+        assert.match(desk, /Signed up online/, 'positive: the signup is on the Desk');
+    } else {
+        assert.match(desk, /approveRegistration\('e1'\)/, 'the desk offered no Approve for the signup');
+        vm.runInContext("approveRegistration('e1')", sb);
+    }
     const after = applyWrites(JSON.parse(JSON.stringify(rec)), sb.__dbWrites, 'tournaments/' + CODE);
     fire(sb, new RegExp('tournaments/' + CODE + '$'), after);
     return { sb, rec: after };

@@ -429,7 +429,8 @@ describe('F. THE DEFAULT STATE: no fees node, today\'s Desk', () => {
         assert.equal((list.match(/type="checkbox"/g) || []).length, 2, 'positive: today\'s checkbox, once per row');
         assert.ok(!/reg-pay-btn|reg-refund-btn/.test(list));
         assert.ok(!/pay-tiles/.test(html(sb, 'registration-counts')));
-        assert.equal(el(sb, 'registration-desk-note').textContent, 'Tick Paid when you have the cash, then approve golfers into the field.');
+        // RE-PINNED 2026-11-21 (SIGN-UP C): on an individual event nobody is approved - the note drops that clause.
+        assert.equal(el(sb, 'registration-desk-note').textContent, 'Tick Paid when you have the cash. Golfers who sign up go straight into the field.');
         assert.match(plain(html(sb, 'registration-chips')), /^All 2 Unpaid 1 Paid 1/);
     });
     test('F2 even with no fees, an entry Stripe touched gets no checkbox and no Undo', () => {

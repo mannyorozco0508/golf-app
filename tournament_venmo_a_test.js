@@ -153,7 +153,8 @@ describe('V. VENMO A', () => {
         deskTab(sb);
         const list = html(sb, 'registration-list');
         assert.match(rowOf(list, 'e3'), /<input type="checkbox" onchange="setRegistrationPaid\('e3', this\.checked\)"> Paid/);
-        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Arrived 0 Not arrived 5 Unpaid 1 Paid 4 Approved 5 Not yet approved 0 Photos 0');
+        // RE-PINNED 2026-11-21 (SIGN-UP C): an individual event's state chips read "In the field" / "Waiting list" (no Approve).
+        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Arrived 0 Not arrived 5 Unpaid 1 Paid 4 In the field 5 Waiting list 0 Photos 0');
         assert.doesNotMatch(plain(html(sb, 'manage-tab-desk')), /venmo|paypal/i);
         assert.equal(html(sb, 'pay-in-tiles' in sb.document.__registry ? 'pay-in-tiles' : 'registration-counts').indexOf('in so far'), -1);
         assert.equal(el(sb, 'ev-pay-note').style.display, 'none');
@@ -251,7 +252,8 @@ describe('V. VENMO A', () => {
         const list = html(sb, 'registration-list');
         assert.match(rowOf(list, 'e3'), /<input type="checkbox" onchange="setRegistrationPaid\('e3', this\.checked\)"> Paid/);
         assert.doesNotMatch(list, /reg-via-venmo|Paid \(Venmo\)/);
-        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Arrived 0 Not arrived 5 Unpaid 1 Paid 4 Approved 5 Not yet approved 0 Photos 0');
+        // RE-PINNED 2026-11-21 (SIGN-UP C): an individual event's state chips read "In the field" / "Waiting list" (no Approve).
+        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Arrived 0 Not arrived 5 Unpaid 1 Paid 4 In the field 5 Waiting list 0 Photos 0');
         assert.doesNotMatch(html(sb, 'registration-counts'), /in so far/);
         vm.runInContext("setPaidVia('e3', 'venmo')", sb);
         assert.deepEqual(writes(sb, /registrations\/STK\/e3$/), [], 'no value the live rules would refuse');
@@ -281,13 +283,15 @@ describe('V. VENMO A', () => {
         tap(sb, rowOf(list, 'e1'), byClass('reg-undo-btn'));
         w = writes(sb, /registrations\/STK\/e1$/);
         assert.deepEqual(w[0].value, { paid: false, paidAt: null, paidVia: null });
-        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Arrived 0 Not arrived 5 Unpaid 1 Paid 4 Venmo 1 PayPal 1 Cash 1 Approved 5 Not yet approved 0 Photos 0');
+        // RE-PINNED 2026-11-21 (SIGN-UP C): an individual event's state chips read "In the field" / "Waiting list" (no Approve).
+        assert.equal(plain(html(sb, 'registration-chips')), 'All 5 Arrived 0 Not arrived 5 Unpaid 1 Paid 4 Venmo 1 PayPal 1 Cash 1 In the field 5 Waiting list 0 Photos 0');
         const counts = html(sb, 'registration-counts');
         // Manny 2026-11-16: the tile and the "Fees collected" line count the SAME payers - four paid, the card one too.
         assert.match(counts, /<b id="pay-tile-in">\$400<\/b><span>in so far \(4 paid · \$100 each\)<\/span>/, 'every paid entry times the fee, the card payment included');
         assert.match(counts, /<b id="pay-tile-by">1 · 1 · 1 · 1<\/b><span>Venmo · PayPal · cash · card<\/span>/, 'the split adds up to the four');
         assert.match(counts, /Fees collected \$400 · 4 paid × \$100 per golfer/);
-        assert.match(el(sb, 'registration-desk-note').textContent, /Tap Venmo, PayPal or Cash beside a golfer when the money lands, then approve golfers into the field\. HardPan never holds or moves money; these buttons open Venmo or PayPal\.$/);
+        // RE-PINNED 2026-11-21 (SIGN-UP C): an individual event drops the approve clause from the note.
+        assert.match(el(sb, 'registration-desk-note').textContent, /Tap Venmo, PayPal or Cash beside a golfer when the money lands\. Golfers who sign up go straight into the field\. HardPan never holds or moves money; these buttons open Venmo or PayPal\.$/);
         const vm2 = arriveOwner(rec({ payTo: PAY_TO }), regs());
         vm.runInContext("setPaidVia('e5', 'venmo')", vm2);
         assert.deepEqual(writes(vm2, /e5$/), [], 'a Stripe entry is never re-marked here');
@@ -359,7 +363,8 @@ describe('V. VENMO A', () => {
         const by = /<b id="pay-tile-by">([\d · ]+)<\/b><span>([^<]+)<\/span>/.exec(counts);
         assert.equal(by[1], '1 · 1 · 2 · 1'); assert.equal(by[2], 'Venmo · PayPal · cash · card');
         assert.equal(by[1].split(' · ').reduce((a, n) => a + Number(n), 0), 5, 'the split adds up to the count');
-        assert.equal(plain(html(sb, 'registration-chips')), 'All 7 Arrived 0 Not arrived 7 Unpaid 2 Paid 5 Venmo 1 PayPal 1 Cash 2 Approved 7 Not yet approved 0 Photos 0');
+        // RE-PINNED 2026-11-21 (SIGN-UP C): an individual event's state chips read "In the field" / "Waiting list" (no Approve).
+        assert.equal(plain(html(sb, 'registration-chips')), 'All 7 Arrived 0 Not arrived 7 Unpaid 2 Paid 5 Venmo 1 PayPal 1 Cash 2 In the field 7 Waiting list 0 Photos 0');
         // no card payment in: three figures, three words
         const noCard = regs({ e5: Object.assign(regs().e5, { paid: false, paidVia: null, amountCents: null }) });
         const sb2 = arriveOwner(rec({ payTo: PAY_TO }), noCard);

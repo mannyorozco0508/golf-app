@@ -136,7 +136,13 @@ describe('3. THE ROWS - a badge per state, the words "In the field" once per app
     test('individual event: Unpaid / Paid / In the field badges, never Needs a team', () => {
         const sb = arrive(individualRecord(), deskEntries('individual'));
         const list = html(sb, 'registration-list');
-        assert.equal(count(list, /reg-state-field/g), TOTALS.inField);
+        // RE-PINNED 2026-11-21 (SIGN-UP C): on an individual event with no field size
+        // every signup goes into the field by itself - the 14 already there read
+        // "In the field", the other 128 "Adding to the field" until the write lands.
+        assert.equal(count(list, /reg-state-field/g), TOTALS.entries);
+        assert.equal(count(list, /reg-state-field">In the field</g), TOTALS.inField);
+        assert.equal(count(list, /Signed up online/g), TOTALS.entries);
+        assert.equal(count(list, /Approve into field/g), 0);
         assert.equal(count(list, /reg-state-needs|Needs a team/g), 0);
     });
 });

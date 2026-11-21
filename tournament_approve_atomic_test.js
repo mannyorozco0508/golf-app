@@ -62,7 +62,10 @@ function desk(rec, opts) {
     sb.__dbHandlers.filter((x) => x.event === 'value' && new RegExp('registrations/' + CODE + '$').test(x.path))
         .forEach((x) => x.cb({ val: () => JSON.parse(JSON.stringify(ENTRIES)), exists: () => true }));
     const desk = String(sb.document.getElementById('registration-list').innerHTML);
-    assert.match(desk, /approveRegistration\('e1'\)/, 'the desk offered no Approve');
+    // RE-PINNED 2026-11-21 (SIGN-UP C): an individual event has no Approve; the
+    // owner's page adds the signup to the field itself (the individual test below).
+    if (rec.scoringModel !== 'player-v1') assert.match(desk, /approveRegistration\('e1'\)/, 'the desk offered no Approve');
+    else assert.doesNotMatch(desk, /approveRegistration\('e1'\)/, 'an individual event offers no Approve');
     return { sb, held };
 }
 // The row's own button: onclick="approveRegistration('<id>')".
@@ -84,10 +87,9 @@ describe('A5. one approve, one write', () => {
         assert.equal(w[0].value['registrations/APP1/e1/teamNum'], 2);
     });
 
-    test('so does an individual approve: the player and the entry’s playerId together', () => {
+    test('so does an individual sign-up going into the field: the player and the entry’s playerId together (SIGN-UP C: written by the page, no tap)', () => {
         const { sb } = desk(indRec());
-        tap(sb, 'e1');
-        const w = approveWrites(sb);
+        const w = approveWrites(sb).filter((x) => x.op === 'update' && Object.keys(x.value || {}).some((k) => /registrations\/APP1\/e1\/playerId$/.test(k)));
         assert.equal(w.length, 1, JSON.stringify(w));
         const pKey = Object.keys(w[0].value).find((k) => /^tournaments\/APP1\/players\//.test(k));
         assert.ok(pKey, 'no player in the write');

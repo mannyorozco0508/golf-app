@@ -281,7 +281,8 @@ describe('B. THE DESK (the organizer, a tap on the Desk tab)', () => {
         assert.match(counts, /<b id="ci-tile-unpaid">3<\/b><span>unpaid · \$85 entry<\/span>/);
         assert.match(plain(html(sb, 'registration-counts')), /^32 signups · 29 paid · 32 in the field/, 'today\'s counts line is still there, first');
         const chips = plain(html(sb, 'registration-chips'));
-        assert.equal(chips, 'All 32 Arrived 22 Not arrived 10 Unpaid 3 Paid 29 Approved 32 Not yet approved 0 Photos 0');
+        // RE-PINNED 2026-11-21 (SIGN-UP C): an individual event has no Approve, so its two state chips read "In the field" / "Waiting list".
+        assert.equal(chips, 'All 32 Arrived 22 Not arrived 10 Unpaid 3 Paid 29 In the field 32 Waiting list 0 Photos 0');
         const list = html(sb, 'registration-list');
         assert.match(plain(rowOf(list, f.ids['Lee Park'])), /In the field Arrived 7:28 by the organizer Undo arrival/);
         assert.match(plain(rowOf(list, f.ids['Ray Diaz'])), /Arrived 7:41 at the table Undo arrival/);
