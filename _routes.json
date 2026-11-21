@@ -14,6 +14,7 @@
     "/tournament-tv",
     "/tournaments",
     "/tournaments/",
+    "/m/*",
     "/tools",
     "/tools/*",
     "/helpers",

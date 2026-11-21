@@ -4,6 +4,7 @@
       {
         "appIDs": ["A2Z95T64UU.com.rattlegolf.app"],
         "components": [
+          { "/": "/m/*", "comment": "2.1.1 Invite: a round's short invite link hardpangolf.com/m/<CODE> opens the app's Join (hp-email-link-open.js gameTarget). Ahead of the excludes. Deploy only once a store app that handles /m/ is approved: every installed app from 2.0.7 lists applinks:hardpangolf.com. Advisor 2026-11-21." },
           { "/": "/tournament-scorecard*", "exclude": true, "comment": "Team scorecard links stay in the browser until the app ships the in-app card (2.0.6). Manny, 2026-11-10." },
           { "/": "/tournament*", "exclude": true, "comment": "Tournament pages stay in the browser." },
           { "/": "*", "exclude": true, "comment": "Nothing on this host opens the app yet." }

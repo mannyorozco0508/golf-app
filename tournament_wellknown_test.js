@@ -25,6 +25,10 @@
 // THE EMAIL SIGN-IN LINK IS NOT TOUCHED: it lives on golfapp-9fb21.firebaseapp.com
 // (Firebase Hosting), which nothing here serves or changes.
 //
+// 2.1.1 INVITE (Advisor 2026-11-21, branch preview-invite-211): test 1 now allows exactly ONE claim, /m/* (a round's
+// short invite link; m_invite_link_test.js guards its order and the redirect). Every other component still excludes.
+// Against 0b8febf7 this file is 5/0; with the /m/* line and the old test 1 it is 4/1 - this edit is the deliberate re-pin.
+//
 // TESTS: 5. BASELINE against live main 4cf836a4 (AASA excludes only,
 // assetlinks.json NOT served, no _headers rule for it):
 //
@@ -68,7 +72,7 @@ let M = null;
 before(async () => { M = await import(pathToFileURL(path.join(ROOT, 'functions', '_middleware.js')).href); });
 
 describe('P1-e association files', () => {
-    test('1. the AASA: the Rattle Golf app, and every component excludes - no path is claimed', () => {
+    test('1. the AASA: the Rattle Golf app, and every component but /m/* excludes - no other path is claimed', () => {
         const j = JSON.parse(read(AASA));
         const details = j.applinks && j.applinks.details;
         assert.equal(details.length, 1);
@@ -76,7 +80,9 @@ describe('P1-e association files', () => {
         const comps = details[0].components;
         assert.ok(comps.length >= 1, 'positive: the file has components');
         assert.ok(comps.some((c) => c['/'] === '/tournament-scorecard*' && c.exclude === true), 'team links excluded by name');
-        comps.forEach((c) => assert.equal(c.exclude, true, 'a component that claims: ' + c['/']));
+        // 2.1.1 Invite (Advisor 2026-11-21, m_invite_link_test.js): /m/* - a round's short invite link - is the ONE claim.
+        assert.deepEqual(comps.filter((c) => c.exclude !== true).map((c) => c['/']), ['/m/*'], 'the only claim is /m/*');
+        comps.filter((c) => c['/'] !== '/m/*').forEach((c) => assert.equal(c.exclude, true, 'a component that claims: ' + c['/']));
         const claims = (p) => comps.some((c) => !c.exclude && aasaMatch(c['/'], p));
         ['/tournament-scorecard', '/tournament-scorecard.html', '/tournament', '/tournament.html', '/', '/app', '/index.html',
             '/admin', '/admin.html', '/game.html', '/trip.html', '/__/auth/handler', '/__/auth/links'].forEach((p) =>
